@@ -1,0 +1,174 @@
+{
+  "_meta": {
+    "type": "referentiel",
+    "nom": "Conformité FFR",
+    "version": "1.1",
+    "date_creation": "2026-05-08",
+    "date_maj": "2026-05-09",
+    "description": "Règles réglementaires FFR - Le Hub avertit, ne bloque pas",
+    "philosophie": "2 niveaux d'avertissement (Orange : vigilance / Rouge : risque réel). Décision finale au coach.",
+    "reference_reglementaire": "Règlement Sportif LRGER 2024-2025",
+    "_changelog": [
+      "1.0 (2026-05-08) - Création initiale, 12 règles couvrant JDD/ASR, certificats médicaux, surclassements, doublons, effectifs XV/X/7",
+      "1.1 (2026-05-09) - Ajout du format 13 (M14 pédago FFR) : règle JDD format 13 et règle effectif feuille de match format 13. Cohérent avec l'ajout du format 13 dans postes.json v1.1."
+    ]
+  },
+  "regles": [
+    {
+      "uuid": "rgl-jdd-m14",
+      "code": "RGL-JDD-M14",
+      "libelle": "Passeport JDD (Joueur de Devant) requis pour 1ère ligne",
+      "categories_applicables": ["M-14", "F-15"],
+      "formats_applicables": ["XV"],
+      "type_competition": ["compétition_officielle"],
+      "type_regle": "aptitude_requise_par_poste",
+      "condition": "Tous les joueurs titulaires aux postes 1, 2 et 3 doivent avoir leur passeport JDD validé",
+      "severite": "rouge",
+      "message_alerte": "Le joueur [Nom] n'a pas son passeport JDD validé alors qu'il occupe le poste de [Poste]. Le match risque d'être invalidé.",
+      "action_suggeree": "Choisir un autre joueur ou faire valider le passeport JDD avant le match.",
+      "source": "Règlement FFR"
+    },
+    {
+      "uuid": "rgl-jdd-m14-f13",
+      "code": "RGL-JDD-M14-F13",
+      "libelle": "Passeport JDD (Joueur de Devant) requis pour 1ère ligne au format 13",
+      "categories_applicables": ["M-14", "F-15"],
+      "formats_applicables": ["13"],
+      "type_competition": ["compétition_officielle"],
+      "type_regle": "aptitude_requise_par_poste",
+      "condition": "Tous les joueurs titulaires aux postes 1 (Pilier G), 2 (Talonneur) et 3 (Pilier D) doivent avoir leur passeport JDD validé. La mêlée fonctionne sur le même principe qu'en XV.",
+      "severite": "rouge",
+      "message_alerte": "Le joueur [Nom] n'a pas son passeport JDD validé alors qu'il occupe le poste de [Poste]. Le match risque d'être invalidé.",
+      "action_suggeree": "Choisir un autre joueur ou faire valider le passeport JDD avant le match.",
+      "source": "Règlement FFR (déduction par cohérence avec règle XV M14)",
+      "_note": "À confirmer avec le règlement LRGER 2025-2026 spécifique au format 13 M14"
+    },
+    {
+      "uuid": "rgl-jdd-m14-effectif",
+      "code": "RGL-JDD-M14-EFFECTIF",
+      "libelle": "Effectif minimum JDD sur feuille de match",
+      "categories_applicables": ["M-14", "F-15"],
+      "formats_applicables": ["XV"],
+      "type_regle": "effectif_minimum",
+      "condition": "Au moins 12 joueurs avec JDD validé doivent figurer sur la feuille de match",
+      "severite": "rouge",
+      "message_alerte": "Seulement [N] joueurs avec JDD validé sur la feuille (minimum 12 requis).",
+      "action_suggeree": "Compléter l'effectif JDD ou alerter sur le risque de match invalidé."
+    },
+    {
+      "uuid": "rgl-jdd-m16-m19",
+      "code": "RGL-JDD-M16M19",
+      "libelle": "Passeport JDD requis 1ère ligne M16/M19",
+      "categories_applicables": ["M-16", "M-19"],
+      "formats_applicables": ["XV"],
+      "type_regle": "aptitude_requise_par_poste",
+      "condition": "Tous les joueurs aux postes 1, 2 et 3 doivent avoir passeport JDD",
+      "severite": "rouge",
+      "message_alerte": "Joueur sans JDD au poste de première ligne en M-16/M-19."
+    },
+    {
+      "uuid": "rgl-jdd-seniors",
+      "code": "RGL-JDD-SENIORS",
+      "libelle": "Passeport 1ère et 2ème ligne en Seniors",
+      "categories_applicables": ["M+18"],
+      "formats_applicables": ["XV"],
+      "type_regle": "aptitude_requise_par_poste",
+      "condition": "Postes 1 à 5 doivent avoir passeport spécifique première/deuxième ligne",
+      "severite": "rouge",
+      "message_alerte": "Joueur sans passeport adéquat aux postes 1-5 en Seniors."
+    },
+    {
+      "uuid": "rgl-asr-m14",
+      "code": "RGL-ASR-M14",
+      "libelle": "Passeport ASR (Arbitre Sportif Recommandé)",
+      "categories_applicables": ["M-14", "F-15"],
+      "type_regle": "aptitude_recommandee",
+      "condition": "Passeport ASR recommandé pour tous les joueurs (sensibilisation arbitrage)",
+      "severite": "orange",
+      "message_alerte": "Joueurs sans passeport ASR. Sensibilisation arbitrage recommandée."
+    },
+    {
+      "uuid": "rgl-med-valide",
+      "code": "RGL-MED-VALIDE",
+      "libelle": "Certificat médical valide",
+      "categories_applicables": ["toutes"],
+      "type_regle": "document_obligatoire",
+      "condition": "Certificat médical de moins d'un an pour tous les joueurs convoqués",
+      "severite": "rouge",
+      "message_alerte": "Joueur(s) sans certificat médical valide.",
+      "action_suggeree": "Vérifier la validité du certificat médical avant la convocation."
+    },
+    {
+      "uuid": "rgl-surcl-m14-m16",
+      "code": "RGL-SURCL-M14-M16",
+      "libelle": "Surclassement M-14 vers M-16",
+      "categories_applicables": ["M-14"],
+      "type_regle": "validation_surclassement",
+      "condition": "Surclassement médical validé + accord parental requis",
+      "severite": "rouge",
+      "message_alerte": "Joueur M-14 surclassé en M-16 sans validation complète."
+    },
+    {
+      "uuid": "rgl-surcl-m16-m19",
+      "code": "RGL-SURCL-M16-M19",
+      "libelle": "Surclassement M-16 vers M-19",
+      "categories_applicables": ["M-16"],
+      "type_regle": "validation_surclassement",
+      "condition": "Surclassement médical validé + accord parental",
+      "severite": "rouge",
+      "message_alerte": "Joueur M-16 surclassé en M-19 sans validation complète."
+    },
+    {
+      "uuid": "rgl-doublon-jour",
+      "code": "RGL-DOUBLON-MEMEJOURNEE",
+      "libelle": "Doublon convocation même jour",
+      "categories_applicables": ["toutes"],
+      "type_regle": "combinaison_interdite",
+      "condition": "Un joueur ne peut pas être convoqué dans deux compétitions le même jour",
+      "severite": "orange",
+      "message_alerte": "Le joueur est aussi convoqué pour une autre compétition le même jour.",
+      "action_suggeree": "Vérifier la priorité ou choisir un autre joueur."
+    },
+    {
+      "uuid": "rgl-effectif-xv",
+      "code": "RGL-EFFECTIF-XV",
+      "libelle": "Effectif feuille de match à XV",
+      "formats_applicables": ["XV"],
+      "type_regle": "effectif_minimum_maximum",
+      "condition": "Entre 15 et 23 joueurs sur la feuille de match",
+      "severite": "rouge",
+      "message_alerte": "Effectif feuille match : [N] joueurs (autorisé 15-23)."
+    },
+    {
+      "uuid": "rgl-effectif-13",
+      "code": "RGL-EFFECTIF-13",
+      "libelle": "Effectif feuille de match au format 13",
+      "formats_applicables": ["13"],
+      "type_regle": "effectif_minimum_maximum",
+      "condition": "Entre 13 et 21 joueurs sur la feuille de match (13 titulaires + max 8 remplaçants)",
+      "severite": "rouge",
+      "message_alerte": "Effectif feuille match : [N] joueurs (autorisé 13-21).",
+      "_note": "À confirmer avec le règlement LRGER 2025-2026 spécifique au format 13 M14. Valeur déduite par cohérence avec la règle XV (15+8 remplaçants max)."
+    },
+    {
+      "uuid": "rgl-effectif-x",
+      "code": "RGL-EFFECTIF-X",
+      "libelle": "Effectif feuille de match à X",
+      "formats_applicables": ["X"],
+      "type_regle": "effectif_minimum_maximum",
+      "condition": "Entre 10 et 20 joueurs sur la feuille de match",
+      "severite": "rouge",
+      "message_alerte": "Effectif feuille match : [N] joueurs (autorisé 10-20)."
+    },
+    {
+      "uuid": "rgl-effectif-7",
+      "code": "RGL-EFFECTIF-7",
+      "libelle": "Effectif feuille de match à 7",
+      "formats_applicables": ["7"],
+      "type_regle": "effectif_minimum_maximum",
+      "condition": "Entre 7 et 12 joueurs sur la feuille de match",
+      "severite": "rouge",
+      "message_alerte": "Effectif feuille match : [N] joueurs (autorisé 7-12)."
+    }
+  ]
+}

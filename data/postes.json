@@ -1,0 +1,232 @@
+{
+  "_meta": {
+    "type": "referentiel",
+    "nom": "Postes",
+    "version": "1.1",
+    "date_creation": "2026-05-08",
+    "date_maj": "2026-05-09",
+    "description": "Référentiel des postes du rugby selon les formats de jeu",
+    "source": "Règlement FFR + pratiques SAR×MOM Compos",
+    "_changelog": [
+      "1.0 (2026-05-08) - Création initiale, 15 postes XV + regroupements tactiques",
+      "1.1 (2026-05-09) - Ajout du format 13 (rugby pédagogique M14 FFR) : 3 en 1ère ligne, 2 en 2ème ligne, 1 seul en 3ème ligne (N°8), puis comme XV. Les Flankers (3LG, 3LD) ne sont pas applicables au format 13."
+    ]
+  },
+  "postes_precis": [
+    {
+      "uuid": "pst-001",
+      "code": "PG",
+      "libelle_court": "Pilier G",
+      "libelle_long": "Pilier gauche",
+      "numero_maillot_default": 1,
+      "categorie_poste": "Première ligne",
+      "formats_applicables": ["XV", "13", "X"],
+      "description": "Joueur de devant, côté gauche de la mêlée"
+    },
+    {
+      "uuid": "pst-002",
+      "code": "TAL",
+      "libelle_court": "Talonneur",
+      "libelle_long": "Talonneur",
+      "numero_maillot_default": 2,
+      "categorie_poste": "Première ligne",
+      "formats_applicables": ["XV", "13", "X"],
+      "description": "Joueur de devant central, talonne en mêlée et lance en touche"
+    },
+    {
+      "uuid": "pst-003",
+      "code": "PD",
+      "libelle_court": "Pilier D",
+      "libelle_long": "Pilier droit",
+      "numero_maillot_default": 3,
+      "categorie_poste": "Première ligne",
+      "formats_applicables": ["XV", "13", "X"],
+      "description": "Joueur de devant, côté droit de la mêlée"
+    },
+    {
+      "uuid": "pst-004",
+      "code": "2LG",
+      "libelle_court": "2L G",
+      "libelle_long": "Deuxième ligne gauche",
+      "numero_maillot_default": 4,
+      "categorie_poste": "Deuxième ligne",
+      "formats_applicables": ["XV", "13"],
+      "description": "Sauteur en touche, pousseur en mêlée"
+    },
+    {
+      "uuid": "pst-005",
+      "code": "2LD",
+      "libelle_court": "2L D",
+      "libelle_long": "Deuxième ligne droite",
+      "numero_maillot_default": 5,
+      "categorie_poste": "Deuxième ligne",
+      "formats_applicables": ["XV", "13"],
+      "description": "Sauteur en touche, pousseur en mêlée"
+    },
+    {
+      "uuid": "pst-006",
+      "code": "3LG",
+      "libelle_court": "Flanker G",
+      "libelle_long": "Troisième ligne aile gauche",
+      "numero_maillot_default": 6,
+      "categorie_poste": "Troisième ligne",
+      "formats_applicables": ["XV", "X"],
+      "description": "Joueur polyvalent, plaqueur, gratteur. Non applicable au format 13."
+    },
+    {
+      "uuid": "pst-007",
+      "code": "3LD",
+      "libelle_court": "Flanker D",
+      "libelle_long": "Troisième ligne aile droite",
+      "numero_maillot_default": 7,
+      "categorie_poste": "Troisième ligne",
+      "formats_applicables": ["XV", "X"],
+      "description": "Joueur polyvalent, plaqueur, gratteur. Non applicable au format 13."
+    },
+    {
+      "uuid": "pst-008",
+      "code": "N8",
+      "libelle_court": "N°8",
+      "libelle_long": "Numéro 8",
+      "numero_maillot_default": 8,
+      "categorie_poste": "Troisième ligne",
+      "formats_applicables": ["XV", "13", "X"],
+      "description": "Pivot de l'équipe, lien avec les arrières. En format 13, seul joueur de 3ème ligne (poste centre)."
+    },
+    {
+      "uuid": "pst-009",
+      "code": "DM",
+      "libelle_court": "Demi de mêlée",
+      "libelle_long": "Demi de mêlée",
+      "numero_maillot_default": 9,
+      "categorie_poste": "Demis",
+      "formats_applicables": ["XV", "13", "X", "7"],
+      "description": "Distributeur près des phases statiques"
+    },
+    {
+      "uuid": "pst-010",
+      "code": "DO",
+      "libelle_court": "Demi d'ouverture",
+      "libelle_long": "Demi d'ouverture",
+      "numero_maillot_default": 10,
+      "categorie_poste": "Demis",
+      "formats_applicables": ["XV", "13", "X", "7"],
+      "description": "Stratège, jeu au pied, lance les attaques"
+    },
+    {
+      "uuid": "pst-011",
+      "code": "AG",
+      "libelle_court": "Ailier G",
+      "libelle_long": "Ailier gauche",
+      "numero_maillot_default": 11,
+      "categorie_poste": "Ailiers",
+      "formats_applicables": ["XV", "13", "X", "7"],
+      "description": "Finisseur, vitesse pure, plaqueur dans le couloir"
+    },
+    {
+      "uuid": "pst-012",
+      "code": "CG",
+      "libelle_court": "Centre G",
+      "libelle_long": "Centre gauche (premier centre)",
+      "numero_maillot_default": 12,
+      "categorie_poste": "Centres",
+      "formats_applicables": ["XV", "13", "X", "7"],
+      "description": "Premier centre, percutant, distributeur"
+    },
+    {
+      "uuid": "pst-013",
+      "code": "CD",
+      "libelle_court": "Centre D",
+      "libelle_long": "Centre droit (deuxième centre)",
+      "numero_maillot_default": 13,
+      "categorie_poste": "Centres",
+      "formats_applicables": ["XV", "13", "X", "7"],
+      "description": "Deuxième centre, vitesse, jeu au large"
+    },
+    {
+      "uuid": "pst-014",
+      "code": "AD",
+      "libelle_court": "Ailier D",
+      "libelle_long": "Ailier droit",
+      "numero_maillot_default": 14,
+      "categorie_poste": "Ailiers",
+      "formats_applicables": ["XV", "13", "X", "7"],
+      "description": "Finisseur, vitesse pure, plaqueur dans le couloir"
+    },
+    {
+      "uuid": "pst-015",
+      "code": "AR",
+      "libelle_court": "Arrière",
+      "libelle_long": "Arrière",
+      "numero_maillot_default": 15,
+      "categorie_poste": "Arrière",
+      "formats_applicables": ["XV", "13", "X", "7"],
+      "description": "Dernière défense, jeu au pied, contre-attaque"
+    }
+  ],
+  "postes_regroupes": [
+    {
+      "uuid": "pst-grp-001",
+      "code": "PIL",
+      "libelle": "Piliers",
+      "description": "Piliers gauche ou droit (substituables tactiquement)",
+      "postes_inclus": ["pst-001", "pst-003"]
+    },
+    {
+      "uuid": "pst-grp-002",
+      "code": "2L",
+      "libelle": "2èmes lignes",
+      "description": "Deuxièmes lignes gauche ou droite",
+      "postes_inclus": ["pst-004", "pst-005"]
+    },
+    {
+      "uuid": "pst-grp-003",
+      "code": "3L",
+      "libelle": "3èmes lignes",
+      "description": "Troisièmes lignes (Flanker G, Flanker D, N°8). En format 13, seul le N°8 est présent.",
+      "postes_inclus": ["pst-006", "pst-007", "pst-008"]
+    },
+    {
+      "uuid": "pst-grp-004",
+      "code": "CTR",
+      "libelle": "Centres",
+      "description": "Centre gauche ou droit",
+      "postes_inclus": ["pst-012", "pst-013"]
+    },
+    {
+      "uuid": "pst-grp-005",
+      "code": "AIL",
+      "libelle": "Ailiers",
+      "description": "Ailier gauche ou droit",
+      "postes_inclus": ["pst-011", "pst-014"]
+    }
+  ],
+  "structures_par_format": {
+    "_documentation": "Structure attendue selon le format de jeu : nombre de joueurs par catégorie de poste sur le terrain.",
+    "XV": {
+      "nb_titulaires": 15,
+      "premiere_ligne": 3,
+      "deuxieme_ligne": 2,
+      "troisieme_ligne": 3,
+      "demis": 2,
+      "trois_quarts": 5
+    },
+    "13": {
+      "nb_titulaires": 13,
+      "premiere_ligne": 3,
+      "deuxieme_ligne": 2,
+      "troisieme_ligne": 1,
+      "demis": 2,
+      "trois_quarts": 5,
+      "_note": "Format pédagogique FFR pour les jeunes (M14). 3ème ligne réduite au seul N°8."
+    },
+    "X": {
+      "nb_titulaires": 10,
+      "_note": "Postes applicables : PG, TAL, PD, 3LG, 3LD, N8, DM, DO, AG, CG, CD, AD, AR (à structurer plus précisément si besoin)."
+    },
+    "7": {
+      "nb_titulaires": 7,
+      "_note": "Postes applicables : DM, DO, AG, CG, CD, AD, AR (à structurer plus précisément si besoin)."
+    }
+  }
+}

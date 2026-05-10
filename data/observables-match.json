@@ -1,0 +1,194 @@
+{
+  "_meta": {
+    "type": "referentiel",
+    "nom": "Observables match",
+    "version": "1.0",
+    "date_creation": "2026-05-08",
+    "description": "Événements observables pendant un match. Catégorie A universelle + Catégorie B paramétrable par catégorie d'âge",
+    "asymetrie_sar_mom": "Interface détaillée pour SAR/MOM, simplifiée pour adversaire (+5/+2/+3/+3/-1)"
+  },
+  "categorie_A": {
+    "score": [
+      {
+        "uuid": "obs-A-essai",
+        "libelle_court": "Essai",
+        "libelle_long": "Essai marqué",
+        "type": "score",
+        "points": 5,
+        "icone": "🏉",
+        "couleur": "#2E8B57",
+        "saisie_associee": ["joueur"],
+        "reversible": true
+      },
+      {
+        "uuid": "obs-A-transfo",
+        "libelle_court": "Transformation",
+        "libelle_long": "Transformation réussie",
+        "type": "score",
+        "points": 2,
+        "icone": "✅",
+        "couleur": "#4169E1",
+        "saisie_associee": ["joueur"],
+        "reversible": true,
+        "filtre_aptitude": "apt-A-004"
+      },
+      {
+        "uuid": "obs-A-penalite",
+        "libelle_court": "Pénalité réussie",
+        "libelle_long": "Pénalité bottée réussie",
+        "type": "score",
+        "points": 3,
+        "icone": "🎯",
+        "couleur": "#FF8C00",
+        "saisie_associee": ["joueur"],
+        "reversible": true,
+        "filtre_aptitude": "apt-A-004"
+      },
+      {
+        "uuid": "obs-A-drop",
+        "libelle_court": "Drop réussi",
+        "libelle_long": "Drop-goal réussi",
+        "type": "score",
+        "points": 3,
+        "icone": "💥",
+        "couleur": "#9370DB",
+        "saisie_associee": ["joueur"],
+        "reversible": true
+      }
+    ],
+    "discipline": [
+      {
+        "uuid": "obs-A-jaune",
+        "libelle_court": "Carton jaune",
+        "libelle_long": "Carton jaune (10 min d'exclusion)",
+        "type": "discipline",
+        "icone": "🟨",
+        "couleur": "#FFD700",
+        "saisie_associee": ["joueur", "motif_optionnel"],
+        "reversible": true
+      },
+      {
+        "uuid": "obs-A-rouge",
+        "libelle_court": "Carton rouge",
+        "libelle_long": "Carton rouge (exclusion définitive)",
+        "type": "discipline",
+        "icone": "🟥",
+        "couleur": "#DC143C",
+        "saisie_associee": ["joueur", "motif_optionnel"],
+        "reversible": true
+      },
+      {
+        "uuid": "obs-A-avertissement",
+        "libelle_court": "Avertissement",
+        "libelle_long": "Avertissement arbitre",
+        "type": "discipline",
+        "icone": "⚠",
+        "couleur": "#FFA500",
+        "saisie_associee": ["joueur"],
+        "reversible": true
+      }
+    ],
+    "mouvement": [
+      {
+        "uuid": "obs-A-substitution",
+        "libelle_court": "Substitution",
+        "libelle_long": "Remplacement (sortant + entrant)",
+        "type": "mouvement",
+        "icone": "🔄",
+        "couleur": "#708090",
+        "saisie_associee": ["joueur_sortant", "joueur_entrant"],
+        "reversible": true
+      },
+      {
+        "uuid": "obs-A-blessure",
+        "libelle_court": "Blessure",
+        "libelle_long": "Blessure signalée",
+        "type": "mouvement",
+        "icone": "🩹",
+        "couleur": "#B22222",
+        "saisie_associee": ["joueur", "nature_optionnelle"],
+        "reversible": true
+      }
+    ],
+    "jeu_collectif": [
+      {
+        "uuid": "obs-A-melee-gagnee",
+        "libelle_court": "Mêlée gagnée",
+        "type": "jeu_collectif",
+        "couleur": "#2E8B57",
+        "reversible": true
+      },
+      {
+        "uuid": "obs-A-melee-perdue",
+        "libelle_court": "Mêlée perdue",
+        "type": "jeu_collectif",
+        "couleur": "#8B0000",
+        "reversible": true
+      },
+      {
+        "uuid": "obs-A-touche-gagnee",
+        "libelle_court": "Touche gagnée",
+        "type": "jeu_collectif",
+        "couleur": "#2E8B57",
+        "reversible": true
+      },
+      {
+        "uuid": "obs-A-touche-perdue",
+        "libelle_court": "Touche perdue",
+        "type": "jeu_collectif",
+        "couleur": "#8B0000",
+        "reversible": true
+      }
+    ]
+  },
+  "categorie_B_pre_suggestions": {
+    "EDR_M-6_M-8_M-10_M-12": [
+      {"libelle": "A attaqué l'espace libre"},
+      {"libelle": "A passé à 2 mains"},
+      {"libelle": "S'est porté en soutien"},
+      {"libelle": "A su déclencher au bon moment"},
+      {"libelle": "Plaquage à 2 mains"},
+      {"libelle": "A respecté l'arbitre"}
+    ],
+    "M-14_F-15": [
+      {"libelle": "Choix d'orientation pertinent"},
+      {"libelle": "Lecture de l'intervalle"},
+      {"libelle": "Continuité offensive"},
+      {"libelle": "Densité défensive"},
+      {"libelle": "Plaquage offensif"},
+      {"libelle": "Soutien intérieur"},
+      {"libelle": "Récupération au sol"}
+    ],
+    "M-16_M-19": [
+      {"libelle": "Choix d'orientation pertinent"},
+      {"libelle": "Lecture de l'intervalle"},
+      {"libelle": "Continuité offensive"},
+      {"libelle": "Densité défensive"},
+      {"libelle": "Plaquage offensif"},
+      {"libelle": "Soutien intérieur"},
+      {"libelle": "Récupération au sol"},
+      {"libelle": "Maîtrise au sol (rucks)"},
+      {"libelle": "Adaptation aux décisions arbitrales"}
+    ],
+    "F-18": [
+      {"libelle": "Choix d'orientation pertinent"},
+      {"libelle": "Lecture de l'intervalle"},
+      {"libelle": "Continuité offensive"},
+      {"libelle": "Densité défensive"},
+      {"libelle": "Plaquage offensif"},
+      {"libelle": "Soutien intérieur"},
+      {"libelle": "Récupération au sol"},
+      {"libelle": "Maîtrise au sol (rucks)"}
+    ],
+    "M+18_F+18": [
+      {"libelle": "Pertinence stratégique"},
+      {"libelle": "Maîtrise des fondamentaux sous pression"},
+      {"libelle": "Communication défensive"},
+      {"libelle": "Gestion de la fin de match"},
+      {"libelle": "Choix de jeu en début d'action"},
+      {"libelle": "Discipline défensive"},
+      {"libelle": "Efficacité du gain de terrain"},
+      {"libelle": "Leadership"}
+    ]
+  }
+}

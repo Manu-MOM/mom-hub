@@ -1,0 +1,146 @@
+{
+  "_meta": {
+    "type": "referentiel",
+    "nom": "Aptitudes",
+    "version": "1.0",
+    "date_creation": "2026-05-08",
+    "description": "Aptitudes des joueurs : Catégorie A universelle + Catégorie B spécifique par âge",
+    "modes_observation": {
+      "normal": "Affiche uniquement Catégorie A",
+      "expert": "Affiche A + B selon catégorie de l'événement"
+    }
+  },
+  "categorie_A": [
+    {
+      "uuid": "apt-A-001",
+      "libelle_court": "Tank",
+      "libelle_long": "Joueur puissant en percussion",
+      "type": "physique",
+      "description": "Capacité à percuter les défenseurs et avancer dans le contact",
+      "couleur": "#8B0000",
+      "categories_applicables": ["toutes"],
+      "postes_associes": ["pst-001", "pst-002", "pst-003", "pst-004", "pst-005", "pst-008"]
+    },
+    {
+      "uuid": "apt-A-002",
+      "libelle_court": "Runner",
+      "libelle_long": "Joueur rapide en course avec ballon",
+      "type": "physique",
+      "description": "Capacité à porter le ballon en course rapide",
+      "couleur": "#FF8C00",
+      "categories_applicables": ["toutes"],
+      "postes_associes": ["pst-006", "pst-007", "pst-008", "pst-011", "pst-012", "pst-013", "pst-014", "pst-015"]
+    },
+    {
+      "uuid": "apt-A-003",
+      "libelle_court": "Driver",
+      "libelle_long": "Porteur de balle",
+      "type": "technique",
+      "description": "Capacité à conserver et faire avancer le ballon",
+      "couleur": "#2E8B57",
+      "categories_applicables": ["toutes"],
+      "postes_associes": ["pst-006", "pst-007", "pst-008", "pst-009"]
+    },
+    {
+      "uuid": "apt-A-004",
+      "libelle_court": "Botteur",
+      "libelle_long": "Capacité de jeu au pied",
+      "type": "technique",
+      "description": "Maîtrise du jeu au pied (tactique, transformations, pénalités)",
+      "couleur": "#4169E1",
+      "categories_applicables": ["toutes"],
+      "postes_associes": ["pst-009", "pst-010", "pst-015"]
+    },
+    {
+      "uuid": "apt-A-005",
+      "libelle_court": "Avant",
+      "libelle_long": "Profil avant (qualification globale)",
+      "type": "tactique",
+      "description": "Joueur orienté avants : combat, mêlée, touche, contact",
+      "couleur": "#8B4513",
+      "categories_applicables": ["toutes"],
+      "postes_associes": ["pst-001", "pst-002", "pst-003", "pst-004", "pst-005", "pst-006", "pst-007", "pst-008"]
+    },
+    {
+      "uuid": "apt-A-006",
+      "libelle_court": "3/4",
+      "libelle_long": "Profil arrière (qualification globale)",
+      "type": "tactique",
+      "description": "Joueur orienté arrières : vitesse, technique, jeu déployé",
+      "couleur": "#9370DB",
+      "categories_applicables": ["toutes"],
+      "postes_associes": ["pst-009", "pst-010", "pst-011", "pst-012", "pst-013", "pst-014", "pst-015"]
+    }
+  ],
+  "categorie_B_par_age": {
+    "M-14_F-15_M-16_M-19_F-18_M+18_F+18": [
+      {
+        "uuid": "apt-B-M14-001",
+        "libelle_court": "Rapide",
+        "libelle_long": "Vitesse pure",
+        "type": "physique",
+        "description": "Vitesse de pointe sur 30-40 mètres",
+        "couleur": "#FFD700",
+        "postes_associes": ["pst-011", "pst-012", "pst-013", "pst-014", "pst-015"]
+      },
+      {
+        "uuid": "apt-B-M14-002",
+        "libelle_court": "Fort au contact",
+        "libelle_long": "Solidité dans les chocs",
+        "type": "physique",
+        "description": "Capacité à encaisser et donner les contacts",
+        "couleur": "#8B0000",
+        "postes_associes": ["pst-001", "pst-002", "pst-003", "pst-004", "pst-005", "pst-006", "pst-007", "pst-008"]
+      },
+      {
+        "uuid": "apt-B-M14-003",
+        "libelle_court": "Lanceur",
+        "libelle_long": "Lanceur en touche",
+        "type": "technique",
+        "description": "Précision du lancer en touche",
+        "couleur": "#4682B4",
+        "postes_associes": ["pst-002"]
+      },
+      {
+        "uuid": "apt-B-M14-004",
+        "libelle_court": "Sauteur",
+        "libelle_long": "Sauteur en touche",
+        "type": "technique",
+        "description": "Détente verticale et timing pour les sauts en touche",
+        "couleur": "#4682B4",
+        "postes_associes": ["pst-004", "pst-005", "pst-006", "pst-007", "pst-008"]
+      },
+      {
+        "uuid": "apt-B-M14-005",
+        "libelle_court": "Lifteur",
+        "libelle_long": "Porter en touche",
+        "type": "technique",
+        "description": "Capacité à lever un sauteur en touche (force + timing)",
+        "couleur": "#4682B4",
+        "postes_associes": ["pst-001", "pst-003", "pst-004", "pst-005", "pst-006", "pst-007"]
+      },
+      {
+        "uuid": "apt-B-M14-006",
+        "libelle_court": "Gros défenseur",
+        "libelle_long": "Solidité défensive",
+        "type": "tactique",
+        "description": "Plaquages réguliers, bonne lecture défensive",
+        "couleur": "#191970",
+        "postes_associes": ["pst-006", "pst-007", "pst-012", "pst-013"]
+      },
+      {
+        "uuid": "apt-B-M14-007",
+        "libelle_court": "Bon gratteur",
+        "libelle_long": "Récupération au sol",
+        "type": "tactique",
+        "description": "Capacité à récupérer le ballon dans les rucks",
+        "couleur": "#556B2F",
+        "postes_associes": ["pst-006", "pst-007", "pst-008"]
+      }
+    ]
+  },
+  "edr_a_construire": {
+    "M-5_M-6_M-8_M-10_M-12": "Liste à construire par responsable EDR (Lohann)",
+    "F-5_F-6_F-8_F-10_F-12": "Liste à construire par responsable EDR"
+  }
+}

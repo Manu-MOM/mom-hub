@@ -1,0 +1,73 @@
+{
+  "_meta": {
+    "type": "entite",
+    "entite": "Pole",
+    "version": "1.0",
+    "date_creation": "2026-05-10",
+    "description": "Pôles du MOM : 5 pôles organisationnels regroupant les catégories d'âge. Chaque pôle a un responsable principal.",
+    "source_doctrine": "Doc 07 - Entités structurantes (Saison, Pôle, Club, Catégorie)"
+  },
+  "_documentation": {
+    "vocabulaire_retenu": "Préfixe 'Pôle' pour cohérence + libellés courts pour vues compactes",
+    "particularite_F15": "La F15 joue avec les M14 sur le terrain (mixité), mais elle est rattachée administrativement au Pôle Jeunes Féminines. Côté Core : Personne F + catégorie M14, le pôle est dérivé automatiquement.",
+    "table_modifiable": "Un administrateur Hub peut ajouter/retirer un pôle si besoin"
+  },
+  "poles": [
+    {
+      "uuid": "pole-edr",
+      "code": "EDR",
+      "libelle_long": "Pôle École de Rugby",
+      "libelle_court": "EDR",
+      "categories_rattachees": ["M6", "M8", "M10", "M12", "M14"],
+      "responsable_principal_uuid": null,
+      "responsable_principal_nom": "Lohann (à confirmer UUID)",
+      "co_responsable_uuid": null,
+      "_a_completer": ["responsable_principal_uuid"]
+    },
+    {
+      "uuid": "pole-jeunes",
+      "code": "JEUNES",
+      "libelle_long": "Pôle Jeunes",
+      "libelle_court": "Jeunes",
+      "categories_rattachees": ["M16", "M19"],
+      "responsable_principal_uuid": null,
+      "responsable_principal_nom": null,
+      "co_responsable_uuid": null,
+      "_a_completer": ["responsable_principal_uuid", "responsable_principal_nom"]
+    },
+    {
+      "uuid": "pole-jeunes-fem",
+      "code": "JEUNES_F",
+      "libelle_long": "Pôle Jeunes Féminines",
+      "libelle_court": "Jeunes F",
+      "categories_rattachees": ["F15", "F18"],
+      "responsable_principal_uuid": null,
+      "responsable_principal_nom": null,
+      "co_responsable_uuid": null,
+      "_a_completer": ["responsable_principal_uuid", "responsable_principal_nom"]
+    },
+    {
+      "uuid": "pole-seniors",
+      "code": "SENIORS",
+      "libelle_long": "Pôle Seniors",
+      "libelle_court": "Seniors",
+      "categories_rattachees": ["SR-M", "SR-F"],
+      "responsable_principal_uuid": null,
+      "responsable_principal_nom": null,
+      "co_responsable_uuid": null,
+      "_a_completer": ["responsable_principal_uuid", "responsable_principal_nom"]
+    },
+    {
+      "uuid": "pole-loisirs",
+      "code": "LOISIRS",
+      "libelle_long": "Pôle Loisirs",
+      "libelle_court": "Loisirs",
+      "categories_rattachees": ["RLO", "RLSP"],
+      "_categories_aliases": {"RLO": "Vétérans", "RLSP": "Touch"},
+      "responsable_principal_uuid": null,
+      "responsable_principal_nom": null,
+      "co_responsable_uuid": null,
+      "_a_completer": ["responsable_principal_uuid", "responsable_principal_nom"]
+    }
+  ]
+}

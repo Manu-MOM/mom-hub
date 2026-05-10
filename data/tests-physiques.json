@@ -1,0 +1,193 @@
+{
+  "_meta": {
+    "type": "referentiel",
+    "nom": "Tests physiques",
+    "version": "1.0",
+    "date_creation": "2026-05-08",
+    "description": "Tests physiques avec barèmes par catégorie",
+    "barremes_source": "Standards FFR + références INSEP, adaptables par responsable de pôle"
+  },
+  "tests": [
+    {
+      "uuid": "tst-yoyo-ir1",
+      "libelle_court": "Yo-Yo IR1",
+      "libelle_long": "Yo-Yo Intermittent Recovery Test Niveau 1",
+      "type_mesure": "endurance_aerobie",
+      "unite": "palier",
+      "duree_minutes": 30,
+      "materiel": "Audio Yo-Yo, plots, chronomètre, terrain plat",
+      "espace": "Couloir de 20 mètres",
+      "encadrement": "1 testeur",
+      "source": "Standard FFR rugby",
+      "barèmes": {
+        "M-14_M": {
+          "excellent": ">= 17",
+          "bon": ">= 14",
+          "moyen": ">= 11",
+          "faible": "< 11"
+        },
+        "F-15_F": {
+          "excellent": ">= 15",
+          "bon": ">= 12",
+          "moyen": ">= 9",
+          "faible": "< 9"
+        },
+        "M-16_M": {
+          "excellent": ">= 19",
+          "bon": ">= 16",
+          "moyen": ">= 13",
+          "faible": "< 13"
+        },
+        "M-19_M": {
+          "excellent": ">= 19",
+          "bon": ">= 16",
+          "moyen": ">= 13",
+          "faible": "< 13"
+        },
+        "M+18": {
+          "excellent": ">= 21",
+          "bon": ">= 18",
+          "moyen": ">= 15",
+          "faible": "< 15"
+        },
+        "F+18": {
+          "excellent": ">= 17",
+          "bon": ">= 14",
+          "moyen": ">= 11",
+          "faible": "< 11"
+        }
+      }
+    },
+    {
+      "uuid": "tst-bronco",
+      "libelle_court": "Bronco",
+      "libelle_long": "Test Bronco (5x60m + 5x40m + 5x20m)",
+      "type_mesure": "endurance_anaerobie",
+      "unite": "secondes",
+      "duree_minutes": 15,
+      "materiel": "Plots, chronomètre",
+      "espace": "Couloir de 60 mètres",
+      "encadrement": "1 testeur",
+      "source": "Test rugby spécifique",
+      "barèmes": {
+        "M+18": {
+          "excellent": "<= 290",
+          "bon": "<= 320",
+          "moyen": "<= 360",
+          "faible": "> 360"
+        }
+      }
+    },
+    {
+      "uuid": "tst-30-15",
+      "libelle_court": "30-15 IFT",
+      "libelle_long": "Test intermittent 30-15 (30s course / 15s repos)",
+      "type_mesure": "endurance_anaerobie",
+      "unite": "VMA km/h",
+      "duree_minutes": 25,
+      "materiel": "Audio test, plots, chronomètre",
+      "espace": "Couloir de 40 mètres",
+      "encadrement": "1 testeur",
+      "source": "Test rugby intermittent (M-16+)",
+      "barèmes": {
+        "M-16_M": {
+          "excellent": ">= 19",
+          "bon": ">= 17",
+          "moyen": ">= 15",
+          "faible": "< 15"
+        }
+      }
+    },
+    {
+      "uuid": "tst-sprint-30",
+      "libelle_court": "Sprint 30m",
+      "libelle_long": "Sprint 30 mètres départ debout",
+      "type_mesure": "vitesse",
+      "unite": "secondes",
+      "duree_minutes": 5,
+      "materiel": "Cellules photoélectriques ou chronomètre, plots",
+      "espace": "Couloir de 30 mètres",
+      "encadrement": "1 testeur",
+      "source": "Test classique rugby",
+      "barèmes": {
+        "M-14_M": {
+          "excellent": "<= 4.40",
+          "bon": "<= 4.60",
+          "moyen": "<= 4.90",
+          "faible": "> 4.90"
+        },
+        "F-15_F": {
+          "excellent": "<= 4.80",
+          "bon": "<= 5.00",
+          "moyen": "<= 5.30",
+          "faible": "> 5.30"
+        },
+        "M-16_M": {
+          "excellent": "<= 4.20",
+          "bon": "<= 4.40",
+          "moyen": "<= 4.60",
+          "faible": "> 4.60"
+        },
+        "M-19_M": {
+          "excellent": "<= 4.10",
+          "bon": "<= 4.30",
+          "moyen": "<= 4.50",
+          "faible": "> 4.50"
+        },
+        "M+18": {
+          "excellent": "<= 4.00",
+          "bon": "<= 4.20",
+          "moyen": "<= 4.40",
+          "faible": "> 4.40"
+        },
+        "F+18": {
+          "excellent": "<= 4.50",
+          "bon": "<= 4.80",
+          "moyen": "<= 5.10",
+          "faible": "> 5.10"
+        }
+      }
+    },
+    {
+      "uuid": "tst-sprint-10",
+      "libelle_court": "Sprint 10m",
+      "libelle_long": "Sprint 10 mètres départ debout (démarrage)",
+      "type_mesure": "vitesse",
+      "unite": "secondes",
+      "duree_minutes": 3,
+      "materiel": "Cellules photoélectriques ou chronomètre",
+      "espace": "Couloir de 10 mètres",
+      "source": "Test démarrage explosif"
+    },
+    {
+      "uuid": "tst-saut-vertical",
+      "libelle_court": "Saut vertical",
+      "libelle_long": "Saut vertical (Sargent test)",
+      "type_mesure": "force_puissance",
+      "unite": "cm",
+      "duree_minutes": 5,
+      "materiel": "Mur ou poteau gradué, craie",
+      "source": "Test détente verticale classique"
+    },
+    {
+      "uuid": "tst-medecine-ball",
+      "libelle_court": "Lancer médecine-ball",
+      "libelle_long": "Lancer arrière médecine-ball (puissance haut du corps)",
+      "type_mesure": "force_puissance",
+      "unite": "metres",
+      "duree_minutes": 5,
+      "materiel": "Médecine-ball 3kg (jeunes) ou 5kg (seniors)",
+      "source": "Test puissance haut du corps (M-14+)"
+    },
+    {
+      "uuid": "tst-t-test",
+      "libelle_court": "T-test",
+      "libelle_long": "T-test (agilité changement de direction)",
+      "type_mesure": "agilite",
+      "unite": "secondes",
+      "duree_minutes": 5,
+      "materiel": "4 plots disposés en T",
+      "source": "Test agilité reconnu (M-14+)"
+    }
+  ]
+}

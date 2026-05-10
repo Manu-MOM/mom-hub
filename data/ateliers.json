@@ -1,0 +1,56 @@
+{
+  "_meta": {
+    "type": "referentiel",
+    "nom": "Ateliers",
+    "version": "1.0",
+    "date_creation": "2026-05-08",
+    "description": "Référentiel des ateliers pédagogiques. Migration depuis Plateforme EDR à venir.",
+    "vision_migration": "Fiches PDF + dossiers Drive contenant fiche, vidéos, schémas, ressources",
+    "structure_pedagogique": "4 rubriques : Organisation collective / Technique individuelle / Activations physiques / Jeu au poste"
+  },
+  "rubriques": [
+    {
+      "code": "1",
+      "libelle": "Organisation collective",
+      "sous_rubriques": [
+        { "code": "1.A", "libelle": "Jeu pénétrant" },
+        { "code": "1.B", "libelle": "Jeu déployé" },
+        { "code": "1.C", "libelle": "Jeu au pied" },
+        { "code": "1.D", "libelle": "Défendre" },
+        { "code": "1.E", "libelle": "Conserver" },
+        { "code": "1.F", "libelle": "Contre-attaquer" },
+        { "code": "1.G", "libelle": "Projet Bleu" }
+      ]
+    },
+    {
+      "code": "2",
+      "libelle": "Technique individuelle",
+      "sous_rubriques": [
+        { "code": "2.A", "libelle": "Passe / réception" },
+        { "code": "2.B", "libelle": "Plaquage" },
+        { "code": "2.C", "libelle": "Duels" },
+        { "code": "2.D", "libelle": "Zones de blocage" }
+      ]
+    },
+    {
+      "code": "3",
+      "libelle": "Activations physiques",
+      "sous_rubriques": [
+        { "code": "3.A", "libelle": "Échauffements" },
+        { "code": "3.B", "libelle": "Coordination / motricité" }
+      ]
+    },
+    {
+      "code": "4",
+      "libelle": "Jeu au poste",
+      "sous_rubriques": []
+    }
+  ],
+  "ateliers": [],
+  "_notes": [
+    "Les ateliers seront ajoutés progressivement",
+    "Migration depuis Plateforme EDR en cours de réflexion (Manu)",
+    "Vision : chaque atelier référence un dossier Drive avec fiche PDF + ressources",
+    "Vidéos multi-sources : YouTube non listé, FFR officiel, Drive partagé MOM, externes"
+  ]
+}
