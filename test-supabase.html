@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MOM Hub · Test Supabase</title>
+  <style>
+    :root {
+      --vert-mom: #2D7D46;
+      --or-mom: #D4A24C;
+      --gris-fond: #F5F5F5;
+      --gris-bord: #E0E0E0;
+      --rouge-erreur: #C0392B;
+      --vert-succes: #27AE60;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem;
+      background: var(--gris-fond);
+      color: #333;
+      line-height: 1.5;
+    }
+    header {
+      background: var(--vert-mom);
+      color: white;
+      padding: 1.5rem 2rem;
+      border-radius: 8px;
+      margin-bottom: 2rem;
+    }
+    h1 { margin: 0 0 0.5rem 0; font-size: 1.5rem; }
+    .subtitle { opacity: 0.9; font-size: 0.95rem; }
+    .card {
+      background: white;
+      border: 1px solid var(--gris-bord);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .card h2 {
+      margin: 0 0 1rem 0;
+      font-size: 1.15rem;
+      color: var(--vert-mom);
+      border-bottom: 2px solid var(--or-mom);
+      padding-bottom: 0.5rem;
+    }
+    .loading {
+      padding: 2rem;
+      text-align: center;
+      color: #888;
+      font-style: italic;
+    }
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+    }
+    .stat {
+      background: var(--gris-fond);
+      padding: 1rem;
+      border-radius: 6px;
+      text-align: center;
+      border-left: 4px solid var(--vert-mom);
+    }
+    .stat-num {
+      font-size: 2rem;
+      font-weight: bold;
+      color: var(--vert-mom);
+      line-height: 1;
+    }
+    .stat-lbl {
+      font-size: 0.85rem;
+      color: #666;
+      margin-top: 0.25rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .success {
+      background: #E8F5E9;
+      border-left: 4px solid var(--vert-succes);
+      padding: 1rem;
+      border-radius: 4px;
+      margin: 1rem 0;
+    }
+    .error {
+      background: #FFEBEE;
+      border-left: 4px solid var(--rouge-erreur);
+      padding: 1rem;
+      border-radius: 4px;
+      margin: 1rem 0;
+      font-family: monospace;
+      font-size: 0.9rem;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 0.5rem;
+    }
+    th, td {
+      padding: 0.5rem 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid var(--gris-bord);
+    }
+    th {
+      background: var(--gris-fond);
+      font-weight: 600;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      color: #555;
+    }
+    .footer {
+      text-align: center;
+      color: #888;
+      font-size: 0.85rem;
+      margin-top: 2rem;
+      padding: 1rem;
+    }
+    .meta {
+      font-size: 0.85rem;
+      color: #888;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>🏉 MOM Hub · Test de connexion Supabase</h1>
+    <div class="subtitle">Page de diagnostic — Phase 2.1</div>
+  </header>
+
+  <div class="card">
+    <h2>1️⃣ Connexion Supabase</h2>
+    <div id="ping-result" class="loading">⏳ Test en cours...</div>
+  </div>
+
+  <div class="card">
+    <h2>2️⃣ Statistiques Dashboard (récap)</h2>
+    <div id="stats-result" class="loading">⏳ Chargement...</div>
+  </div>
+
+  <div class="card">
+    <h2>3️⃣ Détail des Pôles</h2>
+    <div id="poles-result" class="loading">⏳ Chargement...</div>
+  </div>
+
+  <div class="card">
+    <h2>4️⃣ Détail des Catégories</h2>
+    <div id="categories-result" class="loading">⏳ Chargement...</div>
+  </div>
+
+  <div class="footer">
+    MOM Hub · Page de diagnostic · <span id="timestamp"></span>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- BIBLIOTHÈQUE SUPABASE (CDN officiel)         -->
+  <!-- ============================================ -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+  <!-- ============================================ -->
+  <!-- CLIENT MOM HUB                                -->
+  <!-- ============================================ -->
+  <script src="js/supabase-client.js"></script>
+
+  <!-- ============================================ -->
+  <!-- LOGIQUE DE LA PAGE DE TEST                   -->
+  <!-- ============================================ -->
+  <script>
+    document.getElementById('timestamp').textContent = new Date().toLocaleString('fr-FR');
+
+    // -----------------------------------------------
+    // 1. PING
+    // -----------------------------------------------
+    (async () => {
+      const el = document.getElementById('ping-result');
+      try {
+        const r = await SupabaseHub.ping();
+        if (r.ok) {
+          el.innerHTML = `<div class="success">${r.message}</div>`;
+        } else {
+          el.innerHTML = `<div class="error">${r.message}<br>${r.error?.message || ''}</div>`;
+        }
+      } catch (e) {
+        el.innerHTML = `<div class="error">❌ Erreur inattendue : ${e.message}</div>`;
+      }
+    })();
+
+    // -----------------------------------------------
+    // 2. DASHBOARD STATS
+    // -----------------------------------------------
+    (async () => {
+      const el = document.getElementById('stats-result');
+      try {
+        const s = await SupabaseHub.getDashboardStats();
+        if (!s.ok) {
+          el.innerHTML = `<div class="error">❌ ${s.error}</div>`;
+          return;
+        }
+        el.innerHTML = `
+          <div class="stat-grid">
+            <div class="stat">
+              <div class="stat-num">${s.nbPoles}</div>
+              <div class="stat-lbl">Pôles</div>
+            </div>
+            <div class="stat">
+              <div class="stat-num">${s.nbCategories}</div>
+              <div class="stat-lbl">Catégories</div>
+            </div>
+            <div class="stat">
+              <div class="stat-num">${s.nbClubs}</div>
+              <div class="stat-lbl">Clubs</div>
+            </div>
+            <div class="stat">
+              <div class="stat-num">${s.nbPostes}</div>
+              <div class="stat-lbl">Postes</div>
+            </div>
+          </div>
+          <div class="meta">
+            Saison active : <strong>${s.saisonActive}</strong> · Données lues à ${s.dateMaj}
+          </div>
+        `;
+      } catch (e) {
+        el.innerHTML = `<div class="error">❌ ${e.message}</div>`;
+      }
+    })();
+
+    // -----------------------------------------------
+    // 3. LISTE DES PÔLES
+    // -----------------------------------------------
+    (async () => {
+      const el = document.getElementById('poles-result');
+      try {
+        const poles = await SupabaseHub.getPoles();
+        let html = '<table><thead><tr><th>Code</th><th>Libellé</th><th>Catégories rattachées</th></tr></thead><tbody>';
+        for (const p of poles) {
+          html += `<tr><td><strong>${p.code}</strong></td><td>${p.libelle_long}</td><td>${(p.categories_rattachees || []).join(', ')}</td></tr>`;
+        }
+        html += '</tbody></table>';
+        el.innerHTML = html;
+      } catch (e) {
+        el.innerHTML = `<div class="error">❌ ${e.message}</div>`;
+      }
+    })();
+
+    // -----------------------------------------------
+    // 4. LISTE DES CATÉGORIES
+    // -----------------------------------------------
+    (async () => {
+      const el = document.getElementById('categories-result');
+      try {
+        const cats = await SupabaseHub.getCategories();
+        let html = '<table><thead><tr><th>Code</th><th>Libellé court</th><th>Libellé long</th><th>Type</th></tr></thead><tbody>';
+        for (const c of cats) {
+          html += `<tr>
+            <td><strong>${c.code}</strong></td>
+            <td>${c.libelle_court}</td>
+            <td>${c.libelle_long || ''}</td>
+            <td>${c.type_categorie || ''}</td>
+          </tr>`;
+        }
+        html += '</tbody></table>';
+        el.innerHTML = html;
+      } catch (e) {
+        el.innerHTML = `<div class="error">❌ ${e.message}</div>`;
+      }
+    })();
+  </script>
+
+</body>
+</html>
