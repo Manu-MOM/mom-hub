@@ -3,7 +3,7 @@
 > **Document de référence opérationnel.** À jour à la racine du repo, mis à jour à chaque fin de session significative.
 > Sert de point de reprise universel : toute personne (ou tout Claude) qui ouvre ce fichier doit pouvoir reprendre le travail sans question.
 
-**Dernière mise à jour : 11 mai 2026 — fin Phase 2.4.5 (Réconciliation OVAL-E)**
+**Dernière mise à jour : 11 mai 2026 — fin Phase 2.5 (Authentification Magic Link)**
 
 ---
 
@@ -75,24 +75,28 @@ Première synchronisation Supabase ↔ OVAL-E (export FFR XLSX 358 lignes, 298 p
 **Cible alignement OVAL-E atteinte** :
 - Supabase : 323 personnes, dont **298 licenciées FFR (alignement strict OVAL-E)** + 25 non-licenciées (parents non-MOM, 1 contact LRGER CAMPESE)
 
-### ⏳ Phase 2.5 — Authentification (À FAIRE)
-**Décisions structurantes prises** :
+### ✅ Phase 2.5 — Authentification Magic Link (FAIT — 11 mai 2026)
+
+**Décisions structurantes appliquées** :
 - **Auth Magic Link** (mail → lien éphémère, pas de mot de passe)
-- **3 rôles** : admin / coach / viewer
-- **Premier écran** : Dashboard chiffres clés (le portail actuel)
+- **3 rôles** : admin / coach / viewer (seul `admin` réellement attribué à ce jour, sur le compte de Manu)
+- Premier admin : Manu (UID `7ac40334-0d2a-4b1f-822b-133d564abe6c`), attribué via `INSERT` SQL direct après création du compte par Magic Link
 
-**Implications techniques** :
-- Magic Link sender par défaut : `noreply@mail.app.supabase.io` (OK pour démarrer)
-- Rate limit free tier : 4 emails/heure
-- Rôles non-natifs Supabase : prévoir table `auth_roles` mappant `auth.users.id` ↔ rôle
+**Sous-étapes livrées** :
+1. ✅ **2.5.1** — Table `auth_roles` (pk composite `user_id, role`, CHECK in `('admin','coach','viewer')`), helpers SQL `has_role(p_role)` et `get_my_roles()` en `SECURITY DEFINER`, RLS activée avec 2 policies SELECT (own + admin). Fichier : `sql/04-auth-roles.sql`.
+2. ✅ **2.5.2** — Config Supabase Auth : Email Enabled, Confirm email ON, Site URL `https://manu-mom.github.io/mom-hub`, Redirect URLs whitelist `https://manu-mom.github.io/mom-hub/**`.
+3. ✅ **2.5.3** — `login.html` (page minimaliste, charte Hub, bouton "Recevoir le lien"), extension `js/supabase-client.js` v1.1 puis v1.2.
+4. ✅ **2.5.4** — Session helpers JS dans `supabase-client.js` v1.3 : `getMyRoles()` (cache mémoire), `hasRole(role)`, `isAdmin()`, `requireAuth({ role })` avec redirect, `onAuthChange(callback)`, `signOut()` enrichi.
+5. ✅ **2.5.5** — `dashboard.html` page admin sécurisée via `requireAuth({ role: 'admin' })`, pattern `auth-pending` pour éviter tout flash de contenu pendant la vérification de session.
+6. ✅ **2.5.6** — Intégration auth au portail (`index.html`) : boutons icônes "Admin" + "Déconnexion" dans la puce `.user-profile` (mode admin), pilule "Se connecter" à la place de la puce (mode anonyme). Tout piloté par classes `body.auth-resolved` / `body.auth-anon` / `body.auth-admin`.
 
-**Roadmap détaillée Phase 2.5** :
-1. Créer table `auth_roles` (SQL ~15 min)
-2. Configurer Magic Link dans Supabase (Auth → Settings)
-3. Page `login.html` (~30 min)
-4. Gestion session JS (extension `supabase-client.js`)
-5. Page `dashboard.html` sécurisée (compteurs réels, accès role-based)
-6. Tests bout-en-bout
+**Leçons techniques apprises** :
+- `supabase-js` v2 utilise `window.location.origin` par défaut comme `emailRedirectTo` (pas la Site URL Supabase). Pour les Pages hébergées dans un sous-chemin (`/mom-hub/`), il faut **passer explicitement** le bon redirect. Cf. `requestMagicLink()` v1.2.
+- Gmail scanne les liens Magic Link à la réception (antiphishing), ce qui peut consommer le token avant le clic utilisateur. Workaround testé : copier-coller le lien dans la barre d'adresse plutôt que clic direct. Pour les tests futurs, préférer une adresse non-Gmail.
+- Lors d'un `str_replace` qui injecte du HTML près d'une fermeture, **toujours vérifier l'équilibre des balises ouvrantes/fermantes** dans le bloc remplacé (et viser un pattern de remplacement qui inclut la balise fermante connue). Erreur faite en 2.5.6 : injection dans `.user-profile` au lieu de à côté → boutons masqués par effet de bord.
+- Pour positionner un nouvel élément dans une topbar existante en `display: grid`, ne **pas** essayer de le placer en `position: absolute` calé au pixel près — intégrer plutôt l'élément dans un conteneur existant qui a déjà son slot dans le grid.
+
+**Reste à faire (hors périmètre 2.5, reporté Phase 3)** : ergonomie du portail dans son ensemble — voir dette "Architecture portail".
 
 ---
 
@@ -183,13 +187,21 @@ on conflict (numero_licence_ffr) do update set
 
 3. **293 fichiers JSON personnes** ont nom-de-fichier ≠ uuid contenu interne. Détecté lors de la migration Phase 2.0. Pas bloquant tant qu'on ne ré-importe pas, mais à corriger pour la Vague 2.
 4. **Référentiels Drive `01 - Référentiels/`** : 6 fichiers JSON existent (postes, ateliers, aptitudes, conformite-ffr, observables-match, tests-physiques) mais leur **contenu et conformité à la doctrine reste à évaluer** (Axe B / conv Audits).
-5. **Chiffres en dur résiduels dans index.html** : "16 Sites" et "11 Équipes" restent en dur tant que les tables `sites` et `equipes` ne sont pas créées/remplies (Phase 2.2 future). Le compteur "323 personnes" est désormais dynamique via la RPC.
-6. **Date `VENDREDI 8 MAI 2026 · HUB INITIALISÉ` dans le HTML statique** : remplacée dynamiquement par le JS, mais reste comme fallback en dur. Pas grave.
+5. ~~**Chiffres en dur résiduels dans index.html**~~ ⚠️ **PARTIEL** : "16 Sites" et "11 Équipes" restent en dur tant que les tables `sites` et `equipes` ne sont pas créées/remplies (Phase 2.2 future). Le compteur "323 personnes" est dynamique via la RPC. **24 M14** est aussi dynamique depuis Phase 2.4.5.
+6. ~~**Date `VENDREDI 8 MAI 2026 · HUB INITIALISÉ` dans le HTML statique**~~ ✅ **RÉSOLU** (11 mai 2026, Phase 2.5.6) : remplacé par "TABLEAU DE BORD" (date injectée dynamiquement par JS au format `toLocaleDateString('fr-FR')`). Greeting-sub neutralisé en "Effectifs synchronisés avec OVAL-E" (et probablement écrasé par `dashboard-stats.js` au runtime avec le compteur dynamique). Panneau sidebar "État du Hub" : "Hub initialisé aujourd'hui" → "Hub en production".
 7. ~~**Désalignement Drive ↔ Supabase post-réconciliation OVAL-E**~~ ✅ **ARBITRÉ** (11 mai 2026, conv Audits) : Drive figé au 10 mai 2026 pour la saison 2025-2026, Supabase devient source autoritative des données vivantes. Décision saison 2026-2027 reportée à l'été. Doctrine : `Doctrine-Import-OVAL-E-v1.3.md §13`. Pas d'action Production requise.
 8. **CHECK constraint `personnes_type_personne_check` à étendre** (arbitré 11 mai 2026) : suite à la décision doctrinale `Doctrine-Import-OVAL-E-v1.3.md §14`, ajouter `licencie_soigneur` et `licencie_arbitre` aux valeurs autorisées de `personnes.type_personne` (fidélité à la nomenclature FFR : Joueur / Dirigeant / Éducateur / Soigneur / Arbitre).
    - Migrer les fiches existantes classées par défaut `licencie_dirigeant` mais en réalité soigneurs (minimum MICHEL STEPHANE) vers `licencie_soigneur`
    - Mettre à jour le script d'import OVAL-E (été 2026) pour appliquer le nouveau mapping `qualite_ffr_principale → type_personne` du §14
    - Effort estimé : ~10 minutes côté SQL + migration ponctuelle
+
+### 🔵 Dettes ouvertes par la Phase 2.5
+
+9. **Architecture du portail à revoir** (Phase 3, priorité haute) : la version actuelle de `index.html` est fonctionnelle mais a une architecture d'information faible (KPI passifs "323 / 16 / 11 / 24" plutôt qu'orientés actions, greeting plat, sidebar pauvre, hiérarchie des outils peu lisible). **Référence v3 à conserver** comme inspiration : capture d'écran d'un prototype antérieur (mom-hub-accueil-v3) qui propose un greeting contextualisé ("J-3 AVANT MATCH · 3 actions en attente · compo M14 à finaliser · 2 nouveaux licenciés"), des KPI orientés actions ("3 PRÉSENCES / 1 COMPO / +2 LICENCIÉS / 8 CERT. MÉD."), des sous-titres de section ("construction & planification" / "le quotidien du coach"), et 3 cartes sidebar utiles (Prochain match, À venir, Passerelle synchronisée). Travail à reprendre côté axe B (conception) avant retour Production.
+10. **Panneau "État du Hub" sidebar contient encore des infos obsolètes** (`index.html` ligne ~1156+) : "Créé le · Ven. 8 mai 2026", "Version 1.0 — initiale", "SportEasy · M14 enrichis (23)". À nettoyer pendant la refonte du portail (cf. dette #9), pas en urgence.
+11. **CSS dupliqué entre `index.html`, `login.html`, `dashboard.html`** : palette de couleurs, polices, classes utilitaires définies 3 fois. À factoriser dans un `css/hub.css` partagé lors de la refonte du portail.
+12. **Mini-déséquilibre `<div>` ouverts/fermés dans `index.html`** (1 div fermante manquante quelque part, présent dès la version initiale du fichier). Tolérée par les navigateurs, sans impact visuel constaté. À nettoyer lors de la refonte.
+13. **Allow new users to sign up = ON dans Supabase Auth** : à terme passer à OFF pour fermer les inscriptions spontanées (les comptes seront créés par un admin). À traiter quand les autres rôles seront déployés (coach, viewer).
 
 ---
 
@@ -261,12 +273,13 @@ Dossiers clés :
 
 ## 🚀 Prochaine session
 
-**Avant de démarrer toute Phase 2.5** :
+**Avant de démarrer toute Phase 3** :
 1. Lire ce STATE.md (5 min)
 2. Lire `PASSATION.md` (kit de démarrage par thématique)
-3. Vérifier que la chaîne Hub → Supabase fonctionne toujours (ouvrir `https://manu-mom.github.io/mom-hub/`, F12 console, doit afficher `✅ MOM Hub Dashboard: stats mises à jour depuis Supabase`)
-4. Vérifier que le portail affiche bien **323 personnes** (compteur dynamique post-Phase 2.4.5)
+3. Vérifier que la chaîne Hub → Supabase fonctionne toujours (ouvrir `https://manu-mom.github.io/mom-hub/`, F12 console, doit afficher `✅ MOM Hub Dashboard: stats mises à jour depuis Supabase` ET `🏉 MOM Hub · Supabase Client v1.3 chargé`)
+4. Vérifier que le portail affiche bien **323 personnes** (compteur dynamique post-Phase 2.4.5) et que les boutons d'auth réagissent (icône grille + flèche en mode admin, pilule verte "Se connecter" en mode anonyme)
+5. Vérifier que `login.html` affiche bien `v1.3 chargé` dans la console et que l'envoi d'un Magic Link sur ton email aboutit sur `dashboard.html` avec session active
 
 **Travaux en attente** :
-- **Conv Production** : Phase 2.5 Magic Link
-- **Conv Audits** : reprise des audits + modélisation événements (matchs / entraînements / tournois) + transmission des dettes Axe B (D1-D6) issues de la réconciliation OVAL-E (voir `dettes-axe-b-reconciliation-OVAL-E.md` déposé dans Drive)
+- **Conv Production** : la Phase 3 reste largement à concevoir. Premier sujet probable : **refonte du portail** (cf. dette #9) à partir du prototype v3 et des décisions de l'axe B sur l'architecture d'information.
+- **Conv Audits** : reprise des audits + modélisation événements (matchs / entraînements / tournois) + transmission des dettes Axe B (D1-D6) issues de la réconciliation OVAL-E (voir `dettes-axe-b-reconciliation-OVAL-E.md` déposé dans Drive). Conception de l'architecture du portail (cf. dette #9) à mener en amont de toute reprise Production sur ce sujet.
