@@ -1,219 +1,215 @@
-# MOM Hub — État du projet
+# STATE.md — MOM Hub
 
-*Dernière mise à jour : 11 mai 2026*
+> **Document de référence opérationnel.** À jour à la racine du repo, mis à jour à chaque fin de session significative.
+> Sert de point de reprise universel : toute personne (ou tout Claude) qui ouvre ce fichier doit pouvoir reprendre le travail sans question.
 
-Ce fichier résume **où on en est** dans la construction du MOM Hub.
-Il est mis à jour à la fin de chaque jalon important.
-
----
-
-## 🎯 Vision
-
-MOM Hub = plateforme web qui agrège les outils numériques du club de rugby
-Mutzig Ovalie Molsheim (Bas-Rhin). Construite autour d'un **MOM Core**
-(référentiels métier et fiches Personne) et de **modules natifs** branchés
-dessus.
-
-**Doctrine fondatrice** : simplicité d'usage avant tout, éviter
-l'over-engineering, OVAL-E (avec un A) comme nom de la plateforme FFR.
+**Dernière mise à jour : 11 mai 2026 — fin Phase 2.4**
 
 ---
 
-## 🏗️ Architecture actuelle
+## 🎯 Vision du projet
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  FRONT-END                                                  │
-│  GitHub Pages : https://manu-mom.github.io/mom-hub/        │
-│  Repo public  : https://github.com/Manu-MOM/mom-hub        │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              │ HTTPS + clé anon
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│  BACKEND                                                    │
-│  Supabase free tier : fvfqffxaiaoygqhjtxwr.supabase.co     │
-│  338 lignes dans 6 tables remplies (sur 9 créées)          │
-│  RLS activé partout, lecture publique sur référentiels     │
-└─────────────────────────────────────────────────────────────┘
-                              ▲
-                              │ ping quotidien 03h UTC
-                              │
-┌─────────────────────────────────────────────────────────────┐
-│  AUTOMATION                                                 │
-│  GitHub Actions : keep-alive Supabase (cron 24h)            │
-│  Empêche la mise en pause après 7 jours d'inactivité       │
-└─────────────────────────────────────────────────────────────┘
+**MOM Hub** est une **plateforme web** qui sert de point d'entrée unique à tous les outils du club **Mutzig Ovalie Molsheim** (rugby, Alsace).
 
-┌─────────────────────────────────────────────────────────────┐
-│  STOCKAGE COMPLÉMENTAIRE                                    │
-│  Google Drive : doctrines, audits, schémas Core (référence) │
-│  Source historique des fiches Personne (avant migration)    │
-└─────────────────────────────────────────────────────────────┘
-```
+C'est un **portail/agrégateur**, PAS une migration. Les outils existants (SportEasy, Drive, OVAL-E FFR, etc.) continuent à vivre ; le Hub leur sert de couche de jonction.
+
+**Doctrine fondatrice** : **simplicité d'usage avant tout**. Pas d'over-engineering, pas de schémas baroques, fichiers JSON éditables à la main si possible.
+
+**Budget** : 0 € strict. Stack : GitHub Pages + Supabase free tier + Google Drive.
+
+---
+
+## 🏛️ Architecture en 3 lieux
+
+| Lieu | Rôle | Contenu |
+|---|---|---|
+| **Google Drive** `MOM Hub/2025-2026/` | Source de vérité documentaire et workspace humain | Doctrine, audits, schémas JSON, plans d'attaque, référentiels métier (versions canoniques) |
+| **GitHub** `Manu-MOM/mom-hub` (public) | Code, déploiement, mirroir lecture seule des référentiels | `index.html`, `js/`, `data/` (miroir JSON), `sql/`, `.github/workflows/`, STATE.md |
+| **Supabase** `mom-hub` (free tier) | Source de vérité des **données vivantes** (personnes, événements, présences, etc.) | 9 tables Vague 1 (6 remplies), fonctions RPC, RLS |
+
+⚠️ **Repo GitHub PUBLIC** : ne jamais commit la clé `service_role`, les fiches Personne brutes, ou toute donnée perso.
 
 ---
 
 ## 📊 État des phases
 
-```
-PHASE 1 — Mise en service du Hub                ✅ DONE
-  1.1 Déploiement portail sur GitHub Pages       ✅
-  1.2 Repo GitHub configuré                       ✅
-  1.3 Miroir Drive → GitHub (9 référentiels)     ✅
-  1.4 Portail dynamique                          ⏸ Reporté (option C)
+### ✅ Phase 1 — Déploiement initial du Hub (FAIT)
+- Portail HTML déployé sur GitHub Pages : https://manu-mom.github.io/mom-hub/
+- Repo public : https://github.com/Manu-MOM/mom-hub
+- 9 référentiels JSON mirrorés depuis Drive vers `data/`
+- Design : tableau de bord vert bouteille + or, charte Oswald/Manrope/JetBrains Mono
 
-PHASE 2.0 — Fondations Supabase                 ✅ DONE
-  2.0.1 Compte Supabase                          ✅
-  2.0.2 Projet mom-hub                           ✅
-  2.0.3 Clés API sécurisées                      ✅
-  2.0.4 Modèle de tables conçu (Vague 1)        ✅
-  2.0.5 9 tables créées                          ✅
-  2.0.6 Policies RLS détaillées                  ⏸ Reportée à Phase 2.2
-  2.0.7 5 référentiels migrés (44 lignes)        ✅
-  2.0.8 294 personnes migrées                    ✅
-  2.0.9 Keep-alive Supabase actif                ✅
+### ✅ Phase 2.0 — Fondations Supabase (FAIT)
+- Projet Supabase `mom-hub` créé (NANO compute, healthy)
+- URL : `https://fvfqffxaiaoygqhjtxwr.supabase.co`
+- 9 tables Vague 1 créées + RLS activé + policies lecture publique sur les référentiels
+- 294 personnes migrées via le script `03-migration-personnes-vague1.sql` (**NON commit dans repo public**, archivé local + Drive)
+- Anti-pause GitHub Action `keep-alive-supabase.yml` opérationnel (cron 03h UTC, GET poles?limit=1)
+- Secrets GitHub configurés : `SUPABASE_URL`, `SUPABASE_ANON_KEY`
 
-PHASE 2.1 — Intégration Supabase au Hub        ⏳ NEXT
-  → Page de login Supabase
-  → Premier "Hello World" dynamique
-  → Sécurisation cookies + sessions
+### ✅ Phase 2.4 — Portail dynamique (FAIT — 11 mai 2026)
+- `js/supabase-client.js` : wrapper `SupabaseHub` autour du client supabase-js v2
+- `js/dashboard-stats.js` v1.1 : met à jour les compteurs du dashboard via RPC
+- Fonction RPC `get_dashboard_stats()` créée dans Supabase (SECURITY DEFINER)
+- 5 modifs dans `index.html` : 5 IDs ajoutés (`stat-personnes`, `stat-m14`, `greeting-meta`, `greeting-sub`, `se-joueurs` optionnel) + 3 balises `<script>` avant `</body>`
+- Page de diagnostic `test-supabase.html` à la racine, fonctionnelle
+- **Validé visuellement** : "LUNDI 11 MAI 2026 · CONNECTÉ À SUPABASE", "293 personnes en base · données live Supabase"
 
-PHASE 2.2 — Premier outil natif : MOM Compos   ⏳ APRÈS
-  → Compositions d'équipes avec drag & drop
-  → Conformité FFR live
-  → Sous-tables Vague 2 nécessaires
+### ⏳ Phase 2.5 — Authentification (À FAIRE)
+**Décisions structurantes prises** :
+- **Auth Magic Link** (mail → lien éphémère, pas de mot de passe)
+- **3 rôles** : admin / coach / viewer
+- **Premier écran** : Dashboard chiffres clés (le portail actuel)
 
-PHASE 3-5 — Modules + passerelles + élargissement (lointain)
-```
+**Implications techniques** :
+- Magic Link sender par défaut : `noreply@mail.app.supabase.io` (OK pour démarrer)
+- Rate limit free tier : 4 emails/heure
+- Rôles non-natifs Supabase : prévoir table `auth_roles` mappant `auth.users.id` ↔ rôle
 
----
-
-## 🗄️ Schéma Supabase (Vague 1)
-
-```
-Tables remplies (338 lignes au total)
-─────────────────────────────────────
-poles                  5 lignes   (EDR, Jeunes, Jeunes F, Seniors, Loisirs)
-categories            14 lignes   (M5 à RLSP)
-clubs                  4 lignes   (MOM, SAR, ASCS, CRIG)
-saisons                1 ligne    (2025-2026 active)
-postes                20 lignes   (15 XV + 5 regroupements)
-personnes            294 lignes   (261 joueurs + 30 parents + 3 contacts-externes)
-
-Tables vides (créées, en attente de Phase 2.1+)
-────────────────────────────────────────────────
-ententes               0
-equipes                0
-equipe_joueurs         0
-```
-
-**Conventions** :
-- Toutes les tables ont `id UUID PK + created_at + updated_at`
-- Le champ `uuid_legacy` (TEXT UNIQUE) garde le lien avec les anciens
-  IDs JSON Drive (ex: `pole-edr`, `cat-m14`, `personne-e36325`)
-- RLS activé partout, lecture publique sur les 5 référentiels
+**Roadmap détaillée Phase 2.5** :
+1. Créer table `auth_roles` (SQL ~15 min)
+2. Configurer Magic Link dans Supabase (Auth → Settings)
+3. Page `login.html` (~30 min)
+4. Gestion session JS (extension `supabase-client.js`)
+5. Page `dashboard.html` sécurisée (compteurs réels, accès role-based)
+6. Tests bout-en-bout
 
 ---
 
-## 🚨 Dettes techniques connues
+## 🗃️ Schéma Supabase Vague 1 (état réel au 11 mai 2026)
 
-### 1. Drive personnes désynchronisé (à traiter Phase 2.2)
+Source de vérité agrégée — issue de `get_dashboard_stats()` :
 
-**Problème** : 293 fichiers JSON sur 294 ont un nom-de-fichier qui ne
-correspond pas à leur contenu interne (script d'export raté dans le
-passé). Le doublon WINCKLER/CAMPESE a été résolu côté Supabase.
+```json
+{
+  "nb_personnes": 293,
+  "nb_m14": 24,
+  "nb_poles": 5,
+  "nb_clubs": 4,
+  "nb_categories": 14
+}
+```
 
-**Statut** : Supabase est désormais la source de vérité (propre).
-Le Drive sera régénéré depuis Supabase après Phase 2.2 (quand les
-sous-tables Vague 2 seront en place).
-
-### 2. Sous-tables Vague 2 à créer
-
-Les blocs 3, 4, 6, 7, 8 des fiches Personne ne sont **pas encore migrés**
-parce que les sous-tables n'existent pas :
-- `personne_roles` (bloc 3)
-- `personne_liens_familiaux` (bloc 4)
-- `personne_postes`, `personne_aptitudes`, `personne_certifications`,
-  `personne_journal_observations`, `personne_engagements_externes` (bloc 6)
-- `personne_documents` (bloc 8)
-- `dossiers_medicaux` (séparé, sécurisé)
-
-À faire en Phase 2.2 avant MOM Compos.
-
-### 3. Consentement RGPD à collecter
-
-Le champ `consentement_rgpd_date` est NULL pour les 294 personnes.
-À collecter dans une future campagne (formulaire dédié à imaginer).
-
-### 4. Le portail HTML reste statique
-
-`index.html` affiche encore les chiffres en dur (296 personnes, 16 sites,
-11 équipes, 23 M14). Sera connecté au backend Supabase en Phase 2.1.
+| Table | Lignes | Source | Statut |
+|---|---|---|---|
+| `poles` | 5 | référentiel `postes.json`/Drive | ✅ rempli, lecture publique RLS |
+| `categories` | 14 | référentiel `categories.json` (mirrorée dans data/) | ✅ rempli, lecture publique RLS |
+| `clubs` | 4 | référentiel manuel | ✅ rempli, lecture publique RLS |
+| `saisons` | 1 | saison active 2025-2026 | ✅ rempli, lecture publique RLS |
+| `postes` | 20 | référentiel `postes.json` (v1.1, format 13) | ✅ rempli, lecture publique RLS |
+| `personnes` | 293 | fiches Drive `01 - Référentiels/personnes/` | ✅ rempli, **PAS de policy SELECT publique** (RGPD) |
+| `ententes` | 0 | — | ⏳ Vague 2 |
+| `equipes` | 0 | — | ⏳ Vague 2 |
+| `equipe_joueurs` | 0 | — | ⏳ Vague 2 |
 
 ---
 
-## 📁 Structure du repo `mom-hub`
+## 🧠 Pattern technique acquis (réutilisable)
+
+**RPC `SECURITY DEFINER` pour exposer des agrégats sans policy publique sur les tables sensibles.**
+
+Cas d'usage : afficher des compteurs (nb_personnes, etc.) sur une page publique, sans exposer aucune donnée perso.
+
+Pattern :
+```sql
+create or replace function public.ma_fonction()
+returns json
+language plpgsql
+security definer  -- s'exécute avec les privilèges du créateur
+set search_path = public
+as $$ ... $$;
+
+grant execute on function public.ma_fonction() to anon, authenticated;
+```
+
+Côté JS : `const { data, error } = await supabase.rpc('ma_fonction');`
+
+À réutiliser pour tous les futurs compteurs/agrégats du Hub.
+
+---
+
+## 🩹 Dettes techniques à traiter
+
+1. **Écart 293 vs 294 personnes** : la base contient 293 lignes, mais on pensait avoir migré 294. À investiguer (doublon supprimé silencieusement par le script ? row perdu ? compteur précédent erroné ?).
+2. **Écart 24 vs 23 M14** : Supabase indique 24 M14, SportEasy en référence 23. À réconcilier (joueur transféré ? affiliation ambiguë ?).
+3. **293 fichiers JSON personnes** ont nom-de-fichier ≠ uuid contenu interne. Détecté lors de la migration. Pas bloquant tant qu'on ne ré-importe pas, mais à corriger pour la Vague 2.
+4. **Référentiels Drive `01 - Référentiels/`** : 6 fichiers JSON existent (postes, ateliers, aptitudes, conformite-ffr, observables-match, tests-physiques) mais leur **contenu et conformité à la doctrine reste à évaluer**.
+5. **Chiffres en dur résiduels dans index.html** : "16 Sites" et "11 Équipes" restent en dur tant que les tables `sites` et `equipes` ne sont pas créées/remplies (Phase 2.2 future).
+6. **Date `VENDREDI 8 MAI 2026 · HUB INITIALISÉ` dans le HTML statique** : remplacée dynamiquement par le JS, mais reste comme fallback en dur. Pas grave.
+
+---
+
+## 📂 Structure repo finale
 
 ```
 mom-hub/
-├── .github/
-│   └── workflows/
-│       └── keep-alive-supabase.yml      (workflow GitHub Actions)
-├── data/                                 (miroir Drive des référentiels)
+├── .github/workflows/keep-alive-supabase.yml
+├── data/                                  # miroir lecture seule des référentiels Drive
 │   ├── README.md
-│   ├── poles.json
-│   ├── categories.json
-│   ├── clubs.json
-│   ├── postes.json
 │   ├── aptitudes.json
 │   ├── ateliers.json
+│   ├── categories.json
+│   ├── conformite-ffr.json
 │   ├── observables-match.json
+│   ├── postes.json
 │   ├── tests-physiques.json
-│   └── conformite-ffr.json
+│   └── (3 autres)
 ├── js/
-│   └── data-loader.js                   (chargeur JSON côté front)
-├── sql/                                  (scripts de migration archivés)
+│   ├── data-loader.js                     # ancien loader des référentiels statiques
+│   ├── supabase-client.js                 # wrapper SupabaseHub
+│   └── dashboard-stats.js                 # v1.1 — utilise RPC get_dashboard_stats
+├── sql/
 │   ├── 01-creation-tables-vague1.sql
 │   └── 02-migration-referentiels-vague1.sql
-│   ↳ 03-migration-personnes-vague1.sql NON archivé (données nominatives)
+│   # NB: 03-migration-personnes-vague1.sql NON commit (données perso)
 ├── README.md
-├── STATE.md                              (ce fichier)
-└── index.html                            (portail public)
+├── STATE.md                               # ← CE FICHIER
+├── index.html                             # portail dynamique
+└── test-supabase.html                     # page de diagnostic
 ```
-
-⚠️ **Note sécurité** : le script `03-migration-personnes-vague1.sql`
-contient des données nominatives (noms, emails, téléphones, adresses,
-n° licences FFR). Il NE DOIT PAS être commit dans ce repo public.
-Le conserver en local ou dans un repo privé séparé.
 
 ---
 
-## 🔐 Secrets GitHub configurés
+## 🔐 Secrets & accès
 
-Dans **Settings > Secrets and variables > Actions** :
-
-```
-SUPABASE_URL        = URL projet Supabase
-SUPABASE_ANON_KEY   = clé publique anon (utilisée par le keep-alive)
-```
-
-⚠️ **Ne JAMAIS commit** la `SUPABASE_SERVICE_ROLE_KEY` ni dans le repo,
-ni dans les secrets GitHub Actions (pas nécessaire pour le keep-alive).
+- Secrets GitHub Actions : `SUPABASE_URL`, `SUPABASE_ANON_KEY`
+- Clé `service_role` Supabase : **stockée par Manu en local, jamais commit**
+- Mot de passe DB Supabase : **stocké par Manu en local**
 
 ---
 
-## 🎯 Prochaine session
+## 📚 Documents Drive de référence
 
-Pour reprendre, dire à Claude :
-> *"On reprend MOM Hub, on attaque Phase 2.1 — intégration Supabase au Hub"*
+Dossier `MOM Hub/2025-2026/` :
 
-Décisions structurantes attendues en Phase 2.1 :
-- Quel système d'authentification (email/password, Google, magic link) ?
-- Quels rôles applicatifs (admin, coach, parent, joueur) ?
-- Où héberger le code JS Supabase dans le repo ?
-- Premier écran à construire pour "preuve de concept" ?
+| Document | id Drive | Rôle |
+|---|---|---|
+| `Doctrine-MOM-Hub-v2.md` | `1Ebx20ANb80hU0giLSfVAl8n5OSZFwJZW` | Doctrine fondatrice (simplicité, 3 lieux) |
+| `Phase-2-0-decisions-architecture.md` | dans `1CkeBrMBJGChqGui4r7mVkHa3NwaLwOSK` | Acte décisions Phase 2.0 |
+| `MOM-Core-Synthese-globale-v2.md` | `1X0FjB6Z9eVlxH0VcEQ4le2wf8eCMmmly` | Synthèse globale modèle |
+| `MOM-Core-Cartographie-Globale-v2.md` | `1N2I86T751XneQT9fx1wCQWusmeCz235T` | Cartographie complète |
+| `Doctrine-Import-OVAL-E-v1.1.md` | `1puTaNLXno99T4C9ECkEIgi1YGbk6bE41` | Doctrine import licences FFR |
+| `Audit-Module-Compositions-v2.md` | `114UBo2lSqB8t8J2o0YRc55Nc8uoNtgCM` | Audit module Compos (v2) |
+| `Audit-Module-Suivi-Match.md` | — | Audit module Suivi-Match |
+| `Audit-Module-Rapport.md` | — | Audit module Rapport |
+| `Audit-Module-Statistiques.md` | — | Audit module Stats |
+| `Audit-Module-Bilans.md` | — | Audit module Bilans |
+| `Audit-Personnes-MOM-Hub.md` | `1DsehRBgzGq_kAraCZvpKElCvddmAOM3b` | Audit du modèle Personnes |
+
+Dossiers clés :
+- `01 - Référentiels/` : `1RpOU_TtO20GMQejvJv8th0jXcQYqHb8h` (6 fichiers JSON, conformité à évaluer)
+- `00 - Documentation/` : `1CkeBrMBJGChqGui4r7mVkHa3NwaLwOSK`
+- `01 - Référentiels/personnes/` : `17hmQpAX_etb3pdRvJ_-NBeL2RK17T2NE` (sous-dossiers joueurs/parents/contacts-externes)
 
 ---
 
-*Maintenu par Manu avec assistance Claude · Doctrine MOM : simplicité d'usage avant tout*
+## 🚀 Prochaine session
+
+**Avant de démarrer toute Phase 2.5** :
+1. Lire ce STATE.md (5 min)
+2. Lire `PASSATION.md` (kit de démarrage par thématique)
+3. Vérifier que la chaîne Hub → Supabase fonctionne toujours (ouvrir `https://manu-mom.github.io/mom-hub/`, F12 console, doit afficher `✅ MOM Hub Dashboard: stats mises à jour depuis Supabase`)
+
+**Travaux en attente** :
+- **Conv Production** : Phase 2.5 Magic Link
+- **Conv Audits** : reprise des audits + modélisation événements (matchs / entraînements / tournois)
