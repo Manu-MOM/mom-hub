@@ -18,13 +18,16 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.2 — mai 2026
+ * Version : 1.3 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
  *          (fix : supabase-js v2 utilise window.location.origin par défaut,
  *           pas la Site URL Supabase — d'où le redirect cassé sur les Pages
  *           hébergées dans un sous-chemin /mom-hub/).
+ *   v1.3 : helpers de session pour pages sécurisées — Phase 2.5.4
+ *          getMyRoles (cache mémoire), hasRole, isAdmin, requireAuth,
+ *          onAuthChange ; signOut invalide le cache et redirige.
  */
 
 (function (global) {
@@ -59,6 +62,14 @@
       detectSessionInUrl: true  // pour gérer les liens magiques retour
     }
   });
+
+  // ============================================================
+  // ÉTAT INTERNE — cache mémoire des rôles (Phase 2.5.4)
+  // ============================================================
+  // Cache des rôles de l'utilisateur courant. Vidé par signOut() et
+  // par les événements SIGNED_OUT / SIGNED_IN (cf. onAuthChange).
+  // null = pas encore résolu, [] = résolu et vide, ['admin', ...] = résolu.
+  let _rolesCache = null;
 
   // ============================================================
   // API PUBLIQUE — fonctions utilitaires
@@ -278,13 +289,147 @@
       return user;
     },
 
+    // ----------------------------------------------------------
+    // SESSION & RÔLES — Phase 2.5.4
+    // ----------------------------------------------------------
+
     /**
-     * Déconnecte l'utilisateur.
+     * Renvoie les rôles de l'utilisateur courant (appelle la RPC get_my_roles
+     * côté Supabase). Résultat mis en cache en mémoire pour la durée de vie
+     * de la page (un seul appel réseau par chargement). Le cache est invalidé
+     * par signOut() et par les événements SIGNED_OUT / SIGNED_IN.
+     *
+     * @returns {Promise<string[]>} Tableau de rôles (ex: ['admin']) ou [] si non connecté.
      */
-    async signOut() {
-      const { error } = await client.auth.signOut();
-      if (error) throw error;
+    async getMyRoles() {
+      if (_rolesCache !== null) {
+        return _rolesCache;
+      }
+      const { data, error } = await client.rpc('get_my_roles');
+      if (error) {
+        console.error('MOM Hub: getMyRoles() error', error);
+        return [];
+      }
+      _rolesCache = Array.isArray(data) ? data : [];
+      return _rolesCache;
+    },
+
+    /**
+     * True si l'utilisateur courant possède le rôle demandé.
+     * @param {string} role - 'admin', 'coach' ou 'viewer'.
+     */
+    async hasRole(role) {
+      const roles = await this.getMyRoles();
+      return roles.includes(role);
+    },
+
+    /**
+     * Raccourci pour hasRole('admin'). Utilisé par les pages sécurisées
+     * pour des décisions UI rapides.
+     */
+    async isAdmin() {
+      return this.hasRole('admin');
+    },
+
+    /**
+     * Garde de page : vérifie qu'une session existe (et optionnellement
+     * que l'utilisateur a un rôle requis). Sinon, redirige.
+     *
+     * Pattern d'usage (en TOUT premier dans le <script> d'une page sécurisée) :
+     *
+     *   document.body.classList.add('auth-pending');   // masque le contenu
+     *   const ok = await SupabaseHub.requireAuth({ role: 'admin' });
+     *   if (!ok) return;                                // redirect en cours
+     *   document.body.classList.remove('auth-pending'); // révèle le contenu
+     *
+     * Avec côté CSS :
+     *   body.auth-pending { visibility: hidden; }
+     *
+     * Comportement :
+     *   - Pas de session : redirige vers loginUrl (défaut: 'login.html').
+     *   - Session mais pas le bon rôle : redirige vers forbiddenUrl
+     *     (défaut: la racine du Hub './').
+     *   - OK : ne fait rien, renvoie true.
+     *
+     * @param {object}  [options]
+     * @param {string}  [options.role]         - Rôle requis (ex: 'admin'). Optionnel.
+     * @param {string}  [options.loginUrl]     - URL de redirection si non connecté.
+     * @param {string}  [options.forbiddenUrl] - URL de redirection si mauvais rôle.
+     * @returns {Promise<boolean>} true si l'accès est accordé, false si redirection en cours.
+     */
+    async requireAuth(options) {
+      const opts = options || {};
+      const loginUrl = opts.loginUrl || 'login.html';
+      const forbiddenUrl = opts.forbiddenUrl || './';
+
+      const session = await this.getSession();
+      if (!session) {
+        window.location.replace(loginUrl);
+        return false;
+      }
+      if (opts.role) {
+        const ok = await this.hasRole(opts.role);
+        if (!ok) {
+          window.location.replace(forbiddenUrl);
+          return false;
+        }
+      }
       return true;
+    },
+
+    /**
+     * Abonnement aux changements d'état de l'auth (SIGNED_IN, SIGNED_OUT,
+     * TOKEN_REFRESHED, etc.). Le cache des rôles est automatiquement
+     * invalidé sur SIGNED_OUT et SIGNED_IN avant que le callback ne soit
+     * appelé.
+     *
+     * @param {(event: string, session: object|null) => void} callback
+     * @returns {{ unsubscribe: () => void }} Un objet pour se désabonner.
+     */
+    onAuthChange(callback) {
+      const { data: { subscription } } = client.auth.onAuthStateChange(
+        function (event, session) {
+          if (event === 'SIGNED_OUT' || event === 'SIGNED_IN') {
+            _rolesCache = null;
+          }
+          if (typeof callback === 'function') {
+            try {
+              callback(event, session);
+            } catch (err) {
+              console.error('MOM Hub: onAuthChange callback error', err);
+            }
+          }
+        }
+      );
+      return subscription;
+    },
+
+    /**
+     * Déconnecte l'utilisateur, invalide le cache des rôles, et redirige
+     * vers loginUrl (défaut: 'login.html').
+     *
+     * Si redirect=false, ne fait pas la redirection (utile pour des tests).
+     *
+     * @param {object}  [options]
+     * @param {boolean} [options.redirect=true]
+     * @param {string}  [options.loginUrl='login.html']
+     */
+    async signOut(options) {
+      const opts = options || {};
+      const redirect = opts.redirect !== false;
+      const loginUrl = opts.loginUrl || 'login.html';
+
+      _rolesCache = null;
+      const { error } = await client.auth.signOut();
+      if (error) {
+        console.error('MOM Hub: signOut() error', error);
+        // On redirige quand même : si la déconnexion serveur a échoué,
+        // au moins l'utilisateur quitte la page.
+      }
+      if (redirect) {
+        window.location.replace(loginUrl);
+      }
+      return !error;
     }
   };
 
@@ -295,7 +440,7 @@
 
   // Trace amicale dans la console
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.2 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.3 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
