@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tableau de bord admin · MOM Hub</title>
+  <meta name="description" content="Tableau de bord admin du MOM Hub." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --vert-bouteille: #2D7D46;
+      --vert-bouteille-fonce: #1f5a32;
+      --or: #C9A227;
+      --gris-bg: #F4F5F2;
+      --gris-card-border: #E5E7E0;
+      --gris-texte: #444;
+      --gris-texte-doux: #777;
+      --rouge-soft-bg: #fdecea;
+      --rouge-soft-fg: #8a1b14;
+      --vert-soft-bg: #e7f3ec;
+      --vert-soft-fg: #1f5a32;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      background: var(--gris-bg);
+      font-family: 'Manrope', system-ui, -apple-system, sans-serif;
+      color: var(--gris-texte);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ============================================================
+       Pattern auth-pending : masque tout le body tant que requireAuth
+       n'a pas validé la session. Évite que l'utilisateur voie une
+       page admin pendant 50 ms avant d'être redirigé vers login.
+       ============================================================ */
+    body.auth-pending {
+      visibility: hidden;
+    }
+
+    /* Header sticky : titre + email + bouton se déconnecter */
+    .topbar {
+      background: #fff;
+      border-bottom: 1px solid var(--gris-card-border);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .topbar-title {
+      font-family: 'Oswald', sans-serif;
+      font-weight: 700;
+      font-size: 22px;
+      letter-spacing: 0.5px;
+      color: var(--vert-bouteille);
+      margin: 0;
+    }
+
+    .topbar-user {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 14px;
+    }
+
+    .topbar-user-email {
+      color: var(--gris-texte);
+      font-weight: 500;
+    }
+
+    .btn {
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 8px 14px;
+      border: 1px solid var(--gris-card-border);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--gris-texte);
+      cursor: pointer;
+      transition: background-color 0.15s, border-color 0.15s;
+    }
+
+    .btn:hover:not(:disabled) {
+      background: var(--gris-bg);
+      border-color: var(--gris-texte-doux);
+    }
+
+    .btn--primary {
+      background: var(--vert-bouteille);
+      color: #fff;
+      border-color: var(--vert-bouteille);
+    }
+
+    .btn--primary:hover:not(:disabled) {
+      background: var(--vert-bouteille-fonce);
+      border-color: var(--vert-bouteille-fonce);
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* Conteneur principal */
+    .page {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 32px 24px 64px;
+    }
+
+    .page-intro {
+      margin-bottom: 24px;
+    }
+
+    .page-intro h2 {
+      font-family: 'Oswald', sans-serif;
+      font-weight: 500;
+      font-size: 18px;
+      color: var(--gris-texte);
+      margin: 0 0 4px;
+      letter-spacing: 0.3px;
+    }
+
+    .page-intro p {
+      margin: 0;
+      font-size: 14px;
+      color: var(--gris-texte-doux);
+    }
+
+    /* Grille de cartes */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid var(--gris-card-border);
+      border-radius: 10px;
+      padding: 20px 22px;
+    }
+
+    .card-label {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--gris-texte-doux);
+      margin: 0 0 10px;
+    }
+
+    .card-value {
+      font-family: 'Oswald', sans-serif;
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--vert-bouteille);
+      margin: 0 0 4px;
+      letter-spacing: 0.3px;
+    }
+
+    .card-detail {
+      font-size: 13px;
+      color: var(--gris-texte-doux);
+      margin: 6px 0 0;
+      line-height: 1.5;
+    }
+
+    .role-pill {
+      display: inline-block;
+      background: var(--vert-soft-bg);
+      color: var(--vert-soft-fg);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 14px;
+      margin: 0 4px 4px 0;
+    }
+
+    /* Bloc de test des permissions */
+    .test-card {
+      background: #fff;
+      border: 1px solid var(--gris-card-border);
+      border-radius: 10px;
+      padding: 22px 24px;
+    }
+
+    .test-card h3 {
+      font-family: 'Oswald', sans-serif;
+      font-weight: 500;
+      font-size: 17px;
+      margin: 0 0 6px;
+      color: var(--gris-texte);
+      letter-spacing: 0.3px;
+    }
+
+    .test-card p {
+      font-size: 14px;
+      color: var(--gris-texte-doux);
+      margin: 0 0 14px;
+    }
+
+    .test-feedback {
+      margin-top: 14px;
+      padding: 10px 12px;
+      border-radius: 6px;
+      font-size: 14px;
+      display: none;
+    }
+
+    .test-feedback.is-visible { display: block; }
+
+    .test-feedback--success {
+      background: var(--vert-soft-bg);
+      color: var(--vert-soft-fg);
+    }
+
+    .test-feedback--error {
+      background: var(--rouge-soft-bg);
+      color: var(--rouge-soft-fg);
+    }
+
+    .footer {
+      margin-top: 48px;
+      font-size: 12px;
+      color: var(--gris-texte-doux);
+      text-align: center;
+      letter-spacing: 0.3px;
+    }
+
+    .footer-club {
+      font-family: 'Oswald', sans-serif;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+
+<body class="auth-pending">
+
+  <header class="topbar">
+    <h1 class="topbar-title">MOM Hub · Admin</h1>
+    <div class="topbar-user">
+      <span class="topbar-user-email" id="user-email">…</span>
+      <button type="button" id="signout-btn" class="btn">Se déconnecter</button>
+    </div>
+  </header>
+
+  <main class="page">
+    <div class="page-intro">
+      <h2>Tableau de bord</h2>
+      <p>Page de démonstration de l'accès admin. Sera étendue au fil des phases.</p>
+    </div>
+
+    <section class="card-grid" aria-label="Récap de session">
+      <div class="card">
+        <p class="card-label">Vos rôles</p>
+        <div id="roles-display"></div>
+        <p class="card-detail" id="roles-detail">…</p>
+      </div>
+
+      <div class="card">
+        <p class="card-label">Session</p>
+        <p class="card-value" id="session-status">Active</p>
+        <p class="card-detail" id="session-expires">…</p>
+      </div>
+
+      <div class="card">
+        <p class="card-label">User ID</p>
+        <p class="card-detail" id="user-uid" style="font-family: monospace; font-size: 12px; word-break: break-all; margin-top: 12px;">…</p>
+      </div>
+    </section>
+
+    <section class="test-card" aria-labelledby="test-title">
+      <h3 id="test-title">Test des permissions</h3>
+      <p>Vérifie que les helpers v1.3 répondent correctement.</p>
+      <button type="button" id="test-btn" class="btn btn--primary">Tester l'accès admin</button>
+      <div id="test-feedback" class="test-feedback" role="status" aria-live="polite"></div>
+    </section>
+
+    <p class="footer">
+      <span class="footer-club">Mutzig Ovalie Molsheim</span><br />
+      MOM Hub · accès admin
+    </p>
+  </main>
+
+  <!-- Bibliothèque officielle Supabase JS (UMD via CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <!-- Wrapper MOM Hub -->
+  <script src="js/supabase-client.js"></script>
+
+  <script>
+    (async function () {
+      'use strict';
+
+      // ----------------------------------------------------------
+      // 1. GARDE D'ACCÈS (requireAuth)
+      // ----------------------------------------------------------
+      // Tant que le body a la classe auth-pending, le contenu est caché.
+      // Si pas connecté -> redirect login.html.
+      // Si connecté mais pas admin -> redirect racine.
+      // Si OK -> on enlève auth-pending et on peuple la page.
+      const ok = await SupabaseHub.requireAuth({ role: 'admin' });
+      if (!ok) return;
+
+      // À partir d'ici, on est sûr d'avoir une session valide ET le rôle admin.
+
+      // ----------------------------------------------------------
+      // 2. PEUPLER LA PAGE
+      // ----------------------------------------------------------
+      const elEmail   = document.getElementById('user-email');
+      const elUid     = document.getElementById('user-uid');
+      const elRoles   = document.getElementById('roles-display');
+      const elRolesD  = document.getElementById('roles-detail');
+      const elExpires = document.getElementById('session-expires');
+
+      // Email + UID
+      const session = await SupabaseHub.getSession();
+      const user = session && session.user;
+      if (user) {
+        elEmail.textContent = user.email || '(email inconnu)';
+        elUid.textContent = user.id;
+      }
+
+      // Rôles
+      const roles = await SupabaseHub.getMyRoles();
+      if (roles.length === 0) {
+        elRoles.innerHTML = '<em style="color: var(--gris-texte-doux);">Aucun</em>';
+        elRolesD.textContent = 'Tu es connecté mais aucun rôle ne t\'est attribué.';
+      } else {
+        elRoles.innerHTML = roles
+          .map(function (r) { return '<span class="role-pill">' + r + '</span>'; })
+          .join('');
+        elRolesD.textContent = roles.length + ' rôle' + (roles.length > 1 ? 's' : '') + ' actif' + (roles.length > 1 ? 's' : '') + '.';
+      }
+
+      // Expiration de session
+      if (session && session.expires_at) {
+        const expiresAt = new Date(session.expires_at * 1000);
+        const minutesLeft = Math.round((expiresAt - new Date()) / 60000);
+        const formatted = expiresAt.toLocaleString('fr-FR', {
+          dateStyle: 'short',
+          timeStyle: 'short'
+        });
+        elExpires.textContent = 'Expire le ' + formatted + ' (dans ~' + minutesLeft + ' min)';
+      } else {
+        elExpires.textContent = 'Date d\'expiration inconnue';
+      }
+
+      // ----------------------------------------------------------
+      // 3. AFFICHER LE CONTENU
+      // ----------------------------------------------------------
+      document.body.classList.remove('auth-pending');
+
+      // ----------------------------------------------------------
+      // 4. INTERACTIONS
+      // ----------------------------------------------------------
+
+      // Bouton "Tester l'accès admin"
+      const testBtn = document.getElementById('test-btn');
+      const testFeedback = document.getElementById('test-feedback');
+      testBtn.addEventListener('click', async function () {
+        testBtn.disabled = true;
+        testFeedback.className = 'test-feedback';
+        testFeedback.textContent = '';
+
+        try {
+          const isAdmin = await SupabaseHub.isAdmin();
+          const currentRoles = await SupabaseHub.getMyRoles();
+          if (isAdmin) {
+            testFeedback.className = 'test-feedback is-visible test-feedback--success';
+            testFeedback.textContent =
+              '✅ Accès admin confirmé. Rôles renvoyés : [' + currentRoles.join(', ') + ']';
+          } else {
+            testFeedback.className = 'test-feedback is-visible test-feedback--error';
+            testFeedback.textContent =
+              '❌ Accès admin refusé. Rôles renvoyés : [' + currentRoles.join(', ') + ']';
+          }
+        } catch (err) {
+          testFeedback.className = 'test-feedback is-visible test-feedback--error';
+          testFeedback.textContent = '❌ Erreur : ' + (err.message || err);
+        } finally {
+          testBtn.disabled = false;
+        }
+      });
+
+      // Bouton "Se déconnecter"
+      const signoutBtn = document.getElementById('signout-btn');
+      signoutBtn.addEventListener('click', async function () {
+        signoutBtn.disabled = true;
+        signoutBtn.textContent = 'Déconnexion…';
+        await SupabaseHub.signOut();
+        // signOut() redirige automatiquement vers login.html
+      });
+
+      // Abonnement aux changements d'état d'auth :
+      // si la session expire pendant que la page est ouverte, on redirige.
+      SupabaseHub.onAuthChange(function (event, _session) {
+        if (event === 'SIGNED_OUT') {
+          window.location.replace('login.html');
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
