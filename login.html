@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Connexion · MOM Hub</title>
+  <meta name="description" content="Connexion au MOM Hub par lien magique." />
+
+  <!-- Polices : cohérent avec index.html -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --vert-bouteille: #2D7D46;
+      --vert-bouteille-fonce: #1f5a32;
+      --or: #C9A227;
+      --gris-bg: #F4F5F2;
+      --gris-card-border: #E5E7E0;
+      --gris-texte: #444;
+      --gris-texte-doux: #777;
+      --rouge-soft-bg: #fdecea;
+      --rouge-soft-fg: #8a1b14;
+      --vert-soft-bg: #e7f3ec;
+      --vert-soft-fg: #1f5a32;
+      --bleu-soft-bg: #eaf1fa;
+      --bleu-soft-fg: #1f4a82;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      background: var(--gris-bg);
+      font-family: 'Manrope', system-ui, -apple-system, sans-serif;
+      color: var(--gris-texte);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .page {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 420px;
+      background: #fff;
+      border: 1px solid var(--gris-card-border);
+      border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.04);
+      padding: 36px 32px 32px;
+    }
+
+    .brand {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    .brand-title {
+      font-family: 'Oswald', sans-serif;
+      font-weight: 700;
+      font-size: 32px;
+      letter-spacing: 0.5px;
+      color: var(--vert-bouteille);
+      margin: 0 0 4px;
+    }
+
+    .brand-subtitle {
+      font-size: 14px;
+      color: var(--gris-texte-doux);
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+      margin: 0;
+    }
+
+    .form-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+
+    .form-row label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--gris-texte);
+    }
+
+    .form-row input[type="email"] {
+      font-family: inherit;
+      font-size: 15px;
+      padding: 10px 12px;
+      border: 1px solid var(--gris-card-border);
+      border-radius: 8px;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      background: #fff;
+    }
+
+    .form-row input[type="email"]:focus {
+      border-color: var(--vert-bouteille);
+      box-shadow: 0 0 0 3px rgba(45, 125, 70, 0.12);
+    }
+
+    .form-row input[type="email"]:disabled {
+      background: #f7f7f5;
+      color: #999;
+      cursor: not-allowed;
+    }
+
+    .btn {
+      width: 100%;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 600;
+      padding: 12px 16px;
+      border: none;
+      border-radius: 8px;
+      background: var(--vert-bouteille);
+      color: #fff;
+      cursor: pointer;
+      transition: background-color 0.15s;
+    }
+
+    .btn:hover:not(:disabled) {
+      background: var(--vert-bouteille-fonce);
+    }
+
+    .btn:disabled {
+      background: #b9c5bd;
+      cursor: not-allowed;
+    }
+
+    .feedback {
+      margin-top: 16px;
+      padding: 12px 14px;
+      border-radius: 8px;
+      font-size: 14px;
+      line-height: 1.45;
+      display: none;
+    }
+
+    .feedback.is-visible {
+      display: block;
+    }
+
+    .feedback--success {
+      background: var(--vert-soft-bg);
+      color: var(--vert-soft-fg);
+    }
+
+    .feedback--error {
+      background: var(--rouge-soft-bg);
+      color: var(--rouge-soft-fg);
+    }
+
+    .feedback--info {
+      background: var(--bleu-soft-bg);
+      color: var(--bleu-soft-fg);
+    }
+
+    .resend-row {
+      margin-top: 14px;
+      text-align: center;
+      font-size: 13px;
+      color: var(--gris-texte-doux);
+      display: none;
+    }
+
+    .resend-row.is-visible {
+      display: block;
+    }
+
+    .resend-link {
+      background: none;
+      border: none;
+      color: var(--vert-bouteille);
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 0;
+      text-decoration: underline;
+    }
+
+    .resend-link:hover {
+      color: var(--vert-bouteille-fonce);
+    }
+
+    .footer {
+      margin-top: 24px;
+      font-size: 12px;
+      color: var(--gris-texte-doux);
+      text-align: center;
+      letter-spacing: 0.3px;
+    }
+
+    .footer-club {
+      font-family: 'Oswald', sans-serif;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+
+<body>
+  <main class="page">
+    <section class="card" role="region" aria-labelledby="brand-title">
+      <header class="brand">
+        <h1 id="brand-title" class="brand-title">MOM Hub</h1>
+        <p class="brand-subtitle">Connexion par lien magique</p>
+      </header>
+
+      <form id="login-form" novalidate>
+        <div class="form-row">
+          <label for="email">Adresse email</label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            autocomplete="email"
+            required
+            placeholder="ton.email@exemple.fr"
+          />
+        </div>
+
+        <button type="submit" id="submit-btn" class="btn">
+          Recevoir le lien de connexion
+        </button>
+      </form>
+
+      <div id="feedback" class="feedback" role="status" aria-live="polite"></div>
+
+      <div id="resend-row" class="resend-row">
+        Pas reçu&nbsp;?
+        <button type="button" id="resend-btn" class="resend-link">Renvoyer le lien</button>
+      </div>
+
+      <p class="footer">
+        <span class="footer-club">Mutzig Ovalie Molsheim</span><br />
+        MOM Hub · accès réservé
+      </p>
+    </section>
+  </main>
+
+  <!-- Bibliothèque officielle Supabase JS (UMD via CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <!-- Wrapper MOM Hub -->
+  <script src="js/supabase-client.js"></script>
+
+  <script>
+    (function () {
+      'use strict';
+
+      const form = document.getElementById('login-form');
+      const emailInput = document.getElementById('email');
+      const submitBtn = document.getElementById('submit-btn');
+      const feedback = document.getElementById('feedback');
+      const resendRow = document.getElementById('resend-row');
+      const resendBtn = document.getElementById('resend-btn');
+
+      let resendTimer = null;
+      const RESEND_DELAY_MS = 60 * 1000; // 60 secondes
+
+      // ----------------------------------------------------------------
+      // Helpers UI
+      // ----------------------------------------------------------------
+      function showFeedback(kind, text) {
+        feedback.className = 'feedback is-visible feedback--' + kind;
+        feedback.textContent = text;
+      }
+
+      function hideFeedback() {
+        feedback.className = 'feedback';
+        feedback.textContent = '';
+      }
+
+      function lockForm() {
+        emailInput.disabled = true;
+        submitBtn.disabled = true;
+      }
+
+      function unlockForm() {
+        emailInput.disabled = false;
+        submitBtn.disabled = false;
+      }
+
+      function scheduleResend() {
+        resendRow.classList.remove('is-visible');
+        if (resendTimer) clearTimeout(resendTimer);
+        resendTimer = setTimeout(function () {
+          resendRow.classList.add('is-visible');
+        }, RESEND_DELAY_MS);
+      }
+
+      // ----------------------------------------------------------------
+      // Si déjà loggué : rediriger vers le portail
+      // ----------------------------------------------------------------
+      async function redirectIfAlreadyLoggedIn() {
+        if (typeof SupabaseHub === 'undefined') return;
+        try {
+          const session = await SupabaseHub.getSession();
+          if (session) {
+            // Déjà loggué : on redirige vers la racine du Hub
+            window.location.replace('./');
+          }
+        } catch (err) {
+          // En cas d'erreur on laisse l'utilisateur sur la page
+          console.warn('MOM Hub login: getSession() a échoué, on reste sur login.', err);
+        }
+      }
+
+      // ----------------------------------------------------------------
+      // Soumission du formulaire
+      // ----------------------------------------------------------------
+      async function handleSubmit(event) {
+        event.preventDefault();
+
+        if (typeof SupabaseHub === 'undefined') {
+          showFeedback('error', 'Erreur technique : client Supabase non chargé. Recharge la page.');
+          return;
+        }
+
+        const email = (emailInput.value || '').trim();
+        if (!email || !email.includes('@')) {
+          showFeedback('error', 'Merci de saisir une adresse email valide.');
+          emailInput.focus();
+          return;
+        }
+
+        hideFeedback();
+        lockForm();
+        showFeedback('info', 'Envoi du lien en cours…');
+
+        const result = await SupabaseHub.requestMagicLink(email);
+
+        if (result.ok) {
+          showFeedback(
+            'success',
+            'Si cette adresse a un compte ou peut en créer un, ' +
+            'tu vas recevoir un lien de connexion dans quelques secondes. ' +
+            'Pense à vérifier le dossier spams.'
+          );
+          scheduleResend();
+        } else {
+          // Cas typiques : rate limit, format invalide côté serveur
+          showFeedback('error', 'Impossible d\'envoyer le lien : ' + (result.error || 'erreur inconnue'));
+          unlockForm();
+        }
+      }
+
+      // ----------------------------------------------------------------
+      // Renvoi
+      // ----------------------------------------------------------------
+      function handleResend() {
+        resendRow.classList.remove('is-visible');
+        unlockForm();
+        emailInput.focus();
+        // On relance la soumission avec l'email déjà saisi
+        form.dispatchEvent(new Event('submit', { cancelable: true }));
+      }
+
+      // ----------------------------------------------------------------
+      // Init
+      // ----------------------------------------------------------------
+      form.addEventListener('submit', handleSubmit);
+      resendBtn.addEventListener('click', handleResend);
+      redirectIfAlreadyLoggedIn();
+    })();
+  </script>
+</body>
+</html>
