@@ -701,6 +701,77 @@
     .greeting { grid-template-columns: 1fr; }
     .kpi-row { width: 100%; overflow-x: auto; }
   }
+
+  /* ============================================================
+     Phase 2.5.6 — bouton de connexion / déconnexion dans la topbar
+     ============================================================ */
+
+  /* Zone d'auth — toujours présente, masquée par défaut tant
+     qu'on n'a pas déterminé l'état (évite tout flash) */
+  .auth-zone {
+    display: none;
+    align-items: center;
+    gap: 10px;
+  }
+  body.auth-resolved .auth-zone.show {
+    display: inline-flex;
+  }
+
+  /* Bouton "Se connecter" (état anonyme) */
+  .btn-login {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: var(--vert-prairie);
+    color: #fff;
+    border: 1px solid var(--vert-prairie);
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s;
+  }
+  .btn-login:hover {
+    background: var(--vert-bouteille);
+    border-color: var(--vert-bouteille);
+  }
+
+  /* Boutons "Dashboard" et "Se déconnecter" (état admin) */
+  .btn-auth {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: transparent;
+    color: var(--ink-soft);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+  }
+  .btn-auth:hover {
+    background: var(--paper-warm);
+    border-color: var(--ink-mute);
+    color: var(--ink);
+  }
+  .btn-auth:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  /* user-profile masqué tant que l'état d'auth n'est pas résolu,
+     et masqué définitivement si pas connecté */
+  body:not(.auth-resolved) .user-profile,
+  body.auth-anon .user-profile {
+    display: none;
+  }
 </style>
 </head>
 <body>
@@ -740,9 +811,27 @@
       <div class="avatar">EJ</div>
       <div class="user-info">
         <div class="user-name">Emmanuel Jung</div>
-        <div class="user-role">Resp. EDR · Coach M14</div>
+        <div class="user-role">Référent M14</div>
       </div>
+    <!-- Phase 2.5.6 — zone d'auth (login / logout / dashboard admin) -->
+    <div class="auth-zone" id="auth-zone-anon">
+      <a href="login.html" class="btn-login">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+        Se connecter
+      </a>
     </div>
+
+    <div class="auth-zone" id="auth-zone-admin">
+      <a href="dashboard.html" class="btn-auth" title="Tableau de bord admin">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        Admin
+      </a>
+      <button type="button" class="btn-auth" id="btn-signout" title="Se déconnecter">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Déconnexion
+      </button>
+    </div>
+
   </header>
 
   <!-- ============ MAIN LAYOUT ============ -->
@@ -752,9 +841,9 @@
 
       <div class="greeting">
         <div>
-         <div class="greeting-meta" id="greeting-meta">VENDREDI 8 MAI 2026 · HUB INITIALISÉ</div>
+         <div class="greeting-meta" id="greeting-meta">TABLEAU DE BORD</div>
 <h2>Bonjour <span class="name">Manu</span>,</h2>
-<div class="greeting-sub" id="greeting-sub">Hub créé aujourd'hui · 296 personnes, 16 sites, 11 équipes en base</div>
+<div class="greeting-sub" id="greeting-sub">Effectifs synchronisés avec OVAL-E</div>
         </div>
        <div class="kpi-row">
   <div class="kpi"><div class="kpi-num" id="stat-personnes">296</div><div class="kpi-lbl">Personnes</div></div>
@@ -1124,6 +1213,91 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/dashboard-stats.js"></script>
+
+<!-- Phase 2.5.6 — gestion auth sur le portail -->
+<script>
+  (async function () {
+    'use strict';
+
+    if (typeof SupabaseHub === 'undefined') {
+      console.warn('MOM Hub portail: SupabaseHub indisponible, zone auth désactivée.');
+      return;
+    }
+
+    const body = document.body;
+    const zoneAnon = document.getElementById('auth-zone-anon');
+    const zoneAdmin = document.getElementById('auth-zone-admin');
+    const btnSignout = document.getElementById('btn-signout');
+
+    function applyState(isAdmin) {
+      if (isAdmin) {
+        body.classList.add('auth-admin');
+        body.classList.remove('auth-anon');
+        zoneAdmin.classList.add('show');
+        zoneAnon.classList.remove('show');
+      } else {
+        body.classList.add('auth-anon');
+        body.classList.remove('auth-admin');
+        zoneAnon.classList.add('show');
+        zoneAdmin.classList.remove('show');
+      }
+      body.classList.add('auth-resolved');
+    }
+
+    async function refreshAuthState() {
+      try {
+        const session = await SupabaseHub.getSession();
+        if (!session) {
+          applyState(false);
+          return;
+        }
+        const admin = await SupabaseHub.isAdmin();
+        applyState(admin);
+      } catch (err) {
+        console.error('MOM Hub portail: erreur résolution auth', err);
+        applyState(false);
+      }
+    }
+
+    btnSignout.addEventListener('click', async function () {
+      btnSignout.disabled = true;
+      btnSignout.textContent = 'Déconnexion…';
+      // signOut() redirige par défaut vers login.html. Ici on veut rester
+      // sur le portail (juste rafraîchir l'état), donc redirect: false.
+      await SupabaseHub.signOut({ redirect: false });
+      // onAuthChange ci-dessous va se déclencher avec event SIGNED_OUT
+      // et rebasculer l'UI en mode anonyme.
+    });
+
+    // Réagir aux changements d'état (login dans un autre onglet,
+    // expiration de session, déconnexion volontaire).
+    SupabaseHub.onAuthChange(function (_event, _session) {
+      refreshAuthState();
+    });
+
+    // Premier résolution au chargement de la page.
+    refreshAuthState();
+
+    // ----------------------------------------------------------
+    // Greeting : date du jour injectée dynamiquement
+    // ----------------------------------------------------------
+    try {
+      const meta = document.getElementById('greeting-meta');
+      if (meta) {
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('fr-FR', {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric'
+        }).toUpperCase();
+        meta.textContent = dateStr + ' · TABLEAU DE BORD';
+      }
+    } catch (err) {
+      console.warn('MOM Hub portail: maj greeting-meta échouée', err);
+    }
+  })();
+</script>
 
 </body>
 </html>
