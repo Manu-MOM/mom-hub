@@ -185,8 +185,11 @@ on conflict (numero_licence_ffr) do update set
 4. **Référentiels Drive `01 - Référentiels/`** : 6 fichiers JSON existent (postes, ateliers, aptitudes, conformite-ffr, observables-match, tests-physiques) mais leur **contenu et conformité à la doctrine reste à évaluer** (Axe B / conv Audits).
 5. **Chiffres en dur résiduels dans index.html** : "16 Sites" et "11 Équipes" restent en dur tant que les tables `sites` et `equipes` ne sont pas créées/remplies (Phase 2.2 future). Le compteur "323 personnes" est désormais dynamique via la RPC.
 6. **Date `VENDREDI 8 MAI 2026 · HUB INITIALISÉ` dans le HTML statique** : remplacée dynamiquement par le JS, mais reste comme fallback en dur. Pas grave.
-7. **Désalignement Drive ↔ Supabase post-réconciliation OVAL-E** (nouveau, créé par la Phase 2.4.5) : Drive contient 297 fiches Personne conformes (audit doctrine §12), Supabase en a 323. Écart de 26 fiches : il faut décider si on régénère les 26 fiches Drive manquantes ou si on accepte le désalignement (Drive devient documentaire historique, Supabase source autoritative). À arbitrer en conv Audits (Axe B).
-8. **Schéma `type_personne` incomplet vs catégories FFR** (nouveau) : la FFR distingue 5 catégories de licences (Joueur, Dirigeant, Arbitre, Éducateur, Soigneur). Le schéma actuel n'autorise que 3 valeurs `licencie_*` (competition, dirigeant, educateur). Les soigneurs (`SOI`) sont actuellement rangés en `licencie_dirigeant` par défaut. À étendre si on veut fidélité FFR (ajout `licencie_soigneur` et `licencie_arbitre`).
+7. ~~**Désalignement Drive ↔ Supabase post-réconciliation OVAL-E**~~ ✅ **ARBITRÉ** (11 mai 2026, conv Audits) : Drive figé au 10 mai 2026 pour la saison 2025-2026, Supabase devient source autoritative des données vivantes. Décision saison 2026-2027 reportée à l'été. Doctrine : `Doctrine-Import-OVAL-E-v1.3.md §13`. Pas d'action Production requise.
+8. **CHECK constraint `personnes_type_personne_check` à étendre** (arbitré 11 mai 2026) : suite à la décision doctrinale `Doctrine-Import-OVAL-E-v1.3.md §14`, ajouter `licencie_soigneur` et `licencie_arbitre` aux valeurs autorisées de `personnes.type_personne` (fidélité à la nomenclature FFR : Joueur / Dirigeant / Éducateur / Soigneur / Arbitre).
+   - Migrer les fiches existantes classées par défaut `licencie_dirigeant` mais en réalité soigneurs (minimum MICHEL STEPHANE) vers `licencie_soigneur`
+   - Mettre à jour le script d'import OVAL-E (été 2026) pour appliquer le nouveau mapping `qualite_ffr_principale → type_personne` du §14
+   - Effort estimé : ~10 minutes côté SQL + migration ponctuelle
 
 ---
 
@@ -241,13 +244,13 @@ Dossier `MOM Hub/2025-2026/` :
 | `Phase-2-0-decisions-architecture.md` | dans `1CkeBrMBJGChqGui4r7mVkHa3NwaLwOSK` | Acte décisions Phase 2.0 |
 | `MOM-Core-Synthese-globale-v2.md` | `1X0FjB6Z9eVlxH0VcEQ4le2wf8eCMmmly` | Synthèse globale modèle |
 | `MOM-Core-Cartographie-Globale-v2.md` | `1N2I86T751XneQT9fx1wCQWusmeCz235T` | Cartographie complète |
-| `Doctrine-Import-OVAL-E-v1.1.md` | `1puTaNLXno99T4C9ECkEIgi1YGbk6bE41` | Doctrine import licences FFR (v1.2 à rédiger — cf dettes Axe B) |
+| `Doctrine-Import-OVAL-E-v1.1.md` | `1puTaNLXno99T4C9ECkEIgi1YGbk6bE41` | Doctrine import licences FFR (v1.2 et v1.3 ajoutées le 11 mai 2026 dans le même dossier Drive) |
 | `Audit-Module-Compositions-v2.md` | `114UBo2lSqB8t8J2o0YRc55Nc8uoNtgCM` | Audit module Compos (v2) |
 | `Audit-Module-Suivi-Match.md` | — | Audit module Suivi-Match |
 | `Audit-Module-Rapport.md` | — | Audit module Rapport |
 | `Audit-Module-Statistiques.md` | — | Audit module Stats |
 | `Audit-Module-Bilans.md` | — | Audit module Bilans |
-| `Audit-Personnes-MOM-Hub.md` | `1DsehRBgzGq_kAraCZvpKElCvddmAOM3b` | Audit du modèle Personnes (à compléter — cf dettes Axe B) |
+| `Audit-Personnes-MOM-Hub.md` | `1DsehRBgzGq_kAraCZvpKElCvddmAOM3b` | Audit du modèle Personnes (v1.1 ajoutée le 11 mai 2026 dans le même dossier Drive) |
 
 Dossiers clés :
 - `01 - Référentiels/` : `1RpOU_TtO20GMQejvJv8th0jXcQYqHb8h` (6 fichiers JSON, conformité à évaluer)
@@ -267,7 +270,3 @@ Dossiers clés :
 **Travaux en attente** :
 - **Conv Production** : Phase 2.5 Magic Link
 - **Conv Audits** : reprise des audits + modélisation événements (matchs / entraînements / tournois) + transmission des dettes Axe B (D1-D6) issues de la réconciliation OVAL-E (voir `dettes-axe-b-reconciliation-OVAL-E.md` déposé dans Drive)
-7. **CHECK constraint `personnes_type_personne_check` à étendre** : suite à la décision doctrinale (Doctrine-Import-OVAL-E v1.3 §14), ajouter `licencie_soigneur` et `licencie_arbitre` aux valeurs autorisées de `personnes.type_personne`.
-   - Migrer les fiches existantes classées par défaut `licencie_dirigeant` mais en réalité soigneurs (minimum MICHEL STEPHANE) vers `licencie_soigneur`
-   - Mettre à jour le script d'import OVAL-E (été 2026) pour appliquer le nouveau mapping
-   - Effort estimé : ~10 minutes côté SQL + migration ponctuelle
