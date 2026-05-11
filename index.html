@@ -707,11 +707,18 @@
      ============================================================ */
 
   /* Zone d'auth — toujours présente, masquée par défaut tant
-     qu'on n'a pas déterminé l'état (évite tout flash) */
+     qu'on n'a pas déterminé l'état (évite tout flash).
+     Position absolute pour échapper au grid de la topbar
+     (qui a 5 colonnes fixes pré-existantes et ne nous laisse pas de slot). */
   .auth-zone {
     display: none;
+    position: absolute;
+    right: 64px;       /* au-delà des icônes recherche + notif */
+    top: 50%;
+    transform: translateY(-50%);
     align-items: center;
     gap: 10px;
+    z-index: 10;
   }
   body.auth-resolved .auth-zone.show {
     display: inline-flex;
