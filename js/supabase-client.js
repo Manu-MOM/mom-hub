@@ -18,9 +18,13 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.1 — mai 2026
+ * Version : 1.2 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
+ *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
+ *          (fix : supabase-js v2 utilise window.location.origin par défaut,
+ *           pas la Site URL Supabase — d'où le redirect cassé sur les Pages
+ *           hébergées dans un sous-chemin /mom-hub/).
  */
 
 (function (global) {
@@ -194,15 +198,27 @@
      * Comportement :
      *   - Si l'email existe dans auth.users : envoi du lien de connexion
      *   - Sinon : crée un nouveau compte et envoi du lien (shouldCreateUser=true)
-     *   - La page de retour utilisée par Supabase est la "Site URL" configurée
-     *     dans Authentication > URL Configuration (=> https://manu-mom.github.io/mom-hub).
+     *
+     * Redirection après clic sur le lien :
+     *   - Si `redirectTo` est fourni : utilisé tel quel.
+     *   - Sinon : on calcule le DOSSIER PARENT de la page actuelle.
+     *     Exemple : appel depuis https://manu-mom.github.io/mom-hub/login.html
+     *               -> redirect vers https://manu-mom.github.io/mom-hub/
+     *   - Le redirect doit être dans la whitelist Authentication > URL Configuration.
+     *
+     * ⚠️ Note historique : v1.1 ne passait pas emailRedirectTo, en supposant
+     * que Supabase utiliserait la Site URL comme fallback. C'est faux :
+     * supabase-js v2 utilise window.location.origin par défaut (juste l'origine,
+     * sans chemin), ce qui casse pour les sites hébergés sur GitHub Pages
+     * dans un sous-chemin /mom-hub/. v1.2 corrige.
      *
      * Rate limit Supabase free tier : 4 emails/heure.
      *
-     * @param {string} email - L'adresse email cible (sera trim+lowercase).
+     * @param {string} email      - Adresse email cible (sera trim+lowercase).
+     * @param {string} [redirectTo] - URL de retour explicite (optionnel).
      * @returns {Promise<{ok: boolean, error?: string}>}
      */
-    async requestMagicLink(email) {
+    async requestMagicLink(email, redirectTo) {
       if (!email || typeof email !== 'string') {
         return { ok: false, error: 'Email manquant' };
       }
@@ -212,13 +228,22 @@
         return { ok: false, error: 'Email invalide' };
       }
 
+      // Calcul de l'URL de retour
+      let resolvedRedirect = redirectTo;
+      if (!resolvedRedirect && typeof window !== 'undefined' && window.location) {
+        // Dossier parent de la page courante (= remplace le dernier segment par '')
+        resolvedRedirect = window.location.origin +
+          window.location.pathname.replace(/[^/]*$/, '');
+      }
+
+      const otpOptions = { shouldCreateUser: true };
+      if (resolvedRedirect) {
+        otpOptions.emailRedirectTo = resolvedRedirect;
+      }
+
       const { error } = await client.auth.signInWithOtp({
         email: cleanEmail,
-        options: {
-          shouldCreateUser: true
-          // Pas de emailRedirectTo : Supabase utilise la Site URL par défaut.
-          // À l'étape 2.5.5 on pourra forcer vers /dashboard.html si besoin.
-        }
+        options: otpOptions
       });
 
       if (error) {
@@ -270,7 +295,7 @@
 
   // Trace amicale dans la console
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.1 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.2 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
