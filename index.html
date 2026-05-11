@@ -752,17 +752,16 @@
 
       <div class="greeting">
         <div>
-          <div class="greeting-meta">VENDREDI 8 MAI 2026 · HUB INITIALISÉ</div>
-          <h2>Bonjour <span class="name">Manu</span>,</h2>
-          <div class="greeting-sub">Hub créé aujourd'hui · 296 personnes, 16 sites, 11 équipes en base</div>
+         <div class="greeting-meta" id="greeting-meta">VENDREDI 8 MAI 2026 · HUB INITIALISÉ</div>
+<h2>Bonjour <span class="name">Manu</span>,</h2>
+<div class="greeting-sub" id="greeting-sub">Hub créé aujourd'hui · 296 personnes, 16 sites, 11 équipes en base</div>
         </div>
-        <div class="kpi-row">
-          <div class="kpi"><div class="kpi-num">296</div><div class="kpi-lbl">Personnes</div></div>
-          <div class="kpi"><div class="kpi-num">16</div><div class="kpi-lbl">Sites</div></div>
-          <div class="kpi"><div class="kpi-num">11</div><div class="kpi-lbl">Équipes</div></div>
-          <div class="kpi gold"><div class="kpi-num">23</div><div class="kpi-lbl">M14 enr.</div></div>
-        </div>
-      </div>
+       <div class="kpi-row">
+  <div class="kpi"><div class="kpi-num" id="stat-personnes">296</div><div class="kpi-lbl">Personnes</div></div>
+  <div class="kpi"><div class="kpi-num">16</div><div class="kpi-lbl">Sites</div></div>
+  <div class="kpi"><div class="kpi-num">11</div><div class="kpi-lbl">Équipes</div></div>
+  <div class="kpi gold"><div class="kpi-num" id="stat-m14">23</div><div class="kpi-lbl">M14 enr.</div></div>
+</div>
 
       <!-- 01 PÉDAGOGIE EDR -->
       <section class="tool-section">
@@ -1120,5 +1119,11 @@
   </main>
 
 </div>
+
+<!-- ===== Connexion Supabase ===== -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/dashboard-stats.js"></script>
+
 </body>
 </html>
