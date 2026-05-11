@@ -267,3 +267,7 @@ Dossiers clés :
 **Travaux en attente** :
 - **Conv Production** : Phase 2.5 Magic Link
 - **Conv Audits** : reprise des audits + modélisation événements (matchs / entraînements / tournois) + transmission des dettes Axe B (D1-D6) issues de la réconciliation OVAL-E (voir `dettes-axe-b-reconciliation-OVAL-E.md` déposé dans Drive)
+7. **CHECK constraint `personnes_type_personne_check` à étendre** : suite à la décision doctrinale (Doctrine-Import-OVAL-E v1.3 §14), ajouter `licencie_soigneur` et `licencie_arbitre` aux valeurs autorisées de `personnes.type_personne`.
+   - Migrer les fiches existantes classées par défaut `licencie_dirigeant` mais en réalité soigneurs (minimum MICHEL STEPHANE) vers `licencie_soigneur`
+   - Mettre à jour le script d'import OVAL-E (été 2026) pour appliquer le nouveau mapping
+   - Effort estimé : ~10 minutes côté SQL + migration ponctuelle
