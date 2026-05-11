@@ -16,9 +16,11 @@
  *   La clé anon ci-dessous est PUBLIQUE par design.
  *   Elle n'autorise que ce que les policies RLS Supabase permettent.
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
- *   via Magic Link (à venir Phase 2.1.3+).
+ *   via Magic Link (Phase 2.5).
  *
- * Version : 1.0 — mai 2026
+ * Version : 1.1 — mai 2026
+ *   v1.0 : initial (référentiels publics + getDashboardStats)
+ *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  */
 
 (function (global) {
@@ -30,7 +32,6 @@
   const SUPABASE_URL = 'https://fvfqffxaiaoygqhjtxwr.supabase.co';
 
   // CLÉ ANON PUBLIQUE — pas un secret, sécurisée par RLS Supabase
-  // À REMPLACER : colle ici la clé anon que tu as sauvegardée
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ2ZnFmZnhhaWFveWdxaGp0eHdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MjgyNzQsImV4cCI6MjA5NDAwNDI3NH0.1WgEmHTuI00CuKpWflvu5SqZ4ScoEpQgZ7ijJt5OQ00';
 
   // ============================================================
@@ -152,9 +153,9 @@
     // ----------------------------------------------------------
     // Note : ces stats sont basées sur les référentiels publics
     // (poles, categories, clubs). Les stats nécessitant les fiches
-    // Personne (294 personnes, etc.) ne sont PAS encore accessibles
-    // via la clé anon parce que la table personnes est protégée
-    // par RLS. Elles seront disponibles après authentification.
+    // Personne (323 personnes, etc.) passent par la RPC dédiée
+    // get_dashboard_stats() (SECURITY DEFINER) exposée publiquement
+    // pour les agrégats. cf. js/dashboard-stats.js
 
     /**
      * Renvoie un récap des chiffres clés disponibles publiquement.
@@ -184,8 +185,65 @@
     },
 
     // ----------------------------------------------------------
-    // AUTHENTIFICATION (utilisé plus tard Phase 2.1.3)
+    // AUTHENTIFICATION — Phase 2.5
     // ----------------------------------------------------------
+
+    /**
+     * Demande un Magic Link pour l'email fourni.
+     *
+     * Comportement :
+     *   - Si l'email existe dans auth.users : envoi du lien de connexion
+     *   - Sinon : crée un nouveau compte et envoi du lien (shouldCreateUser=true)
+     *   - La page de retour utilisée par Supabase est la "Site URL" configurée
+     *     dans Authentication > URL Configuration (=> https://manu-mom.github.io/mom-hub).
+     *
+     * Rate limit Supabase free tier : 4 emails/heure.
+     *
+     * @param {string} email - L'adresse email cible (sera trim+lowercase).
+     * @returns {Promise<{ok: boolean, error?: string}>}
+     */
+    async requestMagicLink(email) {
+      if (!email || typeof email !== 'string') {
+        return { ok: false, error: 'Email manquant' };
+      }
+      const cleanEmail = email.trim().toLowerCase();
+      // Validation très permissive (Supabase validera côté serveur de toute façon)
+      if (!cleanEmail.includes('@') || cleanEmail.length < 5) {
+        return { ok: false, error: 'Email invalide' };
+      }
+
+      const { error } = await client.auth.signInWithOtp({
+        email: cleanEmail,
+        options: {
+          shouldCreateUser: true
+          // Pas de emailRedirectTo : Supabase utilise la Site URL par défaut.
+          // À l'étape 2.5.5 on pourra forcer vers /dashboard.html si besoin.
+        }
+      });
+
+      if (error) {
+        return { ok: false, error: error.message };
+      }
+      return { ok: true };
+    },
+
+    /**
+     * Renvoie la session Supabase en cours (token + user), ou null si
+     * aucune session active.
+     *
+     * Préférer cette méthode à getCurrentUser() pour les checks de routing
+     * (plus rapide, lit le storage local sans aller-retour réseau).
+     *
+     * @returns {Promise<object|null>}
+     */
+    async getSession() {
+      const { data: { session }, error } = await client.auth.getSession();
+      if (error) {
+        console.error('MOM Hub: getSession() error', error);
+        return null;
+      }
+      return session;
+    },
 
     /**
      * Renvoie l'utilisateur connecté, ou null si non connecté.
@@ -212,7 +270,7 @@
 
   // Trace amicale dans la console
   console.log(
-    '%c🏉 MOM Hub · Supabase Client chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.1 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
