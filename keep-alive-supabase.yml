@@ -1,0 +1,70 @@
+# ============================================================
+# MOM Hub — Keep-alive Supabase
+# ============================================================
+# Ce workflow ping Supabase une fois par jour pour empêcher la
+# mise en pause automatique du projet sur le free tier (7 jours
+# sans activité = pause).
+#
+# Coût : ~5 minutes/mois sur les 2000 minutes gratuites
+# (soit 0,25% du quota gratuit utilisé).
+#
+# Auteur  : Manu (avec assistance Claude)
+# Date    : 2026-05-11
+# Version : 1.0
+# ============================================================
+
+name: Keep-alive Supabase
+
+on:
+  # Déclenchement automatique chaque jour à 03h00 UTC
+  # (= 04h00 heure de Paris en hiver, 05h00 en été)
+  schedule:
+    - cron: '0 3 * * *'
+
+  # Permet aussi de déclencher manuellement depuis l'onglet Actions
+  # (utile pour tester sans attendre 24h)
+  workflow_dispatch:
+
+jobs:
+  ping:
+    name: Ping Supabase REST API
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Pinger la table poles via REST API
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          # Vérification que les secrets sont bien définis
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "❌ Erreur : SUPABASE_URL ou SUPABASE_ANON_KEY non défini."
+            echo "   Va dans Settings > Secrets and variables > Actions"
+            echo "   et vérifie que les deux secrets existent."
+            exit 1
+          fi
+
+          # Requête HTTP GET sur la table poles (limit 1 = une seule ligne)
+          # On utilise la clé anon (publique) et la policy "Lecture publique des poles"
+          echo "📡 Ping Supabase : GET $SUPABASE_URL/rest/v1/poles?limit=1"
+
+          HTTP_CODE=$(curl -s -o response.json -w "%{http_code}" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            "$SUPABASE_URL/rest/v1/poles?limit=1&select=code")
+
+          echo "📬 Code HTTP : $HTTP_CODE"
+
+          if [ "$HTTP_CODE" -ne 200 ]; then
+            echo "❌ Échec du ping (HTTP $HTTP_CODE)"
+            echo "📄 Réponse :"
+            cat response.json
+            exit 1
+          fi
+
+          echo "✅ Ping réussi"
+          echo "📄 Échantillon de réponse :"
+          cat response.json
+          echo ""
+          echo "🎯 Projet Supabase actif — compteur d'inactivité remis à zéro"
