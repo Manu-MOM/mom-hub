@@ -713,12 +713,13 @@
   .auth-zone {
     display: none;
     position: absolute;
-    right: 64px;       /* au-delà des icônes recherche + notif */
+    right: 130px;      /* au-delà des icônes recherche + notif + user-profile */
     top: 50%;
     transform: translateY(-50%);
     align-items: center;
     gap: 10px;
     z-index: 10;
+    white-space: nowrap;
   }
   body.auth-resolved .auth-zone.show {
     display: inline-flex;
@@ -726,47 +727,56 @@
 
   /* Bouton "Se connecter" (état anonyme) */
   .btn-login {
-    display: inline-flex;
+    display: inline-flex !important;
     align-items: center;
     gap: 6px;
     padding: 8px 14px;
     background: var(--vert-prairie);
-    color: #fff;
+    color: #fff !important;
     border: 1px solid var(--vert-prairie);
     border-radius: 6px;
     font-family: inherit;
     font-size: 13px;
     font-weight: 600;
-    text-decoration: none;
+    text-decoration: none !important;
     cursor: pointer;
     transition: background-color 0.15s, border-color 0.15s;
+    white-space: nowrap;
+    line-height: 1;
+    min-height: 32px;
+    letter-spacing: 0;
   }
   .btn-login:hover {
     background: var(--vert-bouteille);
     border-color: var(--vert-bouteille);
+    color: #fff !important;
   }
 
   /* Boutons "Dashboard" et "Se déconnecter" (état admin) */
   .btn-auth {
-    display: inline-flex;
+    display: inline-flex !important;
     align-items: center;
     gap: 6px;
     padding: 6px 12px;
     background: transparent;
-    color: var(--ink-soft);
+    color: var(--ink-soft) !important;
     border: 1px solid var(--line);
     border-radius: 6px;
     font-family: inherit;
     font-size: 12px;
     font-weight: 600;
-    text-decoration: none;
+    text-decoration: none !important;
     cursor: pointer;
     transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+    white-space: nowrap;
+    line-height: 1;
+    min-height: 28px;
+    letter-spacing: 0;
   }
   .btn-auth:hover {
     background: var(--paper-warm);
     border-color: var(--ink-mute);
-    color: var(--ink);
+    color: var(--ink) !important;
   }
   .btn-auth:disabled {
     opacity: 0.6;
