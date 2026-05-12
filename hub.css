@@ -1,0 +1,482 @@
+/**
+ * MOM Hub · Hub CSS
+ * ============================================================
+ * Charte CSS commune aux 3 pages : index.html, login.html, dashboard.html.
+ *
+ * Contient :
+ *   1. Polices Google (Oswald, Manrope, JetBrains Mono) via @import
+ *   2. Palette de variables CSS (canonique + variables sémantiques feedback)
+ *   3. Reset + base typographique partagés
+ *   4. Topbar Hub partagée (acquis Phase 2.5, structure complète)
+ *   5. États d'auth pilotés par classes sur <body>
+ *   6. Media queries responsive de la topbar
+ *   7. Classes utilitaires partagées (login + dashboard) :
+ *      .page, .card, .btn, .feedback, .footer
+ *
+ * Ne contient PAS :
+ *   - Le layout spécifique à chaque page (grid, sidebar, etc.)
+ *   - Les composants métier (cards, kpi, etc. de index.html)
+ *   - Les composants spécifiques à login (.card centrée) ou dashboard
+ *
+ * Version : 1.0 — Phase 3 (12 mai 2026)
+ *   - Factorisation issue de la dette #11 (STATE.md)
+ *   - Palette canonique alignée sur celle d'index.html (15 variables)
+ *   - login.html et dashboard.html adoptent la topbar complète (cf. choix B+D session de conv Production)
+ */
+
+
+/* ============================================================
+ * 1. POLICES
+ * ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600;700&family=Manrope:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+
+/* ============================================================
+ * 2. PALETTE DE VARIABLES (canonique Hub)
+ * ============================================================ */
+:root {
+  --vert-bouteille: #0c3d24;
+  --vert-bouteille-deep: #062817;
+  --vert-prairie: #2d7a3e;
+  --vert-pelouse: #5fa56b;
+  --vert-light: rgba(45, 122, 62, 0.1);
+  --paper: #f8f5ec;
+  --paper-warm: #efe9d6;
+  --paper-deep: #e2d9bf;
+  --line: #cabe9f;
+  --gold: #d4a93a;
+  --clay: #b8451f;
+  --ink: #0c3d24;
+  --ink-soft: #2a4836;
+  --ink-mute: #6b7a6f;
+  --shadow: rgba(12, 61, 36, 0.1);
+
+  /* Variables sémantiques pour les messages de feedback
+     (utilisées par .feedback--success / --error / --info ci-dessous) */
+  --feedback-success-bg: #e7f3ec;
+  --feedback-success-fg: #1f5a32;
+  --feedback-error-bg: #fdecea;
+  --feedback-error-fg: #8a1b14;
+  --feedback-info-bg: #eaf1fa;
+  --feedback-info-fg: #1f4a82;
+}
+
+
+/* ============================================================
+ * 3. RESET + BASE TYPOGRAPHIQUE
+ * ============================================================ */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  font-family: 'Manrope', sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  line-height: 1.45;
+  background-image:
+    radial-gradient(circle at 12% 18%, rgba(45, 122, 62, 0.05) 0%, transparent 35%),
+    radial-gradient(circle at 88% 82%, rgba(212, 169, 58, 0.06) 0%, transparent 35%);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Texture papier (noise fractal), commune aux 3 pages */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E");
+  opacity: 0.05;
+  pointer-events: none;
+  z-index: 1;
+  mix-blend-mode: multiply;
+}
+
+/* Modificateur : pages qui veulent un layout fullscreen sans scroll
+   du body (index.html avec sa sidebar fixe + main col scrollable).
+   Les autres pages (login, dashboard) gardent le body scrollable. */
+body.fullscreen-app {
+  overflow: hidden;
+}
+
+
+/* ============================================================
+ * 4. TOPBAR HUB (partagée par les 3 pages)
+ * ============================================================
+ * Acquis Phase 2.5. Structure HTML attendue dans chaque page :
+ *
+ *   <header class="topbar">
+ *     <div class="brand">...</div>                  [toujours présent]
+ *     <div class="season-pill">...</div>            [optionnel]
+ *     <nav class="main-nav">...</nav>               [optionnel]
+ *     <div class="icon-row">...</div>               [optionnel]
+ *     <div class="user-profile">...</div>           [optionnel, mode admin]
+ *     <a class="login-pill">...</a>                 [optionnel, mode anonyme]
+ *   </header>
+ *
+ * Le grid de la topbar a 5 colonnes ; les éléments manquants
+ * laissent simplement leur colonne vide. Sur login.html (topbar
+ * réduite), seul .brand est présent et il s'aligne naturellement
+ * à gauche.
+ */
+
+.topbar {
+  background: var(--vert-bouteille);
+  color: var(--paper);
+  padding: 0 24px;
+  display: grid;
+  grid-template-columns: auto auto 1fr auto auto;
+  gap: 28px;
+  align-items: center;
+  border-bottom: 3px solid transparent;
+  position: relative;
+  height: 56px;
+  z-index: 2; /* pour passer au-dessus de body::before */
+}
+
+.topbar::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 3px;
+  background: linear-gradient(90deg,
+    var(--gold) 0%, var(--gold) 33%,
+    var(--vert-prairie) 33%, var(--vert-prairie) 66%,
+    var(--clay) 66%, var(--clay) 100%);
+}
+
+
+/* ---- 4.1 Brand (logo + nom du club) ---- */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.brand-logo {
+  width: 44px; height: 44px;
+  display: grid; place-items: center;
+  flex-shrink: 0;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));
+}
+.brand-logo img {
+  width: 100%; height: 100%;
+  object-fit: contain;
+}
+.brand-text h1 {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  font-size: 19px;
+  letter-spacing: 0.05em;
+  line-height: 1;
+  color: var(--paper);
+  text-transform: uppercase;
+}
+.brand-text p {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  color: var(--gold);
+  margin-top: 4px;
+  text-transform: uppercase;
+}
+
+
+/* ---- 4.2 Pilule saison ---- */
+.season-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(212, 169, 58, 0.08);
+  border: 1px solid rgba(212, 169, 58, 0.4);
+  border-radius: 20px;
+  padding: 6px 16px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  font-weight: 500;
+  color: var(--paper);
+  white-space: nowrap;
+}
+.season-pill::before {
+  content: '';
+  width: 6px; height: 6px;
+  background: var(--gold);
+  border-radius: 50%;
+}
+
+
+/* ---- 4.3 Nav principale ---- */
+.main-nav {
+  display: flex;
+  gap: 26px;
+  font-size: 13px;
+  font-weight: 500;
+  justify-content: center;
+}
+.main-nav a {
+  color: var(--paper);
+  text-decoration: none;
+  padding: 4px 2px;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.main-nav a:hover { color: var(--gold); }
+.main-nav a.active {
+  border-bottom-color: var(--gold);
+  color: var(--gold);
+}
+
+
+/* ---- 4.4 Boutons icônes (recherche, notif) ---- */
+.icon-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--gold);
+  width: 32px; height: 32px;
+  display: grid; place-items: center;
+  cursor: pointer;
+  border-radius: 50%;
+  position: relative;
+}
+.icon-btn:hover { background: rgba(212, 169, 58, 0.12); }
+.icon-btn.has-notif::after {
+  content: '';
+  position: absolute;
+  top: 6px; right: 6px;
+  width: 7px; height: 7px;
+  background: var(--clay);
+  border-radius: 50%;
+  border: 1.5px solid var(--vert-bouteille);
+}
+
+
+/* ---- 4.5 User-profile (mode admin) ---- */
+.user-profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 14px 5px 5px;
+  background: var(--vert-bouteille-deep);
+  border-radius: 24px;
+  border: 1px solid var(--vert-prairie);
+  cursor: pointer;
+}
+.avatar {
+  width: 32px; height: 32px;
+  background: var(--gold);
+  color: var(--vert-bouteille);
+  border-radius: 50%;
+  display: grid; place-items: center;
+  font-family: 'Oswald', sans-serif;
+  font-weight: 700;
+  font-size: 12px;
+}
+.user-info { line-height: 1.2; }
+.user-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--paper);
+}
+.user-role {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--gold);
+  margin-top: 1px;
+  letter-spacing: 0.04em;
+}
+
+
+/* ---- 4.6 Boutons d'action dans la puce admin (Admin + Déconnexion) ---- */
+.user-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin-left: 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+.user-action:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+.user-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+
+/* ---- 4.7 Pilule "Se connecter" (mode anonyme) ---- */
+.login-pill {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  background: var(--vert-prairie);
+  color: #fff;
+  border: 1px solid var(--vert-prairie);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  line-height: 1;
+}
+.login-pill:hover {
+  background: var(--vert-bouteille);
+  border-color: var(--vert-bouteille);
+  color: #fff;
+}
+
+
+/* ============================================================
+ * 5. ÉTATS D'AUTH (via classes sur <body>)
+ * ============================================================
+ * - Tant que pas résolu : on cache user-profile et login-pill
+ *   (évite tout flash de contenu avant la résolution de la session)
+ * - Anonyme : on cache user-profile, on montre login-pill
+ * - Admin : on garde user-profile (avec ses boutons), on cache login-pill
+ *
+ * Pour les pages sécurisées (dashboard.html) qui veulent masquer
+ * tout le contenu pendant la vérification de session, utiliser
+ * en complément la classe body.auth-pending (gérée page par page).
+ */
+body:not(.auth-resolved) .user-profile,
+body:not(.auth-resolved) .login-pill {
+  visibility: hidden;
+}
+body.auth-resolved.auth-anon .user-profile {
+  display: none;
+}
+body.auth-resolved.auth-anon .login-pill {
+  display: inline-flex;
+}
+body:not(.auth-admin) .user-action {
+  display: none;
+}
+
+
+/* ============================================================
+ * 6. MEDIA QUERIES RESPONSIVE TOPBAR
+ * ============================================================
+ * Sur écrans étroits, on cache la nav et la pilule saison pour
+ * laisser plus de place au logo + zone d'auth.
+ */
+@media (max-width: 1000px) {
+  .main-nav,
+  .season-pill {
+    display: none;
+  }
+}
+
+
+/* ============================================================
+ * 7. CLASSES UTILITAIRES PARTAGÉES (login + dashboard)
+ * ============================================================
+ * Ces classes sont utilisées par login.html et dashboard.html
+ * pour leur layout "carte centrée sous topbar". index.html ne
+ * les utilise pas (il a son propre layout grid via .app).
+ */
+
+/* Conteneur centré verticalement + horizontalement sous la topbar.
+   Utilisé typiquement pour une carte unique au milieu de la page (login). */
+.page-centered {
+  min-height: calc(100vh - 56px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  position: relative;
+  z-index: 2; /* au-dessus de body::before */
+}
+
+/* Carte blanche réutilisable (sans contrainte de largeur — à fixer
+   localement selon le contexte). Padding par défaut adapté à un
+   contenu compact ; surchargeable. */
+.card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.04);
+  padding: 24px;
+}
+
+/* Bouton principal (vert plein) */
+.btn {
+  width: 100%;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 8px;
+  background: var(--vert-prairie);
+  color: #fff;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.btn:hover:not(:disabled) {
+  background: var(--vert-bouteille);
+}
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Zone de message (success / error / info) — masquée par défaut */
+.feedback {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.45;
+  display: none;
+}
+.feedback.is-visible {
+  display: block;
+}
+.feedback--success {
+  background: var(--feedback-success-bg);
+  color: var(--feedback-success-fg);
+}
+.feedback--error {
+  background: var(--feedback-error-bg);
+  color: var(--feedback-error-fg);
+}
+.feedback--info {
+  background: var(--feedback-info-bg);
+  color: var(--feedback-info-fg);
+}
+
+/* Footer texte centré en bas de carte */
+.footer {
+  margin-top: 24px;
+  font-size: 12px;
+  color: var(--ink-mute);
+  text-align: center;
+  letter-spacing: 0.3px;
+}
+.footer-club {
+  font-family: 'Oswald', sans-serif;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
