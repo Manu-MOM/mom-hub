@@ -3,7 +3,7 @@
 > **Document de référence opérationnel.** À jour à la racine du repo, mis à jour à chaque fin de session significative.
 > Sert de point de reprise universel : toute personne (ou tout Claude) qui ouvre ce fichier doit pouvoir reprendre le travail sans question.
 
-**Dernière mise à jour : 13 mai 2026 (fin de session) — Étapes K (policies RLS SELECT Vague 1, dette k fermée), H (15 entraînements M14 fin de saison), et C/Phase 4.4 (widget "Prochain événement M14" en sidebar du portail) livrées. État précédent : Étape G (4 événements M14 importés sarmom-compos).**
+**Dernière mise à jour : 14 mai 2026 — C7-a livrée côté conv Audits : Doctrine-Import-OVAL-E v1.4 + Audit-OVAL-E-Joueurs-Partenaires-v1.md déposés dans Drive. Débloque Phase 4.3 (compositions/présences) côté Production, conditionné à C7-c (ALTER CHECK personnes_type_personne_check pour ajout `licencie_externe_partenaire`).**
 
 ---
 
@@ -319,7 +319,36 @@ M-4. **Onglet paramètres pour édition admin** des référentiels `groupes-joue
 
 M-5. **RPC `get_distance_between_sites(origine_uuid, destination_uuid)`** : wrapper côté serveur qui interroge le cache `distances_sites` puis l'API externe si besoin. Lié à M-2. Priorité : liée à M-2.
 
-C7. **🆕 Audit doctrine OVAL-E sur `personnes.bloc_5.club_principal_id != MOM`** (côté conv Audits, ouvert par v1.1) : confirmer que la doctrine OVAL-E v1.3 §11.3 (`non_licencie_au_mom`) couvre proprement le cas des joueurs partenaires d'entente qui ont leur licence FFR ailleurs (SAR par exemple). Si l'audit révèle une incompatibilité (ex. : `non_licencie_au_mom` est réservé aux contacts vraiment externes, pas aux joueurs actifs licenciés ailleurs), une révision doctrinale légère pourra être nécessaire (ajout d'une valeur `type_personne = licencie_externe_partenaire` ou similaire). **À traiter par la conv Audits avant que Phase 4.3 commence à peupler `personnes` avec des joueurs SAR.** Priorité : moyenne, liée à Phase 4.3.
+C7. ✅ **Audit doctrine OVAL-E sur `personnes.bloc_5.club_principal_id != MOM`** — **PARTIELLEMENT RÉSOLU (14 mai 2026, conv Audits)** par 2 livrables Drive :
+   - `Audit-OVAL-E-Joueurs-Partenaires-v1.md` (Drive `00 - Documentation/`, fileId `12_akokLYOUpyk-_CKIkW5H8WzvleEqiO`) — doctrine retenue + analyse des 3 pistes envisagées + 8 actions en cascade
+   - `Doctrine-Import-OVAL-E-v1.4.md` (Drive `00 - Documentation/`, fileId `1Va9h9lQVIXHmPfTRK0s5ZuoQoGAy3dwQ`) — révision doctrinale légère : nouvelle valeur `licencie_externe_partenaire` ajoutée au tableau §14, précision §11.3 (la mention "Pas concernés par les imports OVAL-E" ne s'applique qu'aux contacts externes type Winckler/Campese/Jacob, pas aux partenaires d'entente), nouveau §11.7 dédié aux joueurs partenaires d'entente.
+
+   **Doctrine retenue (résumé)** : les joueurs SAR/ASCS d'entente sont créés dans `personnes` Supabase comme fiches complètes, avec `bloc_5.club_principal_uuid = club-sar` ou `club-ascs` (pas `club-mom`), `type_personne = licencie_externe_partenaire` (8e valeur OVAL-E v1.4). Attache via `equipe_joueurs.club_provenance_id` (Vague 1, déjà prévu pour ce cas). Blocs sensibles (coordonnées, famille, préférences, documents) restent vides ou minimaux côté MOM par doctrine RGPD (responsabilité club d'origine).
+
+   **Sous-dettes ouvertes après C7-a** (voir détails ci-dessous dans la nouvelle section "Dettes en cascade C7") :
+   - **C7-b** (Audits, priorité moyenne) : MAJ Audit-Personnes-MOM-Hub v1.1 → v1.2 pour intégrer le cas
+   - **C7-c** (Production, **préalable Phase 4.3**) : ALTER CHECK constraint `personnes_type_personne_check`
+   - **C7-d** (Production) : policies RLS write par rôle, à grouper avec dette (i)
+   - **C7-e** (Production, Phase 4.3) : RPC `get_vivier_compo` doit inclure les `licencie_externe_partenaire`
+   - **C7-f** (Production, préalable Phase 4.3) : choisir canal d'import (SportEasy / Excel manuel / OVAL-E partenaires future)
+   - **C7-g** (long terme) : passerelle OVAL-E partenaires côté FFR
+   - **C7-h** (à l'usage réel) : workflow changement de club d'un joueur en cours de saison
+
+### 🔵 Dettes en cascade ouvertes par C7-a (14 mai 2026 — conv Audits)
+
+C7-b. **MAJ `Audit-Personnes-MOM-Hub-v1.1.md` → v1.2** pour intégrer le cas joueur partenaire d'entente dans la grille de conformité 9-blocs (§ Conformité). Priorité : moyenne, peut attendre. Côté **conv Audits**.
+
+C7-c. 🔴 **ALTER CHECK constraint `personnes_type_personne_check`** pour autoriser la nouvelle valeur `licencie_externe_partenaire`. Pattern connu, identique à dette #8 résolue le 12 mai (ajout `licencie_soigneur` + `licencie_arbitre`). **Préalable bloquant à Phase 4.3** (sans cette extension, l'INSERT des fiches SAR/ASCS échouera). Effort estimé : ~10 minutes côté SQL. Priorité : haute. Côté **conv Production**.
+
+C7-d. **Policies RLS write par rôle** : prévoir le cas `licencie_externe_partenaire` lors de l'écriture des policies write par rôle (dette (i) ouverte). Un coach `entente` (ex: coach SAR autorisé Hub car aussi coach de l'entente) doit pouvoir LIRE ces fiches mais pas les MODIFIER. Le maintien reste côté MOM (admin) ou via canal d'import privilégié. À grouper avec dette (i). Côté **conv Production**.
+
+C7-e. **RPC `get_vivier_compo`** (Phase 4.3) : doit inclure naturellement les fiches `licencie_externe_partenaire` rattachées à l'équipe via `equipe_joueurs`. Pas de jointure spéciale — le LEFT JOIN à `equipe_joueurs` filtré par `equipe_id` retourne tous les attachés, quel que soit leur `type_personne` ou leur `club_principal_uuid`. Côté **conv Production**, Phase 4.3.
+
+C7-f. **Choisir le canal d'import** pour le peuplement initial M14 (39 fiches SAR/ASCS) + futurs M16 (~35) et M19 (similaire). 3 options envisagées : (1) Excel manuel transmis par coachs SAR/ASCS, (2) extraction SportEasy si effectifs synchronisés là-bas, (3) passerelle OVAL-E partenaires future (n'existe pas au 14 mai, dépend FFR). Recommandation audit : démarrer par (1) tant que (3) n'est pas disponible. Préalable à l'usage compos. Côté **conv Production**, Phase 4.3.
+
+C7-g. **Passerelle OVAL-E partenaires** : canal officiel d'import automatique des effectifs partenaires d'entente, non disponible au 14 mai 2026, dépend de la FFR (côté MOM, surveiller les évolutions OVAL-E). Long terme.
+
+C7-h. **Workflow de changement de club** : si un joueur partenaire est muté SAR → MOM ou inverse en cours de saison, `personnes.bloc_5.club_principal_uuid` doit être mis à jour, ainsi que `type_personne` (`licencie_externe_partenaire` ↔ `licencie_competition`). À documenter dans le workflow d'import quand le cas se présentera. Côté **conv Production**, à l'usage réel.
 
 ### 🔵 Dette technique mineure ouverte par Phase 3
 
@@ -385,7 +414,11 @@ Dossier `MOM Hub/2025-2026/` :
 | `Phase-2-0-decisions-architecture.md` | dans `1CkeBrMBJGChqGui4r7mVkHa3NwaLwOSK` | Acte décisions Phase 2.0 |
 | `MOM-Core-Synthese-globale-v2.md` | `1X0FjB6Z9eVlxH0VcEQ4le2wf8eCMmmly` | Synthèse globale modèle |
 | `MOM-Core-Cartographie-Globale-v2.md` | `1N2I86T751XneQT9fx1wCQWusmeCz235T` | Cartographie complète |
-| `Doctrine-Import-OVAL-E-v1.1.md` | `1puTaNLXno99T4C9ECkEIgi1YGbk6bE41` | Doctrine import licences FFR (v1.2 et v1.3 ajoutées le 11 mai 2026 dans le même dossier Drive) |
+| `Doctrine-Import-OVAL-E-v1.1.md` | `1puTaNLXno99T4C9ECkEIgi1YGbk6bE41` | Doctrine import licences FFR — v1.1 historique |
+| `Doctrine-Import-OVAL-E-v1.2.md` | `1dUMeJZfbxSHhWT6Bn2diso1mwbhXMHJz` | Doctrine import licences FFR — v1.2 (11 mai 2026) |
+| `Doctrine-Import-OVAL-E-v1.3.md` | `11mwHCbfx2mkehktMzItqmXVkntFm7BCf` | Doctrine import licences FFR — v1.3 (11 mai 2026) |
+| `Doctrine-Import-OVAL-E-v1.4.md` | `1Va9h9lQVIXHmPfTRK0s5ZuoQoGAy3dwQ` | **Doctrine import licences FFR — v1.4 (14 mai 2026)** — canonique, ajoute `licencie_externe_partenaire` (8e valeur §14) et §11.7 dédié aux partenaires d'entente. Résout C7. |
+| `Audit-OVAL-E-Joueurs-Partenaires-v1.md` | `12_akokLYOUpyk-_CKIkW5H8WzvleEqiO` | **Audit C7 (14 mai 2026)** — doctrine de représentation des joueurs SAR/ASCS d'entente en base Supabase. Analyse 3 pistes, retient (a), abandonne (b) et (c). 8 actions en cascade. |
 | `Conception-Portail-Phase-3.md` | `12xrICwk5NTzk1XZLpq964CkWwhft3zc2` | Conception portail Phase 3 livrée 12 mai 2026 |
 | `Audit-Referentiels-v1.md` | dans `1CkeBrMBJGChqGui4r7mVkHa3NwaLwOSK` | Audit des 6 référentiels métier (11 mai 2026) |
 | `Schema-cible-Supabase-aptitudes.md` | dans `1CkeBrMBJGChqGui4r7mVkHa3NwaLwOSK` | Pattern de migration Drive → Supabase (12 mai 2026) |
@@ -417,7 +450,12 @@ Dossiers clés :
 6. Vérifier que `login.html` affiche bien `v1.4 chargé` dans la console et que l'envoi d'un Magic Link sur ton email aboutit sur `dashboard.html` avec session active
 
 **Travaux en attente** :
-- **Conv Production** : Phase 3 + 4.1.B + **4.1.A complète (13 mai matin)** + **4.2.A noyau (13 mai soir)** + **4.2.B RPC événements + 4.2.C wrappers JS (13 mai soir tard)** + **Étape G peuplement événements M14 (13 mai vraiment très tard)** + **Étapes K (RLS read Vague 1) + H (15 entraînements M14) + C/Phase 4.4 (widget Prochain événement)** terminées. **Prochain travail prioritaire = Phase 4.3 (compositions/présences)** mais **conditionné par instruction dette C7** (audit doctrine OVAL-E pour joueurs SAR partenaires d'entente). Si C7 pas encore instruite : alternatives = dette (i) RLS write par rôle (avec dette (l) durcissement INSERT distances_sites), ou Phase 4.4 P4-2 greeting J-N. Travaux annexes en attente :
+- **Conv Production** : Phase 3 + 4.1.B + **4.1.A complète (13 mai matin)** + **4.2.A noyau (13 mai soir)** + **4.2.B RPC événements + 4.2.C wrappers JS (13 mai soir tard)** + **Étape G peuplement événements M14 (13 mai vraiment très tard)** + **Étapes K (RLS read Vague 1) + H (15 entraînements M14) + C/Phase 4.4 (widget Prochain événement)** terminées. **C7 partiellement résolue le 14 mai (C7-a livrée par conv Audits)**. Phase 4.3 (compositions/présences) **désormais débloquée doctrinalement**, conditionnée à **3 sous-dettes Production préalables** :
+  - **C7-c (PRÉALABLE BLOQUANT)** : ALTER CHECK constraint `personnes_type_personne_check` pour ajout `licencie_externe_partenaire` (~10 min, pattern identique dette #8).
+  - **C7-f (préalable opérationnel)** : choisir le canal d'import des fiches partenaires (Excel manuel recommandé pour démarrer).
+  - **C7-e** : la RPC `get_vivier_compo` à écrire en Phase 4.3 doit inclure les `licencie_externe_partenaire` (déjà couvert par le LEFT JOIN à `equipe_joueurs`).
+
+  Alternatives possibles si Phase 4.3 reportée : dette (i) RLS write par rôle (à grouper avec C7-d et dette (l) durcissement INSERT distances_sites), ou Phase 4.4 P4-2 greeting J-N. Travaux annexes en attente :
   - (a) **Implémentation des tables modélisées** (cf. `Modelisation-Evenements-v1.1.md` §4) :
     - Vague 1 ✅ **PEUPLÉE 13 mai 2026** : `ententes` (11 lignes), `equipes` (11 lignes), `equipe_joueurs` (23 attaches M14 MOM `regulier`)
     - Phase 4.1.B ✅ **TERMINÉE** : `sql/07-sites.sql` (sites + distances_sites créés ; **3 sites MOM en prod** : Brencklé, Clubhouse, Holtzplatz — seuls sites listés dans le sql/07)
@@ -458,10 +496,10 @@ Dossiers clés :
   - **Phase 4.4** Intégration UI portail : `dashboard-stats.js` v3 avec prochain match dans le greeting (P4-2) et nouveau widget sidebar (P4-3).
   - **Phase 4.5** API distances (optionnel) : intégration OpenRouteService + cache, RPC `get_distance_between_sites`, secret API en GitHub Actions (M-2 + M-5).
 
-- **Conv Audits** : modélisation événements **v1.1 livrée** (12 mai 2026 soir, après arbitrage conflit Vague 1). Travaux restants côté Audits :
-  - **🆕 Dette C7 (priorité)** : audit doctrine OVAL-E sur `personnes.bloc_5.club_principal_id != MOM` pour les joueurs partenaires d'entente. **À traiter avant Phase 4.3** (peuplement compositions avec joueurs SAR).
+- **Conv Audits** : modélisation événements v1.1 livrée (12 mai) + **C7-a livrée (14 mai)** : Doctrine-Import-OVAL-E v1.4 + Audit-OVAL-E-Joueurs-Partenaires-v1 déposés Drive. Travaux restants côté Audits :
+  - **C7-b (priorité moyenne)** : MAJ `Audit-Personnes-MOM-Hub` v1.1 → v1.2 pour intégrer le cas partenaire d'entente dans la grille 9-blocs. Peut attendre.
   - Lots 2 et 3 de l'audit référentiels (bloqués par tiers : règlement LRGER 2025-2026, Lohann pour EDR aptitudes, préparateur physique pour barèmes).
-  - Reprise des **audits modules** (Compositions v2, Suivi-Match, Rapport, Stats, Bilans) à la lumière de la modélisation événements v1.1 pour MAJ post-Phase 2.5/3.
+  - Reprise des **audits modules** (Compositions v2, Suivi-Match, Rapport, Stats, Bilans) à la lumière de la modélisation événements v1.1 pour MAJ post-Phase 2.5/3/4.
   - Modélisation **événements extra-sportifs** (dette Phase 5, C2 du doc modélisation).
   - Modélisation **compo adverse + joueurs adverses** (dette C1 du doc modélisation, reportée après quelques mois d'usage de l'app).
 - **Conv Conception Portail** : a livré `Conception-Portail-Phase-3.md` v1.0 (Drive `12xrICwk5NTzk1XZLpq964CkWwhft3zc2`). Pour Phase 4, rouvrir un cycle Conception si besoin de définir le portail par rôle (P4-1), ou de spécifier précisément l'UX greeting/widget prochain match maintenant que la modélisation événements v1.1 est livrée (P4-2/P4-3 débloquées).
