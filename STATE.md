@@ -307,7 +307,7 @@ Dossiers clés :
 3. Lire `Modelisation-Evenements-v1.md` (le document de référence pour les futurs CREATE TABLE de Phase 4)
 4. Vérifier que la chaîne Hub → Supabase fonctionne toujours (ouvrir `https://manu-mom.github.io/mom-hub/`, F12 console, doit afficher `✅ MOM Hub Dashboard: stats mises à jour depuis Supabase` ET `🏉 MOM Hub · Supabase Client v1.4 chargé`)
 5. Vérifier que le portail affiche bien **323 personnes** (compteur dynamique post-Phase 2.4.5) et que les boutons d'auth réagissent (icône grille + flèche en mode admin, pilule verte "Se connecter" en mode anonyme)
-6. Vérifier que `login.html` affiche bien `v1.3 chargé` dans la console et que l'envoi d'un Magic Link sur ton email aboutit sur `dashboard.html` avec session active
+6. Vérifier que `login.html` affiche bien `v1.4 chargé` dans la console et que l'envoi d'un Magic Link sur ton email aboutit sur `dashboard.html` avec session active
 
 **Travaux en attente** :
 - **Conv Production** : la Phase 3 est terminée. Travaux prioritaires pour la Phase 4 :
@@ -317,6 +317,14 @@ Dossiers clés :
   - (d) **Dette #8** (CHECK constraint `type_personne` à étendre) : prêt à exécuter (~10 min).
   - (e) Dettes mineures : externalisation logo M2M (P3-mineure), déplacement `04-auth-roles.sql` vers `sql/` (P3-mineure-2).
   - (f) Déploiement comptes `coach` et `viewer` réels (préalable à P4-1).
+
+  **Plan de découpage Phase 4 acté (12 mai 2026 soir)** — 5 sessions de 2-3 h chacune :
+  - **Phase 4.1** Fondations administratives : `sql/06-equipes.sql` + vue `equipes_ententes`, `sql/07-sites.sql` + `distances_sites` (sans API encore), peuplement initial (11 équipes, sites Brencklé/Holtzplatz/Clubhouse + adversaires fréquents). K2 ÉQUIPES du portail bascule en dynamique (ferme partie de dette #5).
+  - **Phase 4.2** Noyau événements : `sql/08-evenements.sql`, `sql/09-joueurs-externes.sql`, `sql/10-evenement-encadrants.sql`, extension `js/supabase-client.js` v1.5 avec 2-3 wrappers (`getEvenementsAVenir`, `getProchainEvenementParEquipe`).
+  - **Phase 4.3** Compositions + présences : `sql/11-compositions.sql` + `composition_joueurs`, `sql/12-presences.sql`, 2 ALTER TABLE `personnes` (M-1 + bloc_6.`groupe_indicatif_uuid`), référentiel `groupes-joueur.json` dans Drive, RPC `get_vivier_compo` (la plus complexe).
+  - **Phase 4.4** Intégration UI portail : `dashboard-stats.js` v3 avec prochain match dans le greeting (P4-2) et nouveau widget sidebar (P4-3).
+  - **Phase 4.5** API distances (optionnel) : intégration OpenRouteService + cache, RPC `get_distance_between_sites`, secret API en GitHub Actions (M-2 + M-5).
+
 - **Conv Audits** : modélisation événements **livrée** (12 mai 2026). Travaux restants côté Audits :
   - Lots 2 et 3 de l'audit référentiels (bloqués par tiers : règlement LRGER 2025-2026, Lohann pour EDR aptitudes, préparateur physique pour barèmes).
   - Reprise des **audits modules** (Compositions v2, Suivi-Match, Rapport, Stats, Bilans) à la lumière de la modélisation événements pour MAJ post-Phase 2.5/3.
