@@ -3,7 +3,7 @@
 > **Document de référence opérationnel.** À jour à la racine du repo, mis à jour à chaque fin de session significative.
 > Sert de point de reprise universel : toute personne (ou tout Claude) qui ouvre ce fichier doit pouvoir reprendre le travail sans question.
 
-**Dernière mise à jour : 12 mai 2026 — fin Phase 3 (Refonte portail + topbar partagée)**
+**Dernière mise à jour : 12 mai 2026 — fin Phase 3 + synchro conv Audits (dettes Axe B / référentiels)**
 
 ---
 
@@ -208,16 +208,23 @@ on conflict (numero_licence_ffr) do update set
 ### ✅ Dettes résolues le 11 mai 2026 (Phase 2.4.5)
 
 1. ~~**Écart 293 vs 294 personnes**~~ ✅ **RÉSOLU** : OVAL-E a donné l'arbitrage. Le 294 était le chiffre cible du script de migration Phase 2.0 ; le 293 réel résultait d'un doublon perdu (LUTZ Hugo parent fantôme). La base est maintenant à 323 lignes dont 298 licenciées FFR alignées OVAL-E.
-2. ~~**Écart 24 vs 23 M14**~~ ✅ **RÉSOLU** : Supabase a 24 M14 = 16 M-14 + 8 F-15 intégrées. SportEasy doit avoir 1 F-15 manquante (Eden FAUVEL et Auriane DECOURCELLE sont les 2 F-15 qui n'étaient pas dans l'audit Personnes — à vérifier dans SportEasy).
+2. ~~**Écart 24 vs 23 M14**~~ ✅ **RÉSOLU** : Supabase a 24 M14 = 16 M-14 + 8 F-15 intégrées. Les 8 F-15 sont **confirmées par `Audit-Personnes-MOM-Hub v1.1 §N3`** (publié par la conv Audits le 11 mai 2026, après application de la doctrine §5 sur le stockage des F-15). Les 2 noms ajoutés par rapport à l'audit initial (qui n'en référençait que 6) sont **Eden FAUVEL** et **Auriane DECOURCELLE**. Si SportEasy n'en référence que 7, c'est probablement l'une de ces deux qui manque côté SportEasy — à vérifier.
 
 ### 🟡 Dettes encore actives
 
 3. **293 fichiers JSON personnes** ont nom-de-fichier ≠ uuid contenu interne. Détecté lors de la migration Phase 2.0. Pas bloquant tant qu'on ne ré-importe pas, mais à corriger pour la Vague 2.
-4. **Référentiels Drive `01 - Référentiels/`** : 6 fichiers JSON existent (postes, ateliers, aptitudes, conformite-ffr, observables-match, tests-physiques) mais leur **contenu et conformité à la doctrine reste à évaluer** (Axe B / conv Audits).
+4. **Référentiels Drive `01 - Référentiels/`** ⚠️ **PARTIELLEMENT RÉSOLU** : audit complet publié le 11 mai 2026 soir (`Audit-Referentiels-v1.md`, Drive), puis **Lot 1 "cohérence structurelle" soldé le 12 mai 2026 matin** par la conv Audits :
+   - `aptitudes.json` v1.1 (refonte cat B avec structure plate et `categories_applicables` explicite, UUIDs renommés `apt-B-M14-NNN` → `apt-B-NNN`, ajout `actif` + `ordre` pour préparation onglet paramètres)
+   - `conformite-ffr.json` v1.2 (`_meta` enrichi avec champs obligatoires/optionnels, `statut: "a_confirmer"` sur 3 règles avec `source_a_consulter`, `_couverture_a_completer` documentant le trou F-18/F+18)
+   - `postes.json` v1.2 (`_couverture_a_completer` documentant la lacune des formats X et 7)
+   - `observables-match.json` v1.1 (note `_note_jeu_collectif` expliquant l'absence de `libelle_long` et `saisie_associee` sur ce sous-type)
+   - `Schema-cible-Supabase-aptitudes.md` v1.0 (anticipation migration Drive → Supabase pour quand l'onglet paramètres sera implémenté)
+
+   **Reste ouvert (Lots 2 et 3)** : couverture catégorielle F-18/F+18, peuplement métier ateliers/aptitudes EDR/barèmes physiques. Bloqué par dépendances externes (règlement LRGER 2025-2026, Lohann, préparateur physique), pas faisable seul en conv Audits.
 5. ~~**Chiffres en dur résiduels dans index.html**~~ ⚠️ **PARTIEL** : "16 Sites" et "11 Équipes" restent en dur tant que les tables `sites` et `equipes` ne sont pas créées/remplies (Phase 2.2 future). Le compteur "323 personnes" est dynamique via la RPC. **24 M14** est aussi dynamique depuis Phase 2.4.5.
 6. ~~**Date `VENDREDI 8 MAI 2026 · HUB INITIALISÉ` dans le HTML statique**~~ ✅ **RÉSOLU** (11 mai 2026, Phase 2.5.6) : remplacé par "TABLEAU DE BORD" (date injectée dynamiquement par JS au format `toLocaleDateString('fr-FR')`). Greeting-sub neutralisé en "Effectifs synchronisés avec OVAL-E" (et probablement écrasé par `dashboard-stats.js` au runtime avec le compteur dynamique). Panneau sidebar "État du Hub" : "Hub initialisé aujourd'hui" → "Hub en production".
 7. ~~**Désalignement Drive ↔ Supabase post-réconciliation OVAL-E**~~ ✅ **ARBITRÉ** (11 mai 2026, conv Audits) : Drive figé au 10 mai 2026 pour la saison 2025-2026, Supabase devient source autoritative des données vivantes. Décision saison 2026-2027 reportée à l'été. Doctrine : `Doctrine-Import-OVAL-E-v1.3.md §13`. Pas d'action Production requise.
-8. **CHECK constraint `personnes_type_personne_check` à étendre** (arbitré 11 mai 2026) : suite à la décision doctrinale `Doctrine-Import-OVAL-E-v1.3.md §14`, ajouter `licencie_soigneur` et `licencie_arbitre` aux valeurs autorisées de `personnes.type_personne` (fidélité à la nomenclature FFR : Joueur / Dirigeant / Éducateur / Soigneur / Arbitre).
+8. **CHECK constraint `personnes_type_personne_check` à étendre** (arbitré 11 mai 2026, **prêt à exécuter** depuis publication doctrine §14) : la `Doctrine-Import-OVAL-E-v1.3.md §14` est désormais publiée (mapping qualités FFR → `type_personne` officiel : 5 valeurs licenciées + `non_licencie` + `non_licencie_au_mom`). Le SQL est donc cadré, plus d'ambiguïté de spec. Ajouter `licencie_soigneur` et `licencie_arbitre` aux valeurs autorisées de `personnes.type_personne` (fidélité à la nomenclature FFR : Joueur / Dirigeant / Éducateur / Soigneur / Arbitre).
    - Migrer les fiches existantes classées par défaut `licencie_dirigeant` mais en réalité soigneurs (minimum MICHEL STEPHANE) vers `licencie_soigneur`
    - Mettre à jour le script d'import OVAL-E (été 2026) pour appliquer le nouveau mapping `qualite_ffr_principale → type_personne` du §14
    - Effort estimé : ~10 minutes côté SQL + migration ponctuelle
