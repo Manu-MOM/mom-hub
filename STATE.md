@@ -3,7 +3,7 @@
 > **Document de référence opérationnel.** À jour à la racine du repo, mis à jour à chaque fin de session significative.
 > Sert de point de reprise universel : toute personne (ou tout Claude) qui ouvre ce fichier doit pouvoir reprendre le travail sans question.
 
-**Dernière mise à jour : 12 mai 2026 — fin Phase 3 + modélisation événements livrée (conv Audits)**
+**Dernière mise à jour : 12 mai 2026 (soir) — fin Phase 3 + Phase 4.1.B sites livrée + modélisation événements v1.1 livrée (conv Audits, après arbitrage conflit Vague 1)**
 
 ---
 
@@ -185,7 +185,13 @@ OVAL-E export (XLSX) ── parse ──> normalisation ──> upsert idempoten
 
 ### ✅ Dette résolue le 12 mai 2026 (conv Audits — modélisation événements)
 
-14. ~~**Modélisation entités événements / compositions / présences**~~ ✅ **RÉSOLU** (12 mai 2026, conv Audits) : document `Modelisation-Evenements-v1.md` publié dans Drive `00 - Documentation/` (~69 000 caractères, 1 344 lignes). **9 entités principales** modélisées conceptuellement avec schémas SQL complets (`evenements`, `compositions`, `composition_joueurs`, `presences`, `equipes`, `sites`, `distances_sites`, `evenement_encadrants`, `joueurs_externes`). **22 décisions de cadrage** actées, **10 cas d'usage** couverts (match standard, ententes SAR×MOM, triangulaire M-14, quadrangulaire, Challenge Vié multi-phases, tournoi multi-jours, stage EDR multi-catégories, EDR mono-catégorie, matchs simultanés, dépannage hors-catégorie). Cycle de vie événement à 5 états + `annule`. Référentiel `groupes-joueur.json` v1.0 généré à déposer en parallèle dans Drive `01 - Référentiels/`. **Débloque P4-2** (greeting `J-N AVANT MATCH`) **et P4-3** (KPI prochain match). 5 dettes Production transmises (M-1 à M-5 ci-dessous) + 6 dettes conceptuelles consignées dans le document final (§9.2).
+14. ~~**Modélisation entités événements / compositions / présences**~~ ✅ **RÉSOLU** (12 mai 2026, conv Audits) : document `Modelisation-Evenements-v1.1.md` publié dans Drive `00 - Documentation/` (~89 000 caractères, 1 482 lignes). v1.0 conservée pour traçabilité mais **supersedée par v1.1** (conflit Vague 1 détecté en soirée par conv Production, arbitrage Option C : conserver schémas Vague 1 intacts, adapter la modélisation événements).
+
+   **6 nouvelles tables Supabase** à créer : `evenements`, `compositions`, `composition_joueurs`, `presences`, `evenement_encadrants`, `sites`, `distances_sites` (les 3 tables `ententes`, `equipes`, `equipe_joueurs` Vague 1 sont **conservées telles quelles** et juste peuplées).
+
+   **22 décisions de cadrage** actées (dont 6 révisées en v1.1 : #1, #12, #13, Q-eq-1 (b) abandonnée, Q-eq-3 (a) révisée, #16 précisée). **10 cas d'usage** couverts (match standard, ententes SAR×MOM, triangulaire M-14, quadrangulaire, Challenge Vié multi-phases, tournoi multi-jours, stage EDR multi-catégories, EDR mono-catégorie, matchs simultanés, dépannage hors-catégorie). Cycle de vie événement à 5 états + `annule`. Référentiel `groupes-joueur.json` **v1.1** (doctrine d'usage clarifiée : référentiel des valeurs valides, valeur appliquée vit dans `equipe_joueurs.niveau_profil` Vague 1).
+
+   **Débloque P4-2** (greeting `J-N AVANT MATCH`) **et P4-3** (KPI prochain match). 5 dettes Production transmises (M-1 à M-5, dont **M-1 réduit en v1.1**) + 7 dettes conceptuelles consignées dans le document final §9.2 (dont **C7 nouvelle** : audit doctrine OVAL-E sur joueurs partenaires d'entente).
 
 ### 🔵 Dettes ouvertes par la Phase 3
 
@@ -193,7 +199,7 @@ Issues directes du doc `Conception-Portail-Phase-3.md` §3 (12 dettes consolidé
 
 P4-1. **Adaptation portail par rôle** (`coach`, `viewer`) : en Phase 3, tous les rôles voient le même portail avec mêmes 18 outils, mêmes sections, mêmes KPI, même sidebar. Quand des comptes `coach` et `viewer` réels existeront et auront fourni des retours d'usage, calibrer un portail dédié (filtrage sections vs vignettes, sidebar personnalisée, KPI contextualisés). Référence doc §2.6.
 
-P4-2. **Greeting contextualisé `J-N AVANT MATCH`** ⚠️ **DÉBLOQUÉ** (12 mai 2026) : la table `evenements` est désormais modélisée (cf. dette résolue #14 et `Modelisation-Evenements-v1.md`). Implémentation possible en Phase 4 par conv Production une fois les CREATE TABLE exécutés. RPC suggérée : `get_evenements_a_venir(equipe_uuid, n_jours)`.
+P4-2. **Greeting contextualisé `J-N AVANT MATCH`** ⚠️ **DÉBLOQUÉ** (12 mai 2026) : la table `evenements` est désormais modélisée (cf. dette résolue #14 et `Modelisation-Evenements-v1.1.md`). Implémentation possible en Phase 4 par conv Production une fois les CREATE TABLE exécutés. RPC suggérée : `get_evenements_a_venir(equipe_uuid, n_jours)`.
 
 P4-3. **KPI ou widget « prochain match / présences / compo »** ⚠️ **DÉBLOQUÉ** (12 mai 2026) : idem P4-2. RPC suggérée : `get_prochain_evenement_par_equipe(equipe_uuid)`. Pertinent uniquement pour rôle `coach`.
 
@@ -207,9 +213,11 @@ P4-7. **Outil de listing filtré des fiches** (cible des liens carte 2 Qualité 
 
 ### 🔵 Dettes ouvertes par la modélisation événements (12 mai 2026 — conv Audits)
 
-Issues directes du doc `Modelisation-Evenements-v1.md` §9.1. Toutes destinées à la conv Production.
+Issues directes du doc `Modelisation-Evenements-v1.1.md` §9.1. Destinées à la conv Production (M-1 à M-5), sauf C7 destinée à la conv Audits.
 
-M-1. **ALTER TABLE personnes — bloc_5** : ajouter `categorie_surclassement_uuid UUID NULL REFERENCES categories(id)` pour tracer les surclassements officiels. **Préalable** à la prise en compte propre des surclassements dans le vivier de composition (cf. décision cadrage #20 du document). Priorité : moyenne.
+M-1. **ALTER TABLE personnes — bloc_5** 🟡 **RÉDUIT en v1.1** : ajouter `categorie_surclassement_uuid UUID NULL REFERENCES categories(id)` pour tracer les surclassements officiels. **Préalable** à la prise en compte propre des surclassements dans le vivier de composition (cf. décision cadrage #20). Priorité : moyenne.
+
+   **Note v1.1** : l'ALTER `bloc_6.groupe_indicatif_uuid` prévu en v1.0 est **abandonné**. La valeur du groupe (Performance / Développement / Initiation) est portée par `equipe_joueurs.niveau_profil` (Vague 1, TEXT) au niveau de l'attache joueur ↔ équipe, pas par les fiches Personne globales. Cohérent avec le commentaire SQL Vague 1 qui mentionnait déjà "Performance / Développement / Initiation pour M14".
 
 M-2. **Intégration API d'itinéraire + cache `distances_sites`** : pour le calcul automatique des distances et durées de trajet inter-sites. Recommandation : **OpenRouteService** (free tier 2 000 req/jour, respecte la doctrine budget 0€) ; alternative : OSRM auto-hébergé. Pattern lazy (calcul à la demande, mise en cache ~1 an). Clé API stockée en secret GitHub Actions / variable Supabase, **jamais en commit**. Priorité : moyenne.
 
@@ -219,11 +227,17 @@ M-4. **Onglet paramètres pour édition admin** des référentiels `groupes-joue
 
 M-5. **RPC `get_distance_between_sites(origine_uuid, destination_uuid)`** : wrapper côté serveur qui interroge le cache `distances_sites` puis l'API externe si besoin. Lié à M-2. Priorité : liée à M-2.
 
+C7. **🆕 Audit doctrine OVAL-E sur `personnes.bloc_5.club_principal_id != MOM`** (côté conv Audits, ouvert par v1.1) : confirmer que la doctrine OVAL-E v1.3 §11.3 (`non_licencie_au_mom`) couvre proprement le cas des joueurs partenaires d'entente qui ont leur licence FFR ailleurs (SAR par exemple). Si l'audit révèle une incompatibilité (ex. : `non_licencie_au_mom` est réservé aux contacts vraiment externes, pas aux joueurs actifs licenciés ailleurs), une révision doctrinale légère pourra être nécessaire (ajout d'une valeur `type_personne = licencie_externe_partenaire` ou similaire). **À traiter par la conv Audits avant que Phase 4.3 commence à peupler `personnes` avec des joueurs SAR.** Priorité : moyenne, liée à Phase 4.3.
+
 ### 🔵 Dette technique mineure ouverte par Phase 3
 
-P3-mineure. **Logo M2M dupliqué en base64 dans 3 HTML** (~56 ko × 3 = ~170 ko inutiles dans le repo) : `index.html`, `login.html`, `dashboard.html` contiennent chacun une copie base64 du logo. À externaliser dans `assets/logo-m2m.jpg` chargé via `<img src="assets/logo-m2m.jpg">`. Non bloquant, traitable à toute occasion.
+P3-mineure-1. ✅ **RÉSOLU (12 mai 2026 soir)** — Logo M2M externalisé dans `assets/logo-m2m.png` (PNG transparent récupéré du Drive, 106 ko). Les 3 HTML pointent désormais vers le PNG (favicon + img). Gain net repo : ~80 ko (avec un PNG plus lourd que le JPEG initial mais visuellement intégré sans fond noir parasite sur la topbar Phase 3 sombre). Ancien `assets/logo-m2m.jpg` supprimé.
 
-P3-mineure-2. **`sql/04-auth-roles.sql` mal placé à la racine du repo** au lieu du dossier `sql/`. À déplacer un jour pour cohérence (les fichiers SQL 01, 02, 05 sont bien dans `sql/`). Non bloquant.
+P3-mineure-2. ✅ **RÉSOLU** — `sql/04-auth-roles.sql` déplacé du root vers `sql/` (par conv Audits avant cette session).
+
+### 🔵 Dettes techniques mineures ouvertes par Phase 4.1
+
+D-qualite-ffr-array. **`personnes.qualite_ffr` actuellement TEXT singulier** (cf. doctrine OVAL-E v1.3 §8bis) alors qu'un licencié peut avoir simultanément plusieurs qualités (ex: dirigeant + arbitre + soigneur). Migration future à prévoir : `qualite_ffr` TEXT → `qualites_ffr` ARRAY + ajout `qualite_ffr_principale` TEXT. Priorité faible, à grouper avec l'import OVAL-E été 2026 (Phase 5).
 
 ---
 
@@ -283,7 +297,8 @@ Dossier `MOM Hub/2025-2026/` :
 | `Conception-Portail-Phase-3.md` | `12xrICwk5NTzk1XZLpq964CkWwhft3zc2` | Conception portail Phase 3 livrée 12 mai 2026 |
 | `Audit-Referentiels-v1.md` | dans `1CkeBrMBJGChqGui4r7mVkHa3NwaLwOSK` | Audit des 6 référentiels métier (11 mai 2026) |
 | `Schema-cible-Supabase-aptitudes.md` | dans `1CkeBrMBJGChqGui4r7mVkHa3NwaLwOSK` | Pattern de migration Drive → Supabase (12 mai 2026) |
-| `Modelisation-Evenements-v1.md` | dans `1CkeBrMBJGChqGui4r7mVkHa3NwaLwOSK` | **Modélisation événements complète (12 mai 2026)** — référence pour Phase 4 |
+| `Modelisation-Evenements-v1.0.md` | dans `1CkeBrMBJGChqGui4r7mVkHa3NwaLwOSK` | Modélisation événements v1.0 (12 mai matin) — superseded par v1.1, conservée pour traçabilité |
+| `Modelisation-Evenements-v1.1.md` | dans `1CkeBrMBJGChqGui4r7mVkHa3NwaLwOSK` | **Modélisation événements v1.1 (12 mai soir)** — référence canonique pour Phase 4, intègre arbitrage Option C (Vague 1 conservée) |
 | `Audit-Module-Compositions-v2.md` | `114UBo2lSqB8t8J2o0YRc55Nc8uoNtgCM` | Audit module Compos (v2) — à reprendre post-modélisation événements |
 | `Audit-Module-Suivi-Match.md` | — | Audit module Suivi-Match — à reprendre post-modélisation événements |
 | `Audit-Module-Rapport.md` | — | Audit module Rapport — à reprendre post-modélisation événements |
@@ -304,31 +319,39 @@ Dossiers clés :
 **Avant de démarrer toute Phase 4** :
 1. Lire ce STATE.md (5 min)
 2. Lire `PASSATION.md` (kit de démarrage par thématique)
-3. Lire `Modelisation-Evenements-v1.md` (le document de référence pour les futurs CREATE TABLE de Phase 4)
+3. Lire `Modelisation-Evenements-v1.1.md` (le document de référence canonique pour les futurs CREATE TABLE de Phase 4, après arbitrage Option C)
 4. Vérifier que la chaîne Hub → Supabase fonctionne toujours (ouvrir `https://manu-mom.github.io/mom-hub/`, F12 console, doit afficher `✅ MOM Hub Dashboard: stats mises à jour depuis Supabase` ET `🏉 MOM Hub · Supabase Client v1.4 chargé`)
 5. Vérifier que le portail affiche bien **323 personnes** (compteur dynamique post-Phase 2.4.5) et que les boutons d'auth réagissent (icône grille + flèche en mode admin, pilule verte "Se connecter" en mode anonyme)
 6. Vérifier que `login.html` affiche bien `v1.4 chargé` dans la console et que l'envoi d'un Magic Link sur ton email aboutit sur `dashboard.html` avec session active
 
 **Travaux en attente** :
-- **Conv Production** : la Phase 3 est terminée. Travaux prioritaires pour la Phase 4 :
-  - (a) **Implémentation des 9 tables modélisées** (cf. `Modelisation-Evenements-v1.md` §4) : `equipes`, `evenements`, `compositions`, `composition_joueurs`, `presences`, `evenement_encadrants`, `joueurs_externes`, `sites`, `distances_sites`. Plus 2 ALTER TABLE `personnes` (M-1 + bloc_6 `groupe_indicatif_uuid`).
+- **Conv Production** : la Phase 3 est terminée + Phase 4.1.B sites livrée (12 mai soir). Travaux prioritaires pour la suite Phase 4 :
+  - (a) **Implémentation des tables modélisées** (cf. `Modelisation-Evenements-v1.1.md` §4) :
+    - Vague 1 (CONSERVÉE intacte, à **peupler** seulement) : `ententes`, `equipes`, `equipe_joueurs`
+    - Phase 4.1.B ✅ **TERMINÉE** : `sites`, `distances_sites` créés et peuplés (3 sites MOM en prod : Brencklé, Clubhouse, Holtzplatz)
+    - Phase 4.2 à venir : `evenements`, `evenement_encadrants` (⚠️ `joueurs_externes` **ABANDONNÉE en v1.1**)
+    - Phase 4.3 à venir : `compositions`, `composition_joueurs`, `presences`
+    - Plus 1 ALTER TABLE `personnes` (M-1 réduit en v1.1 : seul `bloc_5.categorie_surclassement_uuid` ; `bloc_6.groupe_indicatif_uuid` abandonné)
   - (b) **RPC associées** : `get_evenements_a_venir`, `get_prochain_evenement_par_equipe`, `get_distance_between_sites`, `get_vivier_compo`. Débloque P4-2 et P4-3.
-  - (c) **Mirror `groupes-joueur.json`** dans `data/` une fois déposé dans Drive.
-  - (d) **Dette #8** (CHECK constraint `type_personne` à étendre) : prêt à exécuter (~10 min).
-  - (e) Dettes mineures : externalisation logo M2M (P3-mineure), déplacement `04-auth-roles.sql` vers `sql/` (P3-mineure-2).
+  - (c) **Mirror `groupes-joueur.json` v1.1** dans `data/` une fois déposé dans Drive.
+  - (d) ✅ **Dette #8 RÉSOLUE** (12 mai soir) : CHECK constraint `type_personne` étendue avec `licencie_soigneur` + `licencie_arbitre`. MICHEL Stéphane (UUID `f7c3ba6f-a124-41fd-9229-0433cdb0fdc6`) reclassé `licencie_soigneur`. Reste à commiter `sql/08-extend-type-personne-check.sql` sur GitHub.
+  - (e) ✅ **Dettes mineures RÉSOLUES** : logo M2M externalisé en PNG transparent (P3-mineure-1) + `04-auth-roles.sql` déplacé (P3-mineure-2).
   - (f) Déploiement comptes `coach` et `viewer` réels (préalable à P4-1).
+  - (g) **🆕 D-qualite-ffr-array** (ouverte 12 mai soir) : migration future `personnes.qualite_ffr` TEXT → ARRAY (cf. section dettes ci-dessus). À grouper avec import OVAL-E été 2026.
 
-  **Plan de découpage Phase 4 acté (12 mai 2026 soir)** — 5 sessions de 2-3 h chacune :
-  - **Phase 4.1** Fondations administratives : `sql/06-equipes.sql` + vue `equipes_ententes`, `sql/07-sites.sql` + `distances_sites` (sans API encore), peuplement initial (11 équipes, sites Brencklé/Holtzplatz/Clubhouse + adversaires fréquents). K2 ÉQUIPES du portail bascule en dynamique (ferme partie de dette #5).
-  - **Phase 4.2** Noyau événements : `sql/08-evenements.sql`, `sql/09-joueurs-externes.sql`, `sql/10-evenement-encadrants.sql`, extension `js/supabase-client.js` v1.5 avec 2-3 wrappers (`getEvenementsAVenir`, `getProchainEvenementParEquipe`).
-  - **Phase 4.3** Compositions + présences : `sql/11-compositions.sql` + `composition_joueurs`, `sql/12-presences.sql`, 2 ALTER TABLE `personnes` (M-1 + bloc_6.`groupe_indicatif_uuid`), référentiel `groupes-joueur.json` dans Drive, RPC `get_vivier_compo` (la plus complexe).
+  **Plan de découpage Phase 4 acté (12 mai 2026 soir, post-arbitrage Option C)** :
+  - **Phase 4.1.A** Fondations administratives — Vague 1 (DÉBLOQUÉE post-arbitrage) : **peupler** `ententes` + `equipes` + `equipe_joueurs` (Vague 1, schémas conservés intacts). Le fichier prévu `sql/06-equipes.sql` devient `sql/06-peuplement-vague1-equipes.sql` (peuplement, pas création). K2 ÉQUIPES du portail bascule en dynamique (ferme partie de dette #5).
+  - **Phase 4.1.B** ✅ **TERMINÉE** : `sql/07-sites.sql` (sites + distances_sites créés et peuplés ; API distances reportée à 4.5).
+  - **Phase 4.2** Noyau événements : `sql/08-evenements.sql`, `sql/09-evenement-encadrants.sql` (⚠️ `joueurs_externes` ABANDONNÉE en v1.1 — les joueurs partenaires d'entente vivront dans `personnes` avec `bloc_5.club_principal_id` adapté). Extension `js/supabase-client.js` v1.5 avec 2-3 wrappers (`getEvenementsAVenir`, `getProchainEvenementParEquipe`).
+  - **Phase 4.3** Compositions + présences : `sql/10-compositions.sql` + `composition_joueurs`, `sql/11-presences.sql`, 1 ALTER TABLE `personnes` (M-1 réduit), référentiel `groupes-joueur.json` v1.1 dans Drive, RPC `get_vivier_compo` (la plus complexe — joint `equipe_joueurs` Vague 1 pour flag d'attache régulier/renfort). **Condition préalable** : dette C7 instruite par conv Audits (audit doctrine OVAL-E pour joueurs SAR).
   - **Phase 4.4** Intégration UI portail : `dashboard-stats.js` v3 avec prochain match dans le greeting (P4-2) et nouveau widget sidebar (P4-3).
   - **Phase 4.5** API distances (optionnel) : intégration OpenRouteService + cache, RPC `get_distance_between_sites`, secret API en GitHub Actions (M-2 + M-5).
 
-- **Conv Audits** : modélisation événements **livrée** (12 mai 2026). Travaux restants côté Audits :
+- **Conv Audits** : modélisation événements **v1.1 livrée** (12 mai 2026 soir, après arbitrage conflit Vague 1). Travaux restants côté Audits :
+  - **🆕 Dette C7 (priorité)** : audit doctrine OVAL-E sur `personnes.bloc_5.club_principal_id != MOM` pour les joueurs partenaires d'entente. **À traiter avant Phase 4.3** (peuplement compositions avec joueurs SAR).
   - Lots 2 et 3 de l'audit référentiels (bloqués par tiers : règlement LRGER 2025-2026, Lohann pour EDR aptitudes, préparateur physique pour barèmes).
-  - Reprise des **audits modules** (Compositions v2, Suivi-Match, Rapport, Stats, Bilans) à la lumière de la modélisation événements pour MAJ post-Phase 2.5/3.
+  - Reprise des **audits modules** (Compositions v2, Suivi-Match, Rapport, Stats, Bilans) à la lumière de la modélisation événements v1.1 pour MAJ post-Phase 2.5/3.
   - Modélisation **événements extra-sportifs** (dette Phase 5, C2 du doc modélisation).
   - Modélisation **compo adverse + joueurs adverses** (dette C1 du doc modélisation, reportée après quelques mois d'usage de l'app).
-- **Conv Conception Portail** : a livré `Conception-Portail-Phase-3.md` v1.0 (Drive `12xrICwk5NTzk1XZLpq964CkWwhft3zc2`). Pour Phase 4, rouvrir un cycle Conception si besoin de définir le portail par rôle (P4-1), ou de spécifier précisément l'UX greeting/widget prochain match maintenant que la modélisation événements est livrée (P4-2/P4-3 débloquées).
-- **Futures conv Modules métier** (annoncées) : "MOM Hub - Modules Ateliers et ressources pédagogiques" et "MOM Hub - Modules Planification de la saison et préparation de séances". Trouveront dans `Modelisation-Evenements-v1.md` §10.3 leur point d'ancrage avec les autres conv.
+- **Conv Conception Portail** : a livré `Conception-Portail-Phase-3.md` v1.0 (Drive `12xrICwk5NTzk1XZLpq964CkWwhft3zc2`). Pour Phase 4, rouvrir un cycle Conception si besoin de définir le portail par rôle (P4-1), ou de spécifier précisément l'UX greeting/widget prochain match maintenant que la modélisation événements v1.1 est livrée (P4-2/P4-3 débloquées).
+- **Futures conv Modules métier** (annoncées) : "MOM Hub - Modules Ateliers et ressources pédagogiques" et "MOM Hub - Modules Planification de la saison et préparation de séances". Trouveront dans `Modelisation-Evenements-v1.1.md` §10.3 leur point d'ancrage avec les autres conv.
