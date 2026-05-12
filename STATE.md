@@ -3,7 +3,7 @@
 > **Document de référence opérationnel.** À jour à la racine du repo, mis à jour à chaque fin de session significative.
 > Sert de point de reprise universel : toute personne (ou tout Claude) qui ouvre ce fichier doit pouvoir reprendre le travail sans question.
 
-**Dernière mise à jour : 13 mai 2026 (soir) — Phase 4.2.A livrée (noyau événements : tables `evenements` + `evenement_encadrants` créées en prod, test INSERT/ROLLBACK validé). État précédent (13 mai matin) : Phase 4.1.A complète (peuplement Vague 1 + K2 ÉQUIPES dynamique).**
+**Dernière mise à jour : 13 mai 2026 (soir tard) — Phase 4.2.B (RPC événements) + Phase 4.2.C (wrappers JS v1.5) livrées dans la foulée. Phase 4.2 noyau désormais à 3/4 (reste seulement la 4.2.D UI portail, reportée à un cycle Conception dédié). État précédent : Phase 4.2.A livrée 13 mai soir.**
 
 ---
 
@@ -116,6 +116,23 @@ Détails techniques :
   - Phase 4.2.C : `js/supabase-client.js` v1.5 avec wrappers JS
   - Phase 4.4 : UI portail greeting J-N + widget prochain match
   - Phase 4.3 (compositions/présences) — débloquée par cette modélisation mais conditionnée par instruction dette C7
+
+### ✅ Phase 4.2.B — RPC événements (FAIT — 13 mai 2026 soir tard)
+- **`sql/11-rpc-evenements.sql`** : création de 2 RPC SECURITY DEFINER, authenticated-only
+  - `get_evenements_a_venir(p_equipe_id UUID DEFAULT NULL, p_jours_a_venir INTEGER DEFAULT 30)` → TABLE 16 colonnes (event + libellés joints equipe/site + delta jours)
+  - `get_prochain_evenement_par_equipe(p_equipe_id UUID)` → wrapper de la 1re sur 365j LIMIT 1
+- Conventions : paramètres préfixés `p_`, `p_equipe_id` NULL = toutes équipes, exclut états `annule`/`archive`, filtre `date_debut >= NOW()`.
+- **Test fonctionnel 8 scénarios validé en prod** (INSERT factice + 6 appels RPC avec filtres variés + ROLLBACK propre).
+- Débloque P4-2 (greeting "J-N AVANT MATCH") et P4-3 (widget sidebar) techniquement — reste l'UI à brancher.
+
+### ✅ Phase 4.2.C — Wrappers JS v1.5 (FAIT — 13 mai 2026 soir tard)
+- **`js/supabase-client.js` v1.4 → v1.5** : ajout de 2 méthodes consommant les RPC de 4.2.B
+  - `SupabaseHub.getEvenementsAVenir(equipeId = null, joursAVenir = 30)` → `Promise<Array>`
+  - `SupabaseHub.getProchainEvenementParEquipe(equipeId)` → `Promise<Object|null>`
+- Cohérent avec le pattern des wrappers Phase 3.2 (`countPersonnes*`, `getLastOvalESyncDate`).
+- Test prod console validé : `🏉 MOM Hub · Supabase Client v1.5 chargé`, `getEvenementsAVenir()` retourne `[]`, `getProchainEvenementParEquipe(uuid)` retourne `null` (cohérent vu table evenements vide).
+- Au passage : changelog rattrapé (v1.3 → v1.5, v1.4 marquée "interne sans helper").
+- **Phase 4.2.D (UI portail)** reportée — requiert cycle Conception dédié pour spécifier UX greeting/widget.
 
 ---
 
@@ -362,15 +379,17 @@ Dossiers clés :
 6. Vérifier que `login.html` affiche bien `v1.4 chargé` dans la console et que l'envoi d'un Magic Link sur ton email aboutit sur `dashboard.html` avec session active
 
 **Travaux en attente** :
-- **Conv Production** : Phase 3 + Phase 4.1.B sites + **Phase 4.1.A complète (13 mai 2026 matin)** + **Phase 4.2.A noyau événements (13 mai 2026 soir)** terminées. **Prochain travail prioritaire = Phase 4.2.B (RPC événements)** : `sql/11-rpc-evenements.sql` avec `get_evenements_a_venir` + `get_prochain_evenement_par_equipe` (débloque P4-2 et P4-3). Travaux annexes en attente :
+- **Conv Production** : Phase 3 + 4.1.B + **4.1.A complète (13 mai matin)** + **4.2.A noyau (13 mai soir)** + **4.2.B RPC événements + 4.2.C wrappers JS (13 mai soir tard)** terminées. **Prochain travail prioritaire = Phase 4.3 (compositions/présences)** mais **conditionné par instruction dette C7** (audit doctrine OVAL-E pour joueurs SAR partenaires d'entente). Si C7 pas encore instruite : alternative = Phase 4.4 (UI portail greeting J-N + widget prochain match — requiert cycle Conception dédié) ou dette (h) K2 SITES en filler. Travaux annexes en attente :
   - (a) **Implémentation des tables modélisées** (cf. `Modelisation-Evenements-v1.1.md` §4) :
     - Vague 1 ✅ **PEUPLÉE 13 mai 2026** : `ententes` (11 lignes), `equipes` (11 lignes), `equipe_joueurs` (23 attaches M14 MOM `regulier`)
     - Phase 4.1.B ✅ **TERMINÉE** : `sites` + `distances_sites` créés (**3 sites en prod** : Brencklé, Clubhouse, Holtzplatz ; les 2 INSERT adversaires fréquents du `sql/07` n'ont pas été exécutés en prod)
     - Phase 4.2.A ✅ **TERMINÉE 13 mai soir** : `evenements` + `evenement_encadrants` créées via `sql/10-noyau-evenements.sql` (⚠️ `joueurs_externes` **ABANDONNÉE en v1.1**)
-    - **Phase 4.2.B/C à venir** : RPC événements + JS wrappers
-    - Phase 4.3 à venir : `compositions`, `composition_joueurs`, `presences`
+    - Phase 4.2.B ✅ **TERMINÉE 13 mai soir tard** : RPC `get_evenements_a_venir` + `get_prochain_evenement_par_equipe` via `sql/11-rpc-evenements.sql`
+    - Phase 4.2.C ✅ **TERMINÉE 13 mai soir tard** : `js/supabase-client.js` v1.5 avec 2 wrappers événements
+    - **Phase 4.2.D (UI portail) à venir** : Conception dédié requis pour greeting J-N et widget prochain match
+    - Phase 4.3 à venir : `compositions`, `composition_joueurs`, `presences` (préalable C7)
     - Plus 1 ALTER TABLE `personnes` (M-1 réduit en v1.1 : seul `bloc_5.categorie_surclassement_uuid` ; `bloc_6.groupe_indicatif_uuid` abandonné)
-  - (b) **RPC associées Phase 4.2/4.3 à venir** : `get_evenements_a_venir` (Phase 4.2.B prioritaire), `get_prochain_evenement_par_equipe` (Phase 4.2.B), `get_distance_between_sites` (Phase 4.5), `get_vivier_compo` (Phase 4.3, la plus complexe).
+  - (b) **RPC associées Phase 4.2/4.3** : ✅ `get_evenements_a_venir` + `get_prochain_evenement_par_equipe` LIVRÉES en 4.2.B. Reste à faire : `get_distance_between_sites` (Phase 4.5), `get_vivier_compo` (Phase 4.3, la plus complexe).
   - (c) **Mirror `groupes-joueur.json` v1.1** dans `data/` une fois déposé dans Drive.
   - (d) ✅ **Dette #8 RÉSOLUE et committée** (`sql/08-extend-type-personne-check.sql` poussé 12 mai soir).
   - (e) ✅ **Dettes mineures RÉSOLUES** : logo M2M PNG (P3-mineure-1), `04-auth-roles.sql` déplacé (P3-mineure-2).
@@ -378,12 +397,15 @@ Dossiers clés :
   - (g) **D-qualite-ffr-array** : migration future `personnes.qualite_ffr` TEXT → ARRAY. À grouper avec import OVAL-E été 2026.
   - (h) **Dette mineure ouverte (13 mai 2026) — finir K2 SITES (dette #5 résiduelle)** : mini-cadrage requis (**3 sites en base vs 16 en dur dans HTML** — cf. dette #5 plus haut). À traiter en "filler" 10 min entre 2 chantiers, après cadrage avec Manu (exécuter les 2 INSERT du sql/07 + créer les 11 autres manquants, ou accepter affichage à 3). Pattern à reproduire : identique à `count_equipes_actives` (mini RPC + mini patch JS + mini patch HTML).
   - (i) **Compteur K3 CETTE SEMAINE biaisé jusqu'au 17 mai 2026** : la RPC `count_personnes_created_last_7_days` retourne actuellement 323 (toutes les fiches) car la migration Vague 1 du 10 mai 2026 a créé toutes les fiches d'un coup. Le compteur retombera mécaniquement après 7 jours glissants (≈ 17 mai 2026) sans intervention. Pas un bug, juste un effet de jeunesse de la base. À surveiller mais pas à corriger.
-  - (j) **🆕 Dette ouverte Phase 4.2.A (13 mai 2026 soir) — policies RLS write par rôle** : `evenements` + `evenement_encadrants` ont actuellement RLS activée mais seules les policies SELECT pour `authenticated` sont définies. Aucune policy write n'existe → seul le `service_role` peut INSERT/UPDATE/DELETE (= via le SQL Editor Supabase). À durcir dans une session dédiée : policies write basées sur `auth_roles` (admin/coach/viewer) avec règles métier (ex : un coach n'écrit que sur les événements de ses équipes). Même dette à étendre à `equipes` et `equipe_joueurs`.
+  - (j) **Dette ouverte Phase 4.2.A (13 mai 2026 soir) — policies RLS write par rôle** : `evenements` + `evenement_encadrants` ont actuellement RLS activée mais seules les policies SELECT pour `authenticated` sont définies. Aucune policy write n'existe → seul le `service_role` peut INSERT/UPDATE/DELETE (= via le SQL Editor Supabase). À durcir dans une session dédiée : policies write basées sur `auth_roles` (admin/coach/viewer) avec règles métier (ex : un coach n'écrit que sur les événements de ses équipes). Même dette à étendre à `equipes` et `equipe_joueurs`.
 
   **Plan de découpage Phase 4 acté (12 mai 2026 soir, post-arbitrage Option C ; Phase 4.1.A finie 13 mai matin ; Phase 4.2.A finie 13 mai soir)** :
   - **Phase 4.1.A** ✅ **TERMINÉE 13 mai 2026 matin** : peuplement Vague 1 (11 ententes + 11 équipes + 23 attaches M14 MOM en `regulier`) via `sql/06-peuplement-vague1-equipes.sql`. **Phase 4.1.A bis** : K2 ÉQUIPES dynamique via `sql/09-rpc-equipes.sql` (RPC `count_equipes_actives`) + `js/dashboard-stats.js` v2.1 + `index.html` patché (`id="stat-equipes"`). Ferme partie ÉQUIPES de dette #5. SAR (37) et ASCS (2) M14 attaches reportées à Phase 4.3 après dette C7.
   - **Phase 4.1.B** ✅ **TERMINÉE** : `sql/07-sites.sql` (sites + distances_sites créés ; en prod : 3 sites MOM uniquement à ce jour — les 2 INSERT adversaires fréquents pas encore exécutés ; API distances reportée à 4.5).
   - **Phase 4.2.A** ✅ **TERMINÉE 13 mai 2026 soir** : `sql/10-noyau-evenements.sql` créé (tables `evenements` 28 colonnes + `evenement_encadrants` 9 colonnes, 13 indexes, 8 CHECK, RLS SELECT authenticated). Test INSERT/ROLLBACK validé en prod.
+  - **Phase 4.2.B** ✅ **TERMINÉE 13 mai 2026 soir tard** : `sql/11-rpc-evenements.sql` créé (RPC `get_evenements_a_venir` + `get_prochain_evenement_par_equipe`, SECURITY DEFINER authenticated-only). Test fonctionnel 8 scénarios validé en prod.
+  - **Phase 4.2.C** ✅ **TERMINÉE 13 mai 2026 soir tard** : `js/supabase-client.js` v1.4 → v1.5 avec 2 wrappers JS (`getEvenementsAVenir`, `getProchainEvenementParEquipe`). Test prod console OK.
+  - **Phase 4.2.D (UI portail) à venir** : greeting J-N + widget prochain match — reportée à un cycle Conception dédié (UX à spécifier).
   - **Phase 4.2** Noyau événements : `sql/08-evenements.sql`, `sql/09-evenement-encadrants.sql` (⚠️ `joueurs_externes` ABANDONNÉE en v1.1 — les joueurs partenaires d'entente vivront dans `personnes` avec `bloc_5.club_principal_id` adapté). Extension `js/supabase-client.js` v1.5 avec 2-3 wrappers (`getEvenementsAVenir`, `getProchainEvenementParEquipe`).
   - **Phase 4.3** Compositions + présences : `sql/10-compositions.sql` + `composition_joueurs`, `sql/11-presences.sql`, 1 ALTER TABLE `personnes` (M-1 réduit), référentiel `groupes-joueur.json` v1.1 dans Drive, RPC `get_vivier_compo` (la plus complexe — joint `equipe_joueurs` Vague 1 pour flag d'attache régulier/renfort). **Condition préalable** : dette C7 instruite par conv Audits (audit doctrine OVAL-E pour joueurs SAR).
   - **Phase 4.4** Intégration UI portail : `dashboard-stats.js` v3 avec prochain match dans le greeting (P4-2) et nouveau widget sidebar (P4-3).
