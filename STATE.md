@@ -3,7 +3,7 @@
 > **Document de référence opérationnel.** À jour à la racine du repo, mis à jour à chaque fin de session significative.
 > Sert de point de reprise universel : toute personne (ou tout Claude) qui ouvre ce fichier doit pouvoir reprendre le travail sans question.
 
-**Dernière mise à jour : 12 mai 2026 (soir) — fin Phase 3 + Phase 4.1.B sites livrée + modélisation événements v1.1 livrée (conv Audits, après arbitrage conflit Vague 1)**
+**Dernière mise à jour : 13 mai 2026 — Phase 4.1.A complète (peuplement Vague 1 : 11 ententes + 11 équipes + 23 attaches M14 MOM) + Phase 4.1.A bis (K2 ÉQUIPES dynamique via `count_equipes_actives`). État précédent : 12 mai 2026 soir (fin Phase 3 + Phase 4.1.B sites + modélisation événements v1.1).**
 
 ---
 
@@ -79,6 +79,25 @@ Détails techniques :
 1. ✅ **3.1.A** — `css/hub.css` créé (482 lignes), `index.html` factorisé (-22%), `login.html` adopte topbar minimaliste (-27%), `dashboard.html` adopte topbar complète (-20%). 1 commit `Phase 3 (1/2) — factorisation CSS + topbar partagée (dette #11)`.
 
 **Reste à faire (hors périmètre, reporté Phase 4)** : voir 7 dettes P4-1 à P4-7 ouvertes ci-dessous.
+
+### ✅ Phase 4.1.B — Sites et distances (FAIT — 12 mai 2026 soir)
+- Tables `sites` et `distances_sites` créées via `sql/07-sites.sql`
+- 5 sites peuplés : 3 MOM (Brencklé, Clubhouse, Holtzplatz) + 2 fréquents (Sarre-Union, Strasbourg AR)
+- API distances (OpenRouteService) reportée à Phase 4.5 (optionnel)
+
+### ✅ Phase 4.1.A — Peuplement Vague 1 + K2 ÉQUIPES dynamique (FAIT — 13 mai 2026)
+- **Peuplement via `sql/06-peuplement-vague1-equipes.sql`** :
+  - 11 ententes (3 Permanente SAR/MOM/ASCS M14/M16/M19 + 8 Solo MOM Sen.M, Sen.F, M12/M10/M8/M6 EDR, RLO=Rugby5, RLSP=Touch)
+  - 11 équipes (1 par entente, `numero_equipe=1`, type `entente` ou `mono_club` selon cas)
+  - 23 attaches `equipe_joueurs` M14 MOM en statut `regulier` (17 garçons + 6 F-15 intégrées, `club_provenance=MOM`)
+- Coach M14 = Emmanuel JUNG (référent ET coach principal, confirmé 13 mai 2026)
+- SAR (37) et ASCS (2) M14 attaches **reportées** à Phase 4.3 (après instruction dette C7)
+- **Phase 4.1.A bis — K2 ÉQUIPES bascule en dynamique** :
+  - Nouvelle RPC `count_equipes_actives()` (`sql/09-rpc-equipes.sql`, SECURITY DEFINER, authenticated-only)
+  - `js/dashboard-stats.js` v2.1 : 7e appel Promise.all + `updateEl('stat-equipes', nbEquipes)`
+  - `index.html` ligne 699 : `<div class="kpi-num" id="stat-equipes">…</div>` remplace le `11` en dur
+  - Test prod validé : console `✅ MOM Hub Dashboard v2.1 ... { nbEquipes: 11 }`
+- Ferme **partie ÉQUIPES** de la dette #5 (reste **partie SITES** à finir, cf. dette #5 plus bas)
 
 ---
 
@@ -167,7 +186,7 @@ OVAL-E export (XLSX) ── parse ──> normalisation ──> upsert idempoten
    - **Ajout 12 mai 2026 soir** : nouveau référentiel `groupes-joueur.json` v1.0 généré par la modélisation événements (3 groupes par défaut : Performance / Développement / Initiation), à déposer dans `01 - Référentiels/`
 
    **Reste ouvert (Lots 2 et 3)** : couverture catégorielle F-18/F+18, peuplement métier ateliers/aptitudes EDR/barèmes physiques. Bloqué par dépendances externes (règlement LRGER 2025-2026, Lohann, préparateur physique), pas faisable seul en conv Audits.
-5. ~~**Chiffres en dur résiduels dans index.html**~~ ⚠️ **PARTIEL** : "16 Sites" et "11 Équipes" restent en dur tant que les tables `sites` et `equipes` ne sont pas créées/remplies (cf. dette résolue #14 ci-dessous, modélisation publiée — implémentation Phase 4). Le compteur "323 personnes" est dynamique via la RPC. **24 M14** est aussi dynamique depuis Phase 2.4.5.
+5. ⚠️ **Chiffres en dur résiduels dans index.html** — **partie ÉQUIPES RÉSOLUE 13 mai 2026 (Phase 4.1.A bis)** : "11 Équipes" devient dynamique via la nouvelle RPC `count_equipes_actives()` (cf. `sql/09-rpc-equipes.sql`). Reste **partie SITES ouverte** : le portail affiche "16 Sites" en dur alors que la table `sites` (Phase 4.1.B) ne contient actuellement que **5 sites** (3 MOM + 2 adversaires fréquents Sarre-Union & Strasbourg AR). **Mini-cadrage à faire** avant de brancher K2 SITES dynamique : soit créer les 11 sites manquants en base (autres adversaires LRGER, sites partenaires SAR/ASCS, etc.), soit accepter l'affichage à 5. Le compteur "323 personnes" est dynamique via la RPC. **24 M14** est aussi dynamique depuis Phase 2.4.5.
 6. ~~**Date `VENDREDI 8 MAI 2026 · HUB INITIALISÉ` dans le HTML statique**~~ ✅ **RÉSOLU** (11 mai 2026, Phase 2.5.6) : remplacé par "TABLEAU DE BORD" (date injectée dynamiquement par JS au format `toLocaleDateString('fr-FR')`). Greeting-sub neutralisé en "Effectifs synchronisés avec OVAL-E" (et probablement écrasé par `dashboard-stats.js` au runtime avec le compteur dynamique). Panneau sidebar "État du Hub" : "Hub initialisé aujourd'hui" → "Hub en production".
 7. ~~**Désalignement Drive ↔ Supabase post-réconciliation OVAL-E**~~ ✅ **ARBITRÉ** (11 mai 2026, conv Audits) : Drive figé au 10 mai 2026 pour la saison 2025-2026, Supabase devient source autoritative des données vivantes. Décision saison 2026-2027 reportée à l'été. Doctrine : `Doctrine-Import-OVAL-E-v1.3.md §13`. Pas d'action Production requise.
 8. **CHECK constraint `personnes_type_personne_check` à étendre** (arbitré 11 mai 2026, **prêt à exécuter** depuis publication doctrine §14) : la `Doctrine-Import-OVAL-E-v1.3.md §14` est désormais publiée (mapping qualités FFR → `type_personne` officiel : 5 valeurs licenciées + `non_licencie` + `non_licencie_au_mom`). Le SQL est donc cadré, plus d'ambiguïté de spec. Ajouter `licencie_soigneur` et `licencie_arbitre` aux valeurs autorisées de `personnes.type_personne` (fidélité à la nomenclature FFR : Joueur / Dirigeant / Éducateur / Soigneur / Arbitre).
@@ -325,22 +344,24 @@ Dossiers clés :
 6. Vérifier que `login.html` affiche bien `v1.4 chargé` dans la console et que l'envoi d'un Magic Link sur ton email aboutit sur `dashboard.html` avec session active
 
 **Travaux en attente** :
-- **Conv Production** : la Phase 3 est terminée + Phase 4.1.B sites livrée (12 mai soir). Travaux prioritaires pour la suite Phase 4 :
+- **Conv Production** : Phase 3 + Phase 4.1.B sites + **Phase 4.1.A complète (13 mai 2026)** terminées. **Prochain travail prioritaire = Phase 4.2 (noyau événements)** (cf. plan de découpage ci-dessous). Travaux annexes en attente :
   - (a) **Implémentation des tables modélisées** (cf. `Modelisation-Evenements-v1.1.md` §4) :
-    - Vague 1 (CONSERVÉE intacte, à **peupler** seulement) : `ententes`, `equipes`, `equipe_joueurs`
-    - Phase 4.1.B ✅ **TERMINÉE** : `sites`, `distances_sites` créés et peuplés (3 sites MOM en prod : Brencklé, Clubhouse, Holtzplatz)
-    - Phase 4.2 à venir : `evenements`, `evenement_encadrants` (⚠️ `joueurs_externes` **ABANDONNÉE en v1.1**)
+    - Vague 1 ✅ **PEUPLÉE 13 mai 2026** : `ententes` (11 lignes), `equipes` (11 lignes), `equipe_joueurs` (23 attaches M14 MOM `regulier`)
+    - Phase 4.1.B ✅ **TERMINÉE** : `sites` + `distances_sites` créés (5 sites en prod : 3 MOM + 2 adversaires fréquents)
+    - **Phase 4.2 à venir** : `evenements`, `evenement_encadrants` (⚠️ `joueurs_externes` **ABANDONNÉE en v1.1**)
     - Phase 4.3 à venir : `compositions`, `composition_joueurs`, `presences`
     - Plus 1 ALTER TABLE `personnes` (M-1 réduit en v1.1 : seul `bloc_5.categorie_surclassement_uuid` ; `bloc_6.groupe_indicatif_uuid` abandonné)
-  - (b) **RPC associées** : `get_evenements_a_venir`, `get_prochain_evenement_par_equipe`, `get_distance_between_sites`, `get_vivier_compo`. Débloque P4-2 et P4-3.
+  - (b) **RPC associées Phase 4.2/4.3** : `get_evenements_a_venir`, `get_prochain_evenement_par_equipe`, `get_distance_between_sites`, `get_vivier_compo`. Débloque P4-2 et P4-3.
   - (c) **Mirror `groupes-joueur.json` v1.1** dans `data/` une fois déposé dans Drive.
-  - (d) ✅ **Dette #8 RÉSOLUE** (12 mai soir) : CHECK constraint `type_personne` étendue avec `licencie_soigneur` + `licencie_arbitre`. MICHEL Stéphane (UUID `f7c3ba6f-a124-41fd-9229-0433cdb0fdc6`) reclassé `licencie_soigneur`. Reste à commiter `sql/08-extend-type-personne-check.sql` sur GitHub.
-  - (e) ✅ **Dettes mineures RÉSOLUES** : logo M2M externalisé en PNG transparent (P3-mineure-1) + `04-auth-roles.sql` déplacé (P3-mineure-2).
+  - (d) ✅ **Dette #8 RÉSOLUE et committée** (`sql/08-extend-type-personne-check.sql` poussé 12 mai soir).
+  - (e) ✅ **Dettes mineures RÉSOLUES** : logo M2M PNG (P3-mineure-1), `04-auth-roles.sql` déplacé (P3-mineure-2).
   - (f) Déploiement comptes `coach` et `viewer` réels (préalable à P4-1).
-  - (g) **🆕 D-qualite-ffr-array** (ouverte 12 mai soir) : migration future `personnes.qualite_ffr` TEXT → ARRAY (cf. section dettes ci-dessus). À grouper avec import OVAL-E été 2026.
+  - (g) **D-qualite-ffr-array** : migration future `personnes.qualite_ffr` TEXT → ARRAY. À grouper avec import OVAL-E été 2026.
+  - (h) **🆕 Dette mineure ouverte (13 mai 2026) — finir K2 SITES (dette #5 résiduelle)** : mini-cadrage requis (5 sites en base vs 16 en dur dans HTML — cf. dette #5 plus haut). À traiter en "filler" 10 min entre 2 chantiers, après cadrage avec Manu (créer les 11 manquants ou accepter affichage à 5). Pattern à reproduire : identique à `count_equipes_actives` (mini RPC + mini patch JS + mini patch HTML).
+  - (i) **🆕 Compteur K3 CETTE SEMAINE biaisé jusqu'au 17 mai 2026** : la RPC `count_personnes_created_last_7_days` retourne actuellement 323 (toutes les fiches) car la migration Vague 1 du 10 mai 2026 a créé toutes les fiches d'un coup. Le compteur retombera mécaniquement après 7 jours glissants (≈ 17 mai 2026) sans intervention. Pas un bug, juste un effet de jeunesse de la base. À surveiller mais pas à corriger.
 
-  **Plan de découpage Phase 4 acté (12 mai 2026 soir, post-arbitrage Option C)** :
-  - **Phase 4.1.A** Fondations administratives — Vague 1 (DÉBLOQUÉE post-arbitrage) : **peupler** `ententes` + `equipes` + `equipe_joueurs` (Vague 1, schémas conservés intacts). Le fichier prévu `sql/06-equipes.sql` devient `sql/06-peuplement-vague1-equipes.sql` (peuplement, pas création). K2 ÉQUIPES du portail bascule en dynamique (ferme partie de dette #5).
+  **Plan de découpage Phase 4 acté (12 mai 2026 soir, post-arbitrage Option C ; Phase 4.1.A finie 13 mai)** :
+  - **Phase 4.1.A** ✅ **TERMINÉE 13 mai 2026** : peuplement Vague 1 (11 ententes + 11 équipes + 23 attaches M14 MOM en `regulier`) via `sql/06-peuplement-vague1-equipes.sql`. **Phase 4.1.A bis** : K2 ÉQUIPES dynamique via `sql/09-rpc-equipes.sql` (RPC `count_equipes_actives`) + `js/dashboard-stats.js` v2.1 + `index.html` patché (`id="stat-equipes"`). Ferme partie ÉQUIPES de dette #5. SAR (37) et ASCS (2) M14 attaches reportées à Phase 4.3 après dette C7.
   - **Phase 4.1.B** ✅ **TERMINÉE** : `sql/07-sites.sql` (sites + distances_sites créés et peuplés ; API distances reportée à 4.5).
   - **Phase 4.2** Noyau événements : `sql/08-evenements.sql`, `sql/09-evenement-encadrants.sql` (⚠️ `joueurs_externes` ABANDONNÉE en v1.1 — les joueurs partenaires d'entente vivront dans `personnes` avec `bloc_5.club_principal_id` adapté). Extension `js/supabase-client.js` v1.5 avec 2-3 wrappers (`getEvenementsAVenir`, `getProchainEvenementParEquipe`).
   - **Phase 4.3** Compositions + présences : `sql/10-compositions.sql` + `composition_joueurs`, `sql/11-presences.sql`, 1 ALTER TABLE `personnes` (M-1 réduit), référentiel `groupes-joueur.json` v1.1 dans Drive, RPC `get_vivier_compo` (la plus complexe — joint `equipe_joueurs` Vague 1 pour flag d'attache régulier/renfort). **Condition préalable** : dette C7 instruite par conv Audits (audit doctrine OVAL-E pour joueurs SAR).
