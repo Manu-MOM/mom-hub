@@ -17,6 +17,7 @@
  *   - #greeting-meta         (surtitre date : "LUNDI 12 MAI 2026 · TABLEAU DE BORD")
  *   - #greeting-prenom       (laissé en dur dans HTML)
  *   - #stat-personnes        (K1 PERSONNES)
+ *   - #stat-equipes          (K2 ÉQUIPES)
  *   - #stat-cette-semaine    (K3 CETTE SEMAINE, formaté "+N")
  *   - #stat-sans-email       (K4 SANS EMAIL)
  *   - #oval-e-last-sync      (sidebar carte 1, date sync formatée)
@@ -33,11 +34,14 @@
  *       * count_personnes_without_birthdate
  *       * count_personnes_affiliation_expiring_within_90_days
  *       * get_last_oval_e_sync_date
+ *   - RPC Phase 4.1.A bis (sql/09-rpc-equipes.sql) :
+ *       * count_equipes_actives
  *
- * Version : 2.0 — mai 2026
+ * Version : 2.1 — mai 2026 (K2 ÉQUIPES dynamique via count_equipes_actives)
  *   v1.0 : tentait des SELECT directs (bloqués par RLS)
  *   v1.1 : utilise get_dashboard_stats agrégée
  *   v2.0 : Phase 3.2 — refonte portail (4 KPI + sidebar 3 cartes)
+ *   v2.1 : Phase 4.1.A bis — bascule K2 ÉQUIPES via RPC count_equipes_actives (dette #5)
  */
 
 (function () {
@@ -95,14 +99,15 @@
 
   (async function () {
     try {
-      // 6 appels en parallèle pour minimiser la latence perçue
+      // 7 appels en parallèle pour minimiser la latence perçue
       const results = await Promise.all([
         SupabaseHub.client.rpc('get_dashboard_stats').then(function (r) { return r.data; }).catch(function () { return null; }),
         SupabaseHub.countPersonnesCreatedLast7Days(),
         SupabaseHub.countPersonnesWithoutEmail(),
         SupabaseHub.countPersonnesWithoutBirthdate(),
         SupabaseHub.countPersonnesAffiliationExpiringWithin90Days(),
-        SupabaseHub.getLastOvalESyncDate()
+        SupabaseHub.getLastOvalESyncDate(),
+        SupabaseHub.client.rpc('count_equipes_actives').then(function (r) { return r.data; }).catch(function () { return null; })
       ]);
 
       const dashboardStats  = results[0];
@@ -111,6 +116,7 @@
       const sansNaissance   = results[3];
       const ffr90j          = results[4];
       const lastSyncOvalE   = results[5];
+      const nbEquipes       = results[6];
 
       // --------------------------------------------------------
       // 4a. KPI (header)
@@ -120,7 +126,10 @@
         updateEl('stat-personnes', nbPersonnes);
         updateEl('oval-e-count', String(nbPersonnes));
       }
-      // K2 ÉQUIPES laissé en dur (11) dans le HTML — doctrine §2.3 (dette P4-1)
+      // K2 ÉQUIPES dynamique via count_equipes_actives (v2.1, dette #5 partielle)
+      if (nbEquipes !== undefined && nbEquipes !== null) {
+        updateEl('stat-equipes', nbEquipes);
+      }
 
       updateEl('stat-cette-semaine', '+' + cetteSemaine);
       updateEl('stat-sans-email', sansEmail);
@@ -138,10 +147,11 @@
       updateEl('qd-ffr-90j', ffr90j);
 
       console.log(
-        '%c✅ MOM Hub Dashboard v2.0: stats mises à jour depuis Supabase',
+        '%c✅ MOM Hub Dashboard v2.1: stats mises à jour depuis Supabase',
         'color: #2d7a3e; font-weight: bold;',
         {
           nbPersonnes: nbPersonnes,
+          nbEquipes: nbEquipes,
           cetteSemaine: cetteSemaine,
           sansEmail: sansEmail,
           sansNaissance: sansNaissance,
