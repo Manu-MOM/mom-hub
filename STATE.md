@@ -3,7 +3,7 @@
 > **Document de référence opérationnel.** À jour à la racine du repo, mis à jour à chaque fin de session significative.
 > Sert de point de reprise universel : toute personne (ou tout Claude) qui ouvre ce fichier doit pouvoir reprendre le travail sans question.
 
-**Dernière mise à jour : 12 mai 2026 — fin Phase 3 + synchro conv Audits (dettes Axe B / référentiels)**
+**Dernière mise à jour : 12 mai 2026 — fin Phase 3 + modélisation événements livrée (conv Audits)**
 
 ---
 
@@ -48,155 +48,100 @@ C'est un **portail/agrégateur**, PAS une migration. Les outils existants (Sport
 - Secrets GitHub configurés : `SUPABASE_URL`, `SUPABASE_ANON_KEY`
 
 ### ✅ Phase 2.4 — Portail dynamique (FAIT — 11 mai 2026)
-- `js/supabase-client.js` : wrapper `SupabaseHub` autour du client supabase-js v2
-- `js/dashboard-stats.js` v1.1 : met à jour les compteurs du dashboard via RPC
-- Fonction RPC `get_dashboard_stats()` créée dans Supabase (SECURITY DEFINER)
-- 5 modifs dans `index.html` : 5 IDs ajoutés (`stat-personnes`, `stat-m14`, `greeting-meta`, `greeting-sub`, `se-joueurs` optionnel) + 3 balises `<script>` avant `</body>`
-- Page de diagnostic `test-supabase.html` à la racine, fonctionnelle
-- **Validé visuellement** : "LUNDI 11 MAI 2026 · CONNECTÉ À SUPABASE", "293 personnes en base · données live Supabase"
+- 4 KPI passifs alimentés en dynamique depuis Supabase via RPC RGPD-safe `get_dashboard_stats`
+- Pattern technique : Supabase REST API + RPC + RLS + helpers JS
+- `js/dashboard-stats.js` v1.1, `js/supabase-client.js` v1.4
+- Page diagnostic `test-supabase.html`
 
 ### ✅ Phase 2.4.5 — Réconciliation OVAL-E (FAIT — 11 mai 2026)
+- Réconciliation Drive (297 fiches) vs Supabase (323 fiches) vs OVAL-E export FFR
+- Doctrine v1.3 publiée (§13 architecture sources, §14 mapping qualités FFR → type_personne)
+- 6 dettes Axe B D1-D6 soldées (cf. registre-anomalies-OVAL-E + Audit-Personnes v1.1)
+- Base finale : 323 lignes Supabase dont 298 licenciées FFR alignées OVAL-E
 
-Première synchronisation Supabase ↔ OVAL-E (export FFR XLSX 358 lignes, 298 personnes uniques). Permet de clore les dettes techniques #1 et #2.
-
-**Effets sur la base** :
-- C1 (doublons) : 4 DELETE + 3 UPDATE (293 → 289 lignes)
-- C2 (LRGER fantôme) : 1 DELETE de la fiche WINCKLER qui contenait par erreur les données CAMPESE (289 → 288)
-- C3 (enrichissement) : 2 UPDATE pour ajouter les licences FFR de JUNG Emmanuel et RULFO Vivien
-- C4 (création) : 35 UPSERT pour les licenciés OVAL-E absents de Supabase (1 joueur M-10 + 22 parent_et_staff + 12 staff/dirigeant) → 288 → **323 lignes**
-- C5 (comparaison des 261 en intersection) : 0 divergence — le batch correction du 10 mai avait déjà parfaitement aligné les fiches
-
-**Évolutions schéma `personnes`** :
-- CHECK constraint `personnes_categorie_personne_check` étendue avec 3 nouvelles valeurs : `joueur_et_parent`, `joueur_et_staff`, `joueur_et_parent_et_staff`
-- INDEX UNIQUE créé sur `numero_licence_ffr` (idempotence des futurs imports OVAL-E)
-
-**Pattern réutilisable saisonnier** : les scripts C4 (UPSERT `ON CONFLICT (numero_licence_ffr) DO UPDATE`) sont conçus pour être rejoués à chaque export OVAL-E (été 2026 pour saison 26-27, etc.) sans dégât. La doctrine §10 est respectée : les champs OVAL-E faisant autorité sont mis à jour, les enrichissements manuels (email, tel, adresse déjà renseignés) sont préservés via `coalesce`.
-
-**Cible alignement OVAL-E atteinte** :
-- Supabase : 323 personnes, dont **298 licenciées FFR (alignement strict OVAL-E)** + 25 non-licenciées (parents non-MOM, 1 contact LRGER CAMPESE)
-
-### ✅ Phase 2.5 — Authentification Magic Link (FAIT — 11 mai 2026)
-
-**Décisions structurantes appliquées** :
-- **Auth Magic Link** (mail → lien éphémère, pas de mot de passe)
-- **3 rôles** : admin / coach / viewer (seul `admin` réellement attribué à ce jour, sur le compte de Manu)
-- Premier admin : Manu (UID `7ac40334-0d2a-4b1f-822b-133d564abe6c`), attribué via `INSERT` SQL direct après création du compte par Magic Link
-
-**Sous-étapes livrées** :
-1. ✅ **2.5.1** — Table `auth_roles` (pk composite `user_id, role`, CHECK in `('admin','coach','viewer')`), helpers SQL `has_role(p_role)` et `get_my_roles()` en `SECURITY DEFINER`, RLS activée avec 2 policies SELECT (own + admin). Fichier : `sql/04-auth-roles.sql`.
-2. ✅ **2.5.2** — Config Supabase Auth : Email Enabled, Confirm email ON, Site URL `https://manu-mom.github.io/mom-hub`, Redirect URLs whitelist `https://manu-mom.github.io/mom-hub/**`.
-3. ✅ **2.5.3** — `login.html` (page minimaliste, charte Hub, bouton "Recevoir le lien"), extension `js/supabase-client.js` v1.1 puis v1.2.
-4. ✅ **2.5.4** — Session helpers JS dans `supabase-client.js` v1.3 : `getMyRoles()` (cache mémoire), `hasRole(role)`, `isAdmin()`, `requireAuth({ role })` avec redirect, `onAuthChange(callback)`, `signOut()` enrichi.
-5. ✅ **2.5.5** — `dashboard.html` page admin sécurisée via `requireAuth({ role: 'admin' })`, pattern `auth-pending` pour éviter tout flash de contenu pendant la vérification de session.
-6. ✅ **2.5.6** — Intégration auth au portail (`index.html`) : boutons icônes "Admin" + "Déconnexion" dans la puce `.user-profile` (mode admin), pilule "Se connecter" à la place de la puce (mode anonyme). Tout piloté par classes `body.auth-resolved` / `body.auth-anon` / `body.auth-admin`.
-
-**Leçons techniques apprises** :
-- `supabase-js` v2 utilise `window.location.origin` par défaut comme `emailRedirectTo` (pas la Site URL Supabase). Pour les Pages hébergées dans un sous-chemin (`/mom-hub/`), il faut **passer explicitement** le bon redirect. Cf. `requestMagicLink()` v1.2.
-- Gmail scanne les liens Magic Link à la réception (antiphishing), ce qui peut consommer le token avant le clic utilisateur. Workaround testé : copier-coller le lien dans la barre d'adresse plutôt que clic direct. Pour les tests futurs, préférer une adresse non-Gmail.
-- Lors d'un `str_replace` qui injecte du HTML près d'une fermeture, **toujours vérifier l'équilibre des balises ouvrantes/fermantes** dans le bloc remplacé (et viser un pattern de remplacement qui inclut la balise fermante connue). Erreur faite en 2.5.6 : injection dans `.user-profile` au lieu de à côté → boutons masqués par effet de bord.
-- Pour positionner un nouvel élément dans une topbar existante en `display: grid`, ne **pas** essayer de le placer en `position: absolute` calé au pixel près — intégrer plutôt l'élément dans un conteneur existant qui a déjà son slot dans le grid.
+### ✅ Phase 2.5 — Authentification (FAIT — 11 mai 2026)
+- Login Magic Link Supabase Auth opérationnel
+- Table `auth_roles` (admin / coach / viewer) + 1 admin actif (Manu)
+- Helpers `requireAuth()` / `isAdmin()` / `signOut()`
+- Page `dashboard.html` admin
+- Boutons d'auth intégrés au portail
 
 **Reste à faire (hors périmètre 2.5, reporté Phase 3)** : ergonomie du portail dans son ensemble — voir dette "Architecture portail".
 
----
-
 ### ✅ Phase 3 — Refonte portail + topbar partagée (FAIT — 12 mai 2026)
 
-Refonte complète de l'expérience utilisateur du portail, en réponse aux dettes #9 (architecture portail), #10 (panneau ÉTAT DU HUB obsolète), #11 (CSS dupliqué).
+Travail livré ce 12 mai en deux temps (factorisation CSS puis refonte du contenu), guidé par le document de conception `Conception-Portail-Phase-3.md` v1.0 produit en amont par la conv « Conception Portail ».
 
-**Décisions structurantes appliquées** (cf. `Conception-Portail-Phase-3.md` v1.0 sur Drive, id `12xrICwk5NTzk1XZLpq964CkWwhft3zc2`) :
 - **Phase 3 partie 1/2 (factorisation CSS + topbar partagée)** : création de `css/hub.css` (palette canonique, polices, reset, topbar Hub partagée, états d'auth, classes utilitaires `.page-centered/.card/.btn/.feedback/.footer`). Adoption de la topbar Hub sur `index.html` (mode `fullscreen-app`), `login.html` (variante minimaliste), `dashboard.html` (variante admin complète).
 - **Phase 3 partie 2/2 (refonte portail)** : refonte de la zone sous-bandeau d'`index.html` selon §2.2 à §2.5 du doc de conception. Greeting recontextualisé, 4 KPI repensés (2 vert stable + 2 ambre actions), 5 sections avec sous-titres éditoriaux italique, sidebar 3 cartes (OVAL-E / Qualité des données / Raccourcis), retrait du panneau ÉTAT DU HUB.
 
-**Sous-étapes livrées** :
+Détails techniques :
 1. ✅ **3.1.A** — `css/hub.css` créé (482 lignes), `index.html` factorisé (-22%), `login.html` adopte topbar minimaliste (-27%), `dashboard.html` adopte topbar complète (-20%). 1 commit `Phase 3 (1/2) — factorisation CSS + topbar partagée (dette #11)`.
-2. ✅ **3.2.A** — `sql/05-rpc-portail.sql` : 5 fonctions PostgreSQL (`count_personnes_created_last_7_days`, `count_personnes_without_email`, `count_personnes_without_birthdate`, `count_personnes_affiliation_expiring_within_90_days`, `get_last_oval_e_sync_date`). Exécutées en prod Supabase, testées.
-3. ✅ **3.2.B** — `js/supabase-client.js` v1.3 → v1.4 : 5 wrappers async `SupabaseHub.countPersonnesCreatedLast7Days()` etc., avec tolérance d'erreur (valeur neutre 0/null si échec).
-4. ✅ **3.2.C** — Refonte `index.html` : nouveau greeting (surtitre dyn `LUNDI 12 MAI 2026 · TABLEAU DE BORD`, titre `BONJOUR MANU,`, sous-ligne `Référent M14 · saison 2025-2026`), 4 KPI (PERSONNES vert / ÉQUIPES vert dur=11 / CETTE SEMAINE ambre / SANS EMAIL ambre), 5 sections avec 18 outils v3 (4-4-3-4-3) tous "À VENIR" et sous-titres éditoriaux, sidebar 3 cartes. Adaptation `js/dashboard-stats.js` v1.1 → v2.0 pour peuplement dynamique.
-
-**Effets de bord temporels assumés** (option A doctrine — ne pas masquer) :
-- **K3 CETTE SEMAINE = +323** : tous les fichiers ayant été créés dans les 7 derniers jours (premier import OVAL-E le 10 mai, batch v1.1 le 10 mai, réconciliation le 11 mai), le compteur affichera 100% pendant quelques semaines. Redeviendra normal à partir du ~19 mai 2026.
-- **Sidebar QUALITÉ FFR 90j = 298** : presque toutes les affiliations 2025-2026 expirent le 30 juin par construction. Effet saisonnier qui reviendra entre fin avril et début juillet chaque année.
-
-**Leçons techniques apprises** :
-- L'archivage de la topbar Hub en CSS partagé (`hub.css`) demande de bien isoler les classes utilitaires génériques (`.card` sans contrainte de largeur) des classes contextuelles (`.card--login` qui ajoute max-width). Sinon collision entre login (carte large 420px) et dashboard (mini-cartes grid). Cf. discussion `.page` → `.page-centered` au début de la session.
-- Pour un peuplement dynamique multi-RPC, utiliser `Promise.all` plutôt que des `await` séquentiels — gain de latence x6 quand on a 6 appels indépendants. Cf. `dashboard-stats.js` v2.0.
-- L'éclaircissement entre version Doctrine (riche en données) et version v3 (riche en libellés) se résout par l'option C : adopter v3 pour les libellés/icônes/structure (gratuit), garder Doctrine pour les données (pas d'invention). Cas non trivial : "Réservation matériel" v3 EN LIGNE avec sous-titre infrastructures = ambiguïté sémantique. Solution Manu : "aucun outil n'est en ligne aujourd'hui, tous À VENIR, ils seront basculés au fil de l'intégration réelle".
 
 **Reste à faire (hors périmètre, reporté Phase 4)** : voir 7 dettes P4-1 à P4-7 ouvertes ci-dessous.
 
 ---
 
-## 🗃️ Schéma Supabase Vague 1 (état réel au 11 mai 2026, post-Phase 2.4.5)
+## 🔧 Pattern technique acquis (Phase 2.4)
 
-Source de vérité agrégée — issue de `get_dashboard_stats()` :
+Pour toute donnée Supabase à afficher dans le Hub :
 
-```json
-{
-  "nb_personnes": 323,
-  "nb_m14": 24,
-  "nb_poles": 5,
-  "nb_clubs": 4,
-  "nb_categories": 14
-}
-```
+1. **Côté Supabase** : créer une **fonction RPC `SECURITY DEFINER`** qui retourne uniquement les chiffres agrégés nécessaires (pas de données perso brutes).
+   ```sql
+   CREATE OR REPLACE FUNCTION public.get_dashboard_stats()
+   RETURNS json
+   LANGUAGE plpgsql
+   SECURITY DEFINER
+   SET search_path = public
+   AS $$
+     -- agrégats safe : count, sum, etc. PAS de SELECT * FROM personnes
+   $$;
+   ```
+2. **RLS strict sur la table** : pas de policy SELECT pour `anon` (compteur via RPC seulement).
+3. **Côté Hub** : utiliser `supabaseClient.fetchData('rpc/<fn_name>', { method: 'POST', body: {} })`.
+4. **Fallback gracieux** : si la RPC échoue, garder les chiffres statiques en place et logger l'erreur en console.
 
-| Table | Lignes | Source | Statut |
-|---|---|---|---|
-| `poles` | 5 | référentiel `postes.json`/Drive | ✅ rempli, lecture publique RLS |
-| `categories` | 14 | référentiel `categories.json` (mirrorée dans data/) | ✅ rempli, lecture publique RLS |
-| `clubs` | 4 | référentiel manuel | ✅ rempli, lecture publique RLS |
-| `saisons` | 1 | saison active 2025-2026 | ✅ rempli, lecture publique RLS |
-| `postes` | 20 | référentiel `postes.json` (v1.1, format 13) | ✅ rempli, lecture publique RLS |
-| `personnes` | **323** | fiches Drive + reconciliation OVAL-E 2026-05-11 | ✅ rempli, **PAS de policy SELECT publique** (RGPD) |
-| `ententes` | 0 | — | ⏳ Vague 2 |
-| `equipes` | 0 | — | ⏳ Vague 2 |
-| `equipe_joueurs` | 0 | — | ⏳ Vague 2 |
+Ce pattern doit être appliqué à toute future statistique du portail (événements, présences, etc.).
 
 ---
 
-## 🧠 Pattern technique acquis (réutilisable)
+## 🔄 Doctrine Réconciliation OVAL-E (sources de vérité)
 
-**RPC `SECURITY DEFINER` pour exposer des agrégats sans policy publique sur les tables sensibles.**
+Documents de référence (Drive `00 - Documentation/`) :
+- `Doctrine-Import-OVAL-E-v1.3.md` (canonique, mise à jour 11 mai 2026) — §13 sur l'architecture des sources, §14 sur le mapping qualités FFR
+- `Doctrine-Import-OVAL-E-v1.2.md` (intermédiaire, conservée pour traçabilité)
+- `Doctrine-Import-OVAL-E-v1.1.md` (initiale, conservée pour traçabilité)
+- `Audit-Personnes-MOM-Hub-v1.1.md` — §N3 F-15 documenté, 8 noms confirmés (vs 6 dans v1.0)
+- `Registre-anomalies-OVAL-E.md` — anomalie #1 ALTUN MURAT archivée
 
-Cas d'usage : afficher des compteurs (nb_personnes, etc.) sur une page publique, sans exposer aucune donnée perso.
+**Architecture des sources de vérité (§13 doctrine v1.3)** :
+- **Drive figé au 10 mai 2026** pour la saison 2025-2026 (`01 - Référentiels/personnes/`) — utilisable comme **archive**
+- **Supabase autoritatif** pour les données vivantes des personnes (323 fiches)
+- **OVAL-E export FFR** = source externe pour réconciliation annuelle/saisonnière
+- Décision saison 2026-2027 reportée à l'été 2026 (nouveau cycle d'export OVAL-E)
 
-Pattern :
-```sql
-create or replace function public.ma_fonction()
-returns json
-language plpgsql
-security definer  -- s'exécute avec les privilèges du créateur
-set search_path = public
-as $$ ... $$;
+**Mapping qualités FFR → type_personne (§14 doctrine v1.3)** : 5 valeurs licenciées (`licencie_joueur`, `licencie_dirigeant`, `licencie_educateur`, `licencie_soigneur`, `licencie_arbitre`) + `non_licencie` + `non_licencie_au_mom`. La CHECK constraint Supabase est en attente d'extension (cf. dette #8).
 
-grant execute on function public.ma_fonction() to anon, authenticated;
+---
+
+## 🔁 Pipeline réconciliation OVAL-E (à pérenniser)
+
+Pipeline en 4 chantiers (C1-C4) prêt à rejouer chaque saison :
+
+- **C1** : Hygiène générale (rétro-import doublons, normalisation casse)
+- **C2** : Alignement OVAL-E (insert manquants, update mismatches)
+- **C3** : Conformité doctrinale (type_personne, qualités, statut FFR)
+- **C4** : Audit final (croisement Drive ↔ Supabase ↔ OVAL-E)
+
+**SQL scripts C1/C2/C3/C4** : **NON commit dans repo public** (contiennent des données perso). Archivés local + Drive.
+
+Pipeline complet documenté dans `Doctrine-Import-OVAL-E-v1.3.md §11`.
+
 ```
-
-Côté JS : `const { data, error } = await supabase.rpc('ma_fonction');`
-
-À réutiliser pour tous les futurs compteurs/agrégats du Hub.
-
-**UPSERT idempotent par licence FFR pour les imports OVAL-E saisonniers (acquis Phase 2.4.5).**
-
-Pattern :
-```sql
-insert into personnes (...) values (...)
-on conflict (numero_licence_ffr) do update set
-    -- champs §10 OVAL-E faisant autorité (toujours écrasés)
-    nom = excluded.nom,
-    prenom = excluded.prenom,
-    qualite_ffr = excluded.qualite_ffr,
-    date_fin_affiliation = excluded.date_fin_affiliation,
-    -- champs hors §10 (préservation des enrichissements manuels)
-    email_principal = coalesce(personnes.email_principal, excluded.email_principal),
-    telephone_principal = coalesce(personnes.telephone_principal, excluded.telephone_principal),
-    adresse_postale = coalesce(personnes.adresse_postale, excluded.adresse_postale),
-    -- type_personne : on ne dégrade jamais un licencié vers non_licencie
-    type_personne = case when personnes.type_personne in ('non_licencie','non_licencie_au_mom')
-                         then excluded.type_personne else personnes.type_personne end,
-    modifie_par = excluded.modifie_par,
-    updated_at = now();
+OVAL-E export (XLSX) ── parse ──> normalisation ──> upsert idempotent
+                                       │
+                                       ↓
+                              audit anomalies → registre
 ```
 
 À rejouer chaque saison avec un nouvel export OVAL-E.
@@ -219,9 +164,10 @@ on conflict (numero_licence_ffr) do update set
    - `postes.json` v1.2 (`_couverture_a_completer` documentant la lacune des formats X et 7)
    - `observables-match.json` v1.1 (note `_note_jeu_collectif` expliquant l'absence de `libelle_long` et `saisie_associee` sur ce sous-type)
    - `Schema-cible-Supabase-aptitudes.md` v1.0 (anticipation migration Drive → Supabase pour quand l'onglet paramètres sera implémenté)
+   - **Ajout 12 mai 2026 soir** : nouveau référentiel `groupes-joueur.json` v1.0 généré par la modélisation événements (3 groupes par défaut : Performance / Développement / Initiation), à déposer dans `01 - Référentiels/`
 
    **Reste ouvert (Lots 2 et 3)** : couverture catégorielle F-18/F+18, peuplement métier ateliers/aptitudes EDR/barèmes physiques. Bloqué par dépendances externes (règlement LRGER 2025-2026, Lohann, préparateur physique), pas faisable seul en conv Audits.
-5. ~~**Chiffres en dur résiduels dans index.html**~~ ⚠️ **PARTIEL** : "16 Sites" et "11 Équipes" restent en dur tant que les tables `sites` et `equipes` ne sont pas créées/remplies (Phase 2.2 future). Le compteur "323 personnes" est dynamique via la RPC. **24 M14** est aussi dynamique depuis Phase 2.4.5.
+5. ~~**Chiffres en dur résiduels dans index.html**~~ ⚠️ **PARTIEL** : "16 Sites" et "11 Équipes" restent en dur tant que les tables `sites` et `equipes` ne sont pas créées/remplies (cf. dette résolue #14 ci-dessous, modélisation publiée — implémentation Phase 4). Le compteur "323 personnes" est dynamique via la RPC. **24 M14** est aussi dynamique depuis Phase 2.4.5.
 6. ~~**Date `VENDREDI 8 MAI 2026 · HUB INITIALISÉ` dans le HTML statique**~~ ✅ **RÉSOLU** (11 mai 2026, Phase 2.5.6) : remplacé par "TABLEAU DE BORD" (date injectée dynamiquement par JS au format `toLocaleDateString('fr-FR')`). Greeting-sub neutralisé en "Effectifs synchronisés avec OVAL-E" (et probablement écrasé par `dashboard-stats.js` au runtime avec le compteur dynamique). Panneau sidebar "État du Hub" : "Hub initialisé aujourd'hui" → "Hub en production".
 7. ~~**Désalignement Drive ↔ Supabase post-réconciliation OVAL-E**~~ ✅ **ARBITRÉ** (11 mai 2026, conv Audits) : Drive figé au 10 mai 2026 pour la saison 2025-2026, Supabase devient source autoritative des données vivantes. Décision saison 2026-2027 reportée à l'été. Doctrine : `Doctrine-Import-OVAL-E-v1.3.md §13`. Pas d'action Production requise.
 8. **CHECK constraint `personnes_type_personne_check` à étendre** (arbitré 11 mai 2026, **prêt à exécuter** depuis publication doctrine §14) : la `Doctrine-Import-OVAL-E-v1.3.md §14` est désormais publiée (mapping qualités FFR → `type_personne` officiel : 5 valeurs licenciées + `non_licencie` + `non_licencie_au_mom`). Le SQL est donc cadré, plus d'ambiguïté de spec. Ajouter `licencie_soigneur` et `licencie_arbitre` aux valeurs autorisées de `personnes.type_personne` (fidélité à la nomenclature FFR : Joueur / Dirigeant / Éducateur / Soigneur / Arbitre).
@@ -237,15 +183,19 @@ on conflict (numero_licence_ffr) do update set
 12. **Mini-déséquilibre `<div>` ouverts/fermés dans `index.html`** (1 div fermante manquante quelque part, présent dès la version initiale du fichier). Tolérée par les navigateurs, sans impact visuel constaté. À nettoyer lors de la refonte.
 13. **Allow new users to sign up = ON dans Supabase Auth** : à terme passer à OFF pour fermer les inscriptions spontanées (les comptes seront créés par un admin). À traiter quand les autres rôles seront déployés (coach, viewer).
 
+### ✅ Dette résolue le 12 mai 2026 (conv Audits — modélisation événements)
+
+14. ~~**Modélisation entités événements / compositions / présences**~~ ✅ **RÉSOLU** (12 mai 2026, conv Audits) : document `Modelisation-Evenements-v1.md` publié dans Drive `00 - Documentation/` (~69 000 caractères, 1 344 lignes). **9 entités principales** modélisées conceptuellement avec schémas SQL complets (`evenements`, `compositions`, `composition_joueurs`, `presences`, `equipes`, `sites`, `distances_sites`, `evenement_encadrants`, `joueurs_externes`). **22 décisions de cadrage** actées, **10 cas d'usage** couverts (match standard, ententes SAR×MOM, triangulaire M-14, quadrangulaire, Challenge Vié multi-phases, tournoi multi-jours, stage EDR multi-catégories, EDR mono-catégorie, matchs simultanés, dépannage hors-catégorie). Cycle de vie événement à 5 états + `annule`. Référentiel `groupes-joueur.json` v1.0 généré à déposer en parallèle dans Drive `01 - Référentiels/`. **Débloque P4-2** (greeting `J-N AVANT MATCH`) **et P4-3** (KPI prochain match). 5 dettes Production transmises (M-1 à M-5 ci-dessous) + 6 dettes conceptuelles consignées dans le document final (§9.2).
+
 ### 🔵 Dettes ouvertes par la Phase 3
 
 Issues directes du doc `Conception-Portail-Phase-3.md` §3 (12 dettes consolidées en 7).
 
 P4-1. **Adaptation portail par rôle** (`coach`, `viewer`) : en Phase 3, tous les rôles voient le même portail avec mêmes 18 outils, mêmes sections, mêmes KPI, même sidebar. Quand des comptes `coach` et `viewer` réels existeront et auront fourni des retours d'usage, calibrer un portail dédié (filtrage sections vs vignettes, sidebar personnalisée, KPI contextualisés). Référence doc §2.6.
 
-P4-2. **Greeting contextualisé `J-N AVANT MATCH`** : pour reproduire l'intuition forte de la v3 (afficher l'événement à venir le plus proche dans le surtitre), il faut d'abord la table `evenements` qui n'existe pas. Modélisation à mener côté conv Audits. Référence doc §2.2.
+P4-2. **Greeting contextualisé `J-N AVANT MATCH`** ⚠️ **DÉBLOQUÉ** (12 mai 2026) : la table `evenements` est désormais modélisée (cf. dette résolue #14 et `Modelisation-Evenements-v1.md`). Implémentation possible en Phase 4 par conv Production une fois les CREATE TABLE exécutés. RPC suggérée : `get_evenements_a_venir(equipe_uuid, n_jours)`.
 
-P4-3. **KPI ou widget « prochain match / présences / compo »** : idem P4-2, attend la modélisation événements + présences + compositions. Pertinent uniquement pour rôle `coach`.
+P4-3. **KPI ou widget « prochain match / présences / compo »** ⚠️ **DÉBLOQUÉ** (12 mai 2026) : idem P4-2. RPC suggérée : `get_prochain_evenement_par_equipe(equipe_uuid)`. Pertinent uniquement pour rôle `coach`.
 
 P4-4. **Sync SportEasy automatisée** (avec sidebar dédiée) : remplacerait à terme la mention historique `SportEasy · M14 enrichis (23)` par un vrai état de sync bidirectionnelle. Hors périmètre actuel ; à arbitrer Phase 4 sur la base d'un vrai cas d'usage.
 
@@ -254,6 +204,20 @@ P4-5. **Greeting mode anonyme à préciser** : §2.2 du doc évoque un libellé 
 P4-6. **Personnalisation des `RACCOURCIS` (sidebar carte 3)** : actuellement 3 liens en dur (Annuaire complet / Éditeur de compositions / Bibliothèque ateliers) communs à tous. À terme, personnaliser selon le rôle (un coach a d'autres priorités qu'un dirigeant) ou même selon l'historique de clics. Référence doc §2.5.
 
 P4-7. **Outil de listing filtré des fiches** (cible des liens carte 2 Qualité des données) : actuellement les chiffres "1 fiches sans email / 25 fiches sans naissance / 298 affiliations expirent dans 90j" sont du texte non cliquable. À terme, transformer en liens vers une vue filtrée des fiches concernées. Référence doc §2.5.
+
+### 🔵 Dettes ouvertes par la modélisation événements (12 mai 2026 — conv Audits)
+
+Issues directes du doc `Modelisation-Evenements-v1.md` §9.1. Toutes destinées à la conv Production.
+
+M-1. **ALTER TABLE personnes — bloc_5** : ajouter `categorie_surclassement_uuid UUID NULL REFERENCES categories(id)` pour tracer les surclassements officiels. **Préalable** à la prise en compte propre des surclassements dans le vivier de composition (cf. décision cadrage #20 du document). Priorité : moyenne.
+
+M-2. **Intégration API d'itinéraire + cache `distances_sites`** : pour le calcul automatique des distances et durées de trajet inter-sites. Recommandation : **OpenRouteService** (free tier 2 000 req/jour, respecte la doctrine budget 0€) ; alternative : OSRM auto-hébergé. Pattern lazy (calcul à la demande, mise en cache ~1 an). Clé API stockée en secret GitHub Actions / variable Supabase, **jamais en commit**. Priorité : moyenne.
+
+M-3. **Migration future Drive → Supabase de `groupes-joueur.json`** : quand l'onglet paramètres sera implémenté. Pattern de référence : `Schema-cible-Supabase-aptitudes.md` (Drive `00 - Documentation/`). Priorité : faible.
+
+M-4. **Onglet paramètres pour édition admin** des référentiels `groupes-joueur` et `aptitudes` : permettre à un admin de créer/désactiver/réordonner les valeurs sans éditer le JSON Drive. Lié à M-3. Priorité : faible.
+
+M-5. **RPC `get_distance_between_sites(origine_uuid, destination_uuid)`** : wrapper côté serveur qui interroge le cache `distances_sites` puis l'API externe si besoin. Lié à M-2. Priorité : liée à M-2.
 
 ### 🔵 Dette technique mineure ouverte par Phase 3
 
@@ -277,7 +241,7 @@ mom-hub/
 │   ├── observables-match.json
 │   ├── postes.json
 │   ├── tests-physiques.json
-│   └── (3 autres)
+│   └── (3 autres dont groupes-joueur.json à mirroir post upload Drive)
 ├── js/
 │   ├── data-loader.js                     # ancien loader des référentiels statiques
 │   ├── supabase-client.js                 # wrapper SupabaseHub
@@ -301,6 +265,7 @@ mom-hub/
 - Secrets GitHub Actions : `SUPABASE_URL`, `SUPABASE_ANON_KEY`
 - Clé `service_role` Supabase : **stockée par Manu en local, jamais commit**
 - Mot de passe DB Supabase : **stocké par Manu en local**
+- (à venir) Clé API OpenRouteService (cf. dette M-2) : **secret GitHub Actions / Supabase, jamais commit**
 
 ---
 
@@ -315,15 +280,20 @@ Dossier `MOM Hub/2025-2026/` :
 | `MOM-Core-Synthese-globale-v2.md` | `1X0FjB6Z9eVlxH0VcEQ4le2wf8eCMmmly` | Synthèse globale modèle |
 | `MOM-Core-Cartographie-Globale-v2.md` | `1N2I86T751XneQT9fx1wCQWusmeCz235T` | Cartographie complète |
 | `Doctrine-Import-OVAL-E-v1.1.md` | `1puTaNLXno99T4C9ECkEIgi1YGbk6bE41` | Doctrine import licences FFR (v1.2 et v1.3 ajoutées le 11 mai 2026 dans le même dossier Drive) |
-| `Audit-Module-Compositions-v2.md` | `114UBo2lSqB8t8J2o0YRc55Nc8uoNtgCM` | Audit module Compos (v2) |
-| `Audit-Module-Suivi-Match.md` | — | Audit module Suivi-Match |
-| `Audit-Module-Rapport.md` | — | Audit module Rapport |
-| `Audit-Module-Statistiques.md` | — | Audit module Stats |
-| `Audit-Module-Bilans.md` | — | Audit module Bilans |
+| `Conception-Portail-Phase-3.md` | `12xrICwk5NTzk1XZLpq964CkWwhft3zc2` | Conception portail Phase 3 livrée 12 mai 2026 |
+| `Audit-Referentiels-v1.md` | dans `1CkeBrMBJGChqGui4r7mVkHa3NwaLwOSK` | Audit des 6 référentiels métier (11 mai 2026) |
+| `Schema-cible-Supabase-aptitudes.md` | dans `1CkeBrMBJGChqGui4r7mVkHa3NwaLwOSK` | Pattern de migration Drive → Supabase (12 mai 2026) |
+| `Modelisation-Evenements-v1.md` | dans `1CkeBrMBJGChqGui4r7mVkHa3NwaLwOSK` | **Modélisation événements complète (12 mai 2026)** — référence pour Phase 4 |
+| `Audit-Module-Compositions-v2.md` | `114UBo2lSqB8t8J2o0YRc55Nc8uoNtgCM` | Audit module Compos (v2) — à reprendre post-modélisation événements |
+| `Audit-Module-Suivi-Match.md` | — | Audit module Suivi-Match — à reprendre post-modélisation événements |
+| `Audit-Module-Rapport.md` | — | Audit module Rapport — à reprendre post-modélisation événements |
+| `Audit-Module-Statistiques.md` | — | Audit module Stats — à reprendre post-modélisation événements |
+| `Audit-Module-Bilans.md` | — | Audit module Bilans — à reprendre post-modélisation événements |
 | `Audit-Personnes-MOM-Hub.md` | `1DsehRBgzGq_kAraCZvpKElCvddmAOM3b` | Audit du modèle Personnes (v1.1 ajoutée le 11 mai 2026 dans le même dossier Drive) |
+| `Registre-anomalies-OVAL-E.md` | dans `1CkeBrMBJGChqGui4r7mVkHa3NwaLwOSK` | Registre des anomalies de réconciliation FFR |
 
 Dossiers clés :
-- `01 - Référentiels/` : `1RpOU_TtO20GMQejvJv8th0jXcQYqHb8h` (6 fichiers JSON, conformité à évaluer)
+- `01 - Référentiels/` : `1RpOU_TtO20GMQejvJv8th0jXcQYqHb8h` (6 fichiers JSON existants + `groupes-joueur.json` à déposer post-modélisation événements)
 - `00 - Documentation/` : `1CkeBrMBJGChqGui4r7mVkHa3NwaLwOSK`
 - `01 - Référentiels/personnes/` : `17hmQpAX_etb3pdRvJ_-NBeL2RK17T2NE` (sous-dossiers joueurs/parents/contacts-externes)
 
@@ -331,14 +301,26 @@ Dossiers clés :
 
 ## 🚀 Prochaine session
 
-**Avant de démarrer toute Phase 3** :
+**Avant de démarrer toute Phase 4** :
 1. Lire ce STATE.md (5 min)
 2. Lire `PASSATION.md` (kit de démarrage par thématique)
-3. Vérifier que la chaîne Hub → Supabase fonctionne toujours (ouvrir `https://manu-mom.github.io/mom-hub/`, F12 console, doit afficher `✅ MOM Hub Dashboard: stats mises à jour depuis Supabase` ET `🏉 MOM Hub · Supabase Client v1.4 chargé`)
-4. Vérifier que le portail affiche bien **323 personnes** (compteur dynamique post-Phase 2.4.5) et que les boutons d'auth réagissent (icône grille + flèche en mode admin, pilule verte "Se connecter" en mode anonyme)
-5. Vérifier que `login.html` affiche bien `v1.3 chargé` dans la console et que l'envoi d'un Magic Link sur ton email aboutit sur `dashboard.html` avec session active
+3. Lire `Modelisation-Evenements-v1.md` (le document de référence pour les futurs CREATE TABLE de Phase 4)
+4. Vérifier que la chaîne Hub → Supabase fonctionne toujours (ouvrir `https://manu-mom.github.io/mom-hub/`, F12 console, doit afficher `✅ MOM Hub Dashboard: stats mises à jour depuis Supabase` ET `🏉 MOM Hub · Supabase Client v1.4 chargé`)
+5. Vérifier que le portail affiche bien **323 personnes** (compteur dynamique post-Phase 2.4.5) et que les boutons d'auth réagissent (icône grille + flèche en mode admin, pilule verte "Se connecter" en mode anonyme)
+6. Vérifier que `login.html` affiche bien `v1.3 chargé` dans la console et que l'envoi d'un Magic Link sur ton email aboutit sur `dashboard.html` avec session active
 
 **Travaux en attente** :
-- **Conv Production** : la Phase 3 est terminée. Travaux possibles pour la Phase 4 selon priorités à arbitrer : (a) modélisation table `evenements` (P4-2/P4-3) — préalable à toute évolution UX du portail orientée "prochain match" ; (b) déploiement comptes `coach` et `viewer` réels (P4-1) ; (c) externalisation logo M2M (dette mineure P3) ; (d) déplacement `04-auth-roles.sql` vers `sql/` (dette mineure P3-2).
-- **Conv Audits** : reprise des audits + modélisation événements (matchs / entraînements / tournois) + transmission des dettes Axe B (D1-D6) issues de la réconciliation OVAL-E (voir `dettes-axe-b-reconciliation-OVAL-E.md` déposé dans Drive). Maintenant que la conception portail Phase 3 est livrée, la modélisation événements devient le prochain gros chantier conceptuel.
-- **Conv Conception Portail** : a livré `Conception-Portail-Phase-3.md` v1.0 (Drive `12xrICwk5NTzk1XZLpq964CkWwhft3zc2`). Pour Phase 4, rouvrir un cycle Conception si besoin de définir le portail par rôle (P4-1).
+- **Conv Production** : la Phase 3 est terminée. Travaux prioritaires pour la Phase 4 :
+  - (a) **Implémentation des 9 tables modélisées** (cf. `Modelisation-Evenements-v1.md` §4) : `equipes`, `evenements`, `compositions`, `composition_joueurs`, `presences`, `evenement_encadrants`, `joueurs_externes`, `sites`, `distances_sites`. Plus 2 ALTER TABLE `personnes` (M-1 + bloc_6 `groupe_indicatif_uuid`).
+  - (b) **RPC associées** : `get_evenements_a_venir`, `get_prochain_evenement_par_equipe`, `get_distance_between_sites`, `get_vivier_compo`. Débloque P4-2 et P4-3.
+  - (c) **Mirror `groupes-joueur.json`** dans `data/` une fois déposé dans Drive.
+  - (d) **Dette #8** (CHECK constraint `type_personne` à étendre) : prêt à exécuter (~10 min).
+  - (e) Dettes mineures : externalisation logo M2M (P3-mineure), déplacement `04-auth-roles.sql` vers `sql/` (P3-mineure-2).
+  - (f) Déploiement comptes `coach` et `viewer` réels (préalable à P4-1).
+- **Conv Audits** : modélisation événements **livrée** (12 mai 2026). Travaux restants côté Audits :
+  - Lots 2 et 3 de l'audit référentiels (bloqués par tiers : règlement LRGER 2025-2026, Lohann pour EDR aptitudes, préparateur physique pour barèmes).
+  - Reprise des **audits modules** (Compositions v2, Suivi-Match, Rapport, Stats, Bilans) à la lumière de la modélisation événements pour MAJ post-Phase 2.5/3.
+  - Modélisation **événements extra-sportifs** (dette Phase 5, C2 du doc modélisation).
+  - Modélisation **compo adverse + joueurs adverses** (dette C1 du doc modélisation, reportée après quelques mois d'usage de l'app).
+- **Conv Conception Portail** : a livré `Conception-Portail-Phase-3.md` v1.0 (Drive `12xrICwk5NTzk1XZLpq964CkWwhft3zc2`). Pour Phase 4, rouvrir un cycle Conception si besoin de définir le portail par rôle (P4-1), ou de spécifier précisément l'UX greeting/widget prochain match maintenant que la modélisation événements est livrée (P4-2/P4-3 débloquées).
+- **Futures conv Modules métier** (annoncées) : "MOM Hub - Modules Ateliers et ressources pédagogiques" et "MOM Hub - Modules Planification de la saison et préparation de séances". Trouveront dans `Modelisation-Evenements-v1.md` §10.3 leur point d'ancrage avec les autres conv.
