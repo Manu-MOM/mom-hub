@@ -3,7 +3,7 @@
 > **Document de référence opérationnel.** À jour à la racine du repo, mis à jour à chaque fin de session significative.
 > Sert de point de reprise universel : toute personne (ou tout Claude) qui ouvre ce fichier doit pouvoir reprendre le travail sans question.
 
-**Dernière mise à jour : 11 mai 2026 — fin Phase 2.5 (Authentification Magic Link)**
+**Dernière mise à jour : 12 mai 2026 — fin Phase 3 (Refonte portail + topbar partagée)**
 
 ---
 
@@ -97,6 +97,33 @@ Première synchronisation Supabase ↔ OVAL-E (export FFR XLSX 358 lignes, 298 p
 - Pour positionner un nouvel élément dans une topbar existante en `display: grid`, ne **pas** essayer de le placer en `position: absolute` calé au pixel près — intégrer plutôt l'élément dans un conteneur existant qui a déjà son slot dans le grid.
 
 **Reste à faire (hors périmètre 2.5, reporté Phase 3)** : ergonomie du portail dans son ensemble — voir dette "Architecture portail".
+
+---
+
+### ✅ Phase 3 — Refonte portail + topbar partagée (FAIT — 12 mai 2026)
+
+Refonte complète de l'expérience utilisateur du portail, en réponse aux dettes #9 (architecture portail), #10 (panneau ÉTAT DU HUB obsolète), #11 (CSS dupliqué).
+
+**Décisions structurantes appliquées** (cf. `Conception-Portail-Phase-3.md` v1.0 sur Drive, id `12xrICwk5NTzk1XZLpq964CkWwhft3zc2`) :
+- **Phase 3 partie 1/2 (factorisation CSS + topbar partagée)** : création de `css/hub.css` (palette canonique, polices, reset, topbar Hub partagée, états d'auth, classes utilitaires `.page-centered/.card/.btn/.feedback/.footer`). Adoption de la topbar Hub sur `index.html` (mode `fullscreen-app`), `login.html` (variante minimaliste), `dashboard.html` (variante admin complète).
+- **Phase 3 partie 2/2 (refonte portail)** : refonte de la zone sous-bandeau d'`index.html` selon §2.2 à §2.5 du doc de conception. Greeting recontextualisé, 4 KPI repensés (2 vert stable + 2 ambre actions), 5 sections avec sous-titres éditoriaux italique, sidebar 3 cartes (OVAL-E / Qualité des données / Raccourcis), retrait du panneau ÉTAT DU HUB.
+
+**Sous-étapes livrées** :
+1. ✅ **3.1.A** — `css/hub.css` créé (482 lignes), `index.html` factorisé (-22%), `login.html` adopte topbar minimaliste (-27%), `dashboard.html` adopte topbar complète (-20%). 1 commit `Phase 3 (1/2) — factorisation CSS + topbar partagée (dette #11)`.
+2. ✅ **3.2.A** — `sql/05-rpc-portail.sql` : 5 fonctions PostgreSQL (`count_personnes_created_last_7_days`, `count_personnes_without_email`, `count_personnes_without_birthdate`, `count_personnes_affiliation_expiring_within_90_days`, `get_last_oval_e_sync_date`). Exécutées en prod Supabase, testées.
+3. ✅ **3.2.B** — `js/supabase-client.js` v1.3 → v1.4 : 5 wrappers async `SupabaseHub.countPersonnesCreatedLast7Days()` etc., avec tolérance d'erreur (valeur neutre 0/null si échec).
+4. ✅ **3.2.C** — Refonte `index.html` : nouveau greeting (surtitre dyn `LUNDI 12 MAI 2026 · TABLEAU DE BORD`, titre `BONJOUR MANU,`, sous-ligne `Référent M14 · saison 2025-2026`), 4 KPI (PERSONNES vert / ÉQUIPES vert dur=11 / CETTE SEMAINE ambre / SANS EMAIL ambre), 5 sections avec 18 outils v3 (4-4-3-4-3) tous "À VENIR" et sous-titres éditoriaux, sidebar 3 cartes. Adaptation `js/dashboard-stats.js` v1.1 → v2.0 pour peuplement dynamique.
+
+**Effets de bord temporels assumés** (option A doctrine — ne pas masquer) :
+- **K3 CETTE SEMAINE = +323** : tous les fichiers ayant été créés dans les 7 derniers jours (premier import OVAL-E le 10 mai, batch v1.1 le 10 mai, réconciliation le 11 mai), le compteur affichera 100% pendant quelques semaines. Redeviendra normal à partir du ~19 mai 2026.
+- **Sidebar QUALITÉ FFR 90j = 298** : presque toutes les affiliations 2025-2026 expirent le 30 juin par construction. Effet saisonnier qui reviendra entre fin avril et début juillet chaque année.
+
+**Leçons techniques apprises** :
+- L'archivage de la topbar Hub en CSS partagé (`hub.css`) demande de bien isoler les classes utilitaires génériques (`.card` sans contrainte de largeur) des classes contextuelles (`.card--login` qui ajoute max-width). Sinon collision entre login (carte large 420px) et dashboard (mini-cartes grid). Cf. discussion `.page` → `.page-centered` au début de la session.
+- Pour un peuplement dynamique multi-RPC, utiliser `Promise.all` plutôt que des `await` séquentiels — gain de latence x6 quand on a 6 appels indépendants. Cf. `dashboard-stats.js` v2.0.
+- L'éclaircissement entre version Doctrine (riche en données) et version v3 (riche en libellés) se résout par l'option C : adopter v3 pour les libellés/icônes/structure (gratuit), garder Doctrine pour les données (pas d'invention). Cas non trivial : "Réservation matériel" v3 EN LIGNE avec sous-titre infrastructures = ambiguïté sémantique. Solution Manu : "aucun outil n'est en ligne aujourd'hui, tous À VENIR, ils seront basculés au fil de l'intégration réelle".
+
+**Reste à faire (hors périmètre, reporté Phase 4)** : voir 7 dettes P4-1 à P4-7 ouvertes ci-dessous.
 
 ---
 
@@ -197,11 +224,35 @@ on conflict (numero_licence_ffr) do update set
 
 ### 🔵 Dettes ouvertes par la Phase 2.5
 
-9. **Architecture du portail à revoir** (Phase 3, priorité haute) : la version actuelle de `index.html` est fonctionnelle mais a une architecture d'information faible (KPI passifs "323 / 16 / 11 / 24" plutôt qu'orientés actions, greeting plat, sidebar pauvre, hiérarchie des outils peu lisible). **Référence v3 à conserver** comme inspiration : capture d'écran d'un prototype antérieur (mom-hub-accueil-v3) qui propose un greeting contextualisé ("J-3 AVANT MATCH · 3 actions en attente · compo M14 à finaliser · 2 nouveaux licenciés"), des KPI orientés actions ("3 PRÉSENCES / 1 COMPO / +2 LICENCIÉS / 8 CERT. MÉD."), des sous-titres de section ("construction & planification" / "le quotidien du coach"), et 3 cartes sidebar utiles (Prochain match, À venir, Passerelle synchronisée). Travail à reprendre côté axe B (conception) avant retour Production.
-10. **Panneau "État du Hub" sidebar contient encore des infos obsolètes** (`index.html` ligne ~1156+) : "Créé le · Ven. 8 mai 2026", "Version 1.0 — initiale", "SportEasy · M14 enrichis (23)". À nettoyer pendant la refonte du portail (cf. dette #9), pas en urgence.
-11. **CSS dupliqué entre `index.html`, `login.html`, `dashboard.html`** : palette de couleurs, polices, classes utilitaires définies 3 fois. À factoriser dans un `css/hub.css` partagé lors de la refonte du portail.
+9. ~~**Architecture du portail à revoir**~~ ✅ **RÉSOLU** (12 mai 2026, Phase 3.2) : la version actuelle de `index.html` est fonctionnelle mais a une architecture d'information faible (KPI passifs "323 / 16 / 11 / 24" plutôt qu'orientés actions, greeting plat, sidebar pauvre, hiérarchie des outils peu lisible). **Référence v3 à conserver** comme inspiration : capture d'écran d'un prototype antérieur (mom-hub-accueil-v3) qui propose un greeting contextualisé ("J-3 AVANT MATCH · 3 actions en attente · compo M14 à finaliser · 2 nouveaux licenciés"), des KPI orientés actions ("3 PRÉSENCES / 1 COMPO / +2 LICENCIÉS / 8 CERT. MÉD."), des sous-titres de section ("construction & planification" / "le quotidien du coach"), et 3 cartes sidebar utiles (Prochain match, À venir, Passerelle synchronisée). Travail à reprendre côté axe B (conception) avant retour Production.
+10. ~~**Panneau "État du Hub" sidebar contient encore des infos obsolètes**~~ ✅ **RÉSOLU** (12 mai 2026, Phase 3.2) : panneau retiré, remplacé par sidebar 3 cartes (OVAL-E / Qualité des données / Raccourcis).
+11. ~~**CSS dupliqué entre `index.html`, `login.html`, `dashboard.html`**~~ ✅ **RÉSOLU** (12 mai 2026, Phase 3.1) : factorisation dans `css/hub.css` (palette canonique 15+6 vars, reset, topbar Hub partagée, classes utilitaires).
 12. **Mini-déséquilibre `<div>` ouverts/fermés dans `index.html`** (1 div fermante manquante quelque part, présent dès la version initiale du fichier). Tolérée par les navigateurs, sans impact visuel constaté. À nettoyer lors de la refonte.
 13. **Allow new users to sign up = ON dans Supabase Auth** : à terme passer à OFF pour fermer les inscriptions spontanées (les comptes seront créés par un admin). À traiter quand les autres rôles seront déployés (coach, viewer).
+
+### 🔵 Dettes ouvertes par la Phase 3
+
+Issues directes du doc `Conception-Portail-Phase-3.md` §3 (12 dettes consolidées en 7).
+
+P4-1. **Adaptation portail par rôle** (`coach`, `viewer`) : en Phase 3, tous les rôles voient le même portail avec mêmes 18 outils, mêmes sections, mêmes KPI, même sidebar. Quand des comptes `coach` et `viewer` réels existeront et auront fourni des retours d'usage, calibrer un portail dédié (filtrage sections vs vignettes, sidebar personnalisée, KPI contextualisés). Référence doc §2.6.
+
+P4-2. **Greeting contextualisé `J-N AVANT MATCH`** : pour reproduire l'intuition forte de la v3 (afficher l'événement à venir le plus proche dans le surtitre), il faut d'abord la table `evenements` qui n'existe pas. Modélisation à mener côté conv Audits. Référence doc §2.2.
+
+P4-3. **KPI ou widget « prochain match / présences / compo »** : idem P4-2, attend la modélisation événements + présences + compositions. Pertinent uniquement pour rôle `coach`.
+
+P4-4. **Sync SportEasy automatisée** (avec sidebar dédiée) : remplacerait à terme la mention historique `SportEasy · M14 enrichis (23)` par un vrai état de sync bidirectionnelle. Hors périmètre actuel ; à arbitrer Phase 4 sur la base d'un vrai cas d'usage.
+
+P4-5. **Greeting mode anonyme à préciser** : §2.2 du doc évoque un libellé `BIENVENUE SUR MOM HUB,` pour visiteur non connecté, mais l'expérience mode anonyme n'est pas formellement définie. À traiter quand on activera un vrai compte `viewer` ou qu'on aura une page d'accueil publique.
+
+P4-6. **Personnalisation des `RACCOURCIS` (sidebar carte 3)** : actuellement 3 liens en dur (Annuaire complet / Éditeur de compositions / Bibliothèque ateliers) communs à tous. À terme, personnaliser selon le rôle (un coach a d'autres priorités qu'un dirigeant) ou même selon l'historique de clics. Référence doc §2.5.
+
+P4-7. **Outil de listing filtré des fiches** (cible des liens carte 2 Qualité des données) : actuellement les chiffres "1 fiches sans email / 25 fiches sans naissance / 298 affiliations expirent dans 90j" sont du texte non cliquable. À terme, transformer en liens vers une vue filtrée des fiches concernées. Référence doc §2.5.
+
+### 🔵 Dette technique mineure ouverte par Phase 3
+
+P3-mineure. **Logo M2M dupliqué en base64 dans 3 HTML** (~56 ko × 3 = ~170 ko inutiles dans le repo) : `index.html`, `login.html`, `dashboard.html` contiennent chacun une copie base64 du logo. À externaliser dans `assets/logo-m2m.jpg` chargé via `<img src="assets/logo-m2m.jpg">`. Non bloquant, traitable à toute occasion.
+
+P3-mineure-2. **`sql/04-auth-roles.sql` mal placé à la racine du repo** au lieu du dossier `sql/`. À déplacer un jour pour cohérence (les fichiers SQL 01, 02, 05 sont bien dans `sql/`). Non bloquant.
 
 ---
 
@@ -276,10 +327,11 @@ Dossiers clés :
 **Avant de démarrer toute Phase 3** :
 1. Lire ce STATE.md (5 min)
 2. Lire `PASSATION.md` (kit de démarrage par thématique)
-3. Vérifier que la chaîne Hub → Supabase fonctionne toujours (ouvrir `https://manu-mom.github.io/mom-hub/`, F12 console, doit afficher `✅ MOM Hub Dashboard: stats mises à jour depuis Supabase` ET `🏉 MOM Hub · Supabase Client v1.3 chargé`)
+3. Vérifier que la chaîne Hub → Supabase fonctionne toujours (ouvrir `https://manu-mom.github.io/mom-hub/`, F12 console, doit afficher `✅ MOM Hub Dashboard: stats mises à jour depuis Supabase` ET `🏉 MOM Hub · Supabase Client v1.4 chargé`)
 4. Vérifier que le portail affiche bien **323 personnes** (compteur dynamique post-Phase 2.4.5) et que les boutons d'auth réagissent (icône grille + flèche en mode admin, pilule verte "Se connecter" en mode anonyme)
 5. Vérifier que `login.html` affiche bien `v1.3 chargé` dans la console et que l'envoi d'un Magic Link sur ton email aboutit sur `dashboard.html` avec session active
 
 **Travaux en attente** :
-- **Conv Production** : la Phase 3 reste largement à concevoir. Premier sujet probable : **refonte du portail** (cf. dette #9) à partir du prototype v3 et des décisions de l'axe B sur l'architecture d'information.
-- **Conv Audits** : reprise des audits + modélisation événements (matchs / entraînements / tournois) + transmission des dettes Axe B (D1-D6) issues de la réconciliation OVAL-E (voir `dettes-axe-b-reconciliation-OVAL-E.md` déposé dans Drive). Conception de l'architecture du portail (cf. dette #9) à mener en amont de toute reprise Production sur ce sujet.
+- **Conv Production** : la Phase 3 est terminée. Travaux possibles pour la Phase 4 selon priorités à arbitrer : (a) modélisation table `evenements` (P4-2/P4-3) — préalable à toute évolution UX du portail orientée "prochain match" ; (b) déploiement comptes `coach` et `viewer` réels (P4-1) ; (c) externalisation logo M2M (dette mineure P3) ; (d) déplacement `04-auth-roles.sql` vers `sql/` (dette mineure P3-2).
+- **Conv Audits** : reprise des audits + modélisation événements (matchs / entraînements / tournois) + transmission des dettes Axe B (D1-D6) issues de la réconciliation OVAL-E (voir `dettes-axe-b-reconciliation-OVAL-E.md` déposé dans Drive). Maintenant que la conception portail Phase 3 est livrée, la modélisation événements devient le prochain gros chantier conceptuel.
+- **Conv Conception Portail** : a livré `Conception-Portail-Phase-3.md` v1.0 (Drive `12xrICwk5NTzk1XZLpq964CkWwhft3zc2`). Pour Phase 4, rouvrir un cycle Conception si besoin de définir le portail par rôle (P4-1).
