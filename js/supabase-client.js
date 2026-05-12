@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.3 — mai 2026
+ * Version : 1.5 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -28,6 +28,10 @@
  *   v1.3 : helpers de session pour pages sécurisées — Phase 2.5.4
  *          getMyRoles (cache mémoire), hasRole, isAdmin, requireAuth,
  *          onAuthChange ; signOut invalide le cache et redirige.
+ *   v1.4 : (mise à jour interne sans nouveaux helpers — changelog rattrapé en v1.5)
+ *   v1.5 : wrappers Phase 4.2.C pour les RPC événements —
+ *          getEvenementsAVenir(equipeId, joursAVenir),
+ *          getProchainEvenementParEquipe(equipeId).
  */
 
 (function (global) {
@@ -512,6 +516,49 @@
         return null;
       }
       return data; // string YYYY-MM-DD ou null
+    },
+
+    // ============================================================
+    // PHASE 4.2.C — RPC événements (sql/11-rpc-evenements.sql)
+    // ============================================================
+
+    /**
+     * Liste des événements à venir, filtrable par équipe et fenêtre temporelle.
+     * Wrapper de get_evenements_a_venir() (Phase 4.2.B). Débloque P4-2 (greeting J-N).
+     *
+     * @param {string|null} equipeId    UUID de l'équipe (null = toutes équipes)
+     * @param {number}      joursAVenir Fenêtre temporelle en jours (défaut 30)
+     * @returns {Promise<Array>} tableau d'événements (16 colonnes chacun), [] si erreur
+     */
+    async getEvenementsAVenir(equipeId = null, joursAVenir = 30) {
+      const { data, error } = await client.rpc('get_evenements_a_venir', {
+        p_equipe_id:     equipeId,
+        p_jours_a_venir: joursAVenir
+      });
+      if (error) {
+        console.error('MOM Hub: getEvenementsAVenir() error', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * Prochain événement d'une équipe donnée (0 ou 1).
+     * Wrapper de get_prochain_evenement_par_equipe() (Phase 4.2.B).
+     * Débloque P4-3 (widget sidebar prochain match).
+     *
+     * @param {string} equipeId UUID de l'équipe (obligatoire)
+     * @returns {Promise<Object|null>} objet événement (16 propriétés), ou null si aucun
+     */
+    async getProchainEvenementParEquipe(equipeId) {
+      const { data, error } = await client.rpc('get_prochain_evenement_par_equipe', {
+        p_equipe_id: equipeId
+      });
+      if (error) {
+        console.error('MOM Hub: getProchainEvenementParEquipe() error', error);
+        return null;
+      }
+      return Array.isArray(data) && data.length > 0 ? data[0] : null;
     }
 
   };
@@ -523,7 +570,7 @@
 
   // Trace amicale dans la console
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.4 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.5 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
