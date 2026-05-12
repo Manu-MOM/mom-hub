@@ -3,7 +3,7 @@
 > **Document de référence opérationnel.** À jour à la racine du repo, mis à jour à chaque fin de session significative.
 > Sert de point de reprise universel : toute personne (ou tout Claude) qui ouvre ce fichier doit pouvoir reprendre le travail sans question.
 
-**Dernière mise à jour : 13 mai 2026 (vraiment très tard) — Étape G livrée : 4 événements M14 saison 2025-2026 importés depuis sarmom-compos vers la table `evenements`, wrappers `getEvenementsAVenir` testés en conditions réelles via console portail (2 événements à venir bien retournés : Les Gemmeurs J+10, Challenge Vié J+25). État précédent : nettoyage STATE.md (corrections inventions).**
+**Dernière mise à jour : 13 mai 2026 (fin de session) — Étapes K (policies RLS SELECT Vague 1, dette k fermée), H (15 entraînements M14 fin de saison), et C/Phase 4.4 (widget "Prochain événement M14" en sidebar du portail) livrées. État précédent : Étape G (4 événements M14 importés sarmom-compos).**
 
 ---
 
@@ -145,6 +145,32 @@ Détails techniques :
   - Les 2 événements passés (etat=archive) sont bien exclus
   - Jointure `equipes` OK (`equipe_libelle_court = 'M14'`)
 - **Découverte d'une dette annexe (k)** : pas de policy SELECT `authenticated` sur la table `equipes` (HTTP 406 sur `.from('equipes').select()`). Probablement étendue à toutes les tables Vague 1 (`ententes`, `equipe_joueurs`, `personnes` est sans doute le seul qui en a). À durcir avec la dette (i) policies write par rôle dans une session dédiée RLS.
+
+### ✅ Étape K — Policies RLS SELECT Vague 1 (FAIT — 13 mai 2026, ferme dette k)
+- **`sql/13-rls-read-vague1.sql`** : ajoute 3 policies `SELECT TO authenticated USING (true)` :
+  - `ententes_select_authenticated`
+  - `equipes_select_authenticated`
+  - `equipe_joueurs_select_authenticated`
+- Pattern identique aux 9 policies SELECT existantes (sites, evenements, etc.).
+- `personnes` **volontairement non touchée** : doctrine RGPD = accès via RPC `count_personnes_*` et `get_dashboard_stats` uniquement.
+- Test live console portail validé : le HTTP 406 sur `.from('equipes').select(...)` disparaît, l'objet équipe M14 est retourné (UUID `bfb83b83-83ef-4dde-b526-48ff87313044`).
+- **Dette (k) FERMÉE.** Reste dette (i) policies WRITE par rôle pour une session future.
+
+### ✅ Étape H — 15 entraînements M14 fin de saison (FAIT — 13 mai 2026)
+- **`sql/14-entrainements-m14-fin-saison-2025-2026.sql`** : insère 15 entraînements M14 hebdomadaires entre le 13 mai et le 1er juillet 2026 (fin de saison régulière).
+- Calendrier validé Manu : **LUNDI 18h00-19h15** + **MERCREDI 14h00-16h00** à Brencklé.
+- Total : 7 lundis + 8 mercredis = 15 occurrences.
+  - 14 en état `creation` (à venir)
+  - 1 en état `annule` (lundi 25 mai 2026 = Pentecôte, férié national) — gardé en base pour traçabilité plutôt qu'omis du calendrier.
+- Syntaxe : `WITH refs AS (...) INSERT ... SELECT FROM VALUES (...)` → 1 seul INSERT pour 15 lignes (compact, rapide à parser).
+- Test live console portail : `getProchainEvenementParEquipe(M14)` retourne désormais l'entraînement de demain (13 mai 14h), pas un tournoi lointain.
+
+### ✅ Phase 4.4 Étape C — Widget "Prochain événement M14" en sidebar (FAIT — 13 mai 2026, fin de session)
+- **`index.html`** : nouvelle carte `.sb-card` insérée entre carte 2 "Qualité des données" et carte 3 "Raccourcis", avec 3 IDs JS : `evt-when` (pilule temporelle), `evt-type`, `evt-site`.
+- **`js/dashboard-stats.js` v2.1 → v2.2** : 8e appel `Promise.all` (`getProchainEvenementParEquipe(M14_TEAM_UUID)` avec UUID hardcodé), logique humanisation (Entraînement / Match vs X / Tournoi : Y / Stage), calcul du label temporel en **jours CIVILS** côté JS (`AUJOURD'HUI` / `DEMAIN` / `DANS N JOURS`) plutôt que via `jours_jusqu_a_evenement` de la RPC (qui tronque par heures et donnerait "AUJOURD'HUI" pour un événement de demain matin si on est ce soir).
+- **Test prod validé visuellement** (screenshot Manu) : la carte affiche `[DEMAIN · 14H00]` / `Type : Entraînement` / `Lieu : Brencklé` au soir du 12 mai 2026 (pour l'entraînement du 13 mai 14h). Le portail est désormais à **4 sources dynamiques** (4 KPI + 3 cartes sidebar fonctionnelles, dont la nouvelle carte événement).
+- **Phase 4.4 (UI portail) TERMINÉE** pour la partie "widget prochain événement". La partie "greeting J-N" (P4-2) reste à faire dans une session future si besoin.
+- UUID M14 hardcodé pour démarrer ; à paramétrer par rôle utilisateur quand l'auth multi-équipe sera étendue.
 
 ---
 
@@ -391,7 +417,7 @@ Dossiers clés :
 6. Vérifier que `login.html` affiche bien `v1.4 chargé` dans la console et que l'envoi d'un Magic Link sur ton email aboutit sur `dashboard.html` avec session active
 
 **Travaux en attente** :
-- **Conv Production** : Phase 3 + 4.1.B + **4.1.A complète (13 mai matin)** + **4.2.A noyau (13 mai soir)** + **4.2.B RPC événements + 4.2.C wrappers JS (13 mai soir tard)** + **Étape G peuplement événements M14 (13 mai vraiment très tard)** terminées. **Prochain travail prioritaire = Phase 4.3 (compositions/présences)** mais **conditionné par instruction dette C7** (audit doctrine OVAL-E pour joueurs SAR partenaires d'entente). Si C7 pas encore instruite : alternative = Phase 4.4 (UI portail greeting J-N + widget prochain match — requiert cycle Conception dédié) ou dettes (i)/(k) RLS. Travaux annexes en attente :
+- **Conv Production** : Phase 3 + 4.1.B + **4.1.A complète (13 mai matin)** + **4.2.A noyau (13 mai soir)** + **4.2.B RPC événements + 4.2.C wrappers JS (13 mai soir tard)** + **Étape G peuplement événements M14 (13 mai vraiment très tard)** + **Étapes K (RLS read Vague 1) + H (15 entraînements M14) + C/Phase 4.4 (widget Prochain événement)** terminées. **Prochain travail prioritaire = Phase 4.3 (compositions/présences)** mais **conditionné par instruction dette C7** (audit doctrine OVAL-E pour joueurs SAR partenaires d'entente). Si C7 pas encore instruite : alternatives = dette (i) RLS write par rôle (avec dette (l) durcissement INSERT distances_sites), ou Phase 4.4 P4-2 greeting J-N. Travaux annexes en attente :
   - (a) **Implémentation des tables modélisées** (cf. `Modelisation-Evenements-v1.1.md` §4) :
     - Vague 1 ✅ **PEUPLÉE 13 mai 2026** : `ententes` (11 lignes), `equipes` (11 lignes), `equipe_joueurs` (23 attaches M14 MOM `regulier`)
     - Phase 4.1.B ✅ **TERMINÉE** : `sql/07-sites.sql` (sites + distances_sites créés ; **3 sites MOM en prod** : Brencklé, Clubhouse, Holtzplatz — seuls sites listés dans le sql/07)
@@ -399,7 +425,10 @@ Dossiers clés :
     - Phase 4.2.B ✅ **TERMINÉE 13 mai soir tard** : RPC `get_evenements_a_venir` + `get_prochain_evenement_par_equipe` via `sql/11-rpc-evenements.sql`
     - Phase 4.2.C ✅ **TERMINÉE 13 mai soir tard** : `js/supabase-client.js` v1.5 avec 2 wrappers événements
     - Étape G ✅ **TERMINÉE 13 mai vraiment très tard** : 4 événements M14 saison 2025-2026 insérés via `sql/12-evenements-saison-2025-2026.sql` (import sarmom-compos). Test wrappers réels validé en console portail.
-    - **Phase 4.2.D (UI portail) à venir** : Conception dédié requis pour greeting J-N et widget prochain match
+    - Étape K ✅ **TERMINÉE 13 mai fin de session** : 3 policies SELECT authenticated sur ententes/equipes/equipe_joueurs via `sql/13-rls-read-vague1.sql`. Ferme dette (k).
+    - Étape H ✅ **TERMINÉE 13 mai fin de session** : 15 entraînements M14 (7 lundis + 8 mercredis) via `sql/14-entrainements-m14-fin-saison-2025-2026.sql`. 14 creation + 1 annule (Pentecôte).
+    - Phase 4.4 Étape C ✅ **TERMINÉE 13 mai fin de session** : widget "Prochain événement M14" en sidebar via `index.html` (carte sb-card) + `js/dashboard-stats.js` v2.2 (8e appel Promise.all, humanisation, calcul jour civil).
+    - **Phase 4.4 (UI portail) TERMINÉE** côté widget. Reste optionnel : greeting J-N (P4-2) dans une session future.
     - Phase 4.3 à venir : `compositions`, `composition_joueurs`, `presences` (préalable C7)
     - Plus 1 ALTER TABLE `personnes` (M-1 réduit en v1.1 : seul `bloc_5.categorie_surclassement_uuid` ; `bloc_6.groupe_indicatif_uuid` abandonné)
   - (b) **RPC associées Phase 4.2/4.3** : ✅ `get_evenements_a_venir` + `get_prochain_evenement_par_equipe` LIVRÉES en 4.2.B. Reste à faire : `get_distance_between_sites` (Phase 4.5), `get_vivier_compo` (Phase 4.3, la plus complexe).
@@ -411,7 +440,8 @@ Dossiers clés :
   - (h) **Compteur K3 CETTE SEMAINE biaisé jusqu'au 17 mai 2026** : la RPC `count_personnes_created_last_7_days` retourne actuellement 323 (toutes les fiches) car la migration Vague 1 du 10 mai 2026 a créé toutes les fiches d'un coup. Le compteur retombera mécaniquement après 7 jours glissants (≈ 17 mai 2026) sans intervention. Pas un bug, juste un effet de jeunesse de la base. À surveiller mais pas à corriger.
   - (i) **Dette ouverte Phase 4.2.A (13 mai 2026 soir) — policies RLS write par rôle** : `evenements` + `evenement_encadrants` ont actuellement RLS activée mais seules les policies SELECT pour `authenticated` sont définies. Aucune policy write n'existe → seul le `service_role` peut INSERT/UPDATE/DELETE (= via le SQL Editor Supabase). À durcir dans une session dédiée : policies write basées sur `auth_roles` (admin/coach/viewer) avec règles métier (ex : un coach n'écrit que sur les événements de ses équipes). Même dette à étendre à `equipes` et `equipe_joueurs`.
   - (j) **Leçon doctrinale Claude (13 mai très tard) — anti-invention** : 2 inventions identifiées et corrigées en fin de session (sites adversaires "Sarre-Union" jamais existants, "16 Sites en dur dans index.html" jamais présent). Cause racine : Claude a traité ses propres notes STATE.md précédentes comme source de vérité, sans confronter Supabase/repo. **Correctif pour toute future session** : avant de citer un détail factuel (nombre, code, nom de champ/site/objet), faire un `web_fetch` sur le fichier du repo OU un DRY-RUN sur Supabase. Doctrine OVAL-E §13 (Supabase autoritatif) s'applique aussi à Claude.
-  - (k) **🆕 Dette ouverte Étape G (13 mai vraiment très tard) — policies RLS READ pour Vague 1** : la table `equipes` rejette HTTP 406 sur `.from('equipes').select()` direct depuis le client JS authenticated (testé en console portail). Probablement étendue à `ententes` et `equipe_joueurs` (à vérifier). Conséquence : le client JS ne peut PAS lister les équipes/attaches en direct ; il doit passer par des RPC SECURITY DEFINER comme `count_equipes_actives` ou `get_evenements_a_venir` qui bypassent RLS. À durcir dans la session RLS dédiée (groupée avec dette (i)) : soit ajouter des policies SELECT `authenticated` simples sur ces tables (lecture directe), soit définir des RPC dédiées par cas d'usage (ex: `get_equipes_de_mon_coach`).
+  - (k) ✅ **Dette FERMÉE 13 mai 2026 fin de session — policies RLS READ pour Vague 1** : 3 policies SELECT authenticated ajoutées sur `ententes`, `equipes`, `equipe_joueurs` via `sql/13-rls-read-vague1.sql`. Le client JS peut désormais lire ces tables en direct (HTTP 406 résolu). `personnes` reste volontairement accessible uniquement via RPC (doctrine RGPD).
+  - (l) **🆕 Dette ouverte (13 mai fin de session) — durcissement RLS WRITE distances_sites** : découvert pendant l'inventaire RLS, la table `distances_sites` autorise actuellement INSERT/UPDATE à tout `authenticated` (pas seulement admin). À regrouper avec dette (i) dans la session RLS write par rôle dédiée.
 
   **Plan de découpage Phase 4 acté (12 mai 2026 soir, post-arbitrage Option C ; Phase 4.1.A finie 13 mai matin ; Phase 4.2.A finie 13 mai soir)** :
   - **Phase 4.1.A** ✅ **TERMINÉE 13 mai 2026 matin** : peuplement Vague 1 (11 ententes + 11 équipes + 23 attaches M14 MOM en `regulier`) via `sql/06-peuplement-vague1-equipes.sql`. **Phase 4.1.A bis** : K2 ÉQUIPES dynamique via `sql/09-rpc-equipes.sql` (RPC `count_equipes_actives`) + `js/dashboard-stats.js` v2.1 + `index.html` patché (`id="stat-equipes"`). Ferme partie ÉQUIPES de dette #5. SAR (37) et ASCS (2) M14 attaches reportées à Phase 4.3 après dette C7.
@@ -420,7 +450,9 @@ Dossiers clés :
   - **Phase 4.2.B** ✅ **TERMINÉE 13 mai 2026 soir tard** : `sql/11-rpc-evenements.sql` créé (RPC `get_evenements_a_venir` + `get_prochain_evenement_par_equipe`, SECURITY DEFINER authenticated-only). Test fonctionnel 8 scénarios validé en prod.
   - **Phase 4.2.C** ✅ **TERMINÉE 13 mai 2026 soir tard** : `js/supabase-client.js` v1.4 → v1.5 avec 2 wrappers JS (`getEvenementsAVenir`, `getProchainEvenementParEquipe`). Test prod console OK.
   - **Étape G** ✅ **TERMINÉE 13 mai 2026 vraiment très tard** : 4 événements M14 saison 2025-2026 importés depuis sarmom-compos vers `sql/12-evenements-saison-2025-2026.sql`. Test wrappers en conditions réelles validé (2 à venir : Les Gemmeurs J+10, Challenge Vié J+25). Découverte dette (k) HTTP 406 sur `equipes` direct.
-  - **Phase 4.2.D (UI portail) à venir** : greeting J-N + widget prochain match — reportée à un cycle Conception dédié (UX à spécifier).
+  - **Étape K** ✅ **TERMINÉE 13 mai 2026 fin de session** : `sql/13-rls-read-vague1.sql` créé (3 policies SELECT authenticated sur ententes, equipes, equipe_joueurs). Ferme dette (k).
+  - **Étape H** ✅ **TERMINÉE 13 mai 2026 fin de session** : `sql/14-entrainements-m14-fin-saison-2025-2026.sql` créé (15 entraînements lundi/mercredi à Brencklé, dont 1 annulé pour Pentecôte).
+  - **Phase 4.4 (UI portail) — Étape C widget Prochain événement** ✅ **TERMINÉE 13 mai 2026 fin de session** : `index.html` + `js/dashboard-stats.js` v2.2. Carte sidebar fonctionnelle, screenshot validé. Greeting J-N (P4-2) reste optionnel pour une session future.
   - **Phase 4.2** Noyau événements : `sql/08-evenements.sql`, `sql/09-evenement-encadrants.sql` (⚠️ `joueurs_externes` ABANDONNÉE en v1.1 — les joueurs partenaires d'entente vivront dans `personnes` avec `bloc_5.club_principal_id` adapté). Extension `js/supabase-client.js` v1.5 avec 2-3 wrappers (`getEvenementsAVenir`, `getProchainEvenementParEquipe`).
   - **Phase 4.3** Compositions + présences : `sql/10-compositions.sql` + `composition_joueurs`, `sql/11-presences.sql`, 1 ALTER TABLE `personnes` (M-1 réduit), référentiel `groupes-joueur.json` v1.1 dans Drive, RPC `get_vivier_compo` (la plus complexe — joint `equipe_joueurs` Vague 1 pour flag d'attache régulier/renfort). **Condition préalable** : dette C7 instruite par conv Audits (audit doctrine OVAL-E pour joueurs SAR).
   - **Phase 4.4** Intégration UI portail : `dashboard-stats.js` v3 avec prochain match dans le greeting (P4-2) et nouveau widget sidebar (P4-3).
