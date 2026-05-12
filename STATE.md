@@ -3,7 +3,7 @@
 > **Document de référence opérationnel.** À jour à la racine du repo, mis à jour à chaque fin de session significative.
 > Sert de point de reprise universel : toute personne (ou tout Claude) qui ouvre ce fichier doit pouvoir reprendre le travail sans question.
 
-**Dernière mise à jour : 14 mai 2026 — C7-a livrée côté conv Audits : Doctrine-Import-OVAL-E v1.4 + Audit-OVAL-E-Joueurs-Partenaires-v1.md déposés dans Drive. Débloque Phase 4.3 (compositions/présences) côté Production, conditionné à C7-c (ALTER CHECK personnes_type_personne_check pour ajout `licencie_externe_partenaire`).**
+**Dernière mise à jour : 14 mai 2026 — C7-a + C7-b livrées côté conv Audits (Dette C7 totalement soldée côté Audits) : Doctrine-Import-OVAL-E v1.4, Audit-OVAL-E-Joueurs-Partenaires-v1, Audit-Personnes-MOM-Hub v1.2 déposés dans Drive. Débloque Phase 4.3 (compositions/présences) côté Production, conditionné à 2 préalables Production : C7-c (ALTER CHECK personnes_type_personne_check) et C7-f (choisir canal d'import).**
 
 ---
 
@@ -326,7 +326,7 @@ C7. ✅ **Audit doctrine OVAL-E sur `personnes.bloc_5.club_principal_id != MOM`*
    **Doctrine retenue (résumé)** : les joueurs SAR/ASCS d'entente sont créés dans `personnes` Supabase comme fiches complètes, avec `bloc_5.club_principal_uuid = club-sar` ou `club-ascs` (pas `club-mom`), `type_personne = licencie_externe_partenaire` (8e valeur OVAL-E v1.4). Attache via `equipe_joueurs.club_provenance_id` (Vague 1, déjà prévu pour ce cas). Blocs sensibles (coordonnées, famille, préférences, documents) restent vides ou minimaux côté MOM par doctrine RGPD (responsabilité club d'origine).
 
    **Sous-dettes ouvertes après C7-a** (voir détails ci-dessous dans la nouvelle section "Dettes en cascade C7") :
-   - **C7-b** (Audits, priorité moyenne) : MAJ Audit-Personnes-MOM-Hub v1.1 → v1.2 pour intégrer le cas
+   - **C7-b** ✅ **LIVRÉE 14 mai 2026** : Audit-Personnes-MOM-Hub v1.2 (Audits)
    - **C7-c** (Production, **préalable Phase 4.3**) : ALTER CHECK constraint `personnes_type_personne_check`
    - **C7-d** (Production) : policies RLS write par rôle, à grouper avec dette (i)
    - **C7-e** (Production, Phase 4.3) : RPC `get_vivier_compo` doit inclure les `licencie_externe_partenaire`
@@ -336,7 +336,7 @@ C7. ✅ **Audit doctrine OVAL-E sur `personnes.bloc_5.club_principal_id != MOM`*
 
 ### 🔵 Dettes en cascade ouvertes par C7-a (14 mai 2026 — conv Audits)
 
-C7-b. **MAJ `Audit-Personnes-MOM-Hub-v1.1.md` → v1.2** pour intégrer le cas joueur partenaire d'entente dans la grille de conformité 9-blocs (§ Conformité). Priorité : moyenne, peut attendre. Côté **conv Audits**.
+C7-b. ✅ **LIVRÉE 14 mai 2026** — `Audit-Personnes-MOM-Hub-v1.2.md` déposé dans Drive `00 - Documentation/` (fileId `136ACCR8bazOGQXzE1XoEoCEPnXuXEYnA`). Étend la grille de conformité à 5 profils (ajout colonne "Partenaires d'entente"), nouvelle §6 dédiée avec sous-sections définition / conformité / doctrine / canal de peuplement / stockage Drive / cas particuliers.
 
 C7-c. 🔴 **ALTER CHECK constraint `personnes_type_personne_check`** pour autoriser la nouvelle valeur `licencie_externe_partenaire`. Pattern connu, identique à dette #8 résolue le 12 mai (ajout `licencie_soigneur` + `licencie_arbitre`). **Préalable bloquant à Phase 4.3** (sans cette extension, l'INSERT des fiches SAR/ASCS échouera). Effort estimé : ~10 minutes côté SQL. Priorité : haute. Côté **conv Production**.
 
@@ -429,7 +429,9 @@ Dossier `MOM Hub/2025-2026/` :
 | `Audit-Module-Rapport.md` | — | Audit module Rapport — à reprendre post-modélisation événements |
 | `Audit-Module-Statistiques.md` | — | Audit module Stats — à reprendre post-modélisation événements |
 | `Audit-Module-Bilans.md` | — | Audit module Bilans — à reprendre post-modélisation événements |
-| `Audit-Personnes-MOM-Hub.md` | `1DsehRBgzGq_kAraCZvpKElCvddmAOM3b` | Audit du modèle Personnes (v1.1 ajoutée le 11 mai 2026 dans le même dossier Drive) |
+| `Audit-Personnes-MOM-Hub.md` | `1DsehRBgzGq_kAraCZvpKElCvddmAOM3b` | Audit du modèle Personnes — v1.0 historique |
+| `Audit-Personnes-MOM-Hub-v1.1.md` | `1sf6UMb1dPvh9znfDoUw6duGkLR7GLFtA` | Audit du modèle Personnes — v1.1 (11 mai 2026) avec §N3 résolu (F-15 portées à 8) |
+| `Audit-Personnes-MOM-Hub-v1.2.md` | `136ACCR8bazOGQXzE1XoEoCEPnXuXEYnA` | **Audit du modèle Personnes — v1.2 (14 mai 2026)** — étend le tableau de conformité à 5 profils (ajout colonne "Partenaires d'entente"), nouvelle §6 dédiée. Résout C7-b. |
 | `Registre-anomalies-OVAL-E.md` | dans `1CkeBrMBJGChqGui4r7mVkHa3NwaLwOSK` | Registre des anomalies de réconciliation FFR |
 
 Dossiers clés :
@@ -496,8 +498,7 @@ Dossiers clés :
   - **Phase 4.4** Intégration UI portail : `dashboard-stats.js` v3 avec prochain match dans le greeting (P4-2) et nouveau widget sidebar (P4-3).
   - **Phase 4.5** API distances (optionnel) : intégration OpenRouteService + cache, RPC `get_distance_between_sites`, secret API en GitHub Actions (M-2 + M-5).
 
-- **Conv Audits** : modélisation événements v1.1 livrée (12 mai) + **C7-a livrée (14 mai)** : Doctrine-Import-OVAL-E v1.4 + Audit-OVAL-E-Joueurs-Partenaires-v1 déposés Drive. Travaux restants côté Audits :
-  - **C7-b (priorité moyenne)** : MAJ `Audit-Personnes-MOM-Hub` v1.1 → v1.2 pour intégrer le cas partenaire d'entente dans la grille 9-blocs. Peut attendre.
+- **Conv Audits** : modélisation événements v1.1 livrée (12 mai) + **C7-a + C7-b livrées (14 mai)** : Doctrine-Import-OVAL-E v1.4, Audit-OVAL-E-Joueurs-Partenaires-v1, Audit-Personnes-MOM-Hub v1.2 déposés Drive. **Dette C7 totalement soldée côté Audits.** Travaux restants côté Audits :
   - Lots 2 et 3 de l'audit référentiels (bloqués par tiers : règlement LRGER 2025-2026, Lohann pour EDR aptitudes, préparateur physique pour barèmes).
   - Reprise des **audits modules** (Compositions v2, Suivi-Match, Rapport, Stats, Bilans) à la lumière de la modélisation événements v1.1 pour MAJ post-Phase 2.5/3/4.
   - Modélisation **événements extra-sportifs** (dette Phase 5, C2 du doc modélisation).
