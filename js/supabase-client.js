@@ -430,7 +430,90 @@
         window.location.replace(loginUrl);
       }
       return !error;
+    },
+
+
+    // ============================================================
+    // RPC PORTAIL (Phase 3.2) — KPI et sidebar du portail
+    // ============================================================
+    // Wrappers minces autour des 5 RPC définies dans
+    // sql/05-rpc-portail.sql. Toutes retournent un nombre (ou null
+    // pour la date). En cas d'erreur réseau / permissions, on loggue
+    // et on retourne une valeur neutre (0 ou null) pour ne pas casser
+    // le rendu du portail.
+
+    /**
+     * KPI K3 "CETTE SEMAINE" — fiches `personnes` créées dans les
+     * 7 derniers jours glissants.
+     * @returns {Promise<number>} entier ≥ 0, ou 0 si erreur
+     */
+    async countPersonnesCreatedLast7Days() {
+      const { data, error } = await client.rpc('count_personnes_created_last_7_days');
+      if (error) {
+        console.error('MOM Hub: countPersonnesCreatedLast7Days() error', error);
+        return 0;
+      }
+      return typeof data === 'number' ? data : 0;
+    },
+
+    /**
+     * KPI K4 "SANS EMAIL" + sidebar Qualité des données — fiches
+     * `personnes` sans email principal renseigné (NULL ou chaîne vide).
+     * @returns {Promise<number>}
+     */
+    async countPersonnesWithoutEmail() {
+      const { data, error } = await client.rpc('count_personnes_without_email');
+      if (error) {
+        console.error('MOM Hub: countPersonnesWithoutEmail() error', error);
+        return 0;
+      }
+      return typeof data === 'number' ? data : 0;
+    },
+
+    /**
+     * Sidebar Qualité des données — fiches `personnes` sans date
+     * de naissance renseignée.
+     * @returns {Promise<number>}
+     */
+    async countPersonnesWithoutBirthdate() {
+      const { data, error } = await client.rpc('count_personnes_without_birthdate');
+      if (error) {
+        console.error('MOM Hub: countPersonnesWithoutBirthdate() error', error);
+        return 0;
+      }
+      return typeof data === 'number' ? data : 0;
+    },
+
+    /**
+     * Sidebar Qualité des données — fiches `personnes` dont
+     * l'affiliation FFR expire entre aujourd'hui et J+90 jours.
+     * Les affiliations déjà expirées ne sont PAS comptées.
+     * @returns {Promise<number>}
+     */
+    async countPersonnesAffiliationExpiringWithin90Days() {
+      const { data, error } = await client.rpc('count_personnes_affiliation_expiring_within_90_days');
+      if (error) {
+        console.error('MOM Hub: countPersonnesAffiliationExpiringWithin90Days() error', error);
+        return 0;
+      }
+      return typeof data === 'number' ? data : 0;
+    },
+
+    /**
+     * Sidebar carte 1 OVAL-E — date de la dernière modification
+     * sur une fiche OVAL-E (source_creation ou modifie_par contient
+     * 'OVAL-E').
+     * @returns {Promise<string|null>} Date au format 'YYYY-MM-DD', ou null si aucune fiche OVAL-E
+     */
+    async getLastOvalESyncDate() {
+      const { data, error } = await client.rpc('get_last_oval_e_sync_date');
+      if (error) {
+        console.error('MOM Hub: getLastOvalESyncDate() error', error);
+        return null;
+      }
+      return data; // string YYYY-MM-DD ou null
     }
+
   };
 
   // ============================================================
@@ -440,7 +523,7 @@
 
   // Trace amicale dans la console
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.3 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.4 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
