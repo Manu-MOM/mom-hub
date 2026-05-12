@@ -3,7 +3,7 @@
 > **Document de référence opérationnel.** À jour à la racine du repo, mis à jour à chaque fin de session significative.
 > Sert de point de reprise universel : toute personne (ou tout Claude) qui ouvre ce fichier doit pouvoir reprendre le travail sans question.
 
-**Dernière mise à jour : 14 mai 2026 — C7-a + C7-b livrées côté conv Audits (Dette C7 totalement soldée côté Audits) : Doctrine-Import-OVAL-E v1.4, Audit-OVAL-E-Joueurs-Partenaires-v1, Audit-Personnes-MOM-Hub v1.2 déposés dans Drive. Débloque Phase 4.3 (compositions/présences) côté Production, conditionné à 2 préalables Production : C7-c (ALTER CHECK personnes_type_personne_check) et C7-f (choisir canal d'import).**
+**Dernière mise à jour : 14 mai 2026 — C7-a + C7-b livrées côté conv Audits + C7-c livrée côté conv Production (ALTER CHECK exécuté en prod). Doctrine-Import-OVAL-E v1.4, Audit-OVAL-E-Joueurs-Partenaires-v1, Audit-Personnes-MOM-Hub v1.2 déposés dans Drive ; `sql/15-alter-type-personne-c7c.sql` commité dans le repo. Phase 4.3 (compositions/présences) **n'est plus conditionnée que par C7-f** (choix canal d'import partenaires d'entente).**
 
 ---
 
@@ -327,7 +327,7 @@ C7. ✅ **Audit doctrine OVAL-E sur `personnes.bloc_5.club_principal_id != MOM`*
 
    **Sous-dettes ouvertes après C7-a** (voir détails ci-dessous dans la nouvelle section "Dettes en cascade C7") :
    - **C7-b** ✅ **LIVRÉE 14 mai 2026** : Audit-Personnes-MOM-Hub v1.2 (Audits)
-   - **C7-c** (Production, **préalable Phase 4.3**) : ALTER CHECK constraint `personnes_type_personne_check`
+   - **C7-c** ✅ **LIVRÉE 14 mai 2026** : ALTER CHECK constraint via `sql/15-alter-type-personne-c7c.sql` (Production)
    - **C7-d** (Production) : policies RLS write par rôle, à grouper avec dette (i)
    - **C7-e** (Production, Phase 4.3) : RPC `get_vivier_compo` doit inclure les `licencie_externe_partenaire`
    - **C7-f** (Production, préalable Phase 4.3) : choisir canal d'import (SportEasy / Excel manuel / OVAL-E partenaires future)
@@ -338,7 +338,7 @@ C7. ✅ **Audit doctrine OVAL-E sur `personnes.bloc_5.club_principal_id != MOM`*
 
 C7-b. ✅ **LIVRÉE 14 mai 2026** — `Audit-Personnes-MOM-Hub-v1.2.md` déposé dans Drive `00 - Documentation/` (fileId `136ACCR8bazOGQXzE1XoEoCEPnXuXEYnA`). Étend la grille de conformité à 5 profils (ajout colonne "Partenaires d'entente"), nouvelle §6 dédiée avec sous-sections définition / conformité / doctrine / canal de peuplement / stockage Drive / cas particuliers.
 
-C7-c. 🔴 **ALTER CHECK constraint `personnes_type_personne_check`** pour autoriser la nouvelle valeur `licencie_externe_partenaire`. Pattern connu, identique à dette #8 résolue le 12 mai (ajout `licencie_soigneur` + `licencie_arbitre`). **Préalable bloquant à Phase 4.3** (sans cette extension, l'INSERT des fiches SAR/ASCS échouera). Effort estimé : ~10 minutes côté SQL. Priorité : haute. Côté **conv Production**.
+C7-c. ✅ **LIVRÉE 14 mai 2026 — `sql/15-alter-type-personne-c7c.sql`** : ALTER CHECK constraint `personnes_type_personne_check` ajoute 'licencie_externe_partenaire' (8e valeur autorisée). Pattern identique à dette #8 résolue le 12 mai (ajout `licencie_soigneur` + `licencie_arbitre`). V1.1 du fichier conservée après ROLLBACK de v1.0 (tests DO blocks incomplets — NOT NULL `categorie_personne` non fourni). Vérification SELECT post-modification confirme la nouvelle définition contient bien la valeur. Préalable Phase 4.3 levé côté SQL. Côté **conv Production**.
 
 C7-d. **Policies RLS write par rôle** : prévoir le cas `licencie_externe_partenaire` lors de l'écriture des policies write par rôle (dette (i) ouverte). Un coach `entente` (ex: coach SAR autorisé Hub car aussi coach de l'entente) doit pouvoir LIRE ces fiches mais pas les MODIFIER. Le maintien reste côté MOM (admin) ou via canal d'import privilégié. À grouper avec dette (i). Côté **conv Production**.
 
@@ -452,10 +452,9 @@ Dossiers clés :
 6. Vérifier que `login.html` affiche bien `v1.4 chargé` dans la console et que l'envoi d'un Magic Link sur ton email aboutit sur `dashboard.html` avec session active
 
 **Travaux en attente** :
-- **Conv Production** : Phase 3 + 4.1.B + **4.1.A complète (13 mai matin)** + **4.2.A noyau (13 mai soir)** + **4.2.B RPC événements + 4.2.C wrappers JS (13 mai soir tard)** + **Étape G peuplement événements M14 (13 mai vraiment très tard)** + **Étapes K (RLS read Vague 1) + H (15 entraînements M14) + C/Phase 4.4 (widget Prochain événement)** terminées. **C7 partiellement résolue le 14 mai (C7-a livrée par conv Audits)**. Phase 4.3 (compositions/présences) **désormais débloquée doctrinalement**, conditionnée à **3 sous-dettes Production préalables** :
-  - **C7-c (PRÉALABLE BLOQUANT)** : ALTER CHECK constraint `personnes_type_personne_check` pour ajout `licencie_externe_partenaire` (~10 min, pattern identique dette #8).
+- **Conv Production** : Phase 3 + 4.1.B + **4.1.A complète (13 mai matin)** + **4.2.A noyau (13 mai soir)** + **4.2.B RPC événements + 4.2.C wrappers JS (13 mai soir tard)** + **Étape G peuplement événements M14 (13 mai vraiment très tard)** + **Étapes K (RLS read Vague 1) + H (15 entraînements M14) + C/Phase 4.4 (widget Prochain événement)** terminées. **C7-a + C7-b livrées par conv Audits le 14 mai. C7-c livrée par conv Production le 14 mai (ALTER CHECK exécuté en prod)**. Phase 4.3 (compositions/présences) **conditionnée à 1 dernier préalable Production** :
   - **C7-f (préalable opérationnel)** : choisir le canal d'import des fiches partenaires (Excel manuel recommandé pour démarrer).
-  - **C7-e** : la RPC `get_vivier_compo` à écrire en Phase 4.3 doit inclure les `licencie_externe_partenaire` (déjà couvert par le LEFT JOIN à `equipe_joueurs`).
+  - **C7-e** : la RPC `get_vivier_compo` à écrire en Phase 4.3 doit inclure les `licencie_externe_partenaire` (déjà couvert par le LEFT JOIN à `equipe_joueurs`, intégré en Phase 4.3 naturellement).
 
   Alternatives possibles si Phase 4.3 reportée : dette (i) RLS write par rôle (à grouper avec C7-d et dette (l) durcissement INSERT distances_sites), ou Phase 4.4 P4-2 greeting J-N. Travaux annexes en attente :
   - (a) **Implémentation des tables modélisées** (cf. `Modelisation-Evenements-v1.1.md` §4) :
