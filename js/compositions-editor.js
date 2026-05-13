@@ -5,12 +5,13 @@
  * Phase 4.4 — Construit progressivement :
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
- *   - 6c-4 : autosave + validation + repassage brouillon
- *   - 6c-5 : Vue Terrain (visualisation read-only XV)
- *   - 6c-6 : Modale Création E2 complète
- *   - 6c-7 : Modale Historique E6
  *
- * Version : 3.0 — Phase 4.4 étape 6c-2/6c-3 (13 mai 2026)
+ * Version : 3.1 — Phase 4.4 étape 6c-2/6c-3 (13 mai 2026)
+ *   v3.0 : Vue Liste + Popover Picker
+ *   v3.1 : Fix mapping colonnes table postes Supabase :
+ *           - poste.uuid → poste.id
+ *           - poste.numero_maillot → poste.numero_xv
+ *           - retrait du filtre formats_applicables (la table n'a que les 15 XV)
  */
 
 (function () {
@@ -133,7 +134,7 @@
   function postesVides() {
     const occupes = new Set();
     for (const cj of State.compoJoueurs) if (cj.role === 'titulaire') occupes.add(cj.poste_id);
-    return State.postes.filter(p => !occupes.has(p.uuid));
+    return State.postes.filter(p => !occupes.has(p.id));   // v3.1 : p.id (pas p.uuid)
   }
   function joueurDuPoste(posteId) {
     return State.compoJoueurs.find(cj => cj.role === 'titulaire' && cj.poste_id === posteId);
@@ -325,12 +326,13 @@
     bindSlotHandlers();
   }
 
+  // v3.1 : utilise poste.id (pas poste.uuid) et poste.numero_xv (pas poste.numero_maillot)
   function renderSlotPoste(poste) {
-    const cj = joueurDuPoste(poste.uuid);
+    const cj = joueurDuPoste(poste.id);
     if (!cj) {
       return (
-        '<li class="slot slot--vide" data-poste-id="' + escapeHtml(poste.uuid) + '" data-role="titulaire">' +
-          '<span class="slot__num">' + escapeHtml(poste.numero_maillot || '') + '</span>' +
+        '<li class="slot slot--vide" data-poste-id="' + escapeHtml(poste.id) + '" data-role="titulaire">' +
+          '<span class="slot__num">' + escapeHtml(poste.numero_xv || '') + '</span>' +
           '<span class="slot__poste-label">' + escapeHtml(poste.libelle_court || poste.code) + '</span>' +
           '<span class="slot__add">+ Ajouter</span>' +
         '</li>'
@@ -338,8 +340,8 @@
     }
     const p = cj.personnes || {};
     return (
-      '<li class="slot slot--occupe ' + cssClassEtatJoueur(cj.etat_joueur) + '" data-compo-joueur-id="' + escapeHtml(cj.id) + '" data-poste-id="' + escapeHtml(poste.uuid) + '">' +
-        '<span class="slot__num">' + escapeHtml(cj.numero_maillot != null ? cj.numero_maillot : poste.numero_maillot || '') + '</span>' +
+      '<li class="slot slot--occupe ' + cssClassEtatJoueur(cj.etat_joueur) + '" data-compo-joueur-id="' + escapeHtml(cj.id) + '" data-poste-id="' + escapeHtml(poste.id) + '">' +
+        '<span class="slot__num">' + escapeHtml(cj.numero_maillot != null ? cj.numero_maillot : poste.numero_xv || '') + '</span>' +
         '<span class="slot__poste-label">' + escapeHtml(poste.libelle_court || poste.code) + '</span>' +
         '<span class="slot__joueur">' +
           '<span class="slot__nom">' + escapeHtml(p.nom || '?') + '</span>' +
@@ -492,6 +494,7 @@
     bindPopoverHandlers();
   }
 
+  // v3.1 : utilise poste.numero_xv
   function renderPopoverSlotVide() {
     const pv = State.popover;
     const search = (pv.search || '').toLowerCase();
@@ -504,7 +507,7 @@
     let titre;
     if (pv.role === 'titulaire' && pv.posteId) {
       const poste = getPoste(pv.posteId);
-      titre = poste ? ('Poste ' + poste.numero_maillot + ' — ' + (poste.libelle_long || poste.libelle_court)) : 'Poste inconnu';
+      titre = poste ? ('Poste ' + poste.numero_xv + ' — ' + (poste.libelle_long || poste.libelle_court)) : 'Poste inconnu';
     } else {
       titre = 'Remplaçant n°' + (pv.numeroMaillot || '?');
     }
@@ -541,6 +544,7 @@
     return html;
   }
 
+  // v3.1 : utilise poste.id et poste.numero_xv
   function renderPopoverJoueurVivier() {
     const pv = State.popover;
     const joueur = getJoueurVivier(pv.joueurId);
@@ -564,8 +568,8 @@
       html += '<li class="popover__empty">Tous les postes XV sont déjà occupés.</li>';
     } else {
       for (const p of postesLibres) {
-        html += '<li class="popover__item popover__item--poste" data-poste-id="' + escapeHtml(p.uuid) + '">';
-        html +=   '<span class="slot__num">' + escapeHtml(p.numero_maillot) + '</span>';
+        html += '<li class="popover__item popover__item--poste" data-poste-id="' + escapeHtml(p.id) + '">';
+        html +=   '<span class="slot__num">' + escapeHtml(p.numero_xv) + '</span>';
         html +=   '<span class="popover__poste-libelle">' + escapeHtml(p.libelle_long || p.libelle_court) + '</span>';
         html += '</li>';
       }
@@ -693,6 +697,7 @@
     renderEffectifPanel();
   }
 
+  // v3.1 : utilise poste.id et poste.numero_xv
   async function onPickJoueurPourSlot(joueurId) {
     const pv = State.popover;
     if (!pv) return;
@@ -710,11 +715,16 @@
     if (pv.role === 'titulaire' && pv.posteId) {
       params.poste_id = pv.posteId;
       const p = getPoste(pv.posteId);
-      if (p && p.numero_maillot) params.numero_maillot = p.numero_maillot;
+      if (p && p.numero_xv) params.numero_maillot = p.numero_xv;
     } else if (pv.role === 'remplacant') {
       const libres = postesVides();
-      params.poste_id = libres.length > 0 ? libres[0].uuid : State.postes[0].uuid;
+      params.poste_id = libres.length > 0 ? libres[0].id : (State.postes[0] && State.postes[0].id);
       params.numero_maillot = pv.numeroMaillot || 16;
+    }
+
+    if (!params.poste_id) {
+      alert('Erreur interne : aucun poste disponible en base. Vérifie le chargement du référentiel postes.');
+      return;
     }
 
     const r = await SupabaseHub.addJoueurCompo(params);
@@ -726,6 +736,7 @@
     renderEffectifPanel();
   }
 
+  // v3.1 : utilise poste.id et poste.numero_xv
   async function onPickPostePourJoueur(posteId) {
     const pv = State.popover;
     if (!pv) return;
@@ -743,7 +754,7 @@
       params.role = 'titulaire';
       params.poste_id = posteId;
       const p = getPoste(posteId);
-      if (p && p.numero_maillot) params.numero_maillot = p.numero_maillot;
+      if (p && p.numero_xv) params.numero_maillot = p.numero_xv;
     } else {
       const remp = State.compoJoueurs.filter(cj => cj.role === 'remplacant');
       const usedNums = new Set(remp.map(cj => cj.numero_maillot).filter(Boolean));
@@ -752,7 +763,12 @@
       params.role = 'remplacant';
       params.numero_maillot = nextNum <= 23 ? nextNum : null;
       const libres = postesVides();
-      params.poste_id = libres.length > 0 ? libres[0].uuid : State.postes[0].uuid;
+      params.poste_id = libres.length > 0 ? libres[0].id : (State.postes[0] && State.postes[0].id);
+    }
+
+    if (!params.poste_id) {
+      alert('Erreur interne : aucun poste disponible en base. Vérifie le chargement du référentiel postes.');
+      return;
     }
 
     const r = await SupabaseHub.addJoueurCompo(params);
@@ -801,17 +817,14 @@
     for (const j of State.vivier) State.vivierById.set(j.joueur_id, j);
     return State.vivier;
   }
+
+  // v3.1 : indexation par poste.id, tri par poste.numero_xv,
+  //        plus de filtre formats_applicables (la table contient les 15 XV)
   async function loadPostes() {
     const all = await SupabaseHub.getPostes();
-    // formats_applicables peut être un array OU une string CSV selon le mapping JSON→SQL. On gère les 2.
-    State.postes = all.filter(function (p) {
-      const fa = p.formats_applicables;
-      if (Array.isArray(fa)) return fa.includes('XV');
-      if (typeof fa === 'string') return fa.includes('XV');
-      return true; // par défaut on garde (le tri par numéro fera le reste)
-    }).sort((a, b) => (a.numero_maillot || 99) - (b.numero_maillot || 99));
+    State.postes = (all || []).slice().sort((a, b) => (a.numero_xv || 99) - (b.numero_xv || 99));
     State.postesById = new Map();
-    for (const p of State.postes) State.postesById.set(p.uuid, p);
+    for (const p of State.postes) State.postesById.set(p.id, p);
     return State.postes;
   }
 
@@ -854,7 +867,7 @@
     bindPopoverOutsideClick();
 
     console.log(
-      '%c🏉 Compositions Editor v3 (étape 6c-2 + 6c-3) chargé',
+      '%c🏉 Compositions Editor v3.1 (étape 6c-2 + 6c-3) chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         evenements: State.evenements.length,
