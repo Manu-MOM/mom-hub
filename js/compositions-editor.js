@@ -4,22 +4,27 @@
  *
  * Logique de l'éditeur de compositions (compositions.html).
  *
- * Phase 4.4 — Construit progressivement en 3 étapes :
+ * Phase 4.4 — Construit progressivement :
  *   - 6a : squelette HTML/CSS statique (placeholders)
- *   - 6b : chargement dynamique des événements + sélecteur + liste
- *          des compos par événement + état vide (CETTE VERSION)
- *   - 6c : éditeur complet (vivier, Popover Picker, autosave,
- *          validation, modale E2 complète, etc.)
- *
- * Cette v1 ne gère QUE la navigation entre événements et compos.
- * L'édition de la compo elle-même (XV + remplaçants + drag-clic)
- * arrive en 6c.
+ *   - 6b : chargement dynamique événements + sélecteur + compos
+ *   - 6c-1 : panneau Effectif (vivier 63 joueurs branché) (CETTE VERSION)
+ *   - 6c-2 : Vue Liste (XV + remplaçants + couleurs joueur)
+ *   - 6c-3 : Popover Picker E5 (clic-clic d'ajout/remplacement)
+ *   - 6c-4 : autosave + validation + repassage brouillon
+ *   - 6c-5 : Vue Terrain (visualisation read-only XV)
+ *   - 6c-6 : Modale Création E2 (radio base/match + dupliquer)
+ *   - 6c-7 : Modale Historique E6 (versions précédentes)
  *
  * Dépendances :
  *   - js/supabase-client.js v1.7.1+ (SupabaseHub)
  *   - DOM de compositions.html (IDs définis ci-dessous)
  *
- * Version : 1.0 — Phase 4.4 étape 6b (13 mai 2026)
+ * Version : 2.0 — Phase 4.4 étape 6c-1 (13 mai 2026)
+ *   v1.0 — 6b : navigation événements + compos
+ *   v2.0 — 6c-1 : ajout panneau Effectif (vivier)
+ *     - State.vivier + State.filtreHideSAR
+ *     - loadVivier() : 1 seul appel RPC getVivierCompo au démarrage
+ *     - renderEffectifPanel() : tri par groupes + étiquettes + filtre
  */
 
 (function () {
@@ -29,21 +34,21 @@
   // 1. CONSTANTES + ÉTAT GLOBAL
   // ============================================================
 
-  // UUID de l'équipe M14 EQ1 (V1 hardcodé, multi-équipes en V2 cf. dette
-  // P4-UI-1 du doc Conception §7.1)
+  // UUID de l'équipe M14 EQ1 (V1 hardcodé, multi-équipes V2 cf. P4-UI-1)
   const M14_TEAM_UUID = 'bfb83b83-83ef-4dde-b526-48ff87313044';
 
-  // État applicatif partagé entre les rendus. Volontairement plat
-  // (pas de Redux ni de framework) — P1 simplicité.
   const State = {
-    evenements: [],           // tous les événements à venir M14
-    selectedEvenementId: null, // événement courant
-    compos: [],               // toutes les compos de l'événement sélectionné
-    selectedCompoId: null     // compo courante (BASE par défaut, sinon 1re trouvée)
+    evenements: [],
+    selectedEvenementId: null,
+    compos: [],
+    selectedCompoId: null,
+    // v2 (6c-1) :
+    vivier: [],              // les 63 joueurs M14 piochables (1 fetch au démarrage)
+    filtreHideSAR: false     // toggle "Masquer partenaires entente"
   };
 
   // ============================================================
-  // 2. SÉLECTEURS DOM (référencés par id depuis compositions.html)
+  // 2. SÉLECTEURS DOM
   // ============================================================
 
   const DOM = {
@@ -55,14 +60,17 @@
     eventSelectorList: () => document.getElementById('event-selector-list'),
     compoTabs:         () => document.getElementById('compo-tabs'),
     fillIndicator:     () => document.getElementById('fill-indicator'),
-    editorArea:        () => document.getElementById('editor-area')
+    editorArea:        () => document.getElementById('editor-area'),
+    // v2 (6c-1) :
+    effectifTitle:     () => document.getElementById('effectif-title'),
+    effectifFilter:    () => document.getElementById('effectif-filter-sar'),
+    effectifBody:      () => document.getElementById('effectif-panel-body')
   };
 
   // ============================================================
   // 3. HELPERS UI
   // ============================================================
 
-  // Format date pour le bandeau événement : "samedi 23 mai 2026"
   function formatDateLong(isoDate) {
     if (!isoDate) return '';
     const d = new Date(isoDate);
@@ -71,7 +79,6 @@
     return `${jours[d.getDay()]} ${d.getDate()} ${mois[d.getMonth()]} ${d.getFullYear()}`;
   }
 
-  // Format date courte pour le sélecteur : "lun. 18 mai"
   function formatDateShort(isoDate) {
     if (!isoDate) return '';
     const d = new Date(isoDate);
@@ -80,7 +87,6 @@
     return `${jours[d.getDay()]} ${d.getDate()} ${mois[d.getMonth()]}`;
   }
 
-  // Libellé du type d'événement (humanisé)
   function libelleTypeEvenement(type) {
     if (type === 'entrainement')         return 'Entraînement';
     if (type === 'match')                return 'Match';
@@ -90,16 +96,12 @@
     return type || 'Événement';
   }
 
-  // Libellé court de l'événement, sans préfixe redondant
-  // ("EVT-2026-05-23-LES-GEMMEURS-M14" → "vs Les Gemmeurs" si adversaire,
-  //  sinon depuis le libelle nettoyé)
   function libelleEvenement(evt) {
     if (!evt) return '';
     if (evt.adversaire_nom) return 'vs ' + evt.adversaire_nom;
     return evt.libelle || evt.code || '';
   }
 
-  // Libellé d'état de compo (pour la pastille)
   function libelleEtatCompo(etat) {
     if (etat === 'brouillon') return 'Brouillon';
     if (etat === 'validee')   return 'Validée';
@@ -108,13 +110,54 @@
     return '';
   }
 
+  // ----- Helpers v2 (vivier) -----
+
+  // Initiales d'un nom pour l'avatar. "BARTHEL" → "BA", "DECOURCELLE" → "DE"
+  function initiales(prenom, nom) {
+    const p = (prenom || '').trim().charAt(0).toUpperCase();
+    const n = (nom    || '').trim().charAt(0).toUpperCase();
+    return (p + n) || '?';
+  }
+
+  // Étiquette discrète d'un joueur dans le vivier :
+  //   F-15 prioritaire (plus parlant pour le coach)
+  //   sinon SAR/ASCS pour partenaires
+  //   sinon Renfort si statut_attache='renfort_temporaire'
+  //   sinon rien (cas par défaut MOM régulier)
+  function etiquetteJoueur(j) {
+    if (j.f15_integree) return { label: 'F-15', kind: 'f15' };
+    if (j.est_partenaire_entente) {
+      const club = (j.club_principal_nom_court || '').toUpperCase();
+      if (club === 'SAR' || club === 'ASCS') return { label: club, kind: 'partenaire' };
+      return { label: 'Partenaire', kind: 'partenaire' };
+    }
+    if (j.statut_attache === 'renfort_temporaire') return { label: 'Renfort', kind: 'renfort' };
+    return null;
+  }
+
+  // Détermine le groupe d'un joueur pour le tri en sections :
+  //   'mom'        → Réguliers MOM (par défaut)
+  //   'partenaire' → Partenaires SAR/ASCS
+  //   'renfort'    → Renforts temporaires
+  //   'autre'      → Non-attachés / en_transition
+  function groupeJoueur(j) {
+    if (j.est_partenaire_entente)              return 'partenaire';
+    if (j.statut_attache === 'renfort_temporaire') return 'renfort';
+    if (!j.statut_attache || j.statut_attache === 'en_transition') return 'autre';
+    return 'mom';
+  }
+
+  // Tri alphabétique nom puis prénom
+  function compareJoueurs(a, b) {
+    const cmpN = (a.nom || '').localeCompare(b.nom || '', 'fr');
+    if (cmpN !== 0) return cmpN;
+    return (a.prenom || '').localeCompare(b.prenom || '', 'fr');
+  }
+
   // ============================================================
-  // 4. RENDUS — chaque fonction (re)peint une zone du DOM
+  // 4. RENDUS
   // ============================================================
 
-  /**
-   * Rendu du bandeau événement (type, label, lieu, état de la compo BASE).
-   */
   function renderEventBanner() {
     const evt = State.evenements.find(e => e.id === State.selectedEvenementId);
     if (!evt) {
@@ -130,7 +173,6 @@
     DOM.eventBannerLabel().textContent = libelleEvenement(evt) + ' · ' + formatDateLong(evt.date_debut);
     DOM.eventBannerMeta().textContent  = evt.site_libelle_court || '';
 
-    // Pastille d'état : basée sur la compo BASE s'il y en a une, sinon vide
     const compoBase = State.compos.find(c => c.type_compo === 'base');
     const stateEl = DOM.eventBannerState();
     if (compoBase) {
@@ -142,10 +184,6 @@
     }
   }
 
-  /**
-   * Rendu du dropdown de sélection d'événement (liste cliquable).
-   * Reste caché tant qu'on ne clique pas sur le bandeau.
-   */
   function renderEventSelector() {
     const list = DOM.eventSelectorList();
     if (!list) return;
@@ -171,15 +209,11 @@
     }
   }
 
-  /**
-   * Rendu de la barre d'onglets [BASE] / matchs dérivés / [+].
-   */
   function renderCompoTabs() {
     const container = DOM.compoTabs();
     if (!container) return;
     container.innerHTML = '';
 
-    // Onglet BASE (toujours présent, même si compo non créée)
     const compoBase = State.compos.find(c => c.type_compo === 'base');
     const baseTab = document.createElement('button');
     baseTab.type = 'button';
@@ -196,7 +230,6 @@
     }
     container.appendChild(baseTab);
 
-    // Onglets matchs dérivés
     const compoMatchs = State.compos
       .filter(c => c.type_compo === 'match')
       .sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
@@ -211,7 +244,6 @@
       container.appendChild(tab);
     }
 
-    // Bouton + (création d'un match dérivé, désactivé tant que pas de BASE)
     const addTab = document.createElement('button');
     addTab.type = 'button';
     addTab.className = 'compo-tabs__tab compo-tabs__tab--add';
@@ -221,16 +253,11 @@
       : 'Crée d\'abord une compo de base';
     addTab.disabled = !compoBase;
     addTab.addEventListener('click', function () {
-      alert('Création de compo de match : à brancher en étape 6c');
+      alert('Création de compo de match : à brancher en étape 6c-6');
     });
     container.appendChild(addTab);
   }
 
-  /**
-   * Rendu de l'indicateur de remplissage permanent.
-   * En 6b on n'a pas encore les composition_joueurs chargés en mémoire,
-   * donc on reste sur un affichage minimaliste. Détail vivant en 6c.
-   */
   function renderFillIndicator() {
     const el = DOM.fillIndicator();
     if (!el) return;
@@ -243,14 +270,9 @@
       '<strong>Composition ' + libelleEtatCompo(compo.etat).toLowerCase() + '</strong>' +
       '&nbsp;·&nbsp; v' + compo.version +
       '&nbsp;·&nbsp; type ' + compo.type_compo +
-      '&nbsp;·&nbsp; <em style="color: var(--ink-mute);">détail joueurs en étape 6c</em>';
+      '&nbsp;·&nbsp; <em style="color: var(--ink-mute);">détail joueurs en étape 6c-2</em>';
   }
 
-  /**
-   * Rendu de la zone d'édition centrale.
-   * Trois cas : aucune compo → bouton "Créer la compo de base" ;
-   * compo sélectionnée → récap simple ; pas d'événement → message.
-   */
   function renderEditorArea() {
     const el = DOM.editorArea();
     if (!el) return;
@@ -264,7 +286,6 @@
     }
 
     if (State.compos.length === 0) {
-      // Aucune compo pour cet événement → CTA "Créer la compo de base"
       el.innerHTML =
         '<div class="editor-area__empty">' +
           '<p class="editor-area__empty-title">Aucune composition créée pour cet événement.</p>' +
@@ -278,7 +299,6 @@
       return;
     }
 
-    // Une compo est sélectionnée : on affiche un récap simple
     const compo = State.compos.find(c => c.id === State.selectedCompoId);
     if (!compo) {
       el.innerHTML =
@@ -302,13 +322,87 @@
         '</dl>' +
         '<p class="editor-area__recap-todo">' +
           '<em>L\'éditeur complet (XV + remplaçants + clic-clic + Popover Picker) ' +
-          'arrive en étape 6c.</em>' +
+          'arrive en étape 6c-2 et 6c-3.</em>' +
         '</p>' +
       '</div>';
   }
 
+  // ----- v2 (6c-1) : rendu du panneau Effectif -----
+
+  /**
+   * Rendu du panneau Effectif (vivier des joueurs piochables).
+   * En 6c-1, lecture seule : pas d'interaction au clic (sera ajoutée
+   * en 6c-3 avec le Popover Picker).
+   */
+  function renderEffectifPanel() {
+    const titleEl = DOM.effectifTitle();
+    const bodyEl  = DOM.effectifBody();
+    if (!bodyEl) return;
+
+    // Filtrage selon le toggle "Masquer partenaires entente"
+    let vivier = State.vivier;
+    if (State.filtreHideSAR) {
+      vivier = vivier.filter(j => !j.est_partenaire_entente);
+    }
+
+    // Titre dynamique avec le compteur filtré
+    if (titleEl) {
+      titleEl.textContent = 'Effectif (' + vivier.length + ')';
+    }
+
+    if (vivier.length === 0) {
+      bodyEl.innerHTML =
+        '<div class="effectif-panel__placeholder">' +
+        '<em>Aucun joueur dans le vivier.</em>' +
+        '</div>';
+      return;
+    }
+
+    // Regroupement par catégorie
+    const groupes = {
+      mom:        { label: 'Réguliers MOM',        items: [] },
+      partenaire: { label: 'Partenaires entente',  items: [] },
+      renfort:    { label: 'Renforts temporaires', items: [] },
+      autre:      { label: 'Non-attachés',         items: [] }
+    };
+    for (const j of vivier) {
+      const g = groupeJoueur(j);
+      groupes[g].items.push(j);
+    }
+    // Tri alpha à l'intérieur de chaque groupe
+    for (const k in groupes) groupes[k].items.sort(compareJoueurs);
+
+    // Construction du HTML
+    let html = '';
+    const ordre = ['mom', 'partenaire', 'renfort', 'autre'];
+    for (const k of ordre) {
+      const g = groupes[k];
+      if (g.items.length === 0) continue;
+      html += '<div class="effectif-group">';
+      html +=   '<h3 class="effectif-group__title">' + g.label + ' <span class="effectif-group__count">(' + g.items.length + ')</span></h3>';
+      html +=   '<ul class="effectif-list">';
+      for (const j of g.items) {
+        const etq = etiquetteJoueur(j);
+        const tagHtml = etq
+          ? '<span class="effectif-item__tag effectif-item__tag--' + etq.kind + '">' + etq.label + '</span>'
+          : '';
+        html += '<li class="effectif-item" data-joueur-id="' + j.joueur_id + '" title="' + (j.prenom || '') + ' ' + (j.nom || '') + '">';
+        html +=   '<span class="effectif-item__avatar">' + initiales(j.prenom, j.nom) + '</span>';
+        html +=   '<span class="effectif-item__name">';
+        html +=     '<span class="effectif-item__nom">' + (j.nom || '?') + '</span>';
+        html +=     '<span class="effectif-item__prenom">' + (j.prenom || '') + '</span>';
+        html +=   '</span>';
+        html +=   tagHtml;
+        html += '</li>';
+      }
+      html +=   '</ul>';
+      html += '</div>';
+    }
+    bodyEl.innerHTML = html;
+  }
+
   // ============================================================
-  // 5. ACTIONS — réagissent aux interactions utilisateur
+  // 5. ACTIONS
   // ============================================================
 
   async function selectEvenement(evtId) {
@@ -319,9 +413,8 @@
     renderCompoTabs();
     renderFillIndicator();
     renderEditorArea();
-    // Charger les compos de cet événement
     await loadComposForCurrentEvent();
-    renderEventBanner();    // peut changer si compo BASE détectée (pastille état)
+    renderEventBanner();
     renderCompoTabs();
     renderFillIndicator();
     renderEditorArea();
@@ -345,6 +438,11 @@
     if (list) list.classList.remove('is-open');
   }
 
+  function toggleFiltreSAR(checked) {
+    State.filtreHideSAR = !!checked;
+    renderEffectifPanel();
+  }
+
   async function onCreateBaseClick() {
     if (!State.selectedEvenementId) return;
     const btn = document.getElementById('btn-create-base');
@@ -361,7 +459,6 @@
       return;
     }
 
-    // Recharger les compos pour voir la nouvelle, et la sélectionner
     await loadComposForCurrentEvent();
     State.selectedCompoId = r.data.id;
     renderEventBanner();
@@ -371,7 +468,7 @@
   }
 
   // ============================================================
-  // 6. CHARGEMENTS — requêtes Supabase
+  // 6. CHARGEMENTS
   // ============================================================
 
   async function loadEvenements() {
@@ -384,14 +481,9 @@
       State.compos = [];
       return;
     }
-    // Récupère toutes les compos M14 actives, puis filtre côté JS sur l'événement
-    // (l'API listCompositionsByEquipe ne filtre pas par evenement_id — on pourrait
-    // l'ajouter en option plus tard, mais 4 événements M14 × 1-3 compos = ~12 lignes
-    // max au stade actuel)
     const all = await SupabaseHub.listCompositionsByEquipe(M14_TEAM_UUID);
     State.compos = all.filter(c => c.evenement_id === State.selectedEvenementId);
 
-    // Sélection par défaut : compo BASE si elle existe, sinon la 1re trouvée
     const compoBase = State.compos.find(c => c.type_compo === 'base');
     if (compoBase) {
       State.selectedCompoId = compoBase.id;
@@ -402,33 +494,50 @@
     }
   }
 
+  // v2 (6c-1) : chargement du vivier (1 fetch, conservé tout au long
+  // de la session — la composition de l'équipe ne change pas pendant
+  // qu'on édite une compo, donc inutile de re-fetcher).
+  async function loadVivier() {
+    State.vivier = await SupabaseHub.getVivierCompo(M14_TEAM_UUID);
+    return State.vivier;
+  }
+
   // ============================================================
   // 7. INIT
   // ============================================================
 
   async function init() {
-    // 1. Charger les événements à venir
-    await loadEvenements();
+    // Chargements parallèles : événements + vivier (gain de latence)
+    await Promise.all([
+      loadEvenements(),
+      loadVivier()
+    ]);
 
-    // 2. Sélectionner par défaut le 1er événement (le plus proche)
     if (State.evenements.length > 0) {
       State.selectedEvenementId = State.evenements[0].id;
       await loadComposForCurrentEvent();
     }
 
-    // 3. Premier rendu complet
     renderEventBanner();
     renderEventSelector();
     renderCompoTabs();
     renderFillIndicator();
     renderEditorArea();
+    renderEffectifPanel();
 
-    // 4. Brancher le bouton du sélecteur d'événement (toggle de la liste)
+    // Brancher le bouton du sélecteur d'événement
     const selBtn = DOM.eventSelectorBtn();
-    if (selBtn) {
-      selBtn.addEventListener('click', toggleEventSelector);
+    if (selBtn) selBtn.addEventListener('click', toggleEventSelector);
+
+    // Brancher le filtre "Masquer partenaires entente"
+    const filterEl = DOM.effectifFilter();
+    if (filterEl) {
+      filterEl.addEventListener('change', function (e) {
+        toggleFiltreSAR(e.target.checked);
+      });
     }
-    // Fermer la liste au clic en dehors
+
+    // Fermer la liste événement au clic en dehors
     document.addEventListener('click', function (e) {
       const list = DOM.eventSelectorList();
       const btn = DOM.eventSelectorBtn();
@@ -439,18 +548,22 @@
     });
 
     console.log(
-      '%c🏉 Compositions Editor v1 (étape 6b) chargé',
+      '%c🏉 Compositions Editor v2 (étape 6c-1) chargé',
       'color: #2D7D46; font-weight: bold;',
-      { evenements: State.evenements.length, compos: State.compos.length }
+      {
+        evenements: State.evenements.length,
+        vivier: State.vivier.length,
+        compos: State.compos.length
+      }
     );
   }
 
-  // Exposition globale pour debug console
   window.CompositionsEditor = {
     init: init,
     state: State,
     loadEvenements: loadEvenements,
-    loadComposForCurrentEvent: loadComposForCurrentEvent
+    loadComposForCurrentEvent: loadComposForCurrentEvent,
+    loadVivier: loadVivier
   };
 
 })();
