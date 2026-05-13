@@ -12,18 +12,10 @@
   <style>
     /* ============================================================
      * Styles spécifiques à compositions.html (Phase 4.4 UI)
-     * ------------------------------------------------------------
-     * Le commun (palette, topbar, classes utilitaires) est dans
-     * css/hub.css. Ici on définit uniquement le layout propre à
-     * l'éditeur de compo et ses composants transverses.
      * ============================================================ */
 
-    /* Pattern auth-pending hérité de dashboard.html. */
-    body.auth-pending {
-      visibility: hidden;
-    }
+    body.auth-pending { visibility: hidden; }
 
-    /* Conteneur principal de la page, sous la topbar */
     .compo-layout {
       max-width: 1280px;
       margin: 0 auto;
@@ -32,7 +24,7 @@
       z-index: 2;
     }
 
-    /* ---- Bandeau événement (cliquable, ouvre le sélecteur) ---- */
+    /* ---- Bandeau événement ---- */
     .event-banner {
       background: #fff;
       border: 1px solid var(--line);
@@ -59,9 +51,7 @@
       text-align: left;
       color: inherit;
     }
-    .event-banner__btn:hover .event-banner__label {
-      color: var(--vert-prairie);
-    }
+    .event-banner__btn:hover .event-banner__label { color: var(--vert-prairie); }
     .event-banner__btn::after {
       content: '▾';
       color: var(--ink-mute);
@@ -111,7 +101,7 @@
     .event-banner__state.state-utilisee  { color: var(--bleu-base);    border-color: var(--bleu-base); }
     .event-banner__state.state-archivee  { color: var(--ink-mute); opacity: 0.6; }
 
-    /* ---- Sélecteur d'événement (liste déroulante) ---- */
+    /* ---- Sélecteur d'événement ---- */
     .event-selector {
       list-style: none;
       position: absolute;
@@ -129,9 +119,7 @@
       z-index: 10;
       display: none;
     }
-    .event-selector.is-open {
-      display: block;
-    }
+    .event-selector.is-open { display: block; }
     .event-selector__item {
       display: grid;
       grid-template-columns: 110px 110px 1fr;
@@ -142,12 +130,8 @@
       cursor: pointer;
       font-size: 13px;
     }
-    .event-selector__item:hover {
-      background: var(--paper-warm);
-    }
-    .event-selector__item.is-selected {
-      background: var(--vert-light);
-    }
+    .event-selector__item:hover { background: var(--paper-warm); }
+    .event-selector__item.is-selected { background: var(--vert-light); }
     .event-selector__date {
       font-family: 'JetBrains Mono', monospace;
       font-size: 11px;
@@ -161,10 +145,7 @@
       text-transform: uppercase;
       color: var(--vert-prairie);
     }
-    .event-selector__label {
-      font-size: 13px;
-      color: var(--ink);
-    }
+    .event-selector__label { font-size: 13px; color: var(--ink); }
     .event-selector__empty {
       padding: 16px;
       text-align: center;
@@ -173,7 +154,7 @@
       font-style: italic;
     }
 
-    /* ---- Barre d'onglets BASE / matchs dérivés ---- */
+    /* ---- Barre d'onglets ---- */
     .compo-tabs {
       display: flex;
       gap: 4px;
@@ -198,9 +179,7 @@
       position: relative;
       top: 1px;
     }
-    .compo-tabs__tab:hover:not(:disabled) {
-      background: #fff;
-    }
+    .compo-tabs__tab:hover:not(:disabled) { background: #fff; }
     .compo-tabs__tab.is-active {
       background: #fff;
       color: var(--ink);
@@ -214,16 +193,10 @@
       font-weight: 400;
       padding: 10px 14px;
     }
-    .compo-tabs__tab--placeholder {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-    .compo-tabs__tab:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
+    .compo-tabs__tab--placeholder { opacity: 0.5; cursor: not-allowed; }
+    .compo-tabs__tab:disabled { opacity: 0.4; cursor: not-allowed; }
 
-    /* ---- Bandeau légende permanent (4 couleurs joueur) ---- */
+    /* ---- Bandeau légende permanent ---- */
     .legend-bar {
       background: #fff;
       border: 1px solid var(--line);
@@ -253,7 +226,7 @@
     .legend-bar__dot--independant { background: var(--vert-prairie); }
     .legend-bar__dot--blesse      { background: var(--rouge-blesse); }
 
-    /* ---- Indicateur de remplissage permanent ---- */
+    /* ---- Indicateur de remplissage ---- */
     .fill-indicator {
       background: var(--paper-warm);
       border: 1px solid var(--line);
@@ -265,10 +238,7 @@
       color: var(--ink-soft);
       margin-bottom: 16px;
     }
-    .fill-indicator strong {
-      font-weight: 500;
-      color: var(--ink);
-    }
+    .fill-indicator strong { font-weight: 500; color: var(--ink); }
 
     /* ---- Onglets Liste / Terrain ---- */
     .view-tabs {
@@ -296,7 +266,7 @@
       border-color: var(--vert-prairie);
     }
 
-    /* ---- Grille principale (effectif | éditeur central) ---- */
+    /* ---- Grille principale ---- */
     .compo-grid {
       display: grid;
       grid-template-columns: 320px 1fr;
@@ -304,7 +274,7 @@
       align-items: start;
     }
 
-    /* Panneau Effectif latéral */
+    /* ---- Panneau Effectif ---- */
     .effectif-panel {
       background: #fff;
       border: 1px solid var(--line);
@@ -322,7 +292,26 @@
       letter-spacing: 0.08em;
       text-transform: uppercase;
       color: var(--ink-mute);
-      margin-bottom: 12px;
+      margin-bottom: 10px;
+    }
+    .effectif-panel__filter {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      background: var(--paper-warm);
+      border-radius: 6px;
+      font-size: 12px;
+      color: var(--ink-soft);
+      cursor: pointer;
+      margin-bottom: 14px;
+      user-select: none;
+    }
+    .effectif-panel__filter:hover { background: var(--paper-deep); }
+    .effectif-panel__filter input[type="checkbox"] {
+      width: 14px; height: 14px;
+      accent-color: var(--vert-prairie);
+      cursor: pointer;
     }
     .effectif-panel__placeholder {
       padding: 24px 12px;
@@ -334,7 +323,110 @@
       border-radius: 8px;
     }
 
-    /* Zone d'édition centrale */
+    /* Groupes de joueurs */
+    .effectif-group { margin-bottom: 16px; }
+    .effectif-group:last-child { margin-bottom: 0; }
+    .effectif-group__title {
+      font-family: 'Oswald', sans-serif;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--ink-mute);
+      padding: 6px 8px;
+      background: var(--paper-warm);
+      border-radius: 4px;
+      margin-bottom: 6px;
+    }
+    .effectif-group__count {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: var(--ink-mute);
+      font-weight: 400;
+      margin-left: 4px;
+    }
+    .effectif-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    /* Item joueur */
+    .effectif-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      cursor: default; /* en 6c-1 lecture seule, clic-clic en 6c-3 */
+      transition: background-color 0.1s;
+    }
+    .effectif-item:hover { background: var(--paper-warm); }
+    .effectif-item__avatar {
+      width: 28px;
+      height: 28px;
+      background: var(--vert-light);
+      color: var(--vert-prairie);
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      font-family: 'Oswald', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    .effectif-item__name {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      line-height: 1.25;
+      min-width: 0;
+      overflow: hidden;
+    }
+    .effectif-item__nom {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--ink);
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .effectif-item__prenom {
+      font-size: 11.5px;
+      color: var(--ink-mute);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .effectif-item__tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+      padding: 2px 6px;
+      border-radius: 3px;
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+    .effectif-item__tag--f15 {
+      background: rgba(212, 169, 58, 0.18);
+      color: #8a6913;
+    }
+    .effectif-item__tag--partenaire {
+      background: rgba(184, 69, 31, 0.12);
+      color: var(--clay);
+    }
+    .effectif-item__tag--renfort {
+      background: rgba(48, 102, 190, 0.15);
+      color: var(--bleu-base);
+    }
+
+    /* ---- Zone d'édition ---- */
     .editor-area {
       background: #fff;
       border: 1px solid var(--line);
@@ -349,8 +441,6 @@
       font-size: 14px;
       font-style: italic;
     }
-
-    /* État vide (aucune compo) */
     .editor-area__empty {
       padding: 48px 24px;
       text-align: center;
@@ -379,15 +469,8 @@
       cursor: pointer;
       transition: background-color 0.15s;
     }
-    .editor-area__cta:hover:not(:disabled) {
-      background: var(--vert-bouteille);
-    }
-    .editor-area__cta:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
-    /* Récap compo (étape 6b — sera remplacé par l'éditeur en 6c) */
+    .editor-area__cta:hover:not(:disabled) { background: var(--vert-bouteille); }
+    .editor-area__cta:disabled { opacity: 0.6; cursor: not-allowed; }
     .editor-area__recap-title {
       font-family: 'Oswald', sans-serif;
       font-size: 16px;
@@ -410,10 +493,7 @@
       font-size: 11px;
       padding-top: 2px;
     }
-    .editor-area__recap-list dd {
-      color: var(--ink);
-      margin: 0;
-    }
+    .editor-area__recap-list dd { color: var(--ink); margin: 0; }
     .editor-area__recap-todo {
       padding: 16px;
       background: var(--paper-warm);
@@ -423,7 +503,7 @@
       text-align: center;
     }
 
-    /* ---- Footer page ---- */
+    /* ---- Footer ---- */
     .compo-footer {
       margin-top: 32px;
       font-size: 12px;
@@ -432,37 +512,20 @@
       letter-spacing: 0.3px;
     }
 
-    /* ---- Responsive : breakpoint 1024px (cf. doc Conception §5.8) ---- */
+    /* ---- Responsive 1024px ---- */
     @media (max-width: 1024px) {
-      .compo-grid {
-        grid-template-columns: 1fr;
-      }
-      .effectif-panel {
-        position: static;
-        max-height: none;
-      }
-      .event-banner {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 8px;
-      }
-      .event-banner__btn {
-        flex-direction: column;
-        align-items: flex-start;
-      }
-      .event-selector__item {
-        grid-template-columns: 90px 90px 1fr;
-        gap: 8px;
-      }
+      .compo-grid { grid-template-columns: 1fr; }
+      .effectif-panel { position: static; max-height: none; }
+      .event-banner { flex-direction: column; align-items: flex-start; gap: 8px; }
+      .event-banner__btn { flex-direction: column; align-items: flex-start; }
+      .event-selector__item { grid-template-columns: 90px 90px 1fr; gap: 8px; }
     }
   </style>
 </head>
 
 <body class="auth-pending">
 
-  <!-- ============================================================
-       Topbar Hub partagée — calquée sur dashboard.html
-       ============================================================ -->
+  <!-- Topbar Hub partagée -->
   <header class="topbar">
     <div class="brand">
       <div class="brand-logo">
@@ -507,12 +570,9 @@
     </div>
   </header>
 
-  <!-- ============================================================
-       Layout principal de la page Compositions
-       ============================================================ -->
   <main class="compo-layout">
 
-    <!-- Bandeau événement (cliquable, ouvre le sélecteur ci-dessous) -->
+    <!-- Bandeau événement -->
     <section class="event-banner" aria-label="Événement en cours">
       <button type="button" class="event-banner__btn" id="event-selector-btn" aria-haspopup="listbox" aria-expanded="false">
         <span class="event-banner__type" id="event-type">—</span>
@@ -524,10 +584,10 @@
       <ul class="event-selector" id="event-selector-list" role="listbox"></ul>
     </section>
 
-    <!-- Barre d'onglets BASE / matchs dérivés (peuplée par JS) -->
+    <!-- Barre d'onglets BASE / matchs (peuplée par JS) -->
     <nav class="compo-tabs" id="compo-tabs" aria-label="Compositions de l'événement"></nav>
 
-    <!-- Bandeau légende permanent (4 couleurs joueur) -->
+    <!-- Bandeau légende -->
     <div class="legend-bar" aria-label="Légende des 4 couleurs joueur">
       <span class="legend-bar__item">
         <span class="legend-bar__dot legend-bar__dot--base"></span>
@@ -547,29 +607,31 @@
       </span>
     </div>
 
-    <!-- Indicateur de remplissage permanent (peuplé par JS) -->
-    <div class="fill-indicator" id="fill-indicator" aria-live="polite">
-      Chargement…
-    </div>
+    <!-- Indicateur de remplissage -->
+    <div class="fill-indicator" id="fill-indicator" aria-live="polite">Chargement…</div>
 
-    <!-- Onglets Liste / Terrain (statiques en 6b, fonctionnels en 6c) -->
+    <!-- Onglets Liste / Terrain -->
     <nav class="view-tabs" aria-label="Mode de visualisation">
       <button class="view-tabs__tab is-active" type="button">Liste</button>
       <button class="view-tabs__tab" type="button">Terrain</button>
     </nav>
 
-    <!-- Grille principale : panneau Effectif + zone d'édition -->
+    <!-- Grille : panneau Effectif + zone d'édition -->
     <div class="compo-grid">
 
-      <!-- Panneau Effectif (placeholder en 6b, branché en 6c) -->
+      <!-- Panneau Effectif (vivier, peuplé par JS en 6c-1) -->
       <aside class="effectif-panel" aria-label="Vivier de l'équipe">
-        <h2 class="effectif-panel__title">Effectif (63)</h2>
-        <div class="effectif-panel__placeholder">
-          Liste des joueurs piochables<br>(à brancher en étape 6c)
+        <h2 class="effectif-panel__title" id="effectif-title">Effectif…</h2>
+        <label class="effectif-panel__filter">
+          <input type="checkbox" id="effectif-filter-sar">
+          Masquer les partenaires entente
+        </label>
+        <div id="effectif-panel-body">
+          <div class="effectif-panel__placeholder">Chargement du vivier…</div>
         </div>
       </aside>
 
-      <!-- Zone d'édition centrale (peuplée par JS) -->
+      <!-- Zone d'édition centrale -->
       <section class="editor-area" id="editor-area" aria-label="Éditeur de composition">
         <div class="editor-area__placeholder">Chargement…</div>
       </section>
@@ -582,9 +644,6 @@
     </p>
   </main>
 
-  <!-- ============================================================
-       Scripts : Supabase client + logique éditeur
-       ============================================================ -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="js/supabase-client.js"></script>
   <script src="js/compositions-editor.js"></script>
@@ -593,33 +652,16 @@
     (async function () {
       'use strict';
 
-      // ----------------------------------------------------------
-      // 1. GARDE D'ACCÈS — admin OU coach (cf. doc Conception §1.3)
-      // ----------------------------------------------------------
       const session = await SupabaseHub.getSession();
-      if (!session) {
-        window.location.replace('login.html');
-        return;
-      }
+      if (!session) { window.location.replace('login.html'); return; }
       const roles = await SupabaseHub.getMyRoles();
       const isAdminOrCoach = roles.indexOf('admin') !== -1 || roles.indexOf('coach') !== -1;
-      if (!isAdminOrCoach) {
-        window.location.replace('./');
-        return;
-      }
+      if (!isAdminOrCoach) { window.location.replace('./'); return; }
 
-      // ----------------------------------------------------------
-      // 2. AFFICHER LE CONTENU
-      // ----------------------------------------------------------
       document.body.classList.remove('auth-pending');
       document.body.classList.add('auth-resolved');
-      if (roles.indexOf('admin') !== -1) {
-        document.body.classList.add('auth-admin');
-      }
+      if (roles.indexOf('admin') !== -1) document.body.classList.add('auth-admin');
 
-      // ----------------------------------------------------------
-      // 3. INTERACTIONS topbar
-      // ----------------------------------------------------------
       const signoutBtn = document.getElementById('btn-signout');
       if (signoutBtn) {
         signoutBtn.addEventListener('click', async function () {
@@ -629,14 +671,9 @@
       }
 
       SupabaseHub.onAuthChange(function (event) {
-        if (event === 'SIGNED_OUT') {
-          window.location.replace('login.html');
-        }
+        if (event === 'SIGNED_OUT') window.location.replace('login.html');
       });
 
-      // ----------------------------------------------------------
-      // 4. INIT de l'éditeur compositions
-      // ----------------------------------------------------------
       await window.CompositionsEditor.init();
     })();
   </script>
