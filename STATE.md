@@ -3,7 +3,7 @@
 > **Document de référence opérationnel.** À jour à la racine du repo, mis à jour à chaque fin de session significative.
 > Sert de point de reprise universel : toute personne (ou tout Claude) qui ouvre ce fichier doit pouvoir reprendre le travail sans question.
 
-**Dernière mise à jour : 14 mai 2026 — C7-a + C7-b livrées côté conv Audits + C7-c livrée côté conv Production (ALTER CHECK exécuté en prod). Doctrine-Import-OVAL-E v1.4, Audit-OVAL-E-Joueurs-Partenaires-v1, Audit-Personnes-MOM-Hub v1.2 déposés dans Drive ; `sql/15-alter-type-personne-c7c.sql` commité dans le repo. Phase 4.3 (compositions/présences) **n'est plus conditionnée que par C7-f** (choix canal d'import partenaires d'entente).**
+**Dernière mise à jour : 14 mai 2026 — C7 totalement soldée. C7-a + C7-b livrées (Audits) + C7-c livrée (Production, ALTER CHECK) + C7-f livrée (Production, import SportEasy → 50 fiches partenaires en base via `sql/16-peuplement-partenaires-entente-m14-v1.sql`). 2 nouvelles dettes ouvertes par l'import : (m) correction post-import ASCS et (n) complétion sexe + date_naissance. Phase 4.3 (compositions/présences) DÉBLOQUÉE — prête à démarrer à la prochaine session après commit sql/17 (39 attaches `equipe_joueurs` pour les joueurs partenaires).**
 
 ---
 
@@ -330,7 +330,7 @@ C7. ✅ **Audit doctrine OVAL-E sur `personnes.bloc_5.club_principal_id != MOM`*
    - **C7-c** ✅ **LIVRÉE 14 mai 2026** : ALTER CHECK constraint via `sql/15-alter-type-personne-c7c.sql` (Production)
    - **C7-d** (Production) : policies RLS write par rôle, à grouper avec dette (i)
    - **C7-e** (Production, Phase 4.3) : RPC `get_vivier_compo` doit inclure les `licencie_externe_partenaire`
-   - **C7-f** (Production, préalable Phase 4.3) : choisir canal d'import (SportEasy / Excel manuel / OVAL-E partenaires future)
+   - **C7-f** ✅ **LIVRÉE 14 mai 2026** : import SportEasy SAR Minimes → 50 fiches partenaires en base via `sql/16-peuplement-partenaires-entente-m14-v1.sql` (39 joueurs + 11 coaches, tous taggés SAR par défaut). Cross-check fait avec OVAL-E (25 MOM existants détectés, ignorés). Ouvre 2 nouvelles dettes (m) et (n). Côté **conv Production**.
    - **C7-g** (long terme) : passerelle OVAL-E partenaires côté FFR
    - **C7-h** (à l'usage réel) : workflow changement de club d'un joueur en cours de saison
 
@@ -344,7 +344,19 @@ C7-d. **Policies RLS write par rôle** : prévoir le cas `licencie_externe_parte
 
 C7-e. **RPC `get_vivier_compo`** (Phase 4.3) : doit inclure naturellement les fiches `licencie_externe_partenaire` rattachées à l'équipe via `equipe_joueurs`. Pas de jointure spéciale — le LEFT JOIN à `equipe_joueurs` filtré par `equipe_id` retourne tous les attachés, quel que soit leur `type_personne` ou leur `club_principal_uuid`. Côté **conv Production**, Phase 4.3.
 
-C7-f. **Choisir le canal d'import** pour le peuplement initial M14 (39 fiches SAR/ASCS) + futurs M16 (~35) et M19 (similaire). 3 options envisagées : (1) Excel manuel transmis par coachs SAR/ASCS, (2) extraction SportEasy si effectifs synchronisés là-bas, (3) passerelle OVAL-E partenaires future (n'existe pas au 14 mai, dépend FFR). Recommandation audit : démarrer par (1) tant que (3) n'est pas disponible. Préalable à l'usage compos. Côté **conv Production**, Phase 4.3.
+C7-f. ✅ **LIVRÉE 14 mai 2026 — `sql/16-peuplement-partenaires-entente-m14-v1.sql`** : import de 50 fiches partenaires d'entente M14 (39 joueurs + 11 coaches) en base Supabase, en `type_personne = 'licencie_externe_partenaire'` avec `club_principal_id = SAR` par défaut.
+
+   **Workflow d'import** :
+   1. **Arbitrage Manu** : option "Mix Excel + SportEasy" retenue. Gabarit Excel `gabarit-effectif-partenaire-entente-mom-v1.xlsx` livré pour usage manuel ultérieur (ex: complétion sexe/date_naissance, M16/M19 futures).
+   2. **Découverte clé Manu** : SAR centralise les 3 ententes (M14F15, M16, M19) dans son SportEasy, peu importe le club d'appartenance. Fichier `SportEasy_minimes.xlsx` fourni : 76 lignes (62 joueurs + 14 coaches), tous clubs confondus.
+   3. **Cross-check fait** (`cross_check.py`) entre SportEasy et la base MOM (23 joueurs M14 + 15 coaches éducateurs MOM = 38 personnes), matching normalisé (lowercase, sans accents, sans suffixe " - MOM", fuzzy Levenshtein) :
+      - 25 lignes SportEasy matchent une fiche MOM existante → IGNORÉES (déjà en base via OVAL-E)
+      - 50 lignes ne matchent pas → INSÉRÉES par sql/16 comme partenaires
+      - 1 zone grise (VAUTIER MOM - Nathan, typo position " - MOM") → reconnue MOM par fuzzy match, IGNORÉE
+   4. **Doctrine résolue côté coaches** : `type_personne = 'licencie_externe_partenaire'` pour TOUS (joueurs ET coaches partenaires). Distinction métier portée par `categorie_personne` ('joueur' vs 'staff'). Cohérent doctrine OVAL-E v1.4 §11.7 étendue.
+   5. **50 fiches en base** : sexe = NULL partout (colonne vide dans SportEasy), date_naissance présente 27/50, num_licence_ffr présent 15/50. `tag_verifier = TRUE` sur toutes pour identification facile lors des corrections futures. `source_creation = 'sporteasy_sar_minimes_2025-2026_v1'` pour traçabilité.
+
+   **Non-décisions reportées** : import M16 et M19 partenaires reporté à la rentrée 2026 (mêmes scripts à réutiliser, juste avec exports SportEasy M16 et M19 séparés). Côté **conv Production**.
 
 C7-g. **Passerelle OVAL-E partenaires** : canal officiel d'import automatique des effectifs partenaires d'entente, non disponible au 14 mai 2026, dépend de la FFR (côté MOM, surveiller les évolutions OVAL-E). Long terme.
 
@@ -452,9 +464,7 @@ Dossiers clés :
 6. Vérifier que `login.html` affiche bien `v1.4 chargé` dans la console et que l'envoi d'un Magic Link sur ton email aboutit sur `dashboard.html` avec session active
 
 **Travaux en attente** :
-- **Conv Production** : Phase 3 + 4.1.B + **4.1.A complète (13 mai matin)** + **4.2.A noyau (13 mai soir)** + **4.2.B RPC événements + 4.2.C wrappers JS (13 mai soir tard)** + **Étape G peuplement événements M14 (13 mai vraiment très tard)** + **Étapes K (RLS read Vague 1) + H (15 entraînements M14) + C/Phase 4.4 (widget Prochain événement)** terminées. **C7-a + C7-b livrées par conv Audits le 14 mai. C7-c livrée par conv Production le 14 mai (ALTER CHECK exécuté en prod)**. Phase 4.3 (compositions/présences) **conditionnée à 1 dernier préalable Production** :
-  - **C7-f (préalable opérationnel)** : choisir le canal d'import des fiches partenaires (Excel manuel recommandé pour démarrer).
-  - **C7-e** : la RPC `get_vivier_compo` à écrire en Phase 4.3 doit inclure les `licencie_externe_partenaire` (déjà couvert par le LEFT JOIN à `equipe_joueurs`, intégré en Phase 4.3 naturellement).
+- **Conv Production** : Phase 3 + 4.1.B + **4.1.A complète (13 mai matin)** + **4.2.A noyau (13 mai soir)** + **4.2.B RPC événements + 4.2.C wrappers JS (13 mai soir tard)** + **Étape G peuplement événements M14 (13 mai vraiment très tard)** + **Étapes K (RLS read Vague 1) + H (15 entraînements M14) + C/Phase 4.4 (widget Prochain événement)** terminées. **C7-a + C7-b livrées par conv Audits le 14 mai. C7-c + C7-f livrées par conv Production le 14 mai** : ALTER CHECK + import 50 fiches partenaires SportEasy via `sql/16-peuplement-partenaires-entente-m14-v1.sql`. **Dette C7 totalement soldée.** Phase 4.3 (compositions/présences) **DÉBLOQUÉE** — reste juste `sql/17-attaches-partenaires-entente-m14.sql` (39 attaches `equipe_joueurs` pour les joueurs partenaires, statut 'regulier', club_provenance_id = SAR) avant de pouvoir attaquer les compositions complètes d'entente. C7-e (vivier) sera couvert naturellement en Phase 4.3 par LEFT JOIN à equipe_joueurs.
 
   Alternatives possibles si Phase 4.3 reportée : dette (i) RLS write par rôle (à grouper avec C7-d et dette (l) durcissement INSERT distances_sites), ou Phase 4.4 P4-2 greeting J-N. Travaux annexes en attente :
   - (a) **Implémentation des tables modélisées** (cf. `Modelisation-Evenements-v1.1.md` §4) :
@@ -481,6 +491,8 @@ Dossiers clés :
   - (j) **Leçon doctrinale Claude (13 mai très tard) — anti-invention** : 2 inventions identifiées et corrigées en fin de session (sites adversaires "Sarre-Union" jamais existants, "16 Sites en dur dans index.html" jamais présent). Cause racine : Claude a traité ses propres notes STATE.md précédentes comme source de vérité, sans confronter Supabase/repo. **Correctif pour toute future session** : avant de citer un détail factuel (nombre, code, nom de champ/site/objet), faire un `web_fetch` sur le fichier du repo OU un DRY-RUN sur Supabase. Doctrine OVAL-E §13 (Supabase autoritatif) s'applique aussi à Claude.
   - (k) ✅ **Dette FERMÉE 13 mai 2026 fin de session — policies RLS READ pour Vague 1** : 3 policies SELECT authenticated ajoutées sur `ententes`, `equipes`, `equipe_joueurs` via `sql/13-rls-read-vague1.sql`. Le client JS peut désormais lire ces tables en direct (HTTP 406 résolu). `personnes` reste volontairement accessible uniquement via RPC (doctrine RGPD).
   - (l) **🆕 Dette ouverte (13 mai fin de session) — durcissement RLS WRITE distances_sites** : découvert pendant l'inventaire RLS, la table `distances_sites` autorise actuellement INSERT/UPDATE à tout `authenticated` (pas seulement admin). À regrouper avec dette (i) dans la session RLS write par rôle dédiée.
+  - (m) **🆕 Dette ouverte (14 mai 2026) — Correction post-import ASCS** : les 50 fiches partenaires importées via `sql/16-peuplement-partenaires-entente-m14-v1.sql` sont TOUTES taggées `club_principal_id = SAR` car SportEasy ne distingue pas le club d'appartenance et seuls 4 suffixes " - MOM" étaient présents (aucun " - ASCS"). Manu confirmera ultérieurement la liste exacte des joueurs ASCS dans l'entente M14, puis on fera un UPDATE ciblé `club_principal_id = ASCS` sur les fiches concernées. Filtre facile via `WHERE source_creation = 'sporteasy_sar_minimes_2025-2026_v1' AND tag_verifier = TRUE`. À terme : négocier un export OVAL-E SAR avec la mention du club partenaire (dette long terme C7-g qui converge).
+  - (n) **🆕 Dette ouverte (14 mai 2026) — Complétion sexe + date_naissance partenaires** : sur les 50 fiches partenaires, 50/50 ont `sexe = NULL` (colonne vide dans SportEasy) et environ 23/50 ont `date_naissance = NULL`. Pour combler, utiliser le gabarit Excel `gabarit-effectif-partenaire-entente-mom-v1.xlsx` livré le 14 mai et le faire renvoyer aux coachs SAR/ASCS avec UNIQUEMENT ces 2 champs à compléter (mode "complément" plutôt que "saisie complète"). À regrouper avec un script `sql/peuplement-partenaires-complement-sexe-date.sql` ou un script JS d'import quand les retours arrivent.
 
   **Plan de découpage Phase 4 acté (12 mai 2026 soir, post-arbitrage Option C ; Phase 4.1.A finie 13 mai matin ; Phase 4.2.A finie 13 mai soir)** :
   - **Phase 4.1.A** ✅ **TERMINÉE 13 mai 2026 matin** : peuplement Vague 1 (11 ententes + 11 équipes + 23 attaches M14 MOM en `regulier`) via `sql/06-peuplement-vague1-equipes.sql`. **Phase 4.1.A bis** : K2 ÉQUIPES dynamique via `sql/09-rpc-equipes.sql` (RPC `count_equipes_actives`) + `js/dashboard-stats.js` v2.1 + `index.html` patché (`id="stat-equipes"`). Ferme partie ÉQUIPES de dette #5. SAR (37) et ASCS (2) M14 attaches reportées à Phase 4.3 après dette C7.
