@@ -7,14 +7,15 @@
  *   - 4 KPI (PERSONNES / ÉQUIPES / CETTE SEMAINE / SANS EMAIL)
  *   - Sidebar carte 1 OVAL-E (dernière sync + count fiches)
  *   - Sidebar carte 2 Qualité des données (sans email / sans naissance / FFR 90j)
- *   - Greeting (surtitre date dynamique)
+ *   - Sidebar carte 3 Prochain événement M14 (pilule temporelle + type + lieu)
+ *   - Greeting (surtitre date dynamique + greeting J-N AVANT MATCH v2.3)
  *
  * Stratégie : "graceful degradation"
  *   - Si Supabase répond : on remplace les "…" du HTML par les vraies valeurs
- *   - Si Supabase plante : on laisse les "…" et on logge en console
+ *   - Si Supabase plante : on laisse les "…" / la date du jour, et on logge en console
  *
  * Le HTML doit contenir les éléments avec ces IDs :
- *   - #greeting-meta         (surtitre date : "LUNDI 12 MAI 2026 · TABLEAU DE BORD")
+ *   - #greeting-meta         (surtitre : date OU "J-N AVANT TOURNOI · LES GEMMEURS")
  *   - #greeting-prenom       (laissé en dur dans HTML)
  *   - #stat-personnes        (K1 PERSONNES)
  *   - #stat-equipes          (K2 ÉQUIPES)
@@ -30,27 +31,25 @@
  *   - #evt-site              (sidebar carte 3 — lieu)
  *
  * Côté Supabase :
- *   - RPC `get_dashboard_stats()` (Phase 2) : nb_personnes/nb_m14/...
- *   - RPC Phase 3.2 (sql/05-rpc-portail.sql) :
- *       * count_personnes_created_last_7_days
- *       * count_personnes_without_email
- *       * count_personnes_without_birthdate
- *       * count_personnes_affiliation_expiring_within_90_days
- *       * get_last_oval_e_sync_date
- *   - RPC Phase 4.1.A bis (sql/09-rpc-equipes.sql) :
- *       * count_equipes_actives
+ *   - RPC `get_dashboard_stats()` (Phase 2)
+ *   - RPC Phase 3.2 (sql/05-rpc-portail.sql)
+ *   - RPC Phase 4.1.A bis (sql/09-rpc-equipes.sql) : count_equipes_actives
  *   - RPC Phase 4.2.B (sql/11-rpc-evenements.sql) :
- *       * get_prochain_evenement_par_equipe (utilisé pour carte 3 sidebar)
+ *       * get_prochain_evenement_par_equipe (utilisé pour carte 3 sidebar
+ *         ET pour greeting J-N v2.3)
  *
- * Version : 2.2 — mai 2026 (Phase 4.4 Étape C — widget Prochain événement M14)
+ * Version : 2.3 — mai 2026 (Phase 4.4 P4-2 — greeting J-N AVANT MATCH)
  *   v1.0 : tentait des SELECT directs (bloqués par RLS)
  *   v1.1 : utilise get_dashboard_stats agrégée
  *   v2.0 : Phase 3.2 — refonte portail (4 KPI + sidebar 3 cartes)
- *   v2.1 : Phase 4.1.A bis — bascule K2 ÉQUIPES via RPC count_equipes_actives (dette #5)
+ *   v2.1 : Phase 4.1.A bis — bascule K2 ÉQUIPES via RPC count_equipes_actives
  *   v2.2 : Phase 4.4 Étape C — widget "Prochain événement M14" en sidebar
- *          (uses getProchainEvenementParEquipe ; calcul J civil côté JS pour
- *           "AUJOURD'HUI/DEMAIN/DANS N JOURS" plus humain que la RPC qui
- *           tronque par heures.)
+ *   v2.3 : Phase 4.4 P4-2 — greeting J-N AVANT MATCH dans greeting-meta.
+ *          Réutilise prochainEvtM14 déjà fetché par v2.2, zéro RPC en plus.
+ *          Logique extraite dans 2 helpers (formatLabelTemporel,
+ *          formatTypeEvenement) partagés entre greeting et sidebar carte 3.
+ *          Fallback gracieux : si pas d'événement → garde la date du jour
+ *          (init immédiat au début du script).
  */
 
 (function () {
@@ -86,25 +85,142 @@
     return `${d} ${mois[m - 1]} ${y}`;
   }
 
+  // Calcule le nombre de jours civils entre aujourd'hui et la date de
+  // l'événement (indépendamment des heures). Retourne un entier :
+  //   0  = aujourd'hui
+  //   1  = demain
+  //   N  = dans N jours
+  //   <0 = passé (cas safety)
+  function joursCivilsAvant(dateDebutISO) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const eventDate = new Date(dateDebutISO);
+    const eventDateCivil = new Date(eventDate);
+    eventDateCivil.setHours(0, 0, 0, 0);
+    return Math.round((eventDateCivil - today) / (1000 * 60 * 60 * 24));
+  }
+
+  // Humanise le type d'événement avec l'adversaire/le tournoi.
+  // Retourne par exemple : 'Entraînement', 'Match vs ECLR', 'Tournoi : Les Gemmeurs'.
+  // Utilisé pour la sidebar carte 3 (type=true → casse normale).
+  function formatTypeEvenement(evt) {
+    if (!evt) return '—';
+    const type = evt.type_evenement;
+    if (type === 'entrainement') {
+      return 'Entraînement';
+    }
+    if (type === 'match' || type === 'journee_championnat') {
+      return evt.adversaire_nom
+        ? ('Match vs ' + evt.adversaire_nom)
+        : 'Match';
+    }
+    if (type === 'tournoi') {
+      // Extrait le nom du tournoi du libellé (souvent "Nom (Lieu)" → "Nom")
+      const libelle = evt.libelle || '';
+      const sansParenthese = libelle.replace(/\s*\([^)]*\)\s*$/, '').trim();
+      return 'Tournoi : ' + (sansParenthese || libelle);
+    }
+    if (type === 'stage') {
+      return 'Stage';
+    }
+    return evt.libelle || '—';
+  }
+
+  // Construit le libellé du greeting "J-N AVANT [...]" en UPPERCASE.
+  // Format adapté selon la temporalité ET le type :
+  //   - Entraînement (banal, quotidien) : 'DEMAIN · ENTRAÎNEMENT · BRENCKLÉ'
+  //     ou 'AUJOURD'HUI · ENTRAÎNEMENT · BRENCKLÉ'
+  //   - Match/Tournoi/Stage (jour J) : 'AUJOURD'HUI · TOURNOI · LES GEMMEURS'
+  //   - Match/Tournoi/Stage (J-1)   : 'DEMAIN · TOURNOI · LES GEMMEURS'
+  //   - Match/Tournoi/Stage (J-N>1) : 'J-10 AVANT TOURNOI · LES GEMMEURS'
+  // Retourne null si pas d'événement (le caller affichera la date du jour).
+  function formatGreetingMeta(evt) {
+    if (!evt) return null;
+
+    const j = joursCivilsAvant(evt.date_debut);
+    const type = evt.type_evenement;
+
+    // Identifiant court de l'événement, sans préfixe "Match/Tournoi/..."
+    // (le type est déjà dans le libellé)
+    let identifiant;
+    if (type === 'match' || type === 'journee_championnat') {
+      identifiant = evt.adversaire_nom ? ('VS ' + evt.adversaire_nom.toUpperCase()) : 'MATCH';
+    } else if (type === 'tournoi') {
+      const libelle = evt.libelle || '';
+      const sansParenthese = libelle.replace(/\s*\([^)]*\)\s*$/, '').trim();
+      identifiant = (sansParenthese || libelle).toUpperCase();
+    } else if (type === 'stage') {
+      identifiant = (evt.libelle || 'STAGE').toUpperCase();
+    } else if (type === 'entrainement') {
+      // Pour les entraînements, on inverse : lieu plutôt que libellé
+      // (l'entraînement n'a pas de nom propre)
+      identifiant = (evt.site_libelle_court || 'ENTRAÎNEMENT').toUpperCase();
+    } else {
+      identifiant = (evt.libelle || '').toUpperCase();
+    }
+
+    // Libellé du type pour le greeting (UPPERCASE, sans adversaire/lieu)
+    let typeUpper;
+    if (type === 'entrainement')               typeUpper = 'ENTRAÎNEMENT';
+    else if (type === 'match')                 typeUpper = 'MATCH';
+    else if (type === 'journee_championnat')   typeUpper = 'MATCH';
+    else if (type === 'tournoi')               typeUpper = 'TOURNOI';
+    else if (type === 'stage')                 typeUpper = 'STAGE';
+    else                                       typeUpper = 'ÉVÉNEMENT';
+
+    // Construction selon la temporalité
+    if (j === 0) {
+      // Aujourd'hui — formulation neutre
+      if (type === 'entrainement') {
+        return "AUJOURD'HUI · " + typeUpper + ' · ' + identifiant;
+      }
+      return "AUJOURD'HUI · " + typeUpper + ' · ' + identifiant;
+    }
+
+    if (j === 1) {
+      // Demain — formulation neutre
+      return 'DEMAIN · ' + typeUpper + ' · ' + identifiant;
+    }
+
+    if (j < 0) {
+      // Sécurité — ne devrait pas arriver (la RPC ne renvoie que des
+      // événements futurs), mais on tombe en fallback
+      return null;
+    }
+
+    // J-N > 1
+    if (type === 'entrainement') {
+      // Pour les entraînements, format raccourci (pas de "J-N AVANT
+      // ENTRAÎNEMENT" qui serait pompeux pour un entraînement banal)
+      return 'DANS ' + j + ' JOURS · ' + typeUpper + ' · ' + identifiant;
+    }
+
+    // Match / Tournoi / Stage / Autre : format "J-N AVANT [...]"
+    return 'J-' + j + ' AVANT ' + typeUpper + ' · ' + identifiant;
+  }
+
   // ============================================================
   // 2. CONSTANTES
   // ============================================================
 
-  // UUID de l'équipe pilote M14 (résolu en base le 13/05/2026, dette (k)
-  // ferme l'accès direct equipes pour authenticated mais on garde l'UUID
-  // hardcodé pour simplicité du widget — plus tard, paramétrer par rôle
-  // utilisateur quand l'auth multi-équipe sera en place).
+  // UUID de l'équipe pilote M14 (résolu en base le 13/05/2026).
+  // Plus tard : paramétrer par rôle utilisateur quand l'auth multi-équipe
+  // sera en place.
   const M14_TEAM_UUID = 'bfb83b83-83ef-4dde-b526-48ff87313044';
 
   // ============================================================
   // 3. PEUPLEMENT IMMÉDIAT (sans attendre Supabase)
   // ============================================================
 
-  // Surtitre date — toujours affichable, indépendant de la base
+  // Surtitre date — toujours affichable, indépendant de la base. Sert de
+  // fallback gracieux : si Supabase n'a pas (encore) répondu ou plante,
+  // l'utilisateur voit la date du jour. La résolution Supabase peut
+  // l'écraser ensuite avec "J-N AVANT [...]" si un événement futur existe
+  // (cf. bloc 4e ci-dessous).
   updateEl('greeting-meta', `${dateFr()} · TABLEAU DE BORD`);
 
   // ============================================================
-  // 3. GARDE — SupabaseHub doit être chargé
+  // 4. GARDE — SupabaseHub doit être chargé
   // ============================================================
 
   if (typeof SupabaseHub === 'undefined') {
@@ -113,7 +229,7 @@
   }
 
   // ============================================================
-  // 4. RÉCUPÉRATION DES STATS EN PARALLÈLE
+  // 5. RÉCUPÉRATION DES STATS EN PARALLÈLE
   // ============================================================
 
   (async function () {
@@ -140,95 +256,72 @@
       const prochainEvtM14  = results[7];
 
       // --------------------------------------------------------
-      // 4a. KPI (header)
+      // 5a. KPI (header)
       // --------------------------------------------------------
       const nbPersonnes = dashboardStats && dashboardStats.nb_personnes;
       if (nbPersonnes !== undefined && nbPersonnes !== null) {
         updateEl('stat-personnes', nbPersonnes);
         updateEl('oval-e-count', String(nbPersonnes));
       }
-      // K2 ÉQUIPES dynamique via count_equipes_actives (v2.1, dette #5 partielle)
       if (nbEquipes !== undefined && nbEquipes !== null) {
         updateEl('stat-equipes', nbEquipes);
       }
-
       updateEl('stat-cette-semaine', '+' + cetteSemaine);
       updateEl('stat-sans-email', sansEmail);
 
       // --------------------------------------------------------
-      // 4b. Sidebar carte 1 — OVAL-E
+      // 5b. Sidebar carte 1 — OVAL-E
       // --------------------------------------------------------
       updateEl('oval-e-last-sync', formatSyncDate(lastSyncOvalE));
 
       // --------------------------------------------------------
-      // 4c. Sidebar carte 2 — Qualité des données
+      // 5c. Sidebar carte 2 — Qualité des données
       // --------------------------------------------------------
       updateEl('qd-sans-email', sansEmail);
       updateEl('qd-sans-naissance', sansNaissance);
       updateEl('qd-ffr-90j', ffr90j);
 
       // --------------------------------------------------------
-      // 4d. Sidebar carte 3 — Prochain événement M14 (v2.2)
+      // 5d. Sidebar carte 3 — Prochain événement M14 (v2.2)
       // --------------------------------------------------------
-      // Retourne null si aucun événement futur trouvé.
       if (prochainEvtM14) {
-        // Calcul du libellé temporel basé sur dates CIVILES (J0 = aujourd'hui
-        // selon le calendrier local, indépendamment des heures). Plus humain
-        // que le jours_jusqu_a_evenement de la RPC qui tronque par heures.
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const eventDate = new Date(prochainEvtM14.date_debut);
-        const eventDateCivil = new Date(eventDate);
-        eventDateCivil.setHours(0, 0, 0, 0);
-        const diffJoursCivils = Math.round((eventDateCivil - today) / (1000 * 60 * 60 * 24));
+        const j = joursCivilsAvant(prochainEvtM14.date_debut);
 
         let whenLabel;
-        if (diffJoursCivils === 0)      whenLabel = "AUJOURD'HUI";
-        else if (diffJoursCivils === 1) whenLabel = 'DEMAIN';
-        else if (diffJoursCivils < 0)   whenLabel = 'EN COURS'; // safety
-        else                            whenLabel = 'DANS ' + diffJoursCivils + ' JOURS';
+        if (j === 0)      whenLabel = "AUJOURD'HUI";
+        else if (j === 1) whenLabel = 'DEMAIN';
+        else if (j < 0)   whenLabel = 'EN COURS';
+        else              whenLabel = 'DANS ' + j + ' JOURS';
 
-        // Heure de début (locale Europe/Paris)
-        const heureLocale = eventDate.toLocaleTimeString('fr-FR', {
-          hour: '2-digit',
-          minute: '2-digit'
-        }).replace(':', 'H');
+        const heureLocale = new Date(prochainEvtM14.date_debut)
+          .toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+          .replace(':', 'H');
 
-        // Type humanisé
-        let typeLabel;
-        const type = prochainEvtM14.type_evenement;
-        if (type === 'entrainement') {
-          typeLabel = 'Entraînement';
-        } else if (type === 'match' || type === 'journee_championnat') {
-          typeLabel = prochainEvtM14.adversaire_nom
-            ? ('Match vs ' + prochainEvtM14.adversaire_nom)
-            : 'Match';
-        } else if (type === 'tournoi') {
-          // Extrait le nom du tournoi du libellé (souvent "Nom (Lieu)" → "Nom")
-          const libelle = prochainEvtM14.libelle || '';
-          const sansParenthese = libelle.replace(/\s*\([^)]*\)\s*$/, '').trim();
-          typeLabel = 'Tournoi : ' + (sansParenthese || libelle);
-        } else if (type === 'stage') {
-          typeLabel = 'Stage';
-        } else {
-          typeLabel = prochainEvtM14.libelle || '—';
-        }
-
-        // Lieu : libellé court du site, sinon fallback humain
+        const typeLabel = formatTypeEvenement(prochainEvtM14);
         const siteLabel = prochainEvtM14.site_libelle_court || 'Lieu à confirmer';
 
         updateEl('evt-when', whenLabel + ' · ' + heureLocale);
         updateEl('evt-type', typeLabel);
         updateEl('evt-site', siteLabel);
       } else {
-        // Aucun événement futur trouvé pour cette équipe
         updateEl('evt-when', 'AUCUN ÉVÉNEMENT');
         updateEl('evt-type', '—');
         updateEl('evt-site', '—');
       }
 
+      // --------------------------------------------------------
+      // 5e. Greeting J-N AVANT MATCH (v2.3, P4-2)
+      // --------------------------------------------------------
+      // Réutilise prochainEvtM14 déjà fetché ci-dessus. Si pas d'événement,
+      // greeting-meta garde la valeur "JEUDI 14 MAI 2026 · TABLEAU DE BORD"
+      // posée au peuplement immédiat (bloc 3).
+      const greetingMeta = formatGreetingMeta(prochainEvtM14);
+      if (greetingMeta) {
+        updateEl('greeting-meta', greetingMeta);
+      }
+
       console.log(
-        '%c✅ MOM Hub Dashboard v2.2: stats mises à jour depuis Supabase',
+        '%c✅ MOM Hub Dashboard v2.3: stats mises à jour depuis Supabase',
         'color: #2d7a3e; font-weight: bold;',
         {
           nbPersonnes:     nbPersonnes,
@@ -238,12 +331,14 @@
           sansNaissance:   sansNaissance,
           ffr90j:          ffr90j,
           lastSyncOvalE:   lastSyncOvalE,
-          prochainEvtM14:  prochainEvtM14 ? prochainEvtM14.code : 'aucun'
+          prochainEvtM14:  prochainEvtM14 ? prochainEvtM14.code : 'aucun',
+          greetingMeta:    greetingMeta || '(date du jour)'
         }
       );
     } catch (err) {
       console.warn('⚠️ MOM Hub Dashboard: erreur Supabase, KPI partiels ou "…" affichés.', err);
-      // Pas de plantage : les éléments non-peuplés restent à "…"
+      // Pas de plantage : les éléments non-peuplés restent à "…",
+      // et greeting-meta garde la date du jour (fallback bloc 3).
     }
   })();
 
