@@ -6,7 +6,7 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
- * Version : 3.3 — Phase 4.4 étape 6c-2/6c-3 (13 mai 2026)
+ * Version : 3.4 — Phase 4.4 étape 6c-2/6c-3 (13 mai 2026)
  *   v3.0 : Vue Liste + Popover Picker
  *   v3.1 : Fix mapping colonnes table postes Supabase :
  *           - poste.uuid → poste.id
@@ -25,6 +25,15 @@
  *           - En V1 M14, la RPC get_vivier_compo filtre déjà sur M14
  *             uniquement, donc le warning ne s'affichera jamais — c'est OK,
  *             le code reste prêt pour V2 multi-équipes
+ *   v3.4 : Fix recherche popover à l'envers :
+ *           - À chaque frappe, renderPopover() était appelé → re-render
+ *             complet du popover → input détruit/recréé → curseur replacé
+ *             en position 0 → "obi" tapé donnait "ibo" affiché
+ *           - Refactor : extraction des items de liste dans 2 helpers
+ *             (popoverListItemsSlotVide, popoverListItemsJoueurVivier)
+ *           - Nouvelle fonction refreshPopoverList() qui met à jour
+ *             uniquement le <ul class="popover__list"> + recâble les clics
+ *           - Handler input remplace renderPopover() par refreshPopoverList()
  */
 
 (function () {
@@ -508,7 +517,9 @@
     bindPopoverHandlers();
   }
 
-  function renderPopoverSlotVide() {
+  // v3.4 : helper extrait pour pouvoir rafraîchir uniquement la liste
+  // sans détruire l'input search (évite l'effet "à l'envers")
+  function popoverListItemsSlotVide() {
     const pv = State.popover;
     const search = (pv.search || '').toLowerCase();
     const placedIds = joueursDejaPlaces();
@@ -517,23 +528,7 @@
       .filter(j => !search || ((j.nom || '') + ' ' + (j.prenom || '')).toLowerCase().includes(search))
       .sort(compareJoueurs);
 
-    let titre;
-    if (pv.role === 'titulaire' && pv.posteId) {
-      const poste = getPoste(pv.posteId);
-      titre = poste ? ('Poste ' + poste.numero_xv + ' — ' + (poste.libelle_long || poste.libelle_court)) : 'Poste inconnu';
-    } else {
-      titre = 'Remplaçant n°' + (pv.numeroMaillot || '?');
-    }
-
-    let html = '<div class="popover" role="dialog" aria-label="Choisir un joueur">';
-    html +=   '<div class="popover__header">';
-    html +=     '<h3 class="popover__title">' + escapeHtml(titre) + '</h3>';
-    html +=     '<button type="button" class="popover__close" data-action="close" aria-label="Fermer">×</button>';
-    html +=   '</div>';
-    html +=   '<div class="popover__search">';
-    html +=     '<input type="text" class="popover__input" id="popover-search" placeholder="Rechercher un joueur…" value="' + escapeHtml(pv.search || '') + '" autocomplete="off">';
-    html +=   '</div>';
-    html +=   '<ul class="popover__list">';
+    let html = '';
     if (candidates.length === 0) {
       html += '<li class="popover__empty">Aucun joueur disponible.</li>';
     } else {
@@ -552,30 +547,43 @@
         html += '</li>';
       }
     }
+    return html;
+  }
+
+  function renderPopoverSlotVide() {
+    const pv = State.popover;
+    let titre;
+    if (pv.role === 'titulaire' && pv.posteId) {
+      const poste = getPoste(pv.posteId);
+      titre = poste ? ('Poste ' + poste.numero_xv + ' — ' + (poste.libelle_long || poste.libelle_court)) : 'Poste inconnu';
+    } else {
+      titre = 'Remplaçant n°' + (pv.numeroMaillot || '?');
+    }
+
+    let html = '<div class="popover" role="dialog" aria-label="Choisir un joueur">';
+    html +=   '<div class="popover__header">';
+    html +=     '<h3 class="popover__title">' + escapeHtml(titre) + '</h3>';
+    html +=     '<button type="button" class="popover__close" data-action="close" aria-label="Fermer">×</button>';
+    html +=   '</div>';
+    html +=   '<div class="popover__search">';
+    html +=     '<input type="text" class="popover__input" id="popover-search" placeholder="Rechercher un joueur…" value="' + escapeHtml(pv.search || '') + '" autocomplete="off">';
+    html +=   '</div>';
+    html +=   '<ul class="popover__list">';
+    html +=     popoverListItemsSlotVide();
     html +=   '</ul>';
     html += '</div>';
     return html;
   }
 
-  function renderPopoverJoueurVivier() {
+  // v3.4 : helper extrait pour rafraîchissement ciblé (cf slot-vide)
+  function popoverListItemsJoueurVivier() {
     const pv = State.popover;
-    const joueur = getJoueurVivier(pv.joueurId);
-    if (!joueur) return '';
     const search = (pv.search || '').toLowerCase();
     const postesLibres = postesVides().filter(p =>
       !search || (((p.libelle_long || '') + ' ' + (p.libelle_court || '') + ' ' + (p.code || '')).toLowerCase().includes(search))
     );
 
-    let html = '<div class="popover" role="dialog" aria-label="Affecter à un poste">';
-    html +=   '<div class="popover__header">';
-    html +=     '<h3 class="popover__title">' + escapeHtml((joueur.nom || '') + ' ' + (joueur.prenom || '')) + '</h3>';
-    html +=     '<button type="button" class="popover__close" data-action="close" aria-label="Fermer">×</button>';
-    html +=   '</div>';
-    html +=   '<p class="popover__subtitle">Choisir un poste libre ou la zone des remplaçants.</p>';
-    html +=   '<div class="popover__search">';
-    html +=     '<input type="text" class="popover__input" id="popover-search" placeholder="Rechercher un poste…" value="' + escapeHtml(pv.search || '') + '" autocomplete="off">';
-    html +=   '</div>';
-    html +=   '<ul class="popover__list">';
+    let html = '';
     if (postesLibres.length === 0) {
       html += '<li class="popover__empty">Tous les postes XV sont déjà occupés.</li>';
     } else {
@@ -590,6 +598,25 @@
     html +=   '<span class="slot__num">R</span>';
     html +=   '<span class="popover__poste-libelle">→ Mettre dans les remplaçants</span>';
     html += '</li>';
+    return html;
+  }
+
+  function renderPopoverJoueurVivier() {
+    const pv = State.popover;
+    const joueur = getJoueurVivier(pv.joueurId);
+    if (!joueur) return '';
+
+    let html = '<div class="popover" role="dialog" aria-label="Affecter à un poste">';
+    html +=   '<div class="popover__header">';
+    html +=     '<h3 class="popover__title">' + escapeHtml((joueur.nom || '') + ' ' + (joueur.prenom || '')) + '</h3>';
+    html +=     '<button type="button" class="popover__close" data-action="close" aria-label="Fermer">×</button>';
+    html +=   '</div>';
+    html +=   '<p class="popover__subtitle">Choisir un poste libre ou la zone des remplaçants.</p>';
+    html +=   '<div class="popover__search">';
+    html +=     '<input type="text" class="popover__input" id="popover-search" placeholder="Rechercher un poste…" value="' + escapeHtml(pv.search || '') + '" autocomplete="off">';
+    html +=   '</div>';
+    html +=   '<ul class="popover__list">';
+    html +=     popoverListItemsJoueurVivier();
     html +=   '</ul>';
     html += '</div>';
     return html;
@@ -606,9 +633,13 @@
     const input = root.querySelector('#popover-search');
     if (input) {
       input.focus();
+      // v3.4 : ne pas re-render tout le popover à chaque frappe, sinon
+      // l'input est détruit/recréé et le curseur retourne en position 0
+      // (effet "à l'envers" : 'obi' devient 'ibo'). On rafraîchit
+      // uniquement la liste de résultats.
       input.addEventListener('input', function (e) {
         if (State.popover) State.popover.search = e.target.value;
-        renderPopover();
+        refreshPopoverList();
       });
     }
 
@@ -632,6 +663,30 @@
       if (root.contains(e.target)) return;
       closePopover();
     });
+  }
+
+  // v3.4 : rafraîchir uniquement la liste de résultats sans toucher
+  // à l'input de recherche. Évite que le curseur retourne en position 0
+  // à chaque frappe ("obi" devenait "ibo").
+  function refreshPopoverList() {
+    const root = DOM.popoverRoot();
+    if (!root || !State.popover) return;
+    const ul = root.querySelector('.popover__list');
+    if (!ul) return;
+
+    if (State.popover.mode === 'slot-vide') {
+      ul.innerHTML = popoverListItemsSlotVide();
+      ul.querySelectorAll('.popover__item[data-joueur-id]').forEach(li =>
+        li.addEventListener('click', function (e) { e.stopPropagation(); onPickJoueurPourSlot(li.dataset.joueurId); })
+      );
+    } else if (State.popover.mode === 'joueur-vivier') {
+      ul.innerHTML = popoverListItemsJoueurVivier();
+      ul.querySelectorAll('.popover__item[data-poste-id]').forEach(li =>
+        li.addEventListener('click', function (e) { e.stopPropagation(); onPickPostePourJoueur(li.dataset.posteId); })
+      );
+      const rempEl = ul.querySelector('.popover__item--remp');
+      if (rempEl) rempEl.addEventListener('click', function (e) { e.stopPropagation(); onPickPostePourJoueur(null); });
+    }
   }
 
   // ============================================================
@@ -874,7 +929,7 @@
     bindPopoverOutsideClick();
 
     console.log(
-      '%c🏉 Compositions Editor v3.3 (étape 6c-2 + 6c-3) chargé',
+      '%c🏉 Compositions Editor v3.4 (étape 6c-2 + 6c-3) chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         evenements: State.evenements.length,
