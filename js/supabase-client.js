@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.5 — mai 2026
+ * Version : 1.6 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -32,6 +32,10 @@
  *   v1.5 : wrappers Phase 4.2.C pour les RPC événements —
  *          getEvenementsAVenir(equipeId, joursAVenir),
  *          getProchainEvenementParEquipe(equipeId).
+ *   v1.6 : wrapper Phase 4.3 pour la RPC vivier — getVivierCompo(equipeId).
+ *          Ferme la dette (o) du STATE.md (préalable à Phase 4.4 UI éditeur
+ *          de compo). Pattern identique à v1.5 : fallback gracieux sur
+ *          tableau vide si erreur réseau / RLS / permissions.
  */
 
 (function (global) {
@@ -559,6 +563,54 @@
         return null;
       }
       return Array.isArray(data) && data.length > 0 ? data[0] : null;
+    },
+
+    // ============================================================
+    // PHASE 4.3 — RPC vivier compo (sql/21-rpc-vivier-compo.sql)
+    // ============================================================
+
+    /**
+     * Vivier de joueurs piochables pour composer une équipe sur un
+     * événement donné.
+     * Wrapper de get_vivier_compo() (Phase 4.3, dette o STATE.md).
+     * Préalable à Phase 4.4 UI éditeur de compo.
+     *
+     * Logique côté Supabase :
+     *   - Pivot via equipes.entente_id → ententes.categorie_id
+     *   - Inclut : joueurs MOM de la catégorie nominale + F-15 intégrées
+     *     pour M14 + joueurs partenaires SAR/ASCS de l'entente
+     *   - LEFT JOIN à equipe_joueurs pour le statut d'attache
+     *     (regulier / renfort_temporaire / en_transition / NULL)
+     *   - Tri : réguliers > renforts > en_transition > non-attachés,
+     *     alphabétique à l'intérieur de chaque groupe
+     *
+     * Chaque ligne retournée comporte 15 colonnes :
+     *   - joueur_id, nom, prenom, sexe, date_naissance
+     *   - categorie_id, categorie_libelle_court
+     *   - club_principal_id, club_principal_nom_court
+     *   - type_personne
+     *   - f15_integree (boolean)
+     *   - est_partenaire_entente (boolean, computed)
+     *   - statut_attache (regulier / renfort_temporaire / en_transition / null)
+     *   - niveau_profil (Performance / Développement / Initiation)
+     *   - date_affectation
+     *
+     * @param {string} equipeId UUID de l'équipe (obligatoire)
+     * @returns {Promise<Array>} tableau de joueurs piochables, [] si erreur
+     */
+    async getVivierCompo(equipeId) {
+      if (!equipeId) {
+        console.error('MOM Hub: getVivierCompo() requiert un equipeId');
+        return [];
+      }
+      const { data, error } = await client.rpc('get_vivier_compo', {
+        p_equipe_id: equipeId
+      });
+      if (error) {
+        console.error('MOM Hub: getVivierCompo() error', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
     }
 
   };
@@ -570,7 +622,7 @@
 
   // Trace amicale dans la console
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.5 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.6 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
