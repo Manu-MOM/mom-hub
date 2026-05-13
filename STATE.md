@@ -3,7 +3,7 @@
 > **Document de référence opérationnel.** À jour à la racine du repo, mis à jour à chaque fin de session significative.
 > Sert de point de reprise universel : toute personne (ou tout Claude) qui ouvre ce fichier doit pouvoir reprendre le travail sans question.
 
-**Dernière mise à jour : 14 mai 2026 — C7 totalement soldée. C7-a + C7-b livrées (Audits) + C7-c livrée (Production, ALTER CHECK) + C7-f livrée (Production, import SportEasy → 50 fiches partenaires en base via `sql/16-peuplement-partenaires-entente-m14-v1.sql`). 2 nouvelles dettes ouvertes par l'import : (m) correction post-import ASCS et (n) complétion sexe + date_naissance. Phase 4.3 (compositions/présences) DÉBLOQUÉE — prête à démarrer à la prochaine session après commit sql/17 (39 attaches `equipe_joueurs` pour les joueurs partenaires).**
+**Dernière mise à jour : 14 mai 2026 (soir) — Phase 4.3 LIVRÉE.** Les 3 tables `compositions` + `composition_joueurs` + `presences` créées et leurs contraintes validées. RPC `get_vivier_compo` opérationnelle (smoke test validé : 63 joueurs / 62 réguliers / 39 partenaires / 8 F-15 / 1 non-attaché côté MOM). 5 nouveaux scripts SQL (sql/17, sql/17b, sql/18, sql/19, sql/21). Dette M-1 (ALTER personnes `bloc_5_categorie_surclassement_id`) toujours ouverte — RPC vivier comporte un TODO M-1 commenté. Nouvelle dette mineure (o) : test E2E SQL reporté à Phase 4.4 (sera couvert par l'éditeur de compo UI).
 
 ---
 
@@ -171,6 +171,27 @@ Détails techniques :
 - **Test prod validé visuellement** (screenshot Manu) : la carte affiche `[DEMAIN · 14H00]` / `Type : Entraînement` / `Lieu : Brencklé` au soir du 12 mai 2026 (pour l'entraînement du 13 mai 14h). Le portail est désormais à **4 sources dynamiques** (4 KPI + 3 cartes sidebar fonctionnelles, dont la nouvelle carte événement).
 - **Phase 4.4 (UI portail) TERMINÉE** pour la partie "widget prochain événement". La partie "greeting J-N" (P4-2) reste à faire dans une session future si besoin.
 - UUID M14 hardcodé pour démarrer ; à paramétrer par rôle utilisateur quand l'auth multi-équipe sera étendue.
+
+### ✅ Phase 4.3 — Compositions + présences + vivier (FAIT — 14 mai 2026 soir)
+
+Backend Phase 4.3 entièrement livré. 5 scripts SQL exécutés en prod :
+
+- **`sql/17-attaches-partenaires-entente-m14.sql`** : 39 attaches `equipe_joueurs` pour les joueurs partenaires SAR/ASCS importés via sql/16. Statut `regulier`, `club_provenance_id = SAR` (la distinction ASCS suivra via dette (m)). Vérif post-INSERT : 23 MOM + 39 partenaires = 62 attaches actives sur M14 EQ1.
+- **`sql/17b-fix-categorie-partenaires.sql`** : correctif découvert au smoke test de sql/21. Les 50 fiches importées via sql/16 avaient `categorie_id = NULL` (export SportEasy ne fournit pas la catégorie d'âge). UPDATE des 39 joueurs partenaires vers `categorie_id = M14`. Les 11 staff/coaches partenaires restent à NULL (cohérent métier : un encadrant n'a pas de catégorie d'âge propre).
+- **`sql/18-compositions.sql`** : tables `compositions` (11 colonnes, états `brouillon`/`validee`/`jouee`, index unique partiel `est_active=TRUE` par (event, côté), trigger `set_updated_at_compositions`) + `composition_joueurs` (11 colonnes, FK CASCADE depuis compositions, FK personnes pour `joueur_id`, index unique partiel sur titulaires, UNIQUE per compo). RLS SELECT authenticated sur les 2 tables.
+- **`sql/19-presences.sql`** : table `presences` (11 colonnes, UNIQUE par event/personne, lien optionnel `composition_joueur_id` avec ON DELETE SET NULL, statuts `present`/`absent`/`present_partiel`). Couvre joueurs ET encadrants via `role_a_l_evenement`. Pas de table convocations (SportEasy externe).
+- **`sql/21-rpc-vivier-compo.sql`** : RPC `get_vivier_compo(p_equipe_id UUID)` retourne 15 colonnes par joueur (UUIDs + libellés humains + flags computed). Pivot via `equipes.entente_id → ententes.categorie_id`, LEFT JOIN `equipe_joueurs` pour le statut d'attache, inclut F-15 intégrées si cible = M14, inclut naturellement les partenaires d'entente via leur `categorie_id`. TODO M-1 commenté pour les surclassés officiels. SECURITY DEFINER, authenticated-only.
+
+**Décisions doctrinales prises (déléguées par Manu)** :
+- États `compositions` : `brouillon`/`validee`/`jouee` (fidélité doc v1.1 §4.3, pas le triplet `creation/validee/archive` un temps évoqué).
+- **sql/20 (M-1 ALTER personnes) reporté** : structure exacte des colonnes `bloc_5_*` à confirmer côté Manu. M-1 reste dette ouverte, RPC vivier sans le filtre surclassés (TODO commenté).
+- **Transition automatique `evenements.etat: creation → compo` reportée** : sera implémentée plus tard (trigger SQL ou wrapper JS) quand l'UI éditeur de compo existera.
+
+**Smoke test RPC vivier validé** : sur l'équipe M14 EQ1, retourne `total=63 / reguliers=62 / partenaires=39 / f15=8 / non_attaches=1`. Tous les contrats métier atteints. Le 1 non-attaché côté MOM est cohérent avec l'écart historique (24 M14 dans `personnes` vs 23 dans `equipe_joueurs`, cf. note STATE sur Eden FAUVEL / Auriane DECOURCELLE).
+
+**Test bout-en-bout SQL (BEGIN/INSERT/ROLLBACK)** reporté à Phase 4.4 — sera couvert grandeur nature par l'UI éditeur de compo. Inscrit dette (o).
+
+**Phase 4.3 débloque techniquement la conv Conception Portail pour l'UI éditeur de compositions (Phase 4.4 future)**.
 
 ---
 
@@ -464,7 +485,7 @@ Dossiers clés :
 6. Vérifier que `login.html` affiche bien `v1.4 chargé` dans la console et que l'envoi d'un Magic Link sur ton email aboutit sur `dashboard.html` avec session active
 
 **Travaux en attente** :
-- **Conv Production** : Phase 3 + 4.1.B + **4.1.A complète (13 mai matin)** + **4.2.A noyau (13 mai soir)** + **4.2.B RPC événements + 4.2.C wrappers JS (13 mai soir tard)** + **Étape G peuplement événements M14 (13 mai vraiment très tard)** + **Étapes K (RLS read Vague 1) + H (15 entraînements M14) + C/Phase 4.4 (widget Prochain événement)** terminées. **C7-a + C7-b livrées par conv Audits le 14 mai. C7-c + C7-f livrées par conv Production le 14 mai** : ALTER CHECK + import 50 fiches partenaires SportEasy via `sql/16-peuplement-partenaires-entente-m14-v1.sql`. **Dette C7 totalement soldée.** Phase 4.3 (compositions/présences) **DÉBLOQUÉE** — reste juste `sql/17-attaches-partenaires-entente-m14.sql` (39 attaches `equipe_joueurs` pour les joueurs partenaires, statut 'regulier', club_provenance_id = SAR) avant de pouvoir attaquer les compositions complètes d'entente. C7-e (vivier) sera couvert naturellement en Phase 4.3 par LEFT JOIN à equipe_joueurs.
+- **Conv Production** : Phase 3 + 4.1.B + **4.1.A complète (13 mai matin)** + **4.2.A noyau (13 mai soir)** + **4.2.B RPC événements + 4.2.C wrappers JS (13 mai soir tard)** + **Étape G peuplement événements M14 (13 mai vraiment très tard)** + **Étapes K (RLS read Vague 1) + H (15 entraînements M14) + C/Phase 4.4 (widget Prochain événement)** terminées. **C7-a + C7-b livrées par conv Audits le 14 mai. C7-c + C7-f livrées par conv Production le 14 mai** : ALTER CHECK + import 50 fiches partenaires SportEasy via `sql/16-peuplement-partenaires-entente-m14-v1.sql`. **Dette C7 totalement soldée.** **Phase 4.3 LIVRÉE 14 mai 2026 soir** (sql/17 + sql/17b + sql/18 + sql/19 + sql/21). C7-e couvert : la RPC `get_vivier_compo` LEFT JOIN à `equipe_joueurs` retourne les partenaires SAR/ASCS naturellement via leur `categorie_id`.
 
   Alternatives possibles si Phase 4.3 reportée : dette (i) RLS write par rôle (à grouper avec C7-d et dette (l) durcissement INSERT distances_sites), ou Phase 4.4 P4-2 greeting J-N. Travaux annexes en attente :
   - (a) **Implémentation des tables modélisées** (cf. `Modelisation-Evenements-v1.1.md` §4) :
@@ -493,6 +514,7 @@ Dossiers clés :
   - (l) **🆕 Dette ouverte (13 mai fin de session) — durcissement RLS WRITE distances_sites** : découvert pendant l'inventaire RLS, la table `distances_sites` autorise actuellement INSERT/UPDATE à tout `authenticated` (pas seulement admin). À regrouper avec dette (i) dans la session RLS write par rôle dédiée.
   - (m) **🆕 Dette ouverte (14 mai 2026) — Correction post-import ASCS** : les 50 fiches partenaires importées via `sql/16-peuplement-partenaires-entente-m14-v1.sql` sont TOUTES taggées `club_principal_id = SAR` car SportEasy ne distingue pas le club d'appartenance et seuls 4 suffixes " - MOM" étaient présents (aucun " - ASCS"). Manu confirmera ultérieurement la liste exacte des joueurs ASCS dans l'entente M14, puis on fera un UPDATE ciblé `club_principal_id = ASCS` sur les fiches concernées. Filtre facile via `WHERE source_creation = 'sporteasy_sar_minimes_2025-2026_v1' AND tag_verifier = TRUE`. À terme : négocier un export OVAL-E SAR avec la mention du club partenaire (dette long terme C7-g qui converge).
   - (n) **🆕 Dette ouverte (14 mai 2026) — Complétion sexe + date_naissance partenaires** : sur les 50 fiches partenaires, 50/50 ont `sexe = NULL` (colonne vide dans SportEasy) et environ 23/50 ont `date_naissance = NULL`. Pour combler, utiliser le gabarit Excel `gabarit-effectif-partenaire-entente-mom-v1.xlsx` livré le 14 mai et le faire renvoyer aux coachs SAR/ASCS avec UNIQUEMENT ces 2 champs à compléter (mode "complément" plutôt que "saisie complète"). À regrouper avec un script `sql/peuplement-partenaires-complement-sexe-date.sql` ou un script JS d'import quand les retours arrivent.
+  - (o) **🆕 Dette ouverte (14 mai 2026 soir) — Test E2E SQL Phase 4.3 reporté** : le test bout-en-bout (BEGIN + INSERT compo + INSERT joueurs + INSERT présences + ROLLBACK) n'a pas pu être exécuté propre dans le SQL Editor Supabase (interférence du bouton Explain sur multi-statement). Sera couvert grandeur nature par l'UI éditeur de compositions (Phase 4.4 future) qui exercera la chaîne complète via wrapper JS + service_role. Non bloquant : les contraintes des 3 tables ont été validées à la création par Postgres (CHECK, FK, UNIQUE partiels), et la RPC `get_vivier_compo` est validée par smoke test réel (63 / 62 / 39 / 8 / 1).
 
   **Plan de découpage Phase 4 acté (12 mai 2026 soir, post-arbitrage Option C ; Phase 4.1.A finie 13 mai matin ; Phase 4.2.A finie 13 mai soir)** :
   - **Phase 4.1.A** ✅ **TERMINÉE 13 mai 2026 matin** : peuplement Vague 1 (11 ententes + 11 équipes + 23 attaches M14 MOM en `regulier`) via `sql/06-peuplement-vague1-equipes.sql`. **Phase 4.1.A bis** : K2 ÉQUIPES dynamique via `sql/09-rpc-equipes.sql` (RPC `count_equipes_actives`) + `js/dashboard-stats.js` v2.1 + `index.html` patché (`id="stat-equipes"`). Ferme partie ÉQUIPES de dette #5. SAR (37) et ASCS (2) M14 attaches reportées à Phase 4.3 après dette C7.
@@ -505,7 +527,7 @@ Dossiers clés :
   - **Étape H** ✅ **TERMINÉE 13 mai 2026 fin de session** : `sql/14-entrainements-m14-fin-saison-2025-2026.sql` créé (15 entraînements lundi/mercredi à Brencklé, dont 1 annulé pour Pentecôte).
   - **Phase 4.4 (UI portail) — Étape C widget Prochain événement** ✅ **TERMINÉE 13 mai 2026 fin de session** : `index.html` + `js/dashboard-stats.js` v2.2. Carte sidebar fonctionnelle, screenshot validé. Greeting J-N (P4-2) reste optionnel pour une session future.
   - **Phase 4.2** Noyau événements : `sql/08-evenements.sql`, `sql/09-evenement-encadrants.sql` (⚠️ `joueurs_externes` ABANDONNÉE en v1.1 — les joueurs partenaires d'entente vivront dans `personnes` avec `bloc_5.club_principal_id` adapté). Extension `js/supabase-client.js` v1.5 avec 2-3 wrappers (`getEvenementsAVenir`, `getProchainEvenementParEquipe`).
-  - **Phase 4.3** Compositions + présences : `sql/10-compositions.sql` + `composition_joueurs`, `sql/11-presences.sql`, 1 ALTER TABLE `personnes` (M-1 réduit), référentiel `groupes-joueur.json` v1.1 dans Drive, RPC `get_vivier_compo` (la plus complexe — joint `equipe_joueurs` Vague 1 pour flag d'attache régulier/renfort). **Condition préalable** : dette C7 instruite par conv Audits (audit doctrine OVAL-E pour joueurs SAR).
+  - **Phase 4.3** ✅ **TERMINÉE 14 mai 2026 soir** : sql/17 (39 attaches partenaires) + sql/17b (fix categorie_id) + sql/18 (compositions + composition_joueurs) + sql/19 (presences) + sql/21 (RPC `get_vivier_compo`). sql/20 (M-1 ALTER bloc_5 categorie_surclassement_id) reporté en dette M-1. Transition automatique `creation → compo` reportée.
   - **Phase 4.4** Intégration UI portail : `dashboard-stats.js` v3 avec prochain match dans le greeting (P4-2) et nouveau widget sidebar (P4-3).
   - **Phase 4.5** API distances (optionnel) : intégration OpenRouteService + cache, RPC `get_distance_between_sites`, secret API en GitHub Actions (M-2 + M-5).
 
