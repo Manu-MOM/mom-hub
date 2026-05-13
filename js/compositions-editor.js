@@ -6,7 +6,7 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
- * Version : 3.2 — Phase 4.4 étape 6c-2/6c-3 (13 mai 2026)
+ * Version : 3.3 — Phase 4.4 étape 6c-2/6c-3 (13 mai 2026)
  *   v3.0 : Vue Liste + Popover Picker
  *   v3.1 : Fix mapping colonnes table postes Supabase :
  *           - poste.uuid → poste.id
@@ -17,6 +17,14 @@
  *             composition_joueurs vers personnes
  *           - lookup direct dans State.vivierById qui passe par la RPC
  *             get_vivier_compo (SECURITY DEFINER) → RLS-safe
+ *   v3.3 : Fix warning catégorie sur tous les joueurs :
+ *           - M14_CATEGORIE_ID était 'cat-m14' (slug imaginaire) au lieu
+ *             de l'UUID réel de la catégorie M14 → tous les joueurs étaient
+ *             marqués hors-M14
+ *           - Remplacement par l'UUID réel 312ebb88-25e8-40c5-8a37-9dd2e3927e2e
+ *           - En V1 M14, la RPC get_vivier_compo filtre déjà sur M14
+ *             uniquement, donc le warning ne s'affichera jamais — c'est OK,
+ *             le code reste prêt pour V2 multi-équipes
  */
 
 (function () {
@@ -27,7 +35,7 @@
   // ============================================================
 
   const M14_TEAM_UUID = 'bfb83b83-83ef-4dde-b526-48ff87313044';
-  const M14_CATEGORIE_ID = 'cat-m14';
+  const M14_CATEGORIE_ID = '312ebb88-25e8-40c5-8a37-9dd2e3927e2e'; // UUID réel catégorie M14
   const NB_TITULAIRES_XV = 15;
   const NB_REMPLACANTS = 8;
 
@@ -866,7 +874,7 @@
     bindPopoverOutsideClick();
 
     console.log(
-      '%c🏉 Compositions Editor v3.2 (étape 6c-2 + 6c-3) chargé',
+      '%c🏉 Compositions Editor v3.3 (étape 6c-2 + 6c-3) chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         evenements: State.evenements.length,
