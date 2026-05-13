@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.6 — mai 2026
+ * Version : 1.7 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -33,9 +33,17 @@
  *          getEvenementsAVenir(equipeId, joursAVenir),
  *          getProchainEvenementParEquipe(equipeId).
  *   v1.6 : wrapper Phase 4.3 pour la RPC vivier — getVivierCompo(equipeId).
- *          Ferme la dette (o) du STATE.md (préalable à Phase 4.4 UI éditeur
- *          de compo). Pattern identique à v1.5 : fallback gracieux sur
- *          tableau vide si erreur réseau / RLS / permissions.
+ *          Ferme la dette (o) du STATE.md.
+ *   v1.7 : wrappers ÉCRITURE Phase 4.4 UI compositions —
+ *          createCompo, duplicateCompoFromBase, addJoueurCompo,
+ *          updateJoueurCompo, removeJoueurCompo, updateCompoNotes,
+ *          validateCompo, unvalidateCompo, markCompoUtilisee,
+ *          archiveCompo, listCompositionsByEquipe, getCompoComplete.
+ *          Pattern : retour {ok, data, error} unifié pour gérer
+ *          gracefully les erreurs RLS côté UI. Doctrine côté JS
+ *          (pas de RPC dédiée) pour la duplication base→match :
+ *          INSERT compo + INSERT batch joueurs en 2 appels,
+ *          rollback manuel côté JS si la 2e requête échoue.
  */
 
 (function (global) {
@@ -52,8 +60,6 @@
   // ============================================================
   // INITIALISATION
   // ============================================================
-  // On utilise la bibliothèque officielle @supabase/supabase-js
-  // qui doit être chargée AVANT ce fichier (via balise <script>).
   if (typeof supabase === 'undefined') {
     console.error(
       '❌ MOM Hub: la bibliothèque @supabase/supabase-js n\'est pas chargée. ' +
@@ -64,35 +70,22 @@
 
   const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
-      // Conserve la session dans le localStorage du navigateur
       persistSession: true,
       autoRefreshToken: true,
-      detectSessionInUrl: true  // pour gérer les liens magiques retour
+      detectSessionInUrl: true
     }
   });
 
-  // ============================================================
-  // ÉTAT INTERNE — cache mémoire des rôles (Phase 2.5.4)
-  // ============================================================
-  // Cache des rôles de l'utilisateur courant. Vidé par signOut() et
-  // par les événements SIGNED_OUT / SIGNED_IN (cf. onAuthChange).
-  // null = pas encore résolu, [] = résolu et vide, ['admin', ...] = résolu.
+  // Cache mémoire des rôles (Phase 2.5.4)
   let _rolesCache = null;
 
   // ============================================================
-  // API PUBLIQUE — fonctions utilitaires
+  // API PUBLIQUE
   // ============================================================
   const SupabaseHub = {
 
-    /**
-     * Le client brut, pour usages avancés.
-     */
     client: client,
 
-    /**
-     * Test de connectivité : renvoie OK si la connexion fonctionne,
-     * KO sinon.
-     */
     async ping() {
       try {
         const { data, error } = await client
@@ -110,95 +103,46 @@
     // RÉFÉRENTIELS PUBLICS
     // ----------------------------------------------------------
 
-    /**
-     * Renvoie tous les pôles (5 lignes).
-     */
     async getPoles() {
-      const { data, error } = await client
-        .from('poles')
-        .select('*')
-        .order('uuid_legacy');
+      const { data, error } = await client.from('poles').select('*').order('uuid_legacy');
       if (error) throw error;
       return data;
     },
 
-    /**
-     * Renvoie toutes les catégories (14 lignes), avec ordre de tri.
-     */
     async getCategories() {
-      const { data, error } = await client
-        .from('categories')
-        .select('*')
-        .order('ordre_tri');
+      const { data, error } = await client.from('categories').select('*').order('ordre_tri');
       if (error) throw error;
       return data;
     },
 
-    /**
-     * Renvoie tous les clubs (4 lignes).
-     */
     async getClubs() {
-      const { data, error } = await client
-        .from('clubs')
-        .select('*')
-        .order('uuid_legacy');
+      const { data, error } = await client.from('clubs').select('*').order('uuid_legacy');
       if (error) throw error;
       return data;
     },
 
-    /**
-     * Renvoie la saison active.
-     */
     async getSaisonActive() {
-      const { data, error } = await client
-        .from('saisons')
-        .select('*')
-        .eq('est_active', true)
-        .single();
+      const { data, error } = await client.from('saisons').select('*').eq('est_active', true).single();
       if (error) throw error;
       return data;
     },
 
-    /**
-     * Renvoie tous les postes (20 lignes).
-     */
     async getPostes() {
-      const { data, error } = await client
-        .from('postes')
-        .select('*')
-        .order('numero_xv', { nullsFirst: false });
+      const { data, error } = await client.from('postes').select('*').order('numero_xv', { nullsFirst: false });
       if (error) throw error;
       return data;
     },
 
-    // ----------------------------------------------------------
-    // STATISTIQUES POUR LE DASHBOARD
-    // ----------------------------------------------------------
-    // Note : ces stats sont basées sur les référentiels publics
-    // (poles, categories, clubs). Les stats nécessitant les fiches
-    // Personne (323 personnes, etc.) passent par la RPC dédiée
-    // get_dashboard_stats() (SECURITY DEFINER) exposée publiquement
-    // pour les agrégats. cf. js/dashboard-stats.js
-
-    /**
-     * Renvoie un récap des chiffres clés disponibles publiquement.
-     */
     async getDashboardStats() {
       try {
         const [poles, categories, clubs, postes, saison] = await Promise.all([
-          this.getPoles(),
-          this.getCategories(),
-          this.getClubs(),
-          this.getPostes(),
-          this.getSaisonActive()
+          this.getPoles(), this.getCategories(), this.getClubs(),
+          this.getPostes(), this.getSaisonActive()
         ]);
-
         return {
           ok: true,
-          nbPoles: poles.length,
-          nbCategories: categories.length,
-          nbClubs: clubs.length,
-          nbPostes: postes.length,
+          nbPoles: poles.length, nbCategories: categories.length,
+          nbClubs: clubs.length, nbPostes: postes.length,
           saisonActive: saison ? saison.libelle : 'aucune',
           dateMaj: new Date().toLocaleString('fr-FR')
         };
@@ -211,46 +155,17 @@
     // AUTHENTIFICATION — Phase 2.5
     // ----------------------------------------------------------
 
-    /**
-     * Demande un Magic Link pour l'email fourni.
-     *
-     * Comportement :
-     *   - Si l'email existe dans auth.users : envoi du lien de connexion
-     *   - Sinon : crée un nouveau compte et envoi du lien (shouldCreateUser=true)
-     *
-     * Redirection après clic sur le lien :
-     *   - Si `redirectTo` est fourni : utilisé tel quel.
-     *   - Sinon : on calcule le DOSSIER PARENT de la page actuelle.
-     *     Exemple : appel depuis https://manu-mom.github.io/mom-hub/login.html
-     *               -> redirect vers https://manu-mom.github.io/mom-hub/
-     *   - Le redirect doit être dans la whitelist Authentication > URL Configuration.
-     *
-     * ⚠️ Note historique : v1.1 ne passait pas emailRedirectTo, en supposant
-     * que Supabase utiliserait la Site URL comme fallback. C'est faux :
-     * supabase-js v2 utilise window.location.origin par défaut (juste l'origine,
-     * sans chemin), ce qui casse pour les sites hébergés sur GitHub Pages
-     * dans un sous-chemin /mom-hub/. v1.2 corrige.
-     *
-     * Rate limit Supabase free tier : 4 emails/heure.
-     *
-     * @param {string} email      - Adresse email cible (sera trim+lowercase).
-     * @param {string} [redirectTo] - URL de retour explicite (optionnel).
-     * @returns {Promise<{ok: boolean, error?: string}>}
-     */
     async requestMagicLink(email, redirectTo) {
       if (!email || typeof email !== 'string') {
         return { ok: false, error: 'Email manquant' };
       }
       const cleanEmail = email.trim().toLowerCase();
-      // Validation très permissive (Supabase validera côté serveur de toute façon)
       if (!cleanEmail.includes('@') || cleanEmail.length < 5) {
         return { ok: false, error: 'Email invalide' };
       }
 
-      // Calcul de l'URL de retour
       let resolvedRedirect = redirectTo;
       if (!resolvedRedirect && typeof window !== 'undefined' && window.location) {
-        // Dossier parent de la page courante (= remplace le dernier segment par '')
         resolvedRedirect = window.location.origin +
           window.location.pathname.replace(/[^/]*$/, '');
       }
@@ -265,21 +180,10 @@
         options: otpOptions
       });
 
-      if (error) {
-        return { ok: false, error: error.message };
-      }
+      if (error) return { ok: false, error: error.message };
       return { ok: true };
     },
 
-    /**
-     * Renvoie la session Supabase en cours (token + user), ou null si
-     * aucune session active.
-     *
-     * Préférer cette méthode à getCurrentUser() pour les checks de routing
-     * (plus rapide, lit le storage local sans aller-retour réseau).
-     *
-     * @returns {Promise<object|null>}
-     */
     async getSession() {
       const { data: { session }, error } = await client.auth.getSession();
       if (error) {
@@ -289,30 +193,13 @@
       return session;
     },
 
-    /**
-     * Renvoie l'utilisateur connecté, ou null si non connecté.
-     */
     async getCurrentUser() {
       const { data: { user } } = await client.auth.getUser();
       return user;
     },
 
-    // ----------------------------------------------------------
-    // SESSION & RÔLES — Phase 2.5.4
-    // ----------------------------------------------------------
-
-    /**
-     * Renvoie les rôles de l'utilisateur courant (appelle la RPC get_my_roles
-     * côté Supabase). Résultat mis en cache en mémoire pour la durée de vie
-     * de la page (un seul appel réseau par chargement). Le cache est invalidé
-     * par signOut() et par les événements SIGNED_OUT / SIGNED_IN.
-     *
-     * @returns {Promise<string[]>} Tableau de rôles (ex: ['admin']) ou [] si non connecté.
-     */
     async getMyRoles() {
-      if (_rolesCache !== null) {
-        return _rolesCache;
-      }
+      if (_rolesCache !== null) return _rolesCache;
       const { data, error } = await client.rpc('get_my_roles');
       if (error) {
         console.error('MOM Hub: getMyRoles() error', error);
@@ -322,49 +209,15 @@
       return _rolesCache;
     },
 
-    /**
-     * True si l'utilisateur courant possède le rôle demandé.
-     * @param {string} role - 'admin', 'coach' ou 'viewer'.
-     */
     async hasRole(role) {
       const roles = await this.getMyRoles();
       return roles.includes(role);
     },
 
-    /**
-     * Raccourci pour hasRole('admin'). Utilisé par les pages sécurisées
-     * pour des décisions UI rapides.
-     */
     async isAdmin() {
       return this.hasRole('admin');
     },
 
-    /**
-     * Garde de page : vérifie qu'une session existe (et optionnellement
-     * que l'utilisateur a un rôle requis). Sinon, redirige.
-     *
-     * Pattern d'usage (en TOUT premier dans le <script> d'une page sécurisée) :
-     *
-     *   document.body.classList.add('auth-pending');   // masque le contenu
-     *   const ok = await SupabaseHub.requireAuth({ role: 'admin' });
-     *   if (!ok) return;                                // redirect en cours
-     *   document.body.classList.remove('auth-pending'); // révèle le contenu
-     *
-     * Avec côté CSS :
-     *   body.auth-pending { visibility: hidden; }
-     *
-     * Comportement :
-     *   - Pas de session : redirige vers loginUrl (défaut: 'login.html').
-     *   - Session mais pas le bon rôle : redirige vers forbiddenUrl
-     *     (défaut: la racine du Hub './').
-     *   - OK : ne fait rien, renvoie true.
-     *
-     * @param {object}  [options]
-     * @param {string}  [options.role]         - Rôle requis (ex: 'admin'). Optionnel.
-     * @param {string}  [options.loginUrl]     - URL de redirection si non connecté.
-     * @param {string}  [options.forbiddenUrl] - URL de redirection si mauvais rôle.
-     * @returns {Promise<boolean>} true si l'accès est accordé, false si redirection en cours.
-     */
     async requireAuth(options) {
       const opts = options || {};
       const loginUrl = opts.loginUrl || 'login.html';
@@ -385,15 +238,6 @@
       return true;
     },
 
-    /**
-     * Abonnement aux changements d'état de l'auth (SIGNED_IN, SIGNED_OUT,
-     * TOKEN_REFRESHED, etc.). Le cache des rôles est automatiquement
-     * invalidé sur SIGNED_OUT et SIGNED_IN avant que le callback ne soit
-     * appelé.
-     *
-     * @param {(event: string, session: object|null) => void} callback
-     * @returns {{ unsubscribe: () => void }} Un objet pour se désabonner.
-     */
     onAuthChange(callback) {
       const { data: { subscription } } = client.auth.onAuthStateChange(
         function (event, session) {
@@ -412,16 +256,6 @@
       return subscription;
     },
 
-    /**
-     * Déconnecte l'utilisateur, invalide le cache des rôles, et redirige
-     * vers loginUrl (défaut: 'login.html').
-     *
-     * Si redirect=false, ne fait pas la redirection (utile pour des tests).
-     *
-     * @param {object}  [options]
-     * @param {boolean} [options.redirect=true]
-     * @param {string}  [options.loginUrl='login.html']
-     */
     async signOut(options) {
       const opts = options || {};
       const redirect = opts.redirect !== false;
@@ -429,188 +263,556 @@
 
       _rolesCache = null;
       const { error } = await client.auth.signOut();
-      if (error) {
-        console.error('MOM Hub: signOut() error', error);
-        // On redirige quand même : si la déconnexion serveur a échoué,
-        // au moins l'utilisateur quitte la page.
-      }
-      if (redirect) {
-        window.location.replace(loginUrl);
-      }
+      if (error) console.error('MOM Hub: signOut() error', error);
+      if (redirect) window.location.replace(loginUrl);
       return !error;
     },
 
-
     // ============================================================
-    // RPC PORTAIL (Phase 3.2) — KPI et sidebar du portail
+    // RPC PORTAIL (Phase 3.2)
     // ============================================================
-    // Wrappers minces autour des 5 RPC définies dans
-    // sql/05-rpc-portail.sql. Toutes retournent un nombre (ou null
-    // pour la date). En cas d'erreur réseau / permissions, on loggue
-    // et on retourne une valeur neutre (0 ou null) pour ne pas casser
-    // le rendu du portail.
 
-    /**
-     * KPI K3 "CETTE SEMAINE" — fiches `personnes` créées dans les
-     * 7 derniers jours glissants.
-     * @returns {Promise<number>} entier ≥ 0, ou 0 si erreur
-     */
     async countPersonnesCreatedLast7Days() {
       const { data, error } = await client.rpc('count_personnes_created_last_7_days');
-      if (error) {
-        console.error('MOM Hub: countPersonnesCreatedLast7Days() error', error);
-        return 0;
-      }
+      if (error) { console.error('MOM Hub: countPersonnesCreatedLast7Days()', error); return 0; }
       return typeof data === 'number' ? data : 0;
     },
 
-    /**
-     * KPI K4 "SANS EMAIL" + sidebar Qualité des données — fiches
-     * `personnes` sans email principal renseigné (NULL ou chaîne vide).
-     * @returns {Promise<number>}
-     */
     async countPersonnesWithoutEmail() {
       const { data, error } = await client.rpc('count_personnes_without_email');
-      if (error) {
-        console.error('MOM Hub: countPersonnesWithoutEmail() error', error);
-        return 0;
-      }
+      if (error) { console.error('MOM Hub: countPersonnesWithoutEmail()', error); return 0; }
       return typeof data === 'number' ? data : 0;
     },
 
-    /**
-     * Sidebar Qualité des données — fiches `personnes` sans date
-     * de naissance renseignée.
-     * @returns {Promise<number>}
-     */
     async countPersonnesWithoutBirthdate() {
       const { data, error } = await client.rpc('count_personnes_without_birthdate');
-      if (error) {
-        console.error('MOM Hub: countPersonnesWithoutBirthdate() error', error);
-        return 0;
-      }
+      if (error) { console.error('MOM Hub: countPersonnesWithoutBirthdate()', error); return 0; }
       return typeof data === 'number' ? data : 0;
     },
 
-    /**
-     * Sidebar Qualité des données — fiches `personnes` dont
-     * l'affiliation FFR expire entre aujourd'hui et J+90 jours.
-     * Les affiliations déjà expirées ne sont PAS comptées.
-     * @returns {Promise<number>}
-     */
     async countPersonnesAffiliationExpiringWithin90Days() {
       const { data, error } = await client.rpc('count_personnes_affiliation_expiring_within_90_days');
-      if (error) {
-        console.error('MOM Hub: countPersonnesAffiliationExpiringWithin90Days() error', error);
-        return 0;
-      }
+      if (error) { console.error('MOM Hub: countPersonnesAffiliationExpiringWithin90Days()', error); return 0; }
       return typeof data === 'number' ? data : 0;
     },
 
-    /**
-     * Sidebar carte 1 OVAL-E — date de la dernière modification
-     * sur une fiche OVAL-E (source_creation ou modifie_par contient
-     * 'OVAL-E').
-     * @returns {Promise<string|null>} Date au format 'YYYY-MM-DD', ou null si aucune fiche OVAL-E
-     */
     async getLastOvalESyncDate() {
       const { data, error } = await client.rpc('get_last_oval_e_sync_date');
-      if (error) {
-        console.error('MOM Hub: getLastOvalESyncDate() error', error);
-        return null;
-      }
-      return data; // string YYYY-MM-DD ou null
+      if (error) { console.error('MOM Hub: getLastOvalESyncDate()', error); return null; }
+      return data;
     },
 
     // ============================================================
-    // PHASE 4.2.C — RPC événements (sql/11-rpc-evenements.sql)
+    // PHASE 4.2.C — RPC événements
     // ============================================================
 
-    /**
-     * Liste des événements à venir, filtrable par équipe et fenêtre temporelle.
-     * Wrapper de get_evenements_a_venir() (Phase 4.2.B). Débloque P4-2 (greeting J-N).
-     *
-     * @param {string|null} equipeId    UUID de l'équipe (null = toutes équipes)
-     * @param {number}      joursAVenir Fenêtre temporelle en jours (défaut 30)
-     * @returns {Promise<Array>} tableau d'événements (16 colonnes chacun), [] si erreur
-     */
     async getEvenementsAVenir(equipeId = null, joursAVenir = 30) {
       const { data, error } = await client.rpc('get_evenements_a_venir', {
-        p_equipe_id:     equipeId,
-        p_jours_a_venir: joursAVenir
+        p_equipe_id: equipeId, p_jours_a_venir: joursAVenir
       });
-      if (error) {
-        console.error('MOM Hub: getEvenementsAVenir() error', error);
-        return [];
-      }
+      if (error) { console.error('MOM Hub: getEvenementsAVenir()', error); return []; }
       return Array.isArray(data) ? data : [];
     },
 
-    /**
-     * Prochain événement d'une équipe donnée (0 ou 1).
-     * Wrapper de get_prochain_evenement_par_equipe() (Phase 4.2.B).
-     * Débloque P4-3 (widget sidebar prochain match).
-     *
-     * @param {string} equipeId UUID de l'équipe (obligatoire)
-     * @returns {Promise<Object|null>} objet événement (16 propriétés), ou null si aucun
-     */
     async getProchainEvenementParEquipe(equipeId) {
       const { data, error } = await client.rpc('get_prochain_evenement_par_equipe', {
         p_equipe_id: equipeId
       });
-      if (error) {
-        console.error('MOM Hub: getProchainEvenementParEquipe() error', error);
-        return null;
-      }
+      if (error) { console.error('MOM Hub: getProchainEvenementParEquipe()', error); return null; }
       return Array.isArray(data) && data.length > 0 ? data[0] : null;
     },
 
     // ============================================================
-    // PHASE 4.3 — RPC vivier compo (sql/21-rpc-vivier-compo.sql)
+    // PHASE 4.3 — RPC vivier compo
     // ============================================================
 
-    /**
-     * Vivier de joueurs piochables pour composer une équipe sur un
-     * événement donné.
-     * Wrapper de get_vivier_compo() (Phase 4.3, dette o STATE.md).
-     * Préalable à Phase 4.4 UI éditeur de compo.
-     *
-     * Logique côté Supabase :
-     *   - Pivot via equipes.entente_id → ententes.categorie_id
-     *   - Inclut : joueurs MOM de la catégorie nominale + F-15 intégrées
-     *     pour M14 + joueurs partenaires SAR/ASCS de l'entente
-     *   - LEFT JOIN à equipe_joueurs pour le statut d'attache
-     *     (regulier / renfort_temporaire / en_transition / NULL)
-     *   - Tri : réguliers > renforts > en_transition > non-attachés,
-     *     alphabétique à l'intérieur de chaque groupe
-     *
-     * Chaque ligne retournée comporte 15 colonnes :
-     *   - joueur_id, nom, prenom, sexe, date_naissance
-     *   - categorie_id, categorie_libelle_court
-     *   - club_principal_id, club_principal_nom_court
-     *   - type_personne
-     *   - f15_integree (boolean)
-     *   - est_partenaire_entente (boolean, computed)
-     *   - statut_attache (regulier / renfort_temporaire / en_transition / null)
-     *   - niveau_profil (Performance / Développement / Initiation)
-     *   - date_affectation
-     *
-     * @param {string} equipeId UUID de l'équipe (obligatoire)
-     * @returns {Promise<Array>} tableau de joueurs piochables, [] si erreur
-     */
     async getVivierCompo(equipeId) {
       if (!equipeId) {
         console.error('MOM Hub: getVivierCompo() requiert un equipeId');
         return [];
       }
-      const { data, error } = await client.rpc('get_vivier_compo', {
-        p_equipe_id: equipeId
-      });
+      const { data, error } = await client.rpc('get_vivier_compo', { p_equipe_id: equipeId });
+      if (error) { console.error('MOM Hub: getVivierCompo()', error); return []; }
+      return Array.isArray(data) ? data : [];
+    },
+
+    // ============================================================
+    // PHASE 4.4 UI — WRAPPERS ÉCRITURE COMPOSITIONS (v1.7)
+    // ============================================================
+    // Pattern de retour unifié pour tous les wrappers d'écriture :
+    //   { ok: true,  data: <objet ou tableau> }      → succès
+    //   { ok: false, error: <string|object> }        → échec
+    // Permet aux callers (UI) un branchement simple :
+    //   const r = await SupabaseHub.createCompo({...});
+    //   if (!r.ok) { alert(r.error); return; }
+    //   const compo = r.data;
+    //
+    // RLS write actives depuis sql/24-25-26 :
+    //   - INSERT/UPDATE compositions, composition_joueurs : admin OU coach
+    //   - DELETE compositions, composition_joueurs       : admin OU coach
+    //   - Toutes les écritures requièrent une session authentifiée
+
+    // ----------------------------------------------------------
+    // LECTURE — Compositions
+    // ----------------------------------------------------------
+
+    /**
+     * Liste les compositions d'une équipe (toutes versions actives confondues).
+     * Utilisé par l'écran E1 Tableau de bord compositions.
+     *
+     * @param {string} equipeId UUID de l'équipe
+     * @param {object} [options]
+     * @param {boolean} [options.onlyActive=true] Filtre est_active=TRUE
+     * @returns {Promise<Array>} compositions avec leur événement (joint), [] si erreur
+     */
+    async listCompositionsByEquipe(equipeId, options) {
+      if (!equipeId) {
+        console.error('MOM Hub: listCompositionsByEquipe() requiert un equipeId');
+        return [];
+      }
+      const opts = options || {};
+      const onlyActive = opts.onlyActive !== false;
+
+      // Jointure compositions ← evenements (via FK evenement_id) pour
+      // obtenir équipe_id et libellés. Filtre côté evenements.equipe_id
+      // ne fonctionne pas en select() chaîné classique : on passe par
+      // une jointure inner et on filtre via .eq() sur la colonne jointe.
+      let q = client
+        .from('compositions')
+        .select(`
+          id, evenement_id, cote, etat, version, est_active,
+          type_compo, compo_base_origine_id, notes_compo,
+          created_at, updated_at,
+          evenements!inner ( id, code, libelle, type_evenement,
+                             date_debut, equipe_id, format_de_jeu )
+        `)
+        .eq('evenements.equipe_id', equipeId)
+        .order('created_at', { ascending: false });
+
+      if (onlyActive) q = q.eq('est_active', true);
+
+      const { data, error } = await q;
       if (error) {
-        console.error('MOM Hub: getVivierCompo() error', error);
+        console.error('MOM Hub: listCompositionsByEquipe()', error);
         return [];
       }
       return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * Récupère une compo complète (compositions + composition_joueurs joints
+     * + personnes joints pour nom/prenom). Utilisé à l'ouverture de E3/E4.
+     *
+     * @param {string} compoId UUID de la composition
+     * @returns {Promise<Object|null>} { compo, joueurs: [...] } ou null si erreur
+     */
+    async getCompoComplete(compoId) {
+      if (!compoId) {
+        console.error('MOM Hub: getCompoComplete() requiert un compoId');
+        return null;
+      }
+      // 2 requêtes en parallèle : la compo elle-même et ses joueurs
+      const [compoRes, joueursRes] = await Promise.all([
+        client.from('compositions').select('*').eq('id', compoId).single(),
+        client
+          .from('composition_joueurs')
+          .select(`
+            id, composition_id, joueur_id, poste_id, numero_maillot,
+            role, ordre_remplacement, est_depannage_hors_categorie,
+            etat_joueur, notes_joueur, created_at,
+            personnes ( id, nom, prenom, sexe, date_naissance,
+                        categorie_id, club_principal_id, f15_integree )
+          `)
+          .eq('composition_id', compoId)
+          .order('numero_maillot', { nullsFirst: false })
+      ]);
+
+      if (compoRes.error) {
+        console.error('MOM Hub: getCompoComplete() compo', compoRes.error);
+        return null;
+      }
+      if (joueursRes.error) {
+        console.error('MOM Hub: getCompoComplete() joueurs', joueursRes.error);
+        return null;
+      }
+      return {
+        compo: compoRes.data,
+        joueurs: Array.isArray(joueursRes.data) ? joueursRes.data : []
+      };
+    },
+
+    // ----------------------------------------------------------
+    // ÉCRITURE — Compositions
+    // ----------------------------------------------------------
+
+    /**
+     * Crée une nouvelle composition vierge (sans joueurs).
+     * Utilisé par E2 Modale Création quand l'utilisateur choisit "Compo vierge".
+     *
+     * @param {object} params
+     * @param {string} params.evenement_id UUID de l'événement
+     * @param {string} params.type_compo   'base' ou 'match'
+     * @param {string} [params.compo_base_origine_id] UUID compo origine (si type='match' et dérivation)
+     * @returns {Promise<{ok: boolean, data?: object, error?: string}>}
+     */
+    async createCompo(params) {
+      if (!params || !params.evenement_id || !params.type_compo) {
+        return { ok: false, error: 'evenement_id et type_compo requis' };
+      }
+      if (params.type_compo !== 'base' && params.type_compo !== 'match') {
+        return { ok: false, error: "type_compo doit être 'base' ou 'match'" };
+      }
+      if (params.compo_base_origine_id && params.type_compo !== 'match') {
+        return { ok: false, error: "compo_base_origine_id incompatible avec type_compo='base'" };
+      }
+
+      const payload = {
+        evenement_id: params.evenement_id,
+        cote: 'mom',
+        type_compo: params.type_compo,
+        etat: 'brouillon',
+        version: 1,
+        est_active: true
+      };
+      if (params.compo_base_origine_id) {
+        payload.compo_base_origine_id = params.compo_base_origine_id;
+      }
+
+      const { data, error } = await client
+        .from('compositions')
+        .insert(payload)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('MOM Hub: createCompo()', error);
+        return { ok: false, error: error.message };
+      }
+      return { ok: true, data };
+    },
+
+    /**
+     * Duplique une compo de base vers une nouvelle compo de match.
+     * 2 appels successifs (INSERT compo + INSERT batch joueurs) en JS pur,
+     * avec rollback manuel si la 2e étape échoue. Pattern P1 simplicité
+     * (pas de RPC dédiée tant que les volumes restent faibles).
+     *
+     * Utilisé par E2 quand l'utilisateur choisit "Dupliquer une compo"
+     * ou par l'action "Créer la compo de match à partir de la base"
+     * depuis E1/E3.
+     *
+     * @param {string} compoBaseId UUID de la compo source (type='base')
+     * @param {string} evenementId UUID de l'événement cible (peut être identique
+     *                             à celui de la base — cas normal d'un même match
+     *                             — ou différent si rejouer une base sur un autre événement)
+     * @returns {Promise<{ok: boolean, data?: object, error?: string}>}
+     *          data = { compo: <nouvelleCompo>, joueurs: [<lignesDupliquees>] }
+     */
+    async duplicateCompoFromBase(compoBaseId, evenementId) {
+      if (!compoBaseId || !evenementId) {
+        return { ok: false, error: 'compoBaseId et evenementId requis' };
+      }
+
+      // 1) Lecture de la compo source + ses joueurs
+      const source = await this.getCompoComplete(compoBaseId);
+      if (!source) {
+        return { ok: false, error: 'Compo source introuvable' };
+      }
+      if (source.compo.type_compo !== 'base') {
+        return { ok: false, error: 'La compo source doit être de type "base"' };
+      }
+
+      // 2) Création de la nouvelle compo de match
+      const createRes = await this.createCompo({
+        evenement_id: evenementId,
+        type_compo: 'match',
+        compo_base_origine_id: compoBaseId
+      });
+      if (!createRes.ok) return createRes;
+      const newCompo = createRes.data;
+
+      // 3) Duplication batch des joueurs : tous initialement etat_joueur='base'
+      if (source.joueurs.length === 0) {
+        return { ok: true, data: { compo: newCompo, joueurs: [] } };
+      }
+      const newJoueurs = source.joueurs.map(function (j) {
+        return {
+          composition_id: newCompo.id,
+          joueur_id: j.joueur_id,
+          poste_id: j.poste_id,
+          numero_maillot: j.numero_maillot,
+          role: j.role,
+          ordre_remplacement: j.ordre_remplacement,
+          est_depannage_hors_categorie: j.est_depannage_hors_categorie,
+          etat_joueur: 'base',  // ← tous en bleu au démarrage
+          notes_joueur: null     // on ne reprend pas les notes individuelles
+        };
+      });
+
+      const { data: insertedJoueurs, error: joueursErr } = await client
+        .from('composition_joueurs')
+        .insert(newJoueurs)
+        .select();
+
+      if (joueursErr) {
+        // Rollback manuel : on tente de supprimer la compo créée à l'étape 2
+        console.error('MOM Hub: duplicateCompoFromBase() joueurs error, rollback', joueursErr);
+        await client.from('compositions').delete().eq('id', newCompo.id);
+        return { ok: false, error: 'Échec duplication joueurs : ' + joueursErr.message };
+      }
+
+      return { ok: true, data: { compo: newCompo, joueurs: insertedJoueurs || [] } };
+    },
+
+    /**
+     * Met à jour le champ notes_compo d'une compo (autosave de la textarea).
+     *
+     * @param {string} compoId UUID
+     * @param {string} notes   Nouveau texte (peut être vide)
+     * @returns {Promise<{ok, data?, error?}>}
+     */
+    async updateCompoNotes(compoId, notes) {
+      if (!compoId) return { ok: false, error: 'compoId requis' };
+      const { data, error } = await client
+        .from('compositions')
+        .update({ notes_compo: notes || null })
+        .eq('id', compoId)
+        .select()
+        .single();
+      if (error) {
+        console.error('MOM Hub: updateCompoNotes()', error);
+        return { ok: false, error: error.message };
+      }
+      return { ok: true, data };
+    },
+
+    /**
+     * Passe une compo de 'brouillon' à 'validee'. Le coach a explicitement
+     * confirmé. Pastille d'état devient verte côté UI.
+     *
+     * @param {string} compoId UUID
+     * @returns {Promise<{ok, data?, error?}>}
+     */
+    async validateCompo(compoId) {
+      if (!compoId) return { ok: false, error: 'compoId requis' };
+      const { data, error } = await client
+        .from('compositions')
+        .update({ etat: 'validee' })
+        .eq('id', compoId)
+        .eq('etat', 'brouillon')   // garde-fou : seul brouillon → validee autorisé ici
+        .select()
+        .single();
+      if (error) {
+        console.error('MOM Hub: validateCompo()', error);
+        return { ok: false, error: error.message };
+      }
+      if (!data) {
+        return { ok: false, error: "La compo n'est pas en état 'brouillon'" };
+      }
+      return { ok: true, data };
+    },
+
+    /**
+     * Repasse une compo de 'validee' à 'brouillon'. Accessible au coach
+     * jusqu'au coup d'envoi (cf. doc Conception §5.5).
+     *
+     * @param {string} compoId UUID
+     * @returns {Promise<{ok, data?, error?}>}
+     */
+    async unvalidateCompo(compoId) {
+      if (!compoId) return { ok: false, error: 'compoId requis' };
+      const { data, error } = await client
+        .from('compositions')
+        .update({ etat: 'brouillon' })
+        .eq('id', compoId)
+        .eq('etat', 'validee')     // garde-fou : seul validee → brouillon
+        .select()
+        .single();
+      if (error) {
+        console.error('MOM Hub: unvalidateCompo()', error);
+        return { ok: false, error: error.message };
+      }
+      if (!data) {
+        return { ok: false, error: "La compo n'est pas en état 'validee'" };
+      }
+      return { ok: true, data };
+    },
+
+    /**
+     * Marque manuellement une compo comme 'utilisee' (verrouillage final V1).
+     * À automatiser plus tard quand le module Suivi Match sera construit
+     * (cf. doc Conception §5.5).
+     *
+     * @param {string} compoId UUID
+     * @returns {Promise<{ok, data?, error?}>}
+     */
+    async markCompoUtilisee(compoId) {
+      if (!compoId) return { ok: false, error: 'compoId requis' };
+      const { data, error } = await client
+        .from('compositions')
+        .update({ etat: 'utilisee' })
+        .eq('id', compoId)
+        .eq('etat', 'validee')     // garde-fou : seul validee → utilisee
+        .select()
+        .single();
+      if (error) {
+        console.error('MOM Hub: markCompoUtilisee()', error);
+        return { ok: false, error: error.message };
+      }
+      if (!data) {
+        return { ok: false, error: "La compo n'est pas en état 'validee'" };
+      }
+      return { ok: true, data };
+    },
+
+    /**
+     * Archive une compo (etat='archivee' + est_active=FALSE).
+     * Conserve la traçabilité, retire du flux actif.
+     *
+     * @param {string} compoId UUID
+     * @returns {Promise<{ok, data?, error?}>}
+     */
+    async archiveCompo(compoId) {
+      if (!compoId) return { ok: false, error: 'compoId requis' };
+      const { data, error } = await client
+        .from('compositions')
+        .update({ etat: 'archivee', est_active: false })
+        .eq('id', compoId)
+        .select()
+        .single();
+      if (error) {
+        console.error('MOM Hub: archiveCompo()', error);
+        return { ok: false, error: error.message };
+      }
+      return { ok: true, data };
+    },
+
+    // ----------------------------------------------------------
+    // ÉCRITURE — Composition Joueurs (lignes)
+    // ----------------------------------------------------------
+
+    /**
+     * Ajoute un joueur à une compo (1 ligne dans composition_joueurs).
+     * Utilisé après sélection dans le Popover Picker (E5).
+     *
+     * @param {object} params
+     * @param {string} params.composition_id UUID de la compo
+     * @param {string} params.joueur_id      UUID du joueur (FK personnes)
+     * @param {string} params.poste_id       Code poste (postes.json, ex 'pst-001')
+     * @param {string} [params.role='titulaire'] 'titulaire' | 'remplacant' | 'reserve'
+     * @param {string} [params.etat_joueur='base'] 'base' | 'modifie' | 'independant' | 'blesse'
+     * @param {number} [params.numero_maillot]   Optionnel
+     * @param {number} [params.ordre_remplacement] Optionnel
+     * @param {boolean} [params.est_depannage_hors_categorie=false]
+     * @returns {Promise<{ok, data?, error?}>}
+     */
+    async addJoueurCompo(params) {
+      if (!params || !params.composition_id || !params.joueur_id || !params.poste_id) {
+        return { ok: false, error: 'composition_id, joueur_id, poste_id requis' };
+      }
+      const payload = {
+        composition_id: params.composition_id,
+        joueur_id: params.joueur_id,
+        poste_id: params.poste_id,
+        role: params.role || 'titulaire',
+        etat_joueur: params.etat_joueur || 'base',
+        est_depannage_hors_categorie: !!params.est_depannage_hors_categorie
+      };
+      if (params.numero_maillot !== undefined && params.numero_maillot !== null) {
+        payload.numero_maillot = params.numero_maillot;
+      }
+      if (params.ordre_remplacement !== undefined && params.ordre_remplacement !== null) {
+        payload.ordre_remplacement = params.ordre_remplacement;
+      }
+
+      const { data, error } = await client
+        .from('composition_joueurs')
+        .insert(payload)
+        .select()
+        .single();
+      if (error) {
+        console.error('MOM Hub: addJoueurCompo()', error);
+        return { ok: false, error: error.message };
+      }
+      return { ok: true, data };
+    },
+
+    /**
+     * Met à jour une ligne composition_joueurs.
+     * Champs autorisés : poste_id, role, numero_maillot, ordre_remplacement,
+     * etat_joueur, est_depannage_hors_categorie, notes_joueur.
+     *
+     * @param {string} compoJoueurId UUID de la ligne
+     * @param {object} patch         Objet partiel des champs à mettre à jour
+     * @returns {Promise<{ok, data?, error?}>}
+     */
+    async updateJoueurCompo(compoJoueurId, patch) {
+      if (!compoJoueurId) return { ok: false, error: 'compoJoueurId requis' };
+      if (!patch || typeof patch !== 'object') {
+        return { ok: false, error: 'patch (objet) requis' };
+      }
+      const allowedKeys = [
+        'poste_id', 'role', 'numero_maillot', 'ordre_remplacement',
+        'etat_joueur', 'est_depannage_hors_categorie', 'notes_joueur'
+      ];
+      const cleanPatch = {};
+      for (const k of allowedKeys) {
+        if (Object.prototype.hasOwnProperty.call(patch, k)) {
+          cleanPatch[k] = patch[k];
+        }
+      }
+      if (Object.keys(cleanPatch).length === 0) {
+        return { ok: false, error: 'Aucun champ modifiable dans patch' };
+      }
+
+      const { data, error } = await client
+        .from('composition_joueurs')
+        .update(cleanPatch)
+        .eq('id', compoJoueurId)
+        .select()
+        .single();
+      if (error) {
+        console.error('MOM Hub: updateJoueurCompo()', error);
+        return { ok: false, error: error.message };
+      }
+      return { ok: true, data };
+    },
+
+    /**
+     * Raccourci : change uniquement l'etat_joueur (bleu/orange/vert/rouge).
+     * Wrapper sur updateJoueurCompo pour le cas d'usage le plus fréquent.
+     *
+     * @param {string} compoJoueurId UUID
+     * @param {string} etat          'base' | 'modifie' | 'independant' | 'blesse'
+     * @returns {Promise<{ok, data?, error?}>}
+     */
+    async updateJoueurEtat(compoJoueurId, etat) {
+      const validEtats = ['base', 'modifie', 'independant', 'blesse'];
+      if (validEtats.indexOf(etat) === -1) {
+        return { ok: false, error: 'etat invalide (base/modifie/independant/blesse)' };
+      }
+      return this.updateJoueurCompo(compoJoueurId, { etat_joueur: etat });
+    },
+
+    /**
+     * Retire un joueur d'une compo (DELETE de la ligne composition_joueurs).
+     *
+     * @param {string} compoJoueurId UUID de la ligne
+     * @returns {Promise<{ok, data?, error?}>}
+     */
+    async removeJoueurCompo(compoJoueurId) {
+      if (!compoJoueurId) return { ok: false, error: 'compoJoueurId requis' };
+      const { data, error } = await client
+        .from('composition_joueurs')
+        .delete()
+        .eq('id', compoJoueurId)
+        .select()
+        .single();
+      if (error) {
+        console.error('MOM Hub: removeJoueurCompo()', error);
+        return { ok: false, error: error.message };
+      }
+      return { ok: true, data };
     }
 
   };
@@ -620,9 +822,8 @@
   // ============================================================
   global.SupabaseHub = SupabaseHub;
 
-  // Trace amicale dans la console
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.6 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.7 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
