@@ -1,11 +1,13 @@
 /**
  * MOM Hub · Hub CSS
  * ============================================================
- * Charte CSS commune aux 3 pages : index.html, login.html, dashboard.html.
+ * Charte CSS commune aux pages : index.html, login.html, dashboard.html,
+ * compositions.html (Phase 4.4).
  *
  * Contient :
  *   1. Polices Google (Oswald, Manrope, JetBrains Mono) via @import
- *   2. Palette de variables CSS (canonique + variables sémantiques feedback)
+ *   2. Palette de variables CSS (canonique + variables sémantiques feedback
+ *      + 2 variables Phase 4.4 pour les 4 couleurs joueur)
  *   3. Reset + base typographique partagés
  *   4. Topbar Hub partagée (acquis Phase 2.5, structure complète)
  *   5. États d'auth pilotés par classes sur <body>
@@ -17,11 +19,21 @@
  *   - Le layout spécifique à chaque page (grid, sidebar, etc.)
  *   - Les composants métier (cards, kpi, etc. de index.html)
  *   - Les composants spécifiques à login (.card centrée) ou dashboard
+ *   - Le CSS Phase 4.4 spécifique à compositions.html (vient plus tard
+ *     en sous-étape 6b si nécessaire — pour l'instant on garde tout
+ *     inline dans compositions.html pour ne pas alourdir hub.css)
  *
- * Version : 1.0 — Phase 3 (12 mai 2026)
- *   - Factorisation issue de la dette #11 (STATE.md)
- *   - Palette canonique alignée sur celle d'index.html (15 variables)
- *   - login.html et dashboard.html adoptent la topbar complète (cf. choix B+D session de conv Production)
+ * Version : 1.1 — Phase 4.4 (13 mai 2026)
+ *   v1.0 — Phase 3 (12 mai 2026) :
+ *     - Factorisation issue de la dette #11 (STATE.md)
+ *     - Palette canonique alignée sur celle d'index.html (15 variables)
+ *     - login.html et dashboard.html adoptent la topbar complète
+ *   v1.1 — Phase 4.4 (13 mai 2026) :
+ *     - Ajout des 2 variables --bleu-base et --rouge-blesse pour les
+ *       4 couleurs joueur de l'éditeur de compo (cf. doc Conception
+ *       Phase 4.4 §6.2). Les 2 autres couleurs (orange modifié, vert
+ *       indépendant) réutilisent les variables existantes --clay et
+ *       --vert-prairie.
  */
 
 
@@ -59,6 +71,16 @@
   --feedback-error-fg: #8a1b14;
   --feedback-info-bg: #eaf1fa;
   --feedback-info-fg: #1f4a82;
+
+  /* Variables Phase 4.4 — 4 couleurs etat_joueur de l'éditeur compo
+     (cf. doc Conception Phase 4.4 §6.2). Doctrinalement non-négociables
+     (héritage SAR×MOM Compos via audit v3 §0.4).
+       - base        → --bleu-base       (cette variable, bleu nuit M2M)
+       - modifie     → --clay            (existant, orange/terracotta)
+       - independant → --vert-prairie    (existant, vert prairie)
+       - blesse      → --rouge-blesse    (cette variable, rouge alarme) */
+  --bleu-base: #3066BE;
+  --rouge-blesse: #C73E3E;
 }
 
 
@@ -101,7 +123,7 @@ body.fullscreen-app {
 
 
 /* ============================================================
- * 4. TOPBAR HUB (partagée par les 3 pages)
+ * 4. TOPBAR HUB (partagée par les pages)
  * ============================================================
  * Acquis Phase 2.5. Structure HTML attendue dans chaque page :
  *
@@ -355,9 +377,10 @@ body.fullscreen-app {
  * - Anonyme : on cache user-profile, on montre login-pill
  * - Admin : on garde user-profile (avec ses boutons), on cache login-pill
  *
- * Pour les pages sécurisées (dashboard.html) qui veulent masquer
- * tout le contenu pendant la vérification de session, utiliser
- * en complément la classe body.auth-pending (gérée page par page).
+ * Pour les pages sécurisées (dashboard.html, compositions.html) qui
+ * veulent masquer tout le contenu pendant la vérification de session,
+ * utiliser en complément la classe body.auth-pending (gérée page
+ * par page).
  */
 body:not(.auth-resolved) .user-profile,
 body:not(.auth-resolved) .login-pill {
