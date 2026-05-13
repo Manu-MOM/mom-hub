@@ -6,12 +6,17 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
- * Version : 3.1 — Phase 4.4 étape 6c-2/6c-3 (13 mai 2026)
+ * Version : 3.2 — Phase 4.4 étape 6c-2/6c-3 (13 mai 2026)
  *   v3.0 : Vue Liste + Popover Picker
  *   v3.1 : Fix mapping colonnes table postes Supabase :
  *           - poste.uuid → poste.id
  *           - poste.numero_maillot → poste.numero_xv
  *           - retrait du filtre formats_applicables (la table n'a que les 15 XV)
+ *   v3.2 : Fix lecture nom/prenom joueur :
+ *           - cj.personnes est null car RLS bloque la jointure depuis
+ *             composition_joueurs vers personnes
+ *           - lookup direct dans State.vivierById qui passe par la RPC
+ *             get_vivier_compo (SECURITY DEFINER) → RLS-safe
  */
 
 (function () {
@@ -69,14 +74,14 @@
     const d = new Date(isoDate);
     const jours = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
     const mois  = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
-    return `${jours[d.getDay()]} ${d.getDate()} ${mois[d.getMonth()]} ${d.getFullYear()}`;
+    return jours[d.getDay()] + ' ' + d.getDate() + ' ' + mois[d.getMonth()] + ' ' + d.getFullYear();
   }
   function formatDateShort(isoDate) {
     if (!isoDate) return '';
     const d = new Date(isoDate);
     const jours = ['dim.','lun.','mar.','mer.','jeu.','ven.','sam.'];
     const mois  = ['jan','fév','mar','avr','mai','juin','juil','août','sept','oct','nov','déc'];
-    return `${jours[d.getDay()]} ${d.getDate()} ${mois[d.getMonth()]}`;
+    return jours[d.getDay()] + ' ' + d.getDate() + ' ' + mois[d.getMonth()];
   }
   function libelleTypeEvenement(type) {
     if (type === 'entrainement')         return 'Entraînement';
@@ -134,7 +139,7 @@
   function postesVides() {
     const occupes = new Set();
     for (const cj of State.compoJoueurs) if (cj.role === 'titulaire') occupes.add(cj.poste_id);
-    return State.postes.filter(p => !occupes.has(p.id));   // v3.1 : p.id (pas p.uuid)
+    return State.postes.filter(p => !occupes.has(p.id));
   }
   function joueurDuPoste(posteId) {
     return State.compoJoueurs.find(cj => cj.role === 'titulaire' && cj.poste_id === posteId);
@@ -246,7 +251,7 @@
     addTab.type = 'button';
     addTab.className = 'compo-tabs__tab compo-tabs__tab--add';
     addTab.textContent = '+';
-    addTab.title = compoBase ? 'Créer une compo de match dérivée de la base' : 'Crée d\'abord une compo de base';
+    addTab.title = compoBase ? 'Créer une compo de match dérivée de la base' : "Crée d'abord une compo de base";
     addTab.disabled = !compoBase;
     addTab.addEventListener('click', function () { alert('Création de compo de match : à brancher en étape 6c-6'); });
     container.appendChild(addTab);
@@ -326,7 +331,7 @@
     bindSlotHandlers();
   }
 
-  // v3.1 : utilise poste.id (pas poste.uuid) et poste.numero_xv (pas poste.numero_maillot)
+  // v3.2 : lookup joueur depuis State.vivierById (RLS-safe via RPC get_vivier_compo)
   function renderSlotPoste(poste) {
     const cj = joueurDuPoste(poste.id);
     if (!cj) {
@@ -338,14 +343,14 @@
         '</li>'
       );
     }
-    const p = cj.personnes || {};
+    const j = getJoueurVivier(cj.joueur_id) || {};
     return (
       '<li class="slot slot--occupe ' + cssClassEtatJoueur(cj.etat_joueur) + '" data-compo-joueur-id="' + escapeHtml(cj.id) + '" data-poste-id="' + escapeHtml(poste.id) + '">' +
         '<span class="slot__num">' + escapeHtml(cj.numero_maillot != null ? cj.numero_maillot : poste.numero_xv || '') + '</span>' +
         '<span class="slot__poste-label">' + escapeHtml(poste.libelle_court || poste.code) + '</span>' +
         '<span class="slot__joueur">' +
-          '<span class="slot__nom">' + escapeHtml(p.nom || '?') + '</span>' +
-          '<span class="slot__prenom">' + escapeHtml(p.prenom || '') + '</span>' +
+          '<span class="slot__nom">' + escapeHtml(j.nom || '?') + '</span>' +
+          '<span class="slot__prenom">' + escapeHtml(j.prenom || '') + '</span>' +
         '</span>' +
         (cj.est_depannage_hors_categorie ? '<span class="slot__warning" title="Joueur hors catégorie M14">⚠</span>' : '') +
         '<span class="slot__etat" title="État du joueur">' + libelleEtatJoueurCourt(cj.etat_joueur) + '</span>' +
@@ -354,6 +359,7 @@
     );
   }
 
+  // v3.2 : idem
   function renderSlotRemplacant(numeroMaillot, cj) {
     if (!cj) {
       return (
@@ -364,14 +370,14 @@
         '</li>'
       );
     }
-    const p = cj.personnes || {};
+    const j = getJoueurVivier(cj.joueur_id) || {};
     return (
       '<li class="slot slot--occupe slot--remplacant ' + cssClassEtatJoueur(cj.etat_joueur) + '" data-compo-joueur-id="' + escapeHtml(cj.id) + '">' +
         '<span class="slot__num">' + escapeHtml(cj.numero_maillot || numeroMaillot) + '</span>' +
         '<span class="slot__poste-label">Remp.</span>' +
         '<span class="slot__joueur">' +
-          '<span class="slot__nom">' + escapeHtml(p.nom || '?') + '</span>' +
-          '<span class="slot__prenom">' + escapeHtml(p.prenom || '') + '</span>' +
+          '<span class="slot__nom">' + escapeHtml(j.nom || '?') + '</span>' +
+          '<span class="slot__prenom">' + escapeHtml(j.prenom || '') + '</span>' +
         '</span>' +
         (cj.est_depannage_hors_categorie ? '<span class="slot__warning" title="Joueur hors catégorie M14">⚠</span>' : '') +
         '<span class="slot__etat">' + libelleEtatJoueurCourt(cj.etat_joueur) + '</span>' +
@@ -494,7 +500,6 @@
     bindPopoverHandlers();
   }
 
-  // v3.1 : utilise poste.numero_xv
   function renderPopoverSlotVide() {
     const pv = State.popover;
     const search = (pv.search || '').toLowerCase();
@@ -544,7 +549,6 @@
     return html;
   }
 
-  // v3.1 : utilise poste.id et poste.numero_xv
   function renderPopoverJoueurVivier() {
     const pv = State.popover;
     const joueur = getJoueurVivier(pv.joueurId);
@@ -697,7 +701,6 @@
     renderEffectifPanel();
   }
 
-  // v3.1 : utilise poste.id et poste.numero_xv
   async function onPickJoueurPourSlot(joueurId) {
     const pv = State.popover;
     if (!pv) return;
@@ -736,7 +739,6 @@
     renderEffectifPanel();
   }
 
-  // v3.1 : utilise poste.id et poste.numero_xv
   async function onPickPostePourJoueur(posteId) {
     const pv = State.popover;
     if (!pv) return;
@@ -817,9 +819,6 @@
     for (const j of State.vivier) State.vivierById.set(j.joueur_id, j);
     return State.vivier;
   }
-
-  // v3.1 : indexation par poste.id, tri par poste.numero_xv,
-  //        plus de filtre formats_applicables (la table contient les 15 XV)
   async function loadPostes() {
     const all = await SupabaseHub.getPostes();
     State.postes = (all || []).slice().sort((a, b) => (a.numero_xv || 99) - (b.numero_xv || 99));
@@ -867,7 +866,7 @@
     bindPopoverOutsideClick();
 
     console.log(
-      '%c🏉 Compositions Editor v3.1 (étape 6c-2 + 6c-3) chargé',
+      '%c🏉 Compositions Editor v3.2 (étape 6c-2 + 6c-3) chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         evenements: State.evenements.length,
