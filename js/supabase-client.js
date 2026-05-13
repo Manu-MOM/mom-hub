@@ -18,32 +18,29 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.7 — mai 2026
+ * Version : 1.7.1 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
- *          (fix : supabase-js v2 utilise window.location.origin par défaut,
- *           pas la Site URL Supabase — d'où le redirect cassé sur les Pages
- *           hébergées dans un sous-chemin /mom-hub/).
  *   v1.3 : helpers de session pour pages sécurisées — Phase 2.5.4
- *          getMyRoles (cache mémoire), hasRole, isAdmin, requireAuth,
- *          onAuthChange ; signOut invalide le cache et redirige.
  *   v1.4 : (mise à jour interne sans nouveaux helpers — changelog rattrapé en v1.5)
- *   v1.5 : wrappers Phase 4.2.C pour les RPC événements —
- *          getEvenementsAVenir(equipeId, joursAVenir),
- *          getProchainEvenementParEquipe(equipeId).
- *   v1.6 : wrapper Phase 4.3 pour la RPC vivier — getVivierCompo(equipeId).
- *          Ferme la dette (o) du STATE.md.
+ *   v1.5 : wrappers Phase 4.2.C pour les RPC événements
+ *   v1.6 : wrapper Phase 4.3 pour la RPC vivier — getVivierCompo(equipeId)
  *   v1.7 : wrappers ÉCRITURE Phase 4.4 UI compositions —
  *          createCompo, duplicateCompoFromBase, addJoueurCompo,
  *          updateJoueurCompo, removeJoueurCompo, updateCompoNotes,
  *          validateCompo, unvalidateCompo, markCompoUtilisee,
  *          archiveCompo, listCompositionsByEquipe, getCompoComplete.
- *          Pattern : retour {ok, data, error} unifié pour gérer
- *          gracefully les erreurs RLS côté UI. Doctrine côté JS
- *          (pas de RPC dédiée) pour la duplication base→match :
- *          INSERT compo + INSERT batch joueurs en 2 appels,
- *          rollback manuel côté JS si la 2e requête échoue.
+ *   v1.7.1 : fix robustesse — remplacement de .single() par
+ *          .maybeSingle() sur validateCompo / unvalidateCompo /
+ *          markCompoUtilisee, qui combinent UPDATE + filtre sur état
+ *          source. Sans ce fix, un appel "à blanc" (compo dans le
+ *          mauvais état source) renvoyait l'erreur PostgREST brute
+ *          "Cannot coerce the result to a single JSON object" au lieu
+ *          du message métier "La compo n'est pas en état '...'".
+ *          Détecté en smoke test : 2e appel validateCompo sur compo
+ *          déjà validée. Comportement vu par l'utilisateur final
+ *          désormais aligné sur le message custom du garde-fou.
  */
 
 (function (global) {
@@ -342,15 +339,15 @@
     // Pattern de retour unifié pour tous les wrappers d'écriture :
     //   { ok: true,  data: <objet ou tableau> }      → succès
     //   { ok: false, error: <string|object> }        → échec
-    // Permet aux callers (UI) un branchement simple :
-    //   const r = await SupabaseHub.createCompo({...});
-    //   if (!r.ok) { alert(r.error); return; }
-    //   const compo = r.data;
     //
-    // RLS write actives depuis sql/24-25-26 :
-    //   - INSERT/UPDATE compositions, composition_joueurs : admin OU coach
-    //   - DELETE compositions, composition_joueurs       : admin OU coach
-    //   - Toutes les écritures requièrent une session authentifiée
+    // Note v1.7.1 : les wrappers UPDATE qui combinent un filtre sur
+    // l'état source (validateCompo, unvalidateCompo, markCompoUtilisee)
+    // utilisent .maybeSingle() et non .single(). Raison : avec .single()
+    // PostgREST traite "0 ligne updatée" comme une erreur PGRST116
+    // ("Cannot coerce the result to a single JSON object"), masquant
+    // le message métier qu'on veut renvoyer. Avec .maybeSingle(), data
+    // vaut null si aucune ligne ne matche, et notre check `if (!data)`
+    // peut alors renvoyer le message correct au caller.
 
     // ----------------------------------------------------------
     // LECTURE — Compositions
@@ -373,10 +370,6 @@
       const opts = options || {};
       const onlyActive = opts.onlyActive !== false;
 
-      // Jointure compositions ← evenements (via FK evenement_id) pour
-      // obtenir équipe_id et libellés. Filtre côté evenements.equipe_id
-      // ne fonctionne pas en select() chaîné classique : on passe par
-      // une jointure inner et on filtre via .eq() sur la colonne jointe.
       let q = client
         .from('compositions')
         .select(`
@@ -411,7 +404,6 @@
         console.error('MOM Hub: getCompoComplete() requiert un compoId');
         return null;
       }
-      // 2 requêtes en parallèle : la compo elle-même et ses joueurs
       const [compoRes, joueursRes] = await Promise.all([
         client.from('compositions').select('*').eq('id', compoId).single(),
         client
@@ -447,13 +439,6 @@
 
     /**
      * Crée une nouvelle composition vierge (sans joueurs).
-     * Utilisé par E2 Modale Création quand l'utilisateur choisit "Compo vierge".
-     *
-     * @param {object} params
-     * @param {string} params.evenement_id UUID de l'événement
-     * @param {string} params.type_compo   'base' ou 'match'
-     * @param {string} [params.compo_base_origine_id] UUID compo origine (si type='match' et dérivation)
-     * @returns {Promise<{ok: boolean, data?: object, error?: string}>}
      */
     async createCompo(params) {
       if (!params || !params.evenement_id || !params.type_compo) {
@@ -494,26 +479,13 @@
     /**
      * Duplique une compo de base vers une nouvelle compo de match.
      * 2 appels successifs (INSERT compo + INSERT batch joueurs) en JS pur,
-     * avec rollback manuel si la 2e étape échoue. Pattern P1 simplicité
-     * (pas de RPC dédiée tant que les volumes restent faibles).
-     *
-     * Utilisé par E2 quand l'utilisateur choisit "Dupliquer une compo"
-     * ou par l'action "Créer la compo de match à partir de la base"
-     * depuis E1/E3.
-     *
-     * @param {string} compoBaseId UUID de la compo source (type='base')
-     * @param {string} evenementId UUID de l'événement cible (peut être identique
-     *                             à celui de la base — cas normal d'un même match
-     *                             — ou différent si rejouer une base sur un autre événement)
-     * @returns {Promise<{ok: boolean, data?: object, error?: string}>}
-     *          data = { compo: <nouvelleCompo>, joueurs: [<lignesDupliquees>] }
+     * avec rollback manuel si la 2e étape échoue.
      */
     async duplicateCompoFromBase(compoBaseId, evenementId) {
       if (!compoBaseId || !evenementId) {
         return { ok: false, error: 'compoBaseId et evenementId requis' };
       }
 
-      // 1) Lecture de la compo source + ses joueurs
       const source = await this.getCompoComplete(compoBaseId);
       if (!source) {
         return { ok: false, error: 'Compo source introuvable' };
@@ -522,7 +494,6 @@
         return { ok: false, error: 'La compo source doit être de type "base"' };
       }
 
-      // 2) Création de la nouvelle compo de match
       const createRes = await this.createCompo({
         evenement_id: evenementId,
         type_compo: 'match',
@@ -531,7 +502,6 @@
       if (!createRes.ok) return createRes;
       const newCompo = createRes.data;
 
-      // 3) Duplication batch des joueurs : tous initialement etat_joueur='base'
       if (source.joueurs.length === 0) {
         return { ok: true, data: { compo: newCompo, joueurs: [] } };
       }
@@ -544,8 +514,8 @@
           role: j.role,
           ordre_remplacement: j.ordre_remplacement,
           est_depannage_hors_categorie: j.est_depannage_hors_categorie,
-          etat_joueur: 'base',  // ← tous en bleu au démarrage
-          notes_joueur: null     // on ne reprend pas les notes individuelles
+          etat_joueur: 'base',
+          notes_joueur: null
         };
       });
 
@@ -555,7 +525,6 @@
         .select();
 
       if (joueursErr) {
-        // Rollback manuel : on tente de supprimer la compo créée à l'étape 2
         console.error('MOM Hub: duplicateCompoFromBase() joueurs error, rollback', joueursErr);
         await client.from('compositions').delete().eq('id', newCompo.id);
         return { ok: false, error: 'Échec duplication joueurs : ' + joueursErr.message };
@@ -565,11 +534,7 @@
     },
 
     /**
-     * Met à jour le champ notes_compo d'une compo (autosave de la textarea).
-     *
-     * @param {string} compoId UUID
-     * @param {string} notes   Nouveau texte (peut être vide)
-     * @returns {Promise<{ok, data?, error?}>}
+     * Met à jour le champ notes_compo (autosave de la textarea).
      */
     async updateCompoNotes(compoId, notes) {
       if (!compoId) return { ok: false, error: 'compoId requis' };
@@ -587,11 +552,9 @@
     },
 
     /**
-     * Passe une compo de 'brouillon' à 'validee'. Le coach a explicitement
-     * confirmé. Pastille d'état devient verte côté UI.
-     *
-     * @param {string} compoId UUID
-     * @returns {Promise<{ok, data?, error?}>}
+     * Passe une compo de 'brouillon' à 'validee'.
+     * Utilise .maybeSingle() : si la compo n'est pas en 'brouillon',
+     * data vaut null et on renvoie le message métier.
      */
     async validateCompo(compoId) {
       if (!compoId) return { ok: false, error: 'compoId requis' };
@@ -599,9 +562,9 @@
         .from('compositions')
         .update({ etat: 'validee' })
         .eq('id', compoId)
-        .eq('etat', 'brouillon')   // garde-fou : seul brouillon → validee autorisé ici
+        .eq('etat', 'brouillon')
         .select()
-        .single();
+        .maybeSingle();
       if (error) {
         console.error('MOM Hub: validateCompo()', error);
         return { ok: false, error: error.message };
@@ -613,11 +576,8 @@
     },
 
     /**
-     * Repasse une compo de 'validee' à 'brouillon'. Accessible au coach
-     * jusqu'au coup d'envoi (cf. doc Conception §5.5).
-     *
-     * @param {string} compoId UUID
-     * @returns {Promise<{ok, data?, error?}>}
+     * Repasse une compo de 'validee' à 'brouillon'.
+     * Utilise .maybeSingle() pour le garde-fou métier.
      */
     async unvalidateCompo(compoId) {
       if (!compoId) return { ok: false, error: 'compoId requis' };
@@ -625,9 +585,9 @@
         .from('compositions')
         .update({ etat: 'brouillon' })
         .eq('id', compoId)
-        .eq('etat', 'validee')     // garde-fou : seul validee → brouillon
+        .eq('etat', 'validee')
         .select()
-        .single();
+        .maybeSingle();
       if (error) {
         console.error('MOM Hub: unvalidateCompo()', error);
         return { ok: false, error: error.message };
@@ -639,12 +599,8 @@
     },
 
     /**
-     * Marque manuellement une compo comme 'utilisee' (verrouillage final V1).
-     * À automatiser plus tard quand le module Suivi Match sera construit
-     * (cf. doc Conception §5.5).
-     *
-     * @param {string} compoId UUID
-     * @returns {Promise<{ok, data?, error?}>}
+     * Marque manuellement une compo comme 'utilisee'.
+     * Utilise .maybeSingle() pour le garde-fou métier.
      */
     async markCompoUtilisee(compoId) {
       if (!compoId) return { ok: false, error: 'compoId requis' };
@@ -652,9 +608,9 @@
         .from('compositions')
         .update({ etat: 'utilisee' })
         .eq('id', compoId)
-        .eq('etat', 'validee')     // garde-fou : seul validee → utilisee
+        .eq('etat', 'validee')
         .select()
-        .single();
+        .maybeSingle();
       if (error) {
         console.error('MOM Hub: markCompoUtilisee()', error);
         return { ok: false, error: error.message };
@@ -667,10 +623,6 @@
 
     /**
      * Archive une compo (etat='archivee' + est_active=FALSE).
-     * Conserve la traçabilité, retire du flux actif.
-     *
-     * @param {string} compoId UUID
-     * @returns {Promise<{ok, data?, error?}>}
      */
     async archiveCompo(compoId) {
       if (!compoId) return { ok: false, error: 'compoId requis' };
@@ -693,18 +645,6 @@
 
     /**
      * Ajoute un joueur à une compo (1 ligne dans composition_joueurs).
-     * Utilisé après sélection dans le Popover Picker (E5).
-     *
-     * @param {object} params
-     * @param {string} params.composition_id UUID de la compo
-     * @param {string} params.joueur_id      UUID du joueur (FK personnes)
-     * @param {string} params.poste_id       Code poste (postes.json, ex 'pst-001')
-     * @param {string} [params.role='titulaire'] 'titulaire' | 'remplacant' | 'reserve'
-     * @param {string} [params.etat_joueur='base'] 'base' | 'modifie' | 'independant' | 'blesse'
-     * @param {number} [params.numero_maillot]   Optionnel
-     * @param {number} [params.ordre_remplacement] Optionnel
-     * @param {boolean} [params.est_depannage_hors_categorie=false]
-     * @returns {Promise<{ok, data?, error?}>}
      */
     async addJoueurCompo(params) {
       if (!params || !params.composition_id || !params.joueur_id || !params.poste_id) {
@@ -738,13 +678,7 @@
     },
 
     /**
-     * Met à jour une ligne composition_joueurs.
-     * Champs autorisés : poste_id, role, numero_maillot, ordre_remplacement,
-     * etat_joueur, est_depannage_hors_categorie, notes_joueur.
-     *
-     * @param {string} compoJoueurId UUID de la ligne
-     * @param {object} patch         Objet partiel des champs à mettre à jour
-     * @returns {Promise<{ok, data?, error?}>}
+     * Met à jour une ligne composition_joueurs avec whitelist des champs.
      */
     async updateJoueurCompo(compoJoueurId, patch) {
       if (!compoJoueurId) return { ok: false, error: 'compoJoueurId requis' };
@@ -780,11 +714,6 @@
 
     /**
      * Raccourci : change uniquement l'etat_joueur (bleu/orange/vert/rouge).
-     * Wrapper sur updateJoueurCompo pour le cas d'usage le plus fréquent.
-     *
-     * @param {string} compoJoueurId UUID
-     * @param {string} etat          'base' | 'modifie' | 'independant' | 'blesse'
-     * @returns {Promise<{ok, data?, error?}>}
      */
     async updateJoueurEtat(compoJoueurId, etat) {
       const validEtats = ['base', 'modifie', 'independant', 'blesse'];
@@ -796,9 +725,6 @@
 
     /**
      * Retire un joueur d'une compo (DELETE de la ligne composition_joueurs).
-     *
-     * @param {string} compoJoueurId UUID de la ligne
-     * @returns {Promise<{ok, data?, error?}>}
      */
     async removeJoueurCompo(compoJoueurId) {
       if (!compoJoueurId) return { ok: false, error: 'compoJoueurId requis' };
@@ -823,7 +749,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.7 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.7.1 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
