@@ -1,0 +1,77 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "date_publication": "2026-05-14",
+    "source": "Brief-Conception-Module-Preparation-Seance-v1.md §Q4 (4 axes du Vocabulaire MOM Hub)",
+    "note": "Miroir Drive prévu : 01 - Référentiels/preparation-seance/vocabulaire-seance.json (à déposer ultérieurement). Le doc Drive MOM-Hub_vocabulaire-preparation-seance.docx étant introuvable au 14 mai 2026, ce JSON est construit directement à partir du Brief §Q4 qui en consolide les 36 termes.",
+    "recommandation_usage": "Choisir un axe comme structure principale et utiliser les autres comme étiquettes pour qualifier le contenu. L'Axe 1 (phases macro chronologiques) est l'axe naturel pour structurer une trame de séance. Les Axes 2 et 3 sont des étiquettes contextuelles. L'Axe 4 structure le contenu pédagogique de chaque bloc."
+  },
+
+  "axe_1_phases_macro": {
+    "libelle": "Phases macro chronologiques",
+    "nb_termes": 9,
+    "usage": "Axe principal de structuration de la trame. Cf. data/types-blocs.json pour la liste élargie avec 2 utilitaires (pause boisson, bloc libre).",
+    "valeurs": [
+      { "slug": "accueil",                 "libelle": "Accueil / Présentation" },
+      { "slug": "mise_en_train",           "libelle": "Mise en train" },
+      { "slug": "echauffement",            "libelle": "Échauffement" },
+      { "slug": "echauffement_specifique", "libelle": "Échauffement spécifique / PPS" },
+      { "slug": "corps_seance",            "libelle": "Corps de séance" },
+      { "slug": "jeu_application",         "libelle": "Jeu d'application / Situation de référence" },
+      { "slug": "match_application",       "libelle": "Match d'application" },
+      { "slug": "retour_au_calme",         "libelle": "Retour au calme" },
+      { "slug": "bilan",                   "libelle": "Bilan / Débriefing" }
+    ]
+  },
+
+  "axe_2_types_unites": {
+    "libelle": "Types d'unités d'entraînement",
+    "nb_termes": 10,
+    "usage": "Étiquettes contextuelles proposées dans le détail d'un bloc dont le type est Corps de séance, Jeu d'application ou Match d'application. Stocké dans seances_blocs.etiquette_axe2 (text).",
+    "valeurs": [
+      { "slug": "atelier",                 "libelle": "Atelier" },
+      { "slug": "situation_apprentissage", "libelle": "Situation d'apprentissage" },
+      { "slug": "situation_reference",     "libelle": "Situation de référence" },
+      { "slug": "drill",                   "libelle": "Drill" },
+      { "slug": "forme_jouee",             "libelle": "Forme jouée" },
+      { "slug": "jeu_reduit",              "libelle": "Jeu réduit" },
+      { "slug": "opposition",              "libelle": "Opposition" },
+      { "slug": "circuit",                 "libelle": "Circuit" },
+      { "slug": "lancement_jeu",           "libelle": "Lancement de jeu" },
+      { "slug": "situation_globale",       "libelle": "Situation globale" }
+    ]
+  },
+
+  "axe_3_composants_echauffement": {
+    "libelle": "Composants d'échauffement",
+    "nb_termes": 7,
+    "usage": "Étiquettes contextuelles proposées dans le détail d'un bloc dont le type est Échauffement ou Échauffement spécifique. Stocké dans seances_blocs.etiquette_axe3 (text).",
+    "valeurs": [
+      { "slug": "mobilisation",              "libelle": "Mobilisation" },
+      { "slug": "cardio_progressif",         "libelle": "Cardio progressif" },
+      { "slug": "activation_neuromusculaire","libelle": "Activation neuromusculaire" },
+      { "slug": "gammes_athletiques",        "libelle": "Gammes athlétiques" },
+      { "slug": "manipulations",             "libelle": "Manipulations" },
+      { "slug": "echauffement_reactif",      "libelle": "Échauffement réactif" },
+      { "slug": "etirements_dynamiques",     "libelle": "Étirements dynamiques" }
+    ]
+  },
+
+  "axe_4_champs_ffr": {
+    "libelle": "Champs FFR d'une fiche",
+    "nb_termes": 10,
+    "usage": "Structure le contenu pédagogique de tous les blocs. Stocké dans seances_blocs.contenu_pedagogique_axe4 (jsonb : { objectif: '...', consigne: '...', ... }). Transversal : ne s'utilise pas comme étiquette unique mais comme structure d'objet.",
+    "valeurs": [
+      { "slug": "objectif",            "libelle": "Objectif" },
+      { "slug": "but",                 "libelle": "But" },
+      { "slug": "consigne",            "libelle": "Consigne" },
+      { "slug": "cr",                  "libelle": "CR (Critère de Réussite)" },
+      { "slug": "critere_realisation", "libelle": "Critère de réalisation" },
+      { "slug": "comportements",       "libelle": "Comportements" },
+      { "slug": "variables",           "libelle": "Variables" },
+      { "slug": "regulations",         "libelle": "Régulations" },
+      { "slug": "dispositif",          "libelle": "Dispositif" },
+      { "slug": "transitions",         "libelle": "Transitions" }
+    ]
+  }
+}
