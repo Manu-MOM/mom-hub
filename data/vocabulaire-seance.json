@@ -1,7 +1,11 @@
 {
   "_meta": {
-    "version": "1.0",
+    "version": "1.1",
     "date_publication": "2026-05-14",
+    "changelog": [
+      "v1.1 (14 mai soir) — Axe 4 : libellé 'CR (Critère de Réussite)' reformulé en 'Critère de Réussite (CR)' pour lisibilité. Slug 'cr' inchangé.",
+      "v1.0 (14 mai) — Version initiale construite à partir du Brief §Q4."
+    ],
     "source": "Brief-Conception-Module-Preparation-Seance-v1.md §Q4 (4 axes du Vocabulaire MOM Hub)",
     "note": "Miroir Drive prévu : 01 - Référentiels/preparation-seance/vocabulaire-seance.json (à déposer ultérieurement). Le doc Drive MOM-Hub_vocabulaire-preparation-seance.docx étant introuvable au 14 mai 2026, ce JSON est construit directement à partir du Brief §Q4 qui en consolide les 36 termes.",
     "recommandation_usage": "Choisir un axe comme structure principale et utiliser les autres comme étiquettes pour qualifier le contenu. L'Axe 1 (phases macro chronologiques) est l'axe naturel pour structurer une trame de séance. Les Axes 2 et 3 sont des étiquettes contextuelles. L'Axe 4 structure le contenu pédagogique de chaque bloc."
@@ -65,7 +69,7 @@
       { "slug": "objectif",            "libelle": "Objectif" },
       { "slug": "but",                 "libelle": "But" },
       { "slug": "consigne",            "libelle": "Consigne" },
-      { "slug": "cr",                  "libelle": "CR (Critère de Réussite)" },
+      { "slug": "cr",                  "libelle": "Critère de Réussite (CR)" },
       { "slug": "critere_realisation", "libelle": "Critère de réalisation" },
       { "slug": "comportements",       "libelle": "Comportements" },
       { "slug": "variables",           "libelle": "Variables" },

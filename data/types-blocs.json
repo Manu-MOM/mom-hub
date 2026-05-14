@@ -1,14 +1,13 @@
 {
   "_meta": {
-    "version": "1.0",
+    "version": "1.1",
     "date_publication": "2026-05-14",
+    "changelog": [
+      "v1.1 (14 mai soir) — Arbitrages Manu post-livraison v1.0 : (1) Mise en train passe affiche_intensite=false intensite_defaut=null (cohérent avec autres blocs non-sportifs, friction inutile sinon). (2) Bloc libre durée 10 min confirmée. (3) Axe 4 'CR' et 'Critère de réalisation' conservés tous les deux (distinction pédagogique : CR = mesurable, Critère de réalisation = consigne d'exécution).",
+      "v1.0 (14 mai) — Version initiale construite à partir du Brief §Q4 et §Q5."
+    ],
     "source": "Brief-Conception-Module-Preparation-Seance-v1.md §Q4 (11 types) et §Q5 (4 niveaux d'intensité)",
-    "note": "Slugs alignés sur les CHECK constraints SQL : seances_blocs.type_bloc et seances_blocs.intensite. Référentiel technique pur (pas de miroir Drive prévu).",
-    "decisions_a_valider_manu": [
-      "Mise en train : pas explicitement classée dans le brief §Q5 entre les types qui affichent l'intensité et ceux qui ne l'affichent pas. Choix V1 : affiche_intensite = true, intensite_defaut = sans_contact (cohérent avec 'démarrage en douceur avec ballon').",
-      "Bloc libre : brief donne durée 'variable'. Choix V1 : duree_min_defaut = 10 (valeur raisonnable, ajustable par le coach à la création).",
-      "Axe 4 'CR' vs 'Critère réalisation' : les 2 termes apparaissent dans le brief §Q4. Conservés tels quels en V1, à clarifier si redondance."
-    ]
+    "note": "Slugs alignés sur les CHECK constraints SQL : seances_blocs.type_bloc et seances_blocs.intensite. Référentiel technique pur (pas de miroir Drive prévu)."
   },
 
   "intensites": {
@@ -70,8 +69,8 @@
         "ordre_natif": 2,
         "duree_min_defaut": 10,
         "description": "Démarrage en douceur avec ballon",
-        "affiche_intensite": true,
-        "intensite_defaut": "sans_contact",
+        "affiche_intensite": false,
+        "intensite_defaut": null,
         "etiquettes_proposees": []
       },
       {
