@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.7.1 — mai 2026
+ * Version : 1.8 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -41,6 +41,17 @@
  *          Détecté en smoke test : 2e appel validateCompo sur compo
  *          déjà validée. Comportement vu par l'utilisateur final
  *          désormais aligné sur le message custom du garde-fou.
+ *   v1.8 : Phase 5.3 — 13 wrappers Préparation de séance.
+ *          LECTURE (4) : listSeancesByEquipe, getSeanceComplete,
+ *          getSeancesAVenir (RPC), listModelesSeance.
+ *          ÉCRITURE séance (3) : createSeance, updateSeance, archiveSeance.
+ *          ÉCRITURE bloc (4) : addBlocToSeance, updateBloc, removeBloc,
+ *          reorderBlocs.
+ *          ÉCRITURE rattachement atelier (2) : attachAtelierToBloc,
+ *          detachAtelierFromBloc.
+ *          Note : le brief listait 12 wrappers. Ajout du 13e
+ *          getSeancesAVenir par cohérence avec la RPC SQL créée en
+ *          Phase 5.1 (sinon orpheline).
  */
 
 (function (global) {
@@ -739,6 +750,575 @@
         return { ok: false, error: error.message };
       }
       return { ok: true, data };
+    },
+
+    // ============================================================
+    // PHASE 5.3 — WRAPPERS PRÉPARATION DE SÉANCE (v1.8)
+    // ============================================================
+    // 13 wrappers pour piloter les 3 tables seances / seances_blocs /
+    // seances_blocs_ateliers créées en Phase 5.1, et appeler les 2 RPC
+    // get_seances_a_venir + get_seance_complete.
+    //
+    // Pattern de retour identique aux wrappers Compositions Phase 4.4 :
+    //   LECTURE     : retourne directement data (ou [] / null)
+    //   ÉCRITURE    : retourne { ok: true, data } ou { ok: false, error }
+    //
+    // CHECK constraints SQL en miroir côté JS pour fail-fast :
+    //   - type_bloc        : 11 valeurs (data/types-blocs.json)
+    //   - intensite        : 4 valeurs (data/types-blocs.json)
+    //   - etat (séance)    : 4 valeurs (brouillon/validee/utilisee/archivee)
+    //   - atelier_fileid_drive : longueur exacte 33 caractères
+
+    // ----------------------------------------------------------
+    // LECTURE — Préparation de séance
+    // ----------------------------------------------------------
+
+    /**
+     * Liste les séances d'une équipe (par défaut hors modèles, hors archivées).
+     * Utilisé par la sidebar « Mes séances récentes » du module.
+     *
+     * @param {string} equipeId UUID de l'équipe
+     * @param {object} [options]
+     * @param {boolean} [options.includeModeles=false] Inclure les modèles (est_modele=TRUE)
+     * @param {string}  [options.etat] Filtre exact sur etat (sinon : tous sauf archivee)
+     * @param {boolean} [options.excludeArchivees=true] Exclure les séances archivées
+     * @param {number}  [options.limit=10] Nombre max de résultats
+     * @returns {Promise<Array>} Tableau de séances, [] si erreur
+     */
+    async listSeancesByEquipe(equipeId, options) {
+      if (!equipeId) {
+        console.error('MOM Hub: listSeancesByEquipe() requiert un equipeId');
+        return [];
+      }
+      const opts = options || {};
+
+      let q = client
+        .from('seances')
+        .select('*')
+        .eq('equipe_id', equipeId);
+
+      // Par défaut : exclut les modèles (vraies séances seulement)
+      if (opts.includeModeles !== true) {
+        q = q.eq('est_modele', false);
+      }
+
+      // Filtre par état (mutuellement exclusif avec excludeArchivees)
+      if (opts.etat) {
+        q = q.eq('etat', opts.etat);
+      } else if (opts.excludeArchivees !== false) {
+        q = q.neq('etat', 'archivee');
+      }
+
+      const limit = opts.limit || 10;
+      q = q.order('date_seance', { ascending: false, nullsFirst: false })
+           .order('created_at', { ascending: false })
+           .limit(limit);
+
+      const { data, error } = await q;
+      if (error) {
+        console.error('MOM Hub: listSeancesByEquipe()', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * Récupère une séance complète via la RPC get_seance_complete :
+     * 1 appel = séance + blocs (ordonnés) + ateliers rattachés à chaque bloc.
+     * Utilisé à l'ouverture d'une séance dans l'éditeur.
+     *
+     * @param {string} seanceId UUID de la séance
+     * @returns {Promise<Object|null>} JSONB { seance: {...}, blocs: [...] } ou null
+     */
+    async getSeanceComplete(seanceId) {
+      if (!seanceId) {
+        console.error('MOM Hub: getSeanceComplete() requiert un seanceId');
+        return null;
+      }
+      const { data, error } = await client.rpc('get_seance_complete', {
+        p_seance_id: seanceId
+      });
+      if (error) {
+        console.error('MOM Hub: getSeanceComplete()', error);
+        return null;
+      }
+      return data;
+    },
+
+    /**
+     * Liste les séances futures d'une équipe via la RPC get_seances_a_venir.
+     * Retourne les séances de J+0 à J+joursAVenir, hors modèles et hors archivées,
+     * avec compteur de blocs par séance.
+     *
+     * @param {string} equipeId UUID de l'équipe
+     * @param {number} [joursAVenir=14] Fenêtre en jours à partir d'aujourd'hui
+     * @returns {Promise<Array>} Tableau de séances avec nb_blocs, [] si erreur
+     */
+    async getSeancesAVenir(equipeId, joursAVenir) {
+      if (!equipeId) {
+        console.error('MOM Hub: getSeancesAVenir() requiert un equipeId');
+        return [];
+      }
+      const jours = (joursAVenir === undefined || joursAVenir === null) ? 14 : joursAVenir;
+      const { data, error } = await client.rpc('get_seances_a_venir', {
+        p_equipe_id: equipeId,
+        p_jours_a_venir: jours
+      });
+      if (error) {
+        console.error('MOM Hub: getSeancesAVenir()', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * Liste les modèles de séance disponibles (est_modele=TRUE, hors archivées).
+     * Wrapper prêt pour la V2 « Nouvelle séance depuis modèle ».
+     *
+     * @param {object} [options]
+     * @param {string} [options.equipeId] Filtrer par équipe (sinon : tous modèles)
+     * @param {number} [options.limit=50]
+     * @returns {Promise<Array>} Tableau de modèles, [] si erreur
+     */
+    async listModelesSeance(options) {
+      const opts = options || {};
+      let q = client
+        .from('seances')
+        .select('*')
+        .eq('est_modele', true)
+        .neq('etat', 'archivee');
+
+      if (opts.equipeId) {
+        q = q.eq('equipe_id', opts.equipeId);
+      }
+
+      const limit = opts.limit || 50;
+      q = q.order('created_at', { ascending: false }).limit(limit);
+
+      const { data, error } = await q;
+      if (error) {
+        console.error('MOM Hub: listModelesSeance()', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    // ----------------------------------------------------------
+    // ÉCRITURE — Séance
+    // ----------------------------------------------------------
+
+    /**
+     * Crée une nouvelle séance (vraie séance datée ou modèle).
+     * Si est_modele=true, date_seance doit rester null (CHECK SQL).
+     *
+     * @param {object} params
+     * @param {string} params.equipe_id (requis)
+     * @param {boolean} [params.est_modele=false]
+     * @param {string} [params.evenement_id]
+     * @param {string} [params.date_seance] ISO date 'YYYY-MM-DD'
+     * @param {string} [params.heure_debut] 'HH:MM' ou 'HH:MM:SS'
+     * @param {number} [params.duree_totale_min=75]
+     * @param {number} [params.effectif_prevu]
+     * @param {string} [params.lieu_id]
+     * @param {string} [params.meteo_text]
+     * @param {string} [params.encadrants_text]
+     * @param {string} [params.axe_travail_general]
+     * @param {string} [params.theme_principal]
+     * @param {string} [params.objectifs_text]
+     * @param {string} [params.bloc_cycle]
+     * @param {string} [params.materiel_global_text]
+     * @param {string} [params.modele_origine_id] Si dupliqué depuis modèle
+     * @param {string} [params.etat='brouillon']
+     * @returns {Promise<{ok:boolean, data?:object, error?:string}>}
+     */
+    async createSeance(params) {
+      if (!params || !params.equipe_id) {
+        return { ok: false, error: 'equipe_id requis' };
+      }
+
+      const isModele = !!params.est_modele;
+      if (isModele && params.date_seance) {
+        return { ok: false, error: 'Un modèle ne peut pas avoir de date_seance (CHECK SQL)' };
+      }
+
+      const payload = {
+        equipe_id: params.equipe_id,
+        est_modele: isModele,
+        etat: params.etat || 'brouillon',
+        duree_totale_min: params.duree_totale_min || 75
+      };
+
+      // Champs optionnels (seulement si fournis explicitement)
+      const optionalKeys = [
+        'evenement_id', 'date_seance', 'heure_debut', 'effectif_prevu',
+        'lieu_id', 'meteo_text', 'encadrants_text',
+        'axe_travail_general', 'theme_principal', 'objectifs_text',
+        'bloc_cycle', 'materiel_global_text', 'modele_origine_id'
+      ];
+      for (const k of optionalKeys) {
+        if (params[k] !== undefined) payload[k] = params[k];
+      }
+
+      const { data, error } = await client
+        .from('seances')
+        .insert(payload)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('MOM Hub: createSeance()', error);
+        return { ok: false, error: error.message };
+      }
+      return { ok: true, data };
+    },
+
+    /**
+     * Met à jour les méta d'une séance avec whitelist des champs.
+     * NE TOUCHE PAS à : id, equipe_id, est_modele, modele_origine_id, etat,
+     * created_at, created_by. Pour archiver : utiliser archiveSeance().
+     *
+     * @param {string} seanceId
+     * @param {object} patch
+     * @returns {Promise<{ok:boolean, data?:object, error?:string}>}
+     */
+    async updateSeance(seanceId, patch) {
+      if (!seanceId) return { ok: false, error: 'seanceId requis' };
+      if (!patch || typeof patch !== 'object') {
+        return { ok: false, error: 'patch (objet) requis' };
+      }
+      const allowedKeys = [
+        'evenement_id', 'date_seance', 'heure_debut', 'duree_totale_min',
+        'effectif_prevu', 'lieu_id', 'meteo_text', 'encadrants_text',
+        'axe_travail_general', 'theme_principal', 'objectifs_text',
+        'bloc_cycle', 'materiel_global_text'
+      ];
+      const cleanPatch = {};
+      for (const k of allowedKeys) {
+        if (Object.prototype.hasOwnProperty.call(patch, k)) {
+          cleanPatch[k] = patch[k];
+        }
+      }
+      if (Object.keys(cleanPatch).length === 0) {
+        return { ok: false, error: 'Aucun champ modifiable dans patch' };
+      }
+
+      const { data, error } = await client
+        .from('seances')
+        .update(cleanPatch)
+        .eq('id', seanceId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('MOM Hub: updateSeance()', error);
+        return { ok: false, error: error.message };
+      }
+      return { ok: true, data };
+    },
+
+    /**
+     * Archive une séance (etat='archivee'). UPDATE simple sans filtre d'état
+     * source : on peut archiver depuis n'importe quel état.
+     */
+    async archiveSeance(seanceId) {
+      if (!seanceId) return { ok: false, error: 'seanceId requis' };
+      const { data, error } = await client
+        .from('seances')
+        .update({ etat: 'archivee' })
+        .eq('id', seanceId)
+        .select()
+        .single();
+      if (error) {
+        console.error('MOM Hub: archiveSeance()', error);
+        return { ok: false, error: error.message };
+      }
+      return { ok: true, data };
+    },
+
+    // ----------------------------------------------------------
+    // ÉCRITURE — Blocs de séance
+    // ----------------------------------------------------------
+
+    // 11 types de bloc autorisés (mirror CHECK SQL seances_blocs.type_bloc)
+    _validTypesBloc: [
+      'accueil', 'mise_en_train', 'echauffement', 'echauffement_specifique',
+      'corps_seance', 'jeu_application', 'match_application',
+      'retour_au_calme', 'bilan', 'pause_boisson', 'bloc_libre'
+    ],
+
+    // 4 niveaux d'intensité autorisés (mirror CHECK SQL seances_blocs.intensite)
+    _validIntensites: [
+      'sans_contact', 'toucher_ceinture', 'contact_controle', 'live_combat_reel'
+    ],
+
+    /**
+     * Ajoute un bloc à une séance. Si `ordre` n'est pas fourni, il est
+     * calculé automatiquement = max(ordre actuel) + 1 (ajout en fin de trame).
+     *
+     * @param {string} seanceId
+     * @param {object} params
+     * @param {string} params.type_bloc (requis, 1 des 11 valeurs)
+     * @param {number} params.duree_min (requis)
+     * @param {number} [params.ordre] Auto-calculé si absent
+     * @param {string} [params.titre_precision]
+     * @param {string} [params.intensite] 1 des 4 valeurs ou null
+     * @param {string} [params.etiquette_axe2]
+     * @param {string} [params.etiquette_axe3]
+     * @param {string} [params.comportements_attendus]
+     * @param {string} [params.organisation_spatio_temporelle]
+     * @param {Array}  [params.groupes_jsonb]
+     * @param {Array}  [params.materiel_jsonb]
+     * @param {object} [params.contenu_pedagogique_axe4]
+     * @param {string} [params.notes_bloc]
+     */
+    async addBlocToSeance(seanceId, params) {
+      if (!seanceId) return { ok: false, error: 'seanceId requis' };
+      if (!params || !params.type_bloc || params.duree_min === undefined || params.duree_min === null) {
+        return { ok: false, error: 'type_bloc et duree_min requis' };
+      }
+      if (this._validTypesBloc.indexOf(params.type_bloc) === -1) {
+        return { ok: false, error: "type_bloc invalide (cf. data/types-blocs.json)" };
+      }
+      if (params.intensite && this._validIntensites.indexOf(params.intensite) === -1) {
+        return { ok: false, error: "intensite invalide (cf. data/types-blocs.json)" };
+      }
+
+      // Auto-ordre : max(ordre) + 1
+      let ordre = params.ordre;
+      if (ordre === undefined || ordre === null) {
+        const lastQuery = await client
+          .from('seances_blocs')
+          .select('ordre')
+          .eq('seance_id', seanceId)
+          .order('ordre', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        ordre = lastQuery.data ? lastQuery.data.ordre + 1 : 1;
+      }
+
+      const payload = {
+        seance_id: seanceId,
+        ordre: ordre,
+        type_bloc: params.type_bloc,
+        duree_min: params.duree_min
+      };
+      const optionalKeys = [
+        'titre_precision', 'intensite',
+        'etiquette_axe2', 'etiquette_axe3',
+        'comportements_attendus', 'organisation_spatio_temporelle',
+        'groupes_jsonb', 'materiel_jsonb', 'contenu_pedagogique_axe4',
+        'notes_bloc'
+      ];
+      for (const k of optionalKeys) {
+        if (params[k] !== undefined) payload[k] = params[k];
+      }
+
+      const { data, error } = await client
+        .from('seances_blocs')
+        .insert(payload)
+        .select()
+        .single();
+      if (error) {
+        console.error('MOM Hub: addBlocToSeance()', error);
+        return { ok: false, error: error.message };
+      }
+      return { ok: true, data };
+    },
+
+    /**
+     * Met à jour un bloc avec whitelist des champs.
+     * NE TOUCHE PAS à : id, seance_id, ordre (cf. reorderBlocs).
+     */
+    async updateBloc(blocId, patch) {
+      if (!blocId) return { ok: false, error: 'blocId requis' };
+      if (!patch || typeof patch !== 'object') {
+        return { ok: false, error: 'patch (objet) requis' };
+      }
+      const allowedKeys = [
+        'type_bloc', 'titre_precision', 'duree_min', 'intensite',
+        'etiquette_axe2', 'etiquette_axe3',
+        'comportements_attendus', 'organisation_spatio_temporelle',
+        'groupes_jsonb', 'materiel_jsonb', 'contenu_pedagogique_axe4',
+        'notes_bloc'
+      ];
+      const cleanPatch = {};
+      for (const k of allowedKeys) {
+        if (Object.prototype.hasOwnProperty.call(patch, k)) {
+          cleanPatch[k] = patch[k];
+        }
+      }
+      if (Object.keys(cleanPatch).length === 0) {
+        return { ok: false, error: 'Aucun champ modifiable dans patch' };
+      }
+      // Validation des valeurs ENUM si fournies
+      if (cleanPatch.type_bloc && this._validTypesBloc.indexOf(cleanPatch.type_bloc) === -1) {
+        return { ok: false, error: 'type_bloc invalide' };
+      }
+      if (cleanPatch.intensite && this._validIntensites.indexOf(cleanPatch.intensite) === -1) {
+        return { ok: false, error: 'intensite invalide' };
+      }
+
+      const { data, error } = await client
+        .from('seances_blocs')
+        .update(cleanPatch)
+        .eq('id', blocId)
+        .select()
+        .single();
+      if (error) {
+        console.error('MOM Hub: updateBloc()', error);
+        return { ok: false, error: error.message };
+      }
+      return { ok: true, data };
+    },
+
+    /**
+     * Supprime un bloc (DELETE). CASCADE supprime aussi les rattachements
+     * ateliers liés (seances_blocs_ateliers).
+     */
+    async removeBloc(blocId) {
+      if (!blocId) return { ok: false, error: 'blocId requis' };
+      const { data, error } = await client
+        .from('seances_blocs')
+        .delete()
+        .eq('id', blocId)
+        .select()
+        .single();
+      if (error) {
+        console.error('MOM Hub: removeBloc()', error);
+        return { ok: false, error: error.message };
+      }
+      return { ok: true, data };
+    },
+
+    /**
+     * Réordonne TOUS les blocs d'une séance selon l'ordre du tableau fourni.
+     * Algo en 2 passes (à cause de la contrainte UNIQUE (seance_id, ordre)) :
+     *   Passe 1 : tous les ordres passés en négatif (évite collision)
+     *   Passe 2 : tous les ordres re-passés en positif (1, 2, 3...)
+     *
+     * ⚠️ Limite V1 : pas atomique. Si la passe 2 échoue, certains blocs
+     * restent avec un ordre négatif → état incohérent jusqu'au prochain
+     * appel réussi. À terme : RPC SQL transactionnelle (dette technique).
+     *
+     * @param {string} seanceId
+     * @param {string[]} blocIdsInOrder Tableau d'UUIDs dans l'ordre souhaité
+     */
+    async reorderBlocs(seanceId, blocIdsInOrder) {
+      if (!seanceId) return { ok: false, error: 'seanceId requis' };
+      if (!Array.isArray(blocIdsInOrder) || blocIdsInOrder.length === 0) {
+        return { ok: false, error: 'blocIdsInOrder doit être un tableau non vide' };
+      }
+
+      // Passe 1 : ordres temporaires négatifs
+      for (let i = 0; i < blocIdsInOrder.length; i++) {
+        const { error } = await client
+          .from('seances_blocs')
+          .update({ ordre: -(i + 1) })
+          .eq('id', blocIdsInOrder[i])
+          .eq('seance_id', seanceId);
+        if (error) {
+          console.error('MOM Hub: reorderBlocs() passe 1', error);
+          return { ok: false, error: 'Échec passe 1 réordonnancement : ' + error.message };
+        }
+      }
+
+      // Passe 2 : ordres définitifs positifs
+      for (let i = 0; i < blocIdsInOrder.length; i++) {
+        const { error } = await client
+          .from('seances_blocs')
+          .update({ ordre: i + 1 })
+          .eq('id', blocIdsInOrder[i])
+          .eq('seance_id', seanceId);
+        if (error) {
+          console.error('MOM Hub: reorderBlocs() passe 2', error);
+          return {
+            ok: false,
+            error: 'Échec passe 2 réordonnancement : ' + error.message +
+                   ' (⚠️ état incohérent possible — recharger la séance)'
+          };
+        }
+      }
+
+      return {
+        ok: true,
+        data: { seance_id: seanceId, nb_blocs: blocIdsInOrder.length }
+      };
+    },
+
+    // ----------------------------------------------------------
+    // ÉCRITURE — Rattachements ateliers
+    // ----------------------------------------------------------
+
+    /**
+     * Rattache une fiche Bibliothèque à un bloc de séance.
+     * L'ordre du rattachement est auto-calculé (max + 1) pour ce bloc.
+     *
+     * @param {string} blocId UUID du bloc
+     * @param {string} atelierFileIdDrive fileId Drive du dossier de la fiche
+     *                                    (exactement 33 caractères)
+     * @param {string} [notes] Notes contextuelles libres
+     */
+    async attachAtelierToBloc(blocId, atelierFileIdDrive, notes) {
+      if (!blocId) return { ok: false, error: 'blocId requis' };
+      if (!atelierFileIdDrive || typeof atelierFileIdDrive !== 'string') {
+        return { ok: false, error: 'atelierFileIdDrive requis (chaîne)' };
+      }
+      if (atelierFileIdDrive.length !== 33) {
+        return {
+          ok: false,
+          error: 'atelierFileIdDrive doit faire exactement 33 caractères (CHECK SQL)'
+        };
+      }
+
+      // Auto-ordre = max(ordre) + 1 pour ce bloc
+      const lastQuery = await client
+        .from('seances_blocs_ateliers')
+        .select('ordre')
+        .eq('bloc_id', blocId)
+        .order('ordre', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const ordre = lastQuery.data ? lastQuery.data.ordre + 1 : 1;
+
+      const payload = {
+        bloc_id: blocId,
+        atelier_fileid_drive: atelierFileIdDrive,
+        ordre: ordre
+      };
+      if (notes !== undefined && notes !== null) {
+        payload.notes_atelier = notes;
+      }
+
+      const { data, error } = await client
+        .from('seances_blocs_ateliers')
+        .insert(payload)
+        .select()
+        .single();
+      if (error) {
+        console.error('MOM Hub: attachAtelierToBloc()', error);
+        return { ok: false, error: error.message };
+      }
+      return { ok: true, data };
+    },
+
+    /**
+     * Détache une fiche Bibliothèque d'un bloc (DELETE de la ligne).
+     *
+     * @param {string} rattachementId UUID de la ligne seances_blocs_ateliers
+     */
+    async detachAtelierFromBloc(rattachementId) {
+      if (!rattachementId) return { ok: false, error: 'rattachementId requis' };
+      const { data, error } = await client
+        .from('seances_blocs_ateliers')
+        .delete()
+        .eq('id', rattachementId)
+        .select()
+        .single();
+      if (error) {
+        console.error('MOM Hub: detachAtelierFromBloc()', error);
+        return { ok: false, error: error.message };
+      }
+      return { ok: true, data };
     }
 
   };
@@ -749,7 +1329,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.7.1 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.8 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
