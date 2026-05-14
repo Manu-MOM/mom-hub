@@ -1,0 +1,3681 @@
+{
+  "1W3wNOqkpdpEChPyvlsOJkMQXuLLNl2iv": {
+    "source": {
+      "nom_fiche": "Projet Bleu - 01 - Connexion Relayeur - Base",
+      "fileId_origine": "1-bJSPNVJftxcIR9MdOrvawHzre4Ee5Gp",
+      "fileId_dossier": "1W3wNOqkpdpEChPyvlsOJkMQXuLLNl2iv",
+      "generated_at": "2026-05-14T11:22:16Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Projet Bleu » séquence 1",
+      "theme": "Améliorer les Comportements attendus des joueurs au sein de la cellule d’action (BAD+)",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "",
+      "format": "Enchaînement de Passes",
+      "duree": "10 - 12 min",
+      "materiel": "",
+      "effectif": "Travail individuel",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "réceptionner la Passe du Relayeur dans le bon timing avec une prise de balle adaptée (ballon loin du corps)."
+      ],
+      "but": "Communication · Timing des Courses",
+      "lancement": "5-10’ / Routine sans opposition / 2 terrains de 10m/10m (1 bleu et 1 rouge) / 1 Colonne de joueurs en Zone d’attente                / Plots servant de Porte d’entrée :      / Plot isolé à 7,5m devant la porte :      ou",
+      "consignes": [
+        "Le relayeur se tient prêt sur 1 des 2 plots isolés.",
+        "Les joueurs en zone d’attente restent actifs en réalisant des Jumping-Jacks",
+        "Le 1er joueur de la colonne doit pré-agir pour se proposer dans la bonne zone et s’annoncer : « Base !, je la veux ici !»",
+        "Lorsque le relayeur soulève le ballon, le joueur en Base doit déclencher sa course (course droite), réceptionner la passe et garder le ballon loin du Corps"
+      ],
+      "critere_reussite": [
+        "Communication",
+        "Timing des Courses",
+        "Prises de balle, courses droites vers plot",
+        "La balle n’est pas ramenée au torse."
+      ],
+      "comportements_attendus": [
+        "Le Relayeur :",
+        "se déplace vite, soigne sa gestuelle de passe, effectue des passes ayant une trajectoire rectiligne, effectue des passes précises.",
+        "COMPORTEMENTS ATTENDUS DE LA BASE :",
+        "Le joueur en « base » :",
+        "communique, déclenche sa course quand la balle est soulevée par le relayeur, court droit, saisit le ballon lancé (doigts ouverts, mains en cible étroite vers la source), ne ramène pas le ballon au corps."
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 1,
+      "photos": 1,
+      "videos_size_mo": 19.81
+    },
+    "files": {
+      "fiche_json_id": "1UkH_4_cwHvvKUUVAIfKu86BqKcW1CURz",
+      "fiche_pdf_id": "1imMme8lOMf9u_LRAbMzGThMY-H47hTAX",
+      "fiche_pptx_id": "1jRH629NLChJAT_y7wz8PWQ4S9NPhk2Om",
+      "fiche_origine_pptx_id": "1dAbHHYvGfyfvHoQaJWRFpRqrNtSRAUlN",
+      "videos": [
+        "1BjTz5oav-UqoSadNdpWv_WBGXp1QLrKh"
+      ]
+    }
+  },
+  "1dniDCuHaivJFwads36kgzXTU2AwbIEdh": {
+    "source": {
+      "nom_fiche": "Projet Bleu - 02 - Connexion Relayeur - Base - Plus",
+      "fileId_origine": "10Lp4yYUXfC-0SzNkIkNIWJKN6z-lBt3W",
+      "fileId_dossier": "1dniDCuHaivJFwads36kgzXTU2AwbIEdh",
+      "generated_at": "2026-05-14T11:21:52Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "",
+      "theme": "",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "",
+      "format": "",
+      "duree": "10 - 12 min",
+      "materiel": "",
+      "effectif": "",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [],
+      "but": "",
+      "lancement": "",
+      "consignes": [],
+      "critere_reussite": [
+        "Communication",
+        "Vitesse dans le déplacement et dans le jeu pour marquer le plus rapidement possible.",
+        "Prises de balle, Courses"
+      ],
+      "comportements_attendus": [
+        "Vite, Droit Vers le défenseur, avec de l’Incertitude (balle à 2 mains…)",
+        "Lecture du placement de son adversaire (en retard ? En avance) par rapport au sens de circulation et orientation des épaules.",
+        "COMPORTEMENTS ATTENDUS DU PLUS :",
+        "Menace l’espace large",
+        "S’adapte à l’action du porteur"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 0,
+      "photos": 0,
+      "videos_size_mo": 0
+    },
+    "files": {
+      "fiche_json_id": "1OKtdYz5O1mMlEYTTMbXmp8nflDJQz59z",
+      "fiche_pdf_id": "1OHYCka0yLSSKIgN7-L7eDVvQzkV-SD25",
+      "fiche_pptx_id": "1MbMUMpmH65wKcFCC8cS-IDeox7CAAL7-",
+      "fiche_origine_pptx_id": "1oQUN1MYQqnOfQEK7M0SrAbVZevgn4tOw",
+      "videos": []
+    }
+  },
+  "1Cmz8iPRLe9ukylJzZW9tnIJlQiSJHZzL": {
+    "source": {
+      "nom_fiche": "Projet Bleu - 03 - Connexion Relayeur - Base - Dos",
+      "fileId_origine": "1v64ljzUB-HNx5paBScR0NP5ujKh67fPY",
+      "fileId_dossier": "1Cmz8iPRLe9ukylJzZW9tnIJlQiSJHZzL",
+      "generated_at": "2026-05-14T11:21:32Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Projet Bleu » séquence 3",
+      "theme": "Améliorer les Comportements attendus des joueurs au sein de la cellule d’action (BAD+)",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "",
+      "format": "",
+      "duree": "10 - 12 min",
+      "materiel": "",
+      "effectif": "",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [],
+      "but": "",
+      "lancement": "",
+      "consignes": [],
+      "critere_reussite": [
+        "Communication",
+        "Vitesse dans le déplacement et dans le jeu pour marquer le plus rapidement possible.",
+        "Prises de balle, Courses"
+      ],
+      "comportements_attendus": [
+        "Accélérateur par sa course et par sa position (proche de la ligne d’avantage) et/ou par sa passe",
+        "COMPORTEMENTS ATTENDUS DU PLUS :",
+        "Menace l’espace large / S’adapte à l’action du porteur",
+        "COMPORTEMENTS ATTENDUS DU DOS :",
+        "Menace l’espace profond / Propose une solution si la défense ferme"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 0,
+      "photos": 0,
+      "videos_size_mo": 0
+    },
+    "files": {
+      "fiche_json_id": "18bHKxyZ_RErbKmeC_d0IhgghKquItgCV",
+      "fiche_pdf_id": "1_fnf1mGYzlCxHkz2gKfzQ1oqhBZ6KIFm",
+      "fiche_pptx_id": "1Bp3z2Th85Gj33jhLyUuqP4fM8Lct5eUI",
+      "fiche_origine_pptx_id": "1jgJ6QUHvYHdLxP2_6AVK14CUlz94-Xyk",
+      "videos": []
+    }
+  },
+  "1FV6k8Bbwd9xI41g5jXvEncYsRyvwbmIa": {
+    "source": {
+      "nom_fiche": "Libération au Contact - 02",
+      "fileId_origine": "1982YyWZoLc2HmDk-heDpNTLHWYlFwrLZ",
+      "fileId_dossier": "1FV6k8Bbwd9xI41g5jXvEncYsRyvwbmIa",
+      "generated_at": "2026-05-14T11:14:05Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Comportement sur les Rucks» séquence 1",
+      "theme": "Gestion des blocages · Combat dans les Rucks",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "Sur-nombre offensif",
+      "format": "1+1 VS 1+1",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Chasubles, Carré de 10m",
+      "effectif": "Collectif réduit",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "S’approprier l’espace au-dessus du ballon",
+        "Conserver ou Conquérir le ballon"
+      ],
+      "but": " · Les Joueurs s’investissent dans le combat.",
+      "lancement": "Au Signal « Bleus par les plots blancs » par exemple :",
+      "consignes": [
+        "Ballon aux Joueurs bleus.",
+        "1 joueur bleu se jette sur le ballon et reste au sol.",
+        "Les Soutiens Offensifs interviennent par les Plots blancs.",
+        "Les défenseurs interviennent en passant par les Plots bleus.",
+        "Les Joueurs entament une lutte pour la Conservation ou la Reconquête du ballon."
+      ],
+      "critere_reussite": [
+        "Ballon Gagné par les Utilisateurs ou les Opposants :",
+        "Les Joueurs s’investissent dans le combat.",
+        "Les Joueurs adoptent de bonnes postures.",
+        "Les Opposants ne se consomment dans le Ruck (pas plus de 2 SD) s’il n’y a pas de possibilité de gagner le ballon (lecture).",
+        "Les Utilisateurs engagent plus de 2 Soutiens à la reconquête si possibilité de gagner le ballon (lecture).",
+        "Les Soutiens Offensifs sont les premiers à prendre l’espace au-dessus du ballon."
+      ],
+      "comportements_attendus": [
+        "Le 1er arrivé se jette sur le ballon, reste au sol et présente le ballon vers son camp.",
+        "Les Soutiens adoptent une posture de combat et luttent pour le gain du ballon."
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 2,
+      "photos": 3,
+      "videos_size_mo": 367.17
+    },
+    "files": {
+      "fiche_json_id": "1FqctWs7KZlcDe9NFOYMAi9d9oC1dem5R",
+      "fiche_pdf_id": "1Vu8-1X-yw8jhp13uplQrh0XyLpenYYiq",
+      "fiche_pptx_id": "1a3xVs1WyP-vZkPzKjxAJtJwkE2POVwEK",
+      "fiche_origine_pptx_id": "1hmWYI35h-KNe_OfFe3QfAo5oaFB7kh9c",
+      "videos": [
+        "1Ou1sa_u3dwo6cRz6Q6J-QIOEd6V_FFRu",
+        "1lNj-yJ4TApm7zG7NQsW6h1tA-6UYlGxF"
+      ]
+    }
+  },
+  "1znDfaqXe5D6eNTt3SGrL80lWjEzE1pxq": {
+    "source": {
+      "nom_fiche": "Duels - 01",
+      "fileId_origine": "1pKnVtBkNjE7oVu_4KiCXSf51tld7q5xr",
+      "fileId_dossier": "1znDfaqXe5D6eNTt3SGrL80lWjEzE1pxq",
+      "generated_at": "2026-05-14T11:12:50Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Les Duels » séquence 1",
+      "theme": "Duels Offensifs · Continuité Debout autour du PB",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "",
+      "format": "Gestuelle",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Ballons",
+      "effectif": "1 VS 1",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Gagner son duel",
+        "Franchir la ligne de défense d’un opposant pour se retrouver dans son dos."
+      ],
+      "but": "Attaquer l’espace qui se trouve autour du défenseur. · Déséquilibrer l’adversaire pour le forcer à faire un plaquage bas.",
+      "lancement": "1 VS 1 / Face à Face / 2 longueurs de bras d’écart.",
+      "consignes": [
+        "Défenseur sur sa ligne entre 2 plots écartés de 2m.",
+        "Le PB tient le ballon à 2 mains et a les 2 pieds bien ancrés au sol et parallèles.",
+        "Le PB se laisse déséquilibrer vers l’avant.",
+        "Au moment de se rattraper, le PB raccourcit le 1er appui et engage rapidement le 2ème appui en « changeant de direction » pour franchir l’espace situé autour de son adversaire."
+      ],
+      "critere_reussite": [
+        "Attaquer l’espace qui se trouve autour du défenseur.",
+        "Déséquilibrer l’adversaire pour le forcer à faire un plaquage bas."
+      ],
+      "comportements_attendus": [
+        "Incertitude gestuelle → ballon à 2 mains / switch ballon à 1 main",
+        "Incertitude rythmique → changement de vitesse / appui fort / explosivité",
+        "Incertitude directionnelle → Changements de sens / crochets",
+        "Franchir la ligne des pieds du défenseur avec le bon appui",
+        "Se Sortir du vis-à-vis"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 0,
+      "photos": 4,
+      "videos_size_mo": 0
+    },
+    "files": {
+      "fiche_json_id": "1Wtu1xLnzubOalumM_bbokTO6-Y6K8mC4",
+      "fiche_pdf_id": "1WN_2v2-Pl9ynBIUmXGm28CcTnG-zsNpR",
+      "fiche_pptx_id": "1QBUp5epDluYe-stE2rghC-NjidL8KRzo",
+      "fiche_origine_pptx_id": "10Fd7eO_plTPtEnUAXTGX8GdJ5EdWeZwc",
+      "videos": []
+    }
+  },
+  "1TOMe4O-AvUh3jmmTdRmax4vkx7gF0tHq": {
+    "source": {
+      "nom_fiche": "Duels - 02",
+      "fileId_origine": "16j4jkIYfMHUvpbQ1CN0xw2KjOe_-RGcn",
+      "fileId_dossier": "1TOMe4O-AvUh3jmmTdRmax4vkx7gF0tHq",
+      "generated_at": "2026-05-14T11:12:21Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Les Duels » séquence 2",
+      "theme": "Duels Offensifs · Continuité Debout autour du PB",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "Égalité numérique",
+      "format": "1 VS 1",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Ballons",
+      "effectif": "1 VS 1",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Gagner son duel",
+        "Franchir la ligne de défense d’un opposant pour se retrouver dans son dos."
+      ],
+      "but": "Attaquer l’espace qui se trouve autour du défenseur. · Déséquilibrer l’adversaire pour le forcer à faire un plaquage bas.",
+      "lancement": "1 VS 1 / Utilisateurs en colonne en Zone d’attente à 3m de distance.",
+      "consignes": [
+        "Défenseur sur sa ligne entre 2 plots écartés de 2m.",
+        "Le PB tient le ballon à 2 mains et engage son Duel avec de la vitesse et de l’intensité.",
+        "Au moment de se rattraper, le PB raccourcit le 1er appui et engage rapidement le 2ème appui en « changeant de direction » pour franchir l’espace situé autour de son adversaire."
+      ],
+      "critere_reussite": [
+        "Attaquer l’espace qui se trouve autour du défenseur.",
+        "Déséquilibrer l’adversaire pour le forcer à faire un plaquage bas."
+      ],
+      "comportements_attendus": [
+        "Incertitude gestuelle → ballon à 2 mains / switch ballon à 1 main",
+        "Incertitude rythmique → changement de vitesse / appui fort / explosivité",
+        "Incertitude directionnelle → Changements de sens / crochets",
+        "Franchir la ligne des pieds du défenseur avec le bon appui",
+        "Se Sortir du vis-à-vis"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 0,
+      "photos": 0,
+      "videos_size_mo": 0
+    },
+    "files": {
+      "fiche_json_id": "1Y8kvaeMYaIUoVVyfc2YCIg9TSx9NtFiW",
+      "fiche_pdf_id": "1RyIFXMgrlYKz19IJYAaBohE5qQEY8qoF",
+      "fiche_pptx_id": "1-Lc03BoDfSkkTxRwmrl5fZmEmjQPbKLb",
+      "fiche_origine_pptx_id": "1tVD4Lb4TMa5wSo_IE00tiEa_1ksBCPVW",
+      "videos": []
+    }
+  },
+  "1kKSeg9NcVCgLH4IGyQLKzH-FV_gcRPkq": {
+    "source": {
+      "nom_fiche": "Duels - 03",
+      "fileId_origine": "1wOAmSiTgXINm312-2hCudRBDWZUoA9tj",
+      "fileId_dossier": "1kKSeg9NcVCgLH4IGyQLKzH-FV_gcRPkq",
+      "generated_at": "2026-05-14T11:12:03Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Les Duels » séquence 3",
+      "theme": "Duels Offensifs",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "",
+      "format": "Couloir de Duels",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Ballons",
+      "effectif": "1 VS 1",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Porter le ballon à 2 mains",
+        "Lire et Attaquer l’espace qui se libère."
+      ],
+      "but": "Attaquer l’espace qui se libère. · Mettre de la fréquence sur les appuis au moment de franchir et ré-accélérer.",
+      "lancement": "1 VS 1 / Utilisateurs en 2 colonnes en Zone d’attente à 5m de distance.",
+      "consignes": [
+        "Défenseurs sur leur ligne entre 2 plots écartés de 2m. font des navettes entre 2 plots (Av/Ar ou Pas Chassés de face ou de dos) sans se préoccuper des attaquants."
+      ],
+      "critere_reussite": [
+        "Attaquer l’espace qui se libère.",
+        "Mettre de la fréquence sur les appuis au moment de franchir et ré-accélérer."
+      ],
+      "comportements_attendus": [
+        "Incertitude gestuelle → ballon à 2 mains",
+        "Incertitude rythmique → changement de vitesse / appui fort / explosivité",
+        "Incertitude directionnelle → Changements de sens / crochets"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 0,
+      "photos": 0,
+      "videos_size_mo": 0
+    },
+    "files": {
+      "fiche_json_id": "1YqNrGaxb_nqNcxgB1zsOoaEn-t5t2Cgi",
+      "fiche_pdf_id": "1XbPkmo_kDoTT99arajIcC2HoABQgMST9",
+      "fiche_pptx_id": "18yN3iWrm0RhwRQ0Xly2hS105MbcgLRi9",
+      "fiche_origine_pptx_id": "1_aQvXV7Lc1Dfyopv5V2dm8iwna8Bd0c1",
+      "videos": []
+    }
+  },
+  "11O8Zv94Zo8-j2TEw2an1KlzFWvlXhV0U": {
+    "source": {
+      "nom_fiche": "Duels - 04",
+      "fileId_origine": "12wscmRjwckxjrEEYb_H52kqIXTlqeByn",
+      "fileId_dossier": "11O8Zv94Zo8-j2TEw2an1KlzFWvlXhV0U",
+      "generated_at": "2026-05-14T11:11:44Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Les Duels » séquence 4",
+      "theme": "Duels Offensifs",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "Égalité numérique",
+      "format": "1 VS 1",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Ballons, Swiss Ball",
+      "effectif": "1 VS 1",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Porter le ballon à 2 mains",
+        "Lire et Attaquer l’espace qui se libère."
+      ],
+      "but": "Attaquer l’espace qui se libère. · Mettre de la fréquence sur les appuis au moment de franchir et ré-accélérer.",
+      "lancement": "1 VS 1 / Utilisateurs en 2 colonnes en Zone d’attente à 5m de distance.",
+      "consignes": [
+        "Défenseurs se passent un swiss Ball au pied entre 2 plots écartés de 3m en essayant de toucher l’utilisateur au passage."
+      ],
+      "critere_reussite": [
+        "Attaquer l’espace qui se libère.",
+        "Mettre de la fréquence sur les appuis au moment de franchir et ré-accélérer."
+      ],
+      "comportements_attendus": [
+        "Incertitude gestuelle → ballon à 2 mains",
+        "Incertitude rythmique → changement de vitesse / appui fort / explosivité",
+        "Incertitude directionnelle → Changements de sens / crochets"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 0,
+      "photos": 0,
+      "videos_size_mo": 0
+    },
+    "files": {
+      "fiche_json_id": "16jlFAyFP4UDZGHmM5tkRXDwAbxtoc8hB",
+      "fiche_pdf_id": "1d975TMyCbttyNYTxV_VGkBaS2bibYFDP",
+      "fiche_pptx_id": "1DwebKMkatkWoecJxF_AylEAb-aVel_JX",
+      "fiche_origine_pptx_id": "1lHQxiXlX6X_2kclUbu3Tnnjg0SPOqP0d",
+      "videos": []
+    }
+  },
+  "1DiYJfcZf_X_Ul01gxu3ZU3cVI5yV83EL": {
+    "source": {
+      "nom_fiche": "Duels - 05",
+      "fileId_origine": "19PBy1vdpFPphJ9_xWoe5xnfyIkoYUxJ9",
+      "fileId_dossier": "1DiYJfcZf_X_Ul01gxu3ZU3cVI5yV83EL",
+      "generated_at": "2026-05-14T11:11:26Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Les Duels » séquence 5",
+      "theme": "Duels Offensifs",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "Égalité numérique",
+      "format": "1 VS 1",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Ballons",
+      "effectif": "1 VS 1",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Gagner son Duel en se sortant de la Pression de l’adversaire",
+        "Libérer le ballon pour son Soutien."
+      ],
+      "but": "Se libérer de la pression de son vis-à-vis pour transmettre. · Lire la Situation en tant que Soutien et adapter son comportement.",
+      "lancement": "1 VS 1 / Utilisateur dans le couloir des 5m réceptionne coup de pied du Coach.",
+      "consignes": [
+        "Le 1er Défenseur met la pression sur le réceptionneur dès que ce dernier a réceptionné le ballon.",
+        "L’attaquant qui doit jouer son Duel en essayant de se défaire de la pression de son vis-à-vis pour libérer à son Soutien.",
+        "Le Soutien doit lire la situation (ballon dispo ou pas)  et s’adapter en conséquence :",
+        "Porteur bloqué mais ballon en vie : le Soutien plonge dans l’espace ouvert par le porteur",
+        "Ballon et Porteur bloqués : Le Soutien cible le PB pour l’aider à avancer.",
+        "Une fois le ballon donné, les 2 utilisateurs jouent un 1+1 vs 1 contre le 2ème défenseur."
+      ],
+      "critere_reussite": [
+        "Se libérer de la pression de son vis-à-vis pour transmettre.",
+        "Lire la Situation en tant que Soutien et adapter son comportement."
+      ],
+      "comportements_attendus": [
+        "Incertitude gestuelle → ballon à 2 mains",
+        "Incertitude rythmique → changement de vitesse / appui fort / explosivité",
+        "Incertitude directionnelle → Changements de sens / crochets",
+        "Lecture et adaptation"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 0,
+      "photos": 0,
+      "videos_size_mo": 0
+    },
+    "files": {
+      "fiche_json_id": "1K6ZyU8P6RVcK538WiPZbr5Zn8SxvsZNt",
+      "fiche_pdf_id": "1z7HBB5mmvMpw8teqUOfIUTCjGYW5aNuD",
+      "fiche_pptx_id": "1drRDlzmoUglocTVXg1sMRkjPVBIwDCEL",
+      "fiche_origine_pptx_id": "1AxbrnrGmEG2KQiEVmXaMADPR1JgSsOie",
+      "videos": []
+    }
+  },
+  "1ltmmyO4x8IVbPm7CwqGitoPoLM2nAH1r": {
+    "source": {
+      "nom_fiche": "Duels - 06",
+      "fileId_origine": "1bFxcPch8wYVyB1nzx8TiyBwAcSh62Msc",
+      "fileId_dossier": "1ltmmyO4x8IVbPm7CwqGitoPoLM2nAH1r",
+      "generated_at": "2026-05-14T11:11:09Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Continuité Debout » séquence 6",
+      "theme": "Duels Offensifs · Continuité Debout autour du PB",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "Sur-nombre offensif",
+      "format": "1+1 VS 1",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Chasubles, Carré de 3m",
+      "effectif": "Collectif réduit",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Semer la confusion chez son poursuivant pour adresser une Passe à son Soutien",
+        "Assurer la continuité avec un défenseur en poursuite"
+      ],
+      "but": "J’accélère ma course tout en essayant de donner de fausses informations au défenseur en poursuite. (PB) · Je fais ma passe dans le bon timing. (PB)",
+      "lancement": "Le PB se lance avec le défenseur dans son sillage au TOP du coach",
+      "consignes": [
+        "Le PB doit passer le ballon à son soutien  sous la pression d’un défenseur en poursuite dans une zone établie",
+        "Le SAX adapte sa course pour réceptionner la passe du PB dans la zone établie"
+      ],
+      "critere_reussite": [
+        "J’accélère ma course tout en essayant de donner de fausses informations au défenseur en poursuite. (PB)",
+        "Je fais ma passe dans le bon timing. (PB)",
+        "Je maintiens ma vitesse ou j’accélère selon le comportement du PB. (SAX)",
+        "J’appelle le PB pour lui indiquer ma position. (SAX)"
+      ],
+      "comportements_attendus": [
+        "Incertitude gestuelle → ballon à 2 mains / switch ballon à 1 main si Duel",
+        "Incertitude rythmique → changement de vitesse / appui fort / explosivité",
+        "Incertitude directionnelle → Changements de sens / crochets"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 0,
+      "photos": 0,
+      "videos_size_mo": 0
+    },
+    "files": {
+      "fiche_json_id": "1yEYopAXutI15BqiHF1eVUdw8pYO11655",
+      "fiche_pdf_id": "12VB2S74MKjmNx1hv6ZdsaJ3YjqmevJ4P",
+      "fiche_pptx_id": "1P2Ngqy5mcmnroCmU6nqqlE_A7oOBBvfX",
+      "fiche_origine_pptx_id": "1xZ49hhqVSqSOC95T-9FY2fFQ_PFSlzhH",
+      "videos": []
+    }
+  },
+  "1C-CwsUef2_370QorHoYWet5KT6GQIkum": {
+    "source": {
+      "nom_fiche": "Duels - 07",
+      "fileId_origine": "1HBPYOtswA0FRUjLPMQJjtR6mQ8ohVTWg",
+      "fileId_dossier": "1C-CwsUef2_370QorHoYWet5KT6GQIkum",
+      "generated_at": "2026-05-14T11:10:41Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Continuité Debout » séquence 7",
+      "theme": "Duels Offensifs · Continuité Debout autour du PB",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "Sur-nombre offensif",
+      "format": "1+1 VS 1",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Chasubles, Carré de 3m",
+      "effectif": "Collectif réduit",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Gagner son duel",
+        "Se retrouver dans le dos du défenseur",
+        "Assurer la continuité : passer après contact si bloqué"
+      ],
+      "but": "Essai marqué · Passe après-contact",
+      "lancement": "Opposant à l’intérieur du carré (3x3m) ballon en mains",
+      "consignes": [
+        "Utilisateur 1 à 2 m du carré et Utilisateur 2 à 3m du carré à plat ventre",
+        "Lancement de jeu lorsque l’opposant donne le ballon à utilisateur",
+        "Utilisateur doit gagner son duel pour aller marquer, ou passer après contact si bloqué",
+        "Utilisateur 2 déclenche sa course une fois  que Utilisateur 1 décide de jouer son duel"
+      ],
+      "critere_reussite": [
+        "Essai marqué",
+        "Passe après-contact"
+      ],
+      "comportements_attendus": [
+        "Incertitude gestuelle → ballon à 2 mains / switch ballon à 1 main si Duel",
+        "Incertitude rythmique → changement de vitesse / appui fort / explosivité",
+        "Incertitude directionnelle → Changements de sens / crochets",
+        "Se Sortir du vis-à-vis",
+        "Ballon loin du défenseur",
+        "Raffut pour éloigner la menace voir rebondir sur le défenseur"
+      ],
+      "variantes": {
+        "plus": "Défense au plaquage · élargir le carré · démarrage U2 retardé",
+        "moins": "Défense au toucher 2 mains · réduire la distance U1-carré",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 2,
+      "photos": 2,
+      "videos_size_mo": 2.29
+    },
+    "files": {
+      "fiche_json_id": "1aHO57ytfgh9qvymrqcQiKusnGo-j0ae-",
+      "fiche_pdf_id": "15MXNc4psPEmtoYp4QiANStTy5Ro21LTo",
+      "fiche_pptx_id": "1wJoBWuiy2UGienicU0BL1HDUQRhN0IM-",
+      "fiche_origine_pptx_id": "1DMwpbSpAyxUsO3uPVqO6uIAdkD6wE0oU",
+      "videos": [
+        "1VbzT0UjP8sboDHfZLgIBDgTG1YsWwfoN",
+        "11QOUXEFrK1MO2OeodT62sp80UV32iwDv"
+      ]
+    }
+  },
+  "1FZMwRAeNjn1b6NIPdHh5Z_AaPRkfhYD9": {
+    "source": {
+      "nom_fiche": "Duels - 08",
+      "fileId_origine": "1fgjdF7n06HxHhAFF1wAwa_-m_7qYzIs4",
+      "fileId_dossier": "1FZMwRAeNjn1b6NIPdHh5Z_AaPRkfhYD9",
+      "generated_at": "2026-05-14T11:10:13Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Continuité Debout » séquence 8",
+      "theme": "Duel Offensif · Continuité Debout autour du PB",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "Sur-nombre offensif",
+      "format": "1+1 VS 1+1",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Ballons, Chasubles, 15m de largeur",
+      "effectif": "Collectif réduit",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Gagner son duel",
+        "Gagner la ligne d’avantage",
+        "Passer après contact en cas d’accident de jeu"
+      ],
+      "but": "Essais marqués · Passes après-contact réussies",
+      "lancement": "3 attaquants en 1+2 enchainent 3 duels d’affilé dans le couloir des 5m ",
+      "consignes": [
+        "1+2 VS 1+1+1",
+        "Les attaquants ont interdiction de passer avant contact",
+        "Une fois les 3 duels gagnés , ils enchainent un retour sur 10 m de largeur en 2+1 VS 2+1",
+        "VARIANTE / EVOLUTION :",
+        "Plus de largeur sur la situation de retour si besoin de travailler le jeu déployé"
+      ],
+      "critere_reussite": [
+        "Essais marqués",
+        "Passes après-contact réussies"
+      ],
+      "comportements_attendus": [
+        "Incertitude gestuelle → ballon à 2 mains / ballon à 1 main",
+        "Incertitude rythmique → accélération max pour sortir du duel",
+        "Incertitude directionnelle → Changements de direction soudains ,crochets",
+        "Utilisation du raffut pour éloigner la menace",
+        "Se Sortir du vis-à-vis",
+        "Libérer les bras pour garder le ballon en vie",
+        "Convergence des soutiens proches"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 2,
+      "photos": 3,
+      "videos_size_mo": 7.47
+    },
+    "files": {
+      "fiche_json_id": "1PSUQRo791NcAk4G0ki9fFhtGKiQSP1mY",
+      "fiche_pdf_id": "1OADC0lCcXfCfSP4e0CioUbX09Tp4ep5R",
+      "fiche_pptx_id": "1n6SyLnDiuF3vc_2Ewk2c_M8e1BLYoI2b",
+      "fiche_origine_pptx_id": "171atfyipqJK-FX1NgB_iV_DkCTF5imOa",
+      "videos": [
+        "1JaVAmsgqdzy_r9QMQ1VMmVI2wHp88tqx",
+        "1_Co0z31HLAuqx9uEFRd61mc-xT-mHNCR"
+      ]
+    }
+  },
+  "1AQiHLyGMRzj6sSwl6KUoJQBokjR3jhsj": {
+    "source": {
+      "nom_fiche": "Choix de la forme de Jeu - 01",
+      "fileId_origine": "14cENY-1gnFsjyVB1UXwPcnle1KjBg-S_",
+      "fileId_dossier": "1AQiHLyGMRzj6sSwl6KUoJQBokjR3jhsj",
+      "generated_at": "2026-05-14T11:09:53Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Choix de la forme de Jeu » séquence 1",
+      "theme": "Choix de la Forme de Jeu",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "Sur-nombre offensif",
+      "format": "4 VS 3",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Ballons, Chasubles, 15m de largeur",
+      "effectif": "Collectif réduit",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Utiliser la forme de Jeu appropriée par rapport au placement des défenseurs"
+      ],
+      "but": "Essais marqués · se concentrer sur la capacité d’analyse des joueurs et particulièrement sur le joueur placé en « base ».",
+      "lancement": "1 relayeur.",
+      "consignes": [
+        "4 attaquants aux plots blancs dos tournés, attendent le signal « jeu » du Coach.",
+        "3 défenseurs en attente qui se placent sur les plots de la couleur que leur indique visuellement le Coach (il tient 1 plot de chacune des 3 couleurs dans sa main et en montre 1 aux défenseurs).",
+        "Une fois les défenseurs placés sur leurs plots, le coach annonce  « jeu » et le relayeur peut alors lancer le jeu vers le joueur en « base »."
+      ],
+      "critere_reussite": [
+        "Essais marqués",
+        "se concentrer sur la capacité d’analyse des joueurs et particulièrement sur le joueur placé en « base ».",
+        "préciser le vocabulaire à utiliser :- « Base », « dos », « plus », « large », « moins »",
+        "établir un code de communication sur les 3 formes de jeu utilisées.",
+        "insister sur la communication !"
+      ],
+      "comportements_attendus": [
+        "Le joueur en « base » fait le bon choix :",
+        "1) écarte vite qd les défenseurs sont sur les plots bleus.",
+        "2) joue au pied qd les défenseurs sont sur les plots verts.",
+        "3) fait jouer dans les intervalles quand les joueurs sont sur les plots jaunes.",
+        "Les joueurs en « plus », en « dos », en « large » adoptent le bon comportement selon le choix du joueur en « base »."
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 0,
+      "photos": 1,
+      "videos_size_mo": 0
+    },
+    "files": {
+      "fiche_json_id": "1RkNRxTdd6_5diRGCCjN3cfE6rz5iHK0i",
+      "fiche_pdf_id": "1DX6AYjPhxEIHnPGPznvwMjd_fNWGC-QO",
+      "fiche_pptx_id": "1X9qQWiXk132zPjZAwJGidaMZ0QdTRX7y",
+      "fiche_origine_pptx_id": "19IwnBexohGatvSCR_e7foJHoSW-mISHF",
+      "videos": []
+    }
+  },
+  "1xu1xDBUT8gaDHz4rBKtFUdSylURv4n6R": {
+    "source": {
+      "nom_fiche": "Coordination-Motricité - 01",
+      "fileId_origine": "1udWOTSPn-zWic_p2Q7QJD3YXSA7PDAT1",
+      "fileId_dossier": "1xu1xDBUT8gaDHz4rBKtFUdSylURv4n6R",
+      "generated_at": "2026-05-14T11:09:35Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "",
+      "theme": "Coordination/Motricité · Vitesse/Pliométrie · Parcours 1 : · Slalom avec jeu au pied de récupération",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "",
+      "format": "Echauffement",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Ballons, Cônes",
+      "effectif": "",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Développer sa coordination/motricité"
+      ],
+      "but": "Aisance / Fluidité sur les obstacles · Rapidité sur les enchaînements",
+      "lancement": "",
+      "consignes": [],
+      "critere_reussite": [
+        "Aisance / Fluidité sur les obstacles",
+        "Rapidité sur les enchaînements"
+      ],
+      "comportements_attendus": [
+        "Je stabilise mes réceptions sur les bonds",
+        "Je suis dynamique sur les appuis lors du slalom",
+        "Je contrôle mon Jeu au Pied pour parvenir à récupérer le ballon après l’obstacle"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 0,
+      "photos": 1,
+      "videos_size_mo": 0
+    },
+    "files": {
+      "fiche_json_id": "1J3B2C9D5tyu_vNi7Eoz1nFKcdrUed1WC",
+      "fiche_pdf_id": "19QLb66lV_M3UTDXnzk8Aibq2IXc-Ts1e",
+      "fiche_pptx_id": "1k1BmEdWZ4cSLfMGzievlze_uwq-LMZpD",
+      "fiche_origine_pptx_id": "1QJYZOQWxRXjSkUZf4larA-sU9vbLcO0S",
+      "videos": []
+    }
+  },
+  "18CtCgVo7kD9ORqrqzoI6yJ1o3a4BfUya": {
+    "source": {
+      "nom_fiche": "Coordination-Motricité - 02",
+      "fileId_origine": "1rbCyehNi_A1NXf14KwdkQLAXOG0Pm1am",
+      "fileId_dossier": "18CtCgVo7kD9ORqrqzoI6yJ1o3a4BfUya",
+      "generated_at": "2026-05-14T11:09:16Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "",
+      "theme": "Coordination/Motricité · Vitesse/Pliométrie · Parcours 2 : · Travail d’appuis avec passage par le sol",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "",
+      "format": "Echauffement",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Ballons, Cônes",
+      "effectif": "",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Développer sa coordination/motricité"
+      ],
+      "but": "Aisance / Fluidité sur les obstacles · Rapidité sur les enchaînements",
+      "lancement": "",
+      "consignes": [],
+      "critere_reussite": [
+        "Aisance / Fluidité sur les obstacles",
+        "Rapidité sur les enchaînements"
+      ],
+      "comportements_attendus": [
+        "Je stabilise mes réceptions sur les bonds",
+        "Je suis capable d’aller au sol sans perdre le contrôle du ballon",
+        "Je sprinte au retour en montant haut les genoux"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 0,
+      "photos": 2,
+      "videos_size_mo": 0
+    },
+    "files": {
+      "fiche_json_id": "1EDi_S7tEoJBM2qwBZbdwpESPwESUc7GV",
+      "fiche_pdf_id": "1bb9WgyqxsOJCFKfQnAaK0seh2qM-ETSW",
+      "fiche_pptx_id": "1ev3Z3JaeLwpUjY4iOlYpu3VWzaOx4X5R",
+      "fiche_origine_pptx_id": "1dk7RtzaozVZW_fFoMiB_SGpCTuxtrnJ6",
+      "videos": []
+    }
+  },
+  "1KktNoZHFtdiRgpqTq6Sgi45RnMrCKaQC": {
+    "source": {
+      "nom_fiche": "Coordination-Motricité - 03",
+      "fileId_origine": "1ifDP9hCRFXVPmBg9Rj6SZQS-iMdkundw",
+      "fileId_dossier": "1KktNoZHFtdiRgpqTq6Sgi45RnMrCKaQC",
+      "generated_at": "2026-05-14T11:08:57Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "",
+      "theme": "Coordination/Motricité · Vitesse/Pliométrie · Parcours 3 : · Travail d’appuis avec jeu au pied rasant",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "",
+      "format": "Echauffement",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Ballons, Cônes",
+      "effectif": "",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Développer sa coordination/motricité"
+      ],
+      "but": "Aisance / Fluidité sur les obstacles · Rapidité sur les enchaînements",
+      "lancement": "",
+      "consignes": [],
+      "critere_reussite": [
+        "Aisance / Fluidité sur les obstacles",
+        "Rapidité sur les enchaînements"
+      ],
+      "comportements_attendus": [
+        "Je suis dynamique sur les appuis sur l’échelle de rythme",
+        "Je suis stabilise mes réceptions sur 1 pied",
+        "Je contrôle mon Jeu au pied pour parvenir à récupérer le ballon après l’obstacle"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 0,
+      "photos": 1,
+      "videos_size_mo": 0
+    },
+    "files": {
+      "fiche_json_id": "11eINNN5WbyCLbnuG-NVx0_HUYlUD6GtM",
+      "fiche_pdf_id": "1TAMo70GdLcVp0nOS-8pr6EzqwbYa7fBZ",
+      "fiche_pptx_id": "1QCJunFg9RY_Xkli8T3rlb7ctB_ilhbue",
+      "fiche_origine_pptx_id": "1U6w9rE1htpaPKwpOXUqnCrAiwc7rNEZG",
+      "videos": []
+    }
+  },
+  "11AOA_5SHrzn5DspZznvBwrCL7Rk203Sg": {
+    "source": {
+      "nom_fiche": "Continuité Debout autour du PB - 01",
+      "fileId_origine": "1kv4LTb8l9AmjunjKos4Nchv_CZw8oRSO",
+      "fileId_dossier": "11AOA_5SHrzn5DspZznvBwrCL7Rk203Sg",
+      "generated_at": "2026-05-14T11:08:39Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Continuité Debout » séquence 1",
+      "theme": "Duels Offensifs · Continuité Debout autour du PB",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "Sur-nombre offensif",
+      "format": "1+1 VS 1",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Chasubles, Carré de 3m",
+      "effectif": "Collectif réduit",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Semer la confusion chez son poursuivant pour adresser une Passe à son Soutien",
+        "Assurer la continuité avec un défenseur en poursuite"
+      ],
+      "but": "J’accélère ma course tout en essayant de donner de fausses informations au défenseur en poursuite. (PB) · Je fais ma passe dans le bon timing. (PB)",
+      "lancement": "Le PB se lance avec le défenseur dans son sillage au TOP du coach",
+      "consignes": [
+        "Le PB doit passer le ballon à son soutien  sous la pression d’un défenseur en poursuite dans une zone établie",
+        "Le SAX adapte sa course pour réceptionner la passe du PB dans la zone établie"
+      ],
+      "critere_reussite": [
+        "J’accélère ma course tout en essayant de donner de fausses informations au défenseur en poursuite. (PB)",
+        "Je fais ma passe dans le bon timing. (PB)",
+        "Je maintiens ma vitesse ou j’accélère selon le comportement du PB. (SAX)",
+        "J’appelle le PB pour lui indiquer ma position. (SAX)"
+      ],
+      "comportements_attendus": [
+        "Incertitude gestuelle → ballon à 2 mains / switch ballon à 1 main si Duel",
+        "Incertitude rythmique → changement de vitesse / appui fort / explosivité",
+        "Incertitude directionnelle → Changements de sens / crochets"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 0,
+      "photos": 0,
+      "videos_size_mo": 0
+    },
+    "files": {
+      "fiche_json_id": "1hMg-Ic9P1qwy83dNO-t7LEK0s6b4by7w",
+      "fiche_pdf_id": "1jB5vSw66mLKSkGkceKkRA-obdc60zQwa",
+      "fiche_pptx_id": "1Y4lkhr2QXVtzR3IMxF2pRRP0LcUIsD4c",
+      "fiche_origine_pptx_id": "1vGGqqtC-o0O8f8xb0-Pv9uLcZofwLik-",
+      "videos": []
+    }
+  },
+  "1FLFwJrSUERJv0Fxskq1OafPxYWQqg3Ud": {
+    "source": {
+      "nom_fiche": "Continuité Debout autour du PB - 02",
+      "fileId_origine": "13s0S2cVJb1bK9UmlnzcrQx37fKeWkUiz",
+      "fileId_dossier": "1FLFwJrSUERJv0Fxskq1OafPxYWQqg3Ud",
+      "generated_at": "2026-05-14T11:08:14Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Continuité Debout » séquence 2",
+      "theme": "Duels Offensifs · Continuité Debout autour du PB",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "Sur-nombre offensif",
+      "format": "1+1 VS 1",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Chasubles, Carré de 3m",
+      "effectif": "Collectif réduit",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Gagner son duel",
+        "Se retrouver dans le dos du défenseur",
+        "Assurer la continuité : passer après contact si bloqué"
+      ],
+      "but": "Essai marqué · Passe après-contact",
+      "lancement": "Opposant à l’intérieur du carré (3x3m) ballon en mains",
+      "consignes": [
+        "Utilisateur 1 à 2 m du carré et Utilisateur 2 à 3m du carré à plat ventre",
+        "Lancement de jeu lorsque l’opposant donne le ballon à utilisateur",
+        "Utilisateur doit gagner son duel pour aller marquer, ou passer après contact si bloqué",
+        "Utilisateur 2 déclenche sa course une fois  que Utilisateur 1 décide de jouer son duel"
+      ],
+      "critere_reussite": [
+        "Essai marqué",
+        "Passe après-contact"
+      ],
+      "comportements_attendus": [
+        "Incertitude gestuelle → ballon à 2 mains / switch ballon à 1 main si Duel",
+        "Incertitude rythmique → changement de vitesse / appui fort / explosivité",
+        "Incertitude directionnelle → Changements de sens / crochets",
+        "Se Sortir du vis-à-vis",
+        "Ballon loin du défenseur",
+        "Raffut pour éloigner la menace voir rebondir sur le défenseur"
+      ],
+      "variantes": {
+        "plus": "Défense au plaquage · élargir le carré · démarrage U2 retardé",
+        "moins": "Défense au toucher 2 mains · réduire la distance U1-carré",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 2,
+      "photos": 2,
+      "videos_size_mo": 2.29
+    },
+    "files": {
+      "fiche_json_id": "1o8Vuk3Na6FbBv2H7E8o9LqXlAGM6y3-0",
+      "fiche_pdf_id": "1rIc0ms__jNSBZ0IJzlzoYm-cVvJBB-ra",
+      "fiche_pptx_id": "1s-hGaQ_nNcL8Uz2u3_BmyaEkaqLMUIOo",
+      "fiche_origine_pptx_id": "1RmU-PKSy3DO3kwswPNEsCdHb_Pm8GUnH",
+      "videos": [
+        "1-bWWLkibiiN1VyShLp5igyikASM_CAnw",
+        "1zTntcT2csV6c8L8pYwp43HywfUySd3H-"
+      ]
+    }
+  },
+  "1_tvCGZlfmjI5uTPP9TLO34BK49qE-vUr": {
+    "source": {
+      "nom_fiche": "Continuité Debout autour du PB - 03",
+      "fileId_origine": "1ZVUJCujms2uUJ_QbYpI6NpwWn_ArXGiw",
+      "fileId_dossier": "1_tvCGZlfmjI5uTPP9TLO34BK49qE-vUr",
+      "generated_at": "2026-05-14T11:07:46Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Continuité Debout » séquence 3",
+      "theme": "Duel Offensif · Continuité Debout autour du PB",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "Sur-nombre offensif",
+      "format": "1+1 VS 1+1",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Ballons, Chasubles, 15m de largeur",
+      "effectif": "Collectif réduit",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Gagner son duel",
+        "Gagner la ligne d’avantage",
+        "Passer après contact en cas d’accident de jeu"
+      ],
+      "but": "Essais marqués · Passes après-contact réussies",
+      "lancement": "3 attaquants en 1+2 enchainent 3 duels d’affilé dans le couloir des 5m ",
+      "consignes": [
+        "1+2 VS 1+1+1",
+        "Les attaquants ont interdiction de passer avant contact",
+        "Une fois les 3 duels gagnés , ils enchainent un retour sur 10 m de largeur en 2+1 VS 2+1",
+        "VARIANTE / EVOLUTION :",
+        "Plus de largeur sur la situation de retour si besoin de travailler le jeu déployé"
+      ],
+      "critere_reussite": [
+        "Essais marqués",
+        "Passes après-contact réussies"
+      ],
+      "comportements_attendus": [
+        "Incertitude gestuelle → ballon à 2 mains / ballon à 1 main",
+        "Incertitude rythmique → accélération max pour sortir du duel",
+        "Incertitude directionnelle → Changements de direction soudains ,crochets",
+        "Utilisation du raffut pour éloigner la menace",
+        "Se Sortir du vis-à-vis",
+        "Libérer les bras pour garder le ballon en vie",
+        "Convergence des soutiens proches"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 2,
+      "photos": 3,
+      "videos_size_mo": 7.47
+    },
+    "files": {
+      "fiche_json_id": "1FVsHyUYbwF6-ieY8PB66nhOZgkUc50Mc",
+      "fiche_pdf_id": "1sZzCRGKUps4c-HW7nb2Thiy9Q8Cb_Eic",
+      "fiche_pptx_id": "1NpodLCthqGa30M3MVa8wJHiKyb8ehydy",
+      "fiche_origine_pptx_id": "13kUCjXHSEwgDFoUN_KQ5LvVSoYfUjRn6",
+      "videos": [
+        "1cG_Aa7Xm2X46mjB9B8x04h2rYl7oxjPg",
+        "17q-HR9GItXFg_1ESpG-foLoVPEfyG1pj"
+      ]
+    }
+  },
+  "1PH4Z6r2JWhJSw-Z_QCIsnFhLh6NZ5lDz": {
+    "source": {
+      "nom_fiche": "Continuité Debout autour du PB - 04",
+      "fileId_origine": "1l3hsJQDlxvmHuBdnl6N6Hc56_9Wmqmah",
+      "fileId_dossier": "1PH4Z6r2JWhJSw-Z_QCIsnFhLh6NZ5lDz",
+      "generated_at": "2026-05-14T11:07:26Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Continuité Debout » séquence 4",
+      "theme": "Continuité Debout autour du PB",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "Égalité numérique",
+      "format": "2 VS 2",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Ballons, Chasubles, 10m de largeur",
+      "effectif": "Collectif réduit",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Lire la Défense pour localiser les espaces libres",
+        "Jouer dans les espaces libres"
+      ],
+      "but": "Le PB attaque fort le 1er espace libre · Le Soutien s’adapte en proposant une solution dans le 2ème espace libre au large ou en Cut selon la situation",
+      "lancement": "2 vs 2 ",
+      "consignes": [
+        "Au signal «BLEU !» par ex, le relayeur lance le jeu",
+        "Les 2 défenseurs vont sur les 2 plots bleus et font un burpees",
+        "VARIANTE / EVOLUTION :",
+        "Faire pré-agir les Joueurs (Utilisateurs et Opposants) (cf photos)"
+      ],
+      "critere_reussite": [
+        "Le PB attaque fort le 1er espace libre",
+        "Le Soutien s’adapte en proposant une solution dans le 2ème espace libre au large ou en Cut selon la situation",
+        "Le 2 vs 2 est transformé en un 2 vs 1"
+      ],
+      "comportements_attendus": [
+        "Incertitude gestuelle → ballon à 2 mains",
+        "Incertitude rythmique → accélération max s’engager dans l’intervalle",
+        "Incertitude directionnelle → Changements de direction soudains ,crochets",
+        "Lecture de la Défense",
+        "Choix de l’intervalle"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 0,
+      "photos": 3,
+      "videos_size_mo": 0
+    },
+    "files": {
+      "fiche_json_id": "1aJ96kOQtiuCCYlPRw0hm_eXyhNi6Kilp",
+      "fiche_pdf_id": "1B8nFph9DE3kEo0bOyLvUocCJzu9DVan6",
+      "fiche_pptx_id": "1d4eHbZmr94X20Nso0D4s9w5FxDfg3r7h",
+      "fiche_origine_pptx_id": "1r0RLcoXKsxvhQBoXsK8Hp84w6oWv38Cc",
+      "videos": []
+    }
+  },
+  "1deJTxjT10ri-E7M2ANSbWePux-oocIxm": {
+    "source": {
+      "nom_fiche": "Continuité Debout autour du PB - 06",
+      "fileId_origine": "1Pj1SilHbOCOdaepI-quvpGAuf4pL0IPW",
+      "fileId_dossier": "1deJTxjT10ri-E7M2ANSbWePux-oocIxm",
+      "generated_at": "2026-05-14T11:07:06Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Continuité Debout » séquence 6",
+      "theme": "Continuité Debout autour du PB",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "",
+      "format": "le Récupérateur/Passeur écarte immédiatement le Jeu vers le Large/ Les Soutiens convergent côté ouvert",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Cônes, Ballons, Chasubles",
+      "effectif": "Collectif réduit",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Jouer dans la défense pour aller marquer"
+      ],
+      "but": "Les PB doivent revenir vers les Soutiens. · Les Soutiens convergent et proposent des solutions de Passe en Plus ou en Moins au PB et le communiquent par code.",
+      "lancement": "3+1 vs 2",
+      "consignes": [
+        "A l’annonce « Rouge » du Coach, le 1er défenseur monte fort sur le récupérateur/Passeur : situation 1",
+        "A l’annonce « jaune » du Coach, le 1er défenseur recule : situation 2",
+        "Dans la situation 1, le Récupérateur/Passeur joue son duel et passe après contact : Les Soutiens convergent vers le côté fermé",
+        "Dans la situation 2, le Récupérateur/Passeur écarte immédiatement le Jeu vers le Large/ Les Soutiens convergent côté ouvert"
+      ],
+      "critere_reussite": [
+        "Les PB doivent revenir vers les Soutiens.",
+        "Les Soutiens convergent et proposent des solutions de Passe en Plus ou en Moins au PB et le communiquent par code."
+      ],
+      "comportements_attendus": [
+        "Incertitude gestuelle → ballon à 2 mains",
+        "Incertitude rythmique → accélération max s’engager dans l’intervalle",
+        "Incertitude directionnelle → Changements de direction soudains ,crochets",
+        "Lecture de la Défense",
+        "Choix de l’intervalle"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 0,
+      "photos": 1,
+      "videos_size_mo": 0
+    },
+    "files": {
+      "fiche_json_id": "1PJ6NsAUxsMQNY5JFEr9lT2ISLQSK7Eyf",
+      "fiche_pdf_id": "1Ha4FeN3QEJTjZsO19hkNSw4TUlrpBVtq",
+      "fiche_pptx_id": "18U9eT8Cg5YONlUYvDlS2IauXG0hO5TTh",
+      "fiche_origine_pptx_id": "1spUX9PTlTeE_-xOHZ5jpArc7urfQMA6C",
+      "videos": []
+    }
+  },
+  "1xmdOesiUYKpV9zo6iboUvmSjJWZHptCO": {
+    "source": {
+      "nom_fiche": "Continuité Debout autour du PB - 05",
+      "fileId_origine": "1YjLbxTDFHWLWxD04JgqSQTuRfTT0hNBy",
+      "fileId_dossier": "1xmdOesiUYKpV9zo6iboUvmSjJWZHptCO",
+      "generated_at": "2026-05-14T11:06:46Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Continuité Debout » séquence 5",
+      "theme": "Continuité Debout autour du PB",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "Égalité numérique",
+      "format": "3 VS 3",
+      "duree": "10 - 12 min",
+      "materiel": "Cônes, Ballons, Chasubles, 10m de largeur",
+      "effectif": "Collectif réduit",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Lire la Défense pour localiser les espaces libres",
+        "Jouer dans les espaces libres"
+      ],
+      "but": "Le PB attaque fort le 1er espace libre · Les Soutiens s’adaptent en proposant une solution dans les autres espaces espace libres",
+      "lancement": "3 vs 3 / 3 Zones de 3 couleurs différentes",
+      "consignes": [
+        "Au signal «Rouge !» par ex, le relayeur lance le jeu",
+        "Chacun des 3 défenseurs doit rester dans sa zone pour défendre",
+        "Le défenseur de la zone concernée doit reculer jusqu’à l’arrière de sa zone avant de pouvoir défendre",
+        "Les attaquants vont où ils veulent pour aller marquer avec l’idée d’attaquer les espaces libres (zone Rouge dans cet exemple)."
+      ],
+      "critere_reussite": [
+        "Le PB attaque fort le 1er espace libre",
+        "Les Soutiens s’adaptent en proposant une solution dans les autres espaces espace libres"
+      ],
+      "comportements_attendus": [
+        "Incertitude gestuelle → ballon à 2 mains",
+        "Incertitude rythmique → accélération max s’engager dans l’intervalle",
+        "Incertitude directionnelle → Changements de direction soudains ,crochets",
+        "Lecture de la Défense",
+        "Choix de l’intervalle"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 0,
+      "photos": 1,
+      "videos_size_mo": 0
+    },
+    "files": {
+      "fiche_json_id": "1PiffXSltP_-I4I6k9iKMb3URPQNpIdpp",
+      "fiche_pdf_id": "1zyTxYmGyl5F1ZzvYN8l8DStQ9-McR_be",
+      "fiche_pptx_id": "1n4nTOsdQjOQTjqpwFC-WV0UhaK6lOH37",
+      "fiche_origine_pptx_id": "1Zr7sI0EQxv_EhUYaCoF2YLT4xESfw_qt",
+      "videos": []
+    }
+  },
+  "1hl51Obgt_tNsSOXSdnl2Lf_axTRkzcIA": {
+    "source": {
+      "nom_fiche": "Continuité Debout autour du PB - 08",
+      "fileId_origine": "1HybAxuEe73Dx28VuNg7sv1b7f47NSDUu",
+      "fileId_dossier": "1hl51Obgt_tNsSOXSdnl2Lf_axTRkzcIA",
+      "generated_at": "2026-05-14T11:06:17Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Continuité Debout » séquence 8",
+      "theme": "Manipulation de Balle · Continuité Debout autour du PB",
+      "niveau": "Initiation",
+      "rapport_de_force": "Sur-nombre offensif",
+      "format": "2 VS 1",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Cônes, Ballons, 5 m de largeur",
+      "effectif": "Collectif réduit",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Passer le ballon avant contact",
+        "Profiter d’un situation de Surnombre pour franchir le rideau défensif ou le contourner"
+      ],
+      "but": "Je pré-agis très vite pour me rendre disponible · Je communique ma position au PB",
+      "lancement": "",
+      "consignes": [],
+      "critere_reussite": [
+        "Je pré-agis très vite pour me rendre disponible",
+        "Je communique ma position au PB"
+      ],
+      "comportements_attendus": [
+        "Je scanne",
+        "Je communique",
+        "J’agis"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 1,
+      "photos": 2,
+      "videos_size_mo": 17.16
+    },
+    "files": {
+      "fiche_json_id": "1reIzJ-bCm-DlCn7KmCv_Xo0ybjSIqbNb",
+      "fiche_pdf_id": "1aIFVOU3ON6_G7aUDzw5-SkF_8dZZAXzR",
+      "fiche_pptx_id": "1mRSafZDto0ckgxzB99mghpNBc20brP9d",
+      "fiche_origine_pptx_id": "1QZasH0kBJEkZt2Lp3LUeq3QF_PQMxH2w",
+      "videos": [
+        "19v5UAwpiue5UMy8HofxczxQxhB4VYPVS"
+      ]
+    }
+  },
+  "18b1mnVLBPV78HskgizIUyjIivqo3HsGS": {
+    "source": {
+      "nom_fiche": "Continuité Debout autour du PB - 07",
+      "fileId_origine": "1Mudmb4Pvc3UWpZ0GU7PFRlcgYx2LOyjt",
+      "fileId_dossier": "18b1mnVLBPV78HskgizIUyjIivqo3HsGS",
+      "generated_at": "2026-05-14T11:05:52Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Continuité Debout » séquence 7",
+      "theme": "Continuité Debout autour du PB · Initiation au Travail en cellule",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "Sur-nombre offensif",
+      "format": "3 VS 2",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Cônes, Ballons, 5 m de largeur",
+      "effectif": "Collectif réduit",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Constituer une cellule de 3 joueurs : Base – Dos – Plus",
+        "S’organiser au sein de la cellule en communicant pour franchir la défense"
+      ],
+      "but": "Les Joueurs communiquent entre eux. · Les Utilisateurs ne portent pas le ballon jusqu’au Contact.",
+      "lancement": "Enchaîner les passages sur l’atelier en alternant les positions dans le groupe.",
+      "consignes": [
+        "Passes au Pied (rasant ou petit par-dessus) : Même principe que précédemment mais la BASE fait un coup de pied rasant entre les 2 défenseurs ou un petit coup de pied par-dessus / PLUS et DOS déclenchent leur course dans le bon timing pour récupérer le ballon et aller marquer.",
+        "Même situation avec Pré-action : Les Joueurs attendent le signal du Coach (« Jeu ! ») pour entrer dans le terrain (en contournant leurs cônes respectifs) et jouer un 3 vs 2."
+      ],
+      "critere_reussite": [
+        "Les Joueurs communiquent entre eux.",
+        "Les Utilisateurs ne portent pas le ballon jusqu’au Contact.",
+        "Des intervalles libres sont créés et exploités."
+      ],
+      "comportements_attendus": [
+        "Je scanne",
+        "Je communique",
+        "J’agis"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 0,
+      "photos": 1,
+      "videos_size_mo": 0
+    },
+    "files": {
+      "fiche_json_id": "1-i-Xfq00e3tzyDVejl0w9SZG8W4K_I_w",
+      "fiche_pdf_id": "1behZFymLgzIHH7dtJ1i_vgcxAdJ8HsPV",
+      "fiche_pptx_id": "1IISk-rUlpJarVgAC4MY6TlDUmZCZMm7R",
+      "fiche_origine_pptx_id": "15NuBPb2srfRFRczfL8AcKzaWiZ92Ib9S",
+      "videos": []
+    }
+  },
+  "1JgDYuMRGub-PPvpBI77Y6xp8Q0YGnWiP": {
+    "source": {
+      "nom_fiche": "Libération au contact - 01",
+      "fileId_origine": "1fTC_rBbe32Mxtxj_aHV3gRjuGeCqIHXA",
+      "fileId_dossier": "1JgDYuMRGub-PPvpBI77Y6xp8Q0YGnWiP",
+      "generated_at": "2026-05-14T11:05:03Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Libération au sol » séquence 1",
+      "theme": "Efficacité de la libération au sol",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "Égalité numérique",
+      "format": "1 VS 1",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Ballons",
+      "effectif": "1 VS 1",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Lutter Debout et Lutter au sol",
+        "Compliquer l’action des gratteurs."
+      ],
+      "but": "Le ballon reste toujours difficile à atteindre par le défenseur",
+      "lancement": "Le PB s’avance vers le défenseur et touche le sol avec le ballon avant le contact.",
+      "consignes": [
+        "Le PB lutte debout avant d’aller au sol.",
+        "Le PB plonge dans le dos du défenseur pour passer au sol.",
+        "Le PB est électrique au sol et libère vers son camp loin du défenseur."
+      ],
+      "critere_reussite": [
+        "Le ballon reste toujours difficile à atteindre par le défenseur"
+      ],
+      "comportements_attendus": [
+        "Je lutte debout au contact",
+        "Je plonge sur le ballon dans le dos du défenseur",
+        "Je suis électrique au sol"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 1,
+      "photos": 1,
+      "videos_size_mo": 140.17
+    },
+    "files": {
+      "fiche_json_id": "1L81qvNcIdlB1H8-I8lDtUYC00TiQpx3K",
+      "fiche_pdf_id": "1Km9iAsh0DowugSMBu1BvmZPXT7lFhoCQ",
+      "fiche_pptx_id": "1y3atWQykPPzyYAMKMzLxxm5JXko87S_D",
+      "fiche_origine_pptx_id": "1z3UP1-yXltbF-5_LfwdfAaeDFMK8-dVZ",
+      "videos": [
+        "1qJPaRx0Is9-PcbJSC5_qHkk1ajCf3j7-"
+      ]
+    }
+  },
+  "1b8xXeJDkRlfy82jmOOt_e_UPhM0DmfEX": {
+    "source": {
+      "nom_fiche": "Organisation dans les Rucks - 01",
+      "fileId_origine": "1pmyTMdr_GHUB6F7G6UaMworE2HjXp0Ee",
+      "fileId_dossier": "1b8xXeJDkRlfy82jmOOt_e_UPhM0DmfEX",
+      "generated_at": "2026-05-14T11:04:24Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Organisation dans les Rucks» séquence 1a",
+      "theme": "Gestion des blocages · Conservation sur les Rucks",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "",
+      "format": "Collectif Réduit",
+      "duree": "10 - 12 min",
+      "materiel": "Plots / Ballons, Chasubles",
+      "effectif": "",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Conserver et adapter le nombre de Soutiens en fonction du Rapport de Force"
+      ],
+      "but": "Conserver et adapter le nombre de Soutiens en fonction du Rapport de Force",
+      "lancement": "L’OPP -1 fait la passe au relayeur.",
+      "consignes": [
+        "Le relayeur ou entraîneur annonce une couleur :",
+        "Bleu : il fait la passe de suite PB. Son OPP direct intervient tout de suite.",
+        "Rouge : il fait rouler la balle derrière le PB en direction de la ligne rouge. Son OPP direct lui met la pression.",
+        "Blanc : il fait la passe de suite au PB, son OPP direct recule jusqu’au blanc avant d’intervenir.",
+        "CONSIGNES :",
+        "Soutiens OFF et DEF: ils peuvent pré-agir dès la passe de l’OPP -1 au relayeur.",
+        "Le PB doit passer au sol dans les 2 secondes après avoir été impacté par le bouclier.",
+        "Les soutiens DEF doivent tenter de récupérer la balle ou d’éviter de prendre un essai.",
+        "Si le ballon est conservé, ils peuvent aller marquer derrière la ligne d’essai."
+      ],
+      "critere_reussite": [],
+      "comportements_attendus": [
+        "Identifier le rapport de force : sous pression, à l’équilibre ou favorable.",
+        "Adapter son comportement en fonction du rapport de force :",
+        "Sous pression : -2 / -1 / + 1 à la conservation.",
+        "A l’équilibre : -1 / -2 à la conservation et +1 disponible pour jouer.",
+        "Favorable : -1 à la conservation et -2 / +1 disponibles pour jouer sens."
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 0,
+      "photos": 1,
+      "videos_size_mo": 0
+    },
+    "files": {
+      "fiche_json_id": "1A3JzsPU307XrEV1Ka6kxMFwHIZB4bTs7",
+      "fiche_pdf_id": "1qxIooZ3gdVHlItgRBRf8FPwTgQ4lC_dV",
+      "fiche_pptx_id": "17DtTZ7yaO-N5nnpiiFTxct3mAgfKcBv8",
+      "fiche_origine_pptx_id": "1L6u3oMoa5XsjQo4etYZLKGSeMvkD9OCc",
+      "videos": []
+    }
+  },
+  "1iEglZZb-Sotr87g68uDMkTf_3ePzmHAx": {
+    "source": {
+      "nom_fiche": "Comportement dans les Rucks - 01",
+      "fileId_origine": "1bmfFJSYPkHnT-bLzNHnoUyZm4Ul-1hqe",
+      "fileId_dossier": "1iEglZZb-Sotr87g68uDMkTf_3ePzmHAx",
+      "generated_at": "2026-05-14T11:04:06Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Comportement sur les Rucks» séquence 1",
+      "theme": "Gestion des blocages · Combat dans les Rucks",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "Sur-nombre offensif",
+      "format": "1+1 VS 1+1",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Chasubles, Carré de 10m",
+      "effectif": "Collectif réduit",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "S’approprier l’espace au-dessus du ballon",
+        "Conserver ou Conquérir le ballon"
+      ],
+      "but": " · Les Joueurs s’investissent dans le combat.",
+      "lancement": "Au Signal « Bleus par les plots blancs » par exemple :",
+      "consignes": [
+        "Ballon aux Joueurs bleus.",
+        "1 joueur bleu se jette sur le ballon et reste au sol.",
+        "Les Soutiens Offensifs interviennent par les Plots blancs.",
+        "Les défenseurs interviennent en passant par les Plots bleus.",
+        "Les Joueurs entament une lutte pour la Conservation ou la Reconquête du ballon."
+      ],
+      "critere_reussite": [
+        "Ballon Gagné par les Utilisateurs ou les Opposants :",
+        "Les Joueurs s’investissent dans le combat.",
+        "Les Joueurs adoptent de bonnes postures.",
+        "Les Opposants ne se consomment dans le Ruck (pas plus de 2 SD) s’il n’y a pas de possibilité de gagner le ballon (lecture).",
+        "Les Utilisateurs engagent plus de 2 Soutiens à la reconquête si possibilité de gagner le ballon (lecture).",
+        "Les Soutiens Offensifs sont les premiers à prendre l’espace au-dessus du ballon."
+      ],
+      "comportements_attendus": [
+        "Le 1er arrivé se jette sur le ballon, reste au sol et présente le ballon vers son camp.",
+        "Les Soutiens adoptent une posture de combat et luttent pour le gain du ballon."
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 0,
+      "photos": 1,
+      "videos_size_mo": 0
+    },
+    "files": {
+      "fiche_json_id": "1u_sjcylAIDyoTra69_Yovji9kuA3If0U",
+      "fiche_pdf_id": "1xAO0dvNl9n6jFqS4gMr1xjRPHd0edDAn",
+      "fiche_pptx_id": "1BvrjUxa8Mje2QF2CBzU4FJDQ5jKiyn8Y",
+      "fiche_origine_pptx_id": "1BaJ2A-R-h4PqomiC3QVm9Z0NPXDxw8X_",
+      "videos": []
+    }
+  },
+  "12WdM3KBfcf0c6yy1qwrtENshP0cq-k6a": {
+    "source": {
+      "nom_fiche": "Plaquages - 01",
+      "fileId_origine": "1nu8nvFbl0nMzCAAAA5ZHdPvQYnC5ATeI",
+      "fileId_dossier": "12WdM3KBfcf0c6yy1qwrtENshP0cq-k6a",
+      "generated_at": "2026-05-14T11:02:34Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Décomposition du plaquage offensif",
+      "theme": "Plaquages",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "Égalité numérique",
+      "format": "1 VS 1",
+      "duree": "10 - 12 min",
+      "materiel": "",
+      "effectif": "1 VS 1",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Plaquer en sécurité"
+      ],
+      "but": "Rester dynamique sur les appuis · Adopter une posture de combat avec le dos droit et les genoux fléchis",
+      "lancement": "",
+      "consignes": [],
+      "critere_reussite": [
+        "Rester dynamique sur les appuis",
+        "Adopter une posture de combat avec le dos droit et les genoux fléchis"
+      ],
+      "comportements_attendus": [
+        "Clé 1 : cibler le bassin.",
+        "Clé 2 : être responsable de son espace.",
+        "Clé 3 : engager un appui fort près du plaqué.",
+        "Clé 4 : aligner jambe forte et épaule forte, plaquer la tête, se gainer.",
+        "Clé 5 : « fouetter » avec l’épaule.",
+        "Clé 6 : serrer les bras et pousser fort sur les jambes."
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 6,
+      "photos": 6,
+      "videos_size_mo": 248.91
+    },
+    "files": {
+      "fiche_json_id": "1N9JWyH2qN62Fz6xYLBtvVDfF6TrAPRI3",
+      "fiche_pdf_id": "16leqaBHh8O9pzXdHWX9aBftZ1a8IE3fn",
+      "fiche_pptx_id": "1lf7yr9O86KGNBM02i9nirWYc5ymFz3FX",
+      "fiche_origine_pptx_id": "14F3ri8lPJx55We7-IJmjUZ9kBeVDoRBh",
+      "videos": [
+        "1D1V6Z_lpGqjzVkWI_lpwIRiVgNrigmWl",
+        "1RQB1GYsbQc-e5sbAG9yDMDKd8TGBKzNm",
+        "1FfWINhrqIboagPvCAsXgpfrVpY8oAczr",
+        "1FjPecCAehKOSPzeThjhyAVlIDqnj1-eJ",
+        "1LBnVytLkwJ4ufL1kuP_GhNaGjY9J173v",
+        "17yva-5Hhlf_E0oMr-RIpA26joClGx5ol"
+      ]
+    }
+  },
+  "1C2pSHdmFFq1zJoStv8YdmIyQn4728iSg": {
+    "source": {
+      "nom_fiche": "Plaquages - 02",
+      "fileId_origine": "1NGiupL61v_Ha7tcx94qRrlYnVdcsGnqO",
+      "fileId_dossier": "1C2pSHdmFFq1zJoStv8YdmIyQn4728iSg",
+      "generated_at": "2026-05-14T11:01:35Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "",
+      "theme": "Plaquages",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "Égalité numérique",
+      "format": "1 VS 1",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Ballons",
+      "effectif": "1 VS 1",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Plaquer en sécurité"
+      ],
+      "but": "Plaquer en sécurité",
+      "lancement": "",
+      "consignes": [],
+      "critere_reussite": [],
+      "comportements_attendus": [],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 1,
+      "photos": 3,
+      "videos_size_mo": 5.53
+    },
+    "files": {
+      "fiche_json_id": "1sT1gT9aNE57p0p3yknwR-J1gDlTt3JKp",
+      "fiche_pdf_id": "1qXEP3cBBMuIP5srKVWCTCBlivl8c6NcI",
+      "fiche_pptx_id": "1-PJrr2N1kaYBlaEZrC5pGPbYEYX1HL25",
+      "fiche_origine_pptx_id": "1iWUqBJSIoUGN71nqqoG6c3lMgp_AemS6",
+      "videos": [
+        "1PXW0RUK3Pum0JcLIxMjsBkoG_58ap3o0"
+      ]
+    }
+  },
+  "1it0svv9qQn4NcvFUHYl-irMmhF4cmot0": {
+    "source": {
+      "nom_fiche": "Moyenne Box - Jeu en vert - 01",
+      "fileId_origine": "1OB8YBNZBTnjq4X9vvqlUnZhLwCZFCNDI",
+      "fileId_dossier": "1it0svv9qQn4NcvFUHYl-irMmhF4cmot0",
+      "generated_at": "2026-05-14T11:01:00Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Jeu en vert » séquence 1",
+      "theme": "Jeu en vert · Défense désorganisée.",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "Sur-nombre offensif",
+      "format": "5 VS 3",
+      "duree": "10 - 12 min",
+      "materiel": "",
+      "effectif": "Collectif réduit",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Trouver des solutions collectivement dans une défense désorganisée et marquer sans arrêt."
+      ],
+      "but": "L’équipe qui attaque marque sans arrêt. · Les joueurs cherchent à se démarquer et mettent de la vitesse.",
+      "lancement": "2 vagues de 4 joueurs.",
+      "consignes": [
+        "La 1ère  vague se fait des passes :",
+        "le  dernier fait relayeur",
+        "1 -2 -3 deviennent défenseurs"
+      ],
+      "critere_reussite": [
+        "L’équipe qui attaque marque sans arrêt.",
+        "Les joueurs cherchent à se démarquer et mettent de la vitesse."
+      ],
+      "comportements_attendus": [
+        "Communication / Déplacement / Démarquage.",
+        "Gestuelle, Comportement de la Base, vitesse."
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 1,
+      "photos": 3,
+      "videos_size_mo": 54.01
+    },
+    "files": {
+      "fiche_json_id": "1SuC5yhYFXJENqNSsNG065N8LqxEHZ_Y8",
+      "fiche_pdf_id": "1RrgetErbNt_52-mg6N1wc-JSF_9AhE_K",
+      "fiche_pptx_id": "1nMUY83-6HluoHlXZP3iB27m-ZoWwV5tf",
+      "fiche_origine_pptx_id": "1JF7PSnTuFETxxCC9X1kfj_sqk5Fyp_aH",
+      "videos": [
+        "1-yJazMQJdvsSdOGeQMs8mvyQiTHKsiam"
+      ]
+    }
+  },
+  "1KDpg675obgHk5KlQaryyfIaVlLaKZJPh": {
+    "source": {
+      "nom_fiche": "Plaquages - 03",
+      "fileId_origine": "1tUtx79qdoFFyV6E5PtEGbtpkRK-bUCoQ",
+      "fileId_dossier": "1KDpg675obgHk5KlQaryyfIaVlLaKZJPh",
+      "generated_at": "2026-05-14T10:59:53Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Décomposition du plaquage offensif",
+      "theme": "Plaquages",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "Égalité numérique",
+      "format": "1 VS 1",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Ballons",
+      "effectif": "1 VS 1",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Plaquer en sécurité"
+      ],
+      "but": "Essai non marqué / Plaquage réussi. · Tête du bon côté sur le plaquage (Plaquer en sécurité).",
+      "lancement": "Les joueurs sont espacés de 5m face à face au milieu des 2 zones.",
+      "consignes": [],
+      "critere_reussite": [
+        "Essai non marqué / Plaquage réussi.",
+        "Tête du bon côté sur le plaquage (Plaquer en sécurité)."
+      ],
+      "comportements_attendus": [
+        "Clé 1 : cibler le bassin.",
+        "Clé 2 : être responsable de son espace.",
+        "Clé 3 : engager un appui fort près du plaqué.",
+        "Clé 4 : aligner jambe forte et épaule forte, plaquer la tête du bon côté, se gainer.",
+        "Clé 5 : « fouetter » avec l’épaule.",
+        "Clé 6 : serrer les bras et pousser fort sur les jambes."
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 1,
+      "photos": 2,
+      "videos_size_mo": 162.58
+    },
+    "files": {
+      "fiche_json_id": "1LQQOZMgAppMvWopPCEMtLFaO3nirvdSW",
+      "fiche_pdf_id": "1uVnmavu61PlfWY2nWtew1iXp6_CtaLG1",
+      "fiche_pptx_id": "1okzjfJPKMgsYYqozCKHvuLOmcbLEGWuO",
+      "fiche_origine_pptx_id": "15fq0mds8uUd9YNxB61RnV1LJ2gKEv5Wo",
+      "videos": [
+        "1FtpuhcxCqtnh3_CHov-rkGH5J7aYRs5q"
+      ]
+    }
+  },
+  "1Hq_XTvQHsJaEkxGkQrdpdJBcVQompTS2": {
+    "source": {
+      "nom_fiche": "Apprendre à Pré-agir",
+      "fileId_origine": "16vG9I3ZNDpqAEdjtMasKk3VPb7m0KaXk",
+      "fileId_dossier": "1Hq_XTvQHsJaEkxGkQrdpdJBcVQompTS2",
+      "generated_at": "2026-05-14T10:59:11Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Apprendre à pré-agir » séquence 1",
+      "theme": "Animation Offensive sur Jeu déployé",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "Égalité numérique",
+      "format": "5 VS 5",
+      "duree": "20 - 30 min",
+      "materiel": "",
+      "effectif": "Collectif réduit",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Pré-agir en prenant de la Largeur et de la Profondeur",
+        "Marquer plus rapidement que l’adversaire"
+      ],
+      "but": "Le Ballon ne tombe pas. · Les Joueurs prennent la Largeur en faisant des Pas Chassés ou des Pas Croisés et en gardant le Ballon à vue.",
+      "lancement": "4 vs 4 ou 5 vs 5 / 1 terrain de 4 à 5 m pour la phase statique / 1 terrain de 15 à 25m pour la phase dynamique.",
+      "consignes": [
+        "LANCEMENT :",
+        "Au Signal « Jeu » du Coach.",
+        "CONSIGNES :",
+        "Faire la passe et se replacer rapidement (pré-agir).",
+        "Adapter la longueur de sa passe.",
+        "Soigner sa gestuelle de passe pour gagner en rapidité."
+      ],
+      "critere_reussite": [
+        "Le Ballon ne tombe pas.",
+        "Les Joueurs prennent la Largeur en faisant des Pas Chassés ou des Pas Croisés et en gardant le Ballon à vue.",
+        "Les Courses sont droites."
+      ],
+      "comportements_attendus": [
+        "Communiquer.",
+        "Se replacer sur la largeur immédiatement après avoir fait sa passe « mains à mains ». (Pré-agir).",
+        "Ajuster son placement en fonction de la longueur de passe du PB."
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 0,
+      "photos": 1,
+      "videos_size_mo": 0
+    },
+    "files": {
+      "fiche_json_id": "1_zNj2nE-XYfHN82p0lG3H1VFQ_bAjeua",
+      "fiche_pdf_id": "1U_lCs43n9OlxThoERmk72oj8_opsrcJ7",
+      "fiche_pptx_id": "1qjorkRA9UDTRhibU-eyvWsBzSln-JC7G",
+      "fiche_origine_pptx_id": "1Bv1F0W0KUmySLEzgzhWeioon3Xpdy1ng",
+      "videos": []
+    }
+  },
+  "1oZGeeWzMP6JZ15-Vl6yy0wFc6n6AGslJ": {
+    "source": {
+      "nom_fiche": "Fixer son défenseur - 4VS3",
+      "fileId_origine": "1Coihgid-ZdukQ1hU8slReJfmClU8Ik2v",
+      "fileId_dossier": "1oZGeeWzMP6JZ15-Vl6yy0wFc6n6AGslJ",
+      "generated_at": "2026-05-14T10:58:52Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Fixer son défenseur » séquence 1",
+      "theme": "Animation Offensive sur Jeu déployé",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "Sur-nombre offensif",
+      "format": "4 VS 3",
+      "duree": "10 - 12 min",
+      "materiel": "Plots / Ballons, Chasubles, 12 à 18m de largeur",
+      "effectif": "Collectif réduit",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Passer le Ballon après avoir fixé son Défenseur",
+        "Lire et Anticiper le Comportement de son Défenseur"
+      ],
+      "but": "La situation peut se faire en marchant, en trottinant ou en courant. · Les défenseurs défendent au corps (« chacun le sien »).",
+      "lancement": "4 vs 3 / 2 lignes de Plots bleus et rouges disposés en L.",
+      "consignes": [
+        "LANCEMENT :",
+        "Au Signal « Rouge » ou « Bleu », le PB dans l’angle, avance pour fixer le 1er défenseur et lance l’attaque.",
+        "CONSIGNES :",
+        "Attraper le ballon le plus tôt possible, avancer de 1 ou 2m pour fixer le défenseur et faire la passe en terminant le mouvement avec les mains en direction de la cible."
+      ],
+      "critere_reussite": [
+        "La situation peut se faire en marchant, en trottinant ou en courant.",
+        "Situation de base :  Les défenseurs défendent au corps (« chacun le sien »).",
+        "L’Essai doit être marqué par un attaquant « démarqué » sans qu’il ne se fasse toucher."
+      ],
+      "comportements_attendus": [
+        "Créer de la profondeur en décalant les départs de course.",
+        "Aller chercher le ballon le plus tôt possible pour gagner du temps.",
+        "Observer l’orientation des épaules de l‘adversaire :",
+        "Si les épaules sont tournées vers moi, faire la passe en terminant le geste avec les bras et les mains vers la cible.",
+        "Si les épaules de l’adversaire sont tournées vers l’extérieur, feinter la passe et  prendre l’intervalle."
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 0,
+      "photos": 1,
+      "videos_size_mo": 0
+    },
+    "files": {
+      "fiche_json_id": "12HikE8caYEAvFbqbqXFjmGm9GQ9eOjuQ",
+      "fiche_pdf_id": "1IevUtG6ff3bmnsrm5DqRGpN_0LvhFxNX",
+      "fiche_pptx_id": "1JwUPScl075-1rwwZc-XpjJ912KgQSh8d",
+      "fiche_origine_pptx_id": "11-fP5jp2cri3cpbzaG5Fmi81ZsaLgKQC",
+      "videos": []
+    }
+  },
+  "1XfFbOOTkyXp1Z_1A5JudL1TgIymvS6YB": {
+    "source": {
+      "nom_fiche": "Duels - 09 - Match Point",
+      "fileId_origine": "1kPD2UGrNgB-0tHp46c_qnYLqqNHsVS_2",
+      "fileId_dossier": "1XfFbOOTkyXp1Z_1A5JudL1TgIymvS6YB",
+      "generated_at": "2026-05-14T10:58:10Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Les Duels » séquence 6 «Match Point",
+      "theme": "Duels Offensifs",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "",
+      "format": "Travailler le duel de façon ludique",
+      "duree": "15 - 20 min",
+      "materiel": "",
+      "effectif": "Travail individuel",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Porter le ballon à 2 mains",
+        "Lire et Attaquer l’espace qui se libère."
+      ],
+      "but": "Attaquer l’espace qui se libère. · Mettre de la fréquence sur les appuis au moment de franchir et ré-accélérer.",
+      "lancement": "Au signal du coach :",
+      "consignes": [
+        "Le PB entre dans le carré et doit traverser",
+        "1 des 4 zones d’en-but avec le ballon et sans se faire toucher.",
+        "Zone blanche : 1 point",
+        "Zone bleue : 2 points",
+        "Le défenseur entre dans le carré en même temps que le PB",
+        "et essaye de toucher le PB avant qu’il ne traverse 1 des 4 zones",
+        "d’en-but."
+      ],
+      "critere_reussite": [
+        "Attaquer l’espace qui se libère.",
+        "Mettre de la fréquence sur les appuis au moment de franchir et ré-accélérer."
+      ],
+      "comportements_attendus": [
+        "Incertitude gestuelle → ballon à 2 mains",
+        "Incertitude rythmique → changement de vitesse / appui fort / explosivité",
+        "Incertitude directionnelle → Changements de sens / crochets"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 1,
+      "photos": 2,
+      "videos_size_mo": 109.04
+    },
+    "files": {
+      "fiche_json_id": "1PJk6cZBZqQaWnYcodFEF-G9BBEM-dCUe",
+      "fiche_pdf_id": "11l8vUpdqTG0SKsTiBkx08RFXxmSO0JdA",
+      "fiche_pptx_id": "1fC1aRI3sD33ODrcUmLaHEwgBpdN6GOpy",
+      "fiche_origine_pptx_id": "1u9AIcr0gXyh7coxvK8i_rJ6sPL_3KmDY",
+      "videos": [
+        "1yX4l_GZ74SST5ZPYT3CT4Vxr2RFA1rdc"
+      ]
+    }
+  },
+  "1DajaoI7UirKUp1FTGxJQOVYkMu0W1aWp": {
+    "source": {
+      "nom_fiche": "Plaquages - 04",
+      "fileId_origine": "14o3Os67Yu-K8sS7oU3xKWXbxnW6q2y2J",
+      "fileId_dossier": "1DajaoI7UirKUp1FTGxJQOVYkMu0W1aWp",
+      "generated_at": "2026-05-14T10:57:32Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Plaquages » séquence 2",
+      "theme": "Plaquages",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "Égalité numérique",
+      "format": "1 VS 1",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Ballons",
+      "effectif": "1 VS 1",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Plaquer en sécurité"
+      ],
+      "but": "Plaquer en sécurité",
+      "lancement": "",
+      "consignes": [],
+      "critere_reussite": [],
+      "comportements_attendus": [],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 1,
+      "photos": 3,
+      "videos_size_mo": 7.71
+    },
+    "files": {
+      "fiche_json_id": "1p_HI3MJDUTaSAz_WuMtuMEv75VdF_KkV",
+      "fiche_pdf_id": "1JFmZ7iXFAl5d6fjY3QufvY-hO2YGZynA",
+      "fiche_pptx_id": "1YQgktRBycN15Cu4nDKgUf360jtmZ9C--",
+      "fiche_origine_pptx_id": "135Osrr8Esr-9btuPA4SLVoIUcaZUPUtT",
+      "videos": [
+        "1Oz16yBA2u5Lwf5u3t0gfIeEVPeUfnht5"
+      ]
+    }
+  },
+  "1JAmIk7390Pgtw83QdUW2yoAlU2WEMwKO": {
+    "source": {
+      "nom_fiche": "Rush Défense - 01",
+      "fileId_origine": "1_jOMukI5G6yi9HxhwU-ljZe_CSErzftP",
+      "fileId_dossier": "1JAmIk7390Pgtw83QdUW2yoAlU2WEMwKO",
+      "generated_at": "2026-05-14T10:57:07Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Rush défense » séquence 1",
+      "theme": "Cadrage intérieur / Défense en ligne",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "",
+      "format": "Collectif réduit",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Ballons",
+      "effectif": "",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Organiser la montée défensive",
+        "Cadrer intérieur"
+      ],
+      "but": "Organiser la montée défensive",
+      "lancement": "",
+      "consignes": [],
+      "critere_reussite": [],
+      "comportements_attendus": [],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 1,
+      "photos": 3,
+      "videos_size_mo": 6.39
+    },
+    "files": {
+      "fiche_json_id": "1unjQXoXdOKLpUzkeXN0U-EY-oCvudQWB",
+      "fiche_pdf_id": "1ovrSQX3cvCm3_AgZgJCWAHfit8xNxjSq",
+      "fiche_pptx_id": "1EXs3sQSW7g2rESeyHq49CrHmSQe2SJh_",
+      "fiche_origine_pptx_id": "1R6D1cPHNl1_Ii6LImckYD5ZzNjjAVNWi",
+      "videos": [
+        "1lokLnUn2vXfhTOAjJULJpA-RkmVR8xLo"
+      ]
+    }
+  },
+  "1piPhXGWThmNgAS9FBd8uvbc2mU7r-_Ei": {
+    "source": {
+      "nom_fiche": "Rush Défense - 02",
+      "fileId_origine": "1ROgl6J_85NxJwEnP8ddn6VoQK14V-Gza",
+      "fileId_dossier": "1piPhXGWThmNgAS9FBd8uvbc2mU7r-_Ei",
+      "generated_at": "2026-05-14T10:56:11Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Rush Défense » séquence 2",
+      "theme": "Rush Défense · Cadrage intérieur",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "",
+      "format": "Collectif réduit",
+      "duree": "10 - 12 min",
+      "materiel": "Ballons / Plots, 3 attaquants contre 3 défenseurs.",
+      "effectif": "",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Se coordonner et créer un mur défensif efficace en « cadrant intérieur ».",
+        "Déclencher la montée en Rush et envahir le camp adverse."
+      ],
+      "but": "Les joueurs arrivent à créer un mur défensif rapidement en annonçant leur rôle. · Les joueurs « cadrent intérieur » leurs vis à vis.",
+      "lancement": "",
+      "consignes": [],
+      "critere_reussite": [
+        "Les joueurs arrivent à créer un mur défensif rapidement en annonçant leur rôle.",
+        "Les joueurs « cadrent intérieur » leurs vis à vis."
+      ],
+      "comportements_attendus": [
+        "les joueurs se coordonnent et signalent leur cible.",
+        "Montée défensive coordonnée.",
+        "Epaulement Intérieur."
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 1,
+      "photos": 4,
+      "videos_size_mo": 167.18
+    },
+    "files": {
+      "fiche_json_id": "15_T5tVboAMsovsjvbKKrKoMsIhRrINGG",
+      "fiche_pdf_id": "16cA-oZFDogIbLPmcGq2hyy7ieS_EUZPH",
+      "fiche_pptx_id": "1H6nXlfklF8kXXVIgW3j9SuLWqOOTvqOt",
+      "fiche_origine_pptx_id": "1T_E0QeCNkV1p7efq9CbLfUeZ13zoT0x4",
+      "videos": [
+        "1OMQOpAQkS_rt-9ivNRi4_CNVAL7qRPRC"
+      ]
+    }
+  },
+  "1AgsDW62papFSaqluNmeUD-fM2jvMDpKu": {
+    "source": {
+      "nom_fiche": "Défense autour des Rucks - 01",
+      "fileId_origine": "1AR-TeQZfeNkWpAZ7xaLd_LnD9ZK7eCoJ",
+      "fileId_dossier": "1AgsDW62papFSaqluNmeUD-fM2jvMDpKu",
+      "generated_at": "2026-05-14T10:54:41Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Défense autour des Rucks » séquence 1",
+      "theme": "Rush Défense · Défense autour des Rucks",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "",
+      "format": "Collectif réduit",
+      "duree": "10 - 12 min",
+      "materiel": "Ballons / Plots / Sacs de plaquages / Boucliers, 5 attaquants contre 5 défenseurs. /, 1 Ruck créé artificiellement par un marquage au sol ou des boucliers par ex.",
+      "effectif": "",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Organiser le rideau défensif R1 à partir d’un Ruck.",
+        "Déclencher la montée en Rush à la levée du ballon par le relayeur adverse"
+      ],
+      "but": "Les joueurs arrivent à créer un rideau défensif rapidement en annonçant leur rôle. · Les joueurs envahissent le camp adverse au signal de la Base.",
+      "lancement": "",
+      "consignes": [],
+      "critere_reussite": [
+        "Les joueurs arrivent à créer un rideau défensif rapidement en annonçant leur rôle.",
+        "Les joueurs envahissent le camp adverse au signal de la Base."
+      ],
+      "comportements_attendus": [
+        "Les Défenseurs se placent en commençant par le bord du Ruck puis de l’intérieur vers l’extérieur en ciblant leur vis-à-vis. Appui côté Ruck avancé.",
+        "La défense monte de façon coordonnée dès que le relayeur soulève le ballon en essayant d’envahir le camp adverse."
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 1,
+      "photos": 3,
+      "videos_size_mo": 178.16
+    },
+    "files": {
+      "fiche_json_id": "1fEpUwdaGLX---OjLDs0UbPJQdEdsxzZ6",
+      "fiche_pdf_id": "118oTSg0Rc9BlefgvG99J8nMMSV8d-AuR",
+      "fiche_pptx_id": "1SA88dU2XIyCBA9YlQ0nynYI8qudFGpin",
+      "fiche_origine_pptx_id": "1t0vGU8VF2hTEBGJIwEb6TWA3CnrD5rso",
+      "videos": [
+        "10SYOyClz1FCm0MPt9-9iCO3IGmgA1n-D"
+      ]
+    }
+  },
+  "1mHYd99wwb9OWvqOb9gt9FllnEj3q9IDg": {
+    "source": {
+      "nom_fiche": "Défense en contrôle - 01",
+      "fileId_origine": "1GG_MSJ1yUb3iH5qCk_XelfzcB-8s7qzA",
+      "fileId_dossier": "1mHYd99wwb9OWvqOb9gt9FllnEj3q9IDg",
+      "generated_at": "2026-05-14T10:53:21Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Défense en contrôle » séquence 1",
+      "theme": "Défense en contrôle",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "",
+      "format": "Collectif réduit",
+      "duree": "10 - 12 min",
+      "materiel": "Ballons / Plots, 3 attaquants contre 2 défenseurs.",
+      "effectif": "",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Se coordonner et créer un rideau défensif efficace en glissant de l’intérieur vers l’extérieur."
+      ],
+      "but": "Les joueurs arrivent à créer un rideau défensif et à glisser de l’intérieur vers l’extérieur en communiquant.",
+      "lancement": "",
+      "consignes": [],
+      "critere_reussite": [
+        "Les joueurs arrivent à créer un rideau défensif et à glisser de l’intérieur vers l’extérieur en communiquant."
+      ],
+      "comportements_attendus": [
+        "les joueurs se coordonnent et restent ensemble pour glisser sans laisser de trous dans le rideau tout en évitant un retour intérieur.",
+        "Les joueurs arrivent à repousser les attaquants vers l’extérieur (ligne de touche)."
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 1,
+      "photos": 4,
+      "videos_size_mo": 201.63
+    },
+    "files": {
+      "fiche_json_id": "1lILyZ_sFeGkQiAZlyEI1QxJeI4AiDOro",
+      "fiche_pdf_id": "1bt5iRL1tmMQwOFvWr6-iX65F5IiA2zMb",
+      "fiche_pptx_id": "1p8_hqhNFj4i1QzvdYbc2MhIBxoWNdZsi",
+      "fiche_origine_pptx_id": "1SiL7JiFuTTJLupAOjIn-hyvyOrR2BNzc",
+      "videos": [
+        "19xizK59LIRsfuFWi8lzr8YYB3RBoPxEH"
+      ]
+    }
+  },
+  "1l6dc0a9622JWNRCZ5p4IodO7knbYXDVz": {
+    "source": {
+      "nom_fiche": "Animation offensive sur Jeu déployé - 2VS2",
+      "fileId_origine": "1qVere_J6fgWTz9cCaYpVHAzga0-jaeBV",
+      "fileId_dossier": "1l6dc0a9622JWNRCZ5p4IodO7knbYXDVz",
+      "generated_at": "2026-05-14T10:52:03Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "ORC - 2 VS 1+1",
+      "theme": "Animation offensive sur Jeu déployé",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "Sur-nombre offensif",
+      "format": "2 VS 1+1",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Ballons",
+      "effectif": "Collectif réduit",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Gérer une situation de 2 VS 1+1 en attaque"
+      ],
+      "but": "Essai marqué / Défenseurs battus. · Lecture, Gestuelle et Timing sur les passes.",
+      "lancement": "Les 2 paires de joueurs sont dos à dos, face à leur terrain.",
+      "consignes": [],
+      "critere_reussite": [
+        "Essai marqué / Défenseurs battus.",
+        "Lecture, Gestuelle et Timing sur les passes."
+      ],
+      "comportements_attendus": [
+        "Lecture du Jeu / Prise d’initiative / Adaptation au comportement des défenseurs.",
+        "Vitesse / Gestuelle."
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 1,
+      "photos": 2,
+      "videos_size_mo": 156.96
+    },
+    "files": {
+      "fiche_json_id": "1z16kx29f_HEJUeyst4N0VmHPCTyiGQ8f",
+      "fiche_pdf_id": "1JIeRAxUCL-yAYCf3RolrN1dJJnhYgBzy",
+      "fiche_pptx_id": "19lQyVH4m9bmIounlZXiRNNYe7BPCdqnv",
+      "fiche_origine_pptx_id": "1sxwPVYOWl-QJ7VeDhXFMXnZgcIslWQ81",
+      "videos": [
+        "14odyRgDDtP71Ksk6NYzbsjXepWM-dt1f"
+      ]
+    }
+  },
+  "1_qBp4qkdlDjnvU7iyOcakHq5OExW18FC": {
+    "source": {
+      "nom_fiche": "Projet Bleu - 05 - Initiation au Travail en cellules - séq 2",
+      "fileId_origine": "17duPAkC0OeSCcfjblqhHjZsFmKQxEiWh",
+      "fileId_dossier": "1_qBp4qkdlDjnvU7iyOcakHq5OExW18FC",
+      "generated_at": "2026-05-14T11:20:09Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Projet Bleu » séquence 5",
+      "theme": "Jeu en Vert : Connexion entre la Base et le + · Choix de Jeu du + (« CUT » ou « + »)",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "",
+      "format": "LDJ sur la cellule d’action à partir d’une libération rapide",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Ballons, Chasubles, Sacs de plaquages, Boucliers",
+      "effectif": "Travail individuel",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Pour la Base : donner le ballon dans la course du « + » en fonction de son annonce.",
+        "Pour le + : faire le bon choix « cut » ou « + » en fonction de l’orientation des épaules du défenseur."
+      ],
+      "but": "Essais marqués · se concentrer sur la capacité d’analyse des joueurs et particulièrement sur le joueur placé en « + ».",
+      "lancement": "",
+      "consignes": [],
+      "critere_reussite": [
+        "Essais marqués",
+        "se concentrer sur la capacité d’analyse des joueurs et particulièrement sur le joueur placé en « + ».",
+        "préciser le vocabulaire à utiliser :- « Base », « dos », « plus », « large », « moins », « CUT »",
+        "insister sur la communication !"
+      ],
+      "comportements_attendus": [
+        "Le Relayeur : - se déplace vite, - soigne sa gestuelle de passe, - effectue des passes ayant une trajectoire rectiligne, - effectue des passes précises.",
+        "Le joueur en « base » : - communique, - déclenche sa course quand la balle est soulevée par le relayeur, - court droit, - saisit le ballon lancé, ne ramène pas le ballon au corps.",
+        "Le joueur en + : - fait les bons choix et les bonnes annonces, - a des courses tranchantes."
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 1,
+      "photos": 2,
+      "videos_size_mo": 301.2
+    },
+    "files": {
+      "fiche_json_id": "19f54IFYGINKIavQuq8Lzu6XPRHAdmmHv",
+      "fiche_pdf_id": "1txevxnrkg-dqa07yNVGdDjvMWyZwyhwi",
+      "fiche_pptx_id": "1iRFrEg-i9gCvAL-CcUdxj387Fc5fHTxF",
+      "fiche_origine_pptx_id": "1KJli1pNGzt_2DfRcg7PoDMc3x27ei9bK",
+      "videos": [
+        "168SXCnV9GeStSDePuW2E_Z13stUM3We3"
+      ]
+    }
+  },
+  "13fufaOeNVTiXIwAOB5DCvR_iP4fyCJZ3": {
+    "source": {
+      "nom_fiche": "Projet Bleu - 08 - Initiation au Travail en cellules - séq1",
+      "fileId_origine": "1yd6CcVukyn45csJzq3cBCJqUt-VZvF_8",
+      "fileId_dossier": "13fufaOeNVTiXIwAOB5DCvR_iP4fyCJZ3",
+      "generated_at": "2026-05-14T11:19:10Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Travail en cellules » séquence 1",
+      "theme": "Initiation au travail en cellule",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "",
+      "format": "Moyenne Box",
+      "duree": "10 - 12 min",
+      "materiel": "",
+      "effectif": "Travail individuel",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Constituer une cellule rapidement en s’organisant autour de la base."
+      ],
+      "but": "Les joueurs arrivent à constituer une cellule rapidement en annonçant leur rôle. · Les joueurs cherchent à se démarquer et mettent de la vitesse.",
+      "lancement": "",
+      "consignes": [
+        "1 relayeur qui lance le jeu sur 1 cellule constituée",
+        "d’1 base, d’1 « plus », d’1 dos, d’1 « moins ».",
+        "Le « Plus » se propose avec une course rentrante, le « moins » se propose à l’intérieur, le dos a une trajectoire « en virgule ».",
+        "La base sert le dos qui traverse, va marquer et devient relayeur dans l’autre sens du jeu. Les autres doivent constituer une cellule pour relancer le jeu et ainsi de suite…"
+      ],
+      "critere_reussite": [
+        "Les joueurs arrivent à constituer une cellule rapidement en annonçant leur rôle.",
+        "Les joueurs cherchent à se démarquer et mettent de la vitesse."
+      ],
+      "comportements_attendus": [
+        "Communication / Déplacement / Démarquage.",
+        "Gestuelle, Comportement de la Base, vitesse."
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 0,
+      "photos": 2,
+      "videos_size_mo": 0
+    },
+    "files": {
+      "fiche_json_id": "1LlPZHnU-rebbhlbdlrEPtUMT8r2o2Hu1",
+      "fiche_pdf_id": "1FFrV6JyjJYWD8NRvLMZrOkBb9PqSSluu",
+      "fiche_pptx_id": "19j48zV44RVU-LbMe0Phux5yTZRw7hLkG",
+      "fiche_origine_pptx_id": "1S9Ezd9IJhguH2aEOFvVJ4QTyTWgBNdsf",
+      "videos": []
+    }
+  },
+  "1qPm09ELg9B6z6Hk6OkW0SC_SCrV4I29d": {
+    "source": {
+      "nom_fiche": "Projet Bleu - 06 - Jeu en vert - Démarquage - séq1",
+      "fileId_origine": "1kV6qfC24rclvo-yNX0BWDniHjGiU3f5s",
+      "fileId_dossier": "1qPm09ELg9B6z6Hk6OkW0SC_SCrV4I29d",
+      "generated_at": "2026-05-14T11:18:45Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Projet Bleu » séquence 6",
+      "theme": "Jeu en Vert / Jeu sans Ballon · Démarquage + Transmission",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "",
+      "format": "Travail du démarquage de la Base pour trouver le bon espace",
+      "duree": "10 - 12 min",
+      "materiel": "Ballons / Plots, Consignes :, Dans un 1er temps:, le joueur 1 passe à 2 puis se retourne, le 2 passe à 3 puis se retourne. 1 et 2 attendent., Dans le même temps, les attaquants préagissent en cherchant à se démarquer. (La base menace l’espace entre 2 et 1)., Dans un 2ème temps, le 3 devient relayeur. Au signal « Feu » de la base, le relayeur lance le jeu pour un 3 VS 3.",
+      "effectif": "Collectif réduit",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Pré-agir, se démarquer et trouver le bon espace libre."
+      ],
+      "but": "Marquer",
+      "lancement": "",
+      "consignes": [],
+      "critere_reussite": [
+        "Marquer"
+      ],
+      "comportements_attendus": [
+        "Les joueurs pré-agissent en se démarquant.",
+        "Les joueurs menacent le bon espace.",
+        "Les joueurs courent « droit ».",
+        "Les joueurs communiquent.",
+        "Les joueurs déclenchent leur course dans le bon timing."
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 1,
+      "photos": 2,
+      "videos_size_mo": 14.45
+    },
+    "files": {
+      "fiche_json_id": "1PwuqHnhY8tLn4C4vFR5ukyJAEHDnquLU",
+      "fiche_pdf_id": "1zY6Mhv8-EEL3A9vdP68JVOgfgPgtamvn",
+      "fiche_pptx_id": "1yLKDFESS7ikbZN0tsIRCwk8NNv_doo5r",
+      "fiche_origine_pptx_id": "1XXCRj52-jocE-6q1RPxpRFnTPdalrJSk",
+      "videos": [
+        "1LJ2Y8wMyZhWmcqZ5p-CjV-shJrfz19mp"
+      ]
+    }
+  },
+  "1evSSs__fxgtzP332Zt0YD8mvApZo3SdL": {
+    "source": {
+      "nom_fiche": "Projet Bleu - 07 - Jeu en vert - Démarquage - séq2",
+      "fileId_origine": "1csHrFlmCQdUXJKARk8vUjeL6QQlwvXFy",
+      "fileId_dossier": "1evSSs__fxgtzP332Zt0YD8mvApZo3SdL",
+      "generated_at": "2026-05-14T11:18:09Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Démarquage » séquence 2",
+      "theme": "Jeu en Vert / Jeu sans Ballon · Démarquage",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "Sur-nombre offensif",
+      "format": "1+3 VS 3",
+      "duree": "10 - 12 min",
+      "materiel": "Ballons / Plots",
+      "effectif": "Collectif réduit",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Pré-agir, se démarquer et trouver le bon espace libre."
+      ],
+      "but": "Marquer",
+      "lancement": "",
+      "consignes": [],
+      "critere_reussite": [
+        "Marquer"
+      ],
+      "comportements_attendus": [
+        "Les joueurs pré-agissent en se démarquant.",
+        "Les joueurs menacent le bon espace.",
+        "Les joueurs courent « droit ».",
+        "Les joueurs communiquent.",
+        "Les joueurs déclenchent leur course dans le bon timing."
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 1,
+      "photos": 2,
+      "videos_size_mo": 55.04
+    },
+    "files": {
+      "fiche_json_id": "1Hw_EQHcYY9lzDAirqdTe_q_MonbX_7WV",
+      "fiche_pdf_id": "1st7wAMwgi4OoZlxUCoPwlpT4niD6Bfu2",
+      "fiche_pptx_id": "10FD0Ldf3KpwJAt6GeFhTJISLTIKH_l1K",
+      "fiche_origine_pptx_id": "1tIVM1Y1iXANUtJY1vKhxi3jQUA89Ah7F",
+      "videos": [
+        "1rYZeVXEPOS6G7_eZhXas4fZ0xpQRes52"
+      ]
+    }
+  },
+  "1YVLnNnnedQqBwQYu9UfhpWGERWN2dGwG": {
+    "source": {
+      "nom_fiche": "Projet Bleu - 04 - Jouer dans les espaces libres - 5vs3",
+      "fileId_origine": "1I7yhqTA-1OrstvRL6DtZlTNZ5gZpq6H2",
+      "fileId_dossier": "1YVLnNnnedQqBwQYu9UfhpWGERWN2dGwG",
+      "generated_at": "2026-05-14T11:17:41Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Projet Bleu » séquence 4",
+      "theme": "Améliorer les Comportements attendus des joueurs au sein de la cellule d’action (BAD+)",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "",
+      "format": "",
+      "duree": "10 - 12 min",
+      "materiel": "",
+      "effectif": "Collectif réduit",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [],
+      "but": "",
+      "lancement": "10’-15’ / Jeu au Touché /",
+      "consignes": [
+        "Zone lancement de jeu  3 vs 3 sur  : 2 x (10m / 10m) entre les plots",
+        "Zone de jeu en 5 vs 3+1 sur : 2 x (30m / 10m) entre les plots",
+        "On rajoute un Joueur AXE dans chaque équipe",
+        "Aller / retour de passes, la 1ère équipe qui renvoi à        devient attaquante.",
+        "Pose la balle et jouera, dans un deuxième temps de jeu,  avec l’équipe qui lui a fait la passe.",
+        "C’est le défenseur qui transmet sa balle au 1er attaquant. Jeu à toucher entre les 5 et les 15m.",
+        "est toujours avec l’équipe qui attaque. Il se replace en contournant les derniers plots pendant le jeu de la phase 1.",
+        "se retrouve AXE et permet à AXE de devenir -1. les 3 déf de la zone 1 ne jouent plus."
+      ],
+      "critere_reussite": [
+        "Communication",
+        "Vitesse dans le déplacement et dans le jeu pour marquer le plus rapidement possible.",
+        "Prises de balle, Courses"
+      ],
+      "comportements_attendus": [
+        "Accélérateur par sa course et par sa position (proche de la ligne d’avantage) et/ou par sa passe",
+        "COMPORTEMENTS ATTENDUS DU PLUS :",
+        "Menace l’espace large / S’adapte à l’action du porteur",
+        "COMPORTEMENTS ATTENDUS DU MOINS :",
+        "Menace l’espace intérieur / Propose une solution si la défense ferme"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 0,
+      "photos": 0,
+      "videos_size_mo": 0
+    },
+    "files": {
+      "fiche_json_id": "1VWFNJFP9JFmYTRHyvd01KDJX4EKrqSnk",
+      "fiche_pdf_id": "1OX639EI-0TlFUASeBj8sjkRRevBsLNP5",
+      "fiche_pptx_id": "10q48kSa0D0gch1dT9yHQvfylvL2J3QxW",
+      "fiche_origine_pptx_id": "1cAg9S9JoyXDwCt6h8IJ2zaTsC-UuxRc4",
+      "videos": []
+    }
+  },
+  "1bk0Zl7J9lB0BWZ6MkP-of-9zPESoU4Hv": {
+    "source": {
+      "nom_fiche": "Lancement après conservation - 02",
+      "fileId_origine": "1peanVaN6dy32cC_5X-dhdHgkBLlilnSb",
+      "fileId_dossier": "1bk0Zl7J9lB0BWZ6MkP-of-9zPESoU4Hv",
+      "generated_at": "2026-05-14T10:47:45Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Lancement après conservation » séquence 2",
+      "theme": "Animation Offensive sur Jeu déployé · Jeu en vert",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "Sur-nombre offensif",
+      "format": "2+1 VS 1+1",
+      "duree": "10 - 12 min",
+      "materiel": "7 joueurs minimum, Plots, ballons, boucliers., Espace : Terrain séparés en 2 ½ couloirs de 15m de long et 10m de larg infranchissables. (Délimités par 1 ligne de touche bleue d’un côté et 1 ligne de Touche blanche de l’autre.)",
+      "effectif": "Collectif réduit",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Lancer le jeu après une situation de blocage.",
+        "Scanner la situation et Pré-agir en faisant les bons choix."
+      ],
+      "but": "Les joueurs choisissent le bon côté pour jouer. · Les attaquants se placent avec de la profondeur utile pour lancer l’attaque.",
+      "lancement": "Au signal « Jeu » du Coach :",
+      "consignes": [
+        "Le 1 Rouge engage une lutte au bouclier pour le gain du ballon (au sol entre les pieds du coach).",
+        "Le 2 Bleu choisit un côté et rejoint le 1 Bleu ou le 3 Bleu sur sa ligne défensive.",
+        "Au signal « Gagné ! » du 1 Rouge :",
+        "Les 2, 3, 4 Rouge se retournent et décident alors de quel côté ils vont aller déployer le Jeu. (Sur notre ex, Le 2 Bleu a rejoint le 3 Bleu ; Les attaquants doivent donc choisir d’aller attaquer le côté du 1 Bleu).",
+        "L’attaquant le + éloigné devient relayeur (4 Rouge), Les 2 autres attaquants  se placent « en escalier » pour organiser l’attaque.",
+        "Dès que le relayeur lance  le Jeu :",
+        "Le 2 Bleu va former 1 second rideau défensif en passant derrière le plot jaune le plus éloigné.",
+        "Les attaquants s’organisent pour jouer",
+        "un 3+1 VS 1+1 (Le relayeur peut participer à l’attaque)."
+      ],
+      "critere_reussite": [
+        "Les joueurs choisissent le bon côté pour jouer.",
+        "Les attaquants se placent avec de la profondeur utile pour lancer l’attaque."
+      ],
+      "comportements_attendus": [
+        "Scan / Com / Act.",
+        "Être efficaces sur les situations de surnombre."
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 0,
+      "photos": 4,
+      "videos_size_mo": 0
+    },
+    "files": {
+      "fiche_json_id": "1n9a-lhOln0LHvwHahXO2Am2PR8IJrv-U",
+      "fiche_pdf_id": "1Udffl_DyNfC1Ying3UPcnj02e345B-Ag",
+      "fiche_pptx_id": "1yDOCsLZ-lfFivl5Wt0Zh-fDNa2OYfC8s",
+      "fiche_origine_pptx_id": "1Ve1MPYzzHjV6C_ic5pShxBUAtbsA9aXs",
+      "videos": []
+    }
+  },
+  "1fDYl_PWyk80wmlrcnZ8b9LYTIIjNAJNK": {
+    "source": {
+      "nom_fiche": "Contre-Attaques - 01",
+      "fileId_origine": "1D8Gah_dTcvJn1V0ZptNfkYg47IXmtlWN",
+      "fileId_dossier": "1fDYl_PWyk80wmlrcnZ8b9LYTIIjNAJNK",
+      "generated_at": "2026-05-14T10:47:26Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Contre-attaque » séquence 1",
+      "theme": "Animation Offensive sur Jeu déployé · Jeu en vert",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "Sur-nombre offensif",
+      "format": "3+1 VS 2+1",
+      "duree": "10 - 12 min",
+      "materiel": "7 joueurs minimum, Plots, ballons, boucliers., Espace : Terrain séparés en 2 ½ terrains de 15m de long et 15m de largeur infranchissable. (Délimités par 1 ligne de touche de chaque côté.)",
+      "effectif": "Collectif réduit",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Lancer le jeu après reconquête du ballon.",
+        "Pré-agir très rapidement pour maintenir un Momentum favorable."
+      ],
+      "but": "Les joueurs pré-agissent rapidement. · Les attaquants se placent avec de la profondeur utile pour lancer l’attaque.",
+      "lancement": "",
+      "consignes": [
+        "Le Coach, au centre de la ligne défensive, simule un grattage (ballon derrière un bouclier).",
+        "Au signal « A Droite » ou «  A Gauche » du Coach :",
+        "Les Rouges doivent s’organiser pour aller déployer le Jeu du côté annoncé par le coach.",
+        "Exemple : « A Droite ! »",
+        "L’attaquant le + éloigné (Le 1 Rouge) devient relayeur, Les 2, 3, 4 Rouges prennent la largeur et reculent du côté droit pour adopter une formation « en escalier » afin d’organiser l’attaque.",
+        "Dès que le relayeur lance  le Jeu :",
+        "Les attaquants s’organisent alors pour jouer",
+        "un 3+1 VS 2+1 en restant du côté droit. (Le relayeur peut participer à l’attaque)."
+      ],
+      "critere_reussite": [
+        "Les joueurs pré-agissent rapidement.",
+        "Les attaquants se placent avec de la profondeur utile pour lancer l’attaque."
+      ],
+      "comportements_attendus": [
+        "Scan / Com / Act. Jouer vite.",
+        "Être efficaces sur les situations de surnombre."
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 0,
+      "photos": 4,
+      "videos_size_mo": 0
+    },
+    "files": {
+      "fiche_json_id": "1bDC-N6IkeAn31P8b6dgKnJH-RnlOiAl4",
+      "fiche_pdf_id": "1JtblOL8KMcbjBAj8tXxeXF8GyKB1TO9A",
+      "fiche_pptx_id": "1TNnvvXMiF9c4dZQNSo68r76kGF7eWul3",
+      "fiche_origine_pptx_id": "1yLNCkaB83ZhjrYhlsL9_2irDDNJPdxJs",
+      "videos": []
+    }
+  },
+  "1dScpLNDrCdgKFcPixVIqGoMhvjUJDI6E": {
+    "source": {
+      "nom_fiche": "Lancement après conservation - 01",
+      "fileId_origine": "1kiFNvPuTkk9IpL7f-h28sZjoJoFUY5Ru",
+      "fileId_dossier": "1dScpLNDrCdgKFcPixVIqGoMhvjUJDI6E",
+      "generated_at": "2026-05-14T10:46:54Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Lancement après conservation » séquence 1",
+      "theme": "Animation Offensive sur Jeu déployé",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "Égalité numérique",
+      "format": "10 VS 10",
+      "duree": "10 - 12 min",
+      "materiel": "",
+      "effectif": "Collectif total",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Lancer le jeu sur une cellule après conservation.",
+        "Créer des intervalles et les utiliser pour aller marquer."
+      ],
+      "but": "Le 1er groupe de  joueurs assure la conservation. · Les autres joueurs circulent et se démarquent.",
+      "lancement": "10 vs 10 (Jokers en réserve)",
+      "consignes": [],
+      "critere_reussite": [
+        "Le 1er groupe de  joueurs assure la conservation.",
+        "Les autres joueurs circulent et se démarquent."
+      ],
+      "comportements_attendus": [
+        "Communication / Circulation / Démarquage.",
+        "Être en mouvement en permanence et attaquer les espaces libres."
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 1,
+      "photos": 3,
+      "videos_size_mo": 49.06
+    },
+    "files": {
+      "fiche_json_id": "16OmtgvnLEnWRMH30_fMRi6NYmyaSVyLb",
+      "fiche_pdf_id": "1zYvdULIWnbDVWenyiD07AD4tF3cS9W2V",
+      "fiche_pptx_id": "1jIh8-qFnYfSbDcS3vIckpendGPMRJGck",
+      "fiche_origine_pptx_id": "16DYqFT7QkNf7NEQOFW9EtiWpTCB5rjW7",
+      "videos": [
+        "1g7MkYSIlcbsK2QV0OCnoVl6cRqjO1CBe"
+      ]
+    }
+  },
+  "10FXoAAw6IVX5_Ac6xkfkD4GVgvRMzcc_": {
+    "source": {
+      "nom_fiche": "Transmissions - 00a - Echauffement",
+      "fileId_origine": "15HU8kWVaVrqLGwwIHDpNzLyjM4r9WAIW",
+      "fileId_dossier": "10FXoAAw6IVX5_Ac6xkfkD4GVgvRMzcc_",
+      "generated_at": "2026-05-14T10:45:27Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Echauffement « Manipulation de balle",
+      "theme": "Manipulation de Balle · Continuité Debout autour du PB",
+      "niveau": "Initiation",
+      "rapport_de_force": "",
+      "format": "Echauffement type Manip de Balle autour du Porteur",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Cônes, Ballons",
+      "effectif": "Travail individuel",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Gagner en coordination/Motricité",
+        "Améliorer ses prises de Balle et ses Passes"
+      ],
+      "but": "Les passes sont « tendues » · Les Ballons ne tombent pas",
+      "lancement": "1 Ballon par Joueur :  Chaque Joueur circule Balle en mains dans un petit périmètre et exécute les consignes du Coach.",
+      "consignes": [
+        "1 Ballon pour 2 Joueurs : Mobilisation articulaire et musculaire avec Ballons :  Le PB pré-agit en faisant passer le ballon entre ses jambes pendant des fentes sautées et adresse une Passe à 1 main côté ouvert et/ou côté fermé.",
+        "1 Ballon pour 2 Joueurs : Introduction du Code de Passe : Le PB sautille sur place à cloche-pied / Le Soutien fait 1 ou 2 burpees dans son dos avant de demander le déclenchement de la passe Chistera : « FEU ! »."
+      ],
+      "critere_reussite": [
+        "Les passes sont « tendues »",
+        "Les Ballons ne tombent pas"
+      ],
+      "comportements_attendus": [
+        "Je présente une cible au PB",
+        "Je communique",
+        "Je suis précis dans mes transmissions"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 3,
+      "photos": 3,
+      "videos_size_mo": 239.1
+    },
+    "files": {
+      "fiche_json_id": "1ZWO3zm7LgeLUjyib12i0Q2QdSiep_kge",
+      "fiche_pdf_id": "1ChabuJYWclTVyqedIzJkQpTD3L29hH38",
+      "fiche_pptx_id": "1g2JWgDGmWZPqM8FOGI-2TRm27KVAPQLB",
+      "fiche_origine_pptx_id": "1TBkbCeZtJucK8FwVsSgF3slsB_Z9zDgG",
+      "videos": [
+        "1jgTuLH-fBtg1GLvRgsGiXLgJSdjB78bs",
+        "1ERw5J80_h5E_ihDZaYwawNI-z1AVcP-u",
+        "1HqtOicuAJEPqeLNcphqp0MVfbRZEY7Mm"
+      ]
+    }
+  },
+  "11Si2lVyCrXni13759U3-rIs8zQzaYadZ": {
+    "source": {
+      "nom_fiche": "Transmissions - 00b - Echauffement",
+      "fileId_origine": "1qV_1Xtexl4UAIE5bGq3oXLvPkC_CHbxV",
+      "fileId_dossier": "11Si2lVyCrXni13759U3-rIs8zQzaYadZ",
+      "generated_at": "2026-05-14T10:44:38Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Parcours transmissions",
+      "theme": "Echauffement technique de passe",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "",
+      "format": "Collectif réduit",
+      "duree": "10 - 12 min",
+      "materiel": "",
+      "effectif": "",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Assurer ses passes dans la course du partenaire"
+      ],
+      "but": "Passes dans la course du partenaire. · « Catch and Pass »",
+      "lancement": "3 par 3. Franchir le parcours en courant et en assurant un maximum de transmissions",
+      "consignes": [
+        "A l’aller :  4 zones à franchir. Bien pré-agir à chaque changement de zone.",
+        "Au retour : Suivre le ballon après la transmission ( parcours en 8)."
+      ],
+      "critere_reussite": [
+        "Passes dans la course du partenaire.",
+        "« Catch and Pass »"
+      ],
+      "comportements_attendus": [
+        "Clé 1 : Accueillir le ballon",
+        "bassin parallèle à l’en-but.",
+        "préparer la cible (mains liées, cible étroite, doigts crochetés).",
+        "+ j’attrape le ballon tôt, +je le passe vite.",
+        "Clé 2 : Transmettre le ballon",
+        "bras éloignés du corps et parallèles au sol.",
+        "rotation des épaules de la source vers la cible coudes fermés à 90°.",
+        "mettre le ballon dans la course du partenaire.",
+        "Clé 3 : Accélérer le ballon",
+        "vitesse et amplitude des bras.",
+        "fouet des poignets.",
+        "finir le geste avec les doigts en direction de la cible"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 0,
+      "photos": 5,
+      "videos_size_mo": 0
+    },
+    "files": {
+      "fiche_json_id": "1I8VUuC-l8zvFkwd6xx_V5m0SEb7FIxDM",
+      "fiche_pdf_id": "1S4iF_MEqr5enlhnIb7HB7X9M4vu3gbPt",
+      "fiche_pptx_id": "1VpPt-CQVyhgBOcUU9mvdL3uVtaUg3OVH",
+      "fiche_origine_pptx_id": "1FbHWww-FXwrOHAib5gGukuHJts8mn-5h",
+      "videos": []
+    }
+  },
+  "1kRDRpBd3ijH98YFThz3J-iss87xG73mz": {
+    "source": {
+      "nom_fiche": "Transmissions - 01",
+      "fileId_origine": "1Z4E2GVB6XO_ywvo3poOL_UpbMrIVz0Xs",
+      "fileId_dossier": "1kRDRpBd3ijH98YFThz3J-iss87xG73mz",
+      "generated_at": "2026-05-14T10:44:03Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Manipulation de balle » séquence 1",
+      "theme": "Manipulation de Balle · Continuité Debout autour du PB",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "",
+      "format": "Gestuelle",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Ballons, Sacs de plaquage",
+      "effectif": "Travail individuel",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Effectuer des passes « mains à mains » après avoir pré-agi"
+      ],
+      "but": "Le ballon ne doit pas tomber",
+      "lancement": "",
+      "consignes": [],
+      "critere_reussite": [
+        "Le ballon ne doit pas tomber"
+      ],
+      "comportements_attendus": [
+        "Je suis concentré et Je réagis vite"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 1,
+      "photos": 1,
+      "videos_size_mo": 65.02
+    },
+    "files": {
+      "fiche_json_id": "144sjiv_tWNVkZA1QiBkEz6jWIsnU_4rJ",
+      "fiche_pdf_id": "1Oi-EL8y8sAPqQ4r8rhf93WzJeZijlQv-",
+      "fiche_pptx_id": "1cEWrw-VBHGQBsq7DxGiH496g4nLRga1_",
+      "fiche_origine_pptx_id": "1X9QBW0YujB4YmWVBu0sv8UYLoypoM-0J",
+      "videos": [
+        "1zcMZhrFN9aOlo5-litu_reEAFEQVKn5w"
+      ]
+    }
+  },
+  "1_JmiP_JK1ko5o0pstf9-cstHe9qCfcPK": {
+    "source": {
+      "nom_fiche": "Transmissions - 02",
+      "fileId_origine": "1MYzS33P2txawhXOAlkeHhXdaTvBxGoTX",
+      "fileId_dossier": "1_JmiP_JK1ko5o0pstf9-cstHe9qCfcPK",
+      "generated_at": "2026-05-14T10:43:29Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Manipulation de balle » séquence 2",
+      "theme": "Manipulation de Balle · Continuité Debout autour du PB",
+      "niveau": "Initiation",
+      "rapport_de_force": "",
+      "format": "Echauffement",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Ballons",
+      "effectif": "Travail individuel",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Effectuer des Passes sur un Pas au sein de la cellule de vie du Ballon"
+      ],
+      "but": "« Catch » · « Pass »",
+      "lancement": "",
+      "consignes": [],
+      "critere_reussite": [
+        "J’attrape le ballon le plus tôt possible :  « Catch »",
+        "Je donne le ballon le plus rapidement possible sur un pas : « Pass »"
+      ],
+      "comportements_attendus": [
+        "Je présente une cible au PB",
+        "Je fais ma passe sur un Pas dans le bon timing",
+        "J’appelle le PB pour lui indiquer ma position"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 1,
+      "photos": 1,
+      "videos_size_mo": 11.96
+    },
+    "files": {
+      "fiche_json_id": "122OZoBLR-sGl5Wosvha5YOa_eZD7q505",
+      "fiche_pdf_id": "1uDvq_ddgrUSQYY23mc_bUvOMSWQis5ny",
+      "fiche_pptx_id": "11E6Lnad4n_Xl4Xe6wshcylvIJFLW_q-m",
+      "fiche_origine_pptx_id": "1440hBFcYnDtoOOwzfhE6ylgnklQT4FJh",
+      "videos": [
+        "1Ia3u0sqx3eMv1kJEBMLoO8rqIKPaKkDh"
+      ]
+    }
+  },
+  "1ZAK025xAvikspBC4ef4Gdv5LuZRecpLO": {
+    "source": {
+      "nom_fiche": "Transmissions - 03",
+      "fileId_origine": "1D8LDYrXk0BidbROjdBau2V6oc6Wl__a0",
+      "fileId_dossier": "1ZAK025xAvikspBC4ef4Gdv5LuZRecpLO",
+      "generated_at": "2026-05-14T10:42:29Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Transmissions de balle » séquence 3",
+      "theme": "Manipulation de Balle · Continuité Debout autour du PB",
+      "niveau": "Initiation",
+      "rapport_de_force": "",
+      "format": "Echauffement",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Cônes, Ballons, 5 m de largeur",
+      "effectif": "Travail individuel",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Effectuer des Passes sur un Pas au sein de la cellule de vie du Ballon"
+      ],
+      "but": "« Catch » · « Pass »",
+      "lancement": "Enchaîner les passages sur l’atelier en alternant les positions dans la ligne",
+      "consignes": [
+        "Les plots sont situés à 2m de la rambarde pour forcer les joueurs à attraper le ballon tôt et à le passer vite sur un Pas",
+        "Pré-action : Pas chassés",
+        "Pré-action : Courses croisées"
+      ],
+      "critere_reussite": [
+        "J’attrape le ballon le plus tôt possible :  « Catch »",
+        "Je donne le ballon le plus rapidement possible sur un pas : « Pass »"
+      ],
+      "comportements_attendus": [
+        "Je présente une cible au PB",
+        "Je fais ma passe sur un Pas dans le bon timing",
+        "J’appelle le PB pour lui indiquer ma position"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 1,
+      "photos": 1,
+      "videos_size_mo": 168.14
+    },
+    "files": {
+      "fiche_json_id": "18K4L42WznEvatdP3qaaMANW4Wm8ls4wN",
+      "fiche_pdf_id": "1dHI3kWtwa6wx3Yys9lWrc9oitV0xPZGv",
+      "fiche_pptx_id": "1juAOTeVzNq8yp3kFv1nWpdhpxcqyXVGW",
+      "fiche_origine_pptx_id": "1wiEVE2ad_G83DawCvbXhRHxAasojJbNu",
+      "videos": [
+        "1RzWqy49f2eAO4S-VKoRYRbBBnR7oeJbN"
+      ]
+    }
+  },
+  "1W_f7x7O-WC3ynW9J8BujeeYP_vpbNahh": {
+    "source": {
+      "nom_fiche": "Transmissions - 04",
+      "fileId_origine": "1ThJerHspzdU88QWq1cevUEzJeoBjkdbr",
+      "fileId_dossier": "1W_f7x7O-WC3ynW9J8BujeeYP_vpbNahh",
+      "generated_at": "2026-05-14T10:41:51Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Transmissions de balle » séquence 4",
+      "theme": "Manipulation de Balle · Continuité Debout autour du PB",
+      "niveau": "Initiation",
+      "rapport_de_force": "",
+      "format": "Gestuelle",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Cônes, Ballons, 5 m de largeur",
+      "effectif": "Travail individuel",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Effectuer différents types de Passes au sein de la cellule de vie du Ballon"
+      ],
+      "but": "Les passes sont « tendues » · Les Ballons ne tombent pas",
+      "lancement": "Enchaîner les passages sur l’atelier en alternant les positions dans le groupe",
+      "consignes": [
+        "Passes à plat :  Avec 2 ballons / J’attrape le ballon le plus tôt possible / Je tourne mon buste rapidement / Je donne le ballon le + rapidement possible.",
+        "Passes croisées : Le PB s’occupe de sa menace (vis-à-vis) en cassant sa course avant de libérer sa balle à son soutien / Le Soutien croise sa course, arrive dans le bon timing et demande le déclenchement de la Passe.",
+        "Passes chistera : Le PB sautille sur place à cloche-pied / Le Soutien fait 1 ou 2 burpees dans son dos avant de demander le déclenchement de la passe Chistera : « FEU ! »."
+      ],
+      "critere_reussite": [
+        "Les passes sont « tendues »",
+        "Les Ballons ne tombent pas"
+      ],
+      "comportements_attendus": [
+        "Je présente une cible au PB",
+        "Je communique",
+        "Je suis précis dans mes transmissions"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 0,
+      "photos": 1,
+      "videos_size_mo": 0
+    },
+    "files": {
+      "fiche_json_id": "17PcxqIHU5xSEc8xN2Gl336ADJ7XlTjZY",
+      "fiche_pdf_id": "1iGcgpSbCs0VvsW-gy6U2P6bbPMCKe8hz",
+      "fiche_pptx_id": "1v1gHlgMpntbFcqiXGLM7BYxG2peee7Ly",
+      "fiche_origine_pptx_id": "1WgAU2iyenzWHzEQwsesZ8ZjOw6A58HX0",
+      "videos": []
+    }
+  },
+  "1Ts6w5cxhO_OcHSxBUc_Tdgwg_UPUvSls": {
+    "source": {
+      "nom_fiche": "Transmissions - 05",
+      "fileId_origine": "10ycbJcKs8OaofkJENHVHpVExLRWhXO1Z",
+      "fileId_dossier": "1Ts6w5cxhO_OcHSxBUc_Tdgwg_UPUvSls",
+      "generated_at": "2026-05-14T10:41:12Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Transmissions de balle » séquence 5",
+      "theme": "Manipulation de Balle · Continuité Debout autour du PB",
+      "niveau": "Initiation",
+      "rapport_de_force": "",
+      "format": "Gestuelle",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Ballons",
+      "effectif": "Travail individuel",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Effectuer des Passes sur un Pas et se Replacer le plus rapidement possible pour se rendre disponible"
+      ],
+      "but": "« Catch » · « Pass »",
+      "lancement": "",
+      "consignes": [],
+      "critere_reussite": [
+        "J’attrape le ballon le plus tôt possible :  « Catch »",
+        "Je donne le ballon le plus rapidement possible sur un pas : « Pass »"
+      ],
+      "comportements_attendus": [
+        "Je présente une cible au PB",
+        "Je fais ma passe sur un Pas dans le bon timing",
+        "J’appelle le PB pour lui indiquer ma position"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 2,
+      "photos": 5,
+      "videos_size_mo": 66.24
+    },
+    "files": {
+      "fiche_json_id": "1l89b-yKd9iIjuOBfsIg9WZvkWbD0w-zn",
+      "fiche_pdf_id": "1jAkQIPRYvg95AoAzxKQfKIPVgXAdCJMT",
+      "fiche_pptx_id": "1DyJ9v-p6Bd5lNWeNhSnhu3Iu5rJ7h6rk",
+      "fiche_origine_pptx_id": "1288HDqkkesdp005PBYf1tpzexC9v64wQ",
+      "videos": [
+        "10NYyCsNi9xsdxwZV13Zq2kNzTKvt5bu_",
+        "1u6ioHfYel57Bg-VurDPhR9nSR5c0VO8s"
+      ]
+    }
+  },
+  "1xOW6Iq-5XvRBZCb8x-t3kVFcsHtWgHPe": {
+    "source": {
+      "nom_fiche": "Transmissions - 06",
+      "fileId_origine": "1eoWOhfReKEPKIDgt4ZvBTgXsyg9c_5HQ",
+      "fileId_dossier": "1xOW6Iq-5XvRBZCb8x-t3kVFcsHtWgHPe",
+      "generated_at": "2026-05-14T10:40:38Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Transmissions de balle » séquence 6",
+      "theme": "Manipulation de Balle · Continuité Debout autour du PB",
+      "niveau": "Initiation",
+      "rapport_de_force": "",
+      "format": "Gestuelle",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Ballons, Boucliers",
+      "effectif": "Travail individuel",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Effectuer des Passes sur un Pas sous la Pression d’un défenseur",
+        "Démarquer le dernier relayeur pour qu’il puisse aller marquer"
+      ],
+      "but": "« Catch » · « Pass »",
+      "lancement": "",
+      "consignes": [],
+      "critere_reussite": [
+        "J’attrape le ballon le plus tôt possible :  « Catch »",
+        "Je donne le ballon le plus rapidement possible sur un pas : « Pass »"
+      ],
+      "comportements_attendus": [
+        "Je présente une cible au PB",
+        "Je fais ma passe sur un Pas dans le bon timing",
+        "J’appelle le PB pour lui indiquer ma position"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 1,
+      "photos": 2,
+      "videos_size_mo": 9.13
+    },
+    "files": {
+      "fiche_json_id": "1fzmMTl8RGl2vVEzr2NWeI5mQG_dVp8Xz",
+      "fiche_pdf_id": "1H5LoOYmiCHHmSrW6HFXMzMpw8FknN9tC",
+      "fiche_pptx_id": "1AAZipHvFVJIJkNfZuh9nRaczmy6QUOqk",
+      "fiche_origine_pptx_id": "1JLR2M42MWitURewvychBcZCb8sYL3BvD",
+      "videos": [
+        "1a9MI70843yiw4ofyXWXZ18EiNdy0J-Kz"
+      ]
+    }
+  },
+  "18_deylrC7xXiIWU_3FwjOvV3tmtfBloM": {
+    "source": {
+      "nom_fiche": "Transmissions - 07",
+      "fileId_origine": "198dgn7eOyHiUWkM1-H0n08Xl15Zdk_Kn",
+      "fileId_dossier": "18_deylrC7xXiIWU_3FwjOvV3tmtfBloM",
+      "generated_at": "2026-05-14T10:40:10Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Transmissions de balle » séquence 7",
+      "theme": "Manipulation de Balle · Continuité Debout autour du PB",
+      "niveau": "Initiation",
+      "rapport_de_force": "",
+      "format": "Gestuelle",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Ballons",
+      "effectif": "Travail individuel",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Effectuer des Passes sur un Pas dans la course"
+      ],
+      "but": "« Catch » · « Pass »",
+      "lancement": "",
+      "consignes": [],
+      "critere_reussite": [
+        "J’attrape le ballon le plus tôt possible :  « Catch »",
+        "Je donne le ballon le plus rapidement possible sur un pas : « Pass »"
+      ],
+      "comportements_attendus": [
+        "Je présente une cible au PB",
+        "Je fais ma passe sur un Pas dans le bon timing",
+        "J’appelle le PB pour lui indiquer ma position"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 1,
+      "photos": 1,
+      "videos_size_mo": 25.43
+    },
+    "files": {
+      "fiche_json_id": "1hZjM5QyYYmLAhENpqRKfUwmoOZIs_XiA",
+      "fiche_pdf_id": "1lqF4pKL3ANKDQ10Kbe7p_N-XgY-fAI5p",
+      "fiche_pptx_id": "12c4cDDcRZEa0TSSSdsnPazhhOEDtwjaZ",
+      "fiche_origine_pptx_id": "1EpVlPdmUlTHagfuEao0tXoR8RrAJPjHU",
+      "videos": [
+        "1JZPIW04GbuIQWLifuLYIqnYmFqPISgts"
+      ]
+    }
+  },
+  "14ACxEVQwlv2xnEF6OUvUowmOSef6hQxe": {
+    "source": {
+      "nom_fiche": "Transmissions - 08",
+      "fileId_origine": "1VknAgAzDZ6vUFUzd-vKBDrgS-6wUxM6l",
+      "fileId_dossier": "14ACxEVQwlv2xnEF6OUvUowmOSef6hQxe",
+      "generated_at": "2026-05-14T10:39:41Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Transmissions de balle » séquence 8",
+      "theme": "Manipulation de Balle · Continuité Debout autour du PB",
+      "niveau": "Initiation",
+      "rapport_de_force": "",
+      "format": "Gestuelle",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Ballons",
+      "effectif": "Travail individuel",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Effectuer des Passes sur un Pas dans la course"
+      ],
+      "but": "« Catch » · « Pass »",
+      "lancement": "",
+      "consignes": [],
+      "critere_reussite": [
+        "J’attrape le ballon le plus tôt possible :  « Catch »",
+        "Je donne le ballon le plus rapidement possible sur un pas : « Pass »"
+      ],
+      "comportements_attendus": [
+        "Je présente une cible au PB",
+        "Je fais ma passe sur un Pas dans le bon timing",
+        "J’appelle le PB pour lui indiquer ma position"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 1,
+      "photos": 2,
+      "videos_size_mo": 18.64
+    },
+    "files": {
+      "fiche_json_id": "1cxJpbc1YWAS_jAFHWwtynEZ9KqNPjfy0",
+      "fiche_pdf_id": "1gHgCYpGi6z_5mjgg8AhsWfnbZzOrB2Lg",
+      "fiche_pptx_id": "1qc_lbUZIR2d2opgMmQ2feiv5aXYB1xON",
+      "fiche_origine_pptx_id": "1DRd7xxa2994wq1AQ_HDl9PtTZRLcRvMH",
+      "videos": [
+        "116bgeT3d8EUAhKFn3t5Y1hUGQrpmzFSG"
+      ]
+    }
+  },
+  "1utaktoE5OT5e-UYR6dbj5qgWj5lMCR5k": {
+    "source": {
+      "nom_fiche": "Transmissions - 09",
+      "fileId_origine": "1bgCBZ_I2rcjn8WxUHcChPn1oBpnKtxW6",
+      "fileId_dossier": "1utaktoE5OT5e-UYR6dbj5qgWj5lMCR5k",
+      "generated_at": "2026-05-14T10:39:11Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Transmissions de balle » séquence 9",
+      "theme": "Manipulation de Balle · Continuité Debout autour du PB",
+      "niveau": "Initiation",
+      "rapport_de_force": "",
+      "format": "Gestuelle",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Ballons",
+      "effectif": "Travail individuel",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Effectuer des Passes sur un Pas et se replacer pour se rendre disponible pour le PB"
+      ],
+      "but": "J’attrape le ballon rapidement et je me replace vite · Je communique ma position aux autres utilisateurs",
+      "lancement": "",
+      "consignes": [],
+      "critere_reussite": [
+        "J’attrape le ballon rapidement et je me replace vite",
+        "Je communique ma position aux autres utilisateurs"
+      ],
+      "comportements_attendus": [
+        "Je fais ma Passe",
+        "Je me replace"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 1,
+      "photos": 2,
+      "videos_size_mo": 15.75
+    },
+    "files": {
+      "fiche_json_id": "12ZOS7MALbjeFMaabTE-8VgVDGlcLK9Tj",
+      "fiche_pdf_id": "1qsYRS-me42J_b_WQE6p6KfE7xGMplrme",
+      "fiche_pptx_id": "1VRnVk3lqF22gOLRNUXqSuj6s6vPZGH-R",
+      "fiche_origine_pptx_id": "1OnZ7d7zanAL1ZsCeso0yju31CE-G9CMl",
+      "videos": [
+        "1qcY0B-CavOGFqNTP4YzgnMSHqZxfKUpq"
+      ]
+    }
+  },
+  "1QwAnkGU7AA-JnWpcUeJi0iTH1f8xUjyB": {
+    "source": {
+      "nom_fiche": "Transmissions - 10",
+      "fileId_origine": "1625W3LMmEwYNurPsTmbz7UafdlvNjDI8",
+      "fileId_dossier": "1QwAnkGU7AA-JnWpcUeJi0iTH1f8xUjyB",
+      "generated_at": "2026-05-14T10:38:38Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Transmissions de balle » séquence 10",
+      "theme": "Manipulation de Balle · Continuité Debout autour du PB",
+      "niveau": "Initiation",
+      "rapport_de_force": "",
+      "format": "Gestuelle",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Ballons",
+      "effectif": "Travail individuel",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Effectuer des Passes sur un Pas dans la course"
+      ],
+      "but": "« Catch » · « Pass »",
+      "lancement": "",
+      "consignes": [],
+      "critere_reussite": [
+        "J’attrape le ballon le plus tôt possible :  « Catch »",
+        "Je donne le ballon le plus rapidement possible sur un pas : « Pass »"
+      ],
+      "comportements_attendus": [
+        "Je présente une cible au PB",
+        "Je fais ma passe sur un Pas dans le bon timing",
+        "J’appelle le PB pour lui indiquer ma position"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 1,
+      "photos": 2,
+      "videos_size_mo": 33.23
+    },
+    "files": {
+      "fiche_json_id": "1dmbqHniK5116CRXsw1g7ebMKLx7wPH8-",
+      "fiche_pdf_id": "1iPwIkQotB9jfKSBC96XBFM1O2pAvefn6",
+      "fiche_pptx_id": "1pTFCSVyJZ0HpyPFUVz9FBA80WYMEd1DJ",
+      "fiche_origine_pptx_id": "1VXbJbHW0j2X5aE_uNpFZh8kHwGvMrDpr",
+      "videos": [
+        "1w41uo74OMXxnb5ON5PfuebnJm0WBmAnf"
+      ]
+    }
+  },
+  "1sErMFTysLJHiWz2NB6zujy2fCEqlvx1P": {
+    "source": {
+      "nom_fiche": "Transmissions - 11",
+      "fileId_origine": "1WLu-vNXs9Z70XUiKnzjt3uFGhfbmYmSA",
+      "fileId_dossier": "1sErMFTysLJHiWz2NB6zujy2fCEqlvx1P",
+      "generated_at": "2026-05-14T10:38:08Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Transmissions de balle » séquence 11",
+      "theme": "Manipulation de Balle · Continuité Debout autour du PB",
+      "niveau": "Initiation",
+      "rapport_de_force": "",
+      "format": "Gestuelle",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Ballons",
+      "effectif": "Travail individuel",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Effectuer des Passes sur un Pas dans la course",
+        "Se proposer dans l’espace pour réceptionner la Passe"
+      ],
+      "but": "« Catch » · « Pass »",
+      "lancement": "",
+      "consignes": [],
+      "critere_reussite": [
+        "J’attrape le ballon le plus tôt possible :  « Catch »",
+        "Je donne le ballon le plus rapidement possible sur un pas : « Pass »"
+      ],
+      "comportements_attendus": [
+        "Je présente une cible au PB",
+        "Je fais ma passe sur un Pas dans le bon timing",
+        "J’appelle le PB pour lui indiquer ma position"
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 1,
+      "photos": 2,
+      "videos_size_mo": 14.66
+    },
+    "files": {
+      "fiche_json_id": "1KM03rnmzRQiQQz7vfVNgKWucvhCowOtG",
+      "fiche_pdf_id": "1qDzZnjZ95uK7eGZlITb1iqFaoBjSxldu",
+      "fiche_pptx_id": "13RsxGGNvlis6zBhK5I9OX9brC0F4bXIG",
+      "fiche_origine_pptx_id": "1zO-QCMBQiIJZSaV5qbN11epC2Bhw5nnM",
+      "videos": [
+        "1SU54IefrbaFJZ_YQXL3bUMjJYf_C8g8j"
+      ]
+    }
+  },
+  "1cAlgovg1J_neDXf69lSSaQVGDKYSJHnw": {
+    "source": {
+      "nom_fiche": "Transmissions - 12",
+      "fileId_origine": "1FkAPzUYYxskCM_rebC9irJO8C5_rg_P8",
+      "fileId_dossier": "1cAlgovg1J_neDXf69lSSaQVGDKYSJHnw",
+      "generated_at": "2026-05-14T10:37:01Z",
+      "converter_version": "3.2"
+    },
+    "cartouche": {
+      "titre": "Cercle de Passes",
+      "theme": "Eveil – Transmission - Connexion · Principes de conservation",
+      "niveau": "Perfectionnement",
+      "rapport_de_force": "",
+      "format": "Echauffement",
+      "duree": "10 - 12 min",
+      "materiel": "Plots, Ballons",
+      "effectif": "",
+      "categorie": ""
+    },
+    "pedagogie": {
+      "objectifs": [
+        "Mettre en application les repères -1 -2 dans un exercice de passes avec circulation des joueurs.",
+        "Retrouver très rapidement les soutiens proches et être prêt à lancer le jeu après conservation."
+      ],
+      "but": "Les ballons ne tombent pas. · Tous les joueurs trouvent leur place dans le dispositif.",
+      "lancement": "Cercles de 7 à 10 joueurs d’environ 4m de diamètre.",
+      "consignes": [
+        "Un ordre de passes est défini :",
+        "Les joueurs doivent toujours faire la passe au même joueur.",
+        "Les joueurs reçoivent le ballon toujours du même joueur."
+      ],
+      "critere_reussite": [
+        "Les ballons ne tombent pas.",
+        "Tous les joueurs trouvent leur place dans le dispositif."
+      ],
+      "comportements_attendus": [
+        "Les joueurs réalisent des passes de qualité",
+        "Les joueurs se déplacent et respectent les repères -1 -2",
+        "Les joueurs se replacent rapidement et sont prêts à jouer."
+      ],
+      "variantes": {
+        "plus": "",
+        "moins": "",
+        "progression": ""
+      }
+    },
+    "media": {
+      "videos_count": 1,
+      "photos": 2,
+      "videos_size_mo": 93.2
+    },
+    "files": {
+      "fiche_json_id": "190h05kZHZfmdS8lcbGz-2mfnjX9rqaNI",
+      "fiche_pdf_id": "1C2ZUyVdLPlz1DF7mNL_2fCGOuURulUEB",
+      "fiche_pptx_id": "1LQuFAotGF0SzHHgdJhfSIg_YjOAeJRfn",
+      "fiche_origine_pptx_id": "1x4vOiTXb4WeKw-vbPTYW1EC25TYGgkHD",
+      "videos": [
+        "1_nZZDgO3Iw1bsmZL_suQhaCL88OXt8aJ"
+      ]
+    }
+  }
+}
