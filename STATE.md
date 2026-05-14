@@ -3,9 +3,16 @@
 > **Document de référence opérationnel.** À jour à la racine du repo, mis à jour à chaque fin de session significative.
 > Sert de point de reprise universel : toute personne (ou tout Claude) qui ouvre ce fichier doit pouvoir reprendre le travail sans question.
 
-**Dernière mise à jour : 13 mai 2026 fin de journée — Journée massive Production : Phase 4.3 + dette C8 a/b/c/d/e + P4-2 (greeting J-N) + session RLS write par rôle + Phase 4.4 UI compos étapes 6a/6b/6c-1/6c-2/6c-3 toutes livrées et fonctionnelles en prod.**
+**Dernière mise à jour : 14 mai 2026 — Intégration Module Bibliothèque d'ateliers EDR. Hier (13 mai) avait livré la Phase 4.3 + dette C8 a/b/c/d/e + P4-2 (greeting J-N) + session RLS write par rôle + Phase 4.4 UI compos étapes 6a/6b/6c-1/6c-2/6c-3. Aujourd'hui (14 mai) intègre dans le portail le module Bibliothèque d'ateliers livré par la conv "Production Module Bibliothèque" + active les 2 premières tuiles du dashboard (Compositions + Bibliothèque).**
 
-**Bilan chiffré du 13 mai 2026** :
+**Bilan chiffré du 14 mai 2026** :
+- **4 fichiers nouveaux livrés et committés** : `bibliotheque.html` (38 KB, page module à la racine), `js/bibliotheque-browser.js` (26 KB, module IIFE), `data/ateliers.json` (87 KB, taxonomie 4 rubriques / 82 ateliers), `data/fiches-all.json` (139 KB, bundle 62 fiches PPTX généré par Apps Script `Build-Fiches-All.gs` côté Drive).
+- **1 fichier modifié** : `index.html` (activation 2 tuiles dashboard : Compositions + Bibliothèque, et 2 liens sidebar).
+- **5 commits séparés** poussés sur `main` (ateliers.json, fiches-all.json, bibliotheque-browser.js, bibliotheque.html, index.html dans cet ordre — fichiers de dépendance d'abord pour qu'aucun état intermédiaire ne soit cassé).
+- **Convention d'activation des tuiles** posée (première utilisation) : `class="tool todo"` + statut "todo À venir" → `class="tool" onclick="location.href='X.html'" role="link" tabindex="0"` + statut "on Disponible". À reprendre pour les futures activations.
+- **Tests post-déploiement** vague 1 (smoke) + vague 2 (fonctionnels Bibliothèque : auth, chargement données, vue Cartes, modal détail, vue Plan, filtres, déconnexion) tous **passés vert**. Vague 3 (cas dégradé + responsive) reportée à plus tard.
+
+**Bilan chiffré du 13 mai 2026** (rappel) :
 - **12 fichiers SQL** : sql/17 (39 attaches partenaires), sql/17b (fix categorie_id partenaires), sql/18 (compositions + composition_joueurs), sql/19 (presences), sql/21 (RPC get_vivier_compo), sql/22 (ALTER compositions ADD type_compo + compo_base_origine_id — C8-a/b), sql/23 (ALTER composition_joueurs ADD etat_joueur — C8-c), sql/24 (RLS write Vague 1 + durcissement distances_sites), sql/25 (RLS write evenements + evenement_encadrants), sql/26 (RLS write compositions + composition_joueurs + presences), sql/27 (ALTER état compositions : `jouee` → `utilisee` + ajout `archivee` — C8-d). sql/20 volontairement sauté (M-1).
 - **3 fichiers JS livrés** : `js/dashboard-stats.js` v2.3 (greeting J-N), `js/supabase-client.js` v1.6→v1.7.1 (13 wrappers Phase 4.4 + fix `.maybeSingle()`), `js/compositions-editor.js` v3.4 (Vue Liste éditable + Popover Picker).
 - **2 fichiers CSS/HTML livrés** : `css/hub.css` v1.1 (ajout `--bleu-base` + `--rouge-blesse`), `compositions.html` (page complète éditeur de compo + styles inline ~500 lignes).
@@ -245,6 +252,45 @@ Module **`compositions.html`** (page dédiée à la racine), accessible aux rôl
 - 6c-6 : Modale Création E2 complète (radio base/match + sélecteur compo source pour dupliquer)
 - 6c-7 : Modale Historique E6 (versions précédentes lecture seule)
 
+### ✅ Module Bibliothèque d'ateliers EDR (FAIT — 14 mai 2026)
+
+Module **autonome** intégré au portail MOM Hub. Aucune modification de fichiers partagés (`css/hub.css`, `js/supabase-client.js`, etc.). Livré par la conv "Production Module Bibliothèque" (ouverte le 14 mai 2026, distincte de la conv Modules Ateliers qui avait fait le cadrage doctrinal v1.0 et de la conv Production générale qui possède l'architecture du portail).
+
+**Architecture** : Scénario 2 — **Drive = source ET lieu de lecture**. Pas de Supabase pour ce module (contrairement aux autres modules MOM Hub). Le Hub web lit directement les 2 JSON dans `data/`. Bascule prévue en Scénario 3 (table Supabase `ateliers` miroir) à l'arrivée du module Préparation de séance (à coordonner).
+
+**Fichiers livrés et committés** (5 commits séparés sur `main`) :
+- `bibliotheque.html` : page module à la racine, ~38 KB, 1257 lignes. Topbar Hub standardisée (onglet "Bibliothèque" en `.active`). CSS spécifique inline (~25 KB) avec classes préfixées `.biblio-*` pour la plupart, ainsi que `.m-*` (modal) et `.plan-*` (vue Plan) — toutes scopées au document. Auth admin OR coach (pattern identique à `compositions.html`).
+- `js/bibliotheque-browser.js` : module IIFE `window.BibliothequeBrowser.{init, openModal, closeModal}`, cohérent avec `js/compositions-editor.js`. Fetch `data/ateliers.json` + `data/fiches-all.json` en parallèle, mode dégradé si bundle absent. Rendu vues Cartes / Plan, modal détail avec vidéo embed Drive `/preview` 16:9, filtres âge/famille/type/recherche texte. Stop automatique de la vidéo à la fermeture de la modal.
+- `data/ateliers.json` : index taxonomique, 87 KB, schéma v2.0. 4 rubriques (Organisation collective, Technique individuelle, Activations physiques, Jeu au poste), 14 sous-rubriques, 82 ateliers_flat. Clé étrangère = `id` atelier (fileId Drive 33 caractères). Édité à la main par Manu depuis Drive `01 - Référentiels/ateliers/`.
+- `data/fiches-all.json` : bundle détaillé, 139 KB. Object Drive-fileId-keyed (62 fiches sur 82 ateliers déclarés ; les 20 sans fiche sont soit des vidéos pures, soit des ateliers en attente de production — gérés en mode dégradé par le JS). Généré par `Build-Fiches-All.gs` (Apps Script de Manu) sur Drive fileId `156WucB3mgISTssfIZC3MSSOZCNHt5OOO` dans `_MOM-Hub-WORK/`. À régénérer à chaque évolution des fiches (Converter v3.3 à venir, retouches PPTX, nouvelles fiches Jeu au poste, etc.).
+
+**Modification `index.html`** : activation des 2 premières tuiles du dashboard (convention posée pour la première fois) :
+- Tuile "Compositions" : `class="tool todo"` → `class="tool" onclick="location.href='compositions.html'" role="link" tabindex="0"`. Statut "todo À venir" → "on Disponible". *Note : la page `compositions.html` était en prod depuis le 13 mai mais sa tuile était restée par oubli en mode "À venir".*
+- Tuile "Bibliothèque ateliers" : idem activation. Sous-titre "4 rubriques · fiches PPTX" → "4 rubriques · 62 fiches".
+- Sidebar : 2 liens activés (`href="compositions.html"` et `href="bibliotheque.html"`).
+
+Le CSS de `hub.css` définit déjà `.tool-status.on` (vert-prairie) — rien à modifier dans `hub.css`. Le choix `onclick` plutôt que wrap `<a>` évite tout problème de styling sur les éléments enfants.
+
+**Convention d'activation des tuiles** (à reprendre pour les futures) :
+```
+AVANT : <div class="tool todo">...<div class="tool-status todo">À venir</div></div>
+APRÈS : <div class="tool" onclick="location.href='X.html'" role="link" tabindex="0" title="...">
+        ...<div class="tool-status on">Disponible</div></div>
+```
+
+**Tests post-déploiement validés** (14 mai) :
+- Vague 1 smoke : page d'accueil OK, tuiles vertes "Disponible", liens sidebar fonctionnels, console JS propre.
+- Vague 2 fonctionnels Bibliothèque : auth admin/coach OK, chargement `ateliers.json` + `fiches-all.json` OK, vue Cartes (4 rubriques), modal détail (cartouche meta + pédagogie + vidéo embed), arrêt vidéo à fermeture modal OK, vue Plan (accordéon), filtres âge/famille/recherche texte, déconnexion → `login.html`.
+- Vague 3 cas dégradé + responsive : **reportée**, à faire à tête reposée.
+
+**Coordinations en attente** :
+- À l'arrivée du module **Préparation de séance** (annoncé "dans quelques semaines") : bascule en Scénario 3 (table Supabase `ateliers` miroir). Clé étrangère pour `seances_ateliers` = `fileId_dossier` Drive (string ~33 caractères), pas d'`atl-NNNN` séquentiel. Specs précises de la table à fournir par la conv "Production Module Bibliothèque" le moment venu.
+- **Converter PPTX v3.3** (conv Converter) : schéma `fiche.json` cible aligné sur `Schema-atelier-json-v2.0.md`. Le module Bibliothèque actuel **tolère les deux schémas** (`critere_reussite` singulier v3.2 ET `criteres_reussite` pluriel v2.0), pas de rupture attendue.
+
+**Caveats** :
+- Vidéos Drive : transcoding lent au premier accès (>50 MB), affiche "traitement en cours" quelques heures. Pas un bug. Long terme : envisager extraction 720p H.264 ~10-30 MB max (à coordonner avec Converter v3.3+).
+- Le dossier Drive `_MOM-Hub-WORK/ateliers-converted/` **doit rester en partage "Tous les utilisateurs disposant du lien, Lecteur"** pour que les iframes `/preview` fonctionnent. Conséquence : contenu pédagogique accessible via lien direct par quiconque connaît le lien. Cohérent avec module servi sur GitHub Pages public + auth coach minimum.
+
 ---
 
 ## 🔧 Patterns techniques acquis
@@ -407,8 +453,9 @@ mom-hub/
 │   └── hub.css                                # v1.1 — ajout --bleu-base + --rouge-blesse
 ├── data/                                      # miroir lecture seule des référentiels Drive
 │   ├── aptitudes.json
-│   ├── ateliers.json
+│   ├── ateliers.json                          # 14 mai — taxonomie Bibliothèque (4 rubriques, 82 ateliers)
 │   ├── conformite-ffr.json
+│   ├── fiches-all.json                        # 14 mai — bundle détaillé 62 fiches PPTX
 │   ├── observables-match.json
 │   ├── postes.json
 │   ├── tests-physiques.json
@@ -417,7 +464,8 @@ mom-hub/
 │   ├── data-loader.js
 │   ├── supabase-client.js                     # v1.7.1 — 13 wrappers Phase 4.4 + fix maybeSingle
 │   ├── dashboard-stats.js                     # v2.3 — greeting J-N + 8 sources dynamiques
-│   └── compositions-editor.js                 # v3.4 — Vue Liste éditable + Popover Picker (6c-2 + 6c-3)
+│   ├── compositions-editor.js                 # v3.4 — Vue Liste éditable + Popover Picker (6c-2 + 6c-3)
+│   └── bibliotheque-browser.js                # 14 mai — module IIFE Bibliothèque d'ateliers
 ├── sql/
 │   ├── 01-creation-tables-vague1.sql
 │   ├── 02-migration-referentiels-vague1.sql
@@ -447,10 +495,11 @@ mom-hub/
 │   # NB: sql/20 sauté (M-1 ALTER personnes bloc_5, dette ouverte)
 │   # NB: 03-migration-personnes-vague1.sql NON commit (données perso)
 │   # NB: C1/C2/C3/C4-*.sql (réconciliation OVAL-E 2026-05-11) NON commit (données perso)
-├── index.html
+├── index.html                                 # 14 mai — tuiles Compositions + Bibliothèque activées
 ├── login.html
 ├── dashboard.html
-├── compositions.html                          # NOUVEAU 13 mai — éditeur de compositions Phase 4.4
+├── compositions.html                          # 13 mai — éditeur de compositions Phase 4.4
+├── bibliotheque.html                          # 14 mai — Bibliothèque d'ateliers EDR
 ├── test-supabase.html
 ├── README.md
 ├── STATE.md                                   # ← CE FICHIER
@@ -508,7 +557,7 @@ Dossiers clés :
 6. Vérifier `compositions.html` : créer une compo de base test, ajouter 2-3 joueurs, vérifier l'affichage, supprimer la compo de test
 7. Vérifier que `login.html` envoie bien un Magic Link aboutissant sur `dashboard.html`
 
-**Travaux en attente — Conv Production** :
+**Travaux en attente — Conv Production générale (cette conv)** :
 
 - **Phase 4.4 UI 6c-4 à 6c-7** (suite directe) :
   - 6c-4 : autosave notes_compo 30s + 4 boutons d'action (valider / repasser-brouillon / marquer utilisée / archiver) câblés aux wrappers existants
@@ -516,11 +565,16 @@ Dossiers clés :
   - 6c-6 : Modale Création E2 (radio base/match + sélecteur compo source pour dupliquer)
   - 6c-7 : Modale Historique E6 (versions précédentes lecture seule)
 
+- **Vague 3 tests Bibliothèque** (cas dégradé + responsive + performance) à faire à tête reposée — non bloquant.
+
 - **Recopier dans STATE.md les 12 dettes P4-UI-* verbatim** depuis le doc Drive Conception (la liste actuelle est de mémoire, à recaler).
 
 - **Dette (q)** : table de jonction `coach_equipes` quand un 2e coach réel arrivera.
 
-- **Greeting J-N** : ✅ livré, optionnellement à enrichir avec multi-équipes en V2.
+**Travaux en attente — Conv "Production Module Bibliothèque"** (ouverte 14 mai 2026) :
+- À l'arrivée du module **Préparation de séance** : fournir à la conv Production générale les specs précises de la future table Supabase `ateliers` (miroir des 2 JSON), avec `fileId_dossier` comme clé étrangère pour `seances_ateliers`.
+- Coordonner avec la conv **Converter PPTX** le passage en v3.3 (schéma `fiche.json` aligné v2.0).
+- Coordonner avec la conv **Modules Ateliers** (cadrage doctrinal) si évolutions du schéma `atelier.json` v2.0.
 
 **Travaux en attente — Conv Audits** :
 - **Reprise audit Suivi-Match** (recommandation forte) à la lumière de Phase 4.3 + dette C3.
@@ -535,17 +589,15 @@ Dossiers clés :
 - Pour 6c-4 à 6c-7, possible nouvelle itération si besoin d'arbitrage UX (autosave, modale Historique).
 
 **Travaux en attente — Conv Modules Ateliers** :
-- Migration physique 62 PPTX vers structure plate par UUID
-- Extraction médias embarqués
-- Génération index ateliers.json
-- Voir `PASSATION-Ateliers-vers-Production-v1.md` (Drive `00 - Documentation/`)
+- Cadrage doctrinal v1.0 du schéma `atelier.json` figé. Évolutions à venir uniquement si arbitrages nouveaux.
+- Voir `Schema-atelier-json-v2.0.md` (Drive `00 - Documentation/`) — schéma v2.0 figé le 14 mai par la conv Production Module Bibliothèque, légèrement plus complet/propre que v1.0 (rupture mineure ; les deux convs coordonnent).
 
 **Travaux en attente — Conv Suivi Match** (à ouvrir, recommandation forte) :
 - Module à construire, audit v2 existant, dette C3 à instruire. Pré-requis C8-c livré ✅.
 
 ---
 
-## 📓 Leçons doctrinales accumulées 13 mai (dette j renforcée)
+## 📓 Leçons doctrinales accumulées 13-14 mai (dette j renforcée + conventions activation)
 
 Le 13 mai a été particulièrement riche en bugs causés par des inventions de détails non vérifiés. **Mitigation systématique pour les sessions futures** :
 
@@ -560,6 +612,12 @@ Le 13 mai a été particulièrement riche en bugs causés par des inventions de 
 5. **Pour les fichiers > 30k caractères livrés via `create_file`** : préférer construction par blocs successifs via `bash heredoc` (échec connu de `create_file` avec contenus très longs : "Field required").
 
 6. **Pour les commits côté Manu** : toujours vérifier que le commit est bien poussé sur GitHub avant de soupçonner un bug. Lancer dans la console : `fetch('js/<fichier>.js').then(r => r.text()).then(t => console.log(t.match(/Version : ([\d.]+)/)?.[1]))` pour vérifier la version réellement servie par GitHub Pages.
+
+7. **Classes CSS non préfixées dans une page module dédiée** (leçon 14 mai sur Bibliothèque) : pas un risque réel tant que (a) les classes sont définies dans un `<style>` inline (scopage au document), (b) elles ne sont **pas** définies dans `hub.css` partagé, (c) elles ne sont pas utilisées par d'autres pages. La note d'intégration affirmait "toutes les classes préfixées `.biblio-*`" alors qu'en réalité ~40% restaient non préfixées (`.pastille`, `.tag`, `.age-chip`, `.m-*`, `.plan-*`). Vérifié OK car aucune collision avec `hub.css` ni `index.html`. **Mais** : si plus tard d'autres modules à pages dédiées sont ajoutés (ex : `seance.html`), revérifier que ces noms restent libres. Dette à noter pour plus tard si besoin.
+
+8. **Convention d'activation des tuiles dashboard** posée 14 mai (première utilisation, à reprendre systématiquement) : `class="tool todo"` + statut "todo À venir" → `class="tool" onclick="location.href='X.html'" role="link" tabindex="0" title="..."` + statut "on Disponible". Le CSS `hub.css` a déjà la définition `.tool-status.on` (vert-prairie) — rien à modifier. Choix `onclick` plutôt que wrap `<a>` pour éviter problèmes de styling (text-decoration, color) sur les éléments enfants.
+
+9. **Commits séparés pour un module multi-fichiers** (leçon 14 mai sur intégration Bibliothèque) : un commit par fichier en remontant la pile de dépendances (data → js → html → index modifié). À chaque commit intermédiaire, l'état du repo reste cohérent : aucun fichier n'utilise un autre fichier pas encore committé. Pratique pour la traçabilité, le diff lisible, et les rollbacks si besoin.
 
 ---
 
