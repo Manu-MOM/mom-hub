@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bibliothèque d'ateliers · MOM Hub</title>
+  <link rel="icon" type="image/png" href="assets/logo-m2m.png">
+  <meta name="description" content="Bibliothèque d'ateliers EDR du MOM — consultation des fiches pédagogiques." />
+
+  <link rel="stylesheet" href="css/hub.css">
+
+  <style>
+    /* ============================================================
+       Styles spécifiques à bibliotheque.html
+       Adaptés au design system MOM Hub (hub.css).
+       Toutes les classes spécifiques sont préfixées .biblio-*
+       pour éviter tout conflit avec les autres modules.
+       ============================================================ */
+
+    /* Pattern auth-pending — masque tout le body tant que la session
+       n'a pas été vérifiée (évite un flash de contenu coach pour un
+       utilisateur non autorisé). */
+    body.auth-pending { visibility: hidden; }
+
+    /* ===== LAYOUT ===== */
+    .biblio-layout {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 18px 16px 48px;
+      position: relative;
+      z-index: 2;
+    }
+
+    /* ===== BANNER ===== */
+    .biblio-banner {
+      background: linear-gradient(135deg, var(--vert-bouteille) 0%, var(--vert-bouteille-deep) 100%);
+      color: #fff;
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 16px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 4px 16px var(--shadow);
+    }
+    .biblio-banner::before {
+      content: "";
+      position: absolute;
+      right: -30px;
+      top: -30px;
+      width: 160px;
+      height: 160px;
+      background: radial-gradient(circle, rgba(212,169,58,.18) 0%, transparent 70%);
+    }
+    .biblio-banner-title {
+      font-family: 'Oswald', sans-serif;
+      font-size: 24px;
+      font-weight: 700;
+      line-height: 1.05;
+      letter-spacing: 0.02em;
+      position: relative;
+      z-index: 1;
+      text-transform: uppercase;
+    }
+    .biblio-banner-sub {
+      font-size: 12px;
+      color: rgba(255,255,255,.65);
+      margin-top: 4px;
+      position: relative;
+      z-index: 1;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.04em;
+    }
+    .biblio-banner-age {
+      display: inline-block;
+      margin-top: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      background: rgba(212,169,58,.18);
+      color: var(--gold);
+      padding: 5px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(212,169,58,.3);
+      position: relative;
+      z-index: 1;
+      letter-spacing: 0.02em;
+    }
+    .biblio-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-top: 16px;
+      position: relative;
+      z-index: 1;
+    }
+    .biblio-stat {
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 10px;
+      padding: 10px;
+      text-align: center;
+    }
+    .biblio-stat-n {
+      font-family: 'Oswald', sans-serif;
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 1;
+      color: #fff;
+    }
+    .biblio-stat-n.gold { color: var(--gold); }
+    .biblio-stat-l {
+      font-size: 9px;
+      font-weight: 600;
+      color: rgba(255,255,255,.55);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-top: 4px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* ===== TOOLBAR ===== */
+    .biblio-toolbar {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      margin-bottom: 14px;
+      box-shadow: 0 2px 8px var(--shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .biblio-search-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .biblio-search-input {
+      flex: 1;
+      background: var(--paper-warm);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 9px 12px;
+      font-size: 13px;
+      font-family: inherit;
+      color: var(--ink);
+      outline: none;
+      transition: border-color .15s, background .15s, box-shadow .15s;
+    }
+    .biblio-search-input:focus {
+      border-color: var(--vert-prairie);
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(45, 122, 62, 0.12);
+    }
+    .biblio-view-toggle {
+      display: flex;
+      gap: 2px;
+      background: var(--paper-warm);
+      padding: 2px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+    }
+    .biblio-view-toggle button {
+      background: transparent;
+      border: none;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      color: var(--ink-mute);
+      transition: all .15s;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .biblio-view-toggle button.on {
+      background: var(--vert-prairie);
+      color: #fff;
+      box-shadow: 0 1px 2px rgba(0,0,0,.1);
+    }
+    .biblio-view-toggle button svg { width: 13px; height: 13px; }
+
+    .biblio-filters-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+      padding-top: 8px;
+      border-top: 1px solid var(--line);
+    }
+    .biblio-f-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      font-weight: 600;
+      color: var(--ink-mute);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-right: 2px;
+    }
+    .biblio-f-label:not(:first-child) { margin-left: 6px; }
+    .biblio-f-btn {
+      background: var(--paper-warm);
+      border: 1px solid transparent;
+      border-radius: 14px;
+      padding: 5px 11px;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--ink-soft);
+      cursor: pointer;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .biblio-f-btn:hover { background: var(--paper-deep); }
+    .biblio-f-btn.on {
+      background: var(--vert-prairie);
+      color: #fff;
+      border-color: var(--vert-prairie);
+    }
+
+    /* ===== PASTILLE ICÔNES (sémantiques par rubrique) ===== */
+    .pastille {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      font-size: 16px;
+      line-height: 1;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+      flex-shrink: 0;
+    }
+    .pastille.lg { width: 44px; height: 44px; font-size: 22px; }
+    .pastille.md { width: 36px; height: 36px; font-size: 18px; }
+    .pastille.sm { width: 28px; height: 28px; font-size: 14px; }
+
+    /* ===== RUBRIQUE HEADER (vue Cartes) ===== */
+    .biblio-rub-h {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 22px 0 12px;
+      padding: 10px 0 10px 4px;
+      border-bottom: 2px solid;
+    }
+    .biblio-rub-h-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+    .biblio-rub-h-title {
+      font-family: 'Oswald', sans-serif;
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+    .biblio-rub-h-desc {
+      font-size: 11px;
+      color: var(--ink-mute);
+      margin-top: 2px;
+    }
+    .biblio-rub-h-count {
+      font-size: 11px;
+      margin-left: auto;
+      padding: 4px 10px;
+      border-radius: 10px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    /* ===== CARTES VIEW ===== */
+    .biblio-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 12px;
+    }
+    .biblio-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      box-shadow: 0 2px 8px var(--shadow);
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform .15s, box-shadow .15s;
+      display: flex;
+      flex-direction: column;
+      border-top: 3px solid var(--vert-prairie);
+    }
+    .biblio-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px var(--shadow);
+    }
+    .biblio-card-top {
+      padding: 12px 12px 8px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .biblio-card-top-info { flex: 1; min-width: 0; }
+    .biblio-card-num {
+      font-family: 'Oswald', sans-serif;
+      font-size: 22px;
+      font-weight: 700;
+      line-height: 1;
+      color: var(--ink);
+      margin-bottom: 2px;
+    }
+    .biblio-card-sub-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      font-weight: 600;
+      color: var(--ink-mute);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .biblio-card-body {
+      padding: 0 12px 12px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    .biblio-card-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--ink);
+      line-height: 1.25;
+      margin-bottom: 4px;
+    }
+    .biblio-card-desc {
+      font-size: 11px;
+      color: var(--ink-soft);
+      line-height: 1.35;
+      margin-bottom: 8px;
+      flex: 1;
+    }
+    .biblio-card-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 3px;
+      margin-bottom: 6px;
+    }
+    .tag {
+      font-size: 9px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 8px;
+      background: var(--paper-warm);
+      color: var(--ink-soft);
+    }
+    .tag.fam-tactique  { background: #e8f1fb; color: #185fa5; }
+    .tag.fam-technique { background: var(--vert-light); color: var(--vert-bouteille); }
+    .tag.fam-physique  { background: #fdf3d0; color: #7c4200; }
+    .tag.video         { background: #fff0ed; color: var(--clay); }
+    .tag.cross         { background: #f0e8ff; color: #3a1060; }
+    .biblio-card-ages {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2px;
+      padding-top: 6px;
+      border-top: 1px solid var(--line);
+    }
+    .age-chip {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 8px;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 3px;
+      background: var(--paper-warm);
+      color: var(--ink-mute);
+    }
+    .age-chip.on { background: var(--gold); color: var(--vert-bouteille-deep); }
+
+    /* ===== PLAN VIEW (accordéon) ===== */
+    .plan-rub {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      margin-bottom: 10px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px var(--shadow);
+    }
+    .plan-rub-h {
+      padding: 14px 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: relative;
+      transition: background .15s;
+    }
+    .plan-rub-h::before {
+      content: "";
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 4px;
+      background: var(--rub-color, var(--vert-prairie));
+    }
+    .plan-rub-h:hover { background: var(--paper); }
+    .plan-rub-h-l { flex: 1; min-width: 0; }
+    .plan-rub-h-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .plan-rub-h-title {
+      font-family: 'Oswald', sans-serif;
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--ink);
+      line-height: 1.05;
+      margin-top: 2px;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+    .plan-rub-h-desc {
+      font-size: 11px;
+      color: var(--ink-mute);
+      margin-top: 2px;
+    }
+    .plan-rub-h-count {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 10px;
+      white-space: nowrap;
+    }
+    .plan-rub-h-chev {
+      color: var(--ink-mute);
+      font-size: 14px;
+      transition: transform .2s;
+    }
+    .plan-rub.open .plan-rub-h-chev { transform: rotate(180deg); }
+    .plan-rub-body {
+      display: none;
+      padding: 6px 14px 14px;
+      border-top: 1px solid var(--line);
+      background: var(--paper);
+    }
+    .plan-rub.open .plan-rub-body { display: block; }
+
+    .plan-sub {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin-top: 8px;
+      overflow: hidden;
+    }
+    .plan-sub-h {
+      padding: 10px 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: background .15s;
+    }
+    .plan-sub-h:hover { background: var(--paper); }
+    .plan-sub-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      font-size: 13px;
+      flex-shrink: 0;
+    }
+    .plan-sub-title {
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--ink);
+    }
+    .plan-sub-sub {
+      font-size: 11px;
+      color: var(--ink-mute);
+      flex: 1;
+    }
+    .plan-sub-count {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      background: var(--paper-warm);
+      color: var(--ink-soft);
+      padding: 2px 8px;
+      border-radius: 8px;
+    }
+    .plan-sub-chev {
+      color: var(--ink-mute);
+      font-size: 12px;
+      transition: transform .2s;
+    }
+    .plan-sub.open .plan-sub-chev { transform: rotate(180deg); }
+    .plan-sub-body {
+      display: none;
+      padding: 6px 12px 12px;
+      border-top: 1px solid var(--line);
+    }
+    .plan-sub.open .plan-sub-body { display: block; }
+
+    .plan-ss { margin-top: 8px; }
+    .plan-ss-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--ink-mute);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 4px;
+      padding-left: 4px;
+    }
+    .plan-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .plan-item:hover { background: var(--paper); }
+    .plan-item-pastille {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      font-family: 'Oswald', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .plan-item-t {
+      flex: 1;
+      font-size: 12.5px;
+      color: var(--ink);
+    }
+    .plan-item-meta {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .plan-item-cross {
+      font-size: 10px;
+      color: var(--ink-mute);
+      background: var(--paper-warm);
+      padding: 2px 6px;
+      border-radius: 8px;
+    }
+    .plan-item-icon {
+      color: var(--clay);
+      font-size: 12px;
+    }
+    .plan-sub-placeholder { opacity: 0.7; }
+    .plan-sub-placeholder .plan-sub-h { cursor: default; }
+    .plan-sub-placeholder .plan-sub-h:hover { background: transparent; }
+
+    /* "Bientôt" pour rubriques placeholder */
+    .rub-soon-body {
+      padding: 14px;
+      background: var(--paper);
+      border: 1px dashed var(--line);
+      border-radius: 10px;
+      margin-bottom: 14px;
+    }
+    .rub-soon-sub {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: #fff;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      opacity: 0.75;
+    }
+    .rub-soon-sub:last-child { margin-bottom: 0; }
+    .rub-soon-sub-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--ink-soft);
+    }
+    .rub-soon-sub-sub {
+      font-size: 11px;
+      color: var(--ink-mute);
+      margin-top: 2px;
+    }
+    .rub-soon-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      padding: 3px 8px;
+      border-radius: 10px;
+      background: var(--gold);
+      color: var(--vert-bouteille-deep);
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    /* Message vide */
+    .biblio-empty {
+      padding: 40px 20px;
+      text-align: center;
+      color: var(--ink-mute);
+      font-size: 14px;
+      background: #fff;
+      border: 1px dashed var(--line);
+      border-radius: 10px;
+    }
+    .biblio-empty-error {
+      background: var(--feedback-error-bg);
+      color: var(--feedback-error-fg);
+      border-color: var(--feedback-error-fg);
+    }
+
+    /* ===== MODAL ===== */
+    .biblio-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.55);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .biblio-overlay.open { display: flex; }
+    .biblio-modal {
+      background: #fff;
+      border-radius: 14px;
+      max-width: 640px;
+      width: 100%;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 12px 48px rgba(0,0,0,.3);
+    }
+    .biblio-modal-head {
+      background: linear-gradient(135deg, var(--vert-bouteille) 0%, var(--vert-bouteille-deep) 100%);
+      color: #fff;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .biblio-modal-head-l { flex: 1; min-width: 0; }
+    .biblio-modal-badge {
+      display: inline-block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: rgba(255,255,255,.15);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 4px;
+    }
+    .biblio-modal-title {
+      font-family: 'Oswald', sans-serif;
+      font-size: 20px;
+      font-weight: 600;
+      line-height: 1.1;
+      letter-spacing: 0.01em;
+    }
+    .biblio-modal-sub {
+      font-size: 11px;
+      color: rgba(255,255,255,.7);
+      margin-top: 3px;
+    }
+    .biblio-m-orig {
+      font-size: 10px;
+      color: rgba(255,255,255,.55);
+      margin-top: 2px;
+      font-style: italic;
+    }
+    .biblio-modal-close {
+      background: rgba(255,255,255,.1);
+      border: none;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      color: #fff;
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background .15s;
+    }
+    .biblio-modal-close:hover { background: rgba(255,255,255,.2); }
+    .biblio-modal-body {
+      padding: 14px 16px;
+      overflow: auto;
+      flex: 1;
+    }
+    .m-sec { margin-bottom: 14px; }
+    .m-lbl {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--ink-mute);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 5px;
+    }
+    .m-text {
+      font-size: 13px;
+      color: var(--ink);
+      line-height: 1.45;
+    }
+    .m-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    .m-chip {
+      font-size: 11px;
+      padding: 3px 9px;
+      border-radius: 10px;
+      background: var(--vert-light);
+      color: var(--vert-bouteille);
+    }
+    .m-chip-fam { background: #e8f1fb; color: #185fa5; }
+    .m-chip-tag { background: #fdf3d0; color: #7c4200; }
+    .m-chip-video { background: #fff0ed; color: var(--clay); }
+    .m-chip-meta {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      padding: 5px 9px;
+      border-radius: 14px;
+      background: var(--paper-warm);
+      color: var(--ink);
+      font-weight: 500;
+      line-height: 1.2;
+    }
+    .m-chip-meta b { font-weight: 700; color: var(--ink-soft); }
+    .m-chip-meta-theme { background: #eef4ff; color: #1a3a7a; }
+
+    .m-video-box {
+      position: relative;
+      width: 100%;
+      padding-bottom: 56.25%;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #000;
+      margin-bottom: 6px;
+    }
+    .m-video-box iframe {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      border: 0;
+    }
+    .m-video-extras {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+    .m-video-btn {
+      font-size: 11px;
+      padding: 5px 10px;
+      border-radius: 6px;
+      background: #fff0ed;
+      color: var(--clay);
+      border: 1px solid #fad6cf;
+      cursor: pointer;
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .m-video-btn:hover { background: #fde3dc; }
+
+    .m-list {
+      margin: 0;
+      padding-left: 18px;
+      font-size: 13px;
+      color: var(--ink);
+      line-height: 1.5;
+    }
+    .m-list li { margin-bottom: 4px; }
+    .m-list li:last-child { margin-bottom: 0; }
+    .m-list-check { list-style: none; padding-left: 0; }
+    .m-list-check li {
+      position: relative;
+      padding-left: 20px;
+      margin-bottom: 5px;
+      line-height: 1.45;
+    }
+    .m-list-check li::before {
+      content: '✓';
+      position: absolute;
+      left: 0; top: 0;
+      color: var(--vert-prairie);
+      font-weight: 700;
+    }
+    .m-list-arrow { list-style: none; padding-left: 0; }
+    .m-list-arrow li {
+      position: relative;
+      padding-left: 20px;
+      margin-bottom: 5px;
+      line-height: 1.45;
+    }
+    .m-list-arrow li::before {
+      content: '→';
+      position: absolute;
+      left: 0; top: 0;
+      color: var(--vert-prairie);
+      font-weight: 700;
+    }
+
+    .m-variantes {
+      background: #fcf8eb;
+      border-left: 3px solid var(--gold);
+      padding: 10px 12px;
+      border-radius: 0 6px 6px 0;
+    }
+    .m-var-row {
+      margin-bottom: 8px;
+      font-size: 12.5px;
+      line-height: 1.45;
+    }
+    .m-var-row:last-child { margin-bottom: 0; }
+    .m-var-row b {
+      color: #9c7810;
+      margin-right: 4px;
+    }
+
+    .m-res-grid {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .m-res-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 8px 12px;
+      border-radius: 6px;
+      background: var(--paper-warm);
+      color: var(--ink-soft);
+      border: 1px solid var(--line);
+      text-decoration: none;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .m-res-btn:hover { background: var(--paper-deep); }
+
+    .m-fiche-missing {
+      background: #fff8e6;
+      border: 1px dashed var(--gold);
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-size: 12px;
+      color: #7c5200;
+      line-height: 1.4;
+    }
+    .m-fiche-missing b { color: #5a3a00; }
+    .m-fiche-missing code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      background: rgba(0,0,0,.05);
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+
+    .biblio-modal-foot {
+      padding: 10px 14px;
+      background: var(--paper);
+      border-top: 1px solid var(--line);
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .biblio-btn {
+      border: none;
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      transition: all .15s;
+      text-decoration: none;
+    }
+    .biblio-btn svg { width: 14px; height: 14px; }
+    .biblio-btn-sec {
+      background: var(--paper-warm);
+      color: var(--ink-soft);
+      border: 1px solid var(--line);
+    }
+    .biblio-btn-sec:hover { background: var(--paper-deep); }
+    .biblio-btn-pri {
+      background: var(--vert-prairie);
+      color: #fff;
+    }
+    .biblio-btn-pri:hover { background: var(--vert-bouteille); }
+    .biblio-btn-gold {
+      background: var(--gold);
+      color: var(--vert-bouteille-deep);
+    }
+    .biblio-btn-gold:hover { background: #c4a032; }
+
+    /* ===== RESPONSIVE ===== */
+    @media (min-width: 768px) {
+      .biblio-layout { padding: 22px 20px 64px; }
+      .biblio-banner { padding: 26px 28px; }
+      .biblio-banner-title { font-size: 28px; }
+      .biblio-stats { gap: 12px; }
+      .biblio-stat { padding: 14px; }
+      .biblio-stat-n { font-size: 32px; }
+      .biblio-toolbar {
+        padding: 14px;
+        flex-direction: row;
+        align-items: center;
+      }
+      .biblio-search-row { flex: 0 0 auto; min-width: 320px; }
+      .biblio-filters-row {
+        flex: 1;
+        border-top: none;
+        padding-top: 0;
+        padding-left: 14px;
+        border-left: 1px solid var(--line);
+      }
+      .biblio-cards-grid {
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 14px;
+      }
+    }
+    @media (min-width: 1024px) {
+      .biblio-cards-grid {
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 16px;
+      }
+    }
+
+    /* Footer */
+    .biblio-footer {
+      margin-top: 40px;
+      text-align: center;
+      font-size: 11px;
+      color: var(--ink-mute);
+      letter-spacing: 0.3px;
+    }
+  </style>
+</head>
+
+<body class="auth-pending">
+
+  <!-- Topbar Hub standardisée (cohérente avec index.html, dashboard.html, compositions.html) -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo"><img src="assets/logo-m2m.png" alt="MOM Rugby"></div>
+      <div class="brand-text">
+        <h1>MOM Hub</h1>
+        <p>Mutzig Ovalie Molsheim</p>
+      </div>
+    </div>
+
+    <div class="season-pill">SAISON 2025 / 2026</div>
+
+    <nav class="main-nav">
+      <a href="./">Tableau de bord</a>
+      <a class="active">Bibliothèque</a>
+      <a>Annuaire</a>
+      <a>Configuration</a>
+    </nav>
+
+    <div class="icon-row">
+      <button class="icon-btn" title="Recherche" aria-label="Recherche">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      </button>
+      <button class="icon-btn has-notif" title="Notifications" aria-label="Notifications">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+      </button>
+    </div>
+
+    <div class="user-profile">
+      <div class="avatar">EJ</div>
+      <div class="user-info">
+        <div class="user-name">Emmanuel Jung</div>
+        <div class="user-role">Référent M14</div>
+      </div>
+      <a href="./" class="user-action" title="Retour au portail" aria-label="Retour au portail">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/></svg>
+      </a>
+      <button type="button" class="user-action" id="btn-signout" title="Se déconnecter" aria-label="Se déconnecter">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="biblio-layout">
+
+    <!-- Bannière haute avec compteurs dynamiques -->
+    <section class="biblio-banner">
+      <div class="biblio-banner-title">Bibliothèque<br>des Ateliers EDR</div>
+      <div class="biblio-banner-sub">École de Rugby — Mutzig Ovalie Molsheim</div>
+      <div class="biblio-banner-age" id="age-display">🎯 Affichage : Toutes catégories</div>
+      <div class="biblio-stats">
+        <div class="biblio-stat"><div class="biblio-stat-n" id="stat-fiches">0</div><div class="biblio-stat-l">Fiches</div></div>
+        <div class="biblio-stat"><div class="biblio-stat-n" id="stat-videos">0</div><div class="biblio-stat-l">Vidéos</div></div>
+        <div class="biblio-stat"><div class="biblio-stat-n">4</div><div class="biblio-stat-l">Rubriques</div></div>
+        <div class="biblio-stat"><div class="biblio-stat-n gold" id="stat-age">Tous</div><div class="biblio-stat-l">Niveaux d'âge</div></div>
+      </div>
+    </section>
+
+    <!-- Toolbar : recherche, toggle vue, filtres -->
+    <section class="biblio-toolbar" aria-label="Filtres et recherche">
+      <div class="biblio-search-row">
+        <input type="text" class="biblio-search-input" placeholder="🔍 Rechercher un atelier..." id="search" />
+        <div class="biblio-view-toggle" role="tablist" aria-label="Mode d'affichage">
+          <button class="on" data-view="cards" role="tab" type="button">
+            <svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            Cartes
+          </button>
+          <button data-view="plan" role="tab" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+            Plan
+          </button>
+        </div>
+      </div>
+      <div class="biblio-filters-row">
+        <span class="biblio-f-label">Âge</span>
+        <button class="biblio-f-btn on" data-age="all" type="button">Tous</button>
+        <button class="biblio-f-btn" data-age="M6" type="button">M6</button>
+        <button class="biblio-f-btn" data-age="M8" type="button">M8</button>
+        <button class="biblio-f-btn" data-age="M10" type="button">M10</button>
+        <button class="biblio-f-btn" data-age="M12" type="button">M12</button>
+        <button class="biblio-f-btn" data-age="M14F15" type="button">M14</button>
+        <button class="biblio-f-btn" data-age="M16" type="button">M16</button>
+        <button class="biblio-f-btn" data-age="M18" type="button">M18</button>
+        <span class="biblio-f-label">Famille</span>
+        <button class="biblio-f-btn on" data-fam="all" type="button">Toutes</button>
+        <button class="biblio-f-btn" data-fam="tactique" type="button">Tactique</button>
+        <button class="biblio-f-btn" data-fam="technique" type="button">Technique</button>
+        <button class="biblio-f-btn" data-fam="physique" type="button">Physique</button>
+        <span class="biblio-f-label">Type</span>
+        <button class="biblio-f-btn on" data-vid="all" type="button">Tout</button>
+        <button class="biblio-f-btn" data-vid="fiches" type="button">Fiches</button>
+        <button class="biblio-f-btn" data-vid="videos" type="button">Vidéos</button>
+      </div>
+    </section>
+
+    <!-- Zone de contenu (peuplée par BibliothequeBrowser) -->
+    <section id="content" aria-live="polite">
+      <div class="biblio-empty">Chargement de la bibliothèque…</div>
+    </section>
+
+    <p class="biblio-footer">
+      <span class="footer-club">Mutzig Ovalie Molsheim</span><br>
+      MOM Hub · Bibliothèque d'ateliers EDR
+    </p>
+  </main>
+
+  <!-- Modal détail atelier -->
+  <div class="biblio-overlay" id="overlay" aria-modal="true" role="dialog">
+    <div class="biblio-modal">
+      <div class="biblio-modal-head">
+        <div class="pastille lg" id="m-pastille" style="background:rgba(255,255,255,0.15);color:#fff">⚡</div>
+        <div class="biblio-modal-head-l">
+          <div class="biblio-modal-badge" id="m-badge">Rubrique</div>
+          <div class="biblio-modal-title" id="m-title">Titre atelier</div>
+          <div class="biblio-modal-sub" id="m-sub">Sous-rubrique</div>
+          <div class="biblio-m-orig" id="m-orig" style="display:none">Nom de fiche : <span id="m-orig-name"></span></div>
+        </div>
+        <button class="biblio-modal-close" type="button" aria-label="Fermer">×</button>
+      </div>
+
+      <div class="biblio-modal-body">
+
+        <!-- Aperçu rapide (description courte de ateliers.json) -->
+        <div class="m-sec" id="m-desc-sec">
+          <div class="m-lbl">Aperçu</div>
+          <div class="m-text" id="m-desc"></div>
+        </div>
+
+        <!-- Cartouche meta (depuis fiche.json) -->
+        <div class="m-sec" id="m-meta-sec" style="display:none">
+          <div class="m-lbl">Cartouche</div>
+          <div class="m-chips" id="m-meta"></div>
+        </div>
+
+        <!-- Catégories d'âge applicables -->
+        <div class="m-sec">
+          <div class="m-lbl">Catégories d'âge applicables</div>
+          <div class="m-chips" id="m-ages"></div>
+        </div>
+
+        <!-- Tags transverses -->
+        <div class="m-sec" id="m-tags-sec" style="display:none">
+          <div class="m-lbl">Tags transverses</div>
+          <div class="m-chips" id="m-tags"></div>
+        </div>
+
+        <!-- Renvoi croisé -->
+        <div class="m-sec" id="m-cross-sec" style="display:none">
+          <div class="m-lbl">Aussi présente dans</div>
+          <div class="m-text" id="m-cross"></div>
+        </div>
+
+        <!-- Vidéo principale (embed) -->
+        <div class="m-sec" id="m-video-sec" style="display:none">
+          <div class="m-lbl">Vidéo</div>
+          <div class="m-video-box">
+            <iframe id="m-video-frame" src="" allow="autoplay" allowfullscreen></iframe>
+          </div>
+          <div class="m-video-extras" id="m-video-extras"></div>
+        </div>
+
+        <!-- Message si fiches-all.json absent -->
+        <div class="m-sec" id="m-fiche-missing-sec" style="display:none">
+          <div class="m-fiche-missing">
+            <b>Détails pédagogiques non chargés.</b><br>
+            Le fichier <code>data/fiches-all.json</code> n'a pas été trouvé. Pour voir le contenu pédagogique complet, déposez le bundle généré par <code>Build-Fiches-All.gs</code> dans <code>data/</code>.
+          </div>
+        </div>
+
+        <!-- Pédagogie -->
+        <div class="m-sec" id="m-objectifs-sec" style="display:none">
+          <div class="m-lbl">Objectifs</div>
+          <ul class="m-list" id="m-objectifs"></ul>
+        </div>
+
+        <div class="m-sec" id="m-but-sec" style="display:none">
+          <div class="m-lbl">But</div>
+          <div class="m-text" id="m-but"></div>
+        </div>
+
+        <div class="m-sec" id="m-lancement-sec" style="display:none">
+          <div class="m-lbl">Lancement</div>
+          <div class="m-text" id="m-lancement"></div>
+        </div>
+
+        <div class="m-sec" id="m-consignes-sec" style="display:none">
+          <div class="m-lbl">Consignes</div>
+          <ul class="m-list" id="m-consignes"></ul>
+        </div>
+
+        <div class="m-sec" id="m-critere-sec" style="display:none">
+          <div class="m-lbl">Critères de réussite</div>
+          <ul class="m-list m-list-check" id="m-critere"></ul>
+        </div>
+
+        <div class="m-sec" id="m-compatt-sec" style="display:none">
+          <div class="m-lbl">Comportements attendus</div>
+          <ul class="m-list m-list-arrow" id="m-compatt"></ul>
+        </div>
+
+        <div class="m-sec" id="m-variantes-sec" style="display:none">
+          <div class="m-lbl">Variantes &amp; progression</div>
+          <div class="m-variantes">
+            <div class="m-var-row" id="m-var-plus-row" style="display:none"><b>+ Plus difficile :</b> <span id="m-var-plus"></span></div>
+            <div class="m-var-row" id="m-var-moins-row" style="display:none"><b>− Plus facile :</b> <span id="m-var-moins"></span></div>
+            <div class="m-var-row" id="m-var-progression-row" style="display:none"><b>↗ Progression :</b> <span id="m-var-progression"></span></div>
+          </div>
+        </div>
+
+        <!-- Compétences de la sous-rubrique parent -->
+        <div class="m-sec" id="m-comp-sec">
+          <div class="m-lbl">Compétences visées (sous-rubrique parent)</div>
+          <div class="m-chips" id="m-comp"></div>
+        </div>
+
+        <!-- Ressources Drive -->
+        <div class="m-sec">
+          <div class="m-lbl">Ressources</div>
+          <div class="m-res-grid" id="m-resources"></div>
+        </div>
+
+      </div>
+
+      <div class="biblio-modal-foot">
+        <button class="biblio-btn biblio-btn-sec" type="button" data-modal-close>Fermer</button>
+        <button class="biblio-btn biblio-btn-pri" type="button" id="m-open-drive">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Ouvrir dans Drive
+        </button>
+        <button class="biblio-btn biblio-btn-gold" type="button" id="m-add-seance">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Ajouter à ma séance
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bibliothèque officielle Supabase JS (UMD via CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <!-- Wrapper MOM Hub -->
+  <script src="js/supabase-client.js"></script>
+  <!-- Logique du module Bibliothèque -->
+  <script src="js/bibliotheque-browser.js"></script>
+
+  <script>
+    (async function () {
+      'use strict';
+
+      // ----------------------------------------------------------
+      // 1. GARDE D'ACCÈS — rôle coach minimum (admin OK car super-rôle)
+      // ----------------------------------------------------------
+      const session = await SupabaseHub.getSession();
+      if (!session) { window.location.replace('login.html'); return; }
+
+      const roles = await SupabaseHub.getMyRoles();
+      const isAdminOrCoach = roles.indexOf('admin') !== -1 || roles.indexOf('coach') !== -1;
+      if (!isAdminOrCoach) { window.location.replace('./'); return; }
+
+      // ----------------------------------------------------------
+      // 2. AFFICHER LA PAGE
+      // ----------------------------------------------------------
+      document.body.classList.remove('auth-pending');
+      document.body.classList.add('auth-resolved');
+      if (roles.indexOf('admin') !== -1) document.body.classList.add('auth-admin');
+
+      // ----------------------------------------------------------
+      // 3. INTERACTIONS HEADER
+      // ----------------------------------------------------------
+      const signoutBtn = document.getElementById('btn-signout');
+      if (signoutBtn) {
+        signoutBtn.addEventListener('click', async function () {
+          signoutBtn.disabled = true;
+          await SupabaseHub.signOut();
+          // signOut() redirige vers login.html
+        });
+      }
+
+      // Si la session expire pendant que la page est ouverte, on redirige
+      SupabaseHub.onAuthChange(function (event) {
+        if (event === 'SIGNED_OUT') window.location.replace('login.html');
+      });
+
+      // ----------------------------------------------------------
+      // 4. INITIALISER LE MODULE BIBLIOTHÈQUE
+      // ----------------------------------------------------------
+      await window.BibliothequeBrowser.init();
+    })();
+  </script>
+</body>
+</html>
