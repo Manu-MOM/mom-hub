@@ -1,0 +1,178 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "date_publication": "2026-05-14",
+    "source": "Brief-Conception-Module-Preparation-Seance-v1.md §Q4 (11 types) et §Q5 (4 niveaux d'intensité)",
+    "note": "Slugs alignés sur les CHECK constraints SQL : seances_blocs.type_bloc et seances_blocs.intensite. Référentiel technique pur (pas de miroir Drive prévu).",
+    "decisions_a_valider_manu": [
+      "Mise en train : pas explicitement classée dans le brief §Q5 entre les types qui affichent l'intensité et ceux qui ne l'affichent pas. Choix V1 : affiche_intensite = true, intensite_defaut = sans_contact (cohérent avec 'démarrage en douceur avec ballon').",
+      "Bloc libre : brief donne durée 'variable'. Choix V1 : duree_min_defaut = 10 (valeur raisonnable, ajustable par le coach à la création).",
+      "Axe 4 'CR' vs 'Critère réalisation' : les 2 termes apparaissent dans le brief §Q4. Conservés tels quels en V1, à clarifier si redondance."
+    ]
+  },
+
+  "intensites": {
+    "libelle": "Gradation du contact en 4 niveaux",
+    "source_externe": "FFR (formation éducateurs, plan reprise post-COVID 2021) + World Rugby Contact Load Guidelines 2021",
+    "nb_termes": 4,
+    "valeurs": [
+      {
+        "slug": "sans_contact",
+        "libelle": "Sans contact",
+        "couleur": "vert",
+        "emoji": "🟢",
+        "description": "Travail technique, manipulation, parcours, jeu d'évitement"
+      },
+      {
+        "slug": "toucher_ceinture",
+        "libelle": "Toucher / Ceinturé",
+        "couleur": "jaune",
+        "emoji": "🟡",
+        "description": "Contact symbolique (2 mains taille), opposition à distance — règle M14 'Toucher + 2 sec'"
+      },
+      {
+        "slug": "contact_controle",
+        "libelle": "Contact contrôlé",
+        "couleur": "orange",
+        "emoji": "🟠",
+        "description": "Plaquage technique ralenti, ruck stoppé, opposition à 50-70%"
+      },
+      {
+        "slug": "live_combat_reel",
+        "libelle": "Live / Combat réel",
+        "couleur": "rouge",
+        "emoji": "🔴",
+        "description": "Opposition complète à intensité match"
+      }
+    ]
+  },
+
+  "types_blocs": {
+    "libelle": "11 types de bloc disponibles dans la trame chronologique",
+    "nb_termes": 11,
+    "note_etiquettes": "Le champ etiquettes_proposees indique quels axes (axe_2 / axe_3) sont proposés dans le détail du bloc. L'Axe 4 (champs FFR) est universel : il structure le contenu pédagogique de tous les blocs via seances_blocs.contenu_pedagogique_axe4.",
+    "valeurs": [
+      {
+        "slug": "accueil",
+        "libelle": "Accueil / Présentation",
+        "emoji": "🎤",
+        "ordre_natif": 1,
+        "duree_min_defaut": 5,
+        "description": "Annonce thème, objectifs, cadre",
+        "affiche_intensite": false,
+        "intensite_defaut": null,
+        "etiquettes_proposees": []
+      },
+      {
+        "slug": "mise_en_train",
+        "libelle": "Mise en train",
+        "emoji": "⚡",
+        "ordre_natif": 2,
+        "duree_min_defaut": 10,
+        "description": "Démarrage en douceur avec ballon",
+        "affiche_intensite": true,
+        "intensite_defaut": "sans_contact",
+        "etiquettes_proposees": []
+      },
+      {
+        "slug": "echauffement",
+        "libelle": "Échauffement",
+        "emoji": "🔥",
+        "ordre_natif": 3,
+        "duree_min_defaut": 15,
+        "description": "Mobilisation, activation, montée intensité",
+        "affiche_intensite": true,
+        "intensite_defaut": "sans_contact",
+        "etiquettes_proposees": ["axe_3"]
+      },
+      {
+        "slug": "echauffement_specifique",
+        "libelle": "Échauffement spécifique / PPS",
+        "emoji": "💪",
+        "ordre_natif": 4,
+        "duree_min_defaut": 10,
+        "description": "Gammes athlétiques, sollicitations proches du jeu",
+        "affiche_intensite": true,
+        "intensite_defaut": "sans_contact",
+        "etiquettes_proposees": ["axe_3"]
+      },
+      {
+        "slug": "corps_seance",
+        "libelle": "Corps de séance",
+        "emoji": "🎯",
+        "ordre_natif": 5,
+        "duree_min_defaut": 20,
+        "description": "Partie centrale, travail des objectifs",
+        "affiche_intensite": true,
+        "intensite_defaut": "contact_controle",
+        "etiquettes_proposees": ["axe_2"]
+      },
+      {
+        "slug": "jeu_application",
+        "libelle": "Jeu d'application / Situation de référence",
+        "emoji": "🏉",
+        "ordre_natif": 6,
+        "duree_min_defaut": 20,
+        "description": "Réinvestissement en jeu global",
+        "affiche_intensite": true,
+        "intensite_defaut": "contact_controle",
+        "etiquettes_proposees": ["axe_2"]
+      },
+      {
+        "slug": "match_application",
+        "libelle": "Match d'application",
+        "emoji": "⚔",
+        "ordre_natif": 7,
+        "duree_min_defaut": 15,
+        "description": "Opposition complète",
+        "affiche_intensite": true,
+        "intensite_defaut": "live_combat_reel",
+        "etiquettes_proposees": ["axe_2"]
+      },
+      {
+        "slug": "retour_au_calme",
+        "libelle": "Retour au calme",
+        "emoji": "🧘",
+        "ordre_natif": 8,
+        "duree_min_defaut": 10,
+        "description": "Récupération active, étirements",
+        "affiche_intensite": false,
+        "intensite_defaut": null,
+        "etiquettes_proposees": []
+      },
+      {
+        "slug": "bilan",
+        "libelle": "Bilan / Débriefing",
+        "emoji": "💬",
+        "ordre_natif": 9,
+        "duree_min_defaut": 5,
+        "description": "Verbalisation, ressenti, axes de progrès",
+        "affiche_intensite": false,
+        "intensite_defaut": null,
+        "etiquettes_proposees": []
+      },
+      {
+        "slug": "pause_boisson",
+        "libelle": "Pause boisson",
+        "emoji": "💧",
+        "ordre_natif": 10,
+        "duree_min_defaut": 3,
+        "description": "Pause hydratation (utilitaire)",
+        "affiche_intensite": false,
+        "intensite_defaut": null,
+        "etiquettes_proposees": []
+      },
+      {
+        "slug": "bloc_libre",
+        "libelle": "Bloc libre",
+        "emoji": "📝",
+        "ordre_natif": 11,
+        "duree_min_defaut": 10,
+        "description": "Type fourre-tout quand rien ne correspond",
+        "affiche_intensite": false,
+        "intensite_defaut": null,
+        "etiquettes_proposees": []
+      }
+    ]
+  }
+}
