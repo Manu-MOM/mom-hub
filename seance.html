@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Préparation de séance · MOM Hub</title>
+  <link rel="icon" type="image/png" href="assets/logo-m2m.png">
+  <meta name="description" content="Module Préparation de séance du MOM Hub — construire la trame chronologique d'un entraînement." />
+
+  <link rel="stylesheet" href="css/hub.css">
+
+  <style>
+    /* ============================================================
+     * Préparation de séance — CSS spécifique (Phase 5.4 squelette)
+     * Préfixe : .seance-*
+     * Aligné sur le pattern compositions.html Phase 4.4
+     * ============================================================ */
+
+    body.auth-pending { visibility: hidden; }
+
+    /* Wrapper principal de la page sous la topbar */
+    .seance-layout {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 24px 24px 48px;
+      position: relative;
+      z-index: 2;
+    }
+
+    /* En-tête de page : titre du module + sous-titre */
+    .seance-header {
+      margin-bottom: 20px;
+    }
+    .seance-header__title {
+      font-family: 'Oswald', sans-serif;
+      font-weight: 600;
+      font-size: 22px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--ink);
+    }
+    .seance-header__subtitle {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      color: var(--ink-mute);
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    /* Grille principale : sidebar gauche + zone éditeur droite */
+    .seance-grid {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+
+    /* ----------------------------------------------------------
+     * Sidebar gauche : "Mes séances récentes" + CTA nouvelle séance
+     * ---------------------------------------------------------- */
+    .seance-sidebar {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px;
+      max-height: calc(100vh - 200px);
+      overflow-y: auto;
+      position: sticky;
+      top: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .seance-sidebar__title {
+      font-family: 'Oswald', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ink-mute);
+    }
+    .seance-sidebar__cta {
+      padding: 10px 16px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      background: var(--vert-prairie);
+      color: #fff;
+      cursor: pointer;
+      transition: background-color 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .seance-sidebar__cta:hover:not(:disabled) {
+      background: var(--vert-bouteille);
+    }
+    .seance-sidebar__cta:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .seance-sidebar__cta-icon {
+      font-size: 18px;
+      line-height: 1;
+      font-weight: 400;
+    }
+
+    /* Liste des séances (placeholder en Phase 5.4) */
+    .seance-sidebar__list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .seance-sidebar__placeholder {
+      padding: 24px 12px;
+      text-align: center;
+      color: var(--ink-mute);
+      font-size: 13px;
+      font-style: italic;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+    }
+
+    /* ----------------------------------------------------------
+     * Zone éditeur (droite) — vide en Phase 5.4
+     * ---------------------------------------------------------- */
+    .seance-editor-area {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 24px;
+      min-height: 400px;
+    }
+    .seance-editor-area__placeholder {
+      padding: 60px 24px;
+      text-align: center;
+      color: var(--ink-mute);
+      font-size: 14px;
+      font-style: italic;
+    }
+    .seance-editor-area__empty {
+      padding: 48px 24px;
+      text-align: center;
+    }
+    .seance-editor-area__empty-title {
+      font-family: 'Oswald', sans-serif;
+      font-size: 16px;
+      color: var(--ink);
+      margin-bottom: 8px;
+      letter-spacing: 0.3px;
+    }
+    .seance-editor-area__empty-text {
+      font-size: 14px;
+      color: var(--ink-mute);
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+    .seance-editor-area__cta {
+      padding: 12px 28px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      background: var(--vert-prairie);
+      color: #fff;
+      cursor: pointer;
+      transition: background-color 0.15s;
+    }
+    .seance-editor-area__cta:hover:not(:disabled) {
+      background: var(--vert-bouteille);
+    }
+    .seance-editor-area__cta:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* ----------------------------------------------------------
+     * Footer
+     * ---------------------------------------------------------- */
+    .seance-footer {
+      margin-top: 32px;
+      font-size: 12px;
+      color: var(--ink-mute);
+      text-align: center;
+      letter-spacing: 0.3px;
+    }
+
+    /* ----------------------------------------------------------
+     * Responsive
+     * ---------------------------------------------------------- */
+    @media (max-width: 1024px) {
+      .seance-grid {
+        grid-template-columns: 1fr;
+      }
+      .seance-sidebar {
+        position: static;
+        max-height: none;
+      }
+    }
+  </style>
+</head>
+
+<body class="auth-pending">
+
+  <!-- ============================================================
+       TOPBAR Hub partagée (cf. css/hub.css §4)
+       ============================================================ -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo"><img src="assets/logo-m2m.png" alt="MOM Rugby"></div>
+      <div class="brand-text">
+        <h1>MOM Hub</h1>
+        <p>Mutzig Ovalie Molsheim</p>
+      </div>
+    </div>
+
+    <div class="season-pill">SAISON 2025 / 2026</div>
+
+    <nav class="main-nav">
+      <a href="./">Tableau de bord</a>
+      <a href="compositions.html">Compositions</a>
+      <a class="active">Préparation de séance</a>
+      <a>Annuaire</a>
+      <a>Configuration</a>
+    </nav>
+
+    <div class="icon-row">
+      <button class="icon-btn" title="Recherche" aria-label="Recherche">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      </button>
+      <button class="icon-btn has-notif" title="Notifications" aria-label="Notifications">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+      </button>
+    </div>
+
+    <div class="user-profile">
+      <div class="avatar">EJ</div>
+      <div class="user-info">
+        <div class="user-name">Emmanuel Jung</div>
+        <div class="user-role">Référent M14</div>
+      </div>
+      <a href="./" class="user-action" title="Retour au portail" aria-label="Retour au portail">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/></svg>
+      </a>
+      <button type="button" class="user-action" id="btn-signout" title="Se déconnecter" aria-label="Se déconnecter">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ============================================================
+       CONTENU PRINCIPAL
+       ============================================================ -->
+  <main class="seance-layout">
+
+    <header class="seance-header">
+      <h2 class="seance-header__title">Préparation de séance · M14</h2>
+      <p class="seance-header__subtitle">Construire l'entraînement · trame chronologique</p>
+    </header>
+
+    <div class="seance-grid">
+
+      <!-- Sidebar gauche : liste des séances + CTA nouvelle séance -->
+      <aside class="seance-sidebar" aria-label="Mes séances récentes">
+        <button type="button" class="seance-sidebar__cta" id="btn-nouvelle-seance" disabled>
+          <span class="seance-sidebar__cta-icon">+</span>
+          Nouvelle séance
+        </button>
+        <h2 class="seance-sidebar__title">Mes séances récentes</h2>
+        <div id="seance-sidebar-body">
+          <div class="seance-sidebar__placeholder">
+            Aucune séance pour l'instant.<br>
+            (Module en construction · Phase 5.10)
+          </div>
+        </div>
+      </aside>
+
+      <!-- Zone éditeur droite : vide en Phase 5.4 -->
+      <section class="seance-editor-area" id="seance-editor-area" aria-label="Éditeur de séance">
+        <div class="seance-editor-area__empty">
+          <h3 class="seance-editor-area__empty-title">Bienvenue dans le module Préparation de séance</h3>
+          <p class="seance-editor-area__empty-text">
+            Le squelette du module est en place.<br>
+            L'éditeur (méta, trame chronologique, détail des blocs, ateliers, groupes) sera livré dans les Phases 5.5 à 5.10.
+          </p>
+          <button type="button" class="seance-editor-area__cta" id="btn-nouvelle-seance-cta" disabled>
+            Créer une séance (Phase 5.5)
+          </button>
+        </div>
+      </section>
+
+    </div>
+
+    <p class="seance-footer">
+      <span class="footer-club">Mutzig Ovalie Molsheim</span><br>
+      MOM Hub · Module Préparation de séance · Phase 5.4 (squelette)
+    </p>
+  </main>
+
+  <!-- ============================================================
+       SCRIPTS
+       ============================================================ -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <!-- Phase 5.5 : <script src="js/seance-editor.js"></script> -->
+
+  <script>
+    /*
+     * Auth gate · Préparation de séance (Phase 5.4)
+     * Pattern identique à compositions.html :
+     *   1. Vérifier la session (sinon → login.html)
+     *   2. Vérifier les rôles (admin OR coach, sinon → portail ./)
+     *   3. Toggle des classes body pour révéler la page
+     *   4. Câbler le bouton signout
+     *   5. Écouter onAuthChange pour réagir à un SIGNED_OUT
+     */
+    (async function () {
+      'use strict';
+
+      const session = await SupabaseHub.getSession();
+      if (!session) {
+        window.location.replace('login.html');
+        return;
+      }
+
+      const roles = await SupabaseHub.getMyRoles();
+      const isAdminOrCoach = roles.indexOf('admin') !== -1 || roles.indexOf('coach') !== -1;
+      if (!isAdminOrCoach) {
+        window.location.replace('./');
+        return;
+      }
+
+      document.body.classList.remove('auth-pending');
+      document.body.classList.add('auth-resolved');
+      if (roles.indexOf('admin') !== -1) {
+        document.body.classList.add('auth-admin');
+      }
+
+      // Bouton de déconnexion
+      const signoutBtn = document.getElementById('btn-signout');
+      if (signoutBtn) {
+        signoutBtn.addEventListener('click', async function () {
+          signoutBtn.disabled = true;
+          await SupabaseHub.signOut();
+        });
+      }
+
+      // Listener auth state
+      SupabaseHub.onAuthChange(function (event) {
+        if (event === 'SIGNED_OUT') {
+          window.location.replace('login.html');
+        }
+      });
+
+      // Smoke check console : confirme que les wrappers v1.8 sont disponibles
+      if (typeof SupabaseHub.getSeancesAVenir === 'function'
+          && typeof SupabaseHub.createSeance === 'function') {
+        console.log(
+          '%c✅ MOM Hub · Préparation de séance — wrappers v1.8 disponibles',
+          'color: #2D7D46; font-weight: bold;'
+        );
+      } else {
+        console.error('❌ MOM Hub · Préparation de séance : wrappers v1.8 absents — vérifier js/supabase-client.js');
+      }
+
+      // Phase 5.5 : await window.SeanceEditor.init();
+    })();
+  </script>
+</body>
+</html>
