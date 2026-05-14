@@ -194,6 +194,203 @@
     }
 
     /* ----------------------------------------------------------
+     * Sidebar — Liste des séances (Phase 5.5.A)
+     * ---------------------------------------------------------- */
+    .seance-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .seance-list-item {
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--line);
+      background: var(--paper);
+      cursor: not-allowed;
+      transition: background-color 0.1s, border-color 0.1s;
+      opacity: 0.85;
+    }
+    .seance-list-item.is-selected {
+      background: var(--vert-light);
+      border-color: var(--vert-prairie);
+      opacity: 1;
+    }
+    .seance-list-item__head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .seance-list-item__date {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      color: var(--ink-mute);
+      text-transform: lowercase;
+    }
+    .seance-list-item__etat {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      padding: 2px 6px;
+      border-radius: 3px;
+      text-transform: uppercase;
+      background: var(--paper-warm);
+      color: var(--ink-soft);
+    }
+    .seance-list-item__etat.etat-brouillon { color: var(--ink-mute); }
+    .seance-list-item__etat.etat-validee   { color: var(--vert-prairie); background: var(--vert-light); }
+    .seance-list-item__etat.etat-utilisee  { color: var(--bleu-base); background: rgba(48, 102, 190, 0.10); }
+    .seance-list-item__etat.etat-archivee  { color: var(--ink-mute); opacity: 0.6; }
+    .seance-list-item__title {
+      font-size: 12.5px;
+      color: var(--ink);
+      line-height: 1.35;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    /* ----------------------------------------------------------
+     * Formulaire méta (Phase 5.5.A)
+     * ---------------------------------------------------------- */
+    .seance-form { display: flex; flex-direction: column; gap: 18px; }
+    .seance-form__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+    .seance-form__title {
+      font-family: 'Oswald', sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--ink);
+    }
+    .seance-form__etat {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.16em;
+      padding: 4px 12px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      background: var(--paper-warm);
+      color: var(--ink-soft);
+      border: 1px solid var(--line);
+    }
+    .seance-form__etat.etat-brouillon { color: var(--ink-mute); }
+    .seance-form__etat.etat-validee   { color: var(--vert-prairie); border-color: var(--vert-prairie); }
+    .seance-form__etat.etat-utilisee  { color: var(--bleu-base); border-color: var(--bleu-base); }
+    .seance-form__etat.etat-archivee  { color: var(--ink-mute); opacity: 0.6; }
+
+    .seance-form__grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px 18px;
+    }
+
+    .seance-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .seance-field--full { grid-column: 1 / -1; }
+    .seance-field__label {
+      font-family: 'Oswald', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ink-mute);
+    }
+    .seance-field__input {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      font-size: 13.5px;
+      font-family: inherit;
+      background: var(--paper);
+      color: var(--ink);
+      transition: border-color 0.15s, background-color 0.15s;
+    }
+    .seance-field__input:focus {
+      outline: none;
+      border-color: var(--vert-prairie);
+      background: #fff;
+    }
+    .seance-field__textarea {
+      resize: vertical;
+      min-height: 64px;
+      font-family: inherit;
+      line-height: 1.45;
+    }
+
+    .seance-form__footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+    }
+    .seance-form__save-btn {
+      padding: 10px 24px;
+      font-family: inherit;
+      font-size: 13.5px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      background: var(--vert-prairie);
+      color: #fff;
+      cursor: pointer;
+      transition: background-color 0.15s, opacity 0.15s;
+      min-width: 220px;
+    }
+    .seance-form__save-btn:hover:not(:disabled) { background: var(--vert-bouteille); }
+    .seance-form__save-btn:disabled { opacity: 0.55; cursor: default; }
+    .seance-form__hint {
+      font-size: 11px;
+      color: var(--ink-mute);
+      font-style: italic;
+    }
+
+    /* Feedback */
+    .seance-feedback {
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      line-height: 1.45;
+      display: none;
+    }
+    .seance-feedback.is-visible { display: block; }
+    .seance-feedback--success {
+      background: var(--feedback-success-bg);
+      color: var(--feedback-success-fg);
+    }
+    .seance-feedback--error {
+      background: var(--feedback-error-bg);
+      color: var(--feedback-error-fg);
+    }
+    .seance-feedback--info {
+      background: var(--feedback-info-bg);
+      color: var(--feedback-info-fg);
+    }
+
+    /* ----------------------------------------------------------
      * Responsive
      * ---------------------------------------------------------- */
     @media (max-width: 1024px) {
@@ -204,6 +401,14 @@
         position: static;
         max-height: none;
       }
+      .seance-form__grid {
+        grid-template-columns: 1fr;
+      }
+      .seance-form__footer {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .seance-form__save-btn { min-width: 0; }
     }
   </style>
 </head>
@@ -310,7 +515,7 @@
        ============================================================ -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="js/supabase-client.js"></script>
-  <!-- Phase 5.5 : <script src="js/seance-editor.js"></script> -->
+  <script src="js/seance-editor.js"></script>
 
   <script>
     /*
@@ -371,7 +576,12 @@
         console.error('❌ MOM Hub · Préparation de séance : wrappers v1.8 absents — vérifier js/supabase-client.js');
       }
 
-      // Phase 5.5 : await window.SeanceEditor.init();
+      // Phase 5.5.A : initialisation de l'éditeur de séance
+      if (window.SeanceEditor && typeof window.SeanceEditor.init === 'function') {
+        await window.SeanceEditor.init();
+      } else {
+        console.error('❌ MOM Hub · Préparation de séance : window.SeanceEditor absent — vérifier js/seance-editor.js');
+      }
     })();
   </script>
 </body>
