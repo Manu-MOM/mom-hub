@@ -188,6 +188,137 @@
     }
 
     /* ----------------------------------------------------------
+     * Phase 5.12 BIS — Mode sélection multi en sidebar
+     * ---------------------------------------------------------- */
+    .seance-sidebar__select-btn {
+      padding: 4px 10px;
+      background: white;
+      border: 1px solid #c2d4ca;
+      border-radius: 4px;
+      color: #2d5b41;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .seance-sidebar__select-btn:hover {
+      background: #e8f0ec;
+      border-color: #2D7D46;
+    }
+    .seance-sidebar__select-btn.is-active {
+      background: #fff3cd;
+      border-color: #ffd591;
+      color: #856404;
+    }
+    .seance-sidebar__select-btn.is-active:hover {
+      background: #ffe8a5;
+    }
+    .seance-list-item__checkbox {
+      flex-shrink: 0;
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+      accent-color: #2D7D46;
+      margin-top: 2px;
+    }
+    /* La structure d'un item passe en flex avec checkbox + main quand on est
+       en mode sélection (la classe is-selection-* est posée seulement alors) */
+    .seance-list-item.is-selection-checked,
+    .seance-list-item.is-selection-protected {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .seance-list-item.is-selection-checked .seance-list-item__main,
+    .seance-list-item.is-selection-protected .seance-list-item__main {
+      flex: 1;
+      min-width: 0;
+    }
+    /* En mode sélection sans la classe protected/checked (donc cochable mais
+       pas encore cochée), on garde le même layout flex */
+    .seance-sidebar__filters .seance-sidebar__select-btn.is-active ~ * .seance-list-item,
+    .seance-list-item:has(.seance-list-item__checkbox) {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .seance-list-item:has(.seance-list-item__checkbox) .seance-list-item__main {
+      flex: 1;
+      min-width: 0;
+    }
+    .seance-list-item.is-selection-checked {
+      background: #e8f0ec;
+      border-color: #2D7D46;
+    }
+    .seance-list-item.is-selection-protected {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .seance-list-item.is-selection-protected:hover {
+      background: inherit; /* annule le hover normal */
+    }
+    .seance-sidebar__selection-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 10px 12px;
+      background: #fdecea;
+      border-top: 2px solid #e74c3c;
+      margin-top: 12px;
+      border-radius: 0 0 8px 8px;
+    }
+    .seance-sidebar__selection-label {
+      font-size: 13px;
+      color: #c0392b;
+      font-weight: 600;
+    }
+    .seance-sidebar__delete-btn {
+      padding: 6px 14px;
+      background: #c0392b;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 13px;
+      cursor: pointer;
+      font-weight: 600;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+    .seance-sidebar__delete-btn:hover {
+      background: #a93223;
+    }
+    .seance-sidebar__selection-hint {
+      padding: 12px;
+      font-size: 12px;
+      color: #6b7480;
+      text-align: center;
+      font-style: italic;
+      background: #f5f7fa;
+      border-radius: 0 0 8px 8px;
+      margin-top: 12px;
+    }
+
+    /* ----------------------------------------------------------
+     * Phase 5.12 BIS — Bouton "🗑 Supprimer" dans formulaire méta
+     * ---------------------------------------------------------- */
+    .seance-form__delete-btn {
+      padding: 4px 10px;
+      background: white;
+      color: #c0392b;
+      border: 1px solid #f5b5ad;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .seance-form__delete-btn:hover {
+      background: #fdecea;
+      border-color: #c0392b;
+    }
+
+    /* ----------------------------------------------------------
      * Bouton "📦 Archiver" dans formulaire méta (Phase 5.10)
      * ---------------------------------------------------------- */
     .seance-form__archive-btn {
@@ -1933,7 +2064,7 @@
 
     <p class="seance-footer">
       <span class="footer-club">Mutzig Ovalie Molsheim</span><br>
-      MOM Hub · Module Préparation de séance · Phase 5.12 (ajustements V1.5)
+      MOM Hub · Module Préparation de séance · Phase 5.12 BIS (ajustements V1.5 + suppression brouillons)
     </p>
   </main>
 
@@ -1992,7 +2123,7 @@
         }
       });
 
-      // Smoke check console : confirme que les wrappers v1.8.5 sont disponibles
+      // Smoke check console : confirme que les wrappers v1.8.6 sont disponibles
       if (typeof SupabaseHub.getSeancesAVenir === 'function'
           && typeof SupabaseHub.createSeance === 'function'
           && typeof SupabaseHub.listSitesActifs === 'function'
@@ -2001,13 +2132,15 @@
           && typeof SupabaseHub.listBrouillonsVides === 'function'
           && typeof SupabaseHub.deleteBrouillonsVides === 'function'
           && typeof SupabaseHub.validerSeance === 'function'
-          && typeof SupabaseHub.repasserSeanceBrouillon === 'function') {
+          && typeof SupabaseHub.repasserSeanceBrouillon === 'function'
+          && typeof SupabaseHub.deleteSeance === 'function'
+          && typeof SupabaseHub.deleteSeancesEnLot === 'function') {
         console.log(
-          '%c✅ MOM Hub · Préparation de séance — wrappers v1.8.5 disponibles',
+          '%c✅ MOM Hub · Préparation de séance — wrappers v1.8.6 disponibles',
           'color: #2D7D46; font-weight: bold;'
         );
       } else {
-        console.error('❌ MOM Hub · Préparation de séance : wrappers v1.8.5 absents — vérifier js/supabase-client.js');
+        console.error('❌ MOM Hub · Préparation de séance : wrappers v1.8.6 absents — vérifier js/supabase-client.js');
       }
 
       // Phase 5.5.A : initialisation de l'éditeur de séance
