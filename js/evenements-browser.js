@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.4 — S2.4.b (15 mai 2026 après-midi)
+ * Version : 1.4.1 — S2.5 (15 mai 2026 fin d'après-midi)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements (trait coloré, pastilles type,
  *          statut compo), regroupement par mois, déploiement inline
@@ -47,6 +47,9 @@
  *          via listSitesActifs (v1.8.1). Forms validés côté client,
  *          appels createEvenement/cancelEvenement/addMatchToTournoi
  *          via wrappers v1.11, reload de la liste après succès.
+ *   v1.4.1: S2.5 fix UX — auto-scrollTop des modales après affichage
+ *          d'un message d'erreur ou de succès (le message s'affichait
+ *          en haut du form invisible si l'utilisateur avait scrollé).
  */
 
 (function () {
@@ -1116,12 +1119,18 @@
       const res = await SupabaseHub.createEvenement(payload);
       if (!res || !res.ok) {
         msg.innerHTML = '<div class="evt-form-error">Échec : ' + escHtml((res && res.error) || 'erreur inconnue') + '</div>';
+        // S2.5 fix UX : scroll en haut pour rendre le message visible
+        const modalBody = document.querySelector('#evt-overlay-create .evt-modal-body');
+        if (modalBody) modalBody.scrollTop = 0;
         submitBtn.disabled = false;
         submitBtn.textContent = "Créer l'évènement";
         return;
       }
       // Succès → ferme la modale + reload de la liste
       msg.innerHTML = '<div class="evt-form-success">✅ Évènement créé.</div>';
+      // S2.5 fix UX : scroll en haut pour rendre le message visible
+      const modalBody = document.querySelector('#evt-overlay-create .evt-modal-body');
+      if (modalBody) modalBody.scrollTop = 0;
       setTimeout(async () => {
         closeModalCreate();
         await reloadEvents();
@@ -1129,6 +1138,8 @@
     } catch (err) {
       console.error('submitModalCreate', err);
       msg.innerHTML = '<div class="evt-form-error">Erreur inattendue : ' + escHtml(err.message || String(err)) + '</div>';
+      const modalBody = document.querySelector('#evt-overlay-create .evt-modal-body');
+      if (modalBody) modalBody.scrollTop = 0;
       submitBtn.disabled = false;
       submitBtn.textContent = "Créer l'évènement";
     }
@@ -1187,11 +1198,15 @@
       const res = await SupabaseHub.cancelEvenement(MODAL_CANCEL_EVENT_ID, motif);
       if (!res || !res.ok) {
         msg.innerHTML = '<div class="evt-form-error">Échec : ' + escHtml((res && res.error) || 'erreur inconnue') + '</div>';
+        const modalBody = document.querySelector('#evt-overlay-cancel .evt-modal-body');
+        if (modalBody) modalBody.scrollTop = 0;
         submitBtn.disabled = false;
         submitBtn.textContent = "Annuler l'évènement";
         return;
       }
       msg.innerHTML = '<div class="evt-form-success">✅ Évènement annulé.</div>';
+      const modalBody = document.querySelector('#evt-overlay-cancel .evt-modal-body');
+      if (modalBody) modalBody.scrollTop = 0;
       setTimeout(async () => {
         const wasId = MODAL_CANCEL_EVENT_ID;
         closeModalCancel();
@@ -1203,6 +1218,8 @@
     } catch (err) {
       console.error('submitModalCancel', err);
       msg.innerHTML = '<div class="evt-form-error">Erreur inattendue : ' + escHtml(err.message || String(err)) + '</div>';
+      const modalBody = document.querySelector('#evt-overlay-cancel .evt-modal-body');
+      if (modalBody) modalBody.scrollTop = 0;
       submitBtn.disabled = false;
       submitBtn.textContent = "Annuler l'évènement";
     }
@@ -1310,11 +1327,15 @@
       const res = await SupabaseHub.addMatchToTournoi(MODAL_ADDMATCH_TOURNOI.id, payload);
       if (!res || !res.ok) {
         msg.innerHTML = '<div class="evt-form-error">Échec : ' + escHtml((res && res.error) || 'erreur inconnue') + '</div>';
+        const modalBody = document.querySelector('#evt-overlay-addmatch .evt-modal-body');
+        if (modalBody) modalBody.scrollTop = 0;
         submitBtn.disabled = false;
         submitBtn.textContent = 'Ajouter le match';
         return;
       }
       msg.innerHTML = '<div class="evt-form-success">✅ Match ajouté.</div>';
+      const modalBody = document.querySelector('#evt-overlay-addmatch .evt-modal-body');
+      if (modalBody) modalBody.scrollTop = 0;
       setTimeout(async () => {
         const wasTournoiId = MODAL_ADDMATCH_TOURNOI.id;
         closeModalAddMatch();
@@ -1326,6 +1347,8 @@
     } catch (err) {
       console.error('submitModalAddMatch', err);
       msg.innerHTML = '<div class="evt-form-error">Erreur inattendue : ' + escHtml(err.message || String(err)) + '</div>';
+      const modalBody = document.querySelector('#evt-overlay-addmatch .evt-modal-body');
+      if (modalBody) modalBody.scrollTop = 0;
       submitBtn.disabled = false;
       submitBtn.textContent = 'Ajouter le match';
     }
@@ -1484,7 +1507,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init S2.4.b (v1.4)');
+    console.log('🏉 MOM Hub · Évènements Browser — init S2.5 (v1.4.1)');
 
     const list = document.getElementById('evt-list');
 
@@ -1552,7 +1575,7 @@
     closeFiche:        closeFiche
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.4 (S2.4.b) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.4.1 (S2.5) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
