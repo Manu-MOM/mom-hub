@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.8 — mai 2026
+ * Version : 1.8.1 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -52,6 +52,10 @@
  *          Note : le brief listait 12 wrappers. Ajout du 13e
  *          getSeancesAVenir par cohérence avec la RPC SQL créée en
  *          Phase 5.1 (sinon orpheline).
+ *   v1.8.1 : Phase 5.5.B1 — wrapper lecture listSitesActifs(options)
+ *          pour alimenter le dropdown lieu_id du formulaire méta
+ *          séance. Filtre actif=TRUE, tri alphabétique sur libelle.
+ *          Pattern lecture identique listCompositionsByEquipe.
  */
 
 (function (global) {
@@ -903,6 +907,31 @@
       return Array.isArray(data) ? data : [];
     },
 
+    /**
+     * Liste les sites actifs (terrains et lieux d'entraînement / match).
+     * Wrapper Phase 5.5.B1 ajouté pour alimenter le dropdown lieu_id du
+     * formulaire méta séance.
+     *
+     * @param {object} [options]
+     * @param {number} [options.limit=100] Plafond raisonnable (peu de sites en pratique)
+     * @returns {Promise<Array>} Sites triés par libellé, [] si erreur
+     */
+    async listSitesActifs(options) {
+      const opts = options || {};
+      const limit = opts.limit || 100;
+      const { data, error } = await client
+        .from('sites')
+        .select('id, code, libelle, libelle_court, ville, type_site')
+        .eq('actif', true)
+        .order('libelle', { ascending: true })
+        .limit(limit);
+      if (error) {
+        console.error('MOM Hub: listSitesActifs()', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
     // ----------------------------------------------------------
     // ÉCRITURE — Séance
     // ----------------------------------------------------------
@@ -1329,7 +1358,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.8 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.8.1 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
