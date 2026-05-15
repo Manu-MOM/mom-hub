@@ -1992,20 +1992,22 @@
         }
       });
 
-      // Smoke check console : confirme que les wrappers v1.8.4 sont disponibles
+      // Smoke check console : confirme que les wrappers v1.8.5 sont disponibles
       if (typeof SupabaseHub.getSeancesAVenir === 'function'
           && typeof SupabaseHub.createSeance === 'function'
           && typeof SupabaseHub.listSitesActifs === 'function'
           && typeof SupabaseHub.listBlocsBySeance === 'function'
           && typeof SupabaseHub.listAteliersRattachesAuBloc === 'function'
           && typeof SupabaseHub.listBrouillonsVides === 'function'
-          && typeof SupabaseHub.deleteBrouillonsVides === 'function') {
+          && typeof SupabaseHub.deleteBrouillonsVides === 'function'
+          && typeof SupabaseHub.validerSeance === 'function'
+          && typeof SupabaseHub.repasserSeanceBrouillon === 'function') {
         console.log(
-          '%c✅ MOM Hub · Préparation de séance — wrappers v1.8.4 disponibles',
+          '%c✅ MOM Hub · Préparation de séance — wrappers v1.8.5 disponibles',
           'color: #2D7D46; font-weight: bold;'
         );
       } else {
-        console.error('❌ MOM Hub · Préparation de séance : wrappers v1.8.4 absents — vérifier js/supabase-client.js');
+        console.error('❌ MOM Hub · Préparation de séance : wrappers v1.8.5 absents — vérifier js/supabase-client.js');
       }
 
       // Phase 5.5.A : initialisation de l'éditeur de séance
