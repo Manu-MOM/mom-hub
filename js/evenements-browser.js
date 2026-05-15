@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.2 — S2.2.fix (15 mai 2026 après-midi)
+ * Version : 1.3 — S2.3 (15 mai 2026 après-midi)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements (trait coloré, pastilles type,
  *          statut compo), regroupement par mois, déploiement inline
@@ -32,6 +32,14 @@
  *          "vs " (cas matchs poule de brassage), on n'ajoute pas une
  *          2e fois l'adversaire_nom. Exploite aussi les colonnes
  *          phase_libelle + ordre_dans_phase remontées par sql/31.
+ *   v1.3 : S2.3 — Fiche détaillée E2 (panneau slide-in droite). Clic
+ *          sur une carte (parent OU enfant) ouvre la fiche.
+ *          Récupération via SupabaseHub.getEvenementWithEncadrants
+ *          (sql/29 + v1.10). Sections empilées : identité, phases si
+ *          tournoi (depuis CHILDREN_BY_PARENT), logistique
+ *          conditionnelle, encadrants (array JSONB), notes_internes,
+ *          score. Mode lecture seule (édition reportée S2.4 avec
+ *          wrappers WRITE). Fermeture Escape + clic overlay + bouton ✕.
  */
 
 (function () {
@@ -448,7 +456,7 @@
         if (e.target.closest('[data-action="toggle-tournoi"]')) return;
         if (e.target.closest('.evt-card-chevron')) return;
         const id = this.getAttribute('data-event-id');
-        console.log('[S2.3 à venir] Ouvrir fiche détaillée pour', id);
+        if (id) openFiche(id);
       });
     });
 
@@ -458,6 +466,17 @@
         const tournoiId = this.getAttribute('data-tournoi-id');
         console.log('[S2.4 à venir] Ouvrir modale E5 pour ajouter match au tournoi', tournoiId);
         openModalAddMatch(tournoiId);
+      });
+    });
+
+    // Clic sur ligne enfant de tournoi → fiche détaillée du match
+    document.querySelectorAll('.evt-enfant-row[data-event-id]').forEach(row => {
+      row.style.cursor = 'pointer';
+      row.addEventListener('click', function (e) {
+        // Ignore les clics sur des éléments enfants interactifs (badges, etc.)
+        if (e.target.closest('[data-action]')) return;
+        const id = this.getAttribute('data-event-id');
+        if (id) openFiche(id);
       });
     });
   }
@@ -570,10 +589,267 @@
   }
 
   // ============================================================
-  // 6. FICHE DÉTAILLÉE E2 (S2.3 — à venir)
+  // 6. FICHE DÉTAILLÉE E2 (S2.3)
   // ============================================================
 
-  // → openFiche(evenementId) / closeFiche() viendront en S2.3
+  /**
+   * Ouvre le panneau fiche détaillée pour un événement donné.
+   * Appelle SupabaseHub.getEvenementWithEncadrants (sql/29 + v1.10)
+   * pour récupérer les 24 colonnes complètes + array encadrants JSONB.
+   *
+   * Mode lecture seule V1 (S2.3). Édition reportée S2.4.
+   *
+   * @param {string} evenementId UUID de l'événement à ouvrir
+   */
+  async function openFiche(evenementId) {
+    if (!evenementId) {
+      console.error('openFiche() : evenementId manquant');
+      return;
+    }
+
+    const overlay = document.getElementById('evt-fiche-overlay');
+    const body    = document.getElementById('evt-fiche-body');
+    const code    = document.getElementById('evt-fiche-code');
+    const title   = document.getElementById('evt-fiche-title');
+    if (!overlay || !body || !title) return;
+
+    // Affiche immédiatement le panneau en loading
+    overlay.classList.add('show');
+    if (code)  code.textContent  = '…';
+    if (title) title.textContent = 'Chargement…';
+    body.innerHTML = '<div class="evt-fiche-loading">Chargement de la fiche…</div>';
+
+    try {
+      if (!window.SupabaseHub || typeof SupabaseHub.getEvenementWithEncadrants !== 'function') {
+        throw new Error('SupabaseHub.getEvenementWithEncadrants indisponible (v1.10+ requis)');
+      }
+      const evt = await SupabaseHub.getEvenementWithEncadrants(evenementId);
+      if (!evt) {
+        body.innerHTML = '<div class="evt-fiche-error">Évènement introuvable en base.</div>';
+        if (title) title.textContent = 'Introuvable';
+        return;
+      }
+      // Met à jour le header
+      if (code)  code.textContent  = evt.code || '';
+      if (title) title.textContent = evt.libelle || '(sans libellé)';
+
+      // Rend le corps de la fiche
+      body.innerHTML = renderFiche(evt);
+
+      // Câblage des actions internes de la fiche (S2.4 fera le vrai câblage
+      // des boutons Annuler / Modifier). Pour l'instant, juste le bouton
+      // fermer dans le header.
+    } catch (err) {
+      console.error('openFiche() erreur', err);
+      body.innerHTML = '<div class="evt-fiche-error">Erreur de chargement : ' + escHtml(err.message || String(err)) + '</div>';
+      if (title) title.textContent = 'Erreur';
+    }
+  }
+
+  /** Ferme le panneau fiche détaillée */
+  function closeFiche() {
+    const overlay = document.getElementById('evt-fiche-overlay');
+    if (overlay) overlay.classList.remove('show');
+  }
+
+  /**
+   * Construit le HTML complet du corps de la fiche détaillée.
+   * Sections empilées selon doc Conception §3.3 :
+   *   Identité → Phases (si tournoi) → Logistique (conditionnelle) →
+   *   Encadrants → Notes → Score (si rempli) → Actions
+   */
+  function renderFiche(evt) {
+    let html = '';
+
+    // ────────────────────────────────────────────────
+    // 1. BANDEAU IDENTITÉ
+    // ────────────────────────────────────────────────
+    const dateLib = formatDateShort(evt.date_debut);
+    const typeLbl = TYPE_LABELS[evt.type_evenement] || evt.type_evenement;
+    const badge   = statutCompoBadge(evt.compo_status_summary);
+    const etatPillCls = 'evt-fiche-pill-etat-' + (evt.etat || 'creation');
+
+    let secondaire = '';
+    if (evt.site_libelle_court) secondaire = escHtml(evt.site_libelle_court);
+    if (evt.adversaire_nom) {
+      secondaire += (secondaire ? ' · ' : '') + 'vs ' + escHtml(evt.adversaire_nom);
+    }
+    if (evt.type_competition) {
+      secondaire += (secondaire ? ' · ' : '') + escHtml(evt.type_competition);
+    }
+    if (evt.format_de_jeu) {
+      secondaire += (secondaire ? ' · ' : '') + escHtml(evt.format_de_jeu);
+    }
+
+    html += '<div class="evt-fiche-identite">';
+    html += '<div class="evt-fiche-identite-meta">' + escHtml(dateLib) + ' · ' + escHtml(typeLbl) + '</div>';
+    html += '<div class="evt-fiche-identite-libelle">' + escHtml(evt.libelle || '(sans libellé)') + '</div>';
+    if (secondaire) {
+      html += '<div class="evt-fiche-identite-secondaire">' + secondaire + '</div>';
+    }
+    html += '<div class="evt-fiche-identite-row">';
+    html += '<span class="evt-fiche-pill ' + etatPillCls + '">État : ' + escHtml(evt.etat || 'creation') + '</span>';
+    if (evt.compo_status_summary && evt.compo_status_summary.total > 0) {
+      html += '<span class="evt-fiche-pill">' + escHtml(badge.libelle) + '</span>';
+    } else if (evt.type_evenement === 'match' || evt.type_evenement === 'tournoi') {
+      html += '<span class="evt-fiche-pill">0 compo · à faire</span>';
+    }
+    if (evt.domicile_exterieur) {
+      html += '<span class="evt-fiche-pill">' + escHtml(evt.domicile_exterieur) + '</span>';
+    }
+    html += '</div>';
+    html += '</div>';
+
+    // ────────────────────────────────────────────────
+    // 2. SCORE (si match joué)
+    // ────────────────────────────────────────────────
+    if (evt.score_mom !== null && evt.score_mom !== undefined && evt.score_adverse !== null && evt.score_adverse !== undefined) {
+      html += '<div class="evt-fiche-section">';
+      html += '<div class="evt-fiche-section-title">🏆 Score</div>';
+      html += '<div class="evt-fiche-score">';
+      html += '<span class="evt-fiche-score-num">' + escHtml(String(evt.score_mom)) + '</span>';
+      html += '<span class="evt-fiche-score-vs">—</span>';
+      html += '<span class="evt-fiche-score-num">' + escHtml(String(evt.score_adverse)) + '</span>';
+      html += '</div>';
+      html += '</div>';
+    }
+
+    // ────────────────────────────────────────────────
+    // 3. PHASES (si tournoi avec enfants — repris depuis CHILDREN_BY_PARENT)
+    // ────────────────────────────────────────────────
+    if (evt.type_evenement === 'tournoi') {
+      const enfants = CHILDREN_BY_PARENT[evt.id] || [];
+      html += '<div class="evt-fiche-section">';
+      html += '<div class="evt-fiche-section-title">📋 Phases du tournoi</div>';
+      if (enfants.length === 0) {
+        html += '<div class="evt-fiche-empty">Aucun match interne créé pour ce tournoi.</div>';
+      } else {
+        // Regroupement par phase_libelle
+        const phases = [];
+        const byPhase = {};
+        enfants.forEach(c => {
+          const p = c.phase_libelle || '(sans phase)';
+          if (!byPhase[p]) { byPhase[p] = []; phases.push(p); }
+          byPhase[p].push(c);
+        });
+        phases.forEach(phaseName => {
+          html += '<div class="evt-fiche-phase-titre">📍 ' + escHtml(phaseName) + '</div>';
+          byPhase[phaseName].forEach(child => {
+            const heure = formatHeureOnly(child.date_debut);
+            const childBadge = statutCompoBadge(child.compo_status_summary);
+            const childLibStartsVs = (child.libelle || '').toLowerCase().indexOf('vs ') === 0;
+            const advBlock = childLibStartsVs
+              ? ''
+              : (child.adversaire_nom
+                  ? ' · vs ' + escHtml(child.adversaire_nom)
+                  : ' · <em style="color:var(--ink-mute)">(adv. à déterminer)</em>');
+            const isChildAnnule = child.etat === 'annule';
+            html += '<div class="evt-fiche-phase-row">';
+            html += '<span class="evt-fiche-phase-heure">' + escHtml(heure) + '</span>';
+            html += '<span style="flex:1;">' + escHtml(child.libelle || '') + advBlock + '</span>';
+            if (isChildAnnule) {
+              html += '<span class="evt-card-badge evt-badge-annule evt-badge-sm">Annulé</span>';
+            } else {
+              html += '<span class="evt-card-badge evt-badge-' + childBadge.cls + ' evt-badge-sm">' + escHtml(childBadge.libelle) + '</span>';
+            }
+            html += '</div>';
+          });
+        });
+      }
+      html += '</div>';
+    }
+
+    // ────────────────────────────────────────────────
+    // 4. PARENT (si match enfant de tournoi)
+    // ────────────────────────────────────────────────
+    if (evt.evenement_parent_id) {
+      const parent = EVENTS_BY_ID[evt.evenement_parent_id];
+      if (parent) {
+        html += '<div class="evt-fiche-section">';
+        html += '<div class="evt-fiche-section-title">🏟️ Rattaché à</div>';
+        html += '<div class="evt-fiche-text">' + escHtml(parent.libelle || parent.code || '(tournoi parent)');
+        if (evt.phase_libelle) {
+          html += ' <span style="color:var(--ink-mute);">— ' + escHtml(evt.phase_libelle) + '</span>';
+        }
+        html += '</div>';
+        html += '</div>';
+      }
+    }
+
+    // ────────────────────────────────────────────────
+    // 5. LOGISTIQUE DÉPLACEMENT (conditionnelle, cf. doc §5.3 Q6)
+    // ────────────────────────────────────────────────
+    const hasLogistique = evt.logistique_deplacement && typeof evt.logistique_deplacement === 'object' && Object.keys(evt.logistique_deplacement).length > 0;
+    if (hasLogistique || evt.type_evenement === 'deplacement') {
+      html += '<div class="evt-fiche-section">';
+      html += '<div class="evt-fiche-section-title">🚐 Logistique déplacement</div>';
+      if (hasLogistique) {
+        // V1 : affichage JSON brut (formattage structuré attendu en S2.4 quand on aura les wrappers UPDATE)
+        html += '<pre class="evt-fiche-jsonbloc">' + escHtml(JSON.stringify(evt.logistique_deplacement, null, 2)) + '</pre>';
+      } else {
+        html += '<div class="evt-fiche-empty">Aucune logistique renseignée.</div>';
+      }
+      html += '</div>';
+    }
+
+    // ────────────────────────────────────────────────
+    // 6. ENCADRANTS (array JSONB depuis la RPC)
+    // ────────────────────────────────────────────────
+    html += '<div class="evt-fiche-section">';
+    html += '<div class="evt-fiche-section-title">👥 Encadrants</div>';
+    const encadrants = Array.isArray(evt.encadrants) ? evt.encadrants : [];
+    if (encadrants.length === 0) {
+      html += '<div class="evt-fiche-empty">Aucun encadrant rattaché à cet évènement.</div>';
+    } else {
+      html += '<ul class="evt-fiche-list">';
+      encadrants.forEach(enc => {
+        const nomComplet = [enc.prenom, enc.nom].filter(Boolean).join(' ') || '(sans nom)';
+        const roles = Array.isArray(enc.roles_encadrement)
+          ? enc.roles_encadrement.join(', ')
+          : '';
+        html += '<li class="evt-fiche-list-item">';
+        html += '<span class="evt-fiche-list-puce">•</span>';
+        html += '<div class="evt-fiche-list-content">';
+        html += '<div class="evt-fiche-list-name">' + escHtml(nomComplet) + '</div>';
+        if (roles) {
+          html += '<div class="evt-fiche-list-meta">' + escHtml(roles) + '</div>';
+        }
+        if (enc.notes) {
+          html += '<div class="evt-fiche-list-meta">📝 ' + escHtml(enc.notes) + '</div>';
+        }
+        html += '</div>';
+        html += '</li>';
+      });
+      html += '</ul>';
+    }
+    html += '</div>';
+
+    // ────────────────────────────────────────────────
+    // 7. NOTES INTERNES
+    // ────────────────────────────────────────────────
+    if (evt.notes_internes) {
+      html += '<div class="evt-fiche-section">';
+      html += '<div class="evt-fiche-section-title">📝 Notes internes</div>';
+      html += '<div class="evt-fiche-text">' + escHtml(evt.notes_internes) + '</div>';
+      html += '</div>';
+    }
+
+    // ────────────────────────────────────────────────
+    // 8. ACTIONS EN PIED (S2.4 câblera les vrais boutons)
+    // ────────────────────────────────────────────────
+    html += '<div class="evt-fiche-actions">';
+    html += '<button type="button" class="evt-btn" disabled title="Câblage en S2.4">✏️ Modifier</button>';
+    if (evt.etat === 'annule') {
+      html += '<div class="evt-fiche-actions-spacer"></div>';
+      html += '<button type="button" class="evt-btn evt-btn-primary" disabled title="Câblage en S2.4">↩ Réactiver</button>';
+    } else if (evt.etat !== 'archive') {
+      html += '<div class="evt-fiche-actions-spacer"></div>';
+      html += '<button type="button" class="evt-btn evt-btn-danger" disabled title="Câblage en S2.4">🗑 Annuler l\'évènement</button>';
+    }
+    html += '</div>';
+
+    return html;
+  }
 
   // ============================================================
   // 7. MODALES E3 / E4 / E5 (S2.4 — câblage complet)
@@ -628,8 +904,25 @@
       });
     });
 
+    // Fermeture du panneau fiche détaillée
+    document.querySelectorAll('[data-action="close-fiche"]').forEach(b => {
+      b.addEventListener('click', closeFiche);
+    });
+    const ficheOverlay = document.getElementById('evt-fiche-overlay');
+    if (ficheOverlay) {
+      ficheOverlay.addEventListener('click', function (e) {
+        if (e.target === ficheOverlay) closeFiche();
+      });
+    }
+
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') {
+        // Si fiche détaillée ouverte, on la ferme en priorité
+        const ficheOverlay = document.getElementById('evt-fiche-overlay');
+        if (ficheOverlay && ficheOverlay.classList.contains('show')) {
+          closeFiche();
+          return;
+        }
         document.querySelectorAll('.evt-overlay.show').forEach(o => o.classList.remove('show'));
       }
     });
@@ -688,7 +981,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init S2.2.fix (v1.2)');
+    console.log('🏉 MOM Hub · Évènements Browser — init S2.3 (v1.3)');
 
     const list = document.getElementById('evt-list');
 
@@ -747,10 +1040,12 @@
     init: init,
     openModalCreate:   openModalCreate,
     openModalCancel:   openModalCancel,
-    openModalAddMatch: openModalAddMatch
+    openModalAddMatch: openModalAddMatch,
+    openFiche:         openFiche,
+    closeFiche:        closeFiche
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.2 (S2.2.fix) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.3 (S2.3) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
