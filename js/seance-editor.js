@@ -11,7 +11,7 @@
  *   - 5.5.A : éditeur méta + sauvegarde manuelle (CETTE VERSION)
  *   - 5.5.B : autosave 30s + dropdowns lieu/événement + champs secondaires
  *
- * Version : 1.7 — Phase 5.9 (15 mai 2026)
+ * Version : 1.8 — Phase 5.10 (15 mai 2026)
  *   v1.0 : squelette IIFE, sidebar liste séances, bouton "+ Nouvelle séance",
  *          formulaire 6 champs méta (date, heure, durée, effectif, thème,
  *          axe de travail), sauvegarde manuelle via updateSeance(), feedback
@@ -112,11 +112,26 @@
  *          [{nom:"G1", joueurs:[uuid,...]}, ...]
  *          Pas de nouveau wrapper Supabase : updateBloc accepte déjà
  *          groupes_jsonb dans sa whitelist (v1.8.3).
+ *   v1.8 : Phase 5.10 — sidebar enrichie + nettoyage brouillons.
+ *          (1) Toggle "Afficher les archivées" dans le header de la
+ *          sidebar. Quand activé, recharge la liste avec l'option
+ *          excludeArchivees:false du wrapper listSeancesByEquipe.
+ *          État persisté dans State.showArchivees (volatile, reset au
+ *          rechargement de page — pas de localStorage par doctrine).
+ *          (2) Bouton "📦 Archiver" dans le formulaire méta (déplié
+ *          ET résumé replié). Confirm() avant action, puis recharge
+ *          la liste et revient à l'écran vide.
+ *          (3) Section "Brouillons vides" en bas de sidebar : affiche
+ *          le compteur (X brouillons vides) + bouton "🧹 Nettoyer"
+ *          quand au moins 1 brouillon vide existe. Confirm() avec
+ *          détail du nombre, puis DELETE en lot via le wrapper
+ *          deleteBrouillonsVides. Compteur rafraîchi à chaque init.
+ *          Résout la dette D-SEANCE-STUB-VIDES héritée de Phase 5.5.
  *
  * Dépendances :
- *   - window.SupabaseHub v1.8.3 (wrappers Phase 5.3 + listSitesActifs +
+ *   - window.SupabaseHub v1.8.4 (wrappers Phase 5.3 + listSitesActifs +
  *     listBlocsBySeance + updateBloc + listAteliersRattachesAuBloc +
- *     getVivierCompo)
+ *     getVivierCompo + listBrouillonsVides + deleteBrouillonsVides)
  *   - data/types-blocs.json v1.1 (fetched à l'init)
  *   - data/vocabulaire-seance.json v1.1 (fetched à l'init, Phase 5.7)
  *   - data/fiches-all.json (fetched à l'init, Phase 5.8)
@@ -163,7 +178,10 @@
     groupesRef: null,       // miroir data/groupes-joueur.json ({_meta, groupes:[...]})
     vivier: [],             // vivier M14 via getVivierCompo (62 joueurs)
     vivierById: null,       // Map (joueur_id → joueur) pour lookup rapide
-    groupePicker: null      // état popover groupe ({open: bool, nomGroupe: 'G1'|'G2'|'G3', query: string})
+    groupePicker: null,     // état popover groupe ({open: bool, nomGroupe: 'G1'|'G2'|'G3', query: string})
+    // Phase 5.10 : sidebar enrichie + nettoyage brouillons
+    showArchivees: false,        // toggle "Afficher les archivées" dans sidebar header
+    brouillonsVides: []          // liste des brouillons vides éligibles à suppression (cache)
   };
 
   // ============================================================
@@ -211,7 +229,13 @@
     pickerFicheRoot: () => document.getElementById('seance-picker-fiche-root'),
     // Phase 5.9 : groupes G1/G2/G3
     groupesSection:   () => document.getElementById('seance-groupes-section'),
-    pickerGroupeRoot: () => document.getElementById('seance-picker-groupe-root')
+    pickerGroupeRoot: () => document.getElementById('seance-picker-groupe-root'),
+    // Phase 5.10 : sidebar enrichie
+    toggleArchivees:    () => document.getElementById('seance-toggle-archivees'),
+    sidebarCleanup:     () => document.getElementById('seance-sidebar-cleanup'),
+    btnCleanup:         () => document.getElementById('seance-btn-cleanup'),
+    btnArchiveExpanded: () => document.getElementById('seance-btn-archive-expanded'),
+    btnArchiveCollapsed:() => document.getElementById('seance-btn-archive-collapsed')
   };
 
   // ============================================================
@@ -351,37 +375,67 @@
     const body = DOM.sidebarBody();
     if (!body) return;
 
+    // Phase 5.10 : header avec toggle "Afficher les archivées"
+    const headerHtml =
+      '<div class="seance-sidebar__filters">' +
+        '<label class="seance-sidebar__toggle" title="Afficher aussi les séances archivées">' +
+          '<input type="checkbox" id="seance-toggle-archivees"' +
+            (State.showArchivees ? ' checked' : '') + '>' +
+          '<span>Afficher les archivées</span>' +
+        '</label>' +
+      '</div>';
+
+    // Liste des séances (ou placeholder si vide)
+    let listHtml;
     if (State.seances.length === 0) {
-      body.innerHTML =
+      listHtml =
         '<div class="seance-sidebar__placeholder">' +
           'Aucune séance pour l\'instant.<br>' +
           'Clique sur « + Nouvelle séance » pour démarrer.' +
         '</div>';
-      return;
+    } else {
+      const items = State.seances.map(function (s) {
+        const isSelected = State.currentSeance && State.currentSeance.id === s.id;
+        const dateLib = s.date_seance ? formatDateShort(s.date_seance) : 'Sans date';
+        const heureLib = s.heure_debut ? normalizeHeureForInput(s.heure_debut) : '';
+        const etatLib = libelleEtatSeance(s.etat);
+        const titre = s.axe_travail_general
+          ? escapeHtml(s.axe_travail_general).substring(0, 60)
+          : (s.theme_principal ? escapeHtml(s.theme_principal).substring(0, 60) : 'Séance sans thème');
+        return (
+          '<li class="seance-list-item' + (isSelected ? ' is-selected' : '') + '" ' +
+              'data-seance-id="' + escapeHtml(s.id) + '" ' +
+              'title="Cliquer pour ouvrir cette séance">' +
+            '<div class="seance-list-item__head">' +
+              '<span class="seance-list-item__date">' + dateLib + (heureLib ? ' · ' + heureLib : '') + '</span>' +
+              '<span class="seance-list-item__etat etat-' + escapeHtml(s.etat) + '">' + etatLib + '</span>' +
+            '</div>' +
+            '<div class="seance-list-item__title">' + titre + '</div>' +
+          '</li>'
+        );
+      }).join('');
+      listHtml = '<ul class="seance-list">' + items + '</ul>';
     }
 
-    const items = State.seances.map(function (s) {
-      const isSelected = State.currentSeance && State.currentSeance.id === s.id;
-      const dateLib = s.date_seance ? formatDateShort(s.date_seance) : 'Sans date';
-      const heureLib = s.heure_debut ? normalizeHeureForInput(s.heure_debut) : '';
-      const etatLib = libelleEtatSeance(s.etat);
-      const titre = s.axe_travail_general
-        ? escapeHtml(s.axe_travail_general).substring(0, 60)
-        : (s.theme_principal ? escapeHtml(s.theme_principal).substring(0, 60) : 'Séance sans thème');
-      return (
-        '<li class="seance-list-item' + (isSelected ? ' is-selected' : '') + '" ' +
-            'data-seance-id="' + escapeHtml(s.id) + '" ' +
-            'title="Cliquer pour ouvrir cette séance">' +
-          '<div class="seance-list-item__head">' +
-            '<span class="seance-list-item__date">' + dateLib + (heureLib ? ' · ' + heureLib : '') + '</span>' +
-            '<span class="seance-list-item__etat etat-' + escapeHtml(s.etat) + '">' + etatLib + '</span>' +
-          '</div>' +
-          '<div class="seance-list-item__title">' + titre + '</div>' +
-        '</li>'
-      );
-    }).join('');
+    // Phase 5.10 : footer nettoyage brouillons vides (visible si compteur > 0)
+    const nbVides = State.brouillonsVides ? State.brouillonsVides.length : 0;
+    let cleanupHtml = '';
+    if (nbVides > 0) {
+      cleanupHtml =
+        '<div id="seance-sidebar-cleanup" class="seance-sidebar__cleanup">' +
+          '<span class="seance-sidebar__cleanup-label">' +
+            '🗑 ' + nbVides + ' brouillon' + (nbVides > 1 ? 's' : '') + ' vide' + (nbVides > 1 ? 's' : '') +
+          '</span>' +
+          '<button type="button" id="seance-btn-cleanup" ' +
+                  'class="seance-sidebar__cleanup-btn" ' +
+                  'title="Supprime les brouillons sans date ni blocs">' +
+            '🧹 Nettoyer' +
+          '</button>' +
+        '</div>';
+    }
 
-    body.innerHTML = '<ul class="seance-list">' + items + '</ul>';
+    body.innerHTML = headerHtml + listHtml + cleanupHtml;
+
     // Phase 5.5.B2 : câble le clic sur chaque item → recharge la séance
     const lis = body.querySelectorAll('.seance-list-item');
     lis.forEach(function (li) {
@@ -390,6 +444,16 @@
         onSelectSeance(id);
       });
     });
+
+    // Phase 5.10 : câbles toggle et bouton nettoyage
+    const toggle = DOM.toggleArchivees();
+    if (toggle) {
+      toggle.addEventListener('change', onToggleArchivees);
+    }
+    const btnCleanup = DOM.btnCleanup();
+    if (btnCleanup) {
+      btnCleanup.addEventListener('click', onCleanupBrouillons);
+    }
   }
 
   // ============================================================
@@ -460,6 +524,12 @@
         '</div>' +
         '<div class="seance-form-collapsed__right">' +
           '<span id="seance-autosave-pill" class="seance-autosave-pill is-idle" title="Sauvegarde automatique (30s si modifications)">● Sauvé</span>' +
+          // Phase 5.10 : bouton Archiver dans le résumé replié
+          '<button type="button" id="seance-btn-archive-collapsed" ' +
+                  'class="seance-form__archive-btn" ' +
+                  (s.etat === 'archivee' ? 'disabled title="Déjà archivée"' : 'title="Archiver cette séance"') + '>' +
+            '📦 Archiver' +
+          '</button>' +
           '<button type="button" id="seance-btn-expand-form" class="seance-form-collapsed__edit-btn" title="Modifier les méta de la séance">' +
             '✏️ Modifier' +
           '</button>' +
@@ -475,6 +545,12 @@
         renderForm();
         renderTrame(); // re-render pour rester en place
       });
+    }
+
+    // Phase 5.10 : bind du bouton "📦 Archiver" en mode collapsed
+    const btnArchive = DOM.btnArchiveCollapsed();
+    if (btnArchive && !btnArchive.disabled) {
+      btnArchive.addEventListener('click', onArchiveSeance);
     }
 
     // Phase 5.6.A : rendu de la trame chronologique sous le résumé
@@ -512,6 +588,12 @@
           '<div class="seance-form__header-right">' +
             '<span id="seance-autosave-pill" class="seance-autosave-pill is-idle" title="État de la sauvegarde automatique (30s si modifications)">● Sauvé</span>' +
             '<span class="seance-form__etat etat-' + escapeHtml(s.etat) + '">' + libelleEtatSeance(s.etat) + '</span>' +
+            // Phase 5.10 : bouton Archiver (désactivé si déjà archivée)
+            '<button type="button" id="seance-btn-archive-expanded" ' +
+                    'class="seance-form__archive-btn" ' +
+                    (s.etat === 'archivee' ? 'disabled title="Déjà archivée"' : 'title="Archiver cette séance"') + '>' +
+              '📦 Archiver' +
+            '</button>' +
             '<button type="button" id="seance-btn-collapse-form" class="seance-form__collapse-btn" title="Replier le formulaire (raccourci : sans modifier)">' +
               '↑ Replier' +
             '</button>' +
@@ -670,6 +752,12 @@
     const btnCollapse = document.getElementById('seance-btn-collapse-form');
     if (btnCollapse) {
       btnCollapse.addEventListener('click', onCollapseForm);
+    }
+
+    // Phase 5.10 : bouton 📦 Archiver
+    const btnArchive = DOM.btnArchiveExpanded();
+    if (btnArchive && !btnArchive.disabled) {
+      btnArchive.addEventListener('click', onArchiveSeance);
     }
 
     // Phase 5.6.A : rendu de la trame chronologique sous le formulaire
@@ -2070,6 +2158,111 @@
   // 6. ACTIONS
   // ============================================================
 
+  // ----------------------------------------------------------
+  // Phase 5.10 — Sidebar enrichie + nettoyage brouillons vides
+  // ----------------------------------------------------------
+
+  /**
+   * Toggle "Afficher les archivées" dans le header de la sidebar.
+   * Recharge la liste avec / sans les séances archivées et re-render.
+   */
+  async function onToggleArchivees() {
+    const toggle = DOM.toggleArchivees();
+    if (!toggle) return;
+    State.showArchivees = toggle.checked;
+    await loadSeances();
+    renderSidebar();
+  }
+
+  /**
+   * Nettoyage manuel des brouillons vides du M14 (Phase 5.10).
+   * Confirme avec compteur, supprime en lot, puis recharge la liste
+   * des séances et le compteur. Si la séance courante était dans la
+   * liste supprimée (peu probable car on a fini de la travailler mais
+   * sécurité), retour à l'écran vide.
+   */
+  async function onCleanupBrouillons() {
+    const nb = State.brouillonsVides ? State.brouillonsVides.length : 0;
+    if (nb === 0) return;
+
+    const ok = window.confirm(
+      'Supprimer ' + nb + ' brouillon' + (nb > 1 ? 's' : '') + ' vide' + (nb > 1 ? 's' : '') + ' ?\n\n' +
+      'Ces séances n\'ont ni date ni bloc rattaché.\n' +
+      'Cette action est irréversible.'
+    );
+    if (!ok) return;
+
+    const idsASupprimer = State.brouillonsVides.map(function (b) { return b.id; });
+    const currentInList = State.currentSeance && idsASupprimer.indexOf(State.currentSeance.id) !== -1;
+
+    const res = await SupabaseHub.deleteBrouillonsVides(idsASupprimer);
+    if (!res.ok) {
+      window.alert('Échec du nettoyage :\n' + (res.error || 'erreur inconnue'));
+      return;
+    }
+
+    // Si la séance courante a été supprimée, retour écran vide
+    if (currentInList) {
+      stopAutosave();
+      stopBlocAutosave();
+      State.currentSeance = null;
+      State.currentBloc = null;
+      State.blocs = [];
+      State.view = 'trame';
+      renderEmptyEditor();
+    }
+
+    // Recharge la liste (loadSeances couple aussi le compteur brouillons vides)
+    await loadSeances();
+    renderSidebar();
+    showFeedback(res.deleted_count + ' brouillon' + (res.deleted_count > 1 ? 's' : '') + ' supprimé' + (res.deleted_count > 1 ? 's' : '') + ' ✓', 'success');
+  }
+
+  /**
+   * Archive la séance courante (Phase 5.10).
+   * Bouton dans le formulaire méta (déplié ET résumé replié).
+   * Confirme, archive via archiveSeance, recharge la sidebar et
+   * revient à l'écran vide.
+   */
+  async function onArchiveSeance() {
+    if (!State.currentSeance) return;
+    const dateLib = State.currentSeance.date_seance
+      ? formatDateShort(State.currentSeance.date_seance)
+      : 'sans date';
+    const ok = window.confirm(
+      'Archiver cette séance (' + dateLib + ') ?\n\n' +
+      'Elle n\'apparaîtra plus dans la sidebar par défaut.\n' +
+      'Coche « Afficher les archivées » pour la retrouver.'
+    );
+    if (!ok) return;
+
+    // Save préventif des modifs en cours pour éviter une perte
+    if (State.isDirty) {
+      await saveSeance({ silent: true });
+    }
+
+    const res = await SupabaseHub.archiveSeance(State.currentSeance.id);
+    if (!res.ok) {
+      window.alert('Échec de l\'archivage :\n' + (res.error || 'erreur inconnue'));
+      return;
+    }
+
+    // Reset propre + retour écran vide
+    stopAutosave();
+    stopBlocAutosave();
+    State.currentSeance = null;
+    State.currentBloc = null;
+    State.blocs = [];
+    State.view = 'trame';
+    State.isDirty = false;
+    State.blocIsDirty = false;
+
+    await loadSeances();
+    renderSidebar();
+    renderEmptyEditor();
+    showFeedback('Séance archivée ✓', 'success');
+  }
+
   async function onNouvelleSeance() {
     const sidebarBtn = DOM.sidebarCta();
     const centerBtn  = DOM.ctaCenter();
@@ -2567,9 +2760,25 @@
   // ============================================================
 
   async function loadSeances() {
-    State.seances = await SupabaseHub.listSeancesByEquipe(M14_TEAM_UUID, {
-      limit: NB_SEANCES_RECENTES
-    });
+    // Phase 5.10 : respecte le toggle "Afficher les archivées" et
+    // rafraîchit en parallèle le compteur de brouillons vides
+    const [seances] = await Promise.all([
+      SupabaseHub.listSeancesByEquipe(M14_TEAM_UUID, {
+        limit: NB_SEANCES_RECENTES,
+        excludeArchivees: !State.showArchivees
+      }),
+      loadBrouillonsVides()
+    ]);
+    State.seances = seances;
+  }
+
+  /**
+   * Charge la liste des brouillons vides du M14 (Phase 5.10).
+   * Met à jour State.brouillonsVides. Le compteur est ensuite affiché
+   * en bas de sidebar par renderSidebar.
+   */
+  async function loadBrouillonsVides() {
+    State.brouillonsVides = await SupabaseHub.listBrouillonsVides(M14_TEAM_UUID);
   }
 
   async function loadSites() {
@@ -2694,11 +2903,12 @@
   // ============================================================
 
   async function init() {
-    // Chargements parallèles : séances pour la sidebar, sites et événements
-    // pour les dropdowns du formulaire, types-blocs.json pour la trame (5.6.A),
-    // vocabulaire-seance.json pour le détail bloc (5.7), fiches-all.json pour
-    // le picker ateliers (5.8), groupes-joueur.json + vivier M14 pour les
-    // groupes G1/G2/G3 par bloc (5.9)
+    // Chargements parallèles : séances pour la sidebar (couple aussi le
+    // compteur de brouillons vides Phase 5.10), sites et événements pour
+    // les dropdowns du formulaire, types-blocs.json pour la trame (5.6.A),
+    // vocabulaire-seance.json pour le détail bloc (5.7), fiches-all.json
+    // pour le picker ateliers (5.8), groupes-joueur.json + vivier M14 pour
+    // les groupes G1/G2/G3 par bloc (5.9)
     await Promise.all([
       loadSeances(),
       loadSites(),
