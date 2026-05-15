@@ -21,12 +21,17 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.1 — S2.2 (15 mai 2026 après-midi)
+ * Version : 1.2 — S2.2.fix (15 mai 2026 après-midi)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements (trait coloré, pastilles type,
  *          statut compo), regroupement par mois, déploiement inline
  *          tournois avec sous-cartes matchs groupés par phase, mini-cal
  *          sidebar fonctionnel (2 mois, clic jour = scroll vers event).
+ *   v1.2 : S2.2.fix — correction redondance affichage adversaire dans
+ *          les enfants de tournoi : si le libellé commence déjà par
+ *          "vs " (cas matchs poule de brassage), on n'ajoute pas une
+ *          2e fois l'adversaire_nom. Exploite aussi les colonnes
+ *          phase_libelle + ordre_dans_phase remontées par sql/31.
  */
 
 (function () {
@@ -336,16 +341,34 @@
 
   function renderEnfantCard(child) {
     const heure = formatHeureOnly(child.date_debut);
-    const adversaire = child.adversaire_nom
-      ? 'vs ' + escHtml(child.adversaire_nom)
-      : '<em style="color:var(--ink-mute)">(adversaire à déterminer)</em>';
+
+    // Évite la redondance "vs Nancy   vs Nancy" : si le libellé commence
+    // déjà par "vs " (cas matchs poule contre équipe nommée), on n'ajoute
+    // pas une 2e fois l'adversaire_nom à côté.
+    const libelle = child.libelle || '';
+    const libelleStartsWithVs = libelle.toLowerCase().indexOf('vs ') === 0;
+
+    let adversaireBlock = '';
+    if (libelleStartsWithVs) {
+      // L'info est déjà dans le libellé → on n'affiche que le libellé tel quel
+      adversaireBlock = '';
+    } else if (child.adversaire_nom) {
+      adversaireBlock = 'vs ' + escHtml(child.adversaire_nom);
+    } else {
+      adversaireBlock = '<em style="color:var(--ink-mute)">(adversaire à déterminer)</em>';
+    }
+
     const badge = statutCompoBadge(child.compo_status_summary);
     const isAnnule = child.etat === 'annule';
 
     let html = '<div class="evt-enfant-row" data-event-id="' + child.id + '">';
     html += '<span class="evt-enfant-heure">' + escHtml(heure) + '</span>';
-    html += '<span class="evt-enfant-libelle">' + escHtml(child.libelle || '') + '</span>';
-    html += '<span class="evt-enfant-adversaire">' + adversaire + '</span>';
+    html += '<span class="evt-enfant-libelle">' + escHtml(libelle) + '</span>';
+    if (adversaireBlock) {
+      html += '<span class="evt-enfant-adversaire">' + adversaireBlock + '</span>';
+    } else {
+      html += '<span class="evt-enfant-adversaire"></span>';
+    }
     if (isAnnule) {
       html += '<span class="evt-card-badge evt-badge-annule evt-badge-sm">Annulé</span>';
     } else {
@@ -665,7 +688,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init S2.2 (v1.1)');
+    console.log('🏉 MOM Hub · Évènements Browser — init S2.2.fix (v1.2)');
 
     const list = document.getElementById('evt-list');
 
@@ -727,7 +750,7 @@
     openModalAddMatch: openModalAddMatch
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.1 (S2.2) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.2 (S2.2.fix) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
