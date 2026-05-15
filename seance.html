@@ -391,6 +391,57 @@
     }
 
     /* ----------------------------------------------------------
+     * Section repliable "Contexte" (Phase 5.5.B1)
+     * ---------------------------------------------------------- */
+    .seance-form__details {
+      border-top: 1px solid var(--line);
+      padding-top: 14px;
+    }
+    .seance-form__details-summary {
+      cursor: pointer;
+      font-family: 'Oswald', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--ink-soft);
+      padding: 4px 0;
+      margin-bottom: 14px;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      user-select: none;
+    }
+    .seance-form__details-summary::-webkit-details-marker { display: none; }
+    .seance-form__details-summary::before {
+      content: '▶';
+      font-size: 9px;
+      color: var(--ink-mute);
+      transition: transform 0.15s;
+      display: inline-block;
+    }
+    .seance-form__details[open] .seance-form__details-summary::before {
+      transform: rotate(90deg);
+    }
+    .seance-form__details-summary:hover {
+      color: var(--vert-prairie);
+    }
+
+    /* Style spécifique des <select> pour cohérence avec les .seance-field__input */
+    select.seance-field__input {
+      cursor: pointer;
+      background: var(--paper) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%236b7a6f' d='M1 1l5 5 5-5z'/%3E%3C/svg%3E") no-repeat right 10px center;
+      padding-right: 32px;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
+    }
+    select.seance-field__input:focus {
+      background-color: #fff;
+    }
+
+    /* ----------------------------------------------------------
      * Responsive
      * ---------------------------------------------------------- */
     @media (max-width: 1024px) {
@@ -565,15 +616,16 @@
         }
       });
 
-      // Smoke check console : confirme que les wrappers v1.8 sont disponibles
+      // Smoke check console : confirme que les wrappers v1.8.1 sont disponibles
       if (typeof SupabaseHub.getSeancesAVenir === 'function'
-          && typeof SupabaseHub.createSeance === 'function') {
+          && typeof SupabaseHub.createSeance === 'function'
+          && typeof SupabaseHub.listSitesActifs === 'function') {
         console.log(
-          '%c✅ MOM Hub · Préparation de séance — wrappers v1.8 disponibles',
+          '%c✅ MOM Hub · Préparation de séance — wrappers v1.8.1 disponibles',
           'color: #2D7D46; font-weight: bold;'
         );
       } else {
-        console.error('❌ MOM Hub · Préparation de séance : wrappers v1.8 absents — vérifier js/supabase-client.js');
+        console.error('❌ MOM Hub · Préparation de séance : wrappers v1.8.1 absents — vérifier js/supabase-client.js');
       }
 
       // Phase 5.5.A : initialisation de l'éditeur de séance
