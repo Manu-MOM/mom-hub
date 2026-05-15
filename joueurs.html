@@ -184,6 +184,9 @@
   /* ========== ZONE LISTE ========== */
   .joueur-list {
     margin-top: 16px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 10px;
   }
   .joueur-list-empty {
     padding: 40px 20px;
@@ -348,10 +351,10 @@
   .joueur-card {
     position: relative;
     display: flex;
+    flex-direction: column;
     background: var(--paper);
     border: 1px solid var(--line);
     border-radius: 6px;
-    margin-bottom: 10px;
     cursor: pointer;
     transition: box-shadow 0.12s, transform 0.12s;
     overflow: hidden;
@@ -367,27 +370,28 @@
 
   .joueur-card-stripe {
     flex-shrink: 0;
-    width: 5px;
+    height: 4px;
+    width: 100%;
     background: var(--vert-prairie);
   }
 
   .joueur-card-body {
     flex: 1;
-    padding: 12px 14px;
+    padding: 10px 12px;
     min-width: 0;
   }
 
   .joueur-card-head {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 8px;
+    gap: 10px;
+    margin-bottom: 6px;
   }
 
   .joueur-card-avatar {
     flex-shrink: 0;
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     background: var(--vert-prairie);
     color: var(--paper);
@@ -396,7 +400,7 @@
     justify-content: center;
     font-family: 'Oswald', sans-serif;
     font-weight: 600;
-    font-size: 13px;
+    font-size: 12px;
     letter-spacing: 0.04em;
   }
 
@@ -405,10 +409,10 @@
     min-width: 0;
   }
   .joueur-card-name {
-    font-size: 14px;
+    font-size: 13px;
     color: var(--ink);
     line-height: 1.2;
-    margin-bottom: 4px;
+    margin-bottom: 3px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -462,15 +466,15 @@
   /* Postes pills (multi-postes) */
   .joueur-card-postes {
     display: flex;
-    gap: 5px;
+    gap: 4px;
     flex-wrap: wrap;
-    margin-bottom: 6px;
+    margin-bottom: 4px;
   }
   .joueur-pill {
     display: inline-block;
-    padding: 2px 9px;
+    padding: 1px 7px;
     border-radius: 10px;
-    font-size: 10.5px;
+    font-size: 10px;
     font-weight: 500;
     color: var(--paper);
   }
@@ -485,25 +489,25 @@
   /* Aptitudes (pills colorées) */
   .joueur-card-aptitudes {
     display: flex;
-    gap: 5px;
+    gap: 4px;
     flex-wrap: wrap;
-    margin-bottom: 6px;
+    margin-bottom: 4px;
   }
 
   /* Ligne physique (taille / poids / qualité FFR) */
   .joueur-card-physique {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 10.5px;
+    font-size: 9.5px;
     color: var(--ink-mute);
     letter-spacing: 0.02em;
   }
 
   /* Ligne "Postes non définis" */
   .joueur-card-empty-line {
-    font-size: 11.5px;
+    font-size: 11px;
     color: var(--ink-mute);
     font-style: italic;
-    margin-bottom: 6px;
+    margin-bottom: 4px;
   }
 
   /* =====================================================
@@ -1066,7 +1070,7 @@
 
       <!-- FOOTER smoke check -->
       <div class="joueur-footer-smoke" id="joueur-footer-smoke">
-        MOM Hub · Module Joueurs · v1.1 (S2.2 + S2.3 + S2.4 édition)
+        MOM Hub · Module Joueurs · v1.2 (grille + boutons haut fiche)
       </div>
 
     </div>
