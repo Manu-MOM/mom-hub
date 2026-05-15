@@ -4,22 +4,19 @@
  *
  * Module IIFE — initialise l'UI de la page joueurs.html.
  *
- * Version : v1.0 — 15 mai 2026
+ * Version : v1.1 — 15 mai 2026
  *   v0 :  Squelette S2.1 (init vide + chips filtres + binders modales)
- *   v1.0 : Phase 5.14 S2.2 + S2.3 lecture
- *          - Chargement backend via SupabaseHub.getJoueursEquipe(M14_TEAM_UUID)
- *          - Chargement référentiels postes.json v1.1 + aptitudes.json v1.0
- *          - Indexes (JOUEURS_BY_ID + POSTES_BY_ID + APTITUDES_BY_ID)
- *          - renderCard() avec stripe colorée par profil, avatar initiales,
- *            badges club/cat/F-15, postes pills, aptitudes pills colorées,
- *            physique (taille/poids), badge état si non actif
- *          - renderKpis réel (Actifs / Indispo / Blessés)
- *          - renderSidebarAlerts réel (Sans email / FFR à renouveler / Indispo)
- *          - applyFilters réel (search + profil + etat + poste avec dégroupage)
- *          - Clic carte → openFiche avec getJoueurDetail
- *          - renderFiche : sections empilées (identité, profil sportif, état,
- *            FFR/conformité, coordonnées, métadonnées) en lecture seule
- *          - Édition métier S2.4 (boutons disabled avec tooltip "Câblage S2.4")
+ *   v1.0 : Phase 5.14 S2.2 + S2.3 lecture (cartes + fiche slide-in)
+ *   v1.1 : Phase 5.14 S2.4 — câblage des 3 modales d'édition métier
+ *          - currentEditPersonneId (state) + currentEditDetail (cache fiche)
+ *          - openModalProfil / submitModalProfil : postes chips multi-toggle,
+ *            aptitudes cases à cocher A+B colorées, taille (cm), poids (kg→g)
+ *          - openModalEtat / submitModalEtat : indispo, blessure, suspension
+ *          - openModalNotes / submitModalNotes : textarea notes_coach
+ *          - bindFicheActions : 3 boutons fiche slide-in cliquables (plus disabled)
+ *          - showModalMessage : helper succès/erreur + auto-scrollTop
+ *            (factorisation P4-UI-evenements-4 anticipée)
+ *          - Après save : reloadJoueurs() + reopenFiche() pour refresh complet
  *
  * Pattern calqué sur :
  *   - js/evenements-browser.js v1.4.1 (cartes + fiche)
@@ -100,6 +97,10 @@ window.JoueursBrowser = (function () {
     etat: 'all',
     poste: 'all'
   };
+
+  /** State d'édition courante (S2.4) */
+  let currentEditPersonneId = null;
+  let currentEditDetail = null;  // cache de la fiche en cours d'édition
 
   // ============================================================
   // CHARGEMENT RÉFÉRENTIELS (postes + aptitudes)
@@ -560,6 +561,10 @@ window.JoueursBrowser = (function () {
     const bodyEl   = document.getElementById('joueur-fiche-body');
     if (!overlay || !bodyEl) return;
 
+    // Mémorise pour l'édition (S2.4)
+    currentEditPersonneId = personneId;
+    currentEditDetail = null;
+
     // Affichage immédiat depuis le cache liste (preview)
     const lite = JOUEURS_BY_ID.get(personneId);
     if (lite) {
@@ -576,7 +581,9 @@ window.JoueursBrowser = (function () {
         bodyEl.innerHTML = '<div class="joueur-fiche-error">Fiche introuvable ou accès refusé.</div>';
         return;
       }
+      currentEditDetail = detail;
       renderFiche(detail);
+      bindFicheActions();
     } catch (err) {
       console.error('Joueurs: openFiche()', err);
       bodyEl.innerHTML = '<div class="joueur-fiche-error">Erreur de chargement : ' + esc(err.message || err) + '</div>';
@@ -829,18 +836,389 @@ window.JoueursBrowser = (function () {
   }
 
   function renderFicheActions(d) {
-    // S2.4 : ces boutons seront câblés vers les modales J3/J4/J5
+    // S2.4 : boutons câblés vers les modales J3/J4/J5
     return `
       <div class="joueur-fiche-section joueur-fiche-actions">
         <div class="joueur-fiche-section-title">✏️ Édition métier</div>
         <div class="joueur-fiche-actions-row">
-          <button type="button" class="joueur-btn" disabled title="Câblage en S2.4">Modifier profil sportif</button>
-          <button type="button" class="joueur-btn" disabled title="Câblage en S2.4">Modifier état</button>
-          <button type="button" class="joueur-btn" disabled title="Câblage en S2.4">Notes coach</button>
+          <button type="button" class="joueur-btn joueur-btn-edit" data-edit="profil">Modifier profil sportif</button>
+          <button type="button" class="joueur-btn joueur-btn-edit" data-edit="etat">Modifier état</button>
+          <button type="button" class="joueur-btn joueur-btn-edit" data-edit="notes">Notes coach</button>
         </div>
-        <div class="joueur-form-hint" style="margin-top: 8px;">Les boutons d'édition seront câblés en sous-jalon S2.4 (modales J3/J4/J5).</div>
       </div>
     `;
+  }
+
+  /** Branche les 3 boutons d'édition de la fiche (à appeler après renderFiche). */
+  function bindFicheActions() {
+    document.querySelectorAll('.joueur-btn-edit[data-edit]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        if (!currentEditDetail) return;
+        const which = this.dataset.edit;
+        if (which === 'profil') openModalProfil(currentEditDetail);
+        else if (which === 'etat') openModalEtat(currentEditDetail);
+        else if (which === 'notes') openModalNotes(currentEditDetail);
+      });
+    });
+  }
+
+  // ============================================================
+  // S2.4 — MODALES D'ÉDITION J3 / J4 / J5
+  // ============================================================
+
+  /**
+   * Helper : affiche un message succès / erreur en haut du body de modale,
+   * et fait remonter le scroll pour s'assurer qu'il est visible.
+   * Anticipe la dette P4-UI-evenements-4 (factorisation).
+   */
+  function showModalMessage(modalMsgElId, modalBodyElId, type, text) {
+    const msgEl = document.getElementById(modalMsgElId);
+    const bodyEl = document.getElementById(modalBodyElId);
+    if (msgEl) {
+      const cls = type === 'success' ? 'joueur-form-success' : 'joueur-form-error';
+      msgEl.innerHTML = `<div class="${cls}">${esc(text)}</div>`;
+    }
+    if (bodyEl) bodyEl.scrollTop = 0;
+  }
+
+  function clearModalMessage(modalMsgElId) {
+    const msgEl = document.getElementById(modalMsgElId);
+    if (msgEl) msgEl.innerHTML = '';
+  }
+
+  /**
+   * Recharge la liste joueurs + ré-render KPIs/cartes/sidebar.
+   * Appelé après save modale pour refresh UI complet.
+   */
+  async function reloadJoueurs() {
+    const joueurs = await SupabaseHub.getJoueursEquipe(M14_TEAM_UUID);
+    if (joueurs) {
+      ALL_JOUEURS = joueurs;
+      buildIndexes();
+      renderKpis();
+      renderSidebarAlerts();
+      render();
+    }
+  }
+
+  /** Ré-ouvre la fiche du joueur courant pour refléter les modifs. */
+  async function reopenFicheCurrent() {
+    if (currentEditPersonneId) {
+      await openFiche(currentEditPersonneId);
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // J3 — Modale Profil sportif (postes + aptitudes + taille + poids)
+  // ----------------------------------------------------------------
+
+  function openModalProfil(d) {
+    const overlay = document.getElementById('joueur-overlay-profil');
+    if (!overlay) return;
+
+    clearModalMessage('joueur-profil-msg');
+
+    // Info en haut
+    const infoEl = document.getElementById('joueur-profil-info');
+    if (infoEl) {
+      infoEl.innerHTML = '<span class="joueur-modal-info-strong">'
+        + esc(d.prenom) + ' ' + esc(d.nom) + '</span> · '
+        + esc(PROFIL_LABELS[d.profil] || 'Autre');
+    }
+
+    // Génère les chips postes
+    renderModalProfilPostesChips(d.postes_uuids || []);
+
+    // Génère la grille aptitudes
+    renderModalProfilAptitudesGrid(d.aptitudes_uuids || []);
+
+    // Pré-remplit taille / poids
+    const inputTaille = document.getElementById('joueur-profil-taille');
+    const inputPoids  = document.getElementById('joueur-profil-poids');
+    if (inputTaille) inputTaille.value = (d.taille_cm !== null && d.taille_cm !== undefined) ? d.taille_cm : '';
+    if (inputPoids)  inputPoids.value  = (d.poids_g !== null && d.poids_g !== undefined) ? (d.poids_g / 1000).toFixed(1) : '';
+
+    // Active le bouton submit
+    const submitBtn = document.getElementById('joueur-profil-submit');
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.onclick = submitModalProfil;
+    }
+
+    overlay.classList.add('show');
+  }
+
+  function renderModalProfilPostesChips(activeUuids) {
+    const container = document.getElementById('joueur-profil-postes-chips');
+    if (!container) return;
+    const html = [];
+    POSTES_BY_ID.forEach((p, uuid) => {
+      const isActive = activeUuids.includes(uuid);
+      html.push(
+        `<span class="joueur-modal-chip-poste${isActive ? ' is-active' : ''}" data-poste-uuid="${esc(uuid)}">`
+        + esc(p.libelle_court || p.code || '?')
+        + `</span>`
+      );
+    });
+    container.innerHTML = html.join('');
+    // Toggle au clic
+    container.querySelectorAll('.joueur-modal-chip-poste').forEach(chip => {
+      chip.addEventListener('click', function () {
+        this.classList.toggle('is-active');
+      });
+    });
+  }
+
+  function renderModalProfilAptitudesGrid(activeUuids) {
+    const container = document.getElementById('joueur-profil-aptitudes-grid');
+    if (!container) return;
+    const html = [];
+    APTITUDES_BY_ID.forEach((a, uuid) => {
+      const isActive = activeUuids.includes(uuid);
+      const couleur = a.couleur || '#888';
+      html.push(
+        `<label class="joueur-modal-apt-cell${isActive ? ' is-active' : ''}" data-apt-uuid="${esc(uuid)}">`
+        + `<input type="checkbox" ${isActive ? 'checked' : ''} class="joueur-modal-apt-checkbox">`
+        + `<span class="joueur-pill joueur-pill-apt" style="background:${esc(couleur)}">${esc(a.libelle_court || '?')}</span>`
+        + `</label>`
+      );
+    });
+    container.innerHTML = html.join('');
+    // Toggle visuel au clic
+    container.querySelectorAll('.joueur-modal-apt-cell').forEach(cell => {
+      cell.addEventListener('change', function () {
+        const cb = this.querySelector('input[type=checkbox]');
+        this.classList.toggle('is-active', !!cb.checked);
+      });
+    });
+  }
+
+  async function submitModalProfil() {
+    if (!currentEditPersonneId) return;
+    clearModalMessage('joueur-profil-msg');
+
+    const submitBtn = document.getElementById('joueur-profil-submit');
+    if (submitBtn) submitBtn.disabled = true;
+
+    try {
+      // Lecture postes actifs
+      const postesActifs = [];
+      document.querySelectorAll('#joueur-profil-postes-chips .joueur-modal-chip-poste.is-active').forEach(chip => {
+        postesActifs.push(chip.dataset.posteUuid);
+      });
+
+      // Lecture aptitudes actives
+      const aptitudesActives = [];
+      document.querySelectorAll('#joueur-profil-aptitudes-grid .joueur-modal-apt-cell').forEach(cell => {
+        const cb = cell.querySelector('input[type=checkbox]');
+        if (cb && cb.checked) {
+          aptitudesActives.push(cell.dataset.aptUuid);
+        }
+      });
+
+      // Lecture taille / poids
+      const inputTaille = document.getElementById('joueur-profil-taille');
+      const inputPoids  = document.getElementById('joueur-profil-poids');
+      const tailleVal = inputTaille && inputTaille.value !== '' ? parseInt(inputTaille.value, 10) : null;
+      const poidsKgVal = inputPoids && inputPoids.value !== '' ? parseFloat(inputPoids.value.replace(',', '.')) : null;
+
+      // Validations côté client
+      if (tailleVal !== null) {
+        if (isNaN(tailleVal) || tailleVal < 50 || tailleVal > 250) {
+          showModalMessage('joueur-profil-msg', 'joueur-profil-body', 'error',
+            'Taille invalide. Doit être un entier entre 50 et 250 cm.');
+          if (submitBtn) submitBtn.disabled = false;
+          return;
+        }
+      }
+      if (poidsKgVal !== null) {
+        if (isNaN(poidsKgVal) || poidsKgVal < 5 || poidsKgVal > 250) {
+          showModalMessage('joueur-profil-msg', 'joueur-profil-body', 'error',
+            'Poids invalide. Doit être entre 5 et 250 kg.');
+          if (submitBtn) submitBtn.disabled = false;
+          return;
+        }
+      }
+
+      // Conversion kg → g pour la RPC (entier)
+      const poidsG = poidsKgVal !== null ? Math.round(poidsKgVal * 1000) : null;
+
+      const patch = {
+        postes_uuids:    postesActifs,
+        aptitudes_uuids: aptitudesActives,
+        taille_cm:       tailleVal,
+        poids_g:         poidsG
+      };
+
+      const res = await SupabaseHub.updateJoueurMetier(currentEditPersonneId, patch);
+      if (!res || !res.ok) {
+        showModalMessage('joueur-profil-msg', 'joueur-profil-body', 'error',
+          'Échec : ' + ((res && res.error) || 'erreur inconnue'));
+        if (submitBtn) submitBtn.disabled = false;
+        return;
+      }
+
+      // Succès : message + refresh
+      showModalMessage('joueur-profil-msg', 'joueur-profil-body', 'success',
+        '✅ Profil sportif mis à jour');
+
+      // Ferme la modale et refresh fiche + liste
+      setTimeout(async () => {
+        document.getElementById('joueur-overlay-profil').classList.remove('show');
+        await reloadJoueurs();
+        await reopenFicheCurrent();
+      }, 700);
+
+    } catch (err) {
+      console.error('Joueurs: submitModalProfil()', err);
+      showModalMessage('joueur-profil-msg', 'joueur-profil-body', 'error',
+        'Erreur inattendue : ' + (err.message || err));
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // J4 — Modale État (indispo / blessure / suspension)
+  // ----------------------------------------------------------------
+
+  function openModalEtat(d) {
+    const overlay = document.getElementById('joueur-overlay-etat');
+    if (!overlay) return;
+
+    clearModalMessage('joueur-etat-msg');
+
+    const infoEl = document.getElementById('joueur-etat-info');
+    if (infoEl) {
+      infoEl.innerHTML = '<span class="joueur-modal-info-strong">'
+        + esc(d.prenom) + ' ' + esc(d.nom) + '</span> · '
+        + 'État actuel : ' + esc(ETAT_LABELS[d.etat_calcule] || d.etat_calcule);
+    }
+
+    // Pré-remplit les 3 champs
+    const tIndispo = document.getElementById('joueur-etat-indispo');
+    const tBlessure = document.getElementById('joueur-etat-blessure');
+    const dSusp = document.getElementById('joueur-etat-suspension');
+    if (tIndispo)  tIndispo.value  = d.indisponibilite || '';
+    if (tBlessure) tBlessure.value = d.blessure_resume || '';
+    if (dSusp)     dSusp.value     = d.suspension_jusqu_au || '';
+
+    const submitBtn = document.getElementById('joueur-etat-submit');
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.onclick = submitModalEtat;
+    }
+
+    overlay.classList.add('show');
+  }
+
+  async function submitModalEtat() {
+    if (!currentEditPersonneId) return;
+    clearModalMessage('joueur-etat-msg');
+
+    const submitBtn = document.getElementById('joueur-etat-submit');
+    if (submitBtn) submitBtn.disabled = true;
+
+    try {
+      const tIndispo  = document.getElementById('joueur-etat-indispo');
+      const tBlessure = document.getElementById('joueur-etat-blessure');
+      const dSusp     = document.getElementById('joueur-etat-suspension');
+
+      const patch = {
+        indisponibilite:     tIndispo  ? tIndispo.value  : '',
+        blessure_resume:     tBlessure ? tBlessure.value : '',
+        suspension_jusqu_au: dSusp     ? dSusp.value     : ''
+      };
+
+      const res = await SupabaseHub.updateJoueurMetier(currentEditPersonneId, patch);
+      if (!res || !res.ok) {
+        showModalMessage('joueur-etat-msg', 'joueur-etat-body', 'error',
+          'Échec : ' + ((res && res.error) || 'erreur inconnue'));
+        if (submitBtn) submitBtn.disabled = false;
+        return;
+      }
+
+      showModalMessage('joueur-etat-msg', 'joueur-etat-body', 'success',
+        '✅ État métier mis à jour');
+
+      setTimeout(async () => {
+        document.getElementById('joueur-overlay-etat').classList.remove('show');
+        await reloadJoueurs();
+        await reopenFicheCurrent();
+      }, 700);
+
+    } catch (err) {
+      console.error('Joueurs: submitModalEtat()', err);
+      showModalMessage('joueur-etat-msg', 'joueur-etat-body', 'error',
+        'Erreur inattendue : ' + (err.message || err));
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // J5 — Modale Notes coach
+  // ----------------------------------------------------------------
+
+  function openModalNotes(d) {
+    const overlay = document.getElementById('joueur-overlay-notes');
+    if (!overlay) return;
+
+    clearModalMessage('joueur-notes-msg');
+
+    const infoEl = document.getElementById('joueur-notes-info');
+    if (infoEl) {
+      infoEl.innerHTML = '<span class="joueur-modal-info-strong">'
+        + esc(d.prenom) + ' ' + esc(d.nom) + '</span>'
+        + ' · Notes privées coach (non visibles par le joueur ni les parents)';
+    }
+
+    const ta = document.getElementById('joueur-notes-texte');
+    if (ta) ta.value = d.notes_coach || '';
+
+    const submitBtn = document.getElementById('joueur-notes-submit');
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.onclick = submitModalNotes;
+    }
+
+    overlay.classList.add('show');
+  }
+
+  async function submitModalNotes() {
+    if (!currentEditPersonneId) return;
+    clearModalMessage('joueur-notes-msg');
+
+    const submitBtn = document.getElementById('joueur-notes-submit');
+    if (submitBtn) submitBtn.disabled = true;
+
+    try {
+      const ta = document.getElementById('joueur-notes-texte');
+      const patch = {
+        notes_coach: ta ? ta.value : ''
+      };
+
+      const res = await SupabaseHub.updateJoueurMetier(currentEditPersonneId, patch);
+      if (!res || !res.ok) {
+        showModalMessage('joueur-notes-msg', 'joueur-notes-body', 'error',
+          'Échec : ' + ((res && res.error) || 'erreur inconnue'));
+        if (submitBtn) submitBtn.disabled = false;
+        return;
+      }
+
+      showModalMessage('joueur-notes-msg', 'joueur-notes-body', 'success',
+        '✅ Notes coach mises à jour');
+
+      setTimeout(async () => {
+        document.getElementById('joueur-overlay-notes').classList.remove('show');
+        await reloadJoueurs();
+        await reopenFicheCurrent();
+      }, 700);
+
+    } catch (err) {
+      console.error('Joueurs: submitModalNotes()', err);
+      showModalMessage('joueur-notes-msg', 'joueur-notes-body', 'error',
+        'Erreur inattendue : ' + (err.message || err));
+      if (submitBtn) submitBtn.disabled = false;
+    }
   }
 
   // ============================================================
@@ -848,7 +1226,7 @@ window.JoueursBrowser = (function () {
   // ============================================================
 
   async function init() {
-    console.log('Joueurs: init() — v1.0 (S2.2 + S2.3 lecture)');
+    console.log('Joueurs: init() — v1.1 (S2.2 + S2.3 + S2.4 édition)');
 
     // 1. Préfs + bindings UI
     loadPrefs();
@@ -895,7 +1273,7 @@ window.JoueursBrowser = (function () {
     _byId: () => JOUEURS_BY_ID,
     _postesById: () => POSTES_BY_ID,
     _aptitudesById: () => APTITUDES_BY_ID,
-    _version: 'v1.0'
+    _version: 'v1.1'
   };
 
 })();
