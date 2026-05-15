@@ -1314,9 +1314,10 @@
 
             '<label class="seance-field seance-field--full">' +
               '<span class="seance-field__label">Encadrants</span>' +
-              '<input type="text" id="seance-input-encadrants" class="seance-field__input" ' +
-                     'placeholder="Ex : Manu, Pierre, Loïc" ' +
-                     'maxlength="200" ' +
+              '<div id="seance-encadrants-tags" class="seance-encadrants-tags">' +
+                renderEncadrantsTags(s.encadrants_text || '') +
+              '</div>' +
+              '<input type="hidden" id="seance-input-encadrants" ' +
                      'value="' + escapeHtml(s.encadrants_text || '') + '">' +
             '</label>' +
 
