@@ -11,7 +11,7 @@
  *   - 5.5.A : éditeur méta + sauvegarde manuelle (CETTE VERSION)
  *   - 5.5.B : autosave 30s + dropdowns lieu/événement + champs secondaires
  *
- * Version : 1.3 — Phase 5.6.A (15 mai 2026)
+ * Version : 1.4 — Phase 5.6.B (15 mai 2026)
  *   v1.0 : squelette IIFE, sidebar liste séances, bouton "+ Nouvelle séance",
  *          formulaire 6 champs méta (date, heure, durée, effectif, thème,
  *          axe de travail), sauvegarde manuelle via updateSeance(), feedback
@@ -39,6 +39,19 @@
  *          11 types (fetched data/types-blocs.json). Création via
  *          addBlocToSeance() avec duree_min + intensite par défaut du type.
  *          Boutons d'actions ↑↓🗑 différés au palier 5.6.B.
+ *   v1.4 : Phase 5.6.B — trame chronologique (palier 2/2) + ergonomie.
+ *          (1) Actions par bloc : boutons ↑ (move-up), ↓ (move-down),
+ *          🗑 (remove). Move-up/down via reorderBlocs(seanceId, [ids dans
+ *          nouvel ordre]). Suppression via removeBloc(blocId) avec
+ *          confirm(). ↑ désactivé sur le 1er bloc, ↓ sur le dernier.
+ *          (2) Repli du formulaire méta en résumé compact après save
+ *          (arbitrage Manu 15 mai d'après screenshot Phase 5.6.A) : une
+ *          fois la séance enregistrée, le form se replie en 1 ligne
+ *          (📅 date · heure · durée · effectif · état) avec bouton
+ *          "✏️ Modifier" pour redéployer. État stocké dans
+ *          State.formCollapsed (default true si séance chargée avec
+ *          date_seance non null, sinon false pour rester ouvert sur
+ *          nouvelles séances vides). Donne toute la place à la trame.
  *
  * Dépendances :
  *   - window.SupabaseHub v1.8.2 (wrappers Phase 5.3 + listSitesActifs +
@@ -70,7 +83,8 @@
     autosaveStatus: 'idle', // 'idle' | 'saving' | 'error' (5.5.B2)
     blocs: [],              // blocs de la séance courante, triés par ordre (5.6.A)
     typesBlocsRef: null,    // référentiel des 11 types (data/types-blocs.json, 5.6.A)
-    picker: null            // état du popover "+ Ajouter un bloc" ({open: bool}, 5.6.A)
+    picker: null,           // état du popover "+ Ajouter un bloc" ({open: bool}, 5.6.A)
+    formCollapsed: false    // true : form méta replié en résumé compact (5.6.B)
   };
 
   // ============================================================
@@ -301,7 +315,80 @@
       '</div>';
   }
 
+  /**
+   * Dispatcher : choisit entre renderFormCollapsed (résumé compact) et
+   * renderFormExpanded (formulaire complet) selon State.formCollapsed.
+   * Phase 5.6.B.
+   */
   function renderForm() {
+    if (State.formCollapsed) {
+      renderFormCollapsed();
+    } else {
+      renderFormExpanded();
+    }
+  }
+
+  /**
+   * Rend le formulaire méta replié en 1 ligne (résumé compact).
+   * Affiché par défaut quand on ouvre une séance déjà documentée
+   * (date_seance non null). Bouton "✏️ Modifier" pour redéployer.
+   * Phase 5.6.B.
+   */
+  function renderFormCollapsed() {
+    const area = DOM.editorArea();
+    if (!area || !State.currentSeance) return;
+    const s = State.currentSeance;
+
+    // Construire le résumé : "📅 ven. 15 mai · 18:30 · 75 min · Effectif 23"
+    const parts = [];
+    if (s.date_seance) {
+      parts.push('📅 ' + formatDateShort(s.date_seance));
+    } else {
+      parts.push('📅 sans date');
+    }
+    if (s.heure_debut) {
+      parts.push(normalizeHeureForInput(s.heure_debut));
+    }
+    if (s.duree_totale_min) {
+      parts.push(s.duree_totale_min + ' min');
+    }
+    if (s.effectif_prevu) {
+      parts.push('Effectif ' + s.effectif_prevu);
+    }
+    if (s.theme_principal) {
+      parts.push('« ' + escapeHtml(s.theme_principal) + ' »');
+    }
+
+    area.innerHTML =
+      '<div class="seance-form-collapsed">' +
+        '<div class="seance-form-collapsed__left">' +
+          '<span class="seance-form-collapsed__summary">' + parts.join(' · ') + '</span>' +
+          '<span class="seance-form-collapsed__etat etat-' + escapeHtml(s.etat) + '">' + libelleEtatSeance(s.etat) + '</span>' +
+        '</div>' +
+        '<div class="seance-form-collapsed__right">' +
+          '<span id="seance-autosave-pill" class="seance-autosave-pill is-idle" title="Sauvegarde automatique (30s si modifications)">● Sauvé</span>' +
+          '<button type="button" id="seance-btn-expand-form" class="seance-form-collapsed__edit-btn" title="Modifier les méta de la séance">' +
+            '✏️ Modifier' +
+          '</button>' +
+        '</div>' +
+        '<div id="seance-feedback" class="seance-feedback"></div>' +
+      '</div>';
+
+    // Bind du bouton "✏️ Modifier"
+    const btn = document.getElementById('seance-btn-expand-form');
+    if (btn) {
+      btn.addEventListener('click', function () {
+        State.formCollapsed = false;
+        renderForm();
+        renderTrame(); // re-render pour rester en place
+      });
+    }
+
+    // Phase 5.6.A : rendu de la trame chronologique sous le résumé
+    renderTrame();
+  }
+
+  function renderFormExpanded() {
     const area = DOM.editorArea();
     if (!area || !State.currentSeance) return;
     const s = State.currentSeance;
@@ -551,13 +638,19 @@
           '<tbody>';
 
       let curHeure = heureDebut;
-      State.blocs.forEach(function (b) {
+      State.blocs.forEach(function (b, i) {
         const t = lookupTypeBloc(b.type_bloc);
         const emoji = (t && t.emoji) || '·';
         const libType = (t && t.libelle) || b.type_bloc;
         const titreCompl = b.titre_precision ? ' — ' + escapeHtml(b.titre_precision) : '';
         const heureCell = curHeure || '—';
         const heureFin = curHeure ? addMinutesToHeure(curHeure, b.duree_min) : '';
+
+        // Phase 5.6.B : actions ↑ ↓ 🗑
+        const isFirst = (i === 0);
+        const isLast  = (i === State.blocs.length - 1);
+        const disUp   = isFirst ? ' disabled' : '';
+        const disDown = isLast  ? ' disabled' : '';
 
         html +=
           '<tr class="seance-trame__row" data-bloc-id="' + escapeHtml(b.id) + '">' +
@@ -572,7 +665,9 @@
             '</td>' +
             '<td class="seance-trame__td-duree">' + b.duree_min + ' min</td>' +
             '<td class="seance-trame__td-actions">' +
-              '<span class="seance-trame__actions-placeholder" title="Réordonnancement et suppression en Phase 5.6.B">—</span>' +
+              '<button type="button" class="seance-trame__action-btn" data-action="up"     data-bloc-id="' + escapeHtml(b.id) + '" title="Monter d\'une place"' + disUp + '>↑</button>' +
+              '<button type="button" class="seance-trame__action-btn" data-action="down"   data-bloc-id="' + escapeHtml(b.id) + '" title="Descendre d\'une place"' + disDown + '>↓</button>' +
+              '<button type="button" class="seance-trame__action-btn seance-trame__action-btn--danger" data-action="remove" data-bloc-id="' + escapeHtml(b.id) + '" title="Supprimer ce bloc">🗑</button>' +
             '</td>' +
           '</tr>';
 
@@ -613,6 +708,19 @@
         togglePicker();
       });
     }
+
+    // Phase 5.6.B : bind des actions ↑ ↓ 🗑 sur chaque ligne
+    section.querySelectorAll('.seance-trame__action-btn').forEach(function (btnEl) {
+      btnEl.addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (btnEl.disabled) return;
+        const action = btnEl.getAttribute('data-action');
+        const blocId = btnEl.getAttribute('data-bloc-id');
+        if (action === 'up')     onMoveBlocUp(blocId);
+        if (action === 'down')   onMoveBlocDown(blocId);
+        if (action === 'remove') onRemoveBloc(blocId);
+      });
+    });
   }
 
   /**
@@ -740,6 +848,7 @@
     State.currentSeance = res.data;
     State.seances.unshift(res.data); // ajoute en tête de liste
     State.blocs = [];                 // nouvelle séance = 0 bloc (Phase 5.6.A)
+    State.formCollapsed = false;      // nouvelle séance = form déployé (Phase 5.6.B)
     setDirty(false);                  // séance fraîche = pas de modif
     renderSidebar();
     renderForm();
@@ -811,10 +920,18 @@
     setDirty(false);
     setAutosaveStatus('idle');
     renderSidebar();
-    // Phase 5.6.A : si heure_debut a changé, le calcul des horaires de la
-    // trame doit être rafraîchi. On relance renderTrame() de toute façon
-    // (idempotent, opération légère).
-    renderTrame();
+    // Phase 5.6.B : sur save MANUEL réussi, si la séance a au moins une
+    // date_seance, on replie le formulaire pour donner la place à la trame.
+    // En autosave (silent), on garde l'état actuel (intrusif sinon).
+    if (!silent && res.data.date_seance) {
+      State.formCollapsed = true;
+      renderForm();
+    } else {
+      // Phase 5.6.A : si heure_debut a changé, le calcul des horaires de la
+      // trame doit être rafraîchi. On relance renderTrame() de toute façon
+      // (idempotent, opération légère).
+      renderTrame();
+    }
     if (!silent) {
       showFeedback('Séance enregistrée.', 'success');
     }
@@ -885,6 +1002,8 @@
     setDirty(false);
     // Phase 5.6.A : charger les blocs de cette séance
     await loadBlocs();
+    // Phase 5.6.B : ouvrir en mode replié si la séance est déjà documentée
+    State.formCollapsed = !!target.date_seance;
     renderSidebar();
     renderForm();
     setAutosaveStatus('idle');
@@ -927,6 +1046,86 @@
 
     // Ajoute le nouveau bloc dans State.blocs (déjà trié par ordre côté DB)
     State.blocs.push(res.data);
+    renderTrame();
+  }
+
+  /**
+   * Échange 2 blocs dans State.blocs et persiste via reorderBlocs.
+   * Helper interne partagé par onMoveBlocUp / onMoveBlocDown.
+   * Phase 5.6.B.
+   */
+  async function swapBlocs(idxA, idxB) {
+    if (idxA < 0 || idxB < 0) return;
+    if (idxA >= State.blocs.length || idxB >= State.blocs.length) return;
+
+    // Échange optimiste en mémoire pour render immédiat
+    const tmp = State.blocs[idxA];
+    State.blocs[idxA] = State.blocs[idxB];
+    State.blocs[idxB] = tmp;
+    renderTrame();
+
+    // Persistance : envoie la nouvelle séquence d'IDs
+    const ids = State.blocs.map(function (b) { return b.id; });
+    const res = await SupabaseHub.reorderBlocs(State.currentSeance.id, ids);
+    if (!res.ok) {
+      console.error('SeanceEditor: swapBlocs() KO', res.error);
+      alert('Erreur réordonnancement : ' + res.error + '\n\nRechargement de la séance…');
+      // Rollback : recharge depuis la DB pour resynchroniser
+      await loadBlocs();
+      renderTrame();
+      return;
+    }
+    // Met à jour les valeurs 'ordre' locales pour cohérence (1-indexé)
+    State.blocs.forEach(function (b, i) { b.ordre = i + 1; });
+  }
+
+  /**
+   * Monte un bloc d'une place dans la trame.
+   * Phase 5.6.B.
+   */
+  async function onMoveBlocUp(blocId) {
+    const idx = State.blocs.findIndex(function (b) { return b.id === blocId; });
+    if (idx <= 0) return; // 1er bloc ou introuvable
+    await swapBlocs(idx, idx - 1);
+  }
+
+  /**
+   * Descend un bloc d'une place dans la trame.
+   * Phase 5.6.B.
+   */
+  async function onMoveBlocDown(blocId) {
+    const idx = State.blocs.findIndex(function (b) { return b.id === blocId; });
+    if (idx < 0 || idx >= State.blocs.length - 1) return; // introuvable ou dernier
+    await swapBlocs(idx, idx + 1);
+  }
+
+  /**
+   * Supprime un bloc de la trame après confirmation.
+   * Phase 5.6.B.
+   */
+  async function onRemoveBloc(blocId) {
+    const bloc = State.blocs.find(function (b) { return b.id === blocId; });
+    if (!bloc) return;
+    const typeDef = lookupTypeBloc(bloc.type_bloc);
+    const libType = (typeDef && typeDef.libelle) || bloc.type_bloc;
+    const titre = bloc.titre_precision ? ' « ' + bloc.titre_precision + ' »' : '';
+    const ok = window.confirm(
+      'Supprimer le bloc ' + libType + titre + ' (' + bloc.duree_min + ' min) ?\n\n' +
+      'Cette action est définitive.'
+    );
+    if (!ok) return;
+
+    const res = await SupabaseHub.removeBloc(blocId);
+    if (!res.ok) {
+      console.error('SeanceEditor: onRemoveBloc() KO', res.error);
+      alert('Erreur suppression : ' + res.error);
+      return;
+    }
+
+    // Retire le bloc de State.blocs sans toucher aux autres ordres
+    // (les ordres restent valides : il y a juste un trou, ce qui est OK
+    // pour un ORDER BY ordre côté DB)
+    State.blocs = State.blocs.filter(function (b) { return b.id !== blocId; });
     renderTrame();
   }
 
@@ -1021,7 +1220,7 @@
     });
 
     console.log(
-      '%c🏉 Seance Editor v1.3 (Phase 5.6.A) chargé',
+      '%c🏉 Seance Editor v1.4 (Phase 5.6.B) chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         seances: State.seances.length,
