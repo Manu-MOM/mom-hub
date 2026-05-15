@@ -338,6 +338,356 @@
     text-align: center;
     letter-spacing: 0.10em;
   }
+
+  /* =====================================================
+   * ========== S2.2 — CARTES ÉVÉNEMENTS ================
+   * ===================================================== */
+
+  /* Section (Passés / À venir) */
+  .evt-section {
+    margin-bottom: 20px;
+  }
+  .evt-section-titre {
+    font-family: 'Oswald', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    color: var(--vert-prairie);
+    text-transform: uppercase;
+    padding: 8px 0 12px 0;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 10px;
+  }
+
+  /* Titre de mois */
+  .evt-mois-titre {
+    font-family: 'Oswald', sans-serif;
+    font-size: 10px;
+    letter-spacing: 0.20em;
+    color: var(--ink-mute);
+    text-transform: uppercase;
+    margin: 16px 0 6px 0;
+    padding-left: 4px;
+  }
+
+  /* CARTE événement */
+  .evt-card {
+    display: flex;
+    background: var(--paper-warm);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    margin-bottom: 6px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.12s;
+    position: relative;
+  }
+  .evt-card:hover {
+    background: var(--paper);
+    border-color: var(--vert-pelouse);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px var(--shadow);
+  }
+
+  /* Bande verticale colorée à gauche (selon type_competition) */
+  .evt-card-stripe {
+    width: 5px;
+    flex-shrink: 0;
+    background: var(--ink-mute);   /* fallback gris si aucune compet */
+  }
+  /* Couleurs par type_competition (cohérent .evt-chip.compet-*) */
+  .evt-card.compet-champ-p1  .evt-card-stripe { background: #6b3fa0; }
+  .evt-card.compet-champ-p2  .evt-card-stripe { background: #2e63a8; }
+  .evt-card.compet-vie       .evt-card-stripe { background: #c93a8a; }
+  .evt-card.compet-fed       .evt-card-stripe { background: #1f9e9e; }
+  .evt-card.compet-tournoi   .evt-card-stripe { background: #cf6a1a; }
+  .evt-card.compet-amical    .evt-card-stripe { background: #8a5a3a; }
+  .evt-card.compet-seven     .evt-card-stripe { background: #d4a93a; }
+
+  /* Corps de carte */
+  .evt-card-body {
+    flex: 1;
+    padding: 10px 14px;
+  }
+  .evt-card-line1 {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  /* Chevron tournoi déployable */
+  .evt-card-chevron {
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    width: 22px;
+    height: 22px;
+    cursor: pointer;
+    font-size: 10px;
+    color: var(--ink-mute);
+    padding: 0;
+    flex-shrink: 0;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 2px;
+  }
+  .evt-card-chevron:hover {
+    background: var(--paper-deep);
+    color: var(--vert-prairie);
+    border-color: var(--vert-pelouse);
+  }
+
+  /* Icône type */
+  .evt-card-type-icon {
+    width: 22px;
+    height: 22px;
+    color: var(--vert-prairie);
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .evt-card-type-icon svg { width: 100%; height: 100%; }
+
+  /* Titre + sous-titre */
+  .evt-card-titre {
+    flex: 1;
+    min-width: 0;
+  }
+  .evt-card-meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    color: var(--ink-mute);
+    text-transform: uppercase;
+    margin-bottom: 3px;
+  }
+  .evt-card-jours {
+    background: var(--paper-deep);
+    color: var(--vert-prairie);
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-weight: 600;
+  }
+  .evt-card-libelle {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+    line-height: 1.25;
+    margin-bottom: 2px;
+    word-break: break-word;
+  }
+  .evt-card-secondaire {
+    font-size: 11px;
+    color: var(--ink-soft);
+    line-height: 1.25;
+  }
+
+  /* Badge statut compo (droite) */
+  .evt-card-badge {
+    flex-shrink: 0;
+    align-self: center;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .evt-badge-neutral {
+    background: var(--paper-deep);
+    color: var(--ink-mute);
+    border: 1px solid var(--line);
+  }
+  .evt-badge-brouillon {
+    background: rgba(212, 169, 58, 0.15);
+    color: #8a6a1a;
+    border: 1px solid rgba(212, 169, 58, 0.3);
+  }
+  .evt-badge-validee {
+    background: rgba(45, 125, 70, 0.12);
+    color: var(--vert-prairie);
+    border: 1px solid rgba(45, 125, 70, 0.3);
+  }
+  .evt-badge-utilisee {
+    background: rgba(46, 99, 168, 0.12);
+    color: #2e63a8;
+    border: 1px solid rgba(46, 99, 168, 0.3);
+  }
+  .evt-badge-annule {
+    background: rgba(200, 137, 106, 0.15);
+    color: #8b3a1a;
+    border: 1px solid var(--clay, #c8896a);
+  }
+  .evt-badge-sm {
+    font-size: 8px;
+    padding: 2px 6px;
+  }
+
+  /* Carte passée : opacité réduite */
+  .evt-card-passe {
+    opacity: 0.78;
+  }
+  .evt-card-passe:hover {
+    opacity: 1;
+  }
+  /* Carte annulée : libellé barré */
+  .evt-card-annule .evt-card-libelle {
+    text-decoration: line-through;
+    color: var(--ink-mute);
+  }
+  /* Highlight au scroll-to (mini-cal click) */
+  .evt-card-highlight {
+    animation: evt-flash 1.4s ease-out;
+  }
+  @keyframes evt-flash {
+    0%   { box-shadow: 0 0 0 0 rgba(45, 125, 70, 0.4); }
+    50%  { box-shadow: 0 0 0 6px rgba(45, 125, 70, 0.18); }
+    100% { box-shadow: 0 0 0 0 rgba(45, 125, 70, 0); }
+  }
+
+  /* ========== Déploiement inline tournoi ========== */
+  .evt-tournoi-enfants {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    padding: 10px 14px 12px 24px;
+    margin-top: -6px;
+    margin-bottom: 8px;
+    margin-left: 5px;   /* aligné avec le stripe parent */
+  }
+  .evt-phase-titre {
+    font-family: 'Oswald', sans-serif;
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    color: var(--vert-prairie);
+    text-transform: uppercase;
+    margin: 8px 0 4px 0;
+    padding-bottom: 2px;
+    border-bottom: 1px dashed var(--line);
+  }
+  .evt-phase-titre:first-child {
+    margin-top: 0;
+  }
+  .evt-enfant-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 5px 0;
+    font-size: 12px;
+    color: var(--ink);
+    border-bottom: 1px solid var(--paper-warm);
+  }
+  .evt-enfant-row:last-of-type {
+    border-bottom: none;
+  }
+  .evt-enfant-heure {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    min-width: 44px;
+    flex-shrink: 0;
+  }
+  .evt-enfant-libelle {
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+  .evt-enfant-adversaire {
+    flex: 1;
+    color: var(--ink-soft);
+  }
+  .evt-tournoi-add-match {
+    margin-top: 10px;
+    background: var(--paper-warm);
+    color: var(--vert-prairie);
+    border: 1px dashed var(--vert-pelouse);
+    border-radius: 4px;
+    padding: 5px 12px;
+    font-size: 11px;
+    font-family: inherit;
+    cursor: pointer;
+    width: 100%;
+    transition: all 0.12s;
+  }
+  .evt-tournoi-add-match:hover {
+    background: var(--paper-deep);
+    border-style: solid;
+  }
+
+  /* =====================================================
+   * ========== S2.2 — MINI-CALENDRIER ==================
+   * ===================================================== */
+
+  .evt-mini-month {
+    margin-bottom: 16px;
+  }
+  .evt-mini-month-title {
+    font-family: 'Oswald', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    color: var(--ink);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    text-align: center;
+  }
+  .evt-mini-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+  }
+  .evt-mini-wday {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    color: var(--ink-mute);
+    text-align: center;
+    padding: 3px 0;
+    letter-spacing: 0.05em;
+  }
+  .evt-mini-day {
+    font-size: 11px;
+    color: var(--ink);
+    text-align: center;
+    padding: 4px 0;
+    border-radius: 3px;
+    cursor: default;
+    position: relative;
+    background: transparent;
+    min-height: 22px;
+  }
+  .evt-mini-day-empty {
+    cursor: default;
+  }
+  .evt-mini-day.has-events {
+    cursor: pointer;
+    color: var(--vert-prairie);
+    font-weight: 600;
+  }
+  .evt-mini-day.has-events:hover {
+    background: var(--paper-deep);
+  }
+  .evt-mini-day.is-today {
+    background: var(--vert-prairie);
+    color: var(--paper);
+    font-weight: 700;
+  }
+  .evt-mini-day.is-today.has-events {
+    background: var(--vert-prairie);
+    color: var(--paper);
+  }
+  .evt-mini-dot {
+    position: absolute;
+    bottom: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--vert-prairie);
+  }
+  .evt-mini-day.is-today .evt-mini-dot {
+    background: var(--paper);
+  }
 </style>
 </head>
 <body class="fullscreen-app">
@@ -466,8 +816,8 @@
     <aside class="evt-side-col">
       <div class="evt-sb-card">
         <div class="evt-sb-title">📅 Calendrier</div>
-        <div class="evt-sb-placeholder">
-          Mini-calendrier<br>(S2.2)
+        <div id="evt-mini-cal">
+          <div class="evt-sb-placeholder">Chargement…</div>
         </div>
       </div>
       <div class="evt-sb-card">
