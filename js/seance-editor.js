@@ -11,16 +11,20 @@
  *   - 5.5.A : éditeur méta + sauvegarde manuelle (CETTE VERSION)
  *   - 5.5.B : autosave 30s + dropdowns lieu/événement + champs secondaires
  *
- * Version : 1.0 — Phase 5.5.A (14 mai 2026)
+ * Version : 1.1 — Phase 5.5.B1 (15 mai 2026)
  *   v1.0 : squelette IIFE, sidebar liste séances, bouton "+ Nouvelle séance",
  *          formulaire 6 champs méta (date, heure, durée, effectif, thème,
  *          axe de travail), sauvegarde manuelle via updateSeance(), feedback
  *          success/error. Sans autosave (Phase 5.5.B), sans lieu_id ni
  *          evenement_id (différés Phase 5.5.B après vérif schéma sites).
+ *   v1.1 : Phase 5.5.B1 — ajout des 5 champs secondaires (meteo_text,
+ *          encadrants_text, objectifs_text, bloc_cycle, materiel_global_text)
+ *          + 2 dropdowns (lieu_id via listSitesActifs, evenement_id via
+ *          getEvenementsAVenir). Toujours sauvegarde manuelle (autosave 30s
+ *          et clic sidebar différés en Phase 5.5.B2).
  *
  * Dépendances :
- *   - window.SupabaseHub v1.8 (wrappers Phase 5.3 : listSeancesByEquipe,
- *     createSeance, updateSeance)
+ *   - window.SupabaseHub v1.8.1 (wrappers Phase 5.3 + listSitesActifs)
  *   - DOM : #seance-sidebar-body, #btn-nouvelle-seance, #seance-editor-area,
  *     #btn-nouvelle-seance-cta (placeholder existants de seance.html v1)
  */
@@ -39,7 +43,9 @@
   const State = {
     seances: [],            // liste pour la sidebar
     currentSeance: null,    // séance en cours d'édition (objet complet)
-    isDirty: false          // true si modif non sauvée
+    isDirty: false,         // true si modif non sauvée
+    sites: [],              // cache pour dropdown lieu_id (5.5.B1)
+    evenements: []          // cache pour dropdown evenement_id (5.5.B1)
   };
 
   // ============================================================
@@ -52,12 +58,20 @@
     editorArea:    () => document.getElementById('seance-editor-area'),
     ctaCenter:     () => document.getElementById('btn-nouvelle-seance-cta'),
     // Champs du formulaire (n'existent que si renderForm() a été appelé)
-    inputDate:     () => document.getElementById('seance-input-date'),
-    inputHeure:    () => document.getElementById('seance-input-heure'),
-    inputDuree:    () => document.getElementById('seance-input-duree'),
-    inputEffectif: () => document.getElementById('seance-input-effectif'),
-    inputTheme:    () => document.getElementById('seance-input-theme'),
-    inputAxe:      () => document.getElementById('seance-input-axe'),
+    inputDate:        () => document.getElementById('seance-input-date'),
+    inputHeure:       () => document.getElementById('seance-input-heure'),
+    inputDuree:       () => document.getElementById('seance-input-duree'),
+    inputEffectif:    () => document.getElementById('seance-input-effectif'),
+    inputTheme:       () => document.getElementById('seance-input-theme'),
+    inputAxe:         () => document.getElementById('seance-input-axe'),
+    // Phase 5.5.B1 : 2 dropdowns + 5 champs secondaires
+    selectLieu:       () => document.getElementById('seance-select-lieu'),
+    selectEvenement:  () => document.getElementById('seance-select-evenement'),
+    inputMeteo:       () => document.getElementById('seance-input-meteo'),
+    inputEncadrants:  () => document.getElementById('seance-input-encadrants'),
+    inputObjectifs:   () => document.getElementById('seance-input-objectifs'),
+    inputCycle:       () => document.getElementById('seance-input-cycle'),
+    inputMateriel:    () => document.getElementById('seance-input-materiel'),
     btnSave:       () => document.getElementById('seance-btn-save'),
     feedback:      () => document.getElementById('seance-feedback')
   };
@@ -94,6 +108,25 @@
   function normalizeHeureForInput(heureSql) {
     if (!heureSql) return '';
     return String(heureSql).substring(0, 5);
+  }
+
+  function libelleSite(site) {
+    if (!site) return '';
+    // Préférence : libelle, sinon libelle_court, sinon code
+    const base = site.libelle || site.libelle_court || site.code || '(sans nom)';
+    return site.ville ? base + ' — ' + site.ville : base;
+  }
+
+  function libelleEvenement(evt) {
+    if (!evt) return '';
+    const date = evt.date_debut ? formatDateShort(evt.date_debut) : '';
+    let nom;
+    if (evt.adversaire_nom) {
+      nom = 'vs ' + evt.adversaire_nom;
+    } else {
+      nom = evt.libelle || evt.code || 'Événement';
+    }
+    return date ? (date + ' · ' + nom) : nom;
   }
 
   function showFeedback(msg, type) {
@@ -184,13 +217,33 @@
     if (!area || !State.currentSeance) return;
     const s = State.currentSeance;
 
+    // Options des dropdowns
+    const lieuOptions = ['<option value="">— Aucun lieu —</option>']
+      .concat(State.sites.map(function (site) {
+        const selected = (site.id === s.lieu_id) ? ' selected' : '';
+        return '<option value="' + escapeHtml(site.id) + '"' + selected + '>' +
+                 escapeHtml(libelleSite(site)) +
+               '</option>';
+      })).join('');
+
+    const evtOptions = ['<option value="">— Aucun événement —</option>']
+      .concat(State.evenements.map(function (evt) {
+        const selected = (evt.id === s.evenement_id) ? ' selected' : '';
+        return '<option value="' + escapeHtml(evt.id) + '"' + selected + '>' +
+                 escapeHtml(libelleEvenement(evt)) +
+               '</option>';
+      })).join('');
+
     area.innerHTML =
       '<form class="seance-form" id="seance-form" autocomplete="off" onsubmit="return false;">' +
+
+        // ----- Header -----
         '<header class="seance-form__header">' +
           '<h3 class="seance-form__title">Méta de la séance</h3>' +
           '<span class="seance-form__etat etat-' + escapeHtml(s.etat) + '">' + libelleEtatSeance(s.etat) + '</span>' +
         '</header>' +
 
+        // ----- Section 1 : essentielle (date/heure/durée/effectif/thème/axe) -----
         '<div class="seance-form__grid">' +
 
           '<label class="seance-field">' +
@@ -238,12 +291,78 @@
 
         '</div>' +
 
+        // ----- Section 2 : contexte (Phase 5.5.B1) -----
+        '<details class="seance-form__details" open>' +
+          '<summary class="seance-form__details-summary">Contexte (lieu, événement, encadrants…)</summary>' +
+
+          '<div class="seance-form__grid">' +
+
+            '<label class="seance-field">' +
+              '<span class="seance-field__label">Lieu</span>' +
+              '<select id="seance-select-lieu" class="seance-field__input">' +
+                lieuOptions +
+              '</select>' +
+            '</label>' +
+
+            '<label class="seance-field">' +
+              '<span class="seance-field__label">Événement rattaché</span>' +
+              '<select id="seance-select-evenement" class="seance-field__input">' +
+                evtOptions +
+              '</select>' +
+            '</label>' +
+
+            '<label class="seance-field">' +
+              '<span class="seance-field__label">Météo prévue</span>' +
+              '<input type="text" id="seance-input-meteo" class="seance-field__input" ' +
+                     'placeholder="Ex : pluie fine, 12°C…" ' +
+                     'maxlength="120" ' +
+                     'value="' + escapeHtml(s.meteo_text || '') + '">' +
+            '</label>' +
+
+            '<label class="seance-field">' +
+              '<span class="seance-field__label">Cycle / Période</span>' +
+              '<input type="text" id="seance-input-cycle" class="seance-field__input" ' +
+                     'placeholder="Ex : Cycle défense (sem. 3/6)" ' +
+                     'maxlength="120" ' +
+                     'value="' + escapeHtml(s.bloc_cycle || '') + '">' +
+            '</label>' +
+
+            '<label class="seance-field seance-field--full">' +
+              '<span class="seance-field__label">Encadrants</span>' +
+              '<input type="text" id="seance-input-encadrants" class="seance-field__input" ' +
+                     'placeholder="Ex : Manu, Pierre, Loïc" ' +
+                     'maxlength="200" ' +
+                     'value="' + escapeHtml(s.encadrants_text || '') + '">' +
+            '</label>' +
+
+            '<label class="seance-field seance-field--full">' +
+              '<span class="seance-field__label">Objectifs détaillés</span>' +
+              '<textarea id="seance-input-objectifs" class="seance-field__input seance-field__textarea" ' +
+                        'rows="3" maxlength="1000" ' +
+                        'placeholder="Une ou plusieurs lignes détaillant les objectifs visés…">' +
+                escapeHtml(s.objectifs_text || '') +
+              '</textarea>' +
+            '</label>' +
+
+            '<label class="seance-field seance-field--full">' +
+              '<span class="seance-field__label">Matériel global</span>' +
+              '<textarea id="seance-input-materiel" class="seance-field__input seance-field__textarea" ' +
+                        'rows="2" maxlength="500" ' +
+                        'placeholder="Ex : 20 plots, 6 boucliers, 4 ballons…">' +
+                escapeHtml(s.materiel_global_text || '') +
+              '</textarea>' +
+            '</label>' +
+
+          '</div>' +
+        '</details>' +
+
+        // ----- Footer -----
         '<div class="seance-form__footer">' +
           '<button type="button" id="seance-btn-save" class="seance-form__save-btn">' +
             '✓ Enregistré' +
           '</button>' +
           '<span class="seance-form__hint">' +
-            'Phase 5.5.A · Sauvegarde manuelle (autosave 30s prévu en Phase 5.5.B)' +
+            'Phase 5.5.B1 · Sauvegarde manuelle (autosave 30s prévu en Phase 5.5.B2)' +
           '</span>' +
         '</div>' +
 
@@ -251,8 +370,12 @@
 
       '</form>';
 
-    // Bind change → setDirty(true)
-    const fields = ['inputDate','inputHeure','inputDuree','inputEffectif','inputTheme','inputAxe'];
+    // Bind change → setDirty(true) sur tous les champs
+    const fields = [
+      'inputDate','inputHeure','inputDuree','inputEffectif','inputTheme','inputAxe',
+      'selectLieu','selectEvenement',
+      'inputMeteo','inputEncadrants','inputObjectifs','inputCycle','inputMateriel'
+    ];
     fields.forEach(function (key) {
       const el = DOM[key]();
       if (el) {
@@ -323,7 +446,15 @@
       duree_totale_min:     parseInt((DOM.inputDuree() && DOM.inputDuree().value) || DUREE_DEFAULT_MIN, 10),
       effectif_prevu:       parseInt((DOM.inputEffectif() && DOM.inputEffectif().value) || '0', 10) || null,
       theme_principal:      (DOM.inputTheme()    && DOM.inputTheme().value.trim())    || null,
-      axe_travail_general:  (DOM.inputAxe()      && DOM.inputAxe().value.trim())      || null
+      axe_travail_general:  (DOM.inputAxe()      && DOM.inputAxe().value.trim())      || null,
+      // Phase 5.5.B1 — 7 champs supplémentaires
+      lieu_id:              (DOM.selectLieu()       && DOM.selectLieu().value)       || null,
+      evenement_id:         (DOM.selectEvenement()  && DOM.selectEvenement().value)  || null,
+      meteo_text:           (DOM.inputMeteo()       && DOM.inputMeteo().value.trim())       || null,
+      encadrants_text:      (DOM.inputEncadrants()  && DOM.inputEncadrants().value.trim())  || null,
+      objectifs_text:       (DOM.inputObjectifs()   && DOM.inputObjectifs().value.trim())   || null,
+      bloc_cycle:           (DOM.inputCycle()       && DOM.inputCycle().value.trim())       || null,
+      materiel_global_text: (DOM.inputMateriel()    && DOM.inputMateriel().value.trim())    || null
     };
 
     const res = await SupabaseHub.updateSeance(State.currentSeance.id, patch);
@@ -358,12 +489,28 @@
     });
   }
 
+  async function loadSites() {
+    State.sites = await SupabaseHub.listSitesActifs();
+  }
+
+  async function loadEvenements() {
+    // Fenêtre de 60 jours par défaut, élargie à l'usage : on couvre la
+    // prochaine demi-saison sans submerger le dropdown.
+    State.evenements = await SupabaseHub.getEvenementsAVenir(M14_TEAM_UUID, 60);
+  }
+
   // ============================================================
   // 8. INIT
   // ============================================================
 
   async function init() {
-    await loadSeances();
+    // Chargements parallèles : séances pour la sidebar, sites et événements
+    // pour les dropdowns du formulaire
+    await Promise.all([
+      loadSeances(),
+      loadSites(),
+      loadEvenements()
+    ]);
 
     renderSidebar();
     renderEmptyEditor();
@@ -391,9 +538,13 @@
     });
 
     console.log(
-      '%c🏉 Seance Editor v1.0 (Phase 5.5.A) chargé',
+      '%c🏉 Seance Editor v1.1 (Phase 5.5.B1) chargé',
       'color: #2D7D46; font-weight: bold;',
-      { seances: State.seances.length }
+      {
+        seances: State.seances.length,
+        sites: State.sites.length,
+        evenements: State.evenements.length
+      }
     );
   }
 
@@ -404,7 +555,9 @@
   window.SeanceEditor = {
     init: init,
     state: State,
-    loadSeances: loadSeances
+    loadSeances: loadSeances,
+    loadSites: loadSites,
+    loadEvenements: loadEvenements
   };
 
 })();
