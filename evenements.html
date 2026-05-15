@@ -1009,6 +1009,128 @@
       max-width: 100%;
     }
   }
+
+  /* =====================================================
+   * ========== S2.4 — FORMULAIRES MODALES ==============
+   * ===================================================== */
+
+  .evt-modal-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .evt-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .evt-form-group-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .evt-form-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+  }
+  .evt-form-label.required::after {
+    content: ' *';
+    color: var(--clay, #c8896a);
+  }
+  .evt-form-input,
+  .evt-form-select,
+  .evt-form-textarea {
+    width: 100%;
+    padding: 7px 11px;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    background: var(--paper);
+    font-size: 13px;
+    color: var(--ink);
+    font-family: inherit;
+    box-sizing: border-box;
+  }
+  .evt-form-input:focus,
+  .evt-form-select:focus,
+  .evt-form-textarea:focus {
+    outline: none;
+    border-color: var(--vert-prairie);
+    background: var(--paper);
+  }
+  .evt-form-textarea {
+    min-height: 70px;
+    resize: vertical;
+    font-family: inherit;
+  }
+  .evt-form-radio-group {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 4px 10px;
+  }
+  .evt-form-radio-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 4px;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--ink);
+    border-radius: 4px;
+  }
+  .evt-form-radio-option:hover {
+    background: var(--paper-deep);
+  }
+  .evt-form-radio-option input[type=radio] {
+    margin: 0;
+    accent-color: var(--vert-prairie);
+  }
+  .evt-form-hint {
+    font-size: 10px;
+    color: var(--ink-mute);
+    font-style: italic;
+    margin-top: 2px;
+  }
+  .evt-form-error {
+    background: rgba(200, 137, 106, 0.12);
+    color: #8b3a1a;
+    border: 1px solid var(--clay, #c8896a);
+    border-radius: 5px;
+    padding: 8px 10px;
+    font-size: 12px;
+    margin-bottom: 8px;
+  }
+  .evt-form-success {
+    background: rgba(45, 125, 70, 0.10);
+    color: var(--vert-prairie);
+    border: 1px solid rgba(45, 125, 70, 0.3);
+    border-radius: 5px;
+    padding: 8px 10px;
+    font-size: 12px;
+    margin-bottom: 8px;
+  }
+  .evt-modal-info {
+    background: var(--paper-warm);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 10px 12px;
+    font-size: 12px;
+    color: var(--ink-soft);
+    line-height: 1.45;
+    margin-bottom: 12px;
+  }
+  .evt-modal-info-strong {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  /* Loading button */
+  .evt-btn[disabled] {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
 </style>
 </head>
 <body class="fullscreen-app">
@@ -1166,11 +1288,88 @@
   <div class="evt-modal">
     <div class="evt-modal-title" id="evt-create-title">Nouvel évènement</div>
     <div class="evt-modal-body">
-      <em>Modale Création — câblage en S2.4</em>
+      <div id="evt-create-msg"></div>
+      <form class="evt-modal-form" id="evt-create-form" onsubmit="return false;">
+
+        <div class="evt-form-group">
+          <label class="evt-form-label required">Type d'évènement</label>
+          <div class="evt-form-radio-group">
+            <label class="evt-form-radio-option"><input type="radio" name="type_evenement" value="entrainement" checked> Entraînement</label>
+            <label class="evt-form-radio-option"><input type="radio" name="type_evenement" value="match"> Match</label>
+            <label class="evt-form-radio-option"><input type="radio" name="type_evenement" value="tournoi"> Tournoi</label>
+            <label class="evt-form-radio-option"><input type="radio" name="type_evenement" value="stage"> Stage</label>
+            <label class="evt-form-radio-option"><input type="radio" name="type_evenement" value="journee_championnat"> Journée champ.</label>
+          </div>
+        </div>
+
+        <div class="evt-form-group">
+          <label class="evt-form-label required" for="evt-create-libelle">Libellé</label>
+          <input type="text" class="evt-form-input" id="evt-create-libelle" name="libelle" placeholder="Ex : Entraînement M14 du mercredi (28/05)" required>
+        </div>
+
+        <div class="evt-form-group-row">
+          <div class="evt-form-group">
+            <label class="evt-form-label required" for="evt-create-date-debut">Date début</label>
+            <input type="datetime-local" class="evt-form-input" id="evt-create-date-debut" name="date_debut" required>
+          </div>
+          <div class="evt-form-group" id="evt-create-date-fin-group">
+            <label class="evt-form-label" for="evt-create-date-fin">Date fin (opt.)</label>
+            <input type="datetime-local" class="evt-form-input" id="evt-create-date-fin" name="date_fin">
+          </div>
+        </div>
+
+        <div class="evt-form-group">
+          <label class="evt-form-label" for="evt-create-site">Site</label>
+          <select class="evt-form-select" id="evt-create-site" name="site_id">
+            <option value="">— Choisir un site —</option>
+          </select>
+          <div class="evt-form-hint">Laissez vide si le site n'est pas dans la liste MOM (ex : déplacement)</div>
+        </div>
+
+        <div class="evt-form-group" id="evt-create-compet-group">
+          <label class="evt-form-label" for="evt-create-compet">Type de compétition</label>
+          <select class="evt-form-select" id="evt-create-compet" name="type_competition">
+            <option value="">— Aucune —</option>
+            <option value="championnat">Championnat</option>
+            <option value="amical">Amical</option>
+            <option value="coupe">Coupe</option>
+            <option value="tournoi">Tournoi</option>
+          </select>
+        </div>
+
+        <div class="evt-form-group" id="evt-create-format-group">
+          <label class="evt-form-label" for="evt-create-format">Format de jeu</label>
+          <select class="evt-form-select" id="evt-create-format" name="format_de_jeu">
+            <option value="">— Choisir —</option>
+            <option value="XV">XV (15 vs 15)</option>
+            <option value="13">XIII</option>
+            <option value="X">X</option>
+            <option value="7">VII</option>
+            <option value="5">V</option>
+          </select>
+          <div class="evt-form-hint">Requis pour match et journée de championnat</div>
+        </div>
+
+        <div class="evt-form-group">
+          <label class="evt-form-label" for="evt-create-adversaire">Adversaire (opt.)</label>
+          <input type="text" class="evt-form-input" id="evt-create-adversaire" name="adversaire_nom" placeholder="Ex : Strasbourg AS">
+        </div>
+
+        <div class="evt-form-group">
+          <label class="evt-form-label" for="evt-create-domicile">Lieu</label>
+          <select class="evt-form-select" id="evt-create-domicile" name="domicile_exterieur">
+            <option value="">— Non renseigné —</option>
+            <option value="domicile">Domicile</option>
+            <option value="exterieur">Extérieur</option>
+            <option value="neutre">Neutre</option>
+          </select>
+        </div>
+
+      </form>
     </div>
     <div class="evt-modal-actions">
       <button type="button" class="evt-btn" data-action="close-create">Annuler</button>
-      <button type="button" class="evt-btn evt-btn-primary" disabled>Créer l'évènement</button>
+      <button type="button" class="evt-btn evt-btn-primary" id="evt-create-submit">Créer l'évènement</button>
     </div>
   </div>
 </div>
@@ -1180,11 +1379,21 @@
   <div class="evt-modal">
     <div class="evt-modal-title" id="evt-cancel-title">Annuler cet évènement</div>
     <div class="evt-modal-body">
-      <em>Modale Annulation — câblage en S2.4</em>
+      <div id="evt-cancel-msg"></div>
+      <div class="evt-modal-info" id="evt-cancel-info">
+        <em>Chargement…</em>
+      </div>
+      <form class="evt-modal-form" id="evt-cancel-form" onsubmit="return false;">
+        <div class="evt-form-group">
+          <label class="evt-form-label" for="evt-cancel-motif">Motif de l'annulation</label>
+          <textarea class="evt-form-textarea" id="evt-cancel-motif" name="motif" placeholder="Ex : Intempéries — orage prévu" maxlength="500"></textarea>
+          <div class="evt-form-hint">⚠️ L'évènement reste consultable, vous pourrez le réactiver à tout moment.</div>
+        </div>
+      </form>
     </div>
     <div class="evt-modal-actions">
       <button type="button" class="evt-btn" data-action="close-cancel">Retour</button>
-      <button type="button" class="evt-btn evt-btn-danger" disabled>Annuler l'évènement</button>
+      <button type="button" class="evt-btn evt-btn-danger" id="evt-cancel-submit">Annuler l'évènement</button>
     </div>
   </div>
 </div>
@@ -1194,11 +1403,52 @@
   <div class="evt-modal">
     <div class="evt-modal-title" id="evt-addmatch-title">Ajouter un match au tournoi</div>
     <div class="evt-modal-body">
-      <em>Modale Ajout match — câblage en S2.4</em>
+      <div id="evt-addmatch-msg"></div>
+      <div class="evt-modal-info" id="evt-addmatch-info">
+        <em>Chargement…</em>
+      </div>
+      <form class="evt-modal-form" id="evt-addmatch-form" onsubmit="return false;">
+
+        <div class="evt-form-group">
+          <label class="evt-form-label" for="evt-addmatch-phase">Phase</label>
+          <input type="text" class="evt-form-input" id="evt-addmatch-phase" name="phase_libelle" placeholder="Ex : Poule de brassage" list="evt-addmatch-phases-datalist">
+          <datalist id="evt-addmatch-phases-datalist"></datalist>
+          <div class="evt-form-hint">Choisissez une phase existante ou tapez un nouveau libellé</div>
+        </div>
+
+        <div class="evt-form-group">
+          <label class="evt-form-label required" for="evt-addmatch-libelle">Libellé court</label>
+          <input type="text" class="evt-form-input" id="evt-addmatch-libelle" name="libelle" placeholder="Ex : vs équipe à déterminer" required>
+        </div>
+
+        <div class="evt-form-group">
+          <label class="evt-form-label required" for="evt-addmatch-heure">Heure de début</label>
+          <input type="time" class="evt-form-input" id="evt-addmatch-heure" name="heure" required>
+          <div class="evt-form-hint">La date du jour du tournoi sera utilisée</div>
+        </div>
+
+        <div class="evt-form-group">
+          <label class="evt-form-label" for="evt-addmatch-adversaire">Adversaire (opt.)</label>
+          <input type="text" class="evt-form-input" id="evt-addmatch-adversaire" name="adversaire_nom" placeholder="(laisser vide si tirage à venir)">
+        </div>
+
+        <div class="evt-form-group">
+          <label class="evt-form-label" for="evt-addmatch-format">Format de jeu (opt.)</label>
+          <select class="evt-form-select" id="evt-addmatch-format" name="format_de_jeu">
+            <option value="">— Hériter du tournoi —</option>
+            <option value="XV">XV</option>
+            <option value="13">XIII</option>
+            <option value="X">X</option>
+            <option value="7">VII</option>
+            <option value="5">V</option>
+          </select>
+        </div>
+
+      </form>
     </div>
     <div class="evt-modal-actions">
       <button type="button" class="evt-btn" data-action="close-addmatch">Annuler</button>
-      <button type="button" class="evt-btn evt-btn-primary" disabled>Ajouter le match</button>
+      <button type="button" class="evt-btn evt-btn-primary" id="evt-addmatch-submit">Ajouter le match</button>
     </div>
   </div>
 </div>
