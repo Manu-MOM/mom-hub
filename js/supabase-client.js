@@ -68,6 +68,19 @@
  *          notes_atelier, created_at). Sert au picker Bibliothèque
  *          côté éditeur de séance pour afficher les fiches déjà
  *          rattachées et permettre leur détachement par id.
+ *   v1.8.4 : Phase 5.10 — 2 wrappers Préparation séance.
+ *          (1) listBrouillonsVides(equipeId) : LECTURE des brouillons
+ *          sans date_seance ET sans bloc rattaché. Implémentation JS
+ *          (pas de RPC SQL pour rester simple) : SELECT brouillons
+ *          puis filtrage côté client via count de seances_blocs par
+ *          séance. Renvoie [{id, created_at}] des brouillons éligibles
+ *          à la suppression.
+ *          (2) deleteBrouillonsVides(seanceIds) : ÉCRITURE DELETE des
+ *          séances correspondantes (CASCADE supprimera les rares blocs
+ *          orphelins éventuels). Renvoie {ok, deleted_count}.
+ *          Résout la dette D-SEANCE-STUB-VIDES héritée de Phase 5.5
+ *          (le bouton "+ Nouvelle séance" crée un stub DB immédiatement,
+ *          laissant des brouillons vides en cas d'abandon).
  */
 
 (function (global) {
@@ -1101,6 +1114,81 @@
       return { ok: true, data };
     },
 
+    /**
+     * Liste les brouillons "vides" d'une équipe (Phase 5.10).
+     * Définition : etat='brouillon' ET date_seance IS NULL ET aucun bloc
+     * rattaché (count seances_blocs = 0). Implémentation JS en 2 passes
+     * (SELECT puis filtrage par count) pour éviter une RPC SQL dédiée.
+     *
+     * @param {string} equipeId UUID de l'équipe
+     * @returns {Promise<Array<{id:string, created_at:string}>>} brouillons
+     *          éligibles à la suppression (peut être vide)
+     */
+    async listBrouillonsVides(equipeId) {
+      if (!equipeId) {
+        console.error('MOM Hub: listBrouillonsVides() requiert un equipeId');
+        return [];
+      }
+      // Étape 1 : SELECT brouillons sans date_seance
+      const { data: brouillons, error: e1 } = await client
+        .from('seances')
+        .select('id, created_at')
+        .eq('equipe_id', equipeId)
+        .eq('etat', 'brouillon')
+        .eq('est_modele', false)
+        .is('date_seance', null);
+      if (e1) {
+        console.error('MOM Hub: listBrouillonsVides() étape 1', e1);
+        return [];
+      }
+      if (!brouillons || brouillons.length === 0) return [];
+
+      // Étape 2 : pour chaque brouillon, count des blocs ; garde ceux à 0
+      const vides = [];
+      for (const b of brouillons) {
+        const { count, error: e2 } = await client
+          .from('seances_blocs')
+          .select('id', { count: 'exact', head: true })
+          .eq('seance_id', b.id);
+        if (e2) {
+          console.error('MOM Hub: listBrouillonsVides() étape 2 sur', b.id, e2);
+          continue; // Skip ce brouillon mais continue les autres
+        }
+        if (count === 0) vides.push(b);
+      }
+      return vides;
+    },
+
+    /**
+     * Supprime physiquement plusieurs séances par leurs IDs (Phase 5.10).
+     * Le CASCADE FK ON DELETE supprimera les éventuels blocs orphelins
+     * (normalement aucun, puisqu'on n'appelle ça que sur des brouillons
+     * vides identifiés par listBrouillonsVides).
+     *
+     * @param {string[]} seanceIds Tableau d'UUIDs à supprimer
+     * @returns {Promise<{ok:boolean, deleted_count?:number, error?:string}>}
+     */
+    async deleteBrouillonsVides(seanceIds) {
+      if (!Array.isArray(seanceIds)) {
+        return { ok: false, error: 'seanceIds (tableau) requis' };
+      }
+      if (seanceIds.length === 0) {
+        return { ok: true, deleted_count: 0 };
+      }
+      // Garde-fou : on ne DELETE que des brouillons (double check côté serveur via .eq)
+      const { data, error } = await client
+        .from('seances')
+        .delete()
+        .in('id', seanceIds)
+        .eq('etat', 'brouillon')
+        .select('id');
+      if (error) {
+        console.error('MOM Hub: deleteBrouillonsVides()', error);
+        return { ok: false, error: error.message };
+      }
+      return { ok: true, deleted_count: Array.isArray(data) ? data.length : 0 };
+    },
+
     // ----------------------------------------------------------
     // ÉCRITURE — Blocs de séance
     // ----------------------------------------------------------
@@ -1426,7 +1514,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.8.3 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.8.4 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
