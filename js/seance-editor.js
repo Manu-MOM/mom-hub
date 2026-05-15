@@ -153,11 +153,32 @@
  *          Champs préservés en texte libre par doctrine : objectifs,
  *          titre_precision, encadrants, notes_bloc, notes_atelier.
  *
+ *          AJUSTEMENTS v1.9 BIS (15 mai 2026 fin d'après-midi, post retour usage) :
+ *          (1) Fix bug "Aucun champ modifiable dans ce patch" via 2
+ *          nouveaux wrappers validerSeance/repasserSeanceBrouillon
+ *          (supabase-client v1.8.5).
+ *          (2) Fix bug "compteur brouillons vides invisible jusqu'au
+ *          coche du toggle archivées" : onNouvelleSeance appelle
+ *          maintenant loadBrouillonsVides() avant renderSidebar().
+ *          (3) Suppression libre de séances (brouillons uniquement) :
+ *          - Bouton "🗑 Supprimer" dans le formulaire méta (déplié ET
+ *            résumé replié), visible UNIQUEMENT si etat='brouillon'.
+ *            Confirm() puis deleteSeance() wrapper v1.8.6, retour
+ *            écran vide + refresh sidebar.
+ *          - Mode "Sélectionner" en sidebar : bouton "✓ Sélectionner"
+ *            en header sidebar bascule en mode multi-sélection. Cases
+ *            à cocher apparaissent sur les BROUILLONS uniquement (les
+ *            validées/utilisées/archivées sont protégées, doctrine
+ *            "conserver l'historique"). Bouton "🗑 Supprimer N
+ *            séance(s)" en bas de sidebar quand au moins 1 cochée.
+ *            Bouton "✕ Annuler" pour sortir du mode sélection.
+ *
  * Dépendances :
- *   - window.SupabaseHub v1.8.5 (wrappers Phase 5.3 + listSitesActifs +
+ *   - window.SupabaseHub v1.8.6 (wrappers Phase 5.3 + listSitesActifs +
  *     listBlocsBySeance + updateBloc + listAteliersRattachesAuBloc +
  *     getVivierCompo + listBrouillonsVides + deleteBrouillonsVides +
- *     validerSeance + repasserSeanceBrouillon)
+ *     validerSeance + repasserSeanceBrouillon + deleteSeance +
+ *     deleteSeancesEnLot)
  *   - data/types-blocs.json v1.1 (fetched à l'init)
  *   - data/vocabulaire-seance.json v1.1 (fetched à l'init, Phase 5.7)
  *   - data/fiches-all.json (fetched à l'init, Phase 5.8)
@@ -211,7 +232,10 @@
     showArchivees: false,        // toggle "Afficher les archivées" dans sidebar header
     brouillonsVides: [],         // liste des brouillons vides éligibles à suppression (cache)
     // Phase 5.12 : propositions pour datalist + matériel
-    propositionsRef: null        // miroir data/propositions-seance.json
+    propositionsRef: null,        // miroir data/propositions-seance.json
+    // Phase 5.12 BIS : mode sélection multiple pour suppression en lot
+    selectionMode: false,         // bascule mode "Sélectionner" en sidebar
+    selectionIds: new Set()       // UUIDs des séances cochées dans la sidebar
   };
 
   // ============================================================
@@ -270,7 +294,13 @@
     btnValiderExpanded:    () => document.getElementById('seance-btn-valider-expanded'),
     btnValiderCollapsed:   () => document.getElementById('seance-btn-valider-collapsed'),
     btnBrouillonExpanded:  () => document.getElementById('seance-btn-brouillon-expanded'),
-    btnBrouillonCollapsed: () => document.getElementById('seance-btn-brouillon-collapsed')
+    btnBrouillonCollapsed: () => document.getElementById('seance-btn-brouillon-collapsed'),
+    // Phase 5.12 BIS : suppression libre + mode sélection
+    btnDeleteExpanded:    () => document.getElementById('seance-btn-delete-expanded'),
+    btnDeleteCollapsed:   () => document.getElementById('seance-btn-delete-collapsed'),
+    btnSidebarSelect:     () => document.getElementById('seance-btn-sidebar-select'),
+    btnSidebarSelectExit: () => document.getElementById('seance-btn-sidebar-select-exit'),
+    btnSidebarDelete:     () => document.getElementById('seance-btn-sidebar-delete')
   };
 
   // ============================================================
@@ -672,7 +702,7 @@
     const body = DOM.sidebarBody();
     if (!body) return;
 
-    // Phase 5.10 : header avec toggle "Afficher les archivées"
+    // Phase 5.10 + 5.12 BIS : header avec toggle + bouton "Sélectionner"
     const headerHtml =
       '<div class="seance-sidebar__filters">' +
         '<label class="seance-sidebar__toggle" title="Afficher aussi les séances archivées">' +
@@ -680,6 +710,17 @@
             (State.showArchivees ? ' checked' : '') + '>' +
           '<span>Afficher les archivées</span>' +
         '</label>' +
+        (State.selectionMode
+          ? '<button type="button" id="seance-btn-sidebar-select-exit" ' +
+                    'class="seance-sidebar__select-btn is-active" ' +
+                    'title="Quitter le mode sélection">' +
+              '✕ Annuler' +
+            '</button>'
+          : '<button type="button" id="seance-btn-sidebar-select" ' +
+                    'class="seance-sidebar__select-btn" ' +
+                    'title="Sélectionner plusieurs brouillons pour les supprimer">' +
+              '☑ Sélectionner' +
+            '</button>') +
       '</div>';
 
     // Liste des séances (ou placeholder si vide)
@@ -699,58 +740,125 @@
         const titre = s.axe_travail_general
           ? escapeHtml(s.axe_travail_general).substring(0, 60)
           : (s.theme_principal ? escapeHtml(s.theme_principal).substring(0, 60) : 'Séance sans thème');
+        // Phase 5.12 BIS : case à cocher si mode sélection ET séance brouillon
+        const peutEtreSupprimee = (s.etat === 'brouillon');
+        const estCochee = State.selectionIds.has(s.id);
+        const checkboxHtml = (State.selectionMode && peutEtreSupprimee)
+          ? '<input type="checkbox" class="seance-list-item__checkbox" ' +
+                   'data-seance-id="' + escapeHtml(s.id) + '"' +
+                   (estCochee ? ' checked' : '') + '>'
+          : '';
+        const isSelectionRowClass = (State.selectionMode && peutEtreSupprimee && estCochee)
+          ? ' is-selection-checked' : '';
+        const isProtectedClass = (State.selectionMode && !peutEtreSupprimee)
+          ? ' is-selection-protected' : '';
         return (
-          '<li class="seance-list-item' + (isSelected ? ' is-selected' : '') + '" ' +
+          '<li class="seance-list-item' + (isSelected ? ' is-selected' : '') +
+              isSelectionRowClass + isProtectedClass + '" ' +
               'data-seance-id="' + escapeHtml(s.id) + '" ' +
-              'title="Cliquer pour ouvrir cette séance">' +
-            '<div class="seance-list-item__head">' +
-              '<span class="seance-list-item__date">' + dateLib + (heureLib ? ' · ' + heureLib : '') + '</span>' +
-              '<span class="seance-list-item__etat etat-' + escapeHtml(s.etat) + '">' + etatLib + '</span>' +
+              (State.selectionMode
+                ? (peutEtreSupprimee
+                    ? 'title="Cocher pour ajouter à la sélection"'
+                    : 'title="Protégée : seuls les brouillons sont supprimables"')
+                : 'title="Cliquer pour ouvrir cette séance"') + '>' +
+            checkboxHtml +
+            '<div class="seance-list-item__main">' +
+              '<div class="seance-list-item__head">' +
+                '<span class="seance-list-item__date">' + dateLib + (heureLib ? ' · ' + heureLib : '') + '</span>' +
+                '<span class="seance-list-item__etat etat-' + escapeHtml(s.etat) + '">' + etatLib + '</span>' +
+              '</div>' +
+              '<div class="seance-list-item__title">' + titre + '</div>' +
             '</div>' +
-            '<div class="seance-list-item__title">' + titre + '</div>' +
           '</li>'
         );
       }).join('');
       listHtml = '<ul class="seance-list">' + items + '</ul>';
     }
 
-    // Phase 5.10 : footer nettoyage brouillons vides (visible si compteur > 0)
-    const nbVides = State.brouillonsVides ? State.brouillonsVides.length : 0;
-    let cleanupHtml = '';
-    if (nbVides > 0) {
-      cleanupHtml =
-        '<div id="seance-sidebar-cleanup" class="seance-sidebar__cleanup">' +
-          '<span class="seance-sidebar__cleanup-label">' +
-            '🗑 ' + nbVides + ' brouillon' + (nbVides > 1 ? 's' : '') + ' vide' + (nbVides > 1 ? 's' : '') +
-          '</span>' +
-          '<button type="button" id="seance-btn-cleanup" ' +
-                  'class="seance-sidebar__cleanup-btn" ' +
-                  'title="Supprime les brouillons sans date ni blocs">' +
-            '🧹 Nettoyer' +
-          '</button>' +
-        '</div>';
+    // Footer : 2 cas selon le mode
+    let footerHtml = '';
+    if (State.selectionMode) {
+      // Phase 5.12 BIS : footer mode sélection — bouton "Supprimer N séance(s)"
+      const nbCochees = State.selectionIds.size;
+      if (nbCochees > 0) {
+        footerHtml =
+          '<div id="seance-sidebar-cleanup" class="seance-sidebar__selection-actions">' +
+            '<span class="seance-sidebar__selection-label">' +
+              nbCochees + ' s\u00e9lectionn\u00e9' + (nbCochees > 1 ? 'es' : 'e') +
+            '</span>' +
+            '<button type="button" id="seance-btn-sidebar-delete" ' +
+                    'class="seance-sidebar__delete-btn" ' +
+                    'title="Supprimer définitivement les séances cochées">' +
+              '🗑 Supprimer' +
+            '</button>' +
+          '</div>';
+      } else {
+        footerHtml =
+          '<div class="seance-sidebar__selection-hint">' +
+            '💡 Coche les brouillons à supprimer' +
+          '</div>';
+      }
+    } else {
+      // Phase 5.10 : footer nettoyage brouillons vides (visible si compteur > 0)
+      const nbVides = State.brouillonsVides ? State.brouillonsVides.length : 0;
+      if (nbVides > 0) {
+        footerHtml =
+          '<div id="seance-sidebar-cleanup" class="seance-sidebar__cleanup">' +
+            '<span class="seance-sidebar__cleanup-label">' +
+              '🗑 ' + nbVides + ' brouillon' + (nbVides > 1 ? 's' : '') + ' vide' + (nbVides > 1 ? 's' : '') +
+            '</span>' +
+            '<button type="button" id="seance-btn-cleanup" ' +
+                    'class="seance-sidebar__cleanup-btn" ' +
+                    'title="Supprime les brouillons sans date ni blocs">' +
+              '🧹 Nettoyer' +
+            '</button>' +
+          '</div>';
+      }
     }
 
-    body.innerHTML = headerHtml + listHtml + cleanupHtml;
+    body.innerHTML = headerHtml + listHtml + footerHtml;
 
-    // Phase 5.5.B2 : câble le clic sur chaque item → recharge la séance
+    // ----- Binds -----
     const lis = body.querySelectorAll('.seance-list-item');
     lis.forEach(function (li) {
-      li.addEventListener('click', function () {
-        const id = li.getAttribute('data-seance-id');
-        onSelectSeance(id);
-      });
+      const id = li.getAttribute('data-seance-id');
+      if (State.selectionMode) {
+        // En mode sélection : clic toggle la checkbox (si protégée, ignore)
+        if (li.classList.contains('is-selection-protected')) return;
+        li.addEventListener('click', function (e) {
+          // Évite double-toggle si on a cliqué directement sur la checkbox
+          if (e.target.tagName === 'INPUT') return;
+          toggleSeanceSelection(id);
+        });
+      } else {
+        // Mode normal : clic ouvre la séance
+        li.addEventListener('click', function () { onSelectSeance(id); });
+      }
     });
 
-    // Phase 5.10 : câbles toggle et bouton nettoyage
+    // Binds des checkboxes (mode sélection)
+    if (State.selectionMode) {
+      body.querySelectorAll('.seance-list-item__checkbox').forEach(function (cb) {
+        cb.addEventListener('click', function (e) {
+          e.stopPropagation(); // évite que le clic remonte au li
+          toggleSeanceSelection(cb.getAttribute('data-seance-id'));
+        });
+      });
+    }
+
+    // Phase 5.10 : câbles toggle archivées et bouton nettoyage
     const toggle = DOM.toggleArchivees();
-    if (toggle) {
-      toggle.addEventListener('change', onToggleArchivees);
-    }
+    if (toggle) toggle.addEventListener('change', onToggleArchivees);
     const btnCleanup = DOM.btnCleanup();
-    if (btnCleanup) {
-      btnCleanup.addEventListener('click', onCleanupBrouillons);
-    }
+    if (btnCleanup) btnCleanup.addEventListener('click', onCleanupBrouillons);
+
+    // Phase 5.12 BIS : binds mode sélection
+    const btnSelect = DOM.btnSidebarSelect();
+    if (btnSelect) btnSelect.addEventListener('click', enterSelectionMode);
+    const btnSelectExit = DOM.btnSidebarSelectExit();
+    if (btnSelectExit) btnSelectExit.addEventListener('click', exitSelectionMode);
+    const btnSidebarDelete = DOM.btnSidebarDelete();
+    if (btnSidebarDelete) btnSidebarDelete.addEventListener('click', onDeleteSeancesEnLot);
   }
 
   // ============================================================
@@ -836,6 +944,14 @@
                 '↩ Brouillon' +
               '</button>'
             : '') +
+          // Phase 5.12 BIS : bouton 🗑 Supprimer dans le résumé replié
+          (s.etat === 'brouillon'
+            ? '<button type="button" id="seance-btn-delete-collapsed" ' +
+                      'class="seance-form__delete-btn" ' +
+                      'title="Supprimer définitivement ce brouillon">' +
+                '🗑 Supprimer' +
+              '</button>'
+            : '') +
           // Phase 5.10 : bouton Archiver dans le résumé replié
           '<button type="button" id="seance-btn-archive-collapsed" ' +
                   'class="seance-form__archive-btn" ' +
@@ -870,6 +986,10 @@
     if (btnValiderC) btnValiderC.addEventListener('click', onValiderSeance);
     const btnBrouillonC = DOM.btnBrouillonCollapsed();
     if (btnBrouillonC) btnBrouillonC.addEventListener('click', onRepasserBrouillon);
+
+    // Phase 5.12 BIS : bind bouton Supprimer en mode collapsed
+    const btnDeleteC = DOM.btnDeleteCollapsed();
+    if (btnDeleteC) btnDeleteC.addEventListener('click', onDeleteSeance);
 
     // Phase 5.6.A : rendu de la trame chronologique sous le résumé
     renderTrame();
@@ -919,6 +1039,14 @@
                         'class="seance-form__brouillon-btn" ' +
                         'title="Repasser cette séance en brouillon (réédition libre)">' +
                   '↩ Brouillon' +
+                '</button>'
+              : '') +
+            // Phase 5.12 BIS : bouton 🗑 Supprimer (uniquement si brouillon)
+            (s.etat === 'brouillon'
+              ? '<button type="button" id="seance-btn-delete-expanded" ' +
+                        'class="seance-form__delete-btn" ' +
+                        'title="Supprimer définitivement ce brouillon">' +
+                  '🗑 Supprimer' +
                 '</button>'
               : '') +
             // Phase 5.10 : bouton Archiver (désactivé si déjà archivée)
@@ -1106,6 +1234,10 @@
     if (btnValiderE) btnValiderE.addEventListener('click', onValiderSeance);
     const btnBrouillonE = DOM.btnBrouillonExpanded();
     if (btnBrouillonE) btnBrouillonE.addEventListener('click', onRepasserBrouillon);
+
+    // Phase 5.12 BIS : bind bouton Supprimer en mode expanded
+    const btnDeleteE = DOM.btnDeleteExpanded();
+    if (btnDeleteE) btnDeleteE.addEventListener('click', onDeleteSeance);
 
     // Phase 5.12 : bind picker à tags matériel global
     bindMaterielTags();
@@ -2713,6 +2845,145 @@
     showFeedback('Séance repassée en brouillon ✓', 'success');
   }
 
+  // ============================================================
+  // Phase 5.12 BIS — Suppression libre + mode sélection
+  // ============================================================
+
+  /**
+   * Supprime physiquement la séance courante (uniquement si brouillon).
+   * Garde-fou métier déjà côté wrapper supabase-client v1.8.6.
+   * Reset l'éditeur après suppression (retour à l'écran vide).
+   */
+  async function onDeleteSeance() {
+    if (!State.currentSeance) return;
+    if (State.currentSeance.etat !== 'brouillon') {
+      window.alert('Seuls les brouillons sont supprimables.\n\n' +
+                   'Si tu veux retirer cette séance, archive-la (📦) ou ' +
+                   'repasse-la en brouillon (↩) puis supprime.');
+      return;
+    }
+
+    const s = State.currentSeance;
+    const dateLib = s.date_seance ? formatDateShort(s.date_seance) : 'sans date';
+    const titreLib = s.axe_travail_general || s.theme_principal || 'sans thème';
+
+    const ok = window.confirm(
+      'Supprimer définitivement ce brouillon ?\n\n' +
+      '🗓  ' + dateLib + '\n' +
+      '📋 ' + titreLib + '\n\n' +
+      '⚠️ Cette action est IRRÉVERSIBLE. ' +
+      'Tous les blocs et rattachements de cette séance seront aussi supprimés.'
+    );
+    if (!ok) return;
+
+    const res = await SupabaseHub.deleteSeance(s.id);
+    if (!res.ok) {
+      window.alert('Échec de la suppression :\n' + (res.error || 'erreur inconnue'));
+      return;
+    }
+
+    // Reset complet de l'éditeur
+    State.currentSeance = null;
+    State.blocs = [];
+    State.currentBloc = null;
+    State.view = 'trame';
+    State.isDirty = false;
+    State.blocIsDirty = false;
+    stopAutosave();
+    stopBlocAutosave();
+
+    // Retire la séance de la liste mémoire
+    State.seances = State.seances.filter(function (x) { return x.id !== s.id; });
+
+    // Refresh sidebar + compteur brouillons vides
+    await loadBrouillonsVides();
+    renderSidebar();
+    renderEmptyEditor();
+    showFeedback('Brouillon supprimé ✓', 'success');
+  }
+
+  /**
+   * Supprime en lot toutes les séances cochées en sidebar (uniquement les
+   * brouillons par construction, le wrapper applique le garde-fou serveur).
+   */
+  async function onDeleteSeancesEnLot() {
+    if (State.selectionIds.size === 0) return;
+
+    const nb = State.selectionIds.size;
+    const ok = window.confirm(
+      'Supprimer ' + nb + ' brouillon' + (nb > 1 ? 's' : '') + ' ?\n\n' +
+      '⚠️ Cette action est IRRÉVERSIBLE. ' +
+      'Tous les blocs et rattachements liés seront aussi supprimés.'
+    );
+    if (!ok) return;
+
+    const ids = Array.from(State.selectionIds);
+    const res = await SupabaseHub.deleteSeancesEnLot(ids);
+    if (!res.ok) {
+      window.alert('Échec de la suppression en lot :\n' + (res.error || 'erreur inconnue'));
+      return;
+    }
+
+    // Si la séance courante est dans la liste supprimée, reset l'éditeur
+    if (State.currentSeance && ids.indexOf(State.currentSeance.id) !== -1) {
+      State.currentSeance = null;
+      State.blocs = [];
+      State.currentBloc = null;
+      State.view = 'trame';
+      State.isDirty = false;
+      State.blocIsDirty = false;
+      stopAutosave();
+      stopBlocAutosave();
+      renderEmptyEditor();
+    }
+
+    // Retire les séances supprimées de la liste mémoire
+    const idsSet = new Set(ids);
+    State.seances = State.seances.filter(function (s) { return !idsSet.has(s.id); });
+
+    // Sort du mode sélection + refresh sidebar
+    State.selectionMode = false;
+    State.selectionIds.clear();
+    await loadBrouillonsVides();
+    renderSidebar();
+
+    showFeedback(res.deleted_count + ' brouillon' + (res.deleted_count > 1 ? 's supprimés' : ' supprimé') + ' ✓', 'success');
+  }
+
+  /**
+   * Bascule le mode "Sélectionner" : cases à cocher apparaissent sur les
+   * brouillons en sidebar, le clic sur un item ne charge plus la séance.
+   */
+  function enterSelectionMode() {
+    State.selectionMode = true;
+    State.selectionIds = new Set();
+    renderSidebar();
+  }
+
+  /**
+   * Quitte le mode "Sélectionner" : retour au comportement normal de la sidebar.
+   */
+  function exitSelectionMode() {
+    State.selectionMode = false;
+    State.selectionIds.clear();
+    renderSidebar();
+  }
+
+  /**
+   * Toggle la sélection d'une séance dans le mode "Sélectionner".
+   * N'a d'effet que si la séance est un brouillon (les autres sont
+   * protégées et le clic est intercepté en amont dans renderSidebar).
+   */
+  function toggleSeanceSelection(seanceId) {
+    if (!State.selectionMode) return;
+    if (State.selectionIds.has(seanceId)) {
+      State.selectionIds.delete(seanceId);
+    } else {
+      State.selectionIds.add(seanceId);
+    }
+    renderSidebar();
+  }
+
   async function onNouvelleSeance() {
     const sidebarBtn = DOM.sidebarCta();
     const centerBtn  = DOM.ctaCenter();
@@ -2746,6 +3017,10 @@
     State.formCollapsed = false;      // nouvelle séance = form déployé (Phase 5.6.B)
     setDirty(false);                  // séance fraîche = pas de modif
     State.blocIsDirty = false;        // Phase 5.7
+    // Phase 5.12 fix : rafraîchir le compteur de brouillons vides
+    // (la nouvelle séance créée est un brouillon vide tant qu'on n'a ni
+    //  date ni bloc, donc le compteur doit le refléter en sidebar).
+    await loadBrouillonsVides();
     renderSidebar();
     renderForm();
     setAutosaveStatus('idle');
