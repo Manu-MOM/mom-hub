@@ -129,6 +129,89 @@
     }
 
     /* ----------------------------------------------------------
+     * Sidebar : filtres + nettoyage brouillons (Phase 5.10)
+     * ---------------------------------------------------------- */
+    .seance-sidebar__filters {
+      margin-bottom: 12px;
+      padding: 8px 10px;
+      background: #f5f7fa;
+      border: 1px solid #d4dce6;
+      border-radius: 6px;
+    }
+    .seance-sidebar__toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      color: #34495e;
+      user-select: none;
+    }
+    .seance-sidebar__toggle input[type="checkbox"] {
+      width: 14px;
+      height: 14px;
+      cursor: pointer;
+      accent-color: #2D7D46;
+    }
+    .seance-sidebar__cleanup {
+      margin-top: 12px;
+      padding: 10px 12px;
+      background: #fff3cd;
+      border: 1px solid #ffeaa7;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .seance-sidebar__cleanup-label {
+      font-size: 12px;
+      color: #856404;
+      font-weight: 500;
+      flex: 1;
+      min-width: 0;
+    }
+    .seance-sidebar__cleanup-btn {
+      padding: 4px 10px;
+      background: #f39c12;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      font-weight: 500;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+    .seance-sidebar__cleanup-btn:hover {
+      background: #e08e0b;
+    }
+
+    /* ----------------------------------------------------------
+     * Bouton "📦 Archiver" dans formulaire méta (Phase 5.10)
+     * ---------------------------------------------------------- */
+    .seance-form__archive-btn {
+      padding: 4px 10px;
+      background: white;
+      color: #5a6c7d;
+      border: 1px solid #d4dce6;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .seance-form__archive-btn:hover:not(:disabled) {
+      background: #ecf0f1;
+      border-color: #95a5a6;
+      color: #34495e;
+    }
+    .seance-form__archive-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* ----------------------------------------------------------
      * Zone éditeur (droite) — vide en Phase 5.4
      * ---------------------------------------------------------- */
     .seance-editor-area {
@@ -1645,7 +1728,7 @@
 
     <p class="seance-footer">
       <span class="footer-club">Mutzig Ovalie Molsheim</span><br>
-      MOM Hub · Module Préparation de séance · Phase 5.9 (groupes G1/G2/G3 par bloc)
+      MOM Hub · Module Préparation de séance · Phase 5.10 (sidebar enrichie + nettoyage brouillons)
     </p>
   </main>
 
@@ -1704,18 +1787,20 @@
         }
       });
 
-      // Smoke check console : confirme que les wrappers v1.8.3 sont disponibles
+      // Smoke check console : confirme que les wrappers v1.8.4 sont disponibles
       if (typeof SupabaseHub.getSeancesAVenir === 'function'
           && typeof SupabaseHub.createSeance === 'function'
           && typeof SupabaseHub.listSitesActifs === 'function'
           && typeof SupabaseHub.listBlocsBySeance === 'function'
-          && typeof SupabaseHub.listAteliersRattachesAuBloc === 'function') {
+          && typeof SupabaseHub.listAteliersRattachesAuBloc === 'function'
+          && typeof SupabaseHub.listBrouillonsVides === 'function'
+          && typeof SupabaseHub.deleteBrouillonsVides === 'function') {
         console.log(
-          '%c✅ MOM Hub · Préparation de séance — wrappers v1.8.3 disponibles',
+          '%c✅ MOM Hub · Préparation de séance — wrappers v1.8.4 disponibles',
           'color: #2D7D46; font-weight: bold;'
         );
       } else {
-        console.error('❌ MOM Hub · Préparation de séance : wrappers v1.8.3 absents — vérifier js/supabase-client.js');
+        console.error('❌ MOM Hub · Préparation de séance : wrappers v1.8.4 absents — vérifier js/supabase-client.js');
       }
 
       // Phase 5.5.A : initialisation de l'éditeur de séance
