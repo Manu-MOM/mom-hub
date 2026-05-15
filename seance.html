@@ -209,14 +209,19 @@
       border-radius: 6px;
       border: 1px solid var(--line);
       background: var(--paper);
-      cursor: not-allowed;
-      transition: background-color 0.1s, border-color 0.1s;
-      opacity: 0.85;
+      cursor: pointer;
+      transition: background-color 0.1s, border-color 0.1s, transform 0.05s;
+    }
+    .seance-list-item:hover {
+      border-color: var(--vert-prairie);
+      background: #fff;
+    }
+    .seance-list-item:active {
+      transform: scale(0.99);
     }
     .seance-list-item.is-selected {
       background: var(--vert-light);
       border-color: var(--vert-prairie);
-      opacity: 1;
     }
     .seance-list-item__head {
       display: flex;
@@ -269,6 +274,46 @@
       gap: 12px;
       padding-bottom: 12px;
       border-bottom: 1px solid var(--line);
+    }
+    .seance-form__header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    /* Pastille autosave (Phase 5.5.B2)
+       3 états : idle (vert), saving (ambre), error (rouge) */
+    .seance-autosave-pill {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      padding: 4px 10px;
+      border-radius: 12px;
+      text-transform: uppercase;
+      border: 1px solid currentColor;
+      background: transparent;
+      transition: color 0.2s, background-color 0.2s, border-color 0.2s;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .seance-autosave-pill.is-idle {
+      color: var(--vert-prairie);
+      background: var(--vert-light);
+    }
+    .seance-autosave-pill.is-saving {
+      color: #b7791f;
+      background: rgba(212, 169, 58, 0.12);
+      animation: seance-pill-pulse 1.2s ease-in-out infinite;
+    }
+    .seance-autosave-pill.is-error {
+      color: var(--feedback-error-fg);
+      background: var(--feedback-error-bg);
+    }
+    @keyframes seance-pill-pulse {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0.5; }
     }
     .seance-form__title {
       font-family: 'Oswald', sans-serif;
