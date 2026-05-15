@@ -487,6 +487,220 @@
     }
 
     /* ----------------------------------------------------------
+     * Trame chronologique (Phase 5.6.A)
+     * ---------------------------------------------------------- */
+    .seance-trame {
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 2px solid var(--line);
+      position: relative; /* nécessaire pour positionner le popover en absolute */
+    }
+    .seance-trame__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .seance-trame__title {
+      font-family: 'Oswald', sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--ink);
+    }
+    .seance-trame__add-btn {
+      padding: 8px 18px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      background: var(--vert-prairie);
+      color: #fff;
+      cursor: pointer;
+      transition: background-color 0.15s;
+    }
+    .seance-trame__add-btn:hover { background: var(--vert-bouteille); }
+
+    .seance-trame__warning {
+      padding: 10px 14px;
+      margin-bottom: 16px;
+      background: var(--feedback-info-bg);
+      color: var(--feedback-info-fg);
+      border-radius: 6px;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .seance-trame__empty {
+      padding: 32px 16px;
+      text-align: center;
+      color: var(--ink-mute);
+      font-size: 13.5px;
+      font-style: italic;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+    }
+
+    .seance-trame__table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13.5px;
+    }
+    .seance-trame__table thead th {
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 2px solid var(--line);
+      font-family: 'Oswald', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ink-mute);
+    }
+    .seance-trame__th-horaire { width: 130px; }
+    .seance-trame__th-duree   { width: 90px; }
+    .seance-trame__th-actions { width: 110px; text-align: right; }
+    .seance-trame__row {
+      border-bottom: 1px solid var(--paper-warm);
+      transition: background-color 0.1s;
+    }
+    .seance-trame__row:hover { background: var(--vert-light); }
+    .seance-trame__td-horaire,
+    .seance-trame__td-bloc,
+    .seance-trame__td-duree,
+    .seance-trame__td-actions {
+      padding: 10px;
+      vertical-align: middle;
+    }
+    .seance-trame__td-actions { text-align: right; }
+    .seance-trame__horaire-start {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--ink);
+      display: inline-block;
+    }
+    .seance-trame__horaire-end {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--ink-mute);
+      display: inline-block;
+      margin-left: 8px;
+    }
+    .seance-trame__emoji { margin-right: 4px; }
+    .seance-trame__type {
+      font-weight: 600;
+      color: var(--ink);
+    }
+    .seance-trame__precision {
+      color: var(--ink-mute);
+      font-style: italic;
+    }
+    .seance-trame__td-duree {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12.5px;
+      color: var(--ink-soft);
+    }
+    .seance-trame__actions-placeholder {
+      color: var(--ink-mute);
+      font-style: italic;
+      font-size: 12px;
+    }
+
+    .seance-trame__recap {
+      margin-top: 16px;
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12.5px;
+      letter-spacing: 0.02em;
+      background: var(--paper-warm);
+      color: var(--ink-soft);
+    }
+    .seance-trame__recap.is-ok    { background: var(--vert-light);            color: var(--vert-prairie); }
+    .seance-trame__recap.is-over  { background: rgba(184, 69, 31, 0.12);      color: var(--clay); }
+    .seance-trame__recap.is-under { background: rgba(212, 169, 58, 0.18);     color: var(--gold); }
+
+    /* ----------------------------------------------------------
+     * Picker "+ Ajouter un bloc" (popover Phase 5.6.A)
+     * ---------------------------------------------------------- */
+    .seance-picker {
+      position: absolute;
+      top: 60px;       /* sous le bouton "+ Ajouter un bloc" du header */
+      right: 0;
+      z-index: 20;
+      display: none;
+    }
+    .seance-picker.is-open { display: block; }
+    .seance-picker__panel {
+      width: 360px;
+      max-width: calc(100vw - 48px);
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+      overflow: hidden;
+      max-height: 70vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .seance-picker__panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+      font-family: 'Oswald', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ink-soft);
+      background: var(--paper);
+    }
+    .seance-picker__close {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font-size: 20px;
+      line-height: 1;
+      color: var(--ink-mute);
+      padding: 0;
+      width: 24px;
+      height: 24px;
+    }
+    .seance-picker__close:hover { color: var(--ink); }
+    .seance-picker__list {
+      list-style: none;
+      padding: 4px 0;
+      margin: 0;
+      overflow-y: auto;
+    }
+    .seance-picker__item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      cursor: pointer;
+      transition: background-color 0.1s;
+      font-size: 13.5px;
+    }
+    .seance-picker__item:hover { background: var(--vert-light); }
+    .seance-picker__item-emoji { font-size: 16px; }
+    .seance-picker__item-libelle { flex: 1; color: var(--ink); }
+    .seance-picker__item-defaut {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--ink-mute);
+    }
+    .seance-picker__error {
+      padding: 16px;
+      color: var(--feedback-error-fg);
+    }
+
+    /* ----------------------------------------------------------
      * Responsive
      * ---------------------------------------------------------- */
     @media (max-width: 1024px) {
@@ -661,16 +875,17 @@
         }
       });
 
-      // Smoke check console : confirme que les wrappers v1.8.1 sont disponibles
+      // Smoke check console : confirme que les wrappers v1.8.2 sont disponibles
       if (typeof SupabaseHub.getSeancesAVenir === 'function'
           && typeof SupabaseHub.createSeance === 'function'
-          && typeof SupabaseHub.listSitesActifs === 'function') {
+          && typeof SupabaseHub.listSitesActifs === 'function'
+          && typeof SupabaseHub.listBlocsBySeance === 'function') {
         console.log(
-          '%c✅ MOM Hub · Préparation de séance — wrappers v1.8.1 disponibles',
+          '%c✅ MOM Hub · Préparation de séance — wrappers v1.8.2 disponibles',
           'color: #2D7D46; font-weight: bold;'
         );
       } else {
-        console.error('❌ MOM Hub · Préparation de séance : wrappers v1.8.1 absents — vérifier js/supabase-client.js');
+        console.error('❌ MOM Hub · Préparation de séance : wrappers v1.8.2 absents — vérifier js/supabase-client.js');
       }
 
       // Phase 5.5.A : initialisation de l'éditeur de séance
