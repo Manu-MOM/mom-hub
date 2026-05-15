@@ -212,6 +212,207 @@
     }
 
     /* ----------------------------------------------------------
+     * Boutons Valider / Repasser-brouillon (Phase 5.12)
+     * ---------------------------------------------------------- */
+    .seance-form__valider-btn {
+      padding: 4px 10px;
+      background: #2D7D46;
+      color: white;
+      border: 1px solid #2D7D46;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+      font-weight: 600;
+    }
+    .seance-form__valider-btn:hover {
+      background: #266b3b;
+      border-color: #266b3b;
+    }
+    .seance-form__brouillon-btn {
+      padding: 4px 10px;
+      background: white;
+      color: #856404;
+      border: 1px solid #ffd591;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .seance-form__brouillon-btn:hover {
+      background: #fff3cd;
+    }
+
+    /* ----------------------------------------------------------
+     * Picker à tags matériel global (Phase 5.12)
+     * ---------------------------------------------------------- */
+    .seance-materiel-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 8px;
+      background: #f6f9f7;
+      border: 1px solid #d9e6df;
+      border-radius: 6px;
+      min-height: 38px;
+      align-items: center;
+      position: relative;
+    }
+    .seance-materiel-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 4px 4px 10px;
+      background: #2D7D46;
+      color: white;
+      border-radius: 14px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .seance-materiel-tag__label {
+      line-height: 1;
+    }
+    .seance-materiel-tag__remove {
+      background: rgba(255,255,255,0.25);
+      border: none;
+      color: white;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 12px;
+      line-height: 1;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .seance-materiel-tag__remove:hover {
+      background: rgba(255,255,255,0.5);
+    }
+    .seance-materiel-tag__add {
+      padding: 4px 12px;
+      background: white;
+      border: 1px dashed #c2d4ca;
+      border-radius: 14px;
+      color: #2d5b41;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.15s;
+    }
+    .seance-materiel-tag__add:hover {
+      background: #e8f0ec;
+      border-style: solid;
+    }
+    .seance-materiel-menu {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      background: white;
+      border: 1px solid #c2d4ca;
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+      z-index: 100;
+      max-height: 320px;
+      display: flex;
+      flex-direction: column;
+    }
+    .seance-materiel-menu__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: #2D7D46;
+      color: white;
+      border-radius: 6px 6px 0 0;
+      flex-shrink: 0;
+    }
+    .seance-materiel-menu__title {
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .seance-materiel-menu__close {
+      background: transparent;
+      border: none;
+      color: white;
+      cursor: pointer;
+      font-size: 16px;
+      padding: 0 4px;
+      line-height: 1;
+    }
+    .seance-materiel-menu__close:hover {
+      background: rgba(255,255,255,0.2);
+      border-radius: 3px;
+    }
+    .seance-materiel-menu__list {
+      overflow-y: auto;
+      flex: 1;
+      padding: 4px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+    }
+    .seance-materiel-menu__item {
+      padding: 6px 10px;
+      background: #f6f9f7;
+      border: 1px solid #d9e6df;
+      border-radius: 4px;
+      font-size: 12px;
+      color: #1a3a28;
+      cursor: pointer;
+      text-align: left;
+      transition: background 0.1s;
+    }
+    .seance-materiel-menu__item:hover:not(:disabled) {
+      background: #e8f0ec;
+      border-color: #2D7D46;
+    }
+    .seance-materiel-menu__item.is-disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .seance-materiel-menu__deja {
+      font-size: 10px;
+      color: #8a98a5;
+      font-style: italic;
+    }
+    .seance-materiel-menu__custom {
+      display: flex;
+      gap: 6px;
+      padding: 8px;
+      border-top: 1px solid #e8f0ec;
+      background: #f5f7fa;
+      flex-shrink: 0;
+    }
+    .seance-materiel-menu__input {
+      flex: 1;
+      padding: 6px 10px;
+      font-size: 12px;
+      border: 1px solid #c2d4ca;
+      border-radius: 4px;
+      outline: none;
+    }
+    .seance-materiel-menu__input:focus {
+      border-color: #2D7D46;
+    }
+    .seance-materiel-menu__add-btn {
+      padding: 6px 12px;
+      background: #2D7D46;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .seance-materiel-menu__add-btn:hover {
+      background: #266b3b;
+    }
+
+    /* ----------------------------------------------------------
      * Zone éditeur (droite) — vide en Phase 5.4
      * ---------------------------------------------------------- */
     .seance-editor-area {
@@ -1631,6 +1832,10 @@
         max-width: 100%;
         max-height: 95vh;
       }
+      /* Phase 5.12 : menu matériel en 1 colonne sur mobile */
+      .seance-materiel-menu__list {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
@@ -1728,7 +1933,7 @@
 
     <p class="seance-footer">
       <span class="footer-club">Mutzig Ovalie Molsheim</span><br>
-      MOM Hub · Module Préparation de séance · Phase 5.10 (sidebar enrichie + nettoyage brouillons)
+      MOM Hub · Module Préparation de séance · Phase 5.12 (ajustements V1.5)
     </p>
   </main>
 
