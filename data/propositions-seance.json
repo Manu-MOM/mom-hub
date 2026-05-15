@@ -1,0 +1,327 @@
+{
+  "_meta": {
+    "type": "referentiel",
+    "nom": "Propositions pré-saisies pour Préparation de séance",
+    "version": "1.0",
+    "date_creation": "2026-05-15",
+    "date_maj": "2026-05-15",
+    "description": "Référentiel des propositions affichées en datalist HTML5 pour les champs texte de la Préparation de séance. Couvre les champs méta de la séance (4 champs : axe_travail, theme, cycle, meteo), les champs détail bloc (2 champs : comportements, organisation), les 10 champs FFR Axe 4 du contenu pédagogique d'un bloc, ainsi que la liste du matériel proposé pour le picker à tags.",
+    "doctrine_application": "Editable à la main. Le coach peut toujours taper du texte libre — les propositions sont indicatives. L'entrée 'Autres...' en fin de liste est un repère visuel pour signaler que la saisie libre est possible. Le fichier est chargé à l'init via fetch('data/propositions-seance.json', {cache:'force-cache'}) par seance-editor.js v1.9. Échec gracieux : si le fichier est absent, les inputs s'affichent sans datalist (saisie libre uniquement).",
+    "champs_obligatoires": ["slug", "libelle", "propositions"],
+    "_changelog": [
+      "1.0 (2026-05-15) - Création initiale Phase 5.12. 16 sections de propositions : 4 méta (axe_travail, theme, cycle, meteo) + 2 détail bloc (comportements, organisation) + 10 Axe 4 (objectif, but, consigne, cr, critere_realisation, comportements_pedagogiques, variables, regulations, dispositif, transitions) + 1 liste matériel pour picker tags."
+    ]
+  },
+  "meta_seance": [
+    {
+      "slug": "axe_travail_general",
+      "libelle": "Axe de travail général",
+      "propositions": [
+        "Plaquage technique en sécurité",
+        "Continuité après contact",
+        "Conquête : touche / mêlée",
+        "Évitement et fixation du défenseur",
+        "Soutien et nettoyage du ruck",
+        "Défense en ligne (alignement, montée)",
+        "Jeu au pied tactique",
+        "Lancement de jeu à partir des phases statiques",
+        "Coordination attaque/défense en transition",
+        "Manipulation et qualité de passe",
+        "Autres..."
+      ]
+    },
+    {
+      "slug": "theme_principal",
+      "libelle": "Thème principal",
+      "propositions": [
+        "Plaquage frontal",
+        "Plaquage côté",
+        "Passe à 2 mains",
+        "Soutien après plaquage",
+        "Évitement par cadrage-débordement",
+        "Ruck défensif (contre-ruck)",
+        "Ruck offensif (nettoyage)",
+        "Défense en ligne montante",
+        "Repli défensif",
+        "Lancement de jeu après touche",
+        "Jeu d'évitement (toucher)",
+        "Match d'application en opposition",
+        "Autres..."
+      ]
+    },
+    {
+      "slug": "bloc_cycle",
+      "libelle": "Bloc / cycle",
+      "propositions": [
+        "Cycle Plaquage 1/5",
+        "Cycle Plaquage 2/5",
+        "Cycle Plaquage 3/5",
+        "Cycle Plaquage 4/5",
+        "Cycle Plaquage 5/5",
+        "Cycle Continuité 1/4",
+        "Cycle Continuité 2/4",
+        "Cycle Continuité 3/4",
+        "Cycle Continuité 4/4",
+        "Cycle Conquête",
+        "Cycle Défense",
+        "Cycle Jeu au pied",
+        "Séance ponctuelle (hors cycle)",
+        "Préparation match (J-2)",
+        "Récupération post-match",
+        "Autres..."
+      ]
+    },
+    {
+      "slug": "meteo_text",
+      "libelle": "Météo",
+      "propositions": [
+        "Beau temps, sec",
+        "Beau temps, terrain humide",
+        "Pluie légère",
+        "Pluie soutenue",
+        "Vent fort",
+        "Froid (< 5°C)",
+        "Très froid (gel)",
+        "Chaud (> 25°C)",
+        "Brouillard / visibilité réduite",
+        "Terrain gras / boueux",
+        "Terrain gelé / dur",
+        "Salle (intempéries extérieures)",
+        "Autres..."
+      ]
+    }
+  ],
+  "detail_bloc": [
+    {
+      "slug": "comportements_attendus",
+      "libelle": "Comportements attendus",
+      "propositions": [
+        "Engagement total dans chaque action",
+        "Communication permanente (parler haut et fort)",
+        "Solidarité dans le contact et le soutien",
+        "Concentration sur la consigne",
+        "Respect des règles et de l'adversaire",
+        "Recherche permanente du soutien",
+        "Initiative individuelle dans le cadre collectif",
+        "Combativité jusqu'à la fin de l'action",
+        "Lucidité dans la décision (passer/garder)",
+        "Acceptation de l'erreur, recherche de la correction",
+        "Autres..."
+      ]
+    },
+    {
+      "slug": "organisation_spatio_temporelle",
+      "libelle": "Organisation spatio-temporelle",
+      "propositions": [
+        "2 lignes de joueurs face à face, espacés de 5m",
+        "Carré de 15m x 15m délimité par 4 plots",
+        "Couloir de 10m de large",
+        "Demi-terrain",
+        "Terrain réduit 30m x 20m",
+        "Atelier en circuit (rotation toutes les 3 min)",
+        "1 ballon pour 2 joueurs, par vagues",
+        "Forme jouée 3 contre 2",
+        "Forme jouée 4 contre 3",
+        "Opposition 7 contre 7",
+        "Match à effectif réduit",
+        "Travail en binômes",
+        "Travail en groupes G1/G2/G3 par niveau",
+        "Autres..."
+      ]
+    }
+  ],
+  "axe_4_ffr": [
+    {
+      "slug": "objectif",
+      "libelle": "Objectif",
+      "propositions": [
+        "Améliorer la précision de la passe à courte distance",
+        "Développer la prise de décision en attaque face à un défenseur",
+        "Travailler la coordination des soutiens autour du porteur de balle",
+        "Renforcer la technique de plaquage frontal en sécurité",
+        "Améliorer la lecture du jeu en défense (alignement, montée)",
+        "Développer la continuité du mouvement après contact",
+        "Travailler la communication entre joueurs (placement, intentions)",
+        "Améliorer la qualité du soutien dans le contact (ruck)",
+        "Développer l'évitement et la fixation du défenseur",
+        "Travailler le déplacement et le replacement en défense",
+        "Autres..."
+      ]
+    },
+    {
+      "slug": "but",
+      "libelle": "But",
+      "propositions": [
+        "Marquer un essai",
+        "Franchir la ligne d'avantage",
+        "Conserver le ballon dans la durée",
+        "Récupérer le ballon",
+        "Sortir le ballon propre du ruck",
+        "Trouver l'intervalle entre 2 défenseurs",
+        "Plaquer le porteur sans franchir la ligne d'avantage",
+        "Atteindre la zone d'en-but adverse",
+        "Conserver l'initiative du jeu (avancer)",
+        "Empêcher l'adversaire d'avancer",
+        "Autres..."
+      ]
+    },
+    {
+      "slug": "consigne",
+      "libelle": "Consigne",
+      "propositions": [
+        "Passer le ballon avant le contact",
+        "Aller au sol côté de son camp après plaquage",
+        "Soutenir le porteur dans les 3 secondes",
+        "Communiquer sa position en attaque",
+        "Plaquer aux jambes / sous les hanches",
+        "Monter ensemble en défense (en ligne)",
+        "Fixer son défenseur avant de passer",
+        "Toucher à 2 mains au-dessus de la taille (règle M14)",
+        "Garder le ballon à 2 mains",
+        "Replacer derrière le porteur dans les 2 secondes",
+        "Autres..."
+      ]
+    },
+    {
+      "slug": "cr",
+      "libelle": "Critère de Réussite (CR)",
+      "propositions": [
+        "70% de passes réussies (réceptionnées sans rebond)",
+        "3 essais marqués sur 5 tentatives",
+        "Aucune perte de balle pendant 2 minutes de jeu",
+        "Le ballon sort propre du ruck dans 80% des cas",
+        "Tous les joueurs replacés en 3 secondes après plaquage",
+        "Le défenseur est fixé sur 4 passes sur 5",
+        "Aucun en-avant pendant la séquence",
+        "La ligne défensive monte au même rythme dans 80% des cas",
+        "100% des plaquages réussis (le porteur tombe)",
+        "Le ballon est conservé pendant 3 phases consécutives",
+        "Autres..."
+      ]
+    },
+    {
+      "slug": "critere_realisation",
+      "libelle": "Critère de réalisation",
+      "propositions": [
+        "Le porteur regarde devant et non le ballon",
+        "Les mains sont en position d'accueil avant la réception",
+        "Le plaqueur place sa tête côté camp",
+        "Le pousseur de ruck pousse avec les jambes (pas avec les bras)",
+        "Le porteur abaisse son centre de gravité avant contact",
+        "L'épaule du plaqueur entre en contact avec la cuisse",
+        "Le soutien arrive perpendiculairement au porteur",
+        "La passe se fait à 2 mains, paume vers la cible",
+        "Le replacement se fait en course arrière (face au jeu)",
+        "L'appui dynamique se fait sur la jambe opposée à la passe",
+        "Autres..."
+      ]
+    },
+    {
+      "slug": "comportements",
+      "libelle": "Comportements",
+      "propositions": [
+        "Engagement total dans chaque action",
+        "Communication permanente (parler haut et fort)",
+        "Solidarité dans le contact et le soutien",
+        "Concentration sur la consigne",
+        "Respect des règles et de l'adversaire",
+        "Recherche permanente du soutien",
+        "Initiative individuelle dans le cadre collectif",
+        "Combativité jusqu'à la fin de l'action",
+        "Lucidité dans la décision (passer/garder)",
+        "Acceptation de l'erreur, recherche de la correction",
+        "Autres..."
+      ]
+    },
+    {
+      "slug": "variables",
+      "libelle": "Variables",
+      "propositions": [
+        "Augmenter / diminuer le nombre de défenseurs",
+        "Réduire / agrandir la zone de jeu",
+        "Imposer une contrainte (ex : pas de passe en arrière)",
+        "Limiter le temps d'action (ex : 8 secondes pour marquer)",
+        "Imposer un nombre minimum de passes avant de marquer",
+        "Bloquer / autoriser certaines zones du terrain",
+        "Surnombre / sous-nombre offensif",
+        "Défense passive → semi-active → active",
+        "Ajouter un ballon (jeu à 2 ballons)",
+        "Imposer une main forte / faible",
+        "Autres..."
+      ]
+    },
+    {
+      "slug": "regulations",
+      "libelle": "Régulations",
+      "propositions": [
+        "Stopper et reprendre lentement si la consigne n'est pas comprise",
+        "Faire verbaliser les joueurs (qu'as-tu vu ? que fais-tu ?)",
+        "Réduire la vitesse d'exécution pour fixer la technique",
+        "Augmenter l'opposition si trop facile",
+        "Démontrer le geste correct",
+        "Changer les groupes (équilibrer les niveaux)",
+        "Repréciser la consigne avec un exemple",
+        "Encourager les bonnes attitudes en pointant",
+        "Sanctionner immédiatement les erreurs de sécurité",
+        "Faire émerger la solution par questionnement",
+        "Autres..."
+      ]
+    },
+    {
+      "slug": "dispositif",
+      "libelle": "Dispositif",
+      "propositions": [
+        "2 lignes de joueurs face à face, espacés de 5m",
+        "Carré de 15m x 15m délimité par 4 plots",
+        "1 ballon pour 2 joueurs",
+        "1 ballon pour 4 joueurs",
+        "Atelier en circuit (rotation toutes les 3 min)",
+        "Couloir de 10m de large",
+        "Demi-terrain",
+        "Terrain réduit 30m x 20m",
+        "2 équipes de 5 joueurs en opposition",
+        "Forme jouée 3 contre 2",
+        "Autres..."
+      ]
+    },
+    {
+      "slug": "transitions",
+      "libelle": "Transitions",
+      "propositions": [
+        "Pause boisson 2 min",
+        "Regroupement coach pour consigne suivante",
+        "Démonstration rapide par un joueur",
+        "Changement de partenaires",
+        "Récupération active (marche / footing lent)",
+        "Étirements dynamiques entre 2 séquences",
+        "Verbalisation des points-clés",
+        "Échange consignes entre joueurs (binômes)",
+        "Petit jeu de transition (course avec ballon)",
+        "Reset complet (retour à la position de départ)",
+        "Autres..."
+      ]
+    }
+  ],
+  "materiel_propose": [
+    "Cônes",
+    "Plots (chinois)",
+    "Plots souples (rond)",
+    "Coupelles",
+    "Ballons",
+    "Ballons lestés",
+    "Boucliers de plaquage",
+    "Sacs de plaquage",
+    "Cibles mobiles (pao)",
+    "Chasubles (jeu de 8)",
+    "Chasubles (jeu de 15)",
+    "Élastiques",
+    "Cerceaux",
+    "Échelles d'agilité",
+    "Haies basses",
+    "Mini-cages / portes",
+    "Plot drapeau de touche",
+    "Sifflet",
+    "Chronomètre",
+    "Tableau / panneau d'affichage"
+  ]
+}
