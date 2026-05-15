@@ -11,7 +11,7 @@
  *   - 5.5.A : éditeur méta + sauvegarde manuelle (CETTE VERSION)
  *   - 5.5.B : autosave 30s + dropdowns lieu/événement + champs secondaires
  *
- * Version : 1.1 — Phase 5.5.B1 (15 mai 2026)
+ * Version : 1.2 — Phase 5.5.B2 (15 mai 2026)
  *   v1.0 : squelette IIFE, sidebar liste séances, bouton "+ Nouvelle séance",
  *          formulaire 6 champs méta (date, heure, durée, effectif, thème,
  *          axe de travail), sauvegarde manuelle via updateSeance(), feedback
@@ -22,6 +22,14 @@
  *          + 2 dropdowns (lieu_id via listSitesActifs, evenement_id via
  *          getEvenementsAVenir). Toujours sauvegarde manuelle (autosave 30s
  *          et clic sidebar différés en Phase 5.5.B2).
+ *   v1.2 : Phase 5.5.B2 — (1) autosave 30s : timer relancé à chaque ouverture
+ *          de formulaire, vérifie State.isDirty à chaque tick et sauve
+ *          silencieusement si dirty. Pastille .seance-autosave-pill dans
+ *          le header du form avec 3 états (idle/saving/error).
+ *          (2) clic sur item sidebar : recharge le formulaire avec la séance
+ *          cliquée. confirm() natif si modif non sauvée.
+ *          Refactor : extraction de la logique de save dans saveSeance(opts)
+ *          partagée par onSaveSeance (manuel) et autosave (silencieux).
  *
  * Dépendances :
  *   - window.SupabaseHub v1.8.1 (wrappers Phase 5.3 + listSitesActifs)
@@ -39,13 +47,16 @@
   const M14_TEAM_UUID = 'bfb83b83-83ef-4dde-b526-48ff87313044';
   const NB_SEANCES_RECENTES = 10;
   const DUREE_DEFAULT_MIN = 75;
+  const AUTOSAVE_INTERVAL_MS = 30000; // 30 secondes (Phase 5.5.B2)
 
   const State = {
     seances: [],            // liste pour la sidebar
     currentSeance: null,    // séance en cours d'édition (objet complet)
     isDirty: false,         // true si modif non sauvée
     sites: [],              // cache pour dropdown lieu_id (5.5.B1)
-    evenements: []          // cache pour dropdown evenement_id (5.5.B1)
+    evenements: [],         // cache pour dropdown evenement_id (5.5.B1)
+    autosaveTimer: null,    // handle setInterval (5.5.B2)
+    autosaveStatus: 'idle'  // 'idle' | 'saving' | 'error' (5.5.B2)
   };
 
   // ============================================================
@@ -73,7 +84,8 @@
     inputCycle:       () => document.getElementById('seance-input-cycle'),
     inputMateriel:    () => document.getElementById('seance-input-materiel'),
     btnSave:       () => document.getElementById('seance-btn-save'),
-    feedback:      () => document.getElementById('seance-feedback')
+    feedback:      () => document.getElementById('seance-feedback'),
+    autosavePill:  () => document.getElementById('seance-autosave-pill')
   };
 
   // ============================================================
@@ -153,6 +165,26 @@
     }
   }
 
+  function setAutosaveStatus(status) {
+    State.autosaveStatus = status;
+    const pill = DOM.autosavePill();
+    if (!pill) return;
+    // 3 états : 'idle' (vert "Sauvé"), 'saving' (ambre "Sauvegarde…"),
+    // 'error' (rouge "Erreur autosave"). Toujours visible quand un form
+    // est affiché ; les changements de couleur signalent l'activité.
+    pill.classList.remove('is-idle','is-saving','is-error');
+    if (status === 'saving') {
+      pill.classList.add('is-saving');
+      pill.textContent = '● Sauvegarde…';
+    } else if (status === 'error') {
+      pill.classList.add('is-error');
+      pill.textContent = '● Erreur autosave';
+    } else {
+      pill.classList.add('is-idle');
+      pill.textContent = '● Sauvé';
+    }
+  }
+
   // ============================================================
   // 4. RENDU SIDEBAR — Liste des séances récentes
   // ============================================================
@@ -181,7 +213,7 @@
       return (
         '<li class="seance-list-item' + (isSelected ? ' is-selected' : '') + '" ' +
             'data-seance-id="' + escapeHtml(s.id) + '" ' +
-            'title="Sélection · Phase 5.5.B">' +
+            'title="Cliquer pour ouvrir cette séance">' +
           '<div class="seance-list-item__head">' +
             '<span class="seance-list-item__date">' + dateLib + (heureLib ? ' · ' + heureLib : '') + '</span>' +
             '<span class="seance-list-item__etat etat-' + escapeHtml(s.etat) + '">' + etatLib + '</span>' +
@@ -192,8 +224,14 @@
     }).join('');
 
     body.innerHTML = '<ul class="seance-list">' + items + '</ul>';
-    // Note 5.5.A : pas de listener de clic — le rechargement par clic
-    // sera activé en 5.5.B (nécessite gestion de isDirty + confirm si non sauvé).
+    // Phase 5.5.B2 : câble le clic sur chaque item → recharge la séance
+    const lis = body.querySelectorAll('.seance-list-item');
+    lis.forEach(function (li) {
+      li.addEventListener('click', function () {
+        const id = li.getAttribute('data-seance-id');
+        onSelectSeance(id);
+      });
+    });
   }
 
   // ============================================================
@@ -240,7 +278,10 @@
         // ----- Header -----
         '<header class="seance-form__header">' +
           '<h3 class="seance-form__title">Méta de la séance</h3>' +
-          '<span class="seance-form__etat etat-' + escapeHtml(s.etat) + '">' + libelleEtatSeance(s.etat) + '</span>' +
+          '<div class="seance-form__header-right">' +
+            '<span id="seance-autosave-pill" class="seance-autosave-pill is-idle" title="État de la sauvegarde automatique (30s si modifications)">● Sauvé</span>' +
+            '<span class="seance-form__etat etat-' + escapeHtml(s.etat) + '">' + libelleEtatSeance(s.etat) + '</span>' +
+          '</div>' +
         '</header>' +
 
         // ----- Section 1 : essentielle (date/heure/durée/effectif/thème/axe) -----
@@ -362,7 +403,7 @@
             '✓ Enregistré' +
           '</button>' +
           '<span class="seance-form__hint">' +
-            'Phase 5.5.B1 · Sauvegarde manuelle (autosave 30s prévu en Phase 5.5.B2)' +
+            'Phase 5.5.B2 · Sauvegarde manuelle + autosave 30s' +
           '</span>' +
         '</div>' +
 
@@ -426,18 +467,32 @@
     setDirty(false);                  // séance fraîche = pas de modif
     renderSidebar();
     renderForm();
+    setAutosaveStatus('idle');
+    startAutosave();                  // Phase 5.5.B2 : timer 30s
     showFeedback('Nouvelle séance créée. Renseigne les méta puis enregistre.', 'info');
   }
 
-  async function onSaveSeance() {
-    if (!State.currentSeance) return;
-    if (!State.isDirty) return;
+  /**
+   * Sauvegarde silencieuse ou manuelle de la séance courante.
+   * Partagée par onSaveSeance (clic bouton) et onTickAutosave (timer 30s).
+   *
+   * @param {object} [opts]
+   * @param {boolean} [opts.silent=false] Si true : pas de feedback bruyant,
+   *                                       pilote uniquement la pastille autosave.
+   * @returns {Promise<boolean>} true si sauvegarde OK, false sinon
+   */
+  async function saveSeance(opts) {
+    if (!State.currentSeance) return false;
+    if (!State.isDirty) return false;
+    const silent = !!(opts && opts.silent);
 
+    // Vérouille le bouton manuel
     const btn = DOM.btnSave();
     if (btn) {
       btn.disabled = true;
       btn.textContent = '⏳ Enregistrement…';
     }
+    setAutosaveStatus('saving');
 
     // Collecte des valeurs du formulaire (lecture du DOM, pas du State)
     const patch = {
@@ -460,13 +515,16 @@
     const res = await SupabaseHub.updateSeance(State.currentSeance.id, patch);
 
     if (!res.ok) {
-      console.error('SeanceEditor: onSaveSeance() KO', res.error);
-      showFeedback('Erreur sauvegarde : ' + res.error, 'error');
+      console.error('SeanceEditor: saveSeance() KO', res.error);
+      setAutosaveStatus('error');
+      if (!silent) {
+        showFeedback('Erreur sauvegarde : ' + res.error, 'error');
+      }
       if (btn) {
         btn.disabled = false;
         btn.textContent = '💾 Enregistrer les modifications';
       }
-      return;
+      return false;
     }
 
     // Succès : on met à jour State avec la donnée canonique (côté DB)
@@ -475,8 +533,80 @@
     const idx = State.seances.findIndex(function (s) { return s.id === res.data.id; });
     if (idx !== -1) State.seances[idx] = res.data;
     setDirty(false);
+    setAutosaveStatus('idle');
     renderSidebar();
-    showFeedback('Séance enregistrée.', 'success');
+    if (!silent) {
+      showFeedback('Séance enregistrée.', 'success');
+    }
+    return true;
+  }
+
+  /**
+   * Handler du bouton "Enregistrer" : wrapper bruyant autour de saveSeance().
+   */
+  async function onSaveSeance() {
+    await saveSeance({ silent: false });
+  }
+
+  /**
+   * Tick autosave : vérifie isDirty, sauve silencieusement si oui.
+   * Appelé toutes les AUTOSAVE_INTERVAL_MS ms par le setInterval.
+   */
+  async function onTickAutosave() {
+    if (!State.isDirty) return;
+    if (State.autosaveStatus === 'saving') return; // évite recouvrement
+    await saveSeance({ silent: true });
+  }
+
+  /**
+   * Démarre l'autosave (à appeler à chaque ouverture de formulaire).
+   * Idempotent : arrête le timer existant avant d'en lancer un nouveau.
+   */
+  function startAutosave() {
+    stopAutosave();
+    State.autosaveTimer = setInterval(onTickAutosave, AUTOSAVE_INTERVAL_MS);
+  }
+
+  /**
+   * Arrête l'autosave (à appeler à la fermeture du form ou avant bascule).
+   */
+  function stopAutosave() {
+    if (State.autosaveTimer) {
+      clearInterval(State.autosaveTimer);
+      State.autosaveTimer = null;
+    }
+  }
+
+  /**
+   * Charge une séance existante (clic sidebar). Phase 5.5.B2.
+   * Si isDirty, demande confirmation avant de basculer.
+   */
+  async function onSelectSeance(seanceId) {
+    if (!seanceId) return;
+    if (State.currentSeance && State.currentSeance.id === seanceId) return; // déjà ouverte
+
+    if (State.isDirty) {
+      const ok = window.confirm(
+        'Tu as des modifications non sauvées sur la séance courante.\n\n' +
+        'Continuer sans sauver ? (clique Annuler pour rester)'
+      );
+      if (!ok) return;
+    }
+
+    // Trouve la séance dans le cache (rechargement complet du form depuis State)
+    const target = State.seances.find(function (s) { return s.id === seanceId; });
+    if (!target) {
+      console.error('SeanceEditor: onSelectSeance() séance introuvable dans State.seances', seanceId);
+      return;
+    }
+
+    stopAutosave();
+    State.currentSeance = target;
+    setDirty(false);
+    renderSidebar();
+    renderForm();
+    setAutosaveStatus('idle');
+    startAutosave();
   }
 
   // ============================================================
@@ -529,7 +659,9 @@
     }
 
     // Warn si modif non sauvée à la fermeture de l'onglet (V1A : check basique)
+    // + arrêt propre du timer autosave (Phase 5.5.B2)
     window.addEventListener('beforeunload', function (e) {
+      stopAutosave();
       if (State.isDirty) {
         e.preventDefault();
         e.returnValue = '';
@@ -538,12 +670,13 @@
     });
 
     console.log(
-      '%c🏉 Seance Editor v1.1 (Phase 5.5.B1) chargé',
+      '%c🏉 Seance Editor v1.2 (Phase 5.5.B2) chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         seances: State.seances.length,
         sites: State.sites.length,
-        evenements: State.evenements.length
+        evenements: State.evenements.length,
+        autosave_interval_ms: AUTOSAVE_INTERVAL_MS
       }
     );
   }
@@ -557,7 +690,10 @@
     state: State,
     loadSeances: loadSeances,
     loadSites: loadSites,
-    loadEvenements: loadEvenements
+    loadEvenements: loadEvenements,
+    // Phase 5.5.B2 : exposition autosave pour debug console
+    startAutosave: startAutosave,
+    stopAutosave: stopAutosave
   };
 
 })();
