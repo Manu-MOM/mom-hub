@@ -3614,6 +3614,29 @@
       console.warn('SeanceEditor: loadPropositionsRef() KO, datalist vides', e);
       State.propositionsRef = null;
     }
+
+  /**
+   * Charge les encadrants de la catégorie de l'utilisateur (Phase 5.12 TER).
+   * Source : data/encadrants-par-categorie.json, basé sur window.momSeanceContext.categorie_uuid.
+   * Indexe en Array puis utilise bindEncadrantsTags() pour le rendu.
+   */
+  async function loadEncadrantsForCategorie() {
+    try {
+      const categorie = window.momSeanceContext && window.momSeanceContext.categorie_uuid 
+                        ? window.momSeanceContext.categorie_uuid 
+                        : 'cat-m14';
+      const resp = await fetch('data/encadrants-par-categorie.json', { cache: 'force-cache' });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const data = await resp.json();
+      const catData = data[categorie];
+      State.encadrantsRef = (catData && catData.encadrants) ? catData.encadrants : [];
+      const nbEnc = State.encadrantsRef.length;
+      console.log('SeanceEditor: encadrants-par-categorie.json chargé (' + nbEnc + ' encadrants pour ' + categorie + ')');
+    } catch (e) {
+      console.warn('SeanceEditor: loadEncadrantsForCategorie() KO, saisie libre active', e);
+      State.encadrantsRef = [];
+    }
+  }
   }
 
   /**
@@ -3668,7 +3691,8 @@
       loadFichesRef(),
       loadGroupesRef(),
       loadVivierM14(),
-      loadPropositionsRef()
+      loadPropositionsRef(),
+      loadEncadrantsForCategorie()
     ]);
 
     renderSidebar();
