@@ -61,6 +61,13 @@
  *          tous les blocs d'une séance triés par ordre. Alternative
  *          plus légère à la RPC get_seance_complete pour l'usage
  *          "afficher juste la trame sans les ateliers rattachés".
+ *   v1.8.3 : Phase 5.8 — wrapper lecture
+ *          listAteliersRattachesAuBloc(blocId). Renvoie la liste
+ *          ordonnée des rattachements ateliers d'un bloc (table
+ *          seances_blocs_ateliers : id, ordre, atelier_fileid_drive,
+ *          notes_atelier, created_at). Sert au picker Bibliothèque
+ *          côté éditeur de séance pour afficher les fiches déjà
+ *          rattachées et permettre leur détachement par id.
  */
 
 (function (global) {
@@ -1305,6 +1312,37 @@
     },
 
     // ----------------------------------------------------------
+    // LECTURE — Rattachements ateliers
+    // ----------------------------------------------------------
+
+    /**
+     * Liste les rattachements ateliers d'un bloc, triés par ordre croissant.
+     * Renvoie les lignes brutes de seances_blocs_ateliers : aucun JOIN
+     * Bibliothèque (qui vit en Drive + miroir JSON, pas en DB).
+     * Le rendu enrichi (titre / thème / niveau / lien Drive) est fait
+     * côté éditeur de séance via le miroir data/fiches-all.json.
+     *
+     * @param {string} blocId UUID du bloc
+     * @returns {Promise<Array>} Tableau de rattachements, [] si erreur/vide
+     */
+    async listAteliersRattachesAuBloc(blocId) {
+      if (!blocId) {
+        console.error('MOM Hub: listAteliersRattachesAuBloc() requiert un blocId');
+        return [];
+      }
+      const { data, error } = await client
+        .from('seances_blocs_ateliers')
+        .select('id, ordre, atelier_fileid_drive, notes_atelier, created_at')
+        .eq('bloc_id', blocId)
+        .order('ordre', { ascending: true });
+      if (error) {
+        console.error('MOM Hub: listAteliersRattachesAuBloc()', error);
+        return [];
+      }
+      return data || [];
+    },
+
+    // ----------------------------------------------------------
     // ÉCRITURE — Rattachements ateliers
     // ----------------------------------------------------------
 
@@ -1388,7 +1426,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.8.2 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.8.3 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
