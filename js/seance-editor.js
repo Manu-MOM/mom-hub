@@ -11,7 +11,7 @@
  *   - 5.5.A : éditeur méta + sauvegarde manuelle (CETTE VERSION)
  *   - 5.5.B : autosave 30s + dropdowns lieu/événement + champs secondaires
  *
- * Version : 1.5 — Phase 5.7 (15 mai 2026)
+ * Version : 1.6 — Phase 5.8 (15 mai 2026)
  *   v1.0 : squelette IIFE, sidebar liste séances, bouton "+ Nouvelle séance",
  *          formulaire 6 champs méta (date, heure, durée, effectif, thème,
  *          axe de travail), sauvegarde manuelle via updateSeance(), feedback
@@ -76,12 +76,31 @@
  *          (pattern identique au form séance, refactor minimal).
  *          Charge vocabulaire-seance.json (4 axes) en plus de
  *          types-blocs.json à l'init.
+ *   v1.6 : Phase 5.8 — picker ateliers Bibliothèque.
+ *          Section "Ateliers rattachés" ajoutée en bas de la vue détail
+ *          d'un bloc. Liste les fiches déjà rattachées (lecture via
+ *          listAteliersRattachesAuBloc, wrapper v1.8.3), avec enrichissement
+ *          local depuis data/fiches-all.json (62 fiches) : titre, thème,
+ *          niveau, durée, lien Drive. Bouton 🗑 par rattachement →
+ *          detachAtelierFromBloc(rattachementId).
+ *          Bouton "+ Rattacher un atelier" ouvre une modale picker avec :
+ *          champ recherche texte (filtre nom_fiche + titre + thème +
+ *          niveau, insensible aux accents), liste filtrée des 62 fiches,
+ *          clic sur une fiche → attachAtelierToBloc(blocId, fileIdDrive)
+ *          puis reload + render. Modale fermable par overlay, Échap ou
+ *          croix.
+ *          Charge data/fiches-all.json (~140 KB, 62 fiches) à l'init en
+ *          parallèle des autres référentiels. Cache navigateur activé
+ *          (force-cache) car miroir Drive régénéré manuellement par
+ *          le converter Python (pas en temps réel).
  *
  * Dépendances :
- *   - window.SupabaseHub v1.8.2 (wrappers Phase 5.3 + listSitesActifs +
- *     listBlocsBySeance + updateBloc)
+ *   - window.SupabaseHub v1.8.3 (wrappers Phase 5.3 + listSitesActifs +
+ *     listBlocsBySeance + updateBloc + listAteliersRattachesAuBloc)
  *   - data/types-blocs.json v1.1 (fetched à l'init)
  *   - data/vocabulaire-seance.json v1.1 (fetched à l'init, Phase 5.7)
+ *   - data/fiches-all.json (fetched à l'init, Phase 5.8, miroir Drive
+ *     de la Bibliothèque ateliers ; clé = fileId_dossier, 62 fiches)
  *   - DOM : #seance-sidebar-body, #btn-nouvelle-seance, #seance-editor-area,
  *     #btn-nouvelle-seance-cta (placeholder existants de seance.html v1)
  */
@@ -115,7 +134,11 @@
     blocIsDirty: false,     // modifs non sauvées sur le bloc en édition (5.7)
     blocAutosaveTimer: null, // handle setInterval pour autosave du bloc (5.7)
     blocAutosaveStatus: 'idle', // 'idle' | 'saving' | 'error' (5.7)
-    view: 'trame'           // 'trame' | 'bloc-detail' : vue active de la zone éditeur (5.7)
+    view: 'trame',          // 'trame' | 'bloc-detail' : vue active de la zone éditeur (5.7)
+    // Phase 5.8 : picker ateliers Bibliothèque
+    fichesRef: null,        // miroir data/fiches-all.json ({fileId_dossier: {...}})
+    ateliersRattaches: [],  // rattachements du bloc courant (cache, rechargé à chaque ouverture)
+    fichePicker: null       // état modale picker ({open: bool, query: string})
   };
 
   // ============================================================
@@ -155,7 +178,12 @@
     blocAutosavePill:  () => document.getElementById('seance-bloc-autosave-pill'),
     blocBtnRetour:     () => document.getElementById('seance-bloc-btn-retour'),
     blocBtnSave:       () => document.getElementById('seance-bloc-btn-save'),
-    blocInputs: () => document.querySelectorAll('[data-bloc-field]') // tous les champs édités
+    blocInputs: () => document.querySelectorAll('[data-bloc-field]'), // tous les champs édités
+    // Phase 5.8 : picker ateliers
+    ateliersSection: () => document.getElementById('seance-ateliers-section'),
+    ateliersList:    () => document.getElementById('seance-ateliers-list'),
+    btnAddAtelier:   () => document.getElementById('seance-btn-add-atelier'),
+    pickerFicheRoot: () => document.getElementById('seance-picker-fiche-root')
   };
 
   // ============================================================
@@ -1134,6 +1162,14 @@
         '</div>' +
       '</details>';
 
+    // ----- Phase 5.8 : Section "Ateliers rattachés" -----
+    // Rendue à part dans renderAteliersSection() pour pouvoir la re-render
+    // sans toucher au reste du formulaire après attach/detach.
+    html +=
+      '<div id="seance-ateliers-section" class="seance-ateliers-section">' +
+        renderAteliersSectionInner() +
+      '</div>';
+
     // ----- Footer : bouton save + hint -----
     html +=
       '<div class="seance-bloc-detail__footer">' +
@@ -1144,6 +1180,9 @@
           'Phase 5.7 · Sauvegarde manuelle + autosave 30s du bloc' +
         '</span>' +
       '</div>';
+
+    // ----- Phase 5.8 : Racine modale picker fiche (vide par défaut) -----
+    html += '<div id="seance-picker-fiche-root"></div>';
 
     section.innerHTML = html;
 
@@ -1162,6 +1201,382 @@
       el.addEventListener('input',  function () { setBlocDirty(true); });
       el.addEventListener('change', function () { setBlocDirty(true); });
     });
+
+    // Phase 5.8 : binds section ateliers
+    bindAteliersSection();
+  }
+
+  // ============================================================
+  // 5.bis  PHASE 5.8 — PICKER ATELIERS BIBLIOTHÈQUE
+  // ============================================================
+
+  /**
+   * Helper : lookup d'une fiche dans le miroir Bibliothèque par fileId_dossier.
+   * Renvoie l'objet complet (source, cartouche, pedagogie, media, files) ou null.
+   */
+  function lookupFiche(fileIdDossier) {
+    if (!State.fichesRef || !fileIdDossier) return null;
+    return State.fichesRef[fileIdDossier] || null;
+  }
+
+  /**
+   * Helper : libellé court d'une fiche pour affichage (titre ou nom_fiche fallback).
+   * Concatène titre + thème si dispo.
+   */
+  function libelleFicheCourt(fiche) {
+    if (!fiche) return '— fiche introuvable —';
+    const titre = (fiche.cartouche && fiche.cartouche.titre) ? fiche.cartouche.titre.trim() : '';
+    const nom   = (fiche.source && fiche.source.nom_fiche) ? fiche.source.nom_fiche.trim() : '';
+    return titre || nom || '(sans titre)';
+  }
+
+  /**
+   * Helper : URL Drive du dossier d'une fiche.
+   */
+  function urlDriveDossier(fileIdDossier) {
+    return 'https://drive.google.com/drive/folders/' + fileIdDossier;
+  }
+
+  /**
+   * Helper : normalise un texte pour recherche insensible aux accents/casse.
+   */
+  function normalizeForSearch(str) {
+    if (!str) return '';
+    return String(str)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+  }
+
+  /**
+   * Rendu HTML interne de la section "Ateliers rattachés".
+   * Séparé de renderBlocDetail pour pouvoir être appelé seul après attach/detach.
+   */
+  function renderAteliersSectionInner() {
+    const rattachements = State.ateliersRattaches || [];
+    const fichesAvailable = State.fichesRef !== null;
+
+    let html =
+      '<div class="seance-ateliers-section__header">' +
+        '<h3 class="seance-ateliers-section__title">' +
+          '📚 Ateliers rattachés (' + rattachements.length + ')' +
+        '</h3>' +
+        '<button type="button" id="seance-btn-add-atelier" ' +
+                'class="seance-form__save-btn"' +
+                (fichesAvailable ? '' : ' disabled title="Bibliothèque non chargée — vérifier data/fiches-all.json"') +
+                '>' +
+          '+ Rattacher un atelier' +
+        '</button>' +
+      '</div>';
+
+    if (rattachements.length === 0) {
+      html +=
+        '<p class="seance-ateliers-section__empty">' +
+          'Aucun atelier rattaché à ce bloc. Clique sur ' +
+          '<strong>+ Rattacher un atelier</strong> pour piocher dans la Bibliothèque.' +
+        '</p>';
+      return html;
+    }
+
+    if (!fichesAvailable) {
+      html +=
+        '<p class="seance-ateliers-section__empty seance-ateliers-section__empty--warn">' +
+          '⚠️ Bibliothèque (data/fiches-all.json) non chargée — affichage minimal.' +
+        '</p>';
+    }
+
+    html += '<ul id="seance-ateliers-list" class="seance-ateliers-list">';
+    rattachements.forEach(function (rat) {
+      const fiche = lookupFiche(rat.atelier_fileid_drive);
+      const titre = libelleFicheCourt(fiche);
+      const theme = (fiche && fiche.cartouche && fiche.cartouche.theme)
+        ? fiche.cartouche.theme : '';
+      const niveau = (fiche && fiche.cartouche && fiche.cartouche.niveau)
+        ? fiche.cartouche.niveau : '';
+      const duree  = (fiche && fiche.cartouche && fiche.cartouche.duree)
+        ? fiche.cartouche.duree : '';
+      const driveUrl = urlDriveDossier(rat.atelier_fileid_drive);
+
+      html +=
+        '<li class="seance-ateliers-list__item">' +
+          '<div class="seance-ateliers-list__main">' +
+            '<div class="seance-ateliers-list__titre">' +
+              escapeHtml(titre) +
+            '</div>' +
+            '<div class="seance-ateliers-list__meta">';
+      if (theme)  html += '<span class="seance-ateliers-list__chip">' + escapeHtml(theme) + '</span>';
+      if (niveau) html += '<span class="seance-ateliers-list__chip">' + escapeHtml(niveau) + '</span>';
+      if (duree)  html += '<span class="seance-ateliers-list__chip">⏱ ' + escapeHtml(duree) + '</span>';
+      html +=
+            '</div>' +
+          '</div>' +
+          '<div class="seance-ateliers-list__actions">' +
+            '<a href="' + driveUrl + '" target="_blank" rel="noopener" ' +
+              'class="seance-ateliers-list__btn seance-ateliers-list__btn--drive" ' +
+              'title="Ouvrir le dossier Drive">📂 Drive</a>' +
+            '<button type="button" ' +
+              'class="seance-ateliers-list__btn seance-ateliers-list__btn--remove" ' +
+              'data-rattachement-id="' + escapeHtml(rat.id) + '" ' +
+              'title="Détacher cet atelier">🗑</button>' +
+          '</div>' +
+        '</li>';
+    });
+    html += '</ul>';
+
+    return html;
+  }
+
+  /**
+   * Re-rend la section "Ateliers rattachés" seule et re-bind ses handlers.
+   * Appelé après attach/detach. N'affecte ni le formulaire bloc ni l'autosave.
+   */
+  function renderAteliersSection() {
+    const section = DOM.ateliersSection();
+    if (!section) return;
+    section.innerHTML = renderAteliersSectionInner();
+    bindAteliersSection();
+  }
+
+  /**
+   * Bind les boutons de la section "Ateliers rattachés".
+   * - Bouton "+ Rattacher un atelier" → ouvre la modale picker.
+   * - Boutons 🗑 par item → détachement.
+   */
+  function bindAteliersSection() {
+    const btnAdd = DOM.btnAddAtelier();
+    if (btnAdd) btnAdd.addEventListener('click', openFichePicker);
+
+    const list = DOM.ateliersList();
+    if (list) {
+      list.querySelectorAll('.seance-ateliers-list__btn--remove').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          const rattId = btn.getAttribute('data-rattachement-id');
+          onDetachAtelier(rattId);
+        });
+      });
+    }
+  }
+
+  /**
+   * Ouvre la modale picker fiche (Phase 5.8).
+   * Liste les 62 fiches de la Bibliothèque avec champ recherche en haut.
+   */
+  function openFichePicker() {
+    if (!State.fichesRef) {
+      window.alert('La Bibliothèque (data/fiches-all.json) n\'est pas chargée.\n' +
+                   'Vérifie la console et le déploiement du miroir.');
+      return;
+    }
+    State.fichePicker = { open: true, query: '' };
+    renderFichePicker();
+    // Échap pour fermer
+    document.addEventListener('keydown', onFichePickerEsc);
+  }
+
+  /**
+   * Ferme la modale picker fiche.
+   */
+  function closeFichePicker() {
+    State.fichePicker = null;
+    const root = DOM.pickerFicheRoot();
+    if (root) root.innerHTML = '';
+    document.removeEventListener('keydown', onFichePickerEsc);
+  }
+
+  /**
+   * Handler keydown pour fermer le picker à Échap.
+   */
+  function onFichePickerEsc(e) {
+    if (e.key === 'Escape') closeFichePicker();
+  }
+
+  /**
+   * Rend la modale picker fiche (overlay + contenu).
+   * Re-rendu à chaque frappe dans le champ recherche.
+   */
+  function renderFichePicker() {
+    const root = DOM.pickerFicheRoot();
+    if (!root) return;
+    if (!State.fichePicker || !State.fichePicker.open) {
+      root.innerHTML = '';
+      return;
+    }
+
+    const query = State.fichePicker.query || '';
+    const qNorm = normalizeForSearch(query);
+
+    // Filtre les fiches
+    const allEntries = Object.entries(State.fichesRef || {});
+    const fichesFiltrees = qNorm.length === 0
+      ? allEntries
+      : allEntries.filter(function (entry) {
+          const fiche = entry[1];
+          const fields = [
+            fiche.source && fiche.source.nom_fiche,
+            fiche.cartouche && fiche.cartouche.titre,
+            fiche.cartouche && fiche.cartouche.theme,
+            fiche.cartouche && fiche.cartouche.niveau
+          ];
+          return fields.some(function (f) {
+            return f && normalizeForSearch(f).indexOf(qNorm) !== -1;
+          });
+        });
+
+    // IDs des fiches déjà rattachées (pour griser ces lignes)
+    const dejaRattaches = new Set(
+      (State.ateliersRattaches || []).map(function (r) { return r.atelier_fileid_drive; })
+    );
+
+    let html =
+      '<div class="seance-picker-fiche__overlay" id="seance-picker-fiche-overlay">' +
+        '<div class="seance-picker-fiche__modal" role="dialog" aria-modal="true">' +
+          '<div class="seance-picker-fiche__header">' +
+            '<h3 class="seance-picker-fiche__title">' +
+              '📚 Bibliothèque — choisir une fiche atelier' +
+            '</h3>' +
+            '<button type="button" id="seance-picker-fiche-close" ' +
+                    'class="seance-picker-fiche__close" title="Fermer (Échap)">✕</button>' +
+          '</div>' +
+          '<div class="seance-picker-fiche__search">' +
+            '<input type="text" id="seance-picker-fiche-query" ' +
+                   'class="seance-picker-fiche__input" ' +
+                   'placeholder="🔍 Rechercher (nom, titre, thème, niveau)…" ' +
+                   'value="' + escapeHtml(query) + '" ' +
+                   'autocomplete="off">' +
+            '<span class="seance-picker-fiche__count">' +
+              fichesFiltrees.length + ' / ' + allEntries.length + ' fiches' +
+            '</span>' +
+          '</div>' +
+          '<div class="seance-picker-fiche__list-wrap">';
+
+    if (fichesFiltrees.length === 0) {
+      html += '<p class="seance-picker-fiche__empty">Aucune fiche ne correspond à cette recherche.</p>';
+    } else {
+      html += '<ul class="seance-picker-fiche__list">';
+      fichesFiltrees.forEach(function (entry) {
+        const fileId = entry[0];
+        const fiche  = entry[1];
+        const titre  = libelleFicheCourt(fiche);
+        const theme  = (fiche.cartouche && fiche.cartouche.theme)  ? fiche.cartouche.theme  : '';
+        const niveau = (fiche.cartouche && fiche.cartouche.niveau) ? fiche.cartouche.niveau : '';
+        const duree  = (fiche.cartouche && fiche.cartouche.duree)  ? fiche.cartouche.duree  : '';
+        const isDeja = dejaRattaches.has(fileId);
+
+        html +=
+          '<li class="seance-picker-fiche__item' + (isDeja ? ' seance-picker-fiche__item--deja' : '') + '" ' +
+              'data-fileid="' + escapeHtml(fileId) + '"' +
+              (isDeja ? ' title="Déjà rattaché à ce bloc"' : '') + '>' +
+            '<div class="seance-picker-fiche__item-titre">' +
+              escapeHtml(titre) +
+              (isDeja ? ' <span class="seance-picker-fiche__badge-deja">déjà rattaché</span>' : '') +
+            '</div>' +
+            '<div class="seance-picker-fiche__item-meta">';
+        if (theme)  html += '<span class="seance-ateliers-list__chip">' + escapeHtml(theme)  + '</span>';
+        if (niveau) html += '<span class="seance-ateliers-list__chip">' + escapeHtml(niveau) + '</span>';
+        if (duree)  html += '<span class="seance-ateliers-list__chip">⏱ ' + escapeHtml(duree) + '</span>';
+        html +=
+            '</div>' +
+          '</li>';
+      });
+      html += '</ul>';
+    }
+
+    html +=
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    root.innerHTML = html;
+
+    // ----- Binds modale -----
+    const overlay = document.getElementById('seance-picker-fiche-overlay');
+    if (overlay) {
+      overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) closeFichePicker(); // clic sur overlay = fermer
+      });
+    }
+    const btnClose = document.getElementById('seance-picker-fiche-close');
+    if (btnClose) btnClose.addEventListener('click', closeFichePicker);
+
+    const inputQuery = document.getElementById('seance-picker-fiche-query');
+    if (inputQuery) {
+      inputQuery.addEventListener('input', function () {
+        if (!State.fichePicker) return;
+        State.fichePicker.query = inputQuery.value;
+        renderFichePicker();
+        // Restaurer le focus + position curseur après re-render
+        const newInput = document.getElementById('seance-picker-fiche-query');
+        if (newInput) {
+          newInput.focus();
+          const len = newInput.value.length;
+          newInput.setSelectionRange(len, len);
+        }
+      });
+      // Auto-focus à l'ouverture
+      setTimeout(function () { inputQuery.focus(); }, 0);
+    }
+
+    // Click sur un item → rattacher
+    document.querySelectorAll('.seance-picker-fiche__item').forEach(function (item) {
+      item.addEventListener('click', function () {
+        const fileId = item.getAttribute('data-fileid');
+        if (item.classList.contains('seance-picker-fiche__item--deja')) {
+          window.alert('Cet atelier est déjà rattaché à ce bloc.');
+          return;
+        }
+        onAttachAtelier(fileId);
+      });
+    });
+  }
+
+  /**
+   * Rattache une fiche au bloc courant via attachAtelierToBloc().
+   * Recharge la liste des rattachements + re-render la section + ferme le picker.
+   */
+  async function onAttachAtelier(fileIdDossier) {
+    if (!State.currentBloc) return;
+    if (!fileIdDossier) return;
+
+    const res = await SupabaseHub.attachAtelierToBloc(
+      State.currentBloc.id,
+      fileIdDossier
+    );
+    if (!res.ok) {
+      window.alert('Échec du rattachement :\n' + (res.error || 'erreur inconnue'));
+      return;
+    }
+    // Recharger la liste depuis la DB pour avoir l'ordre + id de la nouvelle ligne
+    State.ateliersRattaches = await SupabaseHub.listAteliersRattachesAuBloc(
+      State.currentBloc.id
+    );
+    renderAteliersSection();
+    closeFichePicker();
+    showFeedback('Atelier rattaché ✓', 'success');
+  }
+
+  /**
+   * Détache un atelier (DELETE de la ligne seances_blocs_ateliers par id).
+   * Confirmation utilisateur, puis reload + re-render.
+   */
+  async function onDetachAtelier(rattachementId) {
+    if (!rattachementId) return;
+    const ok = window.confirm('Détacher cet atelier du bloc ?\n\n' +
+                              '(La fiche reste dans la Bibliothèque, seul ce rattachement sera supprimé.)');
+    if (!ok) return;
+
+    const res = await SupabaseHub.detachAtelierFromBloc(rattachementId);
+    if (!res.ok) {
+      window.alert('Échec du détachement :\n' + (res.error || 'erreur inconnue'));
+      return;
+    }
+    // Recharger la liste depuis la DB
+    if (State.currentBloc) {
+      State.ateliersRattaches = await SupabaseHub.listAteliersRattachesAuBloc(
+        State.currentBloc.id
+      );
+    }
+    renderAteliersSection();
+    showFeedback('Atelier détaché ✓', 'success');
   }
 
   // ============================================================
@@ -1515,7 +1930,7 @@
    * Ouvre la vue détail d'un bloc (remplace la trame).
    * @param {string} blocId UUID du bloc à éditer
    */
-  function onOpenBlocDetail(blocId) {
+  async function onOpenBlocDetail(blocId) {
     const bloc = State.blocs.find(function (b) { return b.id === blocId; });
     if (!bloc) {
       console.error('SeanceEditor: onOpenBlocDetail() bloc introuvable', blocId);
@@ -1524,6 +1939,9 @@
     State.currentBloc = bloc;
     State.blocIsDirty = false;
     State.view = 'bloc-detail';
+    // Phase 5.8 : charger les rattachements ateliers AVANT le 1er rendu
+    // pour que la section "Ateliers rattachés" s'affiche d'emblée.
+    State.ateliersRattaches = await SupabaseHub.listAteliersRattachesAuBloc(blocId);
     renderTrame();             // bascule la vue (renderTrame appelle renderBlocDetail si view='bloc-detail')
     setBlocAutosaveStatus('idle');
     startBlocAutosave();
@@ -1545,6 +1963,8 @@
     State.view = 'trame';
     State.currentBloc = null;
     State.blocIsDirty = false;
+    State.ateliersRattaches = []; // Phase 5.8 : vider le cache
+    closeFichePicker();           // Phase 5.8 : fermer le picker si ouvert
     renderTrame();
   }
 
@@ -1694,6 +2114,26 @@
   }
 
   /**
+   * Charge le miroir Bibliothèque (Phase 5.8). Top-level = objet
+   * { fileId_dossier (33 chars) : { source, cartouche, pedagogie, media, files } }
+   * avec ~62 fiches. Régénéré manuellement par le converter Python depuis Drive.
+   * En cas d'échec (fichier absent / réseau), State.fichesRef reste null et
+   * le picker affichera un message d'erreur — pas de crash.
+   */
+  async function loadFichesRef() {
+    try {
+      const resp = await fetch('data/fiches-all.json', { cache: 'force-cache' });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      State.fichesRef = await resp.json();
+      const nb = State.fichesRef ? Object.keys(State.fichesRef).length : 0;
+      console.log('SeanceEditor: fiches-all.json chargé (' + nb + ' fiches)');
+    } catch (e) {
+      console.error('SeanceEditor: loadFichesRef() KO', e);
+      State.fichesRef = null;
+    }
+  }
+
+  /**
    * Charge les blocs de la séance courante (Phase 5.6.A).
    */
   async function loadBlocs() {
@@ -1711,13 +2151,15 @@
   async function init() {
     // Chargements parallèles : séances pour la sidebar, sites et événements
     // pour les dropdowns du formulaire, types-blocs.json pour la trame (5.6.A),
-    // vocabulaire-seance.json pour le détail bloc (5.7)
+    // vocabulaire-seance.json pour le détail bloc (5.7), fiches-all.json pour
+    // le picker ateliers (5.8)
     await Promise.all([
       loadSeances(),
       loadSites(),
       loadEvenements(),
       loadTypesBlocsRef(),
-      loadVocabulaireRef()
+      loadVocabulaireRef(),
+      loadFichesRef()
     ]);
 
     renderSidebar();
