@@ -5,22 +5,28 @@
  *
  * Responsabilités :
  *   1. Charger les évènements à venir + passés de l'équipe M14 via RPC Supabase
- *   2. Rendre la vue Liste verticale chronologique (S2.2)
- *   3. Gérer les filtres TYPE + COMPÉTITION + recherche libre (S2.2)
- *   4. Gérer le mini-calendrier sidebar (S2.2)
- *   5. Gérer la fiche détaillée E2 (S2.3, modal ou page)
- *   6. Gérer les modales E3 Création / E4 Annulation / E5 Ajout match (S2.4)
+ *   2. Rendre la vue Liste verticale chronologique (cartes complètes)
+ *   3. Gérer les filtres TYPE + COMPÉTITION + recherche libre
+ *   4. Gérer le déploiement inline des tournois (parents + matchs enfants)
+ *   5. Gérer le mini-calendrier sidebar (2 mois, clic = scroll)
+ *   6. Gérer la fiche détaillée E2 (S2.3)
+ *   7. Gérer les modales E3 Création / E4 Annulation / E5 Ajout match (S2.4)
  *
  * Architecture :
  *   - Module IIFE exposant window.EvenementsBrowser.init()
- *   - Suit le pattern bibliotheque-browser.js (Phase 4.4 Bibliothèque)
- *   - Préfixage CSS .evt-* dans evenements.html
+ *   - Suit le pattern bibliotheque-browser.js
+ *   - Préfixage CSS .evt-* strict dans evenements.html
  *
  * Dépendances :
- *   - SupabaseHub v1.9+ (RPC événements C9 : sql/29)
- *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, modales)
+ *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
+ *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.0 — S2.1 squelette init basique (15 mai 2026)
+ * Version : 1.1 — S2.2 (15 mai 2026 après-midi)
+ *   v1.0 : S2.1 squelette init basique
+ *   v1.1 : S2.2 — vraies cartes événements (trait coloré, pastilles type,
+ *          statut compo), regroupement par mois, déploiement inline
+ *          tournois avec sous-cartes matchs groupés par phase, mini-cal
+ *          sidebar fonctionnel (2 mois, clic jour = scroll vers event).
  */
 
 (function () {
@@ -30,30 +36,28 @@
   // 1. ÉTAT INTERNE DU MODULE
   // ============================================================
 
-  // UUID de l'équipe M14 EQ1 (constante hardcodée V1, dette `(q) coach_equipes` quand multi-équipes)
   const M14_TEAM_UUID = 'bfb83b83-83ef-4dde-b526-48ff87313044';
 
-  // Fenêtres de chargement par défaut (cf. arbitrage S2.0 #8)
   const FENETRE_JOURS_AVENIR  = 90;
   const FENETRE_JOURS_PASSES  = 30;
   const PASSES_LIMIT          = 50;
 
-  // Clé localStorage pour les préférences utilisateur (arbitrage S2.0 #6)
   const STORAGE_KEY_PREFS = 'mom_hub.evenements.prefs';
 
-  // Données chargées
-  let EVENEMENTS_AVENIR = [];   // tableau d'événements à venir (RPC get_evenements_a_venir)
-  let EVENEMENTS_PASSES = [];   // tableau d'événements passés (RPC get_evenements_passes)
+  let EVENEMENTS_AVENIR = [];
+  let EVENEMENTS_PASSES = [];
 
-  // État de l'UI (filtres, recherche, tri)
+  let EVENTS_BY_ID       = {};
+  let CHILDREN_BY_PARENT = {};
+
   const state = {
-    typesActifs:   new Set(['all']),    // 'all' par défaut, ou sous-ensemble des 5 types
-    competsActifs: new Set(['all']),    // 'all' par défaut, ou sous-ensemble des type_competition
-    search:        '',                   // texte de recherche libre (insensible casse)
-    showPassed:    true                  // afficher événements passés dans la liste (V1 oui)
+    typesActifs:   new Set(['all']),
+    competsActifs: new Set(['all']),
+    search:        '',
+    showPassed:    true,
+    expandedTournois: new Set()
   };
 
-  // Libellés humains des types d'événements (alignés sur sql/10 CHECK contraintes)
   const TYPE_LABELS = {
     match:               'Match',
     entrainement:        'Entraînement',
@@ -62,50 +66,70 @@
     journee_championnat: 'Journée champ.'
   };
 
-  // Couleurs sémantiques des types de compétition (cohérent doc Conception §6.1)
-  // Les hex définitifs sont en CSS via .evt-chip.compet-*.active
-  const COMPET_LABELS = {
-    championnat: 'Championnat',
-    coupe:       'Coupe',
-    tournoi:     'Tournoi',
-    amical:      'Amical'
+  const TYPE_ICONS = {
+    match:               '<circle cx="12" cy="12" r="10"/><path d="M12 2v20"/><path d="M2 12h20"/>',
+    entrainement:        '<polyline points="22 4 12 14.01 9 11.01"/><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>',
+    stage:               '<path d="M2 12h6l3-9 4 18 3-9h4"/>',
+    tournoi:             '<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>',
+    journee_championnat: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>'
+  };
+
+  const COMPET_TO_CLASS = {
+    championnat: 'compet-champ-p1',
+    coupe:       'compet-vie',
+    tournoi:     'compet-tournoi',
+    amical:      'compet-amical'
   };
 
   // ============================================================
   // 2. CHARGEMENT DES DONNÉES
   // ============================================================
 
-  /**
-   * Charge les événements à venir de l'équipe M14 sur la fenêtre par défaut.
-   * Appelle la RPC get_evenements_a_venir (Phase 4.4 backend, sql/29 v1.9).
-   * @returns {Promise<Array>} Liste des événements (peut être vide, jamais null)
-   */
   async function loadEvenementsAVenir() {
     if (!window.SupabaseHub || typeof SupabaseHub.getEvenementsAVenir !== 'function') {
-      throw new Error('SupabaseHub.getEvenementsAVenir indisponible (v1.9+ requis)');
+      throw new Error('SupabaseHub.getEvenementsAVenir indisponible (v1.10+ requis)');
     }
     const events = await SupabaseHub.getEvenementsAVenir(M14_TEAM_UUID, FENETRE_JOURS_AVENIR);
     return Array.isArray(events) ? events : [];
   }
 
-  /**
-   * Charge les événements passés de l'équipe M14 sur la fenêtre par défaut.
-   * Appelle la RPC get_evenements_passes (Phase 4.4 backend, sql/29 v1.9).
-   * @returns {Promise<Array>} Liste des événements (peut être vide, jamais null)
-   */
   async function loadEvenementsPasses() {
     if (!window.SupabaseHub || typeof SupabaseHub.getEvenementsPasses !== 'function') {
-      throw new Error('SupabaseHub.getEvenementsPasses indisponible (v1.9+ requis)');
+      throw new Error('SupabaseHub.getEvenementsPasses indisponible (v1.10+ requis)');
     }
     const events = await SupabaseHub.getEvenementsPasses(M14_TEAM_UUID, FENETRE_JOURS_PASSES, PASSES_LIMIT);
     return Array.isArray(events) ? events : [];
+  }
+
+  function buildIndexes() {
+    EVENTS_BY_ID = {};
+    CHILDREN_BY_PARENT = {};
+
+    const all = EVENEMENTS_AVENIR.concat(EVENEMENTS_PASSES);
+    all.forEach(e => {
+      EVENTS_BY_ID[e.id] = e;
+      if (e.evenement_parent_id) {
+        if (!CHILDREN_BY_PARENT[e.evenement_parent_id]) {
+          CHILDREN_BY_PARENT[e.evenement_parent_id] = [];
+        }
+        CHILDREN_BY_PARENT[e.evenement_parent_id].push(e);
+      }
+    });
+
+    Object.keys(CHILDREN_BY_PARENT).forEach(parentId => {
+      CHILDREN_BY_PARENT[parentId].sort((a, b) => {
+        const oa = a.ordre_dans_phase || 999;
+        const ob = b.ordre_dans_phase || 999;
+        if (oa !== ob) return oa - ob;
+        return new Date(a.date_debut) - new Date(b.date_debut);
+      });
+    });
   }
 
   // ============================================================
   // 3. HELPERS GÉNÉRIQUES
   // ============================================================
 
-  /** Échappement HTML défensif (sécurité XSS sur libellés issus de la DB) */
   function escHtml(s) {
     if (s == null) return '';
     return String(s).replace(/[&<>"']/g, c =>
@@ -113,7 +137,6 @@
     );
   }
 
-  /** Formate une date ISO en libellé fr court (« sam 23 mai · 14h00 ») */
   function formatDateShort(isoString) {
     if (!isoString) return '';
     const d = new Date(isoString);
@@ -125,7 +148,30 @@
     return dateFr + ' · ' + heureFr;
   }
 
-  /** Récupère les préférences utilisateur depuis localStorage (filtres mémorisés) */
+  function formatHeureOnly(isoString) {
+    if (!isoString) return '';
+    const d = new Date(isoString);
+    const h = d.getHours();
+    const m = d.getMinutes();
+    return m === 0 ? h + 'h' : h + 'h' + String(m).padStart(2, '0');
+  }
+
+  function formatMoisAnnee(isoString) {
+    if (!isoString) return '';
+    const d = new Date(isoString);
+    return d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }).toUpperCase();
+  }
+
+  function dateKey(isoString) {
+    if (!isoString) return '';
+    return isoString.substring(0, 10);
+  }
+
+  function moisKey(isoString) {
+    if (!isoString) return '';
+    return isoString.substring(0, 7);
+  }
+
   function loadPrefs() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY_PREFS);
@@ -137,7 +183,6 @@
     }
   }
 
-  /** Persiste les préférences utilisateur dans localStorage */
   function savePrefs() {
     try {
       const payload = {
@@ -151,17 +196,9 @@
     }
   }
 
-  /**
-   * Test d'inclusion d'un événement dans les filtres actifs.
-   * @param {Object} evt Événement (issu d'une RPC)
-   * @returns {boolean} true si l'événement passe tous les filtres
-   */
   function pass(evt) {
-    // Filtre TYPE
     if (!state.typesActifs.has('all') && !state.typesActifs.has(evt.type_evenement)) return false;
-    // Filtre COMPÉTITION (seulement si type_competition pertinent)
     if (!state.competsActifs.has('all') && evt.type_competition && !state.competsActifs.has(evt.type_competition)) return false;
-    // Recherche libre
     if (state.search) {
       const s = state.search.toLowerCase();
       const libelle = (evt.libelle || '').toLowerCase();
@@ -171,21 +208,161 @@
     return true;
   }
 
+  /**
+   * Pastille statut compo (cf. doc Conception §5.2 Q5)
+   */
+  function statutCompoBadge(summary) {
+    if (!summary || typeof summary !== 'object') {
+      return { cls: 'neutral', libelle: '0/0 à faire' };
+    }
+    const total     = parseInt(summary.total     || 0, 10);
+    const brouillon = parseInt(summary.brouillon || 0, 10);
+    const validee   = parseInt(summary.validee   || 0, 10);
+    const utilisee  = parseInt(summary.utilisee  || 0, 10);
+
+    if (total === 0) return { cls: 'neutral', libelle: '0/0 à faire' };
+    if (utilisee === total) return { cls: 'utilisee', libelle: total + '/' + total + ' jouées' };
+    if (validee + utilisee === total) return { cls: 'validee', libelle: total + '/' + total + ' prêtes' };
+    if (brouillon > 0) return { cls: 'brouillon', libelle: (brouillon + validee + utilisee) + '/' + total + ' en cours' };
+    return { cls: 'neutral', libelle: total + '/' + total + ' à faire' };
+  }
+
+  function competClass(typeCompet) {
+    return COMPET_TO_CLASS[typeCompet] || '';
+  }
+
+  function typeIconSvg(type) {
+    const inner = TYPE_ICONS[type] || TYPE_ICONS.match;
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>';
+  }
+
   // ============================================================
-  // 4. RENDU LISTE (S2.2 fera le détail des cartes)
+  // 4. RENDU LISTE — CARTES + REGROUPEMENT PAR MOIS
   // ============================================================
 
-  /**
-   * Rend la liste des évènements (zone #evt-list).
-   * S2.1 : rendu minimaliste textuel pour valider que les données arrivent.
-   * S2.2 : remplacera par les cartes complètes avec trait coloré, pastilles, etc.
-   */
+  function renderCard(evt, isPasse) {
+    const dateLib = formatDateShort(evt.date_debut);
+    const competCls = competClass(evt.type_competition);
+    const typeLbl = TYPE_LABELS[evt.type_evenement] || evt.type_evenement;
+    const badge = statutCompoBadge(evt.compo_status_summary);
+
+    const isAnnule = evt.etat === 'annule';
+    const cardClasses = [
+      'evt-card',
+      competCls,
+      isAnnule ? 'evt-card-annule' : '',
+      isPasse ? 'evt-card-passe' : ''
+    ].filter(Boolean).join(' ');
+
+    const isTournoi = evt.type_evenement === 'tournoi';
+    const isExpanded = state.expandedTournois.has(evt.id);
+    const enfants = CHILDREN_BY_PARENT[evt.id] || [];
+
+    let secondaire = '';
+    if (evt.site_libelle_court) secondaire = escHtml(evt.site_libelle_court);
+    if (evt.adversaire_nom) {
+      secondaire += (secondaire ? ' · ' : '') + 'vs ' + escHtml(evt.adversaire_nom);
+    }
+
+    let badgeJours = '';
+    if (isPasse && typeof evt.jours_depuis_evenement === 'number') {
+      badgeJours = '<span class="evt-card-jours">J-' + evt.jours_depuis_evenement + '</span>';
+    } else if (!isPasse && typeof evt.jours_jusqu_a_evenement === 'number') {
+      badgeJours = '<span class="evt-card-jours">J+' + evt.jours_jusqu_a_evenement + '</span>';
+    }
+
+    let html = '<div class="' + cardClasses + '" data-event-id="' + evt.id + '" data-mois="' + escHtml(moisKey(evt.date_debut)) + '">';
+    html += '<div class="evt-card-stripe"></div>';
+    html += '<div class="evt-card-body">';
+    html += '<div class="evt-card-line1">';
+
+    if (isTournoi && enfants.length > 0) {
+      html += '<button type="button" class="evt-card-chevron" data-action="toggle-tournoi" data-tournoi-id="' + evt.id + '" title="Déplier / replier les matchs">';
+      html += isExpanded ? '▼' : '▶';
+      html += '</button>';
+    }
+
+    html += '<div class="evt-card-type-icon" title="' + escHtml(typeLbl) + '">' + typeIconSvg(evt.type_evenement) + '</div>';
+    html += '<div class="evt-card-titre">';
+    html += '<div class="evt-card-meta">' + escHtml(dateLib) + ' · ' + escHtml(typeLbl);
+    if (badgeJours) html += ' · ' + badgeJours;
+    html += '</div>';
+    html += '<div class="evt-card-libelle">' + escHtml(evt.libelle || '(sans libellé)') + '</div>';
+    if (secondaire) html += '<div class="evt-card-secondaire">' + secondaire + '</div>';
+    html += '</div>';
+
+    if (isAnnule) {
+      html += '<div class="evt-card-badge evt-badge-annule">Annulé</div>';
+    } else {
+      html += '<div class="evt-card-badge evt-badge-' + badge.cls + '">' + escHtml(badge.libelle) + '</div>';
+    }
+
+    html += '</div>';
+    html += '</div>';
+    html += '</div>';
+
+    if (isTournoi && isExpanded && enfants.length > 0) {
+      html += renderEnfantsTournoi(evt, enfants);
+    }
+
+    return html;
+  }
+
+  function renderEnfantsTournoi(parent, enfants) {
+    const phases = [];
+    const byPhase = {};
+    enfants.forEach(e => {
+      const phase = e.phase_libelle || '(sans phase)';
+      if (!byPhase[phase]) {
+        byPhase[phase] = [];
+        phases.push(phase);
+      }
+      byPhase[phase].push(e);
+    });
+
+    let html = '<div class="evt-tournoi-enfants">';
+    phases.forEach(phaseName => {
+      html += '<div class="evt-phase-titre">📍 ' + escHtml(phaseName) + '</div>';
+      byPhase[phaseName].forEach(child => {
+        html += renderEnfantCard(child);
+      });
+    });
+    html += '<button type="button" class="evt-tournoi-add-match" data-action="add-match-to-tournoi" data-tournoi-id="' + parent.id + '">';
+    html += '+ Ajouter un match';
+    html += '</button>';
+    html += '</div>';
+    return html;
+  }
+
+  function renderEnfantCard(child) {
+    const heure = formatHeureOnly(child.date_debut);
+    const adversaire = child.adversaire_nom
+      ? 'vs ' + escHtml(child.adversaire_nom)
+      : '<em style="color:var(--ink-mute)">(adversaire à déterminer)</em>';
+    const badge = statutCompoBadge(child.compo_status_summary);
+    const isAnnule = child.etat === 'annule';
+
+    let html = '<div class="evt-enfant-row" data-event-id="' + child.id + '">';
+    html += '<span class="evt-enfant-heure">' + escHtml(heure) + '</span>';
+    html += '<span class="evt-enfant-libelle">' + escHtml(child.libelle || '') + '</span>';
+    html += '<span class="evt-enfant-adversaire">' + adversaire + '</span>';
+    if (isAnnule) {
+      html += '<span class="evt-card-badge evt-badge-annule evt-badge-sm">Annulé</span>';
+    } else {
+      html += '<span class="evt-card-badge evt-badge-' + badge.cls + ' evt-badge-sm">' + escHtml(badge.libelle) + '</span>';
+    }
+    html += '</div>';
+    return html;
+  }
+
   function renderListe() {
     const list = document.getElementById('evt-list');
     if (!list) return;
 
-    const filteredAvenir = EVENEMENTS_AVENIR.filter(pass);
-    const filteredPasses = state.showPassed ? EVENEMENTS_PASSES.filter(pass) : [];
+    const filterRoot = evt => !evt.evenement_parent_id && pass(evt);
+
+    const filteredAvenir = EVENEMENTS_AVENIR.filter(filterRoot);
+    const filteredPasses = state.showPassed ? EVENEMENTS_PASSES.filter(filterRoot) : [];
     const total = filteredAvenir.length + filteredPasses.length;
 
     if (total === 0) {
@@ -193,60 +370,192 @@
       return;
     }
 
-    // S2.1 — Rendu textuel basique (sera remplacé par cartes en S2.2)
-    let html = '<div class="evt-list-loading" style="text-align:left; color: var(--ink-soft); padding: 14px 0;">';
-    html += '<strong>S2.1 — rendu de validation</strong><br><br>';
-    html += filteredAvenir.length + ' évènement(s) à venir, ' + filteredPasses.length + ' passé(s) :';
-    html += '<ul style="margin: 12px 0 0 12px; padding-left: 14px; font-family: inherit; letter-spacing: normal; text-transform: none;">';
+    let html = '';
+    if (filteredPasses.length > 0) {
+      html += renderSection('Évènements passés', filteredPasses, true);
+    }
+    if (filteredAvenir.length > 0) {
+      html += renderSection('Évènements à venir', filteredAvenir, false);
+    }
 
-    filteredAvenir.forEach(e => {
-      html += '<li style="margin-bottom: 4px;"><code style="font-size: 11px;">' + escHtml(e.code) + '</code> · ' + escHtml(e.libelle) + ' · J+' + e.jours_jusqu_a_evenement + '</li>';
-    });
-    filteredPasses.forEach(e => {
-      html += '<li style="margin-bottom: 4px; opacity: 0.6;"><code style="font-size: 11px;">' + escHtml(e.code) + '</code> · ' + escHtml(e.libelle) + ' · J-' + e.jours_depuis_evenement + '</li>';
-    });
-
-    html += '</ul></div>';
     list.innerHTML = html;
+    bindCardEvents();
   }
 
-  /**
-   * Met à jour les compteurs KPI (À venir / Passés) en tête de page.
-   */
+  function renderSection(titre, events, isPasse) {
+    const byMois = {};
+    const moisOrder = [];
+    events.forEach(e => {
+      const m = moisKey(e.date_debut);
+      if (!byMois[m]) {
+        byMois[m] = { libelle: formatMoisAnnee(e.date_debut), events: [] };
+        moisOrder.push(m);
+      }
+      byMois[m].events.push(e);
+    });
+
+    let html = '<div class="evt-section">';
+    html += '<div class="evt-section-titre">' + escHtml(titre) + ' · ' + events.length + '</div>';
+    moisOrder.forEach(m => {
+      html += '<div class="evt-mois-titre" data-mois="' + escHtml(m) + '">' + escHtml(byMois[m].libelle) + '</div>';
+      byMois[m].events.forEach(e => {
+        html += renderCard(e, isPasse);
+      });
+    });
+    html += '</div>';
+    return html;
+  }
+
+  function bindCardEvents() {
+    document.querySelectorAll('.evt-card-chevron[data-action="toggle-tournoi"]').forEach(btn => {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        const tournoiId = this.getAttribute('data-tournoi-id');
+        if (state.expandedTournois.has(tournoiId)) {
+          state.expandedTournois.delete(tournoiId);
+        } else {
+          state.expandedTournois.add(tournoiId);
+        }
+        renderListe();
+      });
+    });
+
+    document.querySelectorAll('.evt-card').forEach(card => {
+      card.addEventListener('click', function (e) {
+        if (e.target.closest('[data-action="toggle-tournoi"]')) return;
+        if (e.target.closest('.evt-card-chevron')) return;
+        const id = this.getAttribute('data-event-id');
+        console.log('[S2.3 à venir] Ouvrir fiche détaillée pour', id);
+      });
+    });
+
+    document.querySelectorAll('[data-action="add-match-to-tournoi"]').forEach(btn => {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        const tournoiId = this.getAttribute('data-tournoi-id');
+        console.log('[S2.4 à venir] Ouvrir modale E5 pour ajouter match au tournoi', tournoiId);
+        openModalAddMatch(tournoiId);
+      });
+    });
+  }
+
   function renderKPIs() {
     const kpiAvenir = document.getElementById('kpi-avenir');
     const kpiPasses = document.getElementById('kpi-passes');
-    if (kpiAvenir) kpiAvenir.textContent = String(EVENEMENTS_AVENIR.length);
-    if (kpiPasses) kpiPasses.textContent = String(EVENEMENTS_PASSES.length);
+    const avenirRoots = EVENEMENTS_AVENIR.filter(e => !e.evenement_parent_id);
+    const passesRoots = EVENEMENTS_PASSES.filter(e => !e.evenement_parent_id);
+    if (kpiAvenir) kpiAvenir.textContent = String(avenirRoots.length);
+    if (kpiPasses) kpiPasses.textContent = String(passesRoots.length);
 
-    // Sous-titre : nombre total + saison
     const sub = document.getElementById('evt-header-sub');
     if (sub) {
-      const total = EVENEMENTS_AVENIR.length + EVENEMENTS_PASSES.length;
-      sub.textContent = total + ' évènement(s) chargé(s) · ' + FENETRE_JOURS_AVENIR + ' jours à venir, ' + FENETRE_JOURS_PASSES + ' jours passés';
+      const totalAll = EVENEMENTS_AVENIR.length + EVENEMENTS_PASSES.length;
+      sub.textContent = totalAll + ' évènement(s) chargé(s) · ' + FENETRE_JOURS_AVENIR + ' jours à venir, ' + FENETRE_JOURS_PASSES + ' jours passés';
     }
   }
 
   // ============================================================
-  // 5. MINI-CALENDRIER SIDEBAR (S2.2)
+  // 5. MINI-CALENDRIER SIDEBAR
   // ============================================================
 
-  // → renderMiniCal() viendra en S2.2
+  function renderMiniCal() {
+    const container = document.getElementById('evt-mini-cal');
+    if (!container) return;
+
+    const now = new Date();
+    const months = [
+      { year: now.getFullYear(), month: now.getMonth() },
+      { year: now.getMonth() === 11 ? now.getFullYear() + 1 : now.getFullYear(), month: (now.getMonth() + 1) % 12 }
+    ];
+
+    const eventsByDay = {};
+    const all = EVENEMENTS_AVENIR.concat(EVENEMENTS_PASSES);
+    all.forEach(e => {
+      if (e.evenement_parent_id) return;
+      const k = dateKey(e.date_debut);
+      if (!eventsByDay[k]) eventsByDay[k] = [];
+      eventsByDay[k].push(e);
+    });
+
+    let html = '';
+    months.forEach(m => {
+      html += renderMonthGrid(m.year, m.month, eventsByDay, now);
+    });
+    container.innerHTML = html;
+
+    container.querySelectorAll('.evt-mini-day[data-day-key]').forEach(cell => {
+      cell.addEventListener('click', function () {
+        const dayKey = this.getAttribute('data-day-key');
+        scrollToFirstEventOfDay(dayKey);
+      });
+    });
+  }
+
+  function renderMonthGrid(year, month, eventsByDay, today) {
+    const moisDate = new Date(year, month, 1);
+    const moisLib = moisDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }).toUpperCase();
+
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+
+    let startCol = firstDay.getDay() - 1;
+    if (startCol < 0) startCol = 6;
+
+    let html = '<div class="evt-mini-month">';
+    html += '<div class="evt-mini-month-title">' + escHtml(moisLib) + '</div>';
+    html += '<div class="evt-mini-grid">';
+    html += '<div class="evt-mini-wday">L</div><div class="evt-mini-wday">M</div><div class="evt-mini-wday">M</div><div class="evt-mini-wday">J</div><div class="evt-mini-wday">V</div><div class="evt-mini-wday">S</div><div class="evt-mini-wday">D</div>';
+
+    for (let i = 0; i < startCol; i++) {
+      html += '<div class="evt-mini-day evt-mini-day-empty"></div>';
+    }
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dayKey = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+      const hasEvents = !!eventsByDay[dayKey];
+      const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === d;
+      const cellClasses = [
+        'evt-mini-day',
+        hasEvents ? 'has-events' : '',
+        isToday ? 'is-today' : ''
+      ].filter(Boolean).join(' ');
+      html += '<div class="' + cellClasses + '" data-day-key="' + dayKey + '"';
+      if (hasEvents) html += ' title="' + eventsByDay[dayKey].length + ' évènement(s)"';
+      html += '>';
+      html += d;
+      if (hasEvents) html += '<span class="evt-mini-dot"></span>';
+      html += '</div>';
+    }
+    html += '</div></div>';
+    return html;
+  }
+
+  function scrollToFirstEventOfDay(dayKey) {
+    const cards = document.querySelectorAll('.evt-card[data-event-id]');
+    for (let i = 0; i < cards.length; i++) {
+      const id = cards[i].getAttribute('data-event-id');
+      const evt = EVENTS_BY_ID[id];
+      if (evt && dateKey(evt.date_debut) === dayKey) {
+        cards[i].scrollIntoView({ behavior: 'smooth', block: 'start' });
+        cards[i].classList.add('evt-card-highlight');
+        setTimeout(() => cards[i].classList.remove('evt-card-highlight'), 1500);
+        return;
+      }
+    }
+    console.log('Aucune carte trouvée pour la date', dayKey);
+  }
 
   // ============================================================
-  // 6. FICHE DÉTAILLÉE E2 (S2.3)
+  // 6. FICHE DÉTAILLÉE E2 (S2.3 — à venir)
   // ============================================================
 
   // → openFiche(evenementId) / closeFiche() viendront en S2.3
 
   // ============================================================
-  // 7. MODALES E3 / E4 / E5 (S2.4)
+  // 7. MODALES E3 / E4 / E5 (S2.4 — câblage complet)
   // ============================================================
 
-  /**
-   * Stubs minimalistes pour les 3 modales — câblage complet en S2.4.
-   * Pour l'instant : ouverture / fermeture seulement, contenu placeholder.
-   */
   function openModalCreate()   { document.getElementById('evt-overlay-create').classList.add('show'); }
   function closeModalCreate()  { document.getElementById('evt-overlay-create').classList.remove('show'); }
   function openModalCancel(evenementId)  { document.getElementById('evt-overlay-cancel').classList.add('show'); }
@@ -255,27 +564,22 @@
   function closeModalAddMatch(){ document.getElementById('evt-overlay-addmatch').classList.remove('show'); }
 
   // ============================================================
-  // 8. ÉVÉNEMENTS DOM (filtres, recherche, FAB, modales)
+  // 8. ÉVÉNEMENTS DOM
   // ============================================================
 
   function bindEvents() {
-    // Filtres TYPE
     document.querySelectorAll('.evt-chip[data-type]').forEach(chip => {
       chip.addEventListener('click', function () {
-        const type = this.getAttribute('data-type');
-        toggleTypeFilter(type);
+        toggleTypeFilter(this.getAttribute('data-type'));
       });
     });
 
-    // Filtres COMPÉTITION
     document.querySelectorAll('.evt-chip[data-compet]').forEach(chip => {
       chip.addEventListener('click', function () {
-        const compet = this.getAttribute('data-compet');
-        toggleCompetFilter(compet);
+        toggleCompetFilter(this.getAttribute('data-compet'));
       });
     });
 
-    // Recherche libre (debounce 200 ms léger)
     const searchInput = document.getElementById('evt-search');
     if (searchInput) {
       let to = null;
@@ -288,23 +592,19 @@
       });
     }
 
-    // FAB → modale création
     const fab = document.getElementById('evt-fab-new');
     if (fab) fab.addEventListener('click', openModalCreate);
 
-    // Fermeture des modales (boutons data-action="close-*")
     document.querySelectorAll('[data-action="close-create"]').forEach(b => b.addEventListener('click', closeModalCreate));
     document.querySelectorAll('[data-action="close-cancel"]').forEach(b => b.addEventListener('click', closeModalCancel));
     document.querySelectorAll('[data-action="close-addmatch"]').forEach(b => b.addEventListener('click', closeModalAddMatch));
 
-    // Fermeture des modales au clic hors-modal (sur l'overlay)
     document.querySelectorAll('.evt-overlay').forEach(overlay => {
       overlay.addEventListener('click', function (e) {
         if (e.target === overlay) overlay.classList.remove('show');
       });
     });
 
-    // Fermeture des modales à la touche Escape
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') {
         document.querySelectorAll('.evt-overlay.show').forEach(o => o.classList.remove('show'));
@@ -312,7 +612,6 @@
     });
   }
 
-  /** Toggle d'un chip filtre TYPE (gère exclusion mutuelle avec 'all') */
   function toggleTypeFilter(type) {
     if (type === 'all') {
       state.typesActifs.clear();
@@ -326,12 +625,9 @@
         state.typesActifs.add(type);
       }
     }
-    // Met à jour les classes .active des chips TYPE
     document.querySelectorAll('.evt-chip[data-type]').forEach(c => {
-      const t = c.getAttribute('data-type');
-      c.classList.toggle('active', state.typesActifs.has(t));
+      c.classList.toggle('active', state.typesActifs.has(c.getAttribute('data-type')));
     });
-    // Masque ou affiche la barre COMPÉT selon présence Match/Tournoi (cf. doc §5.2 Q3)
     const competRow = document.getElementById('evt-filters-compet');
     if (competRow) {
       const showCompet = state.typesActifs.has('all')
@@ -344,7 +640,6 @@
     renderListe();
   }
 
-  /** Toggle d'un chip filtre COMPÉTITION (gère exclusion mutuelle avec 'all') */
   function toggleCompetFilter(compet) {
     if (compet === 'all') {
       state.competsActifs.clear();
@@ -359,8 +654,7 @@
       }
     }
     document.querySelectorAll('.evt-chip[data-compet]').forEach(c => {
-      const v = c.getAttribute('data-compet');
-      c.classList.toggle('active', state.competsActifs.has(v));
+      c.classList.toggle('active', state.competsActifs.has(c.getAttribute('data-compet')));
     });
     savePrefs();
     renderListe();
@@ -371,17 +665,15 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init S2.1');
+    console.log('🏉 MOM Hub · Évènements Browser — init S2.2 (v1.1)');
 
     const list = document.getElementById('evt-list');
 
-    // Restaure les préférences utilisateur si disponibles
     const prefs = loadPrefs();
     if (prefs) {
       if (Array.isArray(prefs.typesActifs))   state.typesActifs   = new Set(prefs.typesActifs);
       if (Array.isArray(prefs.competsActifs)) state.competsActifs = new Set(prefs.competsActifs);
       if (typeof prefs.showPassed === 'boolean') state.showPassed = prefs.showPassed;
-      // Réapplique les classes .active à partir de l'état restauré
       document.querySelectorAll('.evt-chip[data-type]').forEach(c => {
         c.classList.toggle('active', state.typesActifs.has(c.getAttribute('data-type')));
       });
@@ -391,7 +683,6 @@
     }
 
     try {
-      // Charge en parallèle pour gagner du temps
       const [evtAvenir, evtPasses] = await Promise.all([
         loadEvenementsAVenir(),
         loadEvenementsPasses()
@@ -399,40 +690,44 @@
       EVENEMENTS_AVENIR = evtAvenir;
       EVENEMENTS_PASSES = evtPasses;
 
+      buildIndexes();
+
       console.log('Évènements chargés :',
         EVENEMENTS_AVENIR.length, 'à venir,',
-        EVENEMENTS_PASSES.length, 'passé(s)');
+        EVENEMENTS_PASSES.length, 'passé(s)',
+        '·', Object.keys(CHILDREN_BY_PARENT).length, 'tournoi(s) avec enfants');
 
       bindEvents();
       renderKPIs();
       renderListe();
+      renderMiniCal();
 
-      // Met à jour le footer smoke check
       const smoke = document.getElementById('evt-footer-smoke');
       if (smoke) {
-        smoke.textContent = 'MOM Hub · Module Évènements · S2.1 · ' +
-          EVENEMENTS_AVENIR.length + ' à venir + ' +
-          EVENEMENTS_PASSES.length + ' passé(s) chargé(s)';
+        const avenirRoots = EVENEMENTS_AVENIR.filter(e => !e.evenement_parent_id);
+        const passesRoots = EVENEMENTS_PASSES.filter(e => !e.evenement_parent_id);
+        smoke.textContent = 'MOM Hub · Module Évènements · S2.2 (v1.1) · ' +
+          avenirRoots.length + ' à venir + ' +
+          passesRoots.length + ' passé(s) racines · ' +
+          Object.keys(CHILDREN_BY_PARENT).length + ' tournoi(s) avec matchs';
       }
     } catch (err) {
       console.error('Évènements : erreur lors du chargement', err);
       if (list) {
-        list.innerHTML = '<div class="evt-list-error">Erreur de chargement : ' + escHtml(err.message || String(err)) + '<br><br><small>Vérifiez que SupabaseHub v1.9+ est chargé et que les RPC C9 (sql/29) sont déployées.</small></div>';
+        list.innerHTML = '<div class="evt-list-error">Erreur de chargement : ' + escHtml(err.message || String(err)) + '<br><br><small>Vérifiez que SupabaseHub v1.10+ est chargé et que les RPC C9 (sql/29) sont déployées.</small></div>';
       }
       throw err;
     }
   }
 
-  // Exposition publique
   window.EvenementsBrowser = {
     init: init,
-    // Exposés pour usage inline éventuel (pattern bibliotheque-browser.js)
     openModalCreate:   openModalCreate,
     openModalCancel:   openModalCancel,
     openModalAddMatch: openModalAddMatch
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.0 (S2.1) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.1 (S2.2) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
