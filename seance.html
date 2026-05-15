@@ -825,6 +825,136 @@
     }
 
     /* ----------------------------------------------------------
+     * Détail bloc (Phase 5.7)
+     * Vue plein écran qui remplace la trame quand on clique sur
+     * une ligne. Permet d'éditer tous les champs du bloc.
+     * ---------------------------------------------------------- */
+    .seance-bloc-detail {
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 2px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .seance-bloc-detail__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--line);
+    }
+    .seance-bloc-detail__btn-retour {
+      padding: 7px 16px;
+      font-family: inherit;
+      font-size: 12.5px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--ink-soft);
+      cursor: pointer;
+      transition: background-color 0.1s, border-color 0.1s, color 0.1s;
+      flex-shrink: 0;
+    }
+    .seance-bloc-detail__btn-retour:hover {
+      background: var(--vert-light);
+      border-color: var(--vert-prairie);
+      color: var(--vert-prairie);
+    }
+    .seance-bloc-detail__title {
+      font-family: 'Oswald', sans-serif;
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--ink);
+      flex: 1;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    .seance-bloc-detail__emoji {
+      font-size: 22px;
+      line-height: 1;
+    }
+    .seance-bloc-detail__header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .seance-bloc-detail__grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px 18px;
+    }
+
+    .seance-bloc-detail__details {
+      border-top: 1px solid var(--line);
+      padding-top: 14px;
+    }
+    .seance-bloc-detail__details-summary {
+      cursor: pointer;
+      font-family: 'Oswald', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--ink-soft);
+      padding: 4px 0;
+      margin-bottom: 14px;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      user-select: none;
+    }
+    .seance-bloc-detail__details-summary::-webkit-details-marker { display: none; }
+    .seance-bloc-detail__details-summary::before {
+      content: '▶';
+      font-size: 9px;
+      color: var(--ink-mute);
+      transition: transform 0.15s;
+      display: inline-block;
+    }
+    .seance-bloc-detail__details[open] .seance-bloc-detail__details-summary::before {
+      transform: rotate(90deg);
+    }
+    .seance-bloc-detail__details-summary:hover {
+      color: var(--vert-prairie);
+    }
+
+    .seance-bloc-detail__footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+    }
+
+    /* Champ masqué (intensité non applicable) */
+    .seance-field--hidden { display: none; }
+
+    /* Curseur pointer sur la cellule "Bloc" cliquable de la trame */
+    .seance-trame__td-bloc--clickable {
+      cursor: pointer;
+      transition: color 0.1s;
+    }
+    .seance-trame__td-bloc--clickable:hover .seance-trame__type {
+      color: var(--vert-prairie);
+      text-decoration: underline;
+    }
+
+    /* ----------------------------------------------------------
      * Responsive
      * ---------------------------------------------------------- */
     @media (max-width: 1024px) {
@@ -843,6 +973,13 @@
         align-items: stretch;
       }
       .seance-form__save-btn { min-width: 0; }
+      /* Phase 5.7 : détail bloc en 1 colonne */
+      .seance-bloc-detail__grid {
+        grid-template-columns: 1fr;
+      }
+      .seance-bloc-detail__title {
+        font-size: 15px;
+      }
     }
   </style>
 </head>
