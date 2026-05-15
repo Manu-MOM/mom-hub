@@ -3,7 +3,7 @@
 > **Document de référence opérationnel.** À jour à la racine du repo, mis à jour à chaque fin de session significative.
 > Sert de point de reprise universel : toute personne (ou tout Claude) qui ouvre ce fichier doit pouvoir reprendre le travail sans question.
 
-**Dernière mise à jour : 15 mai 2026 — Module Préparation de séance V1 COMPLET (Phases 5.1 → 5.11 livrées et déployées). Conv Production générale a livré aujourd'hui les 4 dernières phases en une journée : 5.8 (picker ateliers Bibliothèque), 5.9 (groupes G1/G2/G3 par bloc), 5.10 (sidebar enrichie + nettoyage brouillons vides), 5.11 (activation tuile dashboard). Hier (14 mai) avait livré le module Bibliothèque et activé les 2 premières tuiles ; aujourd'hui le module Préparation de séance ferme la 3e tuile active du portail. Conv Joueurs/Événements préparée (audits livrés, kickoff de Production rédigé) — chantier suivant.**
+**Dernière mise à jour : 15 mai 2026 — Module Préparation de séance V1 COMPLET (Phases 5.1 → 5.11 livrées et déployées) ET Conv Joueurs/Évènements OUVERTE en après-midi (S1 Phase 4.4 backend Évènements livrée : sql/29 + js v1.9 = clôture dettes C9-a/b/c/d, C9-e reportée V2). Conv Production générale a livré aujourd'hui les 4 dernières phases du module Séances en une journée : 5.8 (picker ateliers Bibliothèque), 5.9 (groupes G1/G2/G3 par bloc), 5.10 (sidebar enrichie + nettoyage brouillons vides), 5.11 (activation tuile dashboard). Hier (14 mai) avait livré le module Bibliothèque et activé les 2 premières tuiles ; aujourd'hui le module Préparation de séance ferme la 3e tuile active du portail. En après-midi, la conv Joueurs/Évènements a démarré et livré la S1 backend Évènements.**
 
 **Bilan chiffré du 15 mai 2026** :
 - **4 phases du module Préparation de séance livrées en une journée** : 5.8 + 5.9 + 5.10 + 5.11.
@@ -18,7 +18,21 @@
 - **Incident GitHub Actions/Pages** rencontré et résorbé en cours de journée (degraded availability sur le déploiement Pages pendant ~20 min, file de workflows en `Queued`). Diagnostic : status.github.com avant de chercher midi à 14h. Rien à faire côté code, attente uniquement.
 - **Dette D-SEANCE-STUB-VIDES résolue** par la Phase 5.10 (bouton manuel "🧹 Nettoyer" avec compteur en bas de sidebar).
 - **3 nouvelles dettes ouvertes** : D-SEANCE-GROUPES-DEFAUT (override groupes par défaut au niveau séance, si l'usage le réclame), D-BLOC-TYPE-CHANGE-NO-RERENDER (changer le type d'un bloc en édition ne refresh pas les étiquettes Axes 2/3), D-PORTAIL-V2-REFONTE (refonte d'`index.html` selon `Conception-Portail-Architecture-V2.md`).
-- **Conv Joueurs/Événements préparée** : audits `Audit-Module-Joueurs-v1.md` (73 KB) et `Audit-Module-Evenements-v1.md` (56 KB) disponibles sur Drive `00 - Documentation/`, message kickoff de Production rédigé (`kickoff-conv-joueurs-evenements.md`, 12 KB) — à coller dans nouvelle conv quand Manu sera prêt à enchaîner.
+- **Conv Joueurs/Évènements préparée** : audits `Audit-Module-Joueurs-v1.md` (73 KB) et `Audit-Module-Evenements-v1.md` (56 KB) disponibles sur Drive `00 - Documentation/`, message kickoff de Production rédigé (`kickoff-conv-joueurs-evenements.md`, 12 KB) — à coller dans nouvelle conv quand Manu sera prêt à enchaîner.
+
+**Bilan chiffré du 15 mai 2026 — session après-midi (Conv Joueurs/Évènements, S1 backend Évènements)** :
+- **Conv ouverte** après kickoff matin. Pré-requis : lecture des 2 audits + 2 docs Conception UI Évènements + UI Joueurs (4 docs Drive consultés via `Google Drive:read_file_content`).
+- **Séquencement validé** : 4 sessions module-par-module, Évènements d'abord. S1 backend Évènements (~1h) → S2 UI Évènements → S3 backend Joueurs → S4 UI Joueurs.
+- **Décision structurante actée** (cf. doc Conception UI Joueurs §préambule) : la fiche Personne sera codée comme un **composant unique réutilisable à 2 modes** (`mode=metier` côté Joueurs vs `mode=identite` côté Annuaire futur). Niveau d'architecture validé = fichier dédié `js/fiche-personne.js` (module IIFE autonome). Pas de surcoût immédiat, gain énorme à l'ouverture future de la conv Annuaire.
+- **Fichiers livrés S1** :
+  - `sql/29-rpc-evenements-c9.sql` (NOUVEAU, 488 lignes) : 4 RPC dans une transaction BEGIN/COMMIT — `get_evenements_a_venir` modifiée (ajout colonne `compo_status_summary` JSONB, 16→17 cols retour), `get_prochain_evenement_par_equipe` recréée (hérite nouvelle signature), `get_evenements_passes` créée (dette C9-a), `get_evenement_with_encadrants` créée (dette C9-b, 24 cols dont array JSONB encadrants enrichis nom/prénom/rôles/ordre).
+  - `js/supabase-client.js` : v1.8.4 → **v1.9** (+84 lignes net = 2 nouveaux wrappers `getEvenementsPasses` + `getEvenementWithEncadrants`, état total ~1605 lignes). Les 2 wrappers existants `getEvenementsAVenir` et `getProchainEvenementParEquipe` NON modifiés (signature d'entrée identique, PostgREST ramène naturellement la nouvelle colonne `compo_status_summary` dans la réponse JSON).
+- **Doctrine compo_status_summary (C9-d arbitré V1 simple)** : agrégat JSONB `{total, brouillon, validee, utilisee}` filtré `cote='mom' AND est_active=TRUE`, pas de récursion serveur parent→enfants. Pour un tournoi parent, valeur = `{0,0,0,0}` ; l'agrégat parent↔enfants se fera côté client UI à l'affichage (P1 simplicité, trivial en JS).
+- **Filtres `etat` divergents** (doctrinés en en-tête du fichier SQL) : `get_evenements_a_venir` exclut `'annule'` ET `'archive'` (comportement Phase 4.2.B conservé) ; `get_evenements_passes` exclut `'archive'` seulement (les `'annule'` restent visibles barrés dans la liste UI, cohérent doc Conception §3.5) ; `get_evenement_with_encadrants` aucun filtre (fiche détail doit ouvrir un événement annulé ou archivé pour audit/réactivation).
+- **Smoke test passé en base (8 tests fonctionnels)** : 4 RPC créées avec arités correctes (17/17/17/24 cols), 9 events à venir 30j (NULL filter) + 15 events 90j (M14 EQ1) + 1 event passé (NOW()-365j) + 1 event archivé (fiche `EVT-2026-05-02-FRANKFURT-M14`) ouvrable, `jsonb_typeof(compo_status_summary)='object'` partout (jamais null), `encadrants=[]` (pas `null`, COALESCE OK), TEST 8 cohérence comptable validé (0 ligne car aucune compo en base sur les events à venir, comportement attendu).
+- **2 commits séparés** poussés sur `main` (sql/29 puis js v1.9 — convention "1 fichier = 1 commit" respectée).
+- **Dette C9 totalement soldée** : C9-a/b/c/d closes, C9-e reportée V2 (transition automatique `creation → compo`, doctrine P3 itération).
+- **Nouvelles dettes ouvertes** : 8 dettes `P4-UI-evenements-*` (du doc Conception UI Évènements §8), 12 dettes `P4-UI-joueurs-*` (du doc Conception UI Joueurs §8), 10 dettes `C10-a à C10-j` préalables S3 backend Joueurs (du doc audit Joueurs §8). Toutes listées plus bas dans la section dettes.
 
 **Bilan chiffré du 14 mai 2026** (rappel) :
 - **4 fichiers nouveaux livrés et committés** : `bibliotheque.html` (38 KB, page module à la racine), `js/bibliotheque-browser.js` (26 KB, module IIFE), `data/ateliers.json` (87 KB, taxonomie 4 rubriques / 82 ateliers), `data/fiches-all.json` (139 KB, bundle 62 fiches PPTX généré par Apps Script `Build-Fiches-All.gs` côté Drive).
@@ -360,6 +374,29 @@ Module **complet** intégré au portail MOM Hub. 3e tuile activée en dashboard 
 - Encadrants structurés via `evenement_encadrants` quand `evenement_id` renseigné (V1 texte libre).
 - Multi-équipes (V1 M14 EQ1 hardcodé via constante `M14_TEAM_UUID`).
 
+### ✅ Phase 4.4 backend Évènements — RPC C9 (FAIT — 15 mai 2026 après-midi)
+
+Conv « Joueurs/Évènements » (cf. kickoff matin). Session 1 du séquencement validé en 4 sessions module-par-module.
+
+**Livraisons** :
+- `sql/29-rpc-evenements-c9.sql` (NOUVEAU, 488 lignes, transaction BEGIN/COMMIT atomique) :
+  - **MODIFIE** `get_evenements_a_venir(p_equipe_id, p_jours_a_venir)` : DROP+CREATE pour ajouter colonne `compo_status_summary JSONB` (16→17 cols retour). Comportement Phase 4.2.B conservé (exclut `'annule'` + `'archive'`).
+  - **MODIFIE** `get_prochain_evenement_par_equipe(p_equipe_id)` : recréée pour hériter de la nouvelle signature à 17 cols. Continue d'appeler `get_evenements_a_venir(p_equipe_id, 365) LIMIT 1`.
+  - **CRÉE** `get_evenements_passes(p_equipe_id, p_jours_passes, p_limit)` : dette C9-a, symétrique de `a_venir`. ORDER BY `date_debut DESC`, plafond configurable. Inclut `'annule'` (visibles barrés UI cohérent doc Conception §3.5), exclut `'archive'` seulement.
+  - **CRÉE** `get_evenement_with_encadrants(p_evenement_id)` : dette C9-b, fiche détaillée E2. 24 cols dont `encadrants JSONB` array enrichi (`personne_id, nom, prenom, roles_encadrement, ordre, notes`) trié `ORDER BY ordre NULLS LAST, date_creation ASC`. Aucun filtre `etat` (utilisable sur événement annulé ou archivé).
+- `js/supabase-client.js` : v1.8.4 → **v1.9** (+84 lignes net, état total ~1605 lignes) — dette C9-c.
+  - **AJOUTE** `getEvenementsPasses(equipeId, joursPasses=30, limit=50)` → `[]` ou tableau.
+  - **AJOUTE** `getEvenementWithEncadrants(evenementId)` → `null` ou objet (validation evenementId obligatoire).
+  - NON modifiés (transparent côté entrée, +1 col côté sortie via PostgREST) : `getEvenementsAVenir`, `getProchainEvenementParEquipe`.
+
+**Doctrine `compo_status_summary` (C9-d V1 simple)** : agrégat JSONB `{total, brouillon, validee, utilisee}` filtré `cote='mom' AND est_active=TRUE`. Pas de récursion serveur parent→enfants. Pour un tournoi parent, valeur = `{0,0,0,0}`. L'agrégat parent↔enfants se fera côté client UI à l'affichage (P1).
+
+**Smoke test passé en base** : 8 tests fonctionnels successifs validés (signatures 17/17/17/24 cols, JSONB type=`object` partout, encadrants type=`array` même vide grâce à `COALESCE([]::jsonb)`).
+
+**2 commits séparés** poussés sur main (sql/29 puis js v1.9).
+
+**Reste à venir** : S2 UI Évènements (~2-3h, 5 écrans E1-E5 selon doc Conception), puis S3 backend Joueurs (~3h30-4h30, 10 dettes C10), puis S4 UI Joueurs (~3-4h, 6 écrans J1-J6 + composant fiche-personne.js à 2 modes).
+
 ---
 
 ## 🔧 Patterns techniques acquis
@@ -538,6 +575,67 @@ C8-e. ✅ LIVRÉE — `sql/26` (RLS write compositions/composition_joueurs).
 
   **Stratégie d'exécution** : doctrine "sujets séparés par conv" → ouvrir une mini-conv "Production Portail v2" dédiée plutôt que mélanger avec d'autres chantiers métier. Priorité **basse** (cosmétique, pas bloquant).
 
+### ✅ Dette C9 SOLDÉE 15 mai 2026 (Conv Joueurs/Évènements S1)
+
+- **C9-a** ✅ RPC `get_evenements_passes(equipe_id, jours, limit)` créée (sql/29).
+- **C9-b** ✅ RPC `get_evenement_with_encadrants(evenement_id)` créée (sql/29).
+- **C9-c** ✅ Wrappers JS `getEvenementsPasses` + `getEvenementWithEncadrants` ajoutés (js/supabase-client.js v1.9).
+- **C9-d** ✅ Arbitrage pastille statut compo : calcul côté serveur dans les 3 RPC événements, V1 simple sans récursion serveur parent→enfants (agrégat côté client UI à l'affichage).
+- **C9-e** 🔵 reportée V2 : transition automatique `creation → compo` à l'apparition d'une compo. Doctrine V1 = manuel (P3 itération). À reconsidérer après 1 saison d'usage.
+
+### 🔵 Dettes Conv Joueurs/Évènements — UI Évènements (issues du doc Drive `Conception-Portail-UI-Evenements.md` §8)
+
+8 dettes ouvertes pour V1.1 / V2 / Phase 4.5 :
+
+- **P4-UI-evenements-1** : Vue Calendrier mensuelle grille (toggle vue Liste / Grille style Google Calendar). V1 livre liste verticale uniquement avec mini-calendrier sidebar comme navigateur. — V2 si demande.
+- **P4-UI-evenements-2** : Duplication arborescente d'un tournoi (parent + matchs internes en récursif). V1 ne duplique que le parent. — V2 si demande sur tournois récurrents annuels.
+- **P4-UI-evenements-3** : Filtre par date / période avancée (« Cette semaine / Ce mois / Période personnalisée »). V1 = scroll + mini-calendrier. — V2 si saison chargée.
+- **P4-UI-evenements-4** : Affichage de la distance Brencklé → site (via API OpenRouteService, lié à dettes M-2 et M-5). — Phase 4.5.
+- **P4-UI-evenements-5** : Transition automatique `creation → compo` (alias C9-e). — V2.
+- **P4-UI-evenements-6** : Vue consolidée multi-équipes pour Resp. pôle (sélecteur d'équipe en tête). Préalable : dette `(q) coach_equipes`. — Quand 2e coach onboardé.
+- **P4-UI-evenements-7** : Notification automatique aux encadrants à la création/annulation d'événement (email tiers type SendGrid/Resend). — V2 si décision communication asynchrone supplémentaire à SportEasy.
+- **P4-V2-evenements-1** : Export iCal pour Google Agenda EDR (flux `.ics` souscrit dans Google Calendar par les coachs). — Dette priorisable, hors V1, ~3-4h Production.
+
+### 🔵 Dettes Conv Joueurs/Évènements — UI Joueurs (issues du doc Drive `Conception-Portail-UI-Joueurs.md` §8)
+
+12 dettes ouvertes pour V1.1 / V2+ :
+
+- **P4-UI-joueurs-1** : Mode tableau (toggle vue Grille / Tableau dense). V1 livre grille de cartes seule. — V2 si demande admin pour scan « qui n'a pas de photo, pas de poste ».
+- **P4-UI-joueurs-2** : Filtre par conformité FFR (chips `OK / Expire <30j / Non conforme / Non vérifiable`). V1 = pastilles visibles sur cartes. — V2 si demande saisonnière.
+- **P4-UI-joueurs-3** : Filtre par postes (multi-sélection 10+ valeurs XV, probablement dropdown). V1 = postes visibles en chips sur cartes. — V2.
+- **P4-UI-joueurs-4** : Vue Comparaison de fiches (2-3 joueurs côte à côte pour aider sélection compo). — V2+.
+- **P4-UI-joueurs-5** : Édition aptitudes inline alternative à la modale (chips toggleable au survol). V1 = modale dédiée. — V2 si demande gain de temps sur édition en lot.
+- **P4-UI-joueurs-6** : Workflow consentement photo automatisé (envoi email parent avec lien validation, type DocuSign light). V1 = workflow manuel. — V2.
+- **P4-UI-joueurs-7** : Pose photo par joueur / parent eux-mêmes (interface dédiée depuis SportEasy ou espace Hub). V1 = seul coach/admin peut uploader. — V2+.
+- **P4-UI-joueurs-8** : Indicateurs fidélisation sur cartes (mode opt-in via préférences utilisateur). V1 = indicateurs dans la fiche détaillée seulement. — V2.
+- **P4-UI-joueurs-9** : Conformité FFR avec workflow validation (édition passeports JDD/ASR + certif médical + validation admin ou OVAL-E sync). V1 = réservé admin via RPC. — V2+.
+- **P4-UI-joueurs-10** : Vue multi-équipes pour Resp. pôle (sélecteur d'équipe en tête). Préalable : dette `(q) coach_equipes`. — Quand 2e coach onboardé.
+- **P4-UI-joueurs-frontiere-1** : Activation du lien « Voir dans l'Annuaire » en pied de fiche. V1 = mention discrète sans lien actif. — Quand Annuaire ouvert.
+- **P4-UI-joueurs-frontiere-2** : Activation du bouton « + Ajouter une personne » vers Annuaire (création identité). V1 = modale informative « Annuaire à venir ». — Quand Annuaire ouvert.
+
+### 🔴 Dettes Conv Joueurs/Évènements — Backend Joueurs C10 (issues du doc Drive `Audit-Module-Joueurs-v1.md` §8)
+
+10 dettes préalables à S4 UI Joueurs. Effort total ~3h30-4h30. **Bloquant** pour S4 :
+
+- **C10-a** : ALTER `personnes` ADD 3 colonnes photo (`photo_storage_key TEXT NULL`, `photo_uploaded_at TIMESTAMPTZ NULL`, `photo_uploaded_by UUID NULL REFERENCES personnes(id)`). ~10 min.
+- **C10-b** : Création bucket Supabase Storage `photos-joueurs/` + RLS adaptées (SELECT autorisé seulement via URL signée, INSERT/UPDATE/DELETE réservé aux coachs/admins via RPC). ~30 min.
+- **C10-c** : RPC `upload_photo_joueur(personne_id, fichier_base64, extension)` SECURITY DEFINER. Vérifie droits + consentement + validation extension/taille, génère clé Storage, met à jour les 3 colonnes photo. ~30 min.
+- **C10-d** : RPC `get_photo_url_signed(personne_id)` SECURITY DEFINER. Vérifie droits + existence + consentement, génère URL signée Storage (TTL ~1h). ~20 min.
+- **C10-e** : ALTER `personnes` (ou `bloc_7`) pour `consentement_photo` JSONB structuré (`{valide, date_consentement, saisi_par, portee}`). ~10 min.
+- **C10-f** : RPC `get_joueurs_equipe(equipe_id)` filtrée par rôle, retournant ~75 fiches M14 avec champs autorisés selon profil joueur × rôle utilisateur. ~30 min.
+- **C10-g** : RPC `get_joueur_detail(personne_id)` retournant la fiche complète avec tous les blocs autorisés selon rôle. ~30 min.
+- **C10-h** : ALTER `personnes` ADD 3 colonnes métier (`indisponibilite JSONB NULL` avec sous-champs `du/au/motif`, `blessure_resume JSONB NULL` avec `description/date_debut/date_estimation_retour`, `suspension_jusqu_au DATE NULL`). ~15 min.
+- **C10-i** : RPC `get_joueur_historique_compo_presences(personne_id, saison_id)` retournant compteurs de fidélisation (matchs alignés, entraînements présents, capitanats). ~30 min.
+- **C10-j** : RPC `update_joueur_metier(personne_id, ...)` restreinte aux champs métier (postes, aptitudes, indispo, blessure, suspension, notes coach). Vérifie le droit d'édition selon rôle × équipe. ~30 min.
+
+### 🔵 Doctrine structurante actée pour S4 UI Joueurs
+
+**Composant fiche Personne à 2 modes** : sera codé comme fichier dédié `js/fiche-personne.js` (module IIFE autonome avec API publique `render(container, {personneId, mode, onSave})`). 2 modes :
+- `mode=metier` (S4 Joueurs) : édition restreinte aux champs métier (postes, aptitudes, indispo, blessure, suspension, notes coach, photo).
+- `mode=identite` (Annuaire futur) : édition étendue (identité, coordonnées, famille, licence FFR) selon rôle.
+
+Conséquence : aucune réécriture lors de l'ouverture de la conv Annuaire — le même composant sera invoqué en `mode=identite` sans rupture (gain économique structurant validé doctrine kickoff).
+
 ---
 
 ## 📂 Structure repo finale
@@ -658,7 +756,7 @@ Dossiers clés :
 
 1. Lire ce STATE.md (5 min)
 2. Lire `PASSATION.md` (kit de démarrage par thématique)
-3. Vérifier que la chaîne Hub → Supabase fonctionne (console portail → `✅ MOM Hub Dashboard v2.3` ET `🏉 MOM Hub · Supabase Client v1.8.4 chargé`)
+3. Vérifier que la chaîne Hub → Supabase fonctionne (console portail → `✅ MOM Hub Dashboard v2.3` ET `🏉 MOM Hub · Supabase Client v1.9 chargé`)
 4. Vérifier le greeting J-N et le widget "Prochain événement M14" en sidebar
 5. Vérifier les 3 tuiles dashboard actives (Compositions, Bibliothèque, **Préparation de séance**)
 6. Vérifier `compositions.html` : créer une compo de base test, ajouter 2-3 joueurs, supprimer
@@ -709,11 +807,14 @@ Dossiers clés :
 - Cadrage doctrinal v1.0 du schéma `atelier.json` figé. Évolutions à venir uniquement si arbitrages nouveaux.
 - Voir `Schema-atelier-json-v2.0.md` (Drive `00 - Documentation/`) — schéma v2.0 figé le 14 mai par la conv Production Module Bibliothèque.
 
-**Travaux en attente — Conv Production Modules Joueurs & Événements** (À OUVRIR — chantier suivant) :
-- 🆕 **Conv à ouvrir** quand Manu sera prêt à enchaîner. Audits déjà livrés (cf. ci-dessus). Message kickoff de Production rédigé 15 mai par cette conv : `kickoff-conv-joueurs-evenements.md` (12 KB, dans `/mnt/user-data/outputs/` côté Claude, copie à conserver côté Manu ou Drive).
-- Le kickoff transfère **l'intégralité de la doctrine de travail** appliquée sur ce projet (10 sections : identité, doctrine non-négociable, écosystème actuel, pattern de phases, conventions code, workflow, dettes ouvertes, mémoire entre convs, communication).
-- Stratégie attendue : analyse des audits → 2 briefs de conception (équivalents de `Brief-Conception-Module-Preparation-Seance-v1.md`) → Production palier par palier.
-- Ordre suggéré : **Événements en premier** (table existante + 15 entraînements M14 peuplés via `sql/14` → reprise d'existant plus simple), puis **Joueurs** (plus complexe car touche Personne, OVAL-E, dossier médical, vivier).
+**Travaux en attente — Conv Production Modules Joueurs & Évènements** (OUVERTE 15 mai après-midi, S1 LIVRÉE) :
+- ✅ **Conv ouverte** 15 mai après-midi après kickoff matin. Audits + 2 docs Conception UI lus en début de session.
+- ✅ **S1 backend Évènements livrée** (~1h) : sql/29 + js v1.9, dettes C9-a/b/c/d closes. Cf. section Phase 4.4 backend Évènements + Bilan 15 mai après-midi plus haut.
+- 🔵 **S2 UI Évènements** (~2-3h, à venir) : 5 écrans E1-E5 selon doc Conception UI Évènements. E1 Vue Liste (liste verticale + mini-calendrier + 3 filtres), E2 Fiche détaillée (modes lecture/édition), E3 Modale Création (workflow 3 étapes), E4 Modale Annulation, E5 Modale Ajout match aux entraînements.
+- 🔴 **S3 Backend Joueurs C10** (~3h30-4h30, à venir) : 10 dettes `C10-a → C10-j` à solder avant S4. Détail dans la section dettes plus haut. **Bloquant** pour S4.
+- 🔵 **S4 UI Joueurs** (~3-4h, à venir) : 6 écrans J1-J6 selon doc Conception UI Joueurs. J1 Vue Grille + filtres, J2 Fiche détaillée mode metier (composant `js/fiche-personne.js`), J3 Workflow consentement photo, J4 Édition aptitudes, J5 Édition indispo/blessure/suspension, J6 Historique fidélisation.
+- 📓 Doctrine structurante actée : composant `js/fiche-personne.js` à 2 modes (mode=metier S4 / mode=identite Annuaire futur). Cf. section "Doctrine structurante actée pour S4 UI Joueurs" plus haut.
+- Pré-requis avant S3 : 10 entraînements M14 déjà en base via sql/14, 1 événement archivé `EVT-2026-05-02-FRANKFURT-M14` (tournoi Frankfurt) utilisable pour tests fiche détaillée mode lecture archive.
 
 **Travaux en attente — Conv Suivi Match** (à ouvrir, recommandation forte) :
 - Module à construire, audit v2 existant, dette C3 à instruire. Pré-requis C8-c livré ✅.
