@@ -1,0 +1,46 @@
+{
+  "_meta": {
+    "type": "referentiel",
+    "nom": "Groupes joueur",
+    "version": "1.1",
+    "date_creation": "2026-05-12",
+    "date_maj": "2026-05-12",
+    "description": "Référentiel des valeurs valides pour la mention indicative de niveau / engagement / projet sportif d'un joueur. Filtrage du vivier de composition. Non bloquant (P4 doctrine).",
+    "doctrine_application": "Le référentiel JSON liste les VALEURS VALIDES (Performance, Développement, Initiation, etc.). La VALEUR APPLIQUÉE à un joueur pour une équipe donnée est stockée dans 'equipe_joueurs.niveau_profil' (TEXT, table Vague 1 Supabase). Le commentaire SQL Vague 1 sur niveau_profil mentionne déjà 'Performance / Développement / Initiation pour M14' — ce référentiel formalise cette intuition. Aucune FK SQL stricte entre le TEXT en base et le référentiel JSON ; la cohérence des valeurs est garantie côté UI via un dropdown alimenté par ce référentiel. Migration future vers Supabase prévue lors de l'onglet paramètres (cf. Schema-cible-Supabase-aptitudes.md pour pattern réutilisable et Modelisation-Evenements-v1.1.md §5.1 pour la doctrine d'usage).",
+    "champs_obligatoires": ["uuid", "libelle_court", "ordre", "actif"],
+    "champs_optionnels_communs": ["libelle_long", "description", "couleur"],
+    "_changelog": [
+      "1.0 (2026-05-12 matin) - Création initiale suite à décision #16 cadrage modélisation événements v1.0. 3 groupes par défaut : Performance, Développement, Initiation. Initialement prévu pour stockage dans bloc_6_profil_sportif des fiches Personne (champ groupe_indicatif_uuid).",
+      "1.1 (2026-05-12 soir) - Doctrine d'usage révisée suite découverte conflit Vague 1 : le référentiel reste mais la valeur appliquée à un joueur est désormais stockée dans 'equipe_joueurs.niveau_profil' (Vague 1, TEXT) au lieu de bloc_6 des fiches Personne. Cohérent avec le commentaire SQL Vague 1 sur niveau_profil. L'ALTER bloc_6 prévu en v1.0 est abandonné. Aucune modification de la liste des 3 groupes (Performance, Développement, Initiation)."
+    ]
+  },
+  "groupes": [
+    {
+      "uuid": "grp-001",
+      "libelle_court": "Performance",
+      "libelle_long": "Groupe Performance",
+      "description": "Joueurs orientés compétition haut niveau, sélectionnables prioritairement pour les équipes premium",
+      "couleur": "#8B0000",
+      "ordre": 10,
+      "actif": true
+    },
+    {
+      "uuid": "grp-002",
+      "libelle_court": "Développement",
+      "libelle_long": "Groupe Développement",
+      "description": "Joueurs en progression, avec un projet sportif identifié",
+      "couleur": "#FF8C00",
+      "ordre": 20,
+      "actif": true
+    },
+    {
+      "uuid": "grp-003",
+      "libelle_court": "Initiation",
+      "libelle_long": "Groupe Initiation",
+      "description": "Joueurs en découverte / consolidation des fondamentaux",
+      "couleur": "#4682B4",
+      "ordre": 30,
+      "actif": true
+    }
+  ]
+}
