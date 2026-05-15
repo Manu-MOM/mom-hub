@@ -487,6 +487,77 @@
     }
 
     /* ----------------------------------------------------------
+     * Formulaire méta replié (Phase 5.6.B)
+     * Affiché à la place du formulaire complet une fois la séance
+     * enregistrée avec une date. Bouton "✏️ Modifier" pour rouvrir.
+     * ---------------------------------------------------------- */
+    .seance-form-collapsed {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 14px 16px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      position: relative;
+    }
+    .seance-form-collapsed__left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+    .seance-form-collapsed__summary {
+      font-size: 13.5px;
+      color: var(--ink);
+      line-height: 1.5;
+    }
+    .seance-form-collapsed__etat {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      padding: 3px 10px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      background: var(--paper-warm);
+      color: var(--ink-soft);
+      border: 1px solid var(--line);
+      flex-shrink: 0;
+    }
+    .seance-form-collapsed__etat.etat-brouillon { color: var(--ink-mute); }
+    .seance-form-collapsed__etat.etat-validee   { color: var(--vert-prairie); border-color: var(--vert-prairie); }
+    .seance-form-collapsed__etat.etat-utilisee  { color: var(--bleu-base); border-color: var(--bleu-base); }
+    .seance-form-collapsed__etat.etat-archivee  { color: var(--ink-mute); opacity: 0.6; }
+    .seance-form-collapsed__right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .seance-form-collapsed__edit-btn {
+      padding: 6px 14px;
+      font-family: inherit;
+      font-size: 12.5px;
+      font-weight: 600;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--ink-soft);
+      cursor: pointer;
+      transition: background-color 0.1s, border-color 0.1s, color 0.1s;
+    }
+    .seance-form-collapsed__edit-btn:hover {
+      background: var(--vert-light);
+      border-color: var(--vert-prairie);
+      color: var(--vert-prairie);
+    }
+
+    /* ----------------------------------------------------------
      * Trame chronologique (Phase 5.6.A)
      * ---------------------------------------------------------- */
     .seance-trame {
@@ -607,6 +678,39 @@
       color: var(--ink-mute);
       font-style: italic;
       font-size: 12px;
+    }
+
+    /* Phase 5.6.B : boutons d'actions par bloc */
+    .seance-trame__action-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      margin-left: 4px;
+      padding: 0;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--ink-soft);
+      font-size: 14px;
+      line-height: 1;
+      cursor: pointer;
+      transition: background-color 0.1s, border-color 0.1s, color 0.1s, opacity 0.1s;
+    }
+    .seance-trame__action-btn:hover:not(:disabled) {
+      background: var(--vert-light);
+      border-color: var(--vert-prairie);
+      color: var(--vert-prairie);
+    }
+    .seance-trame__action-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+    .seance-trame__action-btn--danger:hover:not(:disabled) {
+      background: var(--feedback-error-bg);
+      border-color: var(--feedback-error-fg);
+      color: var(--feedback-error-fg);
     }
 
     .seance-trame__recap {
