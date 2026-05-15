@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.8.1 — mai 2026
+ * Version : 1.8.2 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -56,6 +56,11 @@
  *          pour alimenter le dropdown lieu_id du formulaire méta
  *          séance. Filtre actif=TRUE, tri alphabétique sur libelle.
  *          Pattern lecture identique listCompositionsByEquipe.
+ *   v1.8.2 : Phase 5.6.A — wrapper lecture listBlocsBySeance(seanceId)
+ *          pour alimenter la table de trame chronologique. Renvoie
+ *          tous les blocs d'une séance triés par ordre. Alternative
+ *          plus légère à la RPC get_seance_complete pour l'usage
+ *          "afficher juste la trame sans les ateliers rattachés".
  */
 
 (function (global) {
@@ -932,6 +937,31 @@
       return Array.isArray(data) ? data : [];
     },
 
+    /**
+     * Liste tous les blocs d'une séance, triés par ordre croissant.
+     * Wrapper Phase 5.6.A : alternative légère à get_seance_complete
+     * pour les usages "trame chronologique sans ateliers rattachés".
+     *
+     * @param {string} seanceId UUID de la séance
+     * @returns {Promise<Array>} Tableau de blocs triés par ordre, [] si erreur
+     */
+    async listBlocsBySeance(seanceId) {
+      if (!seanceId) {
+        console.error('MOM Hub: listBlocsBySeance() requiert un seanceId');
+        return [];
+      }
+      const { data, error } = await client
+        .from('seances_blocs')
+        .select('*')
+        .eq('seance_id', seanceId)
+        .order('ordre', { ascending: true });
+      if (error) {
+        console.error('MOM Hub: listBlocsBySeance()', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
     // ----------------------------------------------------------
     // ÉCRITURE — Séance
     // ----------------------------------------------------------
@@ -1358,7 +1388,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.8.1 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.8.2 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
