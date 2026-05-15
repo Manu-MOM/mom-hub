@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.8.2 — mai 2026
+ * Version : 1.10 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -110,6 +110,31 @@
  *          (uniquement brouillons). Renvoie {ok, deleted_count}.
  *          Le CASCADE FK supprime automatiquement les seances_blocs et
  *          seances_blocs_ateliers liés.
+ *   v1.9 :  (numéro sauté pour éviter ambiguïté — version transitoire
+ *          jamais déployée, voir merge v1.10 ci-dessous)
+ *   v1.10 : Phase 4.4 UI Évènements — clôture dette C9-c (audit
+ *          Évènements §8). 2 nouveaux wrappers LECTURE pour le cycle
+ *          Évènements :
+ *          (1) getEvenementsPasses(equipeId, joursPasses, limit) :
+ *              symétrique de getEvenementsAVenir, consomme la nouvelle
+ *              RPC get_evenements_passes (sql/29, dette C9-a). Tri DESC,
+ *              inclut les événements 'annule' (visibles barrés côté UI).
+ *          (2) getEvenementWithEncadrants(evenementId) : fiche détaillée
+ *              E2, consomme la RPC get_evenement_with_encadrants
+ *              (sql/29, dette C9-b). Retourne l'événement complet (24
+ *              colonnes) avec son array JSONB encadrants enrichi
+ *              (nom, prénom, rôles, ordre, notes).
+ *          Note : les 2 wrappers existants getEvenementsAVenir et
+ *          getProchainEvenementParEquipe n'ont PAS été modifiés. Leur
+ *          signature d'entrée reste identique. PostgREST ramène
+ *          naturellement la nouvelle colonne compo_status_summary
+ *          (sql/29, dette C9-d) ajoutée aux 4 RPC événements pour
+ *          alimenter les pastilles statut compo des cartes UI.
+ *          Note historique : initialement bumpé en v1.9 ce matin
+ *          (S1.4 conv Joueurs/Évènements) mais non poussé. Pendant ce
+ *          temps une autre conv a livré v1.8.5 + v1.8.6 sur le module
+ *          Préparation séance (transitions état + suppression séance).
+ *          Merge propre en v1.10 par-dessus v1.8.6 sans rien écraser.
  */
 
 (function (global) {
@@ -385,6 +410,73 @@
         p_equipe_id: equipeId
       });
       if (error) { console.error('MOM Hub: getProchainEvenementParEquipe()', error); return null; }
+      return Array.isArray(data) && data.length > 0 ? data[0] : null;
+    },
+
+    // ============================================================
+    // PHASE 4.4 UI ÉVÈNEMENTS — RPC événements v1.10 (C9-a/b)
+    // ============================================================
+
+    /**
+     * Liste les événements passés d'une équipe (ou toutes équipes si null).
+     * Symétrique de getEvenementsAVenir. ORDER BY date_debut DESC, plafond
+     * configurable. Inclut les événements en état 'annule' (visibles barrés
+     * côté UI, cohérent doc Conception §3.5). Exclut 'archive' (état
+     * explicite de sortie de circulation).
+     *
+     * Chaque ligne contient la nouvelle colonne compo_status_summary JSONB
+     * { total, brouillon, validee, utilisee } pour les pastilles statut compo.
+     *
+     * @param {string|null} [equipeId=null] UUID de l'équipe (null = toutes)
+     * @param {number} [joursPasses=30] Fenêtre temporelle passée en jours
+     * @param {number} [limit=50] Plafond résultats (cf. RPC p_limit)
+     * @returns {Promise<Array>} 0..N événements passés, [] si erreur
+     */
+    async getEvenementsPasses(equipeId = null, joursPasses = 30, limit = 50) {
+      const { data, error } = await client.rpc('get_evenements_passes', {
+        p_equipe_id:    equipeId,
+        p_jours_passes: joursPasses,
+        p_limit:        limit
+      });
+      if (error) { console.error('MOM Hub: getEvenementsPasses()', error); return []; }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * Fiche événement détaillée + array enrichi des encadrants. Aucun
+     * filtre etat côté RPC : utilisable sur un événement annulé ou
+     * archivé (cas réactivation, audit, lecture historique).
+     *
+     * Format de la colonne encadrants (jsonb array) retournée par la RPC :
+     *   [
+     *     {
+     *       personne_id: "uuid",
+     *       nom: "JUNG",
+     *       prenom: "Emmanuel",
+     *       roles_encadrement: ["coach_principal"],
+     *       ordre: 1,
+     *       notes: null
+     *     },
+     *     ...
+     *   ]
+     * Tri encadrants côté serveur : ordre NULLS LAST, puis date_creation ASC.
+     *
+     * Le retour inclut aussi compo_status_summary (JSONB des compteurs
+     * de compos par état) + les colonnes héritées du noyau événement.
+     *
+     * @param {string} evenementId UUID de l'événement
+     * @returns {Promise<Object|null>} L'événement complet (24 colonnes)
+     *                                  ou null si non trouvé / erreur
+     */
+    async getEvenementWithEncadrants(evenementId) {
+      if (!evenementId) {
+        console.error('MOM Hub: getEvenementWithEncadrants() requiert un evenementId');
+        return null;
+      }
+      const { data, error } = await client.rpc('get_evenement_with_encadrants', {
+        p_evenement_id: evenementId
+      });
+      if (error) { console.error('MOM Hub: getEvenementWithEncadrants()', error); return null; }
       return Array.isArray(data) && data.length > 0 ? data[0] : null;
     },
 
@@ -1648,7 +1740,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.8.6 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.10 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
