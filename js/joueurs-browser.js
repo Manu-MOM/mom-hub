@@ -605,14 +605,14 @@ window.JoueursBrowser = (function () {
 
     bodyEl.innerHTML = ''
       + renderFicheIdentite(d)
+      + renderFicheActions(d)
       + renderFicheProfilSportif(d)
       + renderFicheEtatMetier(d)
       + renderFicheFFR(d)
       + renderFicheCoordonnees(d)
       + renderFicheScolarite(d)
       + renderFicheRGPD(d)
-      + renderFicheMetadonnees(d)
-      + renderFicheActions(d);
+      + renderFicheMetadonnees(d);
   }
 
   function renderFicheIdentite(d) {
@@ -1226,7 +1226,7 @@ window.JoueursBrowser = (function () {
   // ============================================================
 
   async function init() {
-    console.log('Joueurs: init() — v1.1 (S2.2 + S2.3 + S2.4 édition)');
+    console.log('Joueurs: init() — v1.2 (grille + boutons haut fiche)');
 
     // 1. Préfs + bindings UI
     loadPrefs();
@@ -1273,7 +1273,7 @@ window.JoueursBrowser = (function () {
     _byId: () => JOUEURS_BY_ID,
     _postesById: () => POSTES_BY_ID,
     _aptitudesById: () => APTITUDES_BY_ID,
-    _version: 'v1.1'
+    _version: 'v1.2'
   };
 
 })();
