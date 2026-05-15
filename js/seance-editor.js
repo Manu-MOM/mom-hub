@@ -446,6 +446,166 @@
    * Bind les boutons du picker à tags : × pour retirer, + Ajouter pour ouvrir
    * le menu d'ajout.
    */
+  /**
+   * Rendu des tags encadrants (Phase 5.12 TER).
+   * Identique au pattern matériel : tags cliquables avec bouton ×
+   */
+  function renderEncadrantsTags(encadrantsStr) {
+    const tags = stringToTags(encadrantsStr);
+    let html = '';
+    tags.forEach(function (tag, idx) {
+      html +=
+        '<span class="seance-encadrants-tag">' +
+          '<span class="seance-encadrants-tag__label">' + escapeHtml(tag) + '</span>' +
+          '<button type="button" class="seance-encadrants-tag__remove" data-tag-idx="' + idx + '" title="Supprimer">×</button>' +
+        '</span>';
+    });
+    html +=
+      '<button type="button" id="seance-encadrants-add" class="seance-encadrants-tag__add">+ Ajouter…</button>';
+    return html;
+  }
+
+  function refreshEncadrantsTags() {
+    const container = document.getElementById('seance-encadrants-tags');
+    const hidden = document.getElementById('seance-input-encadrants');
+    if (!container || !hidden) return;
+    container.innerHTML = renderEncadrantsTags(hidden.value);
+    bindEncadrantsTags();
+  }
+
+  function bindEncadrantsTags() {
+    const container = document.getElementById('seance-encadrants-tags');
+    const hidden = document.getElementById('seance-input-encadrants');
+    if (!container || !hidden) return;
+
+    // Boutons × de chaque tag
+    container.querySelectorAll('.seance-encadrants-tag__remove').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const idx = parseInt(btn.getAttribute('data-tag-idx'), 10);
+        const tags = stringToTags(hidden.value);
+        tags.splice(idx, 1);
+        hidden.value = tagsToString(tags);
+        setDirty(true);
+        refreshEncadrantsTags();
+      });
+    });
+
+    // Bouton "+ Ajouter…"
+    const btnAdd = document.getElementById('seance-encadrants-add');
+    if (btnAdd) {
+      btnAdd.addEventListener('click', function () {
+        openEncadrantsMenu(btnAdd);
+      });
+    }
+  }
+
+  function openEncadrantsMenu(anchorBtn) {
+    closeEncadrantsMenu();
+
+    const hidden = document.getElementById('seance-input-encadrants');
+    if (!hidden) return;
+    const tagsActuels = new Set(stringToTags(hidden.value));
+
+    // Propositions depuis State.encadrantsRef (chargé par loadEncadrantsForCategorie)
+    const propose = (State.encadrantsRef || []).map(e => e.nom);
+
+    let html =
+      '<div id="seance-encadrants-menu" class="seance-encadrants-menu">' +
+        '<div class="seance-encadrants-menu__header">' +
+          '<span class="seance-encadrants-menu__title">Ajouter un encadrant</span>' +
+          '<button type="button" id="seance-encadrants-menu-close" ' +
+                  'class="seance-encadrants-menu__close" title="Fermer">✕</button>' +
+        '</div>' +
+        '<div class="seance-encadrants-menu__list">';
+    propose.forEach(function (enc) {
+      const deja = tagsActuels.has(enc);
+      html +=
+        '<button type="button" class="seance-encadrants-menu__item' +
+                  (deja ? ' is-disabled' : '') + '" ' +
+                'data-encadrant="' + escapeHtml(enc) + '"' +
+                (deja ? ' disabled' : '') + '>' +
+          escapeHtml(enc) +
+          (deja ? ' <span class="seance-encadrants-menu__deja">déjà ajouté</span>' : '') +
+        '</button>';
+    });
+    html +=
+        '</div>' +
+        '<div class="seance-encadrants-menu__custom">' +
+          '<input type="text" id="seance-encadrants-custom" ' +
+                 'class="seance-encadrants-menu__input" ' +
+                 'placeholder="Ou tape un encadrant personnalisé…" ' +
+                 'maxlength="80">' +
+          '<button type="button" id="seance-encadrants-custom-add" ' +
+                  'class="seance-encadrants-menu__add-btn">+ Ajouter</button>' +
+        '</div>' +
+      '</div>';
+
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = html;
+    anchorBtn.parentNode.insertBefore(wrapper.firstChild, anchorBtn.nextSibling);
+
+    const menu = document.getElementById('seance-encadrants-menu');
+    if (!menu) return;
+
+    document.getElementById('seance-encadrants-menu-close').addEventListener('click', closeEncadrantsMenu);
+
+    menu.querySelectorAll('.seance-encadrants-menu__item').forEach(function (item) {
+      item.addEventListener('click', function () {
+        if (item.disabled) return;
+        const enc = item.getAttribute('data-encadrant');
+        addEncadrant(enc);
+      });
+    });
+
+    const inputCustom = document.getElementById('seance-encadrants-custom');
+    const btnCustomAdd = document.getElementById('seance-encadrants-custom-add');
+    function tryAddCustom() {
+      const v = (inputCustom.value || '').trim();
+      if (v) addEncadrant(v);
+    }
+    btnCustomAdd.addEventListener('click', tryAddCustom);
+    inputCustom.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        tryAddCustom();
+      }
+    });
+
+    setTimeout(function () {
+      document.addEventListener('click', onEncadrantsMenuClickOutside);
+    }, 0);
+
+    if (inputCustom) setTimeout(function () { inputCustom.focus(); }, 0);
+  }
+
+  function closeEncadrantsMenu() {
+    const menu = document.getElementById('seance-encadrants-menu');
+    if (menu) menu.parentNode.removeChild(menu);
+    document.removeEventListener('click', onEncadrantsMenuClickOutside);
+  }
+
+  function onEncadrantsMenuClickOutside(e) {
+    const menu = document.getElementById('seance-encadrants-menu');
+    if (!menu) return;
+    if (menu.contains(e.target)) return;
+    const addBtn = document.getElementById('seance-encadrants-add');
+    if (addBtn && addBtn.contains(e.target)) return;
+    closeEncadrantsMenu();
+  }
+
+  function addEncadrant(enc) {
+    const hidden = document.getElementById('seance-input-encadrants');
+    if (!hidden) return;
+    const tags = stringToTags(hidden.value);
+    if (tags.indexOf(enc) === -1) {
+      tags.push(enc);
+      hidden.value = tagsToString(tags);
+      setDirty(true);
+    }
+    closeEncadrantsMenu();
+    refreshEncadrantsTags();
+  }
+
   function bindMaterielTags() {
     const container = document.getElementById('seance-materiel-tags');
     const hidden = document.getElementById('seance-input-materiel');
@@ -1241,6 +1401,9 @@
 
     // Phase 5.12 : bind picker à tags matériel global
     bindMaterielTags();
+
+    // Phase 5.12 TER : bind picker à tags encadrants
+    bindEncadrantsTags();
 
     // Phase 5.6.A : rendu de la trame chronologique sous le formulaire
     renderTrame();
