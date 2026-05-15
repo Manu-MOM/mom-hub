@@ -1,5 +1,5 @@
 # MOM Hub · STATE.md
-**État global du projet au 15 mai 2026**
+**État global du projet au 15 mai 2026, fin d'après-midi**
 
 ---
 
@@ -7,11 +7,12 @@
 
 | Aspect | Statut | Détail |
 |--------|--------|--------|
-| **Phases complétées** | 5 / 5.12 (BIS, TER) | Préparation de séance finalisée avec encadrants dynamiques |
-| **Modules repo** | 4/4 actifs | Accueil, Compositions, Séances, Ateliers |
+| **Phases complétées** | Phase 5.12 TER + Phase 4.4 UI Évènements complète | Préparation séance + Module Évènements V1 livré |
+| **Modules repo actifs** | 5/5 | Accueil v2, Compositions, Séances, Bibliothèque, Évènements |
 | **Référentiels** | 7/7 | postes, ateliers, aptitudes, conformité FFR, observables, tests, encadrants |
-| **Commits prêts** | 3 | seance-editor v1.10 TER, seance.html ctx, STATE.md |
-| **Prochaine conv** | Joueurs/Événements | Phase 5.13 — Core Joueur + gestion événements |
+| **Commits 15 mai matin** | 4 | seance-editor v1.11 TER, seance.html, encadrants JSON, STATE.md |
+| **Commits 15 mai après-midi** | 9 | sql/29, sql/30, sql/31, supabase-client.js v1.11, evenements.html v4, evenements-browser.js v1.4.1, index.html v2, STATE.md, + kickoffs |
+| **Prochaine conv** | Module Joueurs (Phase 5.14) | Audit + conception + production module Joueurs |
 
 ---
 
@@ -20,213 +21,273 @@
 ### **Dossier `/` racine**
 ```
 mom-hub/
-├── index.html                    (Accueil, portail modules)
-├── seance.html                   (Préparation séance, Phase 5.12)
+├── index.html                    (Accueil v2, portail 5 sections 20 tuiles)
+├── seance.html                   (Préparation séance, Phase 5.12 TER)
 ├── compositions.html             (Compositions, Phase 4.4)
+├── evenements.html               (Évènements V1, S2.4.b — NEW 15 mai)
+├── bibliotheque.html             (Bibliothèque ateliers EDR)
 ├── css/
 │   ├── hub.css                   (Thème MOM + variables globales)
 │   ├── compositions.css
 │   └── seance.css
-├── js/ (ou intégré inline)
-│   ├── supabase-client.js       (v1.8.6, RPC wrappers)
-│   ├── seance-editor.js         (v1.10 TER, IIFE)
-│   └── compositions-editor.js   (v2.1.5)
-├── data/
-│   ├── propositions-seance.json (v1.0, matériel + méta + Axe 4)
-│   ├── encadrants-par-categorie.json (v1.0, NEW — sync dynamique)
-│   ├── fiches-all.json          (~140 KB, 62 fiches atelier)
-│   ├── types-blocs.json
-│   ├── vocabulaire-seance.json
-│   ├── groupes-joueur.json
-│   └── [autres referentiels]
+├── js/
+│   ├── supabase-client.js        (v1.11, RPC wrappers + 7 wrappers WRITE évents)
+│   ├── seance-editor.js          (v1.11 TER, IIFE)
+│   ├── compositions-editor.js    (v2.1.5)
+│   └── evenements-browser.js     (v1.4.1, IIFE — NEW 15 mai)
+├── sql/
+│   ├── 29-rpc-evenements-c9.sql     (RPC C9 lecture, NEW 15 mai)
+│   ├── 30-rpc-evenements-c9-fix.sql (fix evenement_parent_id, NEW 15 mai)
+│   └── 31-rpc-evenements-c9-fix2.sql (fix phase_libelle+ordre, NEW 15 mai)
+├── data/                         (référentiels inchangés)
 ├── assets/
-│   └── logo-m2m.png
 └── README.md
-```
-
-### **Dossier Drive `/01 - Référentiels`** (7 fichiers)
-```
-01 - Référentiels/
-├── postes.json (v1.1)
-├── ateliers.json
-├── aptitudes.json
-├── conformite-ffr.json
-├── observables-match.json
-├── tests-physiques.json
-└── encadrants-par-categorie.json (v1.0, NEW — 15 mai)
-   └── 7 encadrants M14 (Emmanuel Jung, Milan Gonthier, Vivien Rulfo, etc.)
 ```
 
 ---
 
 ## 📋 Phases complétées
 
-### **Phase 5 — Préparation de séance** ✅
+### **Phase 5 — Préparation de séance** ✅ (matin du 15 mai)
 
-#### **Phase 5.5 (Clos 14 mai)**
-- [x] Éditeur formulaire 6 champs méta + autosave 30s
-- [x] 5 champs secondaires (météo, encadrants, objectifs, bloc_cycle, matériel global)
-- [x] 2 dropdowns (lieu, événement)
+Phases 5.5 → 5.12 TER inchangées. Voir versions précédentes du STATE.md pour le détail.
 
-#### **Phase 5.6 (Clos 14 mai)**
-- [x] Trame chronologique (table blocs triée par horaire)
-- [x] Actions bloc (↑ ↓ 🗑 avec repli/dépli du form méta)
+Synthèse : seance-editor.js v1.11 TER (3924 lignes, picker encadrants complet) + seance.html Phase 5.12 TER (2290 lignes, contexte categorie_uuid dynamique) + data/encadrants-par-categorie.json v1.0 (7 encadrants M14) + variable globale `window.momSeanceContext`.
 
-#### **Phase 5.7 (Clos 14 mai)**
-- [x] Éditeur détail bloc (10 champs FFR Axe 4)
-- [x] Comportements attendus + organisation spatio-temporelle
+---
 
-#### **Phase 5.8 (Clos 14 mai)**
-- [x] Picker ateliers (62 fiches rattachées par bloc)
-- [x] Recherche insensible accents, Drive link enrichi
+### **Phase 4.4 UI Évènements — Module Évènements V1** ✅ (après-midi du 15 mai)
 
-#### **Phase 5.9 (Clos 14 mai)**
-- [x] Groupes G1/G2/G3 par bloc (perf/dev/init)
-- [x] Vivier M14 enrichi (Phase 4.3 ✅)
+Module complet livré dans **une seule conv** (Joueurs/Évènements), découpé en **S1 backend + S2 UI** selon doctrine MOM Hub :
 
-#### **Phase 5.12 (Clos 15 mai)**
-- [x] Propositions-seance.json v1.0 (208 entrées, 4 sections)
-- [x] Picker matériel (20 items + saisie libre)
-- [x] Datalist méta/bloc/Axe 4 dynamiques
-- [x] Document Word MOM-Hub_propositions-seance-V1.0.docx uploadé Drive
+#### **S1 — Backend RPC + wrappers lecture (Clos ~14h30)**
 
-#### **Phase 5.12 BIS (Clos 15 mai, 11h)**
-- [x] Datalist "Autres…" filtré HTML (marqueur éditeur only)
-- [x] Picker matériel tags multi-select (pattern cohérent)
-- [x] seance-editor.js v1.9 BIS (3739 lignes, 154 KB)
+- [x] **sql/29-rpc-evenements-c9.sql** — 4 RPC C9 :
+  - `get_evenements_a_venir(equipe_id, jours_a_venir)` — modifiée (ajout `compo_status_summary JSONB`)
+  - `get_prochain_evenement_par_equipe(equipe_id)` — recréée
+  - `get_evenements_passes(equipe_id, jours_passes, limit)` — NOUVELLE (C9-a)
+  - `get_evenement_with_encadrants(evenement_id)` — NOUVELLE (C9-b, retourne array JSONB encadrants)
+- [x] **js/supabase-client.js v1.8.6 → v1.10** — merge propre (saut v1.9 documenté) :
+  - 2 wrappers lecture : `getEvenementsPasses`, `getEvenementWithEncadrants`
+  - Préservation totale des wrappers Phase 5.12 (séances)
+- [x] **Test data SQL** : 6 matchs enfants au tournoi Challenge Vié via `test-matchs-enfants-challenge-vie.sql` (NON commit, diagnostic local)
 
-#### **Phase 5.12 TER (Clos 15 mai, 15h)** 🆕
-- [x] Encadrants synchronisés par catégorie (cat-m14 = 7 staff)
-- [x] Référentiel `data/encadrants-par-categorie.json` v1.0 créé + Drive
-- [x] `loadEncadrantsForCategorie()` + init async dans seance-editor.js
-- [x] Variable globale `window.momSeanceContext` (categorie_uuid, equipe_uuid)
-- [x] Pattern dynamique : catégorie → fetch encadrants → datalist picker
-- [x] seance-editor.js v1.10 TER (3763 lignes, 155 KB)
-- [x] seance.html v1.10 TER (variable contexte + 2172 lignes)
+#### **S2.1 — Squelette UI (Clos ~15h15)**
+
+- [x] **evenements.html v1** (598 lignes) — topbar Hub partagée, KPIs, recherche, filtres TYPE (5) + COMPÉT (4), layout 1fr 280px, FAB, 3 modales squelettes
+- [x] **js/evenements-browser.js v1.0** (438 lignes) — IIFE calqué sur bibliotheque-browser.js, state filtres, prefs localStorage
+
+#### **S2.2 — Cartes + déploiement tournois + mini-cal (Clos ~15h45)**
+
+- [x] **evenements.html v2** (948 lignes) — +350 lignes CSS : cartes avec trait coloré gauche par type_competition, icône SVG type, pastilles statut compo (4 états), animation flash highlight, déploiement tournoi inline, mini-cal grid 7 colonnes L-D
+- [x] **js/evenements-browser.js v1.1** (733 lignes) — buildIndexes() EVENTS_BY_ID + CHILDREN_BY_PARENT, TYPE_ICONS, statutCompoBadge, renderCard avec chevron tournoi, renderEnfantsTournoi groupés par phase, renderMiniCal + scrollToFirstEventOfDay
+
+##### **S2.2.fix — 2 patches SQL + correction JS**
+
+- [x] **sql/30-rpc-evenements-c9-fix.sql** — Ajout `evenement_parent_id UUID` aux 3 RPC liste (17 → 18 cols). Sans cette colonne, les matchs enfants remontaient comme racines, KPI à 21 au lieu de 15.
+- [x] **sql/31-rpc-evenements-c9-fix2.sql** — Ajout `phase_libelle TEXT` + `ordre_dans_phase INTEGER` aux 3 RPC liste (18 → 20 cols). Sans ces colonnes, déploiement tournoi affichait "(sans phase)" au lieu des phases attendues.
+- [x] **js/evenements-browser.js v1.2** (756 lignes) — fix renderEnfantCard : si libellé commence par "vs " (case-insensitive), ne pas réafficher adversaire_nom (évite doublon "vs Nancy  vs Nancy")
+
+#### **S2.3 — Fiche détaillée slide-in droite (Clos ~16h15)**
+
+- [x] **evenements.html v3** (1283 lignes) — +335 lignes : panneau slide-in droite 480px (mobile plein écran), overlay 32% noir, header sticky, 7 sections empilées
+- [x] **js/evenements-browser.js v1.3** (1051 lignes) — `openFiche`, `closeFiche`, `renderFiche` avec 7 sections conditionnelles (Identité, Score si rempli, Phases si tournoi, Parent si enfant, Logistique conditionnelle, Encadrants, Notes, Actions). Clic carte parent OU enfant ouvre fiche. Mode lecture seule V1, boutons disabled avec tooltip "Câblage en S2.4". Fermeture Escape + clic overlay + ✕. Wrapper : `getEvenementWithEncadrants`.
+
+#### **S2.4.a — 7 wrappers WRITE supabase-client (Clos ~16h45)**
+
+- [x] **js/supabase-client.js v1.10 → v1.11** (2178 lignes, +431) — 7 wrappers ÉCRITURE (doc Conception §9.1) :
+  1. `createEvenement(payload)` — INSERT, etat forcé 'creation', whitelist 17 champs
+  2. `duplicateEvenement(srcId, overrides)` — V1 duplique parent seul (dette V2 cascade)
+  3. `addMatchToTournoi(tournoiId, payload)` — hérite type_competition/saison/equipe/organisateur/format/site du parent
+  4. `updateEvenement(id, patch)` — UPDATE whitelist 15 champs métier
+  5. `cancelEvenement(id, motif)` — etat → 'annule', garde-fou `.in('etat',...)`, motif dans notes_resultat préfixé '[ANNULÉ]'
+  6. `reactivateEvenement(id)` — etat 'annule' → 'creation', garde-fou `.eq('etat','annule')`
+  7. `updateLogistique(id, jsonbPayload)` — UPDATE colonne logistique_deplacement, accepte null
+- Conventions Hub : `{ ok, data?, error? }`, `.maybeSingle()`, `console.error('MOM Hub: <fn>()', error)`, JSDoc complet
+- Smoke test console PASSÉ : cancel + reactivate Challenge Vié OK
+
+#### **S2.4.b — Câblage 3 modales E3/E4/E5 (Clos ~17h)**
+
+- [x] **evenements.html v4** (1533 lignes, +250) — Forms HTML complets :
+  - E3 Création : radio 5 types, libellé, date début/fin (cond.), site dropdown dynamique, type_competition (cond.), format_de_jeu (cond.), adversaire, domicile_exterieur
+  - E4 Annulation : récap event + textarea motif + bouton rouge
+  - E5 Ajout match : phase (datalist autocomplete), libellé, heure, adversaire, format
+- [x] **js/evenements-browser.js v1.4** (1558 lignes, +507) — câblage complet :
+  - `loadModalContext()` : récupération **dynamique** saison_id + organisateur_principal_id (anti-invention)
+  - 3 paires `openModal*/closeModal*/submitModal*`
+  - `bindFicheActions()` : Annuler/Réactiver de la fiche (Modifier reporté V1.1)
+  - `reloadEvents()` : recharge sans reload de page
+  - `generateEventCode()` : pattern EVT-YYYY-MM-DD-TYPE-M14-RAND
+
+#### **S2.5 — Clôture (Clos ~17h30)**
+
+- [x] **index.html v1 → v2** (1121 lignes) — Refonte portail selon `Conception-Portail-Architecture-v2.md` :
+  - Section 01 PÉDAGOGIE EDR : 4 tuiles (Ressources péda nouveau / Bibliothèque / Préparation séance / Planification annuelle renommée). Suppression "Comportements attendus" (absorbée).
+  - Section 02 MON ÉQUIPE : 5 tuiles (**Évènements DISPONIBLE** / Joueurs / Compos renommée / Suivis de Match nouveau / Statistiques nouveau). Suppression "Présences" + "Convocations" + "Carnet de progression".
+  - Section 03 LOGISTIQUE MOM : renommée (CLUB → MOM), 4 tuiles unifiées autour de "Réservation"
+  - Sections 04/05 inchangées
+- [x] **js/evenements-browser.js v1.4 → v1.4.1** (1581 lignes) — fix UX scroll modale : auto-scrollTop après message d'erreur/succès (sinon invisible si scrollé)
 
 ---
 
 ## 🔧 Versions dépendances
 
-| Package/Module | Version | Rôle | État |
-|--------|---------|------|------|
-| supabase-js | ~2.x | Auth + DB | ✅ v1.8.6 stable |
-| seance-editor.js | v1.10 TER | IIFE éditeur | ✅ 15 mai, loadEncadrants |
-| seance.html | Phase 5.12 TER | Template | ✅ window.momSeanceContext |
-| propositions-seance.json | v1.0 | Datalist + matériel | ✅ 208 items |
-| encadrants-par-categorie.json | v1.0 | Ref staff par cat | ✅ NEW, 7 encadrants M14 |
-| compositions-editor.js | v2.1.5 | Phase 4.4 | ✅ Stable |
+| Module | Version | État |
+|--------|---------|------|
+| supabase-client.js | **v1.11** | ✅ +7 wrappers WRITE évents |
+| seance-editor.js | v1.11 TER | ✅ Matin |
+| seance.html | Phase 5.12 TER | ✅ Matin |
+| **evenements.html** | **v4** | ✅ NEW après-midi |
+| **evenements-browser.js** | **v1.4.1** | ✅ NEW après-midi |
+| **index.html** | **v2** | ✅ Refondu après-midi |
+| compositions-editor.js | v2.1.5 | ✅ Stable |
 
 ---
 
-## 📍 Points clés doctrine Phase 5.12 TER
+## 📍 Points clés doctrinaux S1+S2 (cette conv)
 
-### **Synchronisation encadrants**
+### **Architecture module Évènements V1**
+
 ```
-Utilisateur connecté (cat-m14)
-  ↓
-window.momSeanceContext.categorie_uuid = 'cat-m14'
-  ↓
-loadEncadrantsForCategorie() fetch data/encadrants-par-categorie.json
-  ↓
-State.encadrantsRef = [...] (7 encadrants M14)
-  ↓
-Picker datalist (mêmes patterns que matériel)
-  ↓
-seance.encadrants_text = "Emmanuel Jung, Milan Gonthier, ..."
-```
-
-### **Simplicity rules**
-1. **Pas de complexité AJAX multi-tour** : categorie en variable globale
-2. **Fichier JSON éditable à la main** : ajouter/retirer encadrants sans code
-3. **Picker identique matériel** : cohérence UI/UX, zéro duplicata code
-4. **Saisie libre active** : coach peut ajouter ad-hoc (pas en liste)
-
-### **Whitelist updateSeance**
-```javascript
-// Seuls ces champs sont patchables :
-{
-  date_seance, heure_debut, duree_seance, effectif_prevu,
-  theme_seance, axe_travail_general, meteo_text, encadrants_text,
-  objectifs_text, bloc_cycle, materiel_global_text,
-  lieu_id, evenement_id, contenu_pedagogique_axe4_global,
-  notes_seance
-}
-// Pas de patch direct sur etat, seance_id, timestamps, etc.
+┌─────────────────────────────────────────────┐
+│ Page evenements.html (1533 lignes)          │
+│ • KPIs · filtres · liste cartes · mini-cal  │
+│ • 3 modales E3/E4/E5 · fiche slide-in       │
+└─────────────────┬───────────────────────────┘
+                  ↓
+┌─────────────────────────────────────────────┐
+│ js/evenements-browser.js v1.4.1 (1581 l.)   │
+│ Module IIFE window.EvenementsBrowser.init() │
+└─────────────────┬───────────────────────────┘
+                  ↓
+┌─────────────────────────────────────────────┐
+│ js/supabase-client.js v1.11 (2178 lignes)   │
+│ 2 wrappers RPC C9 + 7 wrappers WRITE        │
+└─────────────────┬───────────────────────────┘
+                  ↓
+┌─────────────────────────────────────────────┐
+│ sql/29 + sql/30 + sql/31                    │
+│ 4 RPC C9 → table evenements (RLS sql/25)    │
+└─────────────────────────────────────────────┘
 ```
 
-### **Brouillons vides (Phase 5.10)**
-Bug doctrinal : `loadBrouillonsVides()` appelé dans init mais pas utilisé. À remontrer après création d'une séance pour vider le brouillon du compteur.
+### **Anti-invention au runtime**
+- `saison_id` et `organisateur_principal_id` récupérés **dynamiquement** à l'init via lecture directe table evenements (dernier évent M14). Pas de hardcode.
+- Sites via `SupabaseHub.listSitesActifs()` (existant v1.8.1)
+- Seul `M14_TEAM_UUID` est constante module (équipe propriétaire de la page)
+
+### **Découpage S1/S2 — leçon doctrinale**
+La séparation **backend (S1) → UI (S2)** a payé. Bénéfices :
+- Smoke test SQL pur avant tout JS
+- Versionning JS distinct (v1.10 read-only puis v1.11 add WRITE)
+- Réaction rapide si modélisation backend a un défaut (sql/30 puis sql/31)
+
+### **Doctrine "tester avec données hiérarchiques"**
+Bug découvert en S2.2 : le smoke test S1 avait validé les RPC à vide d'enfants. Une fois 6 matchs créés sous Challenge Vié, on a découvert que `evenement_parent_id` n'était pas remonté. **Leçon** : quand modélisation contient self-référence, tester systématiquement avec données parent+enfants peuplées avant de clore S1.
+
+---
+
+## 🐛 Dettes ouvertes
+
+### **Dettes Phase 5.12 (matin) — préservées**
+- `loadBrouillonsVides()` appelé mais non utilisé après création séance
+
+### **Nouvelles dettes Phase 4.4 UI Évènements**
+
+#### **Dettes V1.1 (proches)**
+| Code | Description |
+|---|---|
+| P4-UI-evenements-1 | Bouton "✏️ Modifier" fiche détaillée disabled. Nécessite modale E6 avec form pré-rempli + `updateEvenement(id, patch)` |
+| P4-UI-evenements-2 | `duplicateEvenement` V2 cascade enfants (V1 duplique parent seul) |
+| P4-UI-evenements-3 | Section logistique fiche : affichage JSON brut V1, formattage structuré V1.1 |
+| P4-UI-evenements-4 | Auto-scroll modale fix UX ad-hoc dans 3 endroits — factoriser en helper `showModalMessage()` |
+
+#### **Dettes V2 (lointaines)**
+| Code | Description |
+|---|---|
+| P4-UI-evenements-5 | Multi-coachs : UUID organisateur récupéré du dernier évent — à revisiter pour onboarding nouveau coach |
+| P4-UI-evenements-6 | Filtre `etat` exposé dans l'UI (afficher/masquer annulés/archivés) |
+| P4-UI-evenements-7 | Édition encadrants depuis fiche détaillée (actuellement lecture seule) |
+| P4-UI-evenements-8 | Édition matchs enfants tournoi (drag&drop réordo, changement phase) |
+| P4-UI-evenements-9 | Pagination événements passés au-delà de 50 (limit actuelle) |
+| P4-UI-evenements-10 | Vue calendrier complet (mois entier en grille style Google Calendar) |
+
+### **Dettes Phase 4.4 wrappers WRITE (à monitor)**
+| Code | Description |
+|---|---|
+| C10-a | `cancelEvenement` cascade vers compositions actives (transition auto `validee` → `annulee` ?) — arbitrage post-Suivi Match |
+| C10-b | `cancelEvenement` annule pas matchs enfants tournoi annulé (cascade orchestrée UI V1 uniquement) |
+
+### **Dettes refonte portail v2**
+| Code | Description |
+|---|---|
+| Portail-V2-1 | Tuile "Préparation séance" reste DISPONIBLE alors que doc v2 la marque "À VENIR" — arbitrage : préserver l'état réel |
+| Portail-V2-2 | 11 dettes sessions conception module (cf. `Conception-Portail-Architecture-v2.md` §3) |
 
 ---
 
 ## 🚀 Prochaines phases (pipeline)
 
-### **Phase 5.13 — Joueurs & Événements** (Conv suivante)
-- **Joueur** : Core entity, attributs (prénom, nom, date_naissance, positions, etc.)
-- **Événement** : match, préparation, tournoi (lié aux séances)
-- **Kickoff** : doc prêt en `/mnt/user-data/outputs/kickoff-conv-joueurs-evenements.md`
+### **Phase 5.14 — Module Joueurs** (Conv suivante — kickoff prêt)
+- Audit Joueurs : conv Audits → `Audit-Module-Joueurs-v1.md`
+- Conception UX Joueurs : conv Conception Portail → session dédiée post-audit
+- Backend (S1) : RPC liste joueurs + fiche joueur, wrappers lecture
+- UI (S2) : page joueurs.html + js/joueurs-browser.js sur le modèle Évènements
+- Activation tuile "Joueurs" dans index.html section 02
 
-### **Phase 5.14+** (À définir)
-- Bilan séance (Phase 5.10 postponé)
-- Rapports statistiques (Phase 5.11 postponé)
-- Intégration OVAL-E (FFR license management) - **NOM CORRECT avec A**
-
----
-
-## 📁 Fichiers livrés Phase 5.12 TER
-
-| Fichier | Taille | Ligne | Statut | Destination |
-|---------|--------|-------|--------|-------------|
-| seance-editor.js | 155 KB | 3763 | ✅ À uploader | `/js/seance-editor.js` |
-| seance.html | 62 KB | 2163 | ✅ À uploader | `/seance.html` |
-| encadrants-par-categorie.json | 4 KB | 85 | ✅ Uploadé Drive | `01 - Référentiels/` (fileId: 1KydxHRx6YF6hRyE6mjbAgFIbFWze_kgg) |
-| STATE.md | Ceci | — | ✅ À uploader | `/` ou `outputs/` |
+### **Phase 5.15+**
+- Module Statistiques (post-Évènements + post-Joueurs)
+- Module Suivis de Match (transition `validee` → `utilisee`)
+- Module Ressources pédagogiques (catch-all)
+- Modules Logistique MOM (Infrastructures / Minibus / VEO / Autres)
 
 ---
 
-## ⚡ Checklist avant production
+## 📁 Fichiers à committer (15 mai après-midi)
 
-- [ ] seance-editor.js v1.10 TER testé sur séance existante
-- [ ] Variable `window.momSeanceContext` visible en DevTools
-- [ ] `data/encadrants-par-categorie.json` accessible via fetch
-- [ ] Picker encadrants popup (tags cliquables)
-- [ ] Saisie libre fonctionnelle
-- [ ] Autosave réagit à modifs encadrants
-- [ ] Drive links `encadrants-par-categorie.json` statables (cache 7j)
-- [ ] STATE.md en `/` du repo (symlink ou copie)
+| Fichier | Version | Statut |
+|---|---|---|
+| sql/29-rpc-evenements-c9.sql | v1.0 | ✅ Commité |
+| sql/30-rpc-evenements-c9-fix.sql | v1.0 | ✅ Commité |
+| sql/31-rpc-evenements-c9-fix2.sql | v1.0 | ✅ Commité |
+| js/supabase-client.js | v1.11 | ✅ Commité |
+| evenements.html | v4 | ✅ Commité |
+| js/evenements-browser.js | v1.4.1 | ✅ Commité |
+| index.html | v2 | ⏳ À committer |
+| STATE.md | (ce fichier) | ⏳ À committer |
 
 ---
 
-## 📝 Leçons doctrinales consolidées
+## 📝 Leçons doctrinales consolidées (cette conv)
 
-### **De Phase 5.12 TER**
-1. **Synchronisation dynamique > statique** : référentiel centralisé, load au démarrage
-2. **Variable contexte globale** : simple, pas d'API layer
-3. **Éditable JSON** : Manu peut ajouter/retirer staff sans déploiement
-4. **Pattern réutilisé** : matériel → encadrants → [futur: lieux?]
-5. **Fallback saisie libre** : robustesse si champ manquant/mal nommé
-
-### **Bug connu à corriger post-TER**
-- `loadBrouillonsVides()` appelé mais pas utilisé ← appeler après création séance pour vider le compteur brouillon
+1. **Découpage S1 backend / S2 UI** : pattern à reproduire pour Joueurs et tous modules futurs
+2. **Smoke test SQL avec données hiérarchiques** : tester systématiquement parent+enfants peuplés avant clore S1 (leçon sql/30+sql/31)
+3. **Anti-invention runtime** : tout UUID structurel doit venir d'une lecture base, pas d'un hardcode
+4. **Versioning JS micro** : v1.4 → v1.4.1 pour fix UX ponctuel (vs v1.5 pour feature)
+5. **Bumped en parallèle** : récupérer version GitHub réelle avant remplacement, merger explicitement (jamais écraser à l'aveugle)
+6. **Vérifier en base avant code** : `pg_get_function_result(oid)` avant de supposer qu'une colonne remonte
+7. **1 fichier = 1 commit** strictement respecté : 9 commits cet après-midi
+8. **Picker `ask_user_input_v0`** : utilisé à chaque clarif structurante — pas-à-pas doctrinal validé
+9. **UX scroll modale** : les messages d'erreur/succès doivent être visibles sans scroll utilisateur — auto-scrollTop systématique
 
 ### **Vocabulaire MOM Hub stabilisé**
 - **MOM** = Mutzig Ovalie Molsheim (club)
-- **SAR** = Structure partenaire ateliers (coach invité)
-- **OVAL-E** = Plateforme FFR license management (avec A)
-- **Référent** = Coach principal catégorie (Emmanuel Jung pour M14)
-- **Encadrants** = Staff (coachs, entraîneurs, assistants)
+- **SAR** = Structure partenaire ateliers
+- **OVAL-E** = Plateforme FFR license management
+- **Référent** = Coach principal catégorie
+- **Encadrants** = Staff
+- **S1 / S2** = découpage Backend / UI pour un module
+- **C9 / C10** = numérotation interne RPC évents
 
 ---
 
-## 🔐 Sécurité & Confidentialité
+## 🔐 Sécurité
 
-- Aucun identifiant personnel (email, tel) stocké en public
-- Encadrants = prénoms + noms (publics au club)
-- Drive access control via dossier Drive partagé
-- Cache navigateur 7j sur fiches + propositions + encadrants
+- RLS write sur table evenements (sql/25) : `has_role('admin') OR has_role('coach')` côté authenticated
+- Manu = admin (`auth_roles.user_id = 7ac40334...`, role = 'admin') → wrappers WRITE testés OK
+- Aucun identifiant personnel public, cache navigateur 7j
 
 ---
 
-**Document généré : 15 mai 2026, 15h30**
-**Prochaine maj attendue : Après Phase 5.13 (Joueurs/Événements)**
+**Document généré : 15 mai 2026, fin d'après-midi (post-S2.5)**
+**Prochaine maj : Après Phase 5.14 (Module Joueurs)**
