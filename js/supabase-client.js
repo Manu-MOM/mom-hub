@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.11 — mai 2026
+ * Version : 1.12 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -186,6 +186,41 @@
  *
  *          Tous les wrappers exploitent la RLS write en place (sql/25)
  *          via has_role('admin') OR has_role('coach') côté authenticated.
+ *
+ *   v1.12 : Phase 5.14 S1.b — Module Joueurs. 3 wrappers calqués sur le
+ *          pattern v1.11 Évènements et v1.7 Compositions :
+ *
+ *          (1) getJoueursEquipe(equipeId) : LECTURE de la liste des
+ *              joueurs actifs d'une équipe via la RPC SECURITY DEFINER
+ *              get_joueurs_equipe(p_equipe_id) (sql/33-fix v1.1).
+ *              Retourne un tableau ~22 colonnes par joueur, incluant les
+ *              champs calculés profil (mom/f15/partenaire/coach/staff)
+ *              et etat_calcule (actif/indisponible/blesse/suspendu/inactif).
+ *              Dette audit C10-J-f.
+ *
+ *          (2) getJoueurDetail(personneId) : LECTURE de la fiche
+ *              détaillée d'une personne via la RPC SECURITY DEFINER
+ *              get_joueur_detail(p_personne_id) (sql/33-fix v1.1).
+ *              Retourne un objet ~55 colonnes avec coordonnées, identité
+ *              étendue, RGPD, droits image, métadonnées. À utiliser pour
+ *              le panneau slide-in droite (S2.3). Dette audit C10-J-g.
+ *
+ *          (3) updateJoueurMetier(personneId, patch) : ÉCRITURE patch
+ *              partiel d'une fiche joueur via la RPC SECURITY DEFINER
+ *              update_joueur_metier(p_personne_id, p_patch) (sql/34-fix
+ *              v1.1). Whitelist 8 champs : postes_uuids, aptitudes_uuids,
+ *              taille_cm, poids_g, notes_coach, indisponibilite,
+ *              blessure_resume, suspension_jusqu_au. Toute clé hors
+ *              whitelist est ignorée silencieusement côté SQL.
+ *              Normalisation TEXT (trim + nullif empty → NULL).
+ *              Dette audit C10-J-j.
+ *
+ *          Note doctrinale : ces 3 wrappers passent tous par RPC (pas
+ *          de SELECT/UPDATE direct sur personnes) parce que la table
+ *          personnes est interdite en accès client direct (P6
+ *          confidentialité par construction, audit §2.2). Les RPC
+ *          SECURITY DEFINER bypassent la RLS et appliquent leur propre
+ *          contrôle d'accès (has_role + auth.uid).
  */
 
 (function (global) {
@@ -2161,6 +2196,168 @@
         return { ok: false, error: error.message };
       }
       return { ok: true, data };
+    },
+
+    // ============================================================
+    // PHASE 5.14 MODULE JOUEURS — WRAPPERS v1.12 (S1.b)
+    // ============================================================
+    //
+    // 3 wrappers basés sur les RPC SECURITY DEFINER de sql/33-fix et
+    // sql/34-fix. Doctrine : aucun SELECT/UPDATE direct sur personnes
+    // (P6 confidentialité par construction, audit §2.2). Toute lecture
+    // / écriture passe par RPC.
+    //
+    // Pattern de retour cohérent v1.7 compositions et v1.11 évènements :
+    //   - Lecture : retourne data (array ou objet) ou null en cas d'erreur
+    //   - Écriture : retourne { ok, data?, error? }
+    // ============================================================
+
+    /**
+     * Récupère la liste des joueurs actifs d'une équipe via RPC.
+     * (RPC : get_joueurs_equipe — sql/33-fix v1.1, dette audit C10-J-f)
+     *
+     * Filtre actifs : date_sortie IS NULL OR date_sortie >= CURRENT_DATE.
+     * Tri : nom puis prénom.
+     *
+     * Shape retourné par joueur (~22 colonnes utiles pour cartes liste) :
+     *   - Identité : id, nom, prenom, sexe, date_naissance
+     *   - Type / qualités : type_personne, f15_integree, numero_licence_ffr,
+     *     qualite_ffr
+     *   - Refs résolues : club_principal_id + club_principal_code +
+     *     club_principal_nom_court, categorie_id + categorie_libelle_court,
+     *     pole_attache_id + pole_libelle_court
+     *   - Profil sportif : postes_uuids, aptitudes_uuids, taille_cm, poids_g
+     *   - État métier : indisponibilite, blessure_resume, suspension_jusqu_au
+     *   - Équipe-joueurs : ej_statut, ej_niveau_profil, ej_club_provenance_*,
+     *     ej_date_affectation, ej_date_sortie
+     *   - Calculés :
+     *       profil ∈ {mom, f15, partenaire, coach, staff, autre}
+     *       etat_calcule ∈ {actif, indisponible, blesse, suspendu, inactif}
+     *
+     * @param {string} equipeId UUID de l'équipe (ex M14_TEAM_UUID)
+     * @returns {Promise<Array<Object>|null>} Liste des joueurs, ou null si erreur
+     */
+    async getJoueursEquipe(equipeId) {
+      if (!equipeId) {
+        console.error('MOM Hub: getJoueursEquipe() requiert un equipeId');
+        return null;
+      }
+      const { data, error } = await client.rpc('get_joueurs_equipe', {
+        p_equipe_id: equipeId
+      });
+      if (error) {
+        console.error('MOM Hub: getJoueursEquipe()', error);
+        return null;
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * Récupère la fiche détaillée d'une personne via RPC.
+     * (RPC : get_joueur_detail — sql/33-fix v1.1, dette audit C10-J-g)
+     *
+     * À utiliser pour le panneau slide-in droite (S2.3).
+     *
+     * Shape retourné (~55 colonnes) :
+     *   - Tout get_joueurs_equipe (sans contrainte d'équipe)
+     *   - + variantes nom_long / libelle_long
+     *   - + Coordonnées : email_*, telephone_*, adresse_postale, code_postal,
+     *     ville, pays
+     *   - + Identité étendue : lieu_naissance (jsonb), etablissement_scolaire,
+     *     classe_scolaire, personne_a_prevenir_urgence (jsonb)
+     *   - + FFR : date_fin_affiliation, annee_arrivee_club, validation_ffr
+     *   - + RGPD : consentement_rgpd_date, canal_communication_prefere,
+     *     droit_image_* (5 booléens), autorisation_intervention_medicale_urgence
+     *   - + Métadonnées : source_creation, modifie_par, synchronisation_statut,
+     *     visible_annuaire, tag_verifier, created_at, updated_at
+     *   - + notes_coach (réservé à la fiche détail, pas dans la liste)
+     *
+     * @param {string} personneId UUID de la personne
+     * @returns {Promise<Object|null>} Fiche complète ou null si introuvable / erreur
+     */
+    async getJoueurDetail(personneId) {
+      if (!personneId) {
+        console.error('MOM Hub: getJoueurDetail() requiert un personneId');
+        return null;
+      }
+      const { data, error } = await client.rpc('get_joueur_detail', {
+        p_personne_id: personneId
+      });
+      if (error) {
+        console.error('MOM Hub: getJoueurDetail()', error);
+        return null;
+      }
+      return Array.isArray(data) && data.length > 0 ? data[0] : null;
+    },
+
+    /**
+     * Met à jour les champs métier d'une fiche joueur via RPC partial-patch.
+     * (RPC : update_joueur_metier — sql/34-fix v1.1, dette audit C10-J-j)
+     *
+     * Whitelist 8 champs autorisés dans `patch` (toute autre clé est
+     * ignorée silencieusement côté SQL) :
+     *   - postes_uuids        Array<string> d'UUIDs de postes (postes.json v1.1)
+     *   - aptitudes_uuids     Array<string> d'UUIDs d'aptitudes (aptitudes.json v1.0)
+     *   - taille_cm           number entier 50-250 (cm) ou null
+     *   - poids_g             number entier 5000-250000 (grammes) ou null
+     *   - notes_coach         string ou "" (vide = reset à NULL via trim+nullif)
+     *   - indisponibilite     string ou "" (idem)
+     *   - blessure_resume     string ou "" (idem)
+     *   - suspension_jusqu_au string ISO date "YYYY-MM-DD" ou ""
+     *
+     * Comportement par clé :
+     *   - clé absente du patch  → champ inchangé en base
+     *   - clé présente          → champ écrasé (incl. NULL via "" pour TEXT/DATE)
+     *
+     * Validation côté wrapper :
+     *   - postes_uuids et aptitudes_uuids doivent être des arrays (ou absents)
+     *   - taille_cm / poids_g doivent être number ou null (ou absents)
+     *
+     * Autorisation côté RPC :
+     *   has_role('admin') OR has_role('coach') OR superuser DB (Studio).
+     *
+     * @param {string} personneId UUID de la personne à modifier
+     * @param {Object} patch Objet partiel avec les clés whitelistées
+     * @returns {Promise<{ok: boolean, data?: Object, error?: string}>}
+     *           data = shape personnes brut, appeler ensuite getJoueurDetail
+     *           pour la vue enrichie avec jointures.
+     */
+    async updateJoueurMetier(personneId, patch) {
+      if (!personneId) {
+        return { ok: false, error: 'personneId requis' };
+      }
+      if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
+        return { ok: false, error: 'patch doit être un objet JSON' };
+      }
+
+      // Validation pré-RPC des types JSON (pour messages d'erreur clairs côté UI)
+      if (patch.postes_uuids !== undefined && !Array.isArray(patch.postes_uuids)) {
+        return { ok: false, error: 'postes_uuids doit être un tableau' };
+      }
+      if (patch.aptitudes_uuids !== undefined && !Array.isArray(patch.aptitudes_uuids)) {
+        return { ok: false, error: 'aptitudes_uuids doit être un tableau' };
+      }
+      if (patch.taille_cm !== undefined && patch.taille_cm !== null
+          && patch.taille_cm !== '' && typeof patch.taille_cm !== 'number') {
+        return { ok: false, error: 'taille_cm doit être un nombre, null ou ""' };
+      }
+      if (patch.poids_g !== undefined && patch.poids_g !== null
+          && patch.poids_g !== '' && typeof patch.poids_g !== 'number') {
+        return { ok: false, error: 'poids_g doit être un nombre, null ou ""' };
+      }
+
+      const { data, error } = await client.rpc('update_joueur_metier', {
+        p_personne_id: personneId,
+        p_patch: patch
+      });
+
+      if (error) {
+        console.error('MOM Hub: updateJoueurMetier()', error);
+        return { ok: false, error: error.message || 'Erreur update_joueur_metier' };
+      }
+      // La RPC retourne SETOF personnes : prendre la 1ère ligne
+      const row = Array.isArray(data) && data.length > 0 ? data[0] : null;
+      return { ok: true, data: row };
     }
 
   };
@@ -2171,7 +2368,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.11 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.12 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
