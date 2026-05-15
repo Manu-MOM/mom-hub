@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.3 — S2.3 (15 mai 2026 après-midi)
+ * Version : 1.4 — S2.4.b (15 mai 2026 après-midi)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements (trait coloré, pastilles type,
  *          statut compo), regroupement par mois, déploiement inline
@@ -40,6 +40,13 @@
  *          conditionnelle, encadrants (array JSONB), notes_internes,
  *          score. Mode lecture seule (édition reportée S2.4 avec
  *          wrappers WRITE). Fermeture Escape + clic overlay + bouton ✕.
+ *   v1.4 : S2.4.b — câblage complet des 3 modales E3/E4/E5 avec les
+ *          wrappers WRITE v1.11. Récupération dynamique à l'init du
+ *          saison_id + organisateur_principal_id depuis le prochain
+ *          évent M14 (anti-invention). Chargement des sites actifs
+ *          via listSitesActifs (v1.8.1). Forms validés côté client,
+ *          appels createEvenement/cancelEvenement/addMatchToTournoi
+ *          via wrappers v1.11, reload de la liste après succès.
  */
 
 (function () {
@@ -62,6 +69,16 @@
 
   let EVENTS_BY_ID       = {};
   let CHILDREN_BY_PARENT = {};
+
+  // S2.4.b — Context global récupéré dynamiquement à l'init
+  // (pas de hardcode anti-doctrine — récupération via API)
+  let CTX_SAISON_ID       = null;
+  let CTX_ORGANISATEUR_ID = null;
+  let SITES               = [];   // [{id, libelle_court, libelle}]
+
+  // S2.4.b — Contexte courant des modales (event sélectionné pour E4, tournoi pour E5)
+  let MODAL_CANCEL_EVENT_ID  = null;
+  let MODAL_ADDMATCH_TOURNOI = null;   // objet event complet
 
   const state = {
     typesActifs:   new Set(['all']),
@@ -636,9 +653,8 @@
       // Rend le corps de la fiche
       body.innerHTML = renderFiche(evt);
 
-      // Câblage des actions internes de la fiche (S2.4 fera le vrai câblage
-      // des boutons Annuler / Modifier). Pour l'instant, juste le bouton
-      // fermer dans le header.
+      // Câblage des actions internes (Annuler / Réactiver)
+      bindFicheActions();
     } catch (err) {
       console.error('openFiche() erreur', err);
       body.innerHTML = '<div class="evt-fiche-error">Erreur de chargement : ' + escHtml(err.message || String(err)) + '</div>';
@@ -838,29 +854,503 @@
     // 8. ACTIONS EN PIED (S2.4 câblera les vrais boutons)
     // ────────────────────────────────────────────────
     html += '<div class="evt-fiche-actions">';
-    html += '<button type="button" class="evt-btn" disabled title="Câblage en S2.4">✏️ Modifier</button>';
+    html += '<button type="button" class="evt-btn" disabled title="Câblage en S2.5 (V1.1)">✏️ Modifier</button>';
     if (evt.etat === 'annule') {
       html += '<div class="evt-fiche-actions-spacer"></div>';
-      html += '<button type="button" class="evt-btn evt-btn-primary" disabled title="Câblage en S2.4">↩ Réactiver</button>';
+      html += '<button type="button" class="evt-btn evt-btn-primary" data-action="reactivate-from-fiche" data-event-id="' + escHtml(evt.id) + '">↩ Réactiver l\'évènement</button>';
     } else if (evt.etat !== 'archive') {
       html += '<div class="evt-fiche-actions-spacer"></div>';
-      html += '<button type="button" class="evt-btn evt-btn-danger" disabled title="Câblage en S2.4">🗑 Annuler l\'évènement</button>';
+      html += '<button type="button" class="evt-btn evt-btn-danger" data-action="cancel-from-fiche" data-event-id="' + escHtml(evt.id) + '">🗑 Annuler l\'évènement</button>';
     }
     html += '</div>';
 
     return html;
   }
 
+  /**
+   * Câble les actions internes de la fiche détaillée (boutons Annuler /
+   * Réactiver). Appelé après chaque renderFiche pour rebrancher les listeners.
+   */
+  function bindFicheActions() {
+    document.querySelectorAll('[data-action="cancel-from-fiche"]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        const id = this.getAttribute('data-event-id');
+        if (id) openModalCancel(id);
+      });
+    });
+    document.querySelectorAll('[data-action="reactivate-from-fiche"]').forEach(btn => {
+      btn.addEventListener('click', async function () {
+        const id = this.getAttribute('data-event-id');
+        if (!id) return;
+        this.disabled = true;
+        this.textContent = 'Réactivation…';
+        try {
+          const res = await SupabaseHub.reactivateEvenement(id);
+          if (!res || !res.ok) {
+            alert('Échec : ' + ((res && res.error) || 'erreur inconnue'));
+            this.disabled = false;
+            this.textContent = "↩ Réactiver l'évènement";
+            return;
+          }
+          // Succès : recharge + ré-ouvre fiche
+          closeFiche();
+          await reloadEvents();
+          openFiche(id);
+        } catch (err) {
+          console.error('reactivate-from-fiche', err);
+          alert('Erreur inattendue : ' + (err.message || err));
+          this.disabled = false;
+          this.textContent = "↩ Réactiver l'évènement";
+        }
+      });
+    });
+  }
+
   // ============================================================
-  // 7. MODALES E3 / E4 / E5 (S2.4 — câblage complet)
+  // 7. MODALES E3 / E4 / E5 (S2.4.b — câblage complet)
   // ============================================================
 
-  function openModalCreate()   { document.getElementById('evt-overlay-create').classList.add('show'); }
-  function closeModalCreate()  { document.getElementById('evt-overlay-create').classList.remove('show'); }
-  function openModalCancel(evenementId)  { document.getElementById('evt-overlay-cancel').classList.add('show'); }
-  function closeModalCancel()  { document.getElementById('evt-overlay-cancel').classList.remove('show'); }
-  function openModalAddMatch(tournoiId)  { document.getElementById('evt-overlay-addmatch').classList.add('show'); }
-  function closeModalAddMatch(){ document.getElementById('evt-overlay-addmatch').classList.remove('show'); }
+  // ────────────────────────────────────────────────
+  // Récupération du contexte (saison + organisateur + sites)
+  // ────────────────────────────────────────────────
+
+  /**
+   * Récupère dynamiquement saison_id + organisateur_principal_id depuis
+   * le prochain évent M14 en base. Évite tout hardcode (doctrine
+   * anti-invention). Charge aussi la liste des sites actifs pour le
+   * dropdown des modales.
+   */
+  async function loadModalContext() {
+    try {
+      // 1. Saison + organisateur depuis le prochain évent
+      if (window.SupabaseHub && typeof SupabaseHub.getProchainEvenementParEquipe === 'function') {
+        const proch = await SupabaseHub.getProchainEvenementParEquipe(M14_TEAM_UUID);
+        if (proch) {
+          // saison_id n'est pas dans le retour de cette RPC (pas dans les 20 cols)
+          // On va donc le récupérer depuis EVENEMENTS_AVENIR[0] ou EVENEMENTS_PASSES[0]
+          // qui ne le retournent pas non plus en réalité !
+          // → Fallback : on lit directement depuis la table evenements via from()
+        }
+      }
+
+      // Fallback fiable : lecture directe depuis la table evenements pour
+      // récupérer saison_id + organisateur_principal_id du dernier événement M14.
+      // Ces 2 champs ne sont pas dans le retour des RPC liste mais bien dans
+      // la table elle-même.
+      if (window.SupabaseHub && SupabaseHub.client) {
+        const { data, error } = await SupabaseHub.client
+          .from('evenements')
+          .select('saison_id, organisateur_principal_id')
+          .eq('equipe_id', M14_TEAM_UUID)
+          .order('date_debut', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (!error && data) {
+          CTX_SAISON_ID       = data.saison_id;
+          CTX_ORGANISATEUR_ID = data.organisateur_principal_id;
+          console.log('Modal context : saison=', CTX_SAISON_ID, 'organisateur=', CTX_ORGANISATEUR_ID);
+        } else if (error) {
+          console.warn('loadModalContext() lecture saison/organisateur', error);
+        }
+      }
+
+      // 2. Sites actifs pour le dropdown
+      if (window.SupabaseHub && typeof SupabaseHub.listSitesActifs === 'function') {
+        const sites = await SupabaseHub.listSitesActifs();
+        SITES = Array.isArray(sites) ? sites : [];
+        console.log('Modal context :', SITES.length, 'site(s) actif(s) chargé(s)');
+      } else {
+        console.warn('loadModalContext() : listSitesActifs indisponible (v1.8.1+ requis)');
+      }
+
+      // 3. Peuplement du dropdown sites dans la modale E3
+      populateSitesDropdown();
+
+    } catch (err) {
+      console.error('loadModalContext() erreur', err);
+    }
+  }
+
+  /** Peuple le <select> sites dans la modale E3 */
+  function populateSitesDropdown() {
+    const sel = document.getElementById('evt-create-site');
+    if (!sel) return;
+    // Conserve l'option "— Choisir —" en tête
+    let html = '<option value="">— Choisir un site —</option>';
+    SITES.forEach(s => {
+      const lib = s.libelle_court || s.libelle || '(sans nom)';
+      html += '<option value="' + escHtml(s.id) + '">' + escHtml(lib) + '</option>';
+    });
+    sel.innerHTML = html;
+  }
+
+  // ────────────────────────────────────────────────
+  // E3 — Modale Création
+  // ────────────────────────────────────────────────
+
+  function openModalCreate() {
+    // Réinitialise le form
+    const form = document.getElementById('evt-create-form');
+    if (form) form.reset();
+    // Coche par défaut "entrainement"
+    const radioEntr = document.querySelector('#evt-create-form input[name=type_evenement][value=entrainement]');
+    if (radioEntr) radioEntr.checked = true;
+    updateCreateConditionalFields();
+    const msg = document.getElementById('evt-create-msg');
+    if (msg) msg.innerHTML = '';
+    document.getElementById('evt-overlay-create').classList.add('show');
+  }
+
+  function closeModalCreate() {
+    document.getElementById('evt-overlay-create').classList.remove('show');
+  }
+
+  /**
+   * Affiche/masque les champs conditionnels de E3 selon le type sélectionné :
+   * - type_competition + format_de_jeu : seulement match / tournoi / journee_championnat
+   * - date_fin : seulement tournoi / stage
+   */
+  function updateCreateConditionalFields() {
+    const checked = document.querySelector('#evt-create-form input[name=type_evenement]:checked');
+    if (!checked) return;
+    const type = checked.value;
+
+    const competGroup = document.getElementById('evt-create-compet-group');
+    const formatGroup = document.getElementById('evt-create-format-group');
+    const dateFinGroup = document.getElementById('evt-create-date-fin-group');
+
+    const showCompet = ['match', 'tournoi', 'journee_championnat'].indexOf(type) !== -1;
+    const showFormat = ['match', 'tournoi', 'journee_championnat'].indexOf(type) !== -1;
+    const showDateFin = ['tournoi', 'stage'].indexOf(type) !== -1;
+
+    if (competGroup)  competGroup.style.display  = showCompet  ? '' : 'none';
+    if (formatGroup)  formatGroup.style.display  = showFormat  ? '' : 'none';
+    if (dateFinGroup) dateFinGroup.style.display = showDateFin ? '' : 'none';
+  }
+
+  /**
+   * Génère un code unique pour le nouvel évent (pattern interne).
+   * Format : EVT-YYYY-MM-DD-<TYPE>-M14-<RAND>
+   */
+  function generateEventCode(type, dateDebut) {
+    const d = new Date(dateDebut);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const typeShort = (type === 'entrainement' ? 'ENTR'
+                    : type === 'tournoi' ? 'TOURN'
+                    : type === 'match' ? 'MATCH'
+                    : type === 'stage' ? 'STAGE'
+                    : type === 'journee_championnat' ? 'JCHAMP'
+                    : 'EVT');
+    const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
+    return 'EVT-' + y + '-' + m + '-' + day + '-' + typeShort + '-M14-' + rand;
+  }
+
+  async function submitModalCreate() {
+    const submitBtn = document.getElementById('evt-create-submit');
+    const msg = document.getElementById('evt-create-msg');
+    if (!submitBtn || !msg) return;
+
+    // Pré-requis context
+    if (!CTX_SAISON_ID || !CTX_ORGANISATEUR_ID) {
+      msg.innerHTML = '<div class="evt-form-error">Contexte saison/organisateur non chargé. Rechargez la page.</div>';
+      return;
+    }
+
+    // Lecture du form
+    const f = document.getElementById('evt-create-form');
+    if (!f) return;
+
+    const typeChecked = f.querySelector('input[name=type_evenement]:checked');
+    if (!typeChecked) {
+      msg.innerHTML = '<div class="evt-form-error">Veuillez sélectionner un type d\'évènement</div>';
+      return;
+    }
+    const type = typeChecked.value;
+    const libelle = f.elements.libelle.value.trim();
+    const dateDebut = f.elements.date_debut.value;
+    const dateFin = f.elements.date_fin.value;
+    const siteId = f.elements.site_id.value;
+    const typeCompet = f.elements.type_competition.value;
+    const formatJeu = f.elements.format_de_jeu.value;
+    const adversaire = f.elements.adversaire_nom.value.trim();
+    const domicile = f.elements.domicile_exterieur.value;
+
+    // Validation
+    if (!libelle) {
+      msg.innerHTML = '<div class="evt-form-error">Le libellé est requis</div>';
+      return;
+    }
+    if (!dateDebut) {
+      msg.innerHTML = '<div class="evt-form-error">La date de début est requise</div>';
+      return;
+    }
+    if ((type === 'match' || type === 'journee_championnat') && !formatJeu) {
+      msg.innerHTML = '<div class="evt-form-error">Le format de jeu est requis pour ' + (type === 'match' ? 'un match' : 'une journée de championnat') + '</div>';
+      return;
+    }
+
+    // Construction du payload
+    const payload = {
+      code:                       generateEventCode(type, dateDebut),
+      libelle:                    libelle,
+      type_evenement:             type,
+      equipe_id:                  M14_TEAM_UUID,
+      saison_id:                  CTX_SAISON_ID,
+      organisateur_principal_id:  CTX_ORGANISATEUR_ID,
+      date_debut:                 new Date(dateDebut).toISOString()
+    };
+    if (dateFin)    payload.date_fin = new Date(dateFin).toISOString();
+    if (siteId)     payload.site_id = siteId;
+    if (typeCompet) payload.type_competition = typeCompet;
+    if (formatJeu)  payload.format_de_jeu = formatJeu;
+    if (adversaire) payload.adversaire_nom = adversaire;
+    if (domicile)   payload.domicile_exterieur = domicile;
+
+    // Appel wrapper
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Création…';
+    msg.innerHTML = '';
+    try {
+      const res = await SupabaseHub.createEvenement(payload);
+      if (!res || !res.ok) {
+        msg.innerHTML = '<div class="evt-form-error">Échec : ' + escHtml((res && res.error) || 'erreur inconnue') + '</div>';
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Créer l'évènement";
+        return;
+      }
+      // Succès → ferme la modale + reload de la liste
+      msg.innerHTML = '<div class="evt-form-success">✅ Évènement créé.</div>';
+      setTimeout(async () => {
+        closeModalCreate();
+        await reloadEvents();
+      }, 500);
+    } catch (err) {
+      console.error('submitModalCreate', err);
+      msg.innerHTML = '<div class="evt-form-error">Erreur inattendue : ' + escHtml(err.message || String(err)) + '</div>';
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Créer l'évènement";
+    }
+  }
+
+  // ────────────────────────────────────────────────
+  // E4 — Modale Annulation
+  // ────────────────────────────────────────────────
+
+  function openModalCancel(evenementId) {
+    if (!evenementId) return;
+    MODAL_CANCEL_EVENT_ID = evenementId;
+    const evt = EVENTS_BY_ID[evenementId];
+    const info = document.getElementById('evt-cancel-info');
+    const motif = document.getElementById('evt-cancel-motif');
+    const msg = document.getElementById('evt-cancel-msg');
+    if (motif) motif.value = '';
+    if (msg)   msg.innerHTML = '';
+    if (info && evt) {
+      let html = '<span class="evt-modal-info-strong">';
+      html += escHtml(formatDateShort(evt.date_debut)) + ' · ';
+      html += escHtml(TYPE_LABELS[evt.type_evenement] || evt.type_evenement);
+      html += '</span><br>';
+      html += escHtml(evt.libelle || '(sans libellé)');
+      if (evt.site_libelle_court) html += ' · ' + escHtml(evt.site_libelle_court);
+      if (evt.adversaire_nom) html += ' · vs ' + escHtml(evt.adversaire_nom);
+      // KPI compo
+      if (evt.compo_status_summary && evt.compo_status_summary.total > 0) {
+        html += '<br><em style="color:var(--ink-mute);">Cette annulation laissera orphelines : ' + evt.compo_status_summary.total + ' composition(s).</em>';
+      }
+      info.innerHTML = html;
+    } else if (info) {
+      info.innerHTML = '<em>Évènement non trouvé en cache.</em>';
+    }
+    document.getElementById('evt-overlay-cancel').classList.add('show');
+  }
+
+  function closeModalCancel() {
+    MODAL_CANCEL_EVENT_ID = null;
+    document.getElementById('evt-overlay-cancel').classList.remove('show');
+  }
+
+  async function submitModalCancel() {
+    if (!MODAL_CANCEL_EVENT_ID) return;
+    const submitBtn = document.getElementById('evt-cancel-submit');
+    const msg = document.getElementById('evt-cancel-msg');
+    const motifInput = document.getElementById('evt-cancel-motif');
+    if (!submitBtn || !msg || !motifInput) return;
+
+    const motif = motifInput.value.trim();
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Annulation…';
+    msg.innerHTML = '';
+    try {
+      const res = await SupabaseHub.cancelEvenement(MODAL_CANCEL_EVENT_ID, motif);
+      if (!res || !res.ok) {
+        msg.innerHTML = '<div class="evt-form-error">Échec : ' + escHtml((res && res.error) || 'erreur inconnue') + '</div>';
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Annuler l'évènement";
+        return;
+      }
+      msg.innerHTML = '<div class="evt-form-success">✅ Évènement annulé.</div>';
+      setTimeout(async () => {
+        const wasId = MODAL_CANCEL_EVENT_ID;
+        closeModalCancel();
+        closeFiche();
+        await reloadEvents();
+        // Ré-ouvre la fiche pour montrer l'état "annulé" + bouton Réactiver
+        if (wasId) openFiche(wasId);
+      }, 500);
+    } catch (err) {
+      console.error('submitModalCancel', err);
+      msg.innerHTML = '<div class="evt-form-error">Erreur inattendue : ' + escHtml(err.message || String(err)) + '</div>';
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Annuler l'évènement";
+    }
+  }
+
+  // ────────────────────────────────────────────────
+  // E5 — Modale Ajout match au tournoi
+  // ────────────────────────────────────────────────
+
+  function openModalAddMatch(tournoiId) {
+    if (!tournoiId) return;
+    const tournoi = EVENTS_BY_ID[tournoiId];
+    MODAL_ADDMATCH_TOURNOI = tournoi || { id: tournoiId };
+
+    const info = document.getElementById('evt-addmatch-info');
+    const form = document.getElementById('evt-addmatch-form');
+    const msg = document.getElementById('evt-addmatch-msg');
+    if (form) form.reset();
+    if (msg)  msg.innerHTML = '';
+
+    if (info && tournoi) {
+      let html = '<span class="evt-modal-info-strong">' + escHtml(tournoi.libelle || '(sans libellé)') + '</span>';
+      html += '<br>' + escHtml(formatDateShort(tournoi.date_debut));
+      if (tournoi.site_libelle_court) html += ' · ' + escHtml(tournoi.site_libelle_court);
+      info.innerHTML = html;
+    } else if (info) {
+      info.innerHTML = '<em>Tournoi parent en chargement…</em>';
+    }
+
+    // Datalist phases existantes (depuis les enfants déjà rattachés)
+    const datalist = document.getElementById('evt-addmatch-phases-datalist');
+    if (datalist) {
+      const existing = (CHILDREN_BY_PARENT[tournoiId] || [])
+        .map(c => c.phase_libelle)
+        .filter((v, i, arr) => v && arr.indexOf(v) === i);
+      datalist.innerHTML = existing.map(p => '<option value="' + escHtml(p) + '"></option>').join('');
+    }
+
+    document.getElementById('evt-overlay-addmatch').classList.add('show');
+  }
+
+  function closeModalAddMatch() {
+    MODAL_ADDMATCH_TOURNOI = null;
+    document.getElementById('evt-overlay-addmatch').classList.remove('show');
+  }
+
+  async function submitModalAddMatch() {
+    if (!MODAL_ADDMATCH_TOURNOI || !MODAL_ADDMATCH_TOURNOI.id) return;
+    const submitBtn = document.getElementById('evt-addmatch-submit');
+    const msg = document.getElementById('evt-addmatch-msg');
+    const form = document.getElementById('evt-addmatch-form');
+    if (!submitBtn || !msg || !form) return;
+
+    const phase = form.elements.phase_libelle.value.trim();
+    const libelle = form.elements.libelle.value.trim();
+    const heure = form.elements.heure.value;
+    const adversaire = form.elements.adversaire_nom.value.trim();
+    const format = form.elements.format_de_jeu.value;
+
+    if (!libelle) {
+      msg.innerHTML = '<div class="evt-form-error">Le libellé est requis</div>';
+      return;
+    }
+    if (!heure) {
+      msg.innerHTML = '<div class="evt-form-error">L\'heure de début est requise</div>';
+      return;
+    }
+
+    // Construit date_debut = jour du tournoi parent + heure choisie
+    let dateDebutISO;
+    try {
+      const parentDate = new Date(MODAL_ADDMATCH_TOURNOI.date_debut);
+      const [hh, mm] = heure.split(':').map(n => parseInt(n, 10));
+      parentDate.setHours(hh, mm, 0, 0);
+      dateDebutISO = parentDate.toISOString();
+    } catch (e) {
+      msg.innerHTML = '<div class="evt-form-error">Impossible de construire la date du match</div>';
+      return;
+    }
+
+    // Calcul ordre_dans_phase = max(ordre des matchs de cette phase) + 1
+    let ordreDansPhase = 1;
+    if (phase) {
+      const sameParent = CHILDREN_BY_PARENT[MODAL_ADDMATCH_TOURNOI.id] || [];
+      const samePhase = sameParent.filter(c => c.phase_libelle === phase);
+      if (samePhase.length > 0) {
+        const maxOrdre = Math.max.apply(null, samePhase.map(c => c.ordre_dans_phase || 0));
+        ordreDansPhase = maxOrdre + 1;
+      }
+    }
+
+    const payload = {
+      libelle:    libelle,
+      date_debut: dateDebutISO,
+      ordre_dans_phase: ordreDansPhase
+    };
+    if (phase)      payload.phase_libelle = phase;
+    if (adversaire) payload.adversaire_nom = adversaire;
+    if (format)     payload.format_de_jeu = format;
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Ajout…';
+    msg.innerHTML = '';
+    try {
+      const res = await SupabaseHub.addMatchToTournoi(MODAL_ADDMATCH_TOURNOI.id, payload);
+      if (!res || !res.ok) {
+        msg.innerHTML = '<div class="evt-form-error">Échec : ' + escHtml((res && res.error) || 'erreur inconnue') + '</div>';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Ajouter le match';
+        return;
+      }
+      msg.innerHTML = '<div class="evt-form-success">✅ Match ajouté.</div>';
+      setTimeout(async () => {
+        const wasTournoiId = MODAL_ADDMATCH_TOURNOI.id;
+        closeModalAddMatch();
+        await reloadEvents();
+        // Re-déplie le tournoi pour montrer le nouveau match
+        state.expandedTournois.add(wasTournoiId);
+        renderListe();
+      }, 500);
+    } catch (err) {
+      console.error('submitModalAddMatch', err);
+      msg.innerHTML = '<div class="evt-form-error">Erreur inattendue : ' + escHtml(err.message || String(err)) + '</div>';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Ajouter le match';
+    }
+  }
+
+  // ────────────────────────────────────────────────
+  // Helper commun : recharge la liste des évents après modif
+  // ────────────────────────────────────────────────
+
+  async function reloadEvents() {
+    try {
+      const [evtAvenir, evtPasses] = await Promise.all([
+        loadEvenementsAVenir(),
+        loadEvenementsPasses()
+      ]);
+      EVENEMENTS_AVENIR = evtAvenir;
+      EVENEMENTS_PASSES = evtPasses;
+      buildIndexes();
+      renderKPIs();
+      renderListe();
+      renderMiniCal();
+    } catch (err) {
+      console.error('reloadEvents() erreur', err);
+    }
+  }
 
   // ============================================================
   // 8. ÉVÉNEMENTS DOM
@@ -897,6 +1387,19 @@
     document.querySelectorAll('[data-action="close-create"]').forEach(b => b.addEventListener('click', closeModalCreate));
     document.querySelectorAll('[data-action="close-cancel"]').forEach(b => b.addEventListener('click', closeModalCancel));
     document.querySelectorAll('[data-action="close-addmatch"]').forEach(b => b.addEventListener('click', closeModalAddMatch));
+
+    // S2.4.b — Submit des 3 modales
+    const btnCreateSubmit = document.getElementById('evt-create-submit');
+    if (btnCreateSubmit) btnCreateSubmit.addEventListener('click', submitModalCreate);
+    const btnCancelSubmit = document.getElementById('evt-cancel-submit');
+    if (btnCancelSubmit) btnCancelSubmit.addEventListener('click', submitModalCancel);
+    const btnAddMatchSubmit = document.getElementById('evt-addmatch-submit');
+    if (btnAddMatchSubmit) btnAddMatchSubmit.addEventListener('click', submitModalAddMatch);
+
+    // S2.4.b — Changement de type dans E3 → afficher/masquer champs conditionnels
+    document.querySelectorAll('#evt-create-form input[name=type_evenement]').forEach(radio => {
+      radio.addEventListener('change', updateCreateConditionalFields);
+    });
 
     document.querySelectorAll('.evt-overlay').forEach(overlay => {
       overlay.addEventListener('click', function (e) {
@@ -981,7 +1484,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init S2.3 (v1.3)');
+    console.log('🏉 MOM Hub · Évènements Browser — init S2.4.b (v1.4)');
 
     const list = document.getElementById('evt-list');
 
@@ -1018,6 +1521,10 @@
       renderListe();
       renderMiniCal();
 
+      // S2.4.b — Charge le contexte des modales (saison, organisateur, sites)
+      // en arrière-plan, non bloquant pour l'affichage initial
+      loadModalContext();
+
       const smoke = document.getElementById('evt-footer-smoke');
       if (smoke) {
         const avenirRoots = EVENEMENTS_AVENIR.filter(e => !e.evenement_parent_id);
@@ -1045,7 +1552,7 @@
     closeFiche:        closeFiche
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.3 (S2.3) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.4 (S2.4.b) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
