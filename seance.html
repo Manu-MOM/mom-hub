@@ -282,6 +282,26 @@
       flex-wrap: wrap;
     }
 
+    /* Phase 5.6.B fix v1.4.1 : bouton ↑ Replier le formulaire */
+    .seance-form__collapse-btn {
+      padding: 5px 12px;
+      font-family: inherit;
+      font-size: 11.5px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--ink-mute);
+      cursor: pointer;
+      transition: background-color 0.1s, border-color 0.1s, color 0.1s;
+    }
+    .seance-form__collapse-btn:hover {
+      background: var(--vert-light);
+      border-color: var(--vert-prairie);
+      color: var(--vert-prairie);
+    }
+
     /* Pastille autosave (Phase 5.5.B2)
        3 états : idle (vert), saving (ambre), error (rouge) */
     .seance-autosave-pill {
