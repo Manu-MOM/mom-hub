@@ -11,7 +11,7 @@
  *   - 5.5.A : éditeur méta + sauvegarde manuelle (CETTE VERSION)
  *   - 5.5.B : autosave 30s + dropdowns lieu/événement + champs secondaires
  *
- * Version : 1.2 — Phase 5.5.B2 (15 mai 2026)
+ * Version : 1.3 — Phase 5.6.A (15 mai 2026)
  *   v1.0 : squelette IIFE, sidebar liste séances, bouton "+ Nouvelle séance",
  *          formulaire 6 champs méta (date, heure, durée, effectif, thème,
  *          axe de travail), sauvegarde manuelle via updateSeance(), feedback
@@ -30,9 +30,20 @@
  *          cliquée. confirm() natif si modif non sauvée.
  *          Refactor : extraction de la logique de save dans saveSeance(opts)
  *          partagée par onSaveSeance (manuel) et autosave (silencieux).
+ *   v1.3 : Phase 5.6.A — trame chronologique (palier 1/2).
+ *          Chargement des blocs via listBlocsBySeance(seanceId) (wrapper
+ *          v1.8.2). Rendu d'une table 4 colonnes (Horaire | Bloc | Durée |
+ *          Actions) sous le formulaire méta, triée par ordre. Calcul auto
+ *          des horaires à partir de seance.heure_debut + cumul duree_min.
+ *          Bouton "+ Ajouter un bloc" ouvre un popover de choix parmi les
+ *          11 types (fetched data/types-blocs.json). Création via
+ *          addBlocToSeance() avec duree_min + intensite par défaut du type.
+ *          Boutons d'actions ↑↓🗑 différés au palier 5.6.B.
  *
  * Dépendances :
- *   - window.SupabaseHub v1.8.1 (wrappers Phase 5.3 + listSitesActifs)
+ *   - window.SupabaseHub v1.8.2 (wrappers Phase 5.3 + listSitesActifs +
+ *     listBlocsBySeance)
+ *   - data/types-blocs.json v1.1 (fetched à l'init)
  *   - DOM : #seance-sidebar-body, #btn-nouvelle-seance, #seance-editor-area,
  *     #btn-nouvelle-seance-cta (placeholder existants de seance.html v1)
  */
@@ -56,7 +67,10 @@
     sites: [],              // cache pour dropdown lieu_id (5.5.B1)
     evenements: [],         // cache pour dropdown evenement_id (5.5.B1)
     autosaveTimer: null,    // handle setInterval (5.5.B2)
-    autosaveStatus: 'idle'  // 'idle' | 'saving' | 'error' (5.5.B2)
+    autosaveStatus: 'idle', // 'idle' | 'saving' | 'error' (5.5.B2)
+    blocs: [],              // blocs de la séance courante, triés par ordre (5.6.A)
+    typesBlocsRef: null,    // référentiel des 11 types (data/types-blocs.json, 5.6.A)
+    picker: null            // état du popover "+ Ajouter un bloc" ({open: bool}, 5.6.A)
   };
 
   // ============================================================
@@ -85,7 +99,12 @@
     inputMateriel:    () => document.getElementById('seance-input-materiel'),
     btnSave:       () => document.getElementById('seance-btn-save'),
     feedback:      () => document.getElementById('seance-feedback'),
-    autosavePill:  () => document.getElementById('seance-autosave-pill')
+    autosavePill:  () => document.getElementById('seance-autosave-pill'),
+    // Phase 5.6.A : trame chronologique
+    trameSection: () => document.getElementById('seance-trame-section'),
+    trameBody:    () => document.getElementById('seance-trame-body'),
+    btnAddBloc:   () => document.getElementById('seance-btn-add-bloc'),
+    pickerRoot:   () => document.getElementById('seance-picker-root')
   };
 
   // ============================================================
@@ -139,6 +158,38 @@
       nom = evt.libelle || evt.code || 'Événement';
     }
     return date ? (date + ' · ' + nom) : nom;
+  }
+
+  // ----- Helpers Phase 5.6.A : trame chronologique -----
+
+  /**
+   * Cherche un type de bloc dans le référentiel chargé depuis types-blocs.json.
+   * @param {string} slug ex : 'echauffement'
+   * @returns {object|null} L'objet type avec emoji, libelle, etc. ; null si introuvable
+   */
+  function lookupTypeBloc(slug) {
+    if (!State.typesBlocsRef || !slug) return null;
+    const list = State.typesBlocsRef.types_blocs && State.typesBlocsRef.types_blocs.valeurs;
+    if (!Array.isArray(list)) return null;
+    return list.find(function (t) { return t.slug === slug; }) || null;
+  }
+
+  /**
+   * Ajoute N minutes à une heure 'HH:MM' et retourne 'HH:MM'.
+   * Gère le passage de minuit en mod 24h.
+   */
+  function addMinutesToHeure(heureHHMM, minutes) {
+    if (!heureHHMM) return '';
+    const parts = heureHHMM.split(':');
+    if (parts.length < 2) return '';
+    const h = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    if (isNaN(h) || isNaN(m)) return '';
+    let total = h * 60 + m + (parseInt(minutes, 10) || 0);
+    total = ((total % (24 * 60)) + (24 * 60)) % (24 * 60); // wrap 24h
+    const newH = Math.floor(total / 60);
+    const newM = total % 60;
+    return String(newH).padStart(2, '0') + ':' + String(newM).padStart(2, '0');
   }
 
   function showFeedback(msg, type) {
@@ -431,6 +482,230 @@
       btnSave.disabled = true; // état initial : rien à enregistrer
       btnSave.addEventListener('click', onSaveSeance);
     }
+
+    // Phase 5.6.A : rendu de la trame chronologique sous le formulaire
+    renderTrame();
+  }
+
+  // ============================================================
+  // 5.bis. RENDU TRAME CHRONOLOGIQUE (Phase 5.6.A)
+  // ============================================================
+
+  /**
+   * Rend la section "Trame chronologique" sous le formulaire méta.
+   * Appelée après renderForm() et après chaque action (ajout, etc.).
+   */
+  function renderTrame() {
+    const area = DOM.editorArea();
+    if (!area || !State.currentSeance) return;
+
+    // Si la section existe déjà, on remplace son innerHTML pour préserver
+    // les autres éléments (le form). Sinon on l'ajoute en append.
+    let section = DOM.trameSection();
+    if (!section) {
+      section = document.createElement('section');
+      section.id = 'seance-trame-section';
+      section.className = 'seance-trame';
+      area.appendChild(section);
+    }
+
+    const heureDebut = State.currentSeance.heure_debut
+      ? normalizeHeureForInput(State.currentSeance.heure_debut)
+      : null;
+
+    // Header de section
+    let html =
+      '<header class="seance-trame__header">' +
+        '<h3 class="seance-trame__title">Trame chronologique</h3>' +
+        '<button type="button" id="seance-btn-add-bloc" class="seance-trame__add-btn">' +
+          '+ Ajouter un bloc' +
+        '</button>' +
+      '</header>';
+
+    if (!heureDebut) {
+      html +=
+        '<div class="seance-trame__warning">' +
+          '⚠️ Renseigne l\'heure de début dans le formulaire méta ci-dessus ' +
+          'pour voir les horaires calculés automatiquement.' +
+        '</div>';
+    }
+
+    if (State.blocs.length === 0) {
+      html +=
+        '<div class="seance-trame__empty">' +
+          'Aucun bloc dans la trame.<br>' +
+          'Clique sur « + Ajouter un bloc » pour démarrer.' +
+        '</div>';
+    } else {
+      // Table 4 colonnes
+      html +=
+        '<table class="seance-trame__table">' +
+          '<thead>' +
+            '<tr>' +
+              '<th class="seance-trame__th-horaire">Horaire</th>' +
+              '<th class="seance-trame__th-bloc">Bloc</th>' +
+              '<th class="seance-trame__th-duree">Durée</th>' +
+              '<th class="seance-trame__th-actions">Actions</th>' +
+            '</tr>' +
+          '</thead>' +
+          '<tbody>';
+
+      let curHeure = heureDebut;
+      State.blocs.forEach(function (b) {
+        const t = lookupTypeBloc(b.type_bloc);
+        const emoji = (t && t.emoji) || '·';
+        const libType = (t && t.libelle) || b.type_bloc;
+        const titreCompl = b.titre_precision ? ' — ' + escapeHtml(b.titre_precision) : '';
+        const heureCell = curHeure || '—';
+        const heureFin = curHeure ? addMinutesToHeure(curHeure, b.duree_min) : '';
+
+        html +=
+          '<tr class="seance-trame__row" data-bloc-id="' + escapeHtml(b.id) + '">' +
+            '<td class="seance-trame__td-horaire">' +
+              '<span class="seance-trame__horaire-start">' + heureCell + '</span>' +
+              (heureFin ? '<span class="seance-trame__horaire-end">→ ' + heureFin + '</span>' : '') +
+            '</td>' +
+            '<td class="seance-trame__td-bloc">' +
+              '<span class="seance-trame__emoji">' + emoji + '</span> ' +
+              '<span class="seance-trame__type">' + escapeHtml(libType) + '</span>' +
+              '<span class="seance-trame__precision">' + titreCompl + '</span>' +
+            '</td>' +
+            '<td class="seance-trame__td-duree">' + b.duree_min + ' min</td>' +
+            '<td class="seance-trame__td-actions">' +
+              '<span class="seance-trame__actions-placeholder" title="Réordonnancement et suppression en Phase 5.6.B">—</span>' +
+            '</td>' +
+          '</tr>';
+
+        // Avance le curseur horaire pour le prochain bloc
+        if (curHeure) curHeure = heureFin;
+      });
+
+      html +=
+          '</tbody>' +
+        '</table>';
+
+      // Footer récap : durée totale des blocs vs durée prévue
+      const dureeBlocs = State.blocs.reduce(function (sum, b) { return sum + (b.duree_min || 0); }, 0);
+      const dureePrevue = State.currentSeance.duree_totale_min || 0;
+      const ecart = dureeBlocs - dureePrevue;
+      let recapClass = 'is-ok';
+      let recapText = 'Total blocs : ' + dureeBlocs + ' min · Prévu : ' + dureePrevue + ' min';
+      if (ecart !== 0) {
+        recapClass = ecart > 0 ? 'is-over' : 'is-under';
+        recapText += ' · Écart : ' + (ecart > 0 ? '+' : '') + ecart + ' min';
+      }
+      html +=
+        '<div class="seance-trame__recap ' + recapClass + '">' +
+          recapText +
+        '</div>';
+    }
+
+    // Container du popover (toujours présent dans le DOM)
+    html += '<div id="seance-picker-root" class="seance-picker"></div>';
+
+    section.innerHTML = html;
+
+    // Bind du bouton "+ Ajouter un bloc"
+    const btn = DOM.btnAddBloc();
+    if (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        togglePicker();
+      });
+    }
+  }
+
+  /**
+   * Ouvre / ferme le picker de choix de type de bloc.
+   */
+  function togglePicker() {
+    if (State.picker && State.picker.open) {
+      closePicker();
+    } else {
+      openPicker();
+    }
+  }
+
+  function openPicker() {
+    State.picker = { open: true };
+    renderPicker();
+  }
+
+  function closePicker() {
+    State.picker = { open: false };
+    renderPicker();
+  }
+
+  /**
+   * Rend le popover de choix parmi les 11 types de bloc.
+   * Affiche la liste avec emoji + libellé + durée par défaut.
+   */
+  function renderPicker() {
+    const root = DOM.pickerRoot();
+    if (!root) return;
+    if (!State.picker || !State.picker.open) {
+      root.innerHTML = '';
+      root.classList.remove('is-open');
+      return;
+    }
+
+    const types = (State.typesBlocsRef
+                && State.typesBlocsRef.types_blocs
+                && State.typesBlocsRef.types_blocs.valeurs) || [];
+
+    if (types.length === 0) {
+      root.innerHTML =
+        '<div class="seance-picker__panel">' +
+          '<div class="seance-picker__error">⚠️ Référentiel types-blocs.json non chargé.</div>' +
+        '</div>';
+      root.classList.add('is-open');
+      return;
+    }
+
+    const items = types.map(function (t) {
+      return (
+        '<li class="seance-picker__item" data-slug="' + escapeHtml(t.slug) + '">' +
+          '<span class="seance-picker__item-emoji">' + (t.emoji || '·') + '</span>' +
+          '<span class="seance-picker__item-libelle">' + escapeHtml(t.libelle) + '</span>' +
+          '<span class="seance-picker__item-defaut">' + (t.duree_min_defaut || 10) + ' min</span>' +
+        '</li>'
+      );
+    }).join('');
+
+    root.innerHTML =
+      '<div class="seance-picker__panel" role="dialog" aria-label="Choisir un type de bloc">' +
+        '<header class="seance-picker__panel-header">' +
+          '<span>Choisir un type de bloc</span>' +
+          '<button type="button" class="seance-picker__close" aria-label="Fermer">×</button>' +
+        '</header>' +
+        '<ul class="seance-picker__list">' + items + '</ul>' +
+      '</div>';
+    root.classList.add('is-open');
+
+    // Bind clics
+    root.querySelectorAll('.seance-picker__item').forEach(function (li) {
+      li.addEventListener('click', function () {
+        const slug = li.getAttribute('data-slug');
+        onAddBloc(slug);
+      });
+    });
+    const closeBtn = root.querySelector('.seance-picker__close');
+    if (closeBtn) closeBtn.addEventListener('click', closePicker);
+  }
+
+  /**
+   * Fermeture du picker quand on clique en dehors.
+   * Câblé une seule fois à l'init.
+   */
+  function bindPickerOutsideClick() {
+    document.addEventListener('click', function (e) {
+      const root = DOM.pickerRoot();
+      const btn = DOM.btnAddBloc();
+      if (!root || !root.classList.contains('is-open')) return;
+      if (btn && (e.target === btn || btn.contains(e.target))) return;
+      if (root.contains(e.target)) return;
+      closePicker();
+    });
   }
 
   // ============================================================
@@ -464,6 +739,7 @@
 
     State.currentSeance = res.data;
     State.seances.unshift(res.data); // ajoute en tête de liste
+    State.blocs = [];                 // nouvelle séance = 0 bloc (Phase 5.6.A)
     setDirty(false);                  // séance fraîche = pas de modif
     renderSidebar();
     renderForm();
@@ -535,6 +811,10 @@
     setDirty(false);
     setAutosaveStatus('idle');
     renderSidebar();
+    // Phase 5.6.A : si heure_debut a changé, le calcul des horaires de la
+    // trame doit être rafraîchi. On relance renderTrame() de toute façon
+    // (idempotent, opération légère).
+    renderTrame();
     if (!silent) {
       showFeedback('Séance enregistrée.', 'success');
     }
@@ -603,10 +883,51 @@
     stopAutosave();
     State.currentSeance = target;
     setDirty(false);
+    // Phase 5.6.A : charger les blocs de cette séance
+    await loadBlocs();
     renderSidebar();
     renderForm();
     setAutosaveStatus('idle');
     startAutosave();
+  }
+
+  /**
+   * Crée un nouveau bloc dans la séance courante avec les valeurs par défaut
+   * du type sélectionné. Phase 5.6.A.
+   * @param {string} slug Slug du type de bloc (ex : 'echauffement')
+   */
+  async function onAddBloc(slug) {
+    if (!State.currentSeance) {
+      console.error('SeanceEditor: onAddBloc() sans currentSeance');
+      return;
+    }
+    const typeDef = lookupTypeBloc(slug);
+    if (!typeDef) {
+      console.error('SeanceEditor: onAddBloc() type inconnu', slug);
+      return;
+    }
+
+    closePicker();
+
+    const params = {
+      type_bloc: slug,
+      duree_min: typeDef.duree_min_defaut || 10
+    };
+    // Intensité par défaut seulement si le type l'affiche
+    if (typeDef.affiche_intensite && typeDef.intensite_defaut) {
+      params.intensite = typeDef.intensite_defaut;
+    }
+
+    const res = await SupabaseHub.addBlocToSeance(State.currentSeance.id, params);
+    if (!res.ok) {
+      console.error('SeanceEditor: onAddBloc() KO', res.error);
+      alert('Erreur création bloc : ' + res.error);
+      return;
+    }
+
+    // Ajoute le nouveau bloc dans State.blocs (déjà trié par ordre côté DB)
+    State.blocs.push(res.data);
+    renderTrame();
   }
 
   // ============================================================
@@ -629,17 +950,44 @@
     State.evenements = await SupabaseHub.getEvenementsAVenir(M14_TEAM_UUID, 60);
   }
 
+  /**
+   * Charge le référentiel data/types-blocs.json (Phase 5.6.A).
+   * Appelé une seule fois à l'init. Mis en cache dans State.typesBlocsRef.
+   */
+  async function loadTypesBlocsRef() {
+    try {
+      const resp = await fetch('data/types-blocs.json', { cache: 'force-cache' });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      State.typesBlocsRef = await resp.json();
+    } catch (e) {
+      console.error('SeanceEditor: loadTypesBlocsRef() KO', e);
+      State.typesBlocsRef = null;
+    }
+  }
+
+  /**
+   * Charge les blocs de la séance courante (Phase 5.6.A).
+   */
+  async function loadBlocs() {
+    if (!State.currentSeance) {
+      State.blocs = [];
+      return;
+    }
+    State.blocs = await SupabaseHub.listBlocsBySeance(State.currentSeance.id);
+  }
+
   // ============================================================
   // 8. INIT
   // ============================================================
 
   async function init() {
     // Chargements parallèles : séances pour la sidebar, sites et événements
-    // pour les dropdowns du formulaire
+    // pour les dropdowns du formulaire, types-blocs.json pour la trame (5.6.A)
     await Promise.all([
       loadSeances(),
       loadSites(),
-      loadEvenements()
+      loadEvenements(),
+      loadTypesBlocsRef()
     ]);
 
     renderSidebar();
@@ -658,6 +1006,9 @@
       ctaCenter.addEventListener('click', onNouvelleSeance);
     }
 
+    // Phase 5.6.A : câbler le clic en dehors pour fermer le picker
+    bindPickerOutsideClick();
+
     // Warn si modif non sauvée à la fermeture de l'onglet (V1A : check basique)
     // + arrêt propre du timer autosave (Phase 5.5.B2)
     window.addEventListener('beforeunload', function (e) {
@@ -670,12 +1021,13 @@
     });
 
     console.log(
-      '%c🏉 Seance Editor v1.2 (Phase 5.5.B2) chargé',
+      '%c🏉 Seance Editor v1.3 (Phase 5.6.A) chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         seances: State.seances.length,
         sites: State.sites.length,
         evenements: State.evenements.length,
+        types_blocs_ref: State.typesBlocsRef ? 'OK' : 'KO',
         autosave_interval_ms: AUTOSAVE_INTERVAL_MS
       }
     );
@@ -691,6 +1043,7 @@
     loadSeances: loadSeances,
     loadSites: loadSites,
     loadEvenements: loadEvenements,
+    loadBlocs: loadBlocs,
     // Phase 5.5.B2 : exposition autosave pour debug console
     startAutosave: startAutosave,
     stopAutosave: stopAutosave
