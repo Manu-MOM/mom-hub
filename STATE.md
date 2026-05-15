@@ -3,9 +3,24 @@
 > **Document de référence opérationnel.** À jour à la racine du repo, mis à jour à chaque fin de session significative.
 > Sert de point de reprise universel : toute personne (ou tout Claude) qui ouvre ce fichier doit pouvoir reprendre le travail sans question.
 
-**Dernière mise à jour : 14 mai 2026 — Intégration Module Bibliothèque d'ateliers EDR. Hier (13 mai) avait livré la Phase 4.3 + dette C8 a/b/c/d/e + P4-2 (greeting J-N) + session RLS write par rôle + Phase 4.4 UI compos étapes 6a/6b/6c-1/6c-2/6c-3. Aujourd'hui (14 mai) intègre dans le portail le module Bibliothèque d'ateliers livré par la conv "Production Module Bibliothèque" + active les 2 premières tuiles du dashboard (Compositions + Bibliothèque).**
+**Dernière mise à jour : 15 mai 2026 — Module Préparation de séance V1 COMPLET (Phases 5.1 → 5.11 livrées et déployées). Conv Production générale a livré aujourd'hui les 4 dernières phases en une journée : 5.8 (picker ateliers Bibliothèque), 5.9 (groupes G1/G2/G3 par bloc), 5.10 (sidebar enrichie + nettoyage brouillons vides), 5.11 (activation tuile dashboard). Hier (14 mai) avait livré le module Bibliothèque et activé les 2 premières tuiles ; aujourd'hui le module Préparation de séance ferme la 3e tuile active du portail. Conv Joueurs/Événements préparée (audits livrés, kickoff de Production rédigé) — chantier suivant.**
 
-**Bilan chiffré du 14 mai 2026** :
+**Bilan chiffré du 15 mai 2026** :
+- **4 phases du module Préparation de séance livrées en une journée** : 5.8 + 5.9 + 5.10 + 5.11.
+- **Fichiers ajoutés / modifiés** :
+  - `js/seance-editor.js` : v1.5 → **v1.8** (~1 000 lignes ajoutées sur la journée — picker ateliers, groupes G1/G2/G3, sidebar enrichie, état total ~2988 lignes).
+  - `js/supabase-client.js` : v1.8.2 → **v1.8.4** (3 nouveaux wrappers : `listAteliersRattachesAuBloc`, `listBrouillonsVides`, `deleteBrouillonsVides` — état total ~1521 lignes).
+  - `seance.html` : ~600 lignes CSS ajoutées (sections ateliers, groupes, sidebar, popovers, archive) + smoke check v1.8.4 + footer Phase 5.10.
+  - `data/groupes-joueur.json` : nouveau (3 KB, 3 groupes Performance/Développement/Initiation, miroir Drive `01 - Référentiels/`).
+  - `index.html` : modifié pour activer la tuile "Préparation de séance" (section 01 Pédagogie EDR), renommage `Constructeur de séance` → `Préparation de séance`, sous-titre actualisé, compteurs `sec-meta` corrigés (section 01 "4 outils · 2 disponibles", section 02 "4 outils · 1 disponible").
+- **Note** : `data/fiches-all.json` (livré 14 mai pour la Bibliothèque) sert aussi pour le picker ateliers Phase 5.8 — pas de duplication, le même miroir alimente les 2 modules.
+- **9 commits séparés** poussés sur `main` sur la journée (Phase 5.8 : 4 commits, Phase 5.9 : 3 commits, Phase 5.10 : 3 commits, Phase 5.11 : 1 commit — selon le pattern "1 fichier = 1 commit").
+- **Incident GitHub Actions/Pages** rencontré et résorbé en cours de journée (degraded availability sur le déploiement Pages pendant ~20 min, file de workflows en `Queued`). Diagnostic : status.github.com avant de chercher midi à 14h. Rien à faire côté code, attente uniquement.
+- **Dette D-SEANCE-STUB-VIDES résolue** par la Phase 5.10 (bouton manuel "🧹 Nettoyer" avec compteur en bas de sidebar).
+- **3 nouvelles dettes ouvertes** : D-SEANCE-GROUPES-DEFAUT (override groupes par défaut au niveau séance, si l'usage le réclame), D-BLOC-TYPE-CHANGE-NO-RERENDER (changer le type d'un bloc en édition ne refresh pas les étiquettes Axes 2/3), D-PORTAIL-V2-REFONTE (refonte d'`index.html` selon `Conception-Portail-Architecture-V2.md`).
+- **Conv Joueurs/Événements préparée** : audits `Audit-Module-Joueurs-v1.md` (73 KB) et `Audit-Module-Evenements-v1.md` (56 KB) disponibles sur Drive `00 - Documentation/`, message kickoff de Production rédigé (`kickoff-conv-joueurs-evenements.md`, 12 KB) — à coller dans nouvelle conv quand Manu sera prêt à enchaîner.
+
+**Bilan chiffré du 14 mai 2026** (rappel) :
 - **4 fichiers nouveaux livrés et committés** : `bibliotheque.html` (38 KB, page module à la racine), `js/bibliotheque-browser.js` (26 KB, module IIFE), `data/ateliers.json` (87 KB, taxonomie 4 rubriques / 82 ateliers), `data/fiches-all.json` (139 KB, bundle 62 fiches PPTX généré par Apps Script `Build-Fiches-All.gs` côté Drive).
 - **1 fichier modifié** : `index.html` (activation 2 tuiles dashboard : Compositions + Bibliothèque, et 2 liens sidebar).
 - **5 commits séparés** poussés sur `main` (ateliers.json, fiches-all.json, bibliotheque-browser.js, bibliotheque.html, index.html dans cet ordre — fichiers de dépendance d'abord pour qu'aucun état intermédiaire ne soit cassé).
@@ -293,6 +308,60 @@ APRÈS : <div class="tool" onclick="location.href='X.html'" role="link" tabindex
 
 ---
 
+### ✅ Module Préparation de séance (FAIT — 15 mai 2026, Phases 5.1 → 5.11 V1 complet)
+
+Module **complet** intégré au portail MOM Hub. 3e tuile activée en dashboard (après Compositions et Bibliothèque). Livré par la conv "Production générale" (cette conv) en 11 phases techniques étalées entre le 14 mai (squelette + méta + trame + détail bloc) et le 15 mai (picker ateliers + groupes + sidebar enrichie + activation tuile).
+
+**Architecture** : Scénario 1 — **Supabase = source de vérité** (3 tables `seances`, `seances_blocs`, `seances_blocs_ateliers` + 2 RPC). Le module lit le miroir `data/fiches-all.json` (livré 14 mai par la Bibliothèque) pour enrichir l'affichage des ateliers rattachés à un bloc — pas de duplication, le même JSON sert pour 2 modules.
+
+**11 phases livrées** :
+
+| Phase | Sujet | Date |
+|---|---|---|
+| 5.1 | Modélisation Supabase : `sql/28-seances.sql` (3 tables + indexes + 2 RPC `get_seances_a_venir` / `get_seance_complete` + RLS write admin/coach + smoke test SQL séparé) | 14 mai |
+| 5.2 | Référentiels statiques : `data/types-blocs.json` v1.1 (11 types : accueil, mise_en_train, echauffement, echauffement_specifique, corps_seance, jeu_application, match_application, retour_au_calme, bilan, pause_boisson, bloc_libre) + `data/vocabulaire-seance.json` v1.1 (4 axes FFR : phases macro, types d'unités, composants échauffement, champs FFR) | 14 mai |
+| 5.3 | Wrappers JS : `js/supabase-client.js` v1.7.1 → v1.8 (13 wrappers Préparation : `listSeancesByEquipe`, `getSeanceComplete`, `getSeancesAVenir`, `listModelesSeance`, `createSeance`, `updateSeance`, `archiveSeance`, `addBlocToSeance`, `updateBloc`, `removeBloc`, `reorderBlocs`, `attachAtelierToBloc`, `detachAtelierFromBloc`) | 14 mai |
+| 5.4 | UI squelette `seance.html` : topbar Hub onglet "Préparation de séance" en `.active`, sidebar liste séances, zone éditeur vide, auth admin OR coach, CSS spécifique inline `.seance-*` | 14 mai |
+| 5.5.A | Éditeur méta v1 : 6 champs (date, heure, durée, effectif, thème, axe travail) + sauvegarde manuelle | 14 mai |
+| 5.5.B1 | 2 dropdowns (lieu_id via `listSitesActifs` wrapper v1.8.1, evenement_id via `getEvenementsAVenir`) + 5 champs secondaires (météo, encadrants, objectifs, cycle, matériel) | 14 mai |
+| 5.5.B2 | Autosave 30s + clic sidebar → recharge séance + pastille statut 3 états | 14 mai |
+| 5.6.A | Trame chronologique palier 1/2 : table 4 colonnes (Horaire / Bloc / Durée / Actions), calcul auto horaires (cumul), popover "+ Ajouter un bloc" (11 types), wrapper `listBlocsBySeance` v1.8.2 | 14 mai |
+| 5.6.B | Trame palier 2/2 + ergonomie : actions ↑↓🗑 par bloc, repli auto formulaire en résumé compact après save (arbitrage UX), bouton "↑ Replier" (fix v1.4.1) | 14 mai |
+| 5.7 | Détail bloc : édition complète (type changeable, durée, titre précision, intensité conditionnelle 4 niveaux FFR/World Rugby, 2 étiquettes Axes 2/3 selon type, 10 champs FFR Axe 4 en jsonb, comportements/organisation/notes), autosave 30s du bloc, wrappers `updateBloc` + `removeBloc` + `reorderBlocs` | 14 mai |
+| **5.8** | **Picker ateliers Bibliothèque** : section "📚 Ateliers rattachés" en bas de détail bloc, modale picker avec recherche live insensible aux accents (62 fiches), enrichissement depuis `data/fiches-all.json` (titre/thème/niveau/durée/lien Drive), boutons 🗑 par rattachement, anti-doublon (badge "déjà rattaché" + clic bloqué). Wrapper `listAteliersRattachesAuBloc` ajouté en v1.8.3 | **15 mai** |
+| **5.9** | **Groupes G1/G2/G3 par bloc** : section "👥 Groupes" en bas de détail bloc, 3 cartes côte à côte (G1=Performance #8B0000, G2=Développement #FF8C00, G3=Initiation #4682B4), 3 popovers indépendants pour sélection joueurs depuis vivier M14 (`getVivierCompo` existant), unicité par bloc (joueur dans 1 seul groupe à la fois, ⛔ grisé), héritage auto des groupes du bloc précédent à la création. Stockage jsonb dans champ `groupes_jsonb` existant (Phase 5.1). Nouveau référentiel `data/groupes-joueur.json` (miroir Drive). Pas de nouveau wrapper Supabase. | **15 mai** |
+| **5.10** | **Sidebar enrichie + nettoyage brouillons** : toggle "Afficher les archivées" en header sidebar (volatile, pas de localStorage par doctrine), bouton "📦 Archiver" dans formulaire méta (déplié ET résumé replié, désactivé si déjà archivée), section "🗑 N brouillons vides" en bas de sidebar avec bouton "🧹 Nettoyer" (visible uniquement si N>0), `loadSeances()` couplé à `loadBrouillonsVides()` pour rafraîchissement automatique. 2 nouveaux wrappers `listBrouillonsVides` + `deleteBrouillonsVides` (v1.8.4). **Résout la dette D-SEANCE-STUB-VIDES**. | **15 mai** |
+| **5.11** | **Activation tuile dashboard** : modif `index.html` section 01 / Pédagogie EDR. Tuile "Constructeur de séance" (libellé v1) → "Préparation de séance" (libellé v2 issu de `Conception-Portail-Architecture-V2.md`), `class="tool todo"` → `class="tool" onclick="location.href='seance.html'" role="link" tabindex="0"`, statut "À venir" → "Disponible". Compteurs `sec-meta` corrigés (section 01 "4 outils · 2 disponibles", section 02 "4 outils · 1 disponible"). | **15 mai** |
+
+**Fichiers livrés et committés** (état au soir du 15 mai) :
+- `sql/28-seances.sql` : 3 tables + 2 RPC + RLS write (Phase 5.1).
+- `seance.html` : ~1815 lignes (squelette + CSS spécifique inline `.seance-*` + 6 sous-sections CSS : sidebar/form/trame/détail bloc/ateliers/groupes/popovers/responsive).
+- `js/seance-editor.js` : v1.8 (Phase 5.10), ~2988 lignes, module IIFE `window.SeanceEditor.{init}`. Pattern identique à `compositions-editor.js` (sections numérotées, State global, DOM lazy, helpers, rendus, actions, chargements, init).
+- `js/supabase-client.js` : v1.8.4 (Phase 5.10), ~1521 lignes. 16 wrappers Préparation au total (les 13 de Phase 5.3 + listBlocsBySeance + listAteliersRattachesAuBloc + listBrouillonsVides + deleteBrouillonsVides ; + le wrapper existant `getVivierCompo` réutilisé pour les groupes).
+- `data/types-blocs.json` v1.1, `data/vocabulaire-seance.json` v1.1, `data/groupes-joueur.json` v1.1 : 3 référentiels statiques fetched à l'init en parallèle via Promise.all (force-cache).
+- `index.html` modifié (Phase 5.11).
+
+**Couplage avec les autres modules** :
+- **Bibliothèque** : un bloc peut rattacher 1+ ateliers via `seances_blocs_ateliers.atelier_fileid_drive` (TEXT 33 chars). Clé étrangère **logique**, pas SQL stricte (dette D-BIBLIO-V2-MIGRATION ouverte — la table Supabase `ateliers` miroir n'existe pas encore).
+- **Événements** : une séance peut être **optionnellement** rattachée à un événement existant (`seances.evenement_id` NULLABLE, lien vers les 15 entraînements M14 peuplés via `sql/14`).
+- **Vivier M14** : groupes G1/G2/G3 peuplés via la RPC `get_vivier_compo` existante (Phase 4.3) — 62 joueurs (23 MOM + 39 partenaires SAR/ASCS) au 15 mai.
+- **Compositions** : pas de lien direct V1 (V2 envisageable : un bloc pourrait référencer une compo de match pour préparer le déroulé).
+
+**Tests post-déploiement validés** (15 mai) :
+- Console portail : `🏉 MOM Hub · Supabase Client v1.8.4 chargé` + `✅ wrappers v1.8.4 disponibles` + `SeanceEditor: fiches-all.json chargé (62 fiches)` + `SeanceEditor: groupes-joueur.json chargé (3 groupes)` + `SeanceEditor: vivier M14 chargé (63 joueurs)` + `🏉 Seance Editor v1.8 (Phase 5.10) chargé`. (NB : 63 joueurs vs 62 attendus — 1 joueur ajouté au vivier dans la journée, info volatile, pas un bug.)
+- Tuile dashboard "Préparation de séance" verte "Disponible" cliquable, mène à `seance.html`.
+
+**Limites connues V1** (différées V2) :
+- Export PDF du cartouche de séance (chantier conséquent — jsPDF + html2canvas ou Apps Script Drive).
+- Modèles de séance (champ `est_modele` déjà dans le schéma DB, UI à coder).
+- Drag-and-drop pour réordonner blocs (V1 livre flèches ↑↓).
+- Bilan post-séance (observations/régulations + axes prochaine).
+- Météo structurée (V1 texte libre).
+- Encadrants structurés via `evenement_encadrants` quand `evenement_id` renseigné (V1 texte libre).
+- Multi-équipes (V1 M14 EQ1 hardcodé via constante `M14_TEAM_UUID`).
+
+---
+
 ## 🔧 Patterns techniques acquis
 
 **Pattern lecture RGPD-safe** (depuis Phase 2.4) :
@@ -440,6 +509,35 @@ C8-e. ✅ LIVRÉE — `sql/26` (RLS write compositions/composition_joueurs).
 
 ⚠️ **À faire en début de prochaine session** : ouvrir le doc Drive `Conception-Portail-Phase-4-UI-Compo.md` (uploadé par Manu 13 mai) et recopier les 12 dettes verbatim dans ce STATE.md pour avoir la liste fidèle (la liste ci-dessus est reconstituée de mémoire et probablement imprécise sur 1-2 items).
 
+### ✅ Dettes résolues le 15 mai 2026 (Module Préparation de séance)
+
+- **D-SEANCE-STUB-VIDES** ✅ résolue par Phase 5.10. Le bouton "+ Nouvelle séance" crée toujours un stub DB immédiatement (pattern conservé pour rester réactif), mais désormais la sidebar affiche en bas un compteur "🗑 N brouillons vides" + bouton "🧹 Nettoyer" quand au moins 1 brouillon vide existe (`etat='brouillon'` ET `date_seance IS NULL` ET aucun bloc rattaché). Confirm() avec compteur, DELETE en lot via le nouveau wrapper `deleteBrouillonsVides`. Si la séance courante était dans la liste supprimée, retour automatique à l'écran vide.
+
+### 🔵 Dettes Module Préparation de séance (V1 livré, V2 à venir)
+
+- **D-SEANCE-V2-EXPORT-PDF** : Export PDF du cartouche de séance (format A4 selon `MOM-Hub_cartouche-seance.docx` Drive). Chantier conséquent (jsPDF + html2canvas ou Apps Script Drive). Priorité moyenne, à coder une fois que Manu aura validé le format à l'usage.
+- **D-SEANCE-V2-MODELES** : Modèles de séance. Schéma DB déjà prêt (`seances.est_modele` BOOLEAN DEFAULT FALSE + `modele_origine_id` UUID NULLABLE — Phase 5.1). Reste à coder l'UI : "Enregistrer comme modèle" + sélecteur "Nouvelle séance depuis modèle". Priorité moyenne.
+- **D-SEANCE-V2-DRAG-DROP** : Drag-and-drop pour réordonner les blocs (V1 livre flèches ↑↓ qui suffisent).
+- **D-SEANCE-V2-BILAN** : Bilan post-séance (champs Observations/régulations + Axes prochaine séance, cf. cartouche docx). Pas vital en V1.
+- **D-SEANCE-V2-METEO** : Météo structurée via API (V1 = texte libre). Liée au champ `lieu_id` ↔ coordonnées GPS site.
+- **D-SEANCE-V2-ENCADRANTS** : Encadrants structurés via table `evenement_encadrants` existante quand `evenement_id` renseigné (V1 = texte libre).
+- **D-SEANCE-V2-MULTI-EQUIPES** : V1 hardcode `M14_TEAM_UUID`. À débloquer quand 2e équipe sera concernée.
+- **D-SEANCE-GROUPES-DEFAUT** 🆕 (15 mai) : Pas d'override "groupes par défaut au niveau séance". V1 livre uniquement granularité **par bloc** avec héritage auto du bloc précédent à la création (arbitrage doctrinal Manu : commencer simple, voir si l'usage le réclame). Si à l'usage Manu re-saisit sans cesse les mêmes groupes au début de chaque séance, ajouter un champ `seances.groupes_default_jsonb` + UI au formulaire méta. Priorité **à observer**.
+- **D-BLOC-TYPE-CHANGE-NO-RERENDER** 🆕 (15 mai) : Changer le type d'un bloc en édition (dropdown "Type de bloc") ne refresh pas les étiquettes Axes 2/3 (qui dépendent du type via `etiquettes_proposees` dans `types-blocs.json`). Workaround : sauver puis rouvrir le bloc. Bug d'ergonomie mineur. Priorité faible.
+- **D-BIBLIO-V2-MIGRATION** 🔁 (déjà ouverte 14 mai, toujours active) : Pas de FK SQL stricte entre `seances_blocs_ateliers.atelier_fileid_drive` (TEXT 33 chars) et une éventuelle table `ateliers`. La Bibliothèque vit aujourd'hui en Drive + miroir JSON (`data/ateliers.json` + `data/fiches-all.json`). À l'arrivée du module Préparation, on avait prévu de basculer en Scénario 3 (table Supabase `ateliers` miroir, FK stricte). **Note 15 mai** : finalement la bascule n'a PAS été faite, le module Préparation s'est contenté du miroir JSON existant et ça fonctionne très bien. La dette reste ouverte si un jour on veut un vrai contrôle d'intégrité référentielle.
+- **D-REORDER-NON-ATOMIQUE** 🔁 (active depuis Phase 5.3) : `reorderBlocs(seance_id, blocIdsInOrder)` JS fait 2 passes UPDATE (ordres négatifs puis positifs) à cause de la contrainte UNIQUE `(seance_id, ordre)`. Si la passe 2 échoue, certains blocs restent avec ordre négatif → état incohérent jusqu'au prochain appel réussi. À terme : RPC SQL transactionnelle.
+
+### 🔵 Dettes Architecture V2 portail (issues de `Conception-Portail-Architecture-V2.md`)
+
+- **D-PORTAIL-V2-REFONTE** 🆕 (15 mai) : Refonte cosmétique d'`index.html` selon le doc `Conception-Portail-Architecture-V2.md` (livré par la conv Conception Portail le 15 mai matin, uploadé par Manu pendant la Phase 5.11). **Décision Manu Phase 5.11** : on a fait la Phase 5.11 minimaliste (juste activer la tuile Préparation de séance + corriger 2 compteurs `sec-meta`) et reporté la refonte v2 complète. **Liste des modifs reportées** :
+  - Section 01 / Pédagogie EDR : renommer `Comportements attendus` → `Ressources pédagogiques` (catch-all), renommer `Plan de saison` → `Planification annuelle`.
+  - Section 02 / Mon équipe — M14 SAR×MOM : supprimer 3 vignettes obsolètes (`Présences entraînement`, `Convocations`, `Carnet de progression` — toutes redondantes avec SportEasy ou absorbées ailleurs), ajouter 3 vignettes V2 (`Evènements`, `Joueurs`, `Statistiques` toutes en À VENIR), renommer `Compositions` → `Compos`, renommer `Suivi des matchs` → `Suivis de Match`.
+  - Section 03 : renommer la **section** `LOGISTIQUE CLUB` → `LOGISTIQUE MOM` (la logistique reste portée par MOM seul, pas par l'entente — précision doctrinale). Refondre les 3 vignettes autour du verbe `Réservation` : `Réservation matériel` → `Réservation infrastructures`, `Réservation bus` → `Réservation Minibus`, `Veo · vidéos` → `Réservation VEO`. Ajouter `Autres réservations` (catch-all).
+  - Suppression généralisée des possessifs (`Mon canevas`, `Mes joueurs` → libellés impersonnels) — partiellement fait Phase 5.11 sur la seule tuile activée.
+  - 11 dettes ouvertes vers sessions de conception module (P4-V2-1 à P4-V2-11) listées dans le doc — voir doc complet sur Drive `00 - Documentation/`.
+
+  **Stratégie d'exécution** : doctrine "sujets séparés par conv" → ouvrir une mini-conv "Production Portail v2" dédiée plutôt que mélanger avec d'autres chantiers métier. Priorité **basse** (cosmétique, pas bloquant).
+
 ---
 
 ## 📂 Structure repo finale
@@ -455,17 +553,20 @@ mom-hub/
 │   ├── aptitudes.json
 │   ├── ateliers.json                          # 14 mai — taxonomie Bibliothèque (4 rubriques, 82 ateliers)
 │   ├── conformite-ffr.json
-│   ├── fiches-all.json                        # 14 mai — bundle détaillé 62 fiches PPTX
+│   ├── fiches-all.json                        # 14 mai — bundle détaillé 62 fiches PPTX (servi 2 modules : Bibliothèque + picker ateliers Phase 5.8)
+│   ├── groupes-joueur.json                    # 15 mai — référentiel 3 groupes G1/G2/G3 Phase 5.9 (miroir Drive 01-Référentiels/)
 │   ├── observables-match.json
 │   ├── postes.json
 │   ├── tests-physiques.json
-│   └── (groupes-joueur.json à mirroir post upload Drive)
+│   ├── types-blocs.json                       # 14 mai — référentiel 11 types de blocs Phase 5.2
+│   └── vocabulaire-seance.json                # 14 mai — référentiel 4 axes FFR Phase 5.2
 ├── js/
 │   ├── data-loader.js
-│   ├── supabase-client.js                     # v1.7.1 — 13 wrappers Phase 4.4 + fix maybeSingle
+│   ├── supabase-client.js                     # v1.8.4 — Phase 5.10 (16 wrappers Préparation : 13 Phase 5.3 + listBlocsBySeance + listAteliersRattachesAuBloc + listBrouillonsVides + deleteBrouillonsVides)
 │   ├── dashboard-stats.js                     # v2.3 — greeting J-N + 8 sources dynamiques
 │   ├── compositions-editor.js                 # v3.4 — Vue Liste éditable + Popover Picker (6c-2 + 6c-3)
-│   └── bibliotheque-browser.js                # 14 mai — module IIFE Bibliothèque d'ateliers
+│   ├── bibliotheque-browser.js                # 14 mai — module IIFE Bibliothèque d'ateliers
+│   └── seance-editor.js                       # 15 mai — v1.8 Phase 5.10 (Préparation de séance complet, ~2988 lignes)
 ├── sql/
 │   ├── 01-creation-tables-vague1.sql
 │   ├── 02-migration-referentiels-vague1.sql
@@ -491,15 +592,17 @@ mom-hub/
 │   ├── 24-rls-write-vague1.sql
 │   ├── 25-rls-write-evenements.sql
 │   ├── 26-rls-write-compositions-presences.sql
-│   └── 27-alter-compositions-etat-c8d.sql
+│   ├── 27-alter-compositions-etat-c8d.sql
+│   └── 28-seances.sql                         # 14 mai — Phase 5.1 (3 tables + 2 RPC + RLS write Préparation de séance)
 │   # NB: sql/20 sauté (M-1 ALTER personnes bloc_5, dette ouverte)
 │   # NB: 03-migration-personnes-vague1.sql NON commit (données perso)
 │   # NB: C1/C2/C3/C4-*.sql (réconciliation OVAL-E 2026-05-11) NON commit (données perso)
-├── index.html                                 # 14 mai — tuiles Compositions + Bibliothèque activées
+├── index.html                                 # 15 mai — Phase 5.11 (3 tuiles activées : Compositions + Bibliothèque + Préparation de séance ; libellé renommé `Constructeur de séance` → `Préparation de séance`)
 ├── login.html
 ├── dashboard.html
 ├── compositions.html                          # 13 mai — éditeur de compositions Phase 4.4
 ├── bibliotheque.html                          # 14 mai — Bibliothèque d'ateliers EDR
+├── seance.html                                # 15 mai — Préparation de séance Phase 5.10 (~1815 lignes)
 ├── test-supabase.html
 ├── README.md
 ├── STATE.md                                   # ← CE FICHIER
@@ -531,9 +634,13 @@ Dossier `MOM Hub/2025-2026/` :
 | `Audit-OVAL-E-Joueurs-Partenaires-v1.md` | `12_akokLYOUpyk-_CKIkW5H8WzvleEqiO` | Audit C7 |
 | `Conception-Portail-Phase-3.md` | `12xrICwk5NTzk1XZLpq964CkWwhft3zc2` | Conception portail Phase 3 |
 | `Conception-Portail-Phase-4-UI-Compo.md` | uploadé par Manu 13 mai (Drive `00 - Documentation/`) | **Conception UI éditeur compo** — référence canonique pour Phase 4.4 6c-* |
+| `Conception-Portail-Architecture-V2.md` | uploadé par Manu 15 mai (Drive `00 - Documentation/`) | **Architecture v2 du portail** — actualisation de la Phase 3 ; définit les 5 sections + 13 vignettes V2 (libellés actés). Phase 5.11 a appliqué un sous-ensemble minimaliste ; refonte complète reportée — dette D-PORTAIL-V2-REFONTE. |
+| `Brief-Conception-Module-Preparation-Seance-v1.md` | `132DT2Ps0usznZ4LXH2ohz_ubFUygpm-T` (Drive `00 - Documentation/`) | **Brief de conception module Préparation de séance** — exploité pour Phases 5.1 → 5.11. Modèle de référence pour les futurs briefs modules. |
 | `Modelisation-Evenements-v1.1.md` | `1fUJPJ5cQjBORHhHK_DD-b-eBSDnfjs7u` | **Modélisation événements v1.1** — référence canonique |
 | `Audit-Module-Compositions-v2.md` | `114UBo2lSqB8t8J2o0YRc55Nc8uoNtgCM` | Audit Compos v2 historique |
 | `Audit-Module-Compositions-v3.md` | `1QOUvIX7QJeGYwKnK8COTYDrSOY_4qjsJ` | **Audit Compos v3** — révision post-Phase 4.3 |
+| `Audit-Module-Joueurs-v1.md` | `1t9sQPXMt1jqujWk_tcMS9vtTCv2_zMaq` | **Audit Joueurs v1** — 15 mai matin, prêt pour conv Production Joueurs/Événements |
+| `Audit-Module-Evenements-v1.md` | `1G7UEEFMYwQi9H7PNhm_RXWgEA64dj5Vr` | **Audit Évènements v1** — 15 mai matin, prêt pour conv Production Joueurs/Événements |
 | `Audit-Personnes-MOM-Hub-v1.2.md` | `136ACCR8bazOGQXzE1XoEoCEPnXuXEYnA` | **Audit Personnes v1.2** — 5 profils |
 | `Registre-anomalies-OVAL-E.md` | dans `1CkeBrMBJGChqGui4r7mVkHa3NwaLwOSK` | Registre anomalies réconciliation FFR |
 
@@ -547,19 +654,20 @@ Dossiers clés :
 
 ## 🚀 Prochaine session
 
-**Avant de démarrer toute Phase 4.4 (suite)** :
+**Avant de démarrer toute nouvelle phase** :
 
 1. Lire ce STATE.md (5 min)
 2. Lire `PASSATION.md` (kit de démarrage par thématique)
-3. Lire `Conception-Portail-Phase-4-UI-Compo.md` (Drive) pour les 12 dettes P4-UI-* verbatim
-4. Vérifier que la chaîne Hub → Supabase fonctionne (console portail → `✅ MOM Hub Dashboard v2.3` ET `🏉 MOM Hub · Supabase Client v1.7.1 chargé`)
-5. Vérifier le greeting J-N et le widget "Prochain événement M14" en sidebar
-6. Vérifier `compositions.html` : créer une compo de base test, ajouter 2-3 joueurs, vérifier l'affichage, supprimer la compo de test
-7. Vérifier que `login.html` envoie bien un Magic Link aboutissant sur `dashboard.html`
+3. Vérifier que la chaîne Hub → Supabase fonctionne (console portail → `✅ MOM Hub Dashboard v2.3` ET `🏉 MOM Hub · Supabase Client v1.8.4 chargé`)
+4. Vérifier le greeting J-N et le widget "Prochain événement M14" en sidebar
+5. Vérifier les 3 tuiles dashboard actives (Compositions, Bibliothèque, **Préparation de séance**)
+6. Vérifier `compositions.html` : créer une compo de base test, ajouter 2-3 joueurs, supprimer
+7. Vérifier `seance.html` : créer une séance, ajouter un bloc, rattacher un atelier de la Bibliothèque, créer un groupe G1 avec 2-3 joueurs, archiver — puis nettoyer les brouillons vides résiduels
+8. Vérifier que `login.html` envoie bien un Magic Link aboutissant sur `dashboard.html`
 
 **Travaux en attente — Conv Production générale (cette conv)** :
 
-- **Phase 4.4 UI 6c-4 à 6c-7** (suite directe) :
+- **Phase 4.4 UI 6c-4 à 6c-7** (toujours en attente, non bloquant) :
   - 6c-4 : autosave notes_compo 30s + 4 boutons d'action (valider / repasser-brouillon / marquer utilisée / archiver) câblés aux wrappers existants
   - 6c-5 : Vue Terrain (visualisation read-only XV) — positions hardcodées ou via postes.json
   - 6c-6 : Modale Création E2 (radio base/match + sélecteur compo source pour dupliquer)
@@ -571,33 +679,48 @@ Dossiers clés :
 
 - **Dette (q)** : table de jonction `coach_equipes` quand un 2e coach réel arrivera.
 
+- **D-PORTAIL-V2-REFONTE** : refonte cosmétique d'`index.html` selon `Conception-Portail-Architecture-V2.md`. Doctrine sujets séparés → ouvrir mini-conv "Production Portail v2" dédiée plutôt que de mélanger.
+
+**Travaux en attente — Conv Production Module Préparation de séance** (cette conv, livraison V1 close 15 mai) :
+- ✅ **Module V1 complet** — Phases 5.1 → 5.11 livrées. Plus rien à faire sur la V1.
+- V2 envisagée si l'usage le réclame : Export PDF cartouche, Modèles de séance, Drag-and-drop blocs, Bilan post-séance, Météo structurée, Encadrants structurés, Multi-équipes (cf. dettes Phase 5 listées plus haut).
+
 **Travaux en attente — Conv "Production Module Bibliothèque"** (ouverte 14 mai 2026) :
-- À l'arrivée du module **Préparation de séance** : fournir à la conv Production générale les specs précises de la future table Supabase `ateliers` (miroir des 2 JSON), avec `fileId_dossier` comme clé étrangère pour `seances_ateliers`.
+- ✅ **Module Préparation de séance arrivé** sans avoir besoin de la table Supabase `ateliers` miroir. Le scénario 2 (Drive + JSON) tient bien la route. La bascule en Scénario 3 reste optionnelle (dette D-BIBLIO-V2-MIGRATION).
 - Coordonner avec la conv **Converter PPTX** le passage en v3.3 (schéma `fiche.json` aligné v2.0).
 - Coordonner avec la conv **Modules Ateliers** (cadrage doctrinal) si évolutions du schéma `atelier.json` v2.0.
 
 **Travaux en attente — Conv Audits** :
+- ✅ **Audits Joueurs + Événements livrés 15 mai matin** : `Audit-Module-Joueurs-v1.md` (73 KB, fileId `1t9sQPXMt1jqujWk_tcMS9vtTCv2_zMaq`) et `Audit-Module-Evenements-v1.md` (56 KB, fileId `1G7UEEFMYwQi9H7PNhm_RXWgEA64dj5Vr`). Disponibles sur Drive `00 - Documentation/`. À enchaîner par une conv Production dédiée (kickoff prêt — voir ci-dessous).
 - **Reprise audit Suivi-Match** (recommandation forte) à la lumière de Phase 4.3 + dette C3.
 - Audits Rapport, Stats, Bilans à reprendre post-Phase 4.3.
 - Lots 2-3 de l'audit référentiels (bloqués par tiers).
-- Modélisation événements extra-sportifs (C2, Phase 5).
+- Modélisation événements extra-sportifs (C2).
 - Modélisation compo adverse + joueurs adverses (C1, reportée après usage réel).
 
 **Travaux en attente — Conv Conception Portail** :
 - `Conception-Portail-Phase-3.md` v1.0 livrée.
 - `Conception-Portail-Phase-4-UI-Compo.md` livré le 13 mai et exploité Phase 4.4 6a→6c-3.
+- ✅ **`Conception-Portail-Architecture-V2.md`** livré 15 mai par la conv Conception. Définit les évolutions cosmétiques de l'`index.html` (5 sections, 13 vignettes actées, renommage section LOGISTIQUE MOM, suppression de 3 vignettes obsolètes, ajout de 3 nouvelles vignettes V2). Phase 5.11 a appliqué un sous-ensemble minimaliste (juste activation tuile Préparation + 2 compteurs corrigés). Refonte v2 complète reportée — dette D-PORTAIL-V2-REFONTE.
 - Pour 6c-4 à 6c-7, possible nouvelle itération si besoin d'arbitrage UX (autosave, modale Historique).
+- Sessions à venir : Conception UX module Joueurs + module Événements post-audits (dettes P4-V2-3 et P4-V2-4 du doc Architecture V2).
 
 **Travaux en attente — Conv Modules Ateliers** :
 - Cadrage doctrinal v1.0 du schéma `atelier.json` figé. Évolutions à venir uniquement si arbitrages nouveaux.
-- Voir `Schema-atelier-json-v2.0.md` (Drive `00 - Documentation/`) — schéma v2.0 figé le 14 mai par la conv Production Module Bibliothèque, légèrement plus complet/propre que v1.0 (rupture mineure ; les deux convs coordonnent).
+- Voir `Schema-atelier-json-v2.0.md` (Drive `00 - Documentation/`) — schéma v2.0 figé le 14 mai par la conv Production Module Bibliothèque.
+
+**Travaux en attente — Conv Production Modules Joueurs & Événements** (À OUVRIR — chantier suivant) :
+- 🆕 **Conv à ouvrir** quand Manu sera prêt à enchaîner. Audits déjà livrés (cf. ci-dessus). Message kickoff de Production rédigé 15 mai par cette conv : `kickoff-conv-joueurs-evenements.md` (12 KB, dans `/mnt/user-data/outputs/` côté Claude, copie à conserver côté Manu ou Drive).
+- Le kickoff transfère **l'intégralité de la doctrine de travail** appliquée sur ce projet (10 sections : identité, doctrine non-négociable, écosystème actuel, pattern de phases, conventions code, workflow, dettes ouvertes, mémoire entre convs, communication).
+- Stratégie attendue : analyse des audits → 2 briefs de conception (équivalents de `Brief-Conception-Module-Preparation-Seance-v1.md`) → Production palier par palier.
+- Ordre suggéré : **Événements en premier** (table existante + 15 entraînements M14 peuplés via `sql/14` → reprise d'existant plus simple), puis **Joueurs** (plus complexe car touche Personne, OVAL-E, dossier médical, vivier).
 
 **Travaux en attente — Conv Suivi Match** (à ouvrir, recommandation forte) :
 - Module à construire, audit v2 existant, dette C3 à instruire. Pré-requis C8-c livré ✅.
 
 ---
 
-## 📓 Leçons doctrinales accumulées 13-14 mai (dette j renforcée + conventions activation)
+## 📓 Leçons doctrinales accumulées 13-15 mai (dette j renforcée + conventions activation + GitHub status + count null)
 
 Le 13 mai a été particulièrement riche en bugs causés par des inventions de détails non vérifiés. **Mitigation systématique pour les sessions futures** :
 
@@ -613,11 +736,21 @@ Le 13 mai a été particulièrement riche en bugs causés par des inventions de 
 
 6. **Pour les commits côté Manu** : toujours vérifier que le commit est bien poussé sur GitHub avant de soupçonner un bug. Lancer dans la console : `fetch('js/<fichier>.js').then(r => r.text()).then(t => console.log(t.match(/Version : ([\d.]+)/)?.[1]))` pour vérifier la version réellement servie par GitHub Pages.
 
-7. **Classes CSS non préfixées dans une page module dédiée** (leçon 14 mai sur Bibliothèque) : pas un risque réel tant que (a) les classes sont définies dans un `<style>` inline (scopage au document), (b) elles ne sont **pas** définies dans `hub.css` partagé, (c) elles ne sont pas utilisées par d'autres pages. La note d'intégration affirmait "toutes les classes préfixées `.biblio-*`" alors qu'en réalité ~40% restaient non préfixées (`.pastille`, `.tag`, `.age-chip`, `.m-*`, `.plan-*`). Vérifié OK car aucune collision avec `hub.css` ni `index.html`. **Mais** : si plus tard d'autres modules à pages dédiées sont ajoutés (ex : `seance.html`), revérifier que ces noms restent libres. Dette à noter pour plus tard si besoin.
+7. **Classes CSS non préfixées dans une page module dédiée** (leçon 14 mai sur Bibliothèque) : pas un risque réel tant que (a) les classes sont définies dans un `<style>` inline (scopage au document), (b) elles ne sont **pas** définies dans `hub.css` partagé, (c) elles ne sont pas utilisées par d'autres pages. La note d'intégration affirmait "toutes les classes préfixées `.biblio-*`" alors qu'en réalité ~40% restaient non préfixées (`.pastille`, `.tag`, `.age-chip`, `.m-*`, `.plan-*`). Vérifié OK car aucune collision avec `hub.css` ni `index.html`. **Mais** : si plus tard d'autres modules à pages dédiées sont ajoutés (ex : `seance.html`), revérifier que ces noms restent libres. **Note 15 mai** : `seance.html` ajouté, classes `.seance-*` préfixées strictement, aucune collision constatée.
 
-8. **Convention d'activation des tuiles dashboard** posée 14 mai (première utilisation, à reprendre systématiquement) : `class="tool todo"` + statut "todo À venir" → `class="tool" onclick="location.href='X.html'" role="link" tabindex="0" title="..."` + statut "on Disponible". Le CSS `hub.css` a déjà la définition `.tool-status.on` (vert-prairie) — rien à modifier. Choix `onclick` plutôt que wrap `<a>` pour éviter problèmes de styling (text-decoration, color) sur les éléments enfants.
+8. **Convention d'activation des tuiles dashboard** posée 14 mai (première utilisation, à reprendre systématiquement) : `class="tool todo"` + statut "todo À venir" → `class="tool" onclick="location.href='X.html'" role="link" tabindex="0" title="..."` + statut "on Disponible". Le CSS `hub.css` a déjà la définition `.tool-status.on` (vert-prairie) — rien à modifier. Choix `onclick` plutôt que wrap `<a>` pour éviter problèmes de styling (text-decoration, color) sur les éléments enfants. **Réutilisée Phase 5.11 sans accroc.**
 
 9. **Commits séparés pour un module multi-fichiers** (leçon 14 mai sur intégration Bibliothèque) : un commit par fichier en remontant la pile de dépendances (data → js → html → index modifié). À chaque commit intermédiaire, l'état du repo reste cohérent : aucun fichier n'utilise un autre fichier pas encore committé. Pratique pour la traçabilité, le diff lisible, et les rollbacks si besoin.
+
+10. **Avant tout diagnostic prolongé sur un déploiement GitHub Pages qui traîne** (leçon 15 mai sur incident Phase 5.10) : **réflexe → vérifier https://www.githubstatus.com/ AVANT de chercher midi à 14h**. Les workflows en `Queued` depuis plus de 2-3 minutes sans raison évidente sont symptomatiques d'un incident Actions/Pages global. ~20 min perdues le 15 mai à chercher un bug côté code qui n'existait pas. Bannière `Actions is experiencing degraded availability` quand on l'a enfin consultée.
+
+11. **Avant d'écrire `if (count === 0)` après un `select(..., { count: 'exact', head: true })`** (leçon 15 mai sur wrapper `listBrouillonsVides`) : PostgREST peut renvoyer `count: null` (pas 0) si la RLS bloque la query ou si la requête échoue silencieusement. Toujours tester `count === 0 || count === null || count === undefined` quand on veut détecter "aucune ligne". Sinon le filtre rate certains cas et les éléments à filtrer disparaissent en silence.
+
+12. **Anti-invention sur les paramètres d'options des wrappers** (leçon 15 mai, sécurité méthodologique) : avant de chercher à coder un nouveau wrapper Supabase, **toujours grep l'existant** pour vérifier si l'option n'est pas déjà supportée. Exemple Phase 5.10 : `listSeancesByEquipe(equipeId, options)` acceptait déjà `opts.excludeArchivees` (default `true`), donc l'option D du toggle archivées s'est intégrée en 1 ligne de plus dans `loadSeances()`. Une `grep -n "async listSeancesByEquipe" supabase-client.js` avant de poser la question UX permet d'éviter de poser des contraintes fausses à Manu.
+
+13. **Verrouillage doctrinal avant Production** (leçon 15 mai sur Phases 5.9/5.10) : Manu valorise les questions structurées en boutons `ask_user_input_v0` plutôt que les questions ouvertes — mais **certaines questions doctrinales structurantes méritent une discussion préalable**, pas un picker à boutons. Cas Phase 5.9 : la granularité des groupes (séance vs bloc vs mixte) était un arbitrage structurant qui méritait un échange avec présentation des conséquences UX/DB de chaque option, suivi seulement après de la confirmation par picker. Pattern à reproduire : (a) présenter les options en prose avec leurs implications, (b) recommander, (c) confirmer via picker court.
+
+14. **Verrouillage avant Phase d'activation** (leçon 15 mai sur Phase 5.11) : Manu a uploadé `Conception-Portail-Architecture-V2.md` juste avant que je commence la 5.11. Bon réflexe — un doc de Conception fraîchement livré change le périmètre d'une Phase d'activation. À reproduire pour toute Phase d'activation : demander à Manu s'il y a des docs récents qui pourraient affecter le périmètre, plutôt que d'enchaîner mécaniquement.
 
 ---
 
