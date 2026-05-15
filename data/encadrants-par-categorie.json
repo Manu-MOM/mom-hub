@@ -1,0 +1,68 @@
+{
+  "_meta": {
+    "type": "entite",
+    "entite": "Encadrants par catégorie",
+    "version": "1.0",
+    "date_creation": "2026-05-15",
+    "date_maj": "2026-05-15",
+    "description": "Staff encadrants assignés par catégorie MOM. Synchronisation dynamique avec le picker à tags du module Préparation de séance.",
+    "source_doctrine": "Phase 5.12 TER — Encadrants liés au staff catégorie",
+    "_changelog": [
+      "1.0 (2026-05-15) — Création initiale. 7 encadrants M14 (MOM + SAR). Prêt pour sync dynamique seance-editor v1.10 TER."
+    ]
+  },
+  "_documentation": {
+    "synchronisation": "Chargement dynamique au init de seance-editor.js via loadEncadrantsForCategorie(). Catégorie déterminée par window.momSeanceContext.categorie_uuid.",
+    "stockage_seance": "Champ encadrants_text (TEXT, séparé par virgules). Format affichage UI : tags cliquables via bindEncadrantsTags().",
+    "saisie_libre": "Toujours active — coach peut ajouter un encadrant ad-hoc non listé.",
+    "extensibilite": "Champ 'role' optionnel pour évolution (Coach principal, Entraîneur, Assistant, etc.)."
+  },
+  "cat-m14": {
+    "nom_categorie": "M14",
+    "code_ffr": "M14",
+    "encadrants": [
+      {
+        "uuid": "enc-m14-1",
+        "nom": "Emmanuel Jung",
+        "club": "MOM",
+        "role": "Référent de la catégorie"
+      },
+      {
+        "uuid": "enc-m14-2",
+        "nom": "Milan Gonthier",
+        "club": "SAR",
+        "role": "Entraîneur principal"
+      },
+      {
+        "uuid": "enc-m14-3",
+        "nom": "Vivien Rulfo",
+        "club": "MOM",
+        "role": "Entraîneur adjoint"
+      },
+      {
+        "uuid": "enc-m14-4",
+        "nom": "Lorène Voegeli",
+        "club": "MOM",
+        "role": "Entraîneur adjoint"
+      },
+      {
+        "uuid": "enc-m14-5",
+        "nom": "Julien Duchatelle",
+        "club": "SAR",
+        "role": "Entraîneur adjoint"
+      },
+      {
+        "uuid": "enc-m14-6",
+        "nom": "Loïc Helm",
+        "club": "MOM",
+        "role": "Entraîneur adjoint"
+      },
+      {
+        "uuid": "enc-m14-7",
+        "nom": "Olivier Kadiebwe",
+        "club": "SAR",
+        "role": "Entraîneur adjoint"
+      }
+    ]
+  }
+}
