@@ -11,7 +11,7 @@
  *   - 5.5.A : éditeur méta + sauvegarde manuelle (CETTE VERSION)
  *   - 5.5.B : autosave 30s + dropdowns lieu/événement + champs secondaires
  *
- * Version : 1.8 — Phase 5.10 (15 mai 2026)
+ * Version : 1.9 — Phase 5.12 (15 mai 2026)
  *   v1.0 : squelette IIFE, sidebar liste séances, bouton "+ Nouvelle séance",
  *          formulaire 6 champs méta (date, heure, durée, effectif, thème,
  *          axe de travail), sauvegarde manuelle via updateSeance(), feedback
@@ -127,6 +127,31 @@
  *          détail du nombre, puis DELETE en lot via le wrapper
  *          deleteBrouillonsVides. Compteur rafraîchi à chaque init.
  *          Résout la dette D-SEANCE-STUB-VIDES héritée de Phase 5.5.
+ *   v1.9 : Phase 5.12 — Ajustements V1 post-tests utilisateur.
+ *          (1) Boutons "✓ Valider" et "↩ Brouillon" dans le formulaire
+ *          méta (déplié ET résumé replié). Bouton Valider visible si
+ *          etat='brouillon', bouton Brouillon visible si 'validee' ou
+ *          'utilisee'. Garde-fou : refuse de valider sans date_seance.
+ *          Wrapper existant updateSeance({etat: ...}) utilisé.
+ *          (2) Libellés "Performance/Développement/Initiation" retirés
+ *          des cartes Groupes et du popover joueurs. Seule la couleur
+ *          du groupe + le nom court (G1/G2/G3) reste affiché. La
+ *          couleur suffit à distinguer, et ça évite de prescrire un
+ *          mapping rigide groupe ↔ niveau_profil.
+ *          (3) Fix bug scroll popover groupes : à chaque clic sur un
+ *          joueur, le re-render réinitialisait scrollTop à 0. Désormais
+ *          le scrollTop de .seance-picker-groupe__list-wrap est sauvé
+ *          avant le re-render et restauré après. Idem pattern pour le
+ *          focus du champ recherche (déjà existant).
+ *          (4) Refonte UX généralisée des champs texte : datalist HTML5
+ *          avec propositions pré-saisies sur 16 champs (4 méta + 2
+ *          détail bloc + 10 FFR Axe 4), picker à tags pour le matériel
+ *          global de séance. Le coach peut toujours taper du texte libre
+ *          (datalist = autocomplete non-bloquante). Entrée "Autres..."
+ *          en fin de liste comme repère visuel. Chargement à l'init
+ *          via fetch('data/propositions-seance.json').
+ *          Champs préservés en texte libre par doctrine : objectifs,
+ *          titre_precision, encadrants, notes_bloc, notes_atelier.
  *
  * Dépendances :
  *   - window.SupabaseHub v1.8.4 (wrappers Phase 5.3 + listSitesActifs +
@@ -136,6 +161,8 @@
  *   - data/vocabulaire-seance.json v1.1 (fetched à l'init, Phase 5.7)
  *   - data/fiches-all.json (fetched à l'init, Phase 5.8)
  *   - data/groupes-joueur.json (fetched à l'init, Phase 5.9, 3 groupes)
+ *   - data/propositions-seance.json (fetched à l'init, Phase 5.12,
+ *     ~190 propositions sur 16 champs + 20 matériels)
  *   - DOM : #seance-sidebar-body, #btn-nouvelle-seance, #seance-editor-area,
  *     #btn-nouvelle-seance-cta (placeholder existants de seance.html v1)
  */
@@ -181,7 +208,9 @@
     groupePicker: null,     // état popover groupe ({open: bool, nomGroupe: 'G1'|'G2'|'G3', query: string})
     // Phase 5.10 : sidebar enrichie + nettoyage brouillons
     showArchivees: false,        // toggle "Afficher les archivées" dans sidebar header
-    brouillonsVides: []          // liste des brouillons vides éligibles à suppression (cache)
+    brouillonsVides: [],         // liste des brouillons vides éligibles à suppression (cache)
+    // Phase 5.12 : propositions pour datalist + matériel
+    propositionsRef: null        // miroir data/propositions-seance.json
   };
 
   // ============================================================
@@ -235,7 +264,12 @@
     sidebarCleanup:     () => document.getElementById('seance-sidebar-cleanup'),
     btnCleanup:         () => document.getElementById('seance-btn-cleanup'),
     btnArchiveExpanded: () => document.getElementById('seance-btn-archive-expanded'),
-    btnArchiveCollapsed:() => document.getElementById('seance-btn-archive-collapsed')
+    btnArchiveCollapsed:() => document.getElementById('seance-btn-archive-collapsed'),
+    // Phase 5.12 : boutons Valider / Repasser-brouillon
+    btnValiderExpanded:    () => document.getElementById('seance-btn-valider-expanded'),
+    btnValiderCollapsed:   () => document.getElementById('seance-btn-valider-collapsed'),
+    btnBrouillonExpanded:  () => document.getElementById('seance-btn-brouillon-expanded'),
+    btnBrouillonCollapsed: () => document.getElementById('seance-btn-brouillon-collapsed')
   };
 
   // ============================================================
@@ -264,6 +298,268 @@
     if (etat === 'utilisee')  return 'Utilisée';
     if (etat === 'archivee')  return 'Archivée';
     return etat || '—';
+  }
+
+  // ============================================================
+  // Phase 5.12 — Helpers datalist + propositions
+  // ============================================================
+
+  /**
+   * Retourne la liste des propositions pour un slug donné, en cherchant
+   * dans les 3 sections (meta_seance, detail_bloc, axe_4_ffr) du référentiel.
+   * Renvoie un tableau vide si introuvable.
+   */
+  function lookupPropositions(slug) {
+    if (!State.propositionsRef || !slug) return [];
+    const sections = ['meta_seance', 'detail_bloc', 'axe_4_ffr'];
+    for (let i = 0; i < sections.length; i++) {
+      const list = State.propositionsRef[sections[i]] || [];
+      const found = list.find(function (item) { return item.slug === slug; });
+      if (found) return found.propositions || [];
+    }
+    return [];
+  }
+
+  /**
+   * Rend un <datalist> HTML pour un slug donné, avec un id unique.
+   * Utilisation typique :
+   *   <input list="dl-axe-travail-general" ...>
+   *   <datalist id="dl-axe-travail-general">...</datalist>
+   * Renvoie chaîne vide si pas de propositions (input sera mono-ligne libre).
+   */
+  function renderDatalist(slug) {
+    const props = lookupPropositions(slug);
+    if (props.length === 0) return '';
+    const datalistId = 'dl-' + slug.replace(/_/g, '-');
+    let html = '<datalist id="' + datalistId + '">';
+    props.forEach(function (p) {
+      // L'entrée "Autres..." est exclue du datalist : c'est un marqueur visuel
+      // dans le référentiel pour rappeler que la saisie libre est possible.
+      // Inclure "Autres..." dans le datalist polluerait l'autocomplete avec
+      // un item qui ne fait rien quand on le sélectionne.
+      if (p && p.trim() !== 'Autres...') {
+        html += '<option value="' + escapeHtml(p) + '">';
+      }
+    });
+    html += '</datalist>';
+    return html;
+  }
+
+  /**
+   * Helper : ID datalist depuis un slug (utilisé pour l'attribut list= de l'input).
+   */
+  function datalistIdForSlug(slug) {
+    return 'dl-' + slug.replace(/_/g, '-');
+  }
+
+  /**
+   * Retourne la liste des matériels proposés depuis le référentiel.
+   */
+  function lookupMaterielPropose() {
+    if (!State.propositionsRef) return [];
+    return State.propositionsRef.materiel_propose || [];
+  }
+
+  /**
+   * Parse une chaîne matériel séparée par virgules en tableau (trim + filtre vide).
+   * Inverse : tagsToString(tags) → "tag1, tag2, tag3"
+   */
+  function stringToTags(str) {
+    if (!str || typeof str !== 'string') return [];
+    return str.split(',').map(function (t) { return t.trim(); }).filter(function (t) { return t.length > 0; });
+  }
+
+  function tagsToString(tags) {
+    if (!Array.isArray(tags)) return '';
+    return tags.join(', ');
+  }
+
+  /**
+   * Rend le picker à tags matériel comme HTML.
+   * Format affichage : (×Cônes) (×Plots) (+ ajouter…)
+   * Stockage : chaîne séparée par virgules dans materiel_global_text.
+   */
+  function renderMaterielTags(materielStr) {
+    const tags = stringToTags(materielStr);
+    let html = '';
+    tags.forEach(function (tag, idx) {
+      html +=
+        '<span class="seance-materiel-tag" data-tag-idx="' + idx + '">' +
+          '<span class="seance-materiel-tag__label">' + escapeHtml(tag) + '</span>' +
+          '<button type="button" class="seance-materiel-tag__remove" ' +
+                  'data-tag-idx="' + idx + '" title="Retirer">×</button>' +
+        '</span>';
+    });
+    html +=
+      '<button type="button" id="seance-materiel-add" ' +
+              'class="seance-materiel-tag__add" title="Ajouter un matériel">' +
+        '+ Ajouter…' +
+      '</button>';
+    return html;
+  }
+
+  /**
+   * Re-rend le picker à tags matériel et re-bind ses handlers.
+   * Synchronise l'input caché qui sert au save.
+   */
+  function refreshMaterielTags() {
+    const container = document.getElementById('seance-materiel-tags');
+    const hidden = document.getElementById('seance-input-materiel');
+    if (!container || !hidden) return;
+    container.innerHTML = renderMaterielTags(hidden.value || '');
+    bindMaterielTags();
+    setDirty(true); // marque le formulaire comme modifié
+  }
+
+  /**
+   * Bind les boutons du picker à tags : × pour retirer, + Ajouter pour ouvrir
+   * le menu d'ajout.
+   */
+  function bindMaterielTags() {
+    const container = document.getElementById('seance-materiel-tags');
+    const hidden = document.getElementById('seance-input-materiel');
+    if (!container || !hidden) return;
+
+    // Boutons × de chaque tag
+    container.querySelectorAll('.seance-materiel-tag__remove').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const idx = parseInt(btn.getAttribute('data-tag-idx'), 10);
+        const tags = stringToTags(hidden.value);
+        tags.splice(idx, 1);
+        hidden.value = tagsToString(tags);
+        refreshMaterielTags();
+      });
+    });
+
+    // Bouton "+ Ajouter…"
+    const btnAdd = document.getElementById('seance-materiel-add');
+    if (btnAdd) {
+      btnAdd.addEventListener('click', function () {
+        openMaterielMenu(btnAdd);
+      });
+    }
+  }
+
+  /**
+   * Ouvre un menu dropdown sous le bouton "+ Ajouter…" avec :
+   * - Les ~20 matériels proposés (cliquables)
+   * - Un input pour saisie libre
+   * - Bouton Fermer
+   */
+  function openMaterielMenu(anchorBtn) {
+    // Si un menu est déjà ouvert, le fermer d'abord
+    closeMaterielMenu();
+
+    const hidden = document.getElementById('seance-input-materiel');
+    if (!hidden) return;
+    const tagsActuels = new Set(stringToTags(hidden.value));
+    const propose = lookupMaterielPropose();
+
+    let html =
+      '<div id="seance-materiel-menu" class="seance-materiel-menu">' +
+        '<div class="seance-materiel-menu__header">' +
+          '<span class="seance-materiel-menu__title">Ajouter du matériel</span>' +
+          '<button type="button" id="seance-materiel-menu-close" ' +
+                  'class="seance-materiel-menu__close" title="Fermer">✕</button>' +
+        '</div>' +
+        '<div class="seance-materiel-menu__list">';
+    propose.forEach(function (mat) {
+      const deja = tagsActuels.has(mat);
+      html +=
+        '<button type="button" class="seance-materiel-menu__item' +
+                  (deja ? ' is-disabled' : '') + '" ' +
+                'data-materiel="' + escapeHtml(mat) + '"' +
+                (deja ? ' disabled' : '') + '>' +
+          escapeHtml(mat) +
+          (deja ? ' <span class="seance-materiel-menu__deja">déjà ajouté</span>' : '') +
+        '</button>';
+    });
+    html +=
+        '</div>' +
+        '<div class="seance-materiel-menu__custom">' +
+          '<input type="text" id="seance-materiel-custom" ' +
+                 'class="seance-materiel-menu__input" ' +
+                 'placeholder="Ou tape un matériel personnalisé…" ' +
+                 'maxlength="80">' +
+          '<button type="button" id="seance-materiel-custom-add" ' +
+                  'class="seance-materiel-menu__add-btn">+ Ajouter</button>' +
+        '</div>' +
+      '</div>';
+
+    // Insertion juste après le bouton ancre
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = html;
+    anchorBtn.parentNode.insertBefore(wrapper.firstChild, anchorBtn.nextSibling);
+
+    // ----- Binds -----
+    const menu = document.getElementById('seance-materiel-menu');
+    if (!menu) return;
+
+    document.getElementById('seance-materiel-menu-close').addEventListener('click', closeMaterielMenu);
+
+    // Click sur un item proposé → ajout
+    menu.querySelectorAll('.seance-materiel-menu__item').forEach(function (item) {
+      item.addEventListener('click', function () {
+        if (item.disabled) return;
+        const mat = item.getAttribute('data-materiel');
+        addMateriel(mat);
+      });
+    });
+
+    // Bouton + Ajouter pour saisie libre
+    const inputCustom = document.getElementById('seance-materiel-custom');
+    const btnCustomAdd = document.getElementById('seance-materiel-custom-add');
+    function tryAddCustom() {
+      const v = (inputCustom.value || '').trim();
+      if (v) addMateriel(v);
+    }
+    btnCustomAdd.addEventListener('click', tryAddCustom);
+    inputCustom.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        tryAddCustom();
+      }
+    });
+
+    // Fermeture par clic extérieur
+    setTimeout(function () {
+      document.addEventListener('click', onMaterielMenuClickOutside);
+    }, 0);
+
+    // Auto-focus sur l'input
+    if (inputCustom) setTimeout(function () { inputCustom.focus(); }, 0);
+  }
+
+  function closeMaterielMenu() {
+    const menu = document.getElementById('seance-materiel-menu');
+    if (menu) menu.parentNode.removeChild(menu);
+    document.removeEventListener('click', onMaterielMenuClickOutside);
+  }
+
+  function onMaterielMenuClickOutside(e) {
+    const menu = document.getElementById('seance-materiel-menu');
+    if (!menu) return;
+    if (menu.contains(e.target)) return;
+    // Si on a cliqué sur le bouton "+ Ajouter" qui a ouvert le menu, ignorer
+    const addBtn = document.getElementById('seance-materiel-add');
+    if (addBtn && addBtn.contains(e.target)) return;
+    closeMaterielMenu();
+  }
+
+  /**
+   * Ajoute un matériel au tableau de tags, ferme le menu, refresh l'affichage.
+   * Évite les doublons (case-sensitive — un coach qui veut "ballons" et "Ballons" peut).
+   */
+  function addMateriel(mat) {
+    const hidden = document.getElementById('seance-input-materiel');
+    if (!hidden) return;
+    const tags = stringToTags(hidden.value);
+    if (tags.indexOf(mat) === -1) {
+      tags.push(mat);
+      hidden.value = tagsToString(tags);
+    }
+    closeMaterielMenu();
+    refreshMaterielTags();
   }
 
   // Formate une time SQL ('18:30:00' ou '18:30') en 'HH:MM' pour <input type="time">
@@ -524,6 +820,21 @@
         '</div>' +
         '<div class="seance-form-collapsed__right">' +
           '<span id="seance-autosave-pill" class="seance-autosave-pill is-idle" title="Sauvegarde automatique (30s si modifications)">● Sauvé</span>' +
+          // Phase 5.12 : bouton Valider (si brouillon) ou Repasser-brouillon
+          (s.etat === 'brouillon'
+            ? '<button type="button" id="seance-btn-valider-collapsed" ' +
+                      'class="seance-form__valider-btn" ' +
+                      'title="Valider cette séance (prête à coacher)">' +
+                '✓ Valider' +
+              '</button>'
+            : '') +
+          ((s.etat === 'validee' || s.etat === 'utilisee')
+            ? '<button type="button" id="seance-btn-brouillon-collapsed" ' +
+                      'class="seance-form__brouillon-btn" ' +
+                      'title="Repasser cette séance en brouillon (réédition libre)">' +
+                '↩ Brouillon' +
+              '</button>'
+            : '') +
           // Phase 5.10 : bouton Archiver dans le résumé replié
           '<button type="button" id="seance-btn-archive-collapsed" ' +
                   'class="seance-form__archive-btn" ' +
@@ -552,6 +863,12 @@
     if (btnArchive && !btnArchive.disabled) {
       btnArchive.addEventListener('click', onArchiveSeance);
     }
+
+    // Phase 5.12 : binds Valider / Brouillon en mode collapsed
+    const btnValiderC = DOM.btnValiderCollapsed();
+    if (btnValiderC) btnValiderC.addEventListener('click', onValiderSeance);
+    const btnBrouillonC = DOM.btnBrouillonCollapsed();
+    if (btnBrouillonC) btnBrouillonC.addEventListener('click', onRepasserBrouillon);
 
     // Phase 5.6.A : rendu de la trame chronologique sous le résumé
     renderTrame();
@@ -588,6 +905,21 @@
           '<div class="seance-form__header-right">' +
             '<span id="seance-autosave-pill" class="seance-autosave-pill is-idle" title="État de la sauvegarde automatique (30s si modifications)">● Sauvé</span>' +
             '<span class="seance-form__etat etat-' + escapeHtml(s.etat) + '">' + libelleEtatSeance(s.etat) + '</span>' +
+            // Phase 5.12 : bouton Valider (si brouillon) ou Repasser-brouillon (si validee/utilisee)
+            (s.etat === 'brouillon'
+              ? '<button type="button" id="seance-btn-valider-expanded" ' +
+                        'class="seance-form__valider-btn" ' +
+                        'title="Valider cette séance (prête à coacher)">' +
+                  '✓ Valider' +
+                '</button>'
+              : '') +
+            ((s.etat === 'validee' || s.etat === 'utilisee')
+              ? '<button type="button" id="seance-btn-brouillon-expanded" ' +
+                        'class="seance-form__brouillon-btn" ' +
+                        'title="Repasser cette séance en brouillon (réédition libre)">' +
+                  '↩ Brouillon' +
+                '</button>'
+              : '') +
             // Phase 5.10 : bouton Archiver (désactivé si déjà archivée)
             '<button type="button" id="seance-btn-archive-expanded" ' +
                     'class="seance-form__archive-btn" ' +
@@ -632,18 +964,21 @@
           '<label class="seance-field seance-field--full">' +
             '<span class="seance-field__label">Thème principal</span>' +
             '<input type="text" id="seance-input-theme" class="seance-field__input" ' +
+                   'list="' + datalistIdForSlug('theme_principal') + '" ' +
                    'placeholder="Ex : Défense au sol, Plaquage technique…" ' +
                    'maxlength="120" ' +
                    'value="' + escapeHtml(s.theme_principal || '') + '">' +
+            renderDatalist('theme_principal') +
           '</label>' +
 
           '<label class="seance-field seance-field--full">' +
             '<span class="seance-field__label">Axe de travail général</span>' +
-            '<textarea id="seance-input-axe" class="seance-field__input seance-field__textarea" ' +
-                      'rows="2" maxlength="500" ' +
-                      'placeholder="Une phrase qui résume l\'objectif principal de la séance…">' +
-              escapeHtml(s.axe_travail_general || '') +
-            '</textarea>' +
+            '<input type="text" id="seance-input-axe" class="seance-field__input" ' +
+                   'list="' + datalistIdForSlug('axe_travail_general') + '" ' +
+                   'placeholder="Une phrase qui résume l\'objectif principal de la séance…" ' +
+                   'maxlength="500" ' +
+                   'value="' + escapeHtml(s.axe_travail_general || '') + '">' +
+            renderDatalist('axe_travail_general') +
           '</label>' +
 
         '</div>' +
@@ -671,17 +1006,21 @@
             '<label class="seance-field">' +
               '<span class="seance-field__label">Météo prévue</span>' +
               '<input type="text" id="seance-input-meteo" class="seance-field__input" ' +
+                     'list="' + datalistIdForSlug('meteo_text') + '" ' +
                      'placeholder="Ex : pluie fine, 12°C…" ' +
                      'maxlength="120" ' +
                      'value="' + escapeHtml(s.meteo_text || '') + '">' +
+              renderDatalist('meteo_text') +
             '</label>' +
 
             '<label class="seance-field">' +
               '<span class="seance-field__label">Cycle / Période</span>' +
               '<input type="text" id="seance-input-cycle" class="seance-field__input" ' +
+                     'list="' + datalistIdForSlug('bloc_cycle') + '" ' +
                      'placeholder="Ex : Cycle défense (sem. 3/6)" ' +
                      'maxlength="120" ' +
                      'value="' + escapeHtml(s.bloc_cycle || '') + '">' +
+              renderDatalist('bloc_cycle') +
             '</label>' +
 
             '<label class="seance-field seance-field--full">' +
@@ -703,11 +1042,12 @@
 
             '<label class="seance-field seance-field--full">' +
               '<span class="seance-field__label">Matériel global</span>' +
-              '<textarea id="seance-input-materiel" class="seance-field__input seance-field__textarea" ' +
-                        'rows="2" maxlength="500" ' +
-                        'placeholder="Ex : 20 plots, 6 boucliers, 4 ballons…">' +
-                escapeHtml(s.materiel_global_text || '') +
-              '</textarea>' +
+              '<div id="seance-materiel-tags" class="seance-materiel-tags">' +
+                renderMaterielTags(s.materiel_global_text || '') +
+              '</div>' +
+              // Input caché qui contient la valeur sérialisée (compatibilité saveSeance)
+              '<input type="hidden" id="seance-input-materiel" ' +
+                     'value="' + escapeHtml(s.materiel_global_text || '') + '">' +
             '</label>' +
 
           '</div>' +
@@ -759,6 +1099,15 @@
     if (btnArchive && !btnArchive.disabled) {
       btnArchive.addEventListener('click', onArchiveSeance);
     }
+
+    // Phase 5.12 : binds Valider / Brouillon en mode expanded
+    const btnValiderE = DOM.btnValiderExpanded();
+    if (btnValiderE) btnValiderE.addEventListener('click', onValiderSeance);
+    const btnBrouillonE = DOM.btnBrouillonExpanded();
+    if (btnBrouillonE) btnBrouillonE.addEventListener('click', onRepasserBrouillon);
+
+    // Phase 5.12 : bind picker à tags matériel global
+    bindMaterielTags();
 
     // Phase 5.6.A : rendu de la trame chronologique sous le formulaire
     renderTrame();
@@ -1228,16 +1577,19 @@
 
     valeursAxe4.forEach(function (champ) {
       const value = axe4[champ.slug] || '';
-      const isShort = (champ.slug === 'cr' || champ.slug === 'critere_realisation');
+      // Phase 5.12 : tous les champs Axe 4 deviennent des input mono-ligne
+      // avec datalist HTML5 (propositions issues de propositions-seance.json).
+      // Le coach peut toujours taper du texte libre.
       html +=
         '<label class="seance-field seance-field--full">' +
           '<span class="seance-field__label">' + escapeHtml(champ.libelle) + '</span>' +
-          '<textarea class="seance-field__input seance-field__textarea" ' +
-                    'data-bloc-field-axe4="' + escapeHtml(champ.slug) + '" ' +
-                    'rows="' + (isShort ? '2' : '2') + '" maxlength="1000" ' +
-                    'placeholder="…">' +
-            escapeHtml(value) +
-          '</textarea>' +
+          '<input type="text" class="seance-field__input" ' +
+                 'list="' + datalistIdForSlug(champ.slug) + '" ' +
+                 'data-bloc-field-axe4="' + escapeHtml(champ.slug) + '" ' +
+                 'maxlength="1000" ' +
+                 'placeholder="Tape ou choisis dans la liste…" ' +
+                 'value="' + escapeHtml(value) + '">' +
+          renderDatalist(champ.slug) +
         '</label>';
     });
 
@@ -1253,18 +1605,20 @@
 
           '<label class="seance-field seance-field--full">' +
             '<span class="seance-field__label">Comportements attendus</span>' +
-            '<textarea class="seance-field__input seance-field__textarea" ' +
-                      'data-bloc-field="comportements_attendus" rows="2" maxlength="500">' +
-              escapeHtml(b.comportements_attendus || '') +
-            '</textarea>' +
+            '<input type="text" class="seance-field__input" ' +
+                   'list="' + datalistIdForSlug('comportements_attendus') + '" ' +
+                   'data-bloc-field="comportements_attendus" maxlength="500" ' +
+                   'value="' + escapeHtml(b.comportements_attendus || '') + '">' +
+            renderDatalist('comportements_attendus') +
           '</label>' +
 
           '<label class="seance-field seance-field--full">' +
             '<span class="seance-field__label">Organisation spatio-temporelle</span>' +
-            '<textarea class="seance-field__input seance-field__textarea" ' +
-                      'data-bloc-field="organisation_spatio_temporelle" rows="2" maxlength="500">' +
-              escapeHtml(b.organisation_spatio_temporelle || '') +
-            '</textarea>' +
+            '<input type="text" class="seance-field__input" ' +
+                   'list="' + datalistIdForSlug('organisation_spatio_temporelle') + '" ' +
+                   'data-bloc-field="organisation_spatio_temporelle" maxlength="500" ' +
+                   'value="' + escapeHtml(b.organisation_spatio_temporelle || '') + '">' +
+            renderDatalist('organisation_spatio_temporelle') +
           '</label>' +
 
           '<label class="seance-field seance-field--full">' +
@@ -1822,7 +2176,6 @@
           '<div class="seance-groupe-card__header" ' +
                 'style="background: ' + escapeHtml(couleur) + ';">' +
             '<span class="seance-groupe-card__nom">' + escapeHtml(g.nom) + '</span>' +
-            '<span class="seance-groupe-card__label">' + escapeHtml(libelle) + '</span>' +
             '<span class="seance-groupe-card__count">' + g.joueurs.length + '</span>' +
           '</div>' +
           '<div class="seance-groupe-card__body">';
@@ -1926,6 +2279,8 @@
   /**
    * Rend le popover picker joueurs.
    * Re-rendu à chaque frappe dans le champ recherche (avec restauration du focus).
+   * Phase 5.12 : restaure aussi le scrollTop de la liste après re-render
+   * (sinon la liste remonte à chaque coche, bug d'ergonomie remonté en V1).
    */
   function renderGroupePicker() {
     const root = DOM.pickerGroupeRoot();
@@ -1934,6 +2289,10 @@
       root.innerHTML = '';
       return;
     }
+
+    // Phase 5.12 : sauvegarde du scrollTop AVANT re-render (s'il existe déjà)
+    const oldList = root.querySelector('.seance-picker-groupe__list-wrap');
+    const savedScrollTop = oldList ? oldList.scrollTop : 0;
 
     const nomGroupe = State.groupePicker.nomGroupe;
     const query = State.groupePicker.query || '';
@@ -1962,7 +2321,7 @@
         '<div class="seance-picker-groupe__modal" role="dialog" aria-modal="true">' +
           '<div class="seance-picker-groupe__header" style="background: ' + escapeHtml(couleur) + ';">' +
             '<h3 class="seance-picker-groupe__title">' +
-              '👥 ' + escapeHtml(nomGroupe) + ' — ' + escapeHtml(libelle) +
+              '👥 Groupe ' + escapeHtml(nomGroupe) +
             '</h3>' +
             '<button type="button" id="seance-picker-groupe-close" ' +
                     'class="seance-picker-groupe__close" title="Fermer (Échap)">✕</button>' +
@@ -2026,6 +2385,13 @@
       '</div>';
 
     root.innerHTML = html;
+
+    // Phase 5.12 : restaure le scrollTop de la liste après re-render
+    // (sans transition pour ne pas attirer l'œil)
+    if (savedScrollTop > 0) {
+      const newList = root.querySelector('.seance-picker-groupe__list-wrap');
+      if (newList) newList.scrollTop = savedScrollTop;
+    }
 
     // ----- Binds modale -----
     const overlay = document.getElementById('seance-picker-groupe-overlay');
@@ -2261,6 +2627,93 @@
     renderSidebar();
     renderEmptyEditor();
     showFeedback('Séance archivée ✓', 'success');
+  }
+
+  /**
+   * Valide la séance courante (Phase 5.12).
+   * Bouton manuel dans le formulaire méta (déplié ET résumé replié).
+   * Bascule etat='brouillon' → 'validee'. Confirme, save préventif des
+   * modifs en cours, update etat, recharge la sidebar, garde la séance
+   * ouverte (contrairement à archivage).
+   */
+  async function onValiderSeance() {
+    if (!State.currentSeance) return;
+
+    // Garde-fou : refuser de valider sans date_seance
+    if (!State.currentSeance.date_seance) {
+      window.alert('Impossible de valider une séance sans date.\n\n' +
+                   'Renseigne au moins la date avant de valider.');
+      return;
+    }
+
+    const ok = window.confirm(
+      'Valider cette séance ?\n\n' +
+      'Elle passera de "brouillon" à "validée" (prête à coacher).\n' +
+      'Tu pourras toujours la modifier ou la repasser en brouillon ensuite.'
+    );
+    if (!ok) return;
+
+    // Save préventif des modifs en cours (même pattern que onArchiveSeance)
+    if (State.isDirty) {
+      await saveSeance({ silent: true });
+    }
+
+    const res = await SupabaseHub.updateSeance(State.currentSeance.id, {
+      etat: 'validee'
+    });
+    if (!res.ok) {
+      window.alert('Échec de la validation :\n' + (res.error || 'erreur inconnue'));
+      return;
+    }
+
+    // Synchro mémoire + refresh sidebar + re-render du formulaire en place
+    State.currentSeance.etat = 'validee';
+    const idx = State.seances.findIndex(function (s) { return s.id === State.currentSeance.id; });
+    if (idx !== -1) State.seances[idx].etat = 'validee';
+
+    await loadSeances();
+    renderSidebar();
+    renderForm();
+    renderTrame();
+    showFeedback('Séance validée ✓', 'success');
+  }
+
+  /**
+   * Repasse une séance validée/utilisée en brouillon (Phase 5.12).
+   * Permet d'éditer librement après validation. Boutton seulement
+   * visible si etat='validee' ou 'utilisee' (pas pour archivée).
+   */
+  async function onRepasserBrouillon() {
+    if (!State.currentSeance) return;
+    if (State.currentSeance.etat === 'brouillon') return;
+
+    const ok = window.confirm(
+      'Repasser cette séance en brouillon ?\n\n' +
+      'Elle redevient modifiable librement (statut "brouillon").'
+    );
+    if (!ok) return;
+
+    if (State.isDirty) {
+      await saveSeance({ silent: true });
+    }
+
+    const res = await SupabaseHub.updateSeance(State.currentSeance.id, {
+      etat: 'brouillon'
+    });
+    if (!res.ok) {
+      window.alert('Échec du retour en brouillon :\n' + (res.error || 'erreur inconnue'));
+      return;
+    }
+
+    State.currentSeance.etat = 'brouillon';
+    const idx = State.seances.findIndex(function (s) { return s.id === State.currentSeance.id; });
+    if (idx !== -1) State.seances[idx].etat = 'brouillon';
+
+    await loadSeances();
+    renderSidebar();
+    renderForm();
+    renderTrame();
+    showFeedback('Séance repassée en brouillon ✓', 'success');
   }
 
   async function onNouvelleSeance() {
@@ -2868,6 +3321,30 @@
   }
 
   /**
+   * Charge le référentiel des propositions pré-saisies (Phase 5.12).
+   * Structure : { _meta:{...}, meta_seance:[{slug, libelle, propositions}...],
+   *               detail_bloc:[...], axe_4_ffr:[...], materiel_propose:[...] }
+   * En cas d'échec (fichier absent / réseau), State.propositionsRef reste null
+   * et les datalist seront simplement vides — saisie libre conservée.
+   */
+  async function loadPropositionsRef() {
+    try {
+      const resp = await fetch('data/propositions-seance.json', { cache: 'force-cache' });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      State.propositionsRef = await resp.json();
+      const nbMeta = (State.propositionsRef.meta_seance || []).length;
+      const nbBloc = (State.propositionsRef.detail_bloc || []).length;
+      const nbAxe4 = (State.propositionsRef.axe_4_ffr || []).length;
+      const nbMat  = (State.propositionsRef.materiel_propose || []).length;
+      console.log('SeanceEditor: propositions-seance.json chargé (' + nbMeta + ' méta, ' +
+                  nbBloc + ' bloc, ' + nbAxe4 + ' Axe 4, ' + nbMat + ' matériels)');
+    } catch (e) {
+      console.warn('SeanceEditor: loadPropositionsRef() KO, datalist vides', e);
+      State.propositionsRef = null;
+    }
+  }
+
+  /**
    * Charge le vivier M14 (Phase 5.9) via la RPC get_vivier_compo.
    * Indexe les joueurs par joueur_id dans une Map pour lookup rapide.
    * Pattern identique à compositions-editor.js (Phase 4.4).
@@ -2908,7 +3385,8 @@
     // les dropdowns du formulaire, types-blocs.json pour la trame (5.6.A),
     // vocabulaire-seance.json pour le détail bloc (5.7), fiches-all.json
     // pour le picker ateliers (5.8), groupes-joueur.json + vivier M14 pour
-    // les groupes G1/G2/G3 par bloc (5.9)
+    // les groupes G1/G2/G3 par bloc (5.9), propositions-seance.json pour
+    // les datalist + matériel (5.12)
     await Promise.all([
       loadSeances(),
       loadSites(),
@@ -2917,7 +3395,8 @@
       loadVocabulaireRef(),
       loadFichesRef(),
       loadGroupesRef(),
-      loadVivierM14()
+      loadVivierM14(),
+      loadPropositionsRef()
     ]);
 
     renderSidebar();
