@@ -11,7 +11,7 @@
  *   - 5.5.A : éditeur méta + sauvegarde manuelle (CETTE VERSION)
  *   - 5.5.B : autosave 30s + dropdowns lieu/événement + champs secondaires
  *
- * Version : 1.4.1 — Phase 5.6.B fix UX (15 mai 2026)
+ * Version : 1.5 — Phase 5.7 (15 mai 2026)
  *   v1.0 : squelette IIFE, sidebar liste séances, bouton "+ Nouvelle séance",
  *          formulaire 6 champs méta (date, heure, durée, effectif, thème,
  *          axe de travail), sauvegarde manuelle via updateSeance(), feedback
@@ -59,11 +59,29 @@
  *          déplié (à côté de la pastille autosave + badge état) et
  *          permet de revenir au résumé compact sans modification.
  *          Si modifs en cours, confirm() avant repli.
+ *   v1.5 : Phase 5.7 — détail d'un bloc.
+ *          Clic sur une ligne de la trame ouvre l'éditeur complet du bloc
+ *          (remplace la trame, bouton "← Retour à la trame" pour revenir).
+ *          Champs édités :
+ *          - Type de bloc (changeable), durée, titre précision, intensité
+ *            (affichée conditionnellement selon le type)
+ *          - 2 étiquettes Axe 2 (types d'unités) / Axe 3 (composants
+ *            échauffement), affichées selon types-blocs.json.etiquettes_proposees
+ *          - 10 champs FFR Axe 4 (objectif, but, consigne, cr, critère
+ *            réalisation, comportements, variables, régulations, dispositif,
+ *            transitions) stockés en jsonb contenu_pedagogique_axe4
+ *          - Comportements attendus, organisation spatio-temporelle,
+ *            notes bloc (3 textarea libres)
+ *          Sauvegarde via updateBloc() + autosave 30s + pastille statut
+ *          (pattern identique au form séance, refactor minimal).
+ *          Charge vocabulaire-seance.json (4 axes) en plus de
+ *          types-blocs.json à l'init.
  *
  * Dépendances :
  *   - window.SupabaseHub v1.8.2 (wrappers Phase 5.3 + listSitesActifs +
- *     listBlocsBySeance)
+ *     listBlocsBySeance + updateBloc)
  *   - data/types-blocs.json v1.1 (fetched à l'init)
+ *   - data/vocabulaire-seance.json v1.1 (fetched à l'init, Phase 5.7)
  *   - DOM : #seance-sidebar-body, #btn-nouvelle-seance, #seance-editor-area,
  *     #btn-nouvelle-seance-cta (placeholder existants de seance.html v1)
  */
@@ -91,7 +109,13 @@
     blocs: [],              // blocs de la séance courante, triés par ordre (5.6.A)
     typesBlocsRef: null,    // référentiel des 11 types (data/types-blocs.json, 5.6.A)
     picker: null,           // état du popover "+ Ajouter un bloc" ({open: bool}, 5.6.A)
-    formCollapsed: false    // true : form méta replié en résumé compact (5.6.B)
+    formCollapsed: false,   // true : form méta replié en résumé compact (5.6.B)
+    vocabulaireRef: null,   // référentiel des 4 axes (data/vocabulaire-seance.json, 5.7)
+    currentBloc: null,      // bloc en cours d'édition (vue détail, 5.7)
+    blocIsDirty: false,     // modifs non sauvées sur le bloc en édition (5.7)
+    blocAutosaveTimer: null, // handle setInterval pour autosave du bloc (5.7)
+    blocAutosaveStatus: 'idle', // 'idle' | 'saving' | 'error' (5.7)
+    view: 'trame'           // 'trame' | 'bloc-detail' : vue active de la zone éditeur (5.7)
   };
 
   // ============================================================
@@ -125,7 +149,13 @@
     trameSection: () => document.getElementById('seance-trame-section'),
     trameBody:    () => document.getElementById('seance-trame-body'),
     btnAddBloc:   () => document.getElementById('seance-btn-add-bloc'),
-    pickerRoot:   () => document.getElementById('seance-picker-root')
+    pickerRoot:   () => document.getElementById('seance-picker-root'),
+    // Phase 5.7 : détail bloc
+    blocDetailSection: () => document.getElementById('seance-bloc-detail'),
+    blocAutosavePill:  () => document.getElementById('seance-bloc-autosave-pill'),
+    blocBtnRetour:     () => document.getElementById('seance-bloc-btn-retour'),
+    blocBtnSave:       () => document.getElementById('seance-bloc-btn-save'),
+    blocInputs: () => document.querySelectorAll('[data-bloc-field]') // tous les champs édités
   };
 
   // ============================================================
@@ -597,6 +627,9 @@
   /**
    * Rend la section "Trame chronologique" sous le formulaire méta.
    * Appelée après renderForm() et après chaque action (ajout, etc.).
+   *
+   * Phase 5.7 : si State.view === 'bloc-detail', la trame est cachée et
+   * le détail du bloc en édition prend sa place (à la fin de la fonction).
    */
   function renderTrame() {
     const area = DOM.editorArea();
@@ -674,7 +707,9 @@
               '<span class="seance-trame__horaire-start">' + heureCell + '</span>' +
               (heureFin ? '<span class="seance-trame__horaire-end">→ ' + heureFin + '</span>' : '') +
             '</td>' +
-            '<td class="seance-trame__td-bloc">' +
+            '<td class="seance-trame__td-bloc seance-trame__td-bloc--clickable" ' +
+                 'data-action="open-detail" data-bloc-id="' + escapeHtml(b.id) + '" ' +
+                 'title="Cliquer pour éditer ce bloc en détail">' +
               '<span class="seance-trame__emoji">' + emoji + '</span> ' +
               '<span class="seance-trame__type">' + escapeHtml(libType) + '</span>' +
               '<span class="seance-trame__precision">' + titreCompl + '</span>' +
@@ -737,6 +772,25 @@
         if (action === 'remove') onRemoveBloc(blocId);
       });
     });
+
+    // Phase 5.7 : bind des clics open-detail sur les cellules td-bloc
+    section.querySelectorAll('[data-action="open-detail"]').forEach(function (cell) {
+      cell.addEventListener('click', function () {
+        const blocId = cell.getAttribute('data-bloc-id');
+        onOpenBlocDetail(blocId);
+      });
+    });
+
+    // Phase 5.7 : si on est en vue détail bloc, masquer la trame et afficher le détail
+    if (State.view === 'bloc-detail' && State.currentBloc) {
+      section.style.display = 'none';
+      renderBlocDetail();
+    } else {
+      section.style.display = '';
+      // Si une section detail existe et est visible, la masquer
+      const detail = DOM.blocDetailSection();
+      if (detail) detail.style.display = 'none';
+    }
   }
 
   /**
@@ -833,6 +887,284 @@
   }
 
   // ============================================================
+  // 5.ter. RENDU DÉTAIL BLOC (Phase 5.7)
+  // ============================================================
+
+  /**
+   * Récupère la liste des termes d'un axe du vocabulaire-seance.json.
+   * @param {string} axeKey ex : 'axe_2_types_unites', 'axe_3_composants_echauffement', 'axe_4_champs_ffr'
+   * @returns {Array} Liste de {slug, libelle}, [] si introuvable
+   */
+  function lookupVocabAxe(axeKey) {
+    if (!State.vocabulaireRef) return [];
+    const axe = State.vocabulaireRef[axeKey];
+    if (!axe || !Array.isArray(axe.valeurs)) return [];
+    return axe.valeurs;
+  }
+
+  /**
+   * Rend la pastille autosave du détail bloc (3 états comme la séance).
+   */
+  function setBlocAutosaveStatus(status) {
+    State.blocAutosaveStatus = status;
+    const pill = DOM.blocAutosavePill();
+    if (!pill) return;
+    pill.classList.remove('is-idle','is-saving','is-error');
+    if (status === 'saving') {
+      pill.classList.add('is-saving');
+      pill.textContent = '● Sauvegarde…';
+    } else if (status === 'error') {
+      pill.classList.add('is-error');
+      pill.textContent = '● Erreur autosave';
+    } else {
+      pill.classList.add('is-idle');
+      pill.textContent = '● Sauvé';
+    }
+  }
+
+  function setBlocDirty(dirty) {
+    State.blocIsDirty = !!dirty;
+    const btn = DOM.blocBtnSave();
+    if (btn) {
+      btn.disabled = !dirty;
+      btn.textContent = dirty ? '💾 Enregistrer le bloc' : '✓ Enregistré';
+    }
+  }
+
+  /**
+   * Construit une grille d'options pour un <select>.
+   * @param {Array} valeurs Liste {slug, libelle}
+   * @param {string} selectedSlug Slug actuellement sélectionné (ou null)
+   * @param {string} emptyLabel Libellé de l'option vide
+   */
+  function buildSelectOptions(valeurs, selectedSlug, emptyLabel) {
+    let html = '<option value="">— ' + escapeHtml(emptyLabel || 'Aucun') + ' —</option>';
+    valeurs.forEach(function (v) {
+      const sel = (v.slug === selectedSlug) ? ' selected' : '';
+      html += '<option value="' + escapeHtml(v.slug) + '"' + sel + '>' + escapeHtml(v.libelle) + '</option>';
+    });
+    return html;
+  }
+
+  /**
+   * Rend l'éditeur détail d'un bloc dans la zone éditeur (sous le résumé
+   * méta replié). Remplace la trame chronologique tant qu'on est en vue
+   * 'bloc-detail'. Phase 5.7.
+   */
+  function renderBlocDetail() {
+    const area = DOM.editorArea();
+    if (!area || !State.currentBloc) return;
+    const b = State.currentBloc;
+
+    // Crée la section detail si elle n'existe pas encore
+    let section = DOM.blocDetailSection();
+    if (!section) {
+      section = document.createElement('section');
+      section.id = 'seance-bloc-detail';
+      section.className = 'seance-bloc-detail';
+      area.appendChild(section);
+    }
+    section.style.display = '';
+
+    // Lookup type de bloc actuel
+    const typeDef = lookupTypeBloc(b.type_bloc);
+    const emoji = (typeDef && typeDef.emoji) || '·';
+    const libType = (typeDef && typeDef.libelle) || b.type_bloc;
+    const positionDansTrame = State.blocs.findIndex(function (x) { return x.id === b.id; }) + 1;
+
+    // Décide quels champs conditionnels afficher
+    const afficheIntensite   = !!(typeDef && typeDef.affiche_intensite);
+    const etiquettesProp     = (typeDef && Array.isArray(typeDef.etiquettes_proposees)) ? typeDef.etiquettes_proposees : [];
+    const afficheAxe2        = etiquettesProp.indexOf('axe_2') !== -1;
+    const afficheAxe3        = etiquettesProp.indexOf('axe_3') !== -1;
+
+    // Référentiels pour les dropdowns
+    const typesBlocs    = (State.typesBlocsRef && State.typesBlocsRef.types_blocs && State.typesBlocsRef.types_blocs.valeurs) || [];
+    const intensites    = (State.typesBlocsRef && State.typesBlocsRef.intensites && State.typesBlocsRef.intensites.valeurs) || [];
+    const valeursAxe2   = lookupVocabAxe('axe_2_types_unites');
+    const valeursAxe3   = lookupVocabAxe('axe_3_composants_echauffement');
+    const valeursAxe4   = lookupVocabAxe('axe_4_champs_ffr');
+
+    // Contenu pédagogique Axe 4 (jsonb)
+    const axe4 = b.contenu_pedagogique_axe4 || {};
+
+    // ----- Construction du HTML -----
+    let html =
+      // Header avec bouton retour + pastille + bouton save
+      '<header class="seance-bloc-detail__header">' +
+        '<button type="button" id="seance-bloc-btn-retour" class="seance-bloc-detail__btn-retour" title="Retour à la trame chronologique">' +
+          '← Retour à la trame' +
+        '</button>' +
+        '<h3 class="seance-bloc-detail__title">' +
+          '<span class="seance-bloc-detail__emoji">' + emoji + '</span> ' +
+          '<span>Bloc ' + positionDansTrame + ' · ' + escapeHtml(libType) + '</span>' +
+        '</h3>' +
+        '<div class="seance-bloc-detail__header-right">' +
+          '<span id="seance-bloc-autosave-pill" class="seance-autosave-pill is-idle" title="Sauvegarde automatique du bloc (30s si modifications)">● Sauvé</span>' +
+        '</div>' +
+      '</header>' +
+
+      // ----- Section essentielle : type, durée, intensité, titre précision -----
+      '<div class="seance-bloc-detail__grid">' +
+
+        '<label class="seance-field">' +
+          '<span class="seance-field__label">Type de bloc</span>' +
+          '<select class="seance-field__input" data-bloc-field="type_bloc">' +
+            typesBlocs.map(function (t) {
+              const sel = (t.slug === b.type_bloc) ? ' selected' : '';
+              return '<option value="' + escapeHtml(t.slug) + '"' + sel + '>' +
+                       (t.emoji || '·') + ' ' + escapeHtml(t.libelle) +
+                     '</option>';
+            }).join('') +
+          '</select>' +
+        '</label>' +
+
+        '<label class="seance-field">' +
+          '<span class="seance-field__label">Durée (min)</span>' +
+          '<input type="number" class="seance-field__input" data-bloc-field="duree_min" ' +
+                 'min="1" max="240" step="1" ' +
+                 'value="' + escapeHtml(b.duree_min || 10) + '">' +
+        '</label>' +
+
+        // Intensité : afficher conditionnellement, sinon une cellule "—"
+        '<label class="seance-field' + (afficheIntensite ? '' : ' seance-field--hidden') + '">' +
+          '<span class="seance-field__label">Intensité contact</span>' +
+          '<select class="seance-field__input" data-bloc-field="intensite">' +
+            buildSelectOptions(intensites.map(function (i) {
+              return { slug: i.slug, libelle: (i.emoji || '') + ' ' + i.libelle };
+            }), b.intensite, 'Non spécifiée') +
+          '</select>' +
+        '</label>' +
+
+        '<label class="seance-field' + (afficheIntensite ? ' seance-field--full' : ' seance-field--full') + '">' +
+          '<span class="seance-field__label">Titre / précision</span>' +
+          '<input type="text" class="seance-field__input" data-bloc-field="titre_precision" ' +
+                 'maxlength="200" ' +
+                 'placeholder="Ex : Mobilisation articulaire avec ballon" ' +
+                 'value="' + escapeHtml(b.titre_precision || '') + '">' +
+        '</label>' +
+
+      '</div>';
+
+    // ----- Section étiquettes (Axe 2 et/ou Axe 3) conditionnelle -----
+    if (afficheAxe2 || afficheAxe3) {
+      html +=
+        '<details class="seance-bloc-detail__details" open>' +
+          '<summary class="seance-bloc-detail__details-summary">Étiquettes contextuelles</summary>' +
+          '<div class="seance-bloc-detail__grid">';
+
+      if (afficheAxe2) {
+        html +=
+          '<label class="seance-field seance-field--full">' +
+            '<span class="seance-field__label">Type d\'unité (Axe 2)</span>' +
+            '<select class="seance-field__input" data-bloc-field="etiquette_axe2">' +
+              buildSelectOptions(valeursAxe2, b.etiquette_axe2, 'Non spécifié') +
+            '</select>' +
+          '</label>';
+      }
+      if (afficheAxe3) {
+        html +=
+          '<label class="seance-field seance-field--full">' +
+            '<span class="seance-field__label">Composant d\'échauffement (Axe 3)</span>' +
+            '<select class="seance-field__input" data-bloc-field="etiquette_axe3">' +
+              buildSelectOptions(valeursAxe3, b.etiquette_axe3, 'Non spécifié') +
+            '</select>' +
+          '</label>';
+      }
+      html +=
+          '</div>' +
+        '</details>';
+    }
+
+    // ----- Section Contenu pédagogique (Axe 4 : 10 champs FFR) -----
+    html +=
+      '<details class="seance-bloc-detail__details" open>' +
+        '<summary class="seance-bloc-detail__details-summary">Contenu pédagogique (10 champs FFR · Axe 4)</summary>' +
+        '<div class="seance-bloc-detail__grid">';
+
+    valeursAxe4.forEach(function (champ) {
+      const value = axe4[champ.slug] || '';
+      const isShort = (champ.slug === 'cr' || champ.slug === 'critere_realisation');
+      html +=
+        '<label class="seance-field seance-field--full">' +
+          '<span class="seance-field__label">' + escapeHtml(champ.libelle) + '</span>' +
+          '<textarea class="seance-field__input seance-field__textarea" ' +
+                    'data-bloc-field-axe4="' + escapeHtml(champ.slug) + '" ' +
+                    'rows="' + (isShort ? '2' : '2') + '" maxlength="1000" ' +
+                    'placeholder="…">' +
+            escapeHtml(value) +
+          '</textarea>' +
+        '</label>';
+    });
+
+    html +=
+        '</div>' +
+      '</details>';
+
+    // ----- Section Autres (libre) -----
+    html +=
+      '<details class="seance-bloc-detail__details">' +
+        '<summary class="seance-bloc-detail__details-summary">Autres champs (organisation, notes…)</summary>' +
+        '<div class="seance-bloc-detail__grid">' +
+
+          '<label class="seance-field seance-field--full">' +
+            '<span class="seance-field__label">Comportements attendus</span>' +
+            '<textarea class="seance-field__input seance-field__textarea" ' +
+                      'data-bloc-field="comportements_attendus" rows="2" maxlength="500">' +
+              escapeHtml(b.comportements_attendus || '') +
+            '</textarea>' +
+          '</label>' +
+
+          '<label class="seance-field seance-field--full">' +
+            '<span class="seance-field__label">Organisation spatio-temporelle</span>' +
+            '<textarea class="seance-field__input seance-field__textarea" ' +
+                      'data-bloc-field="organisation_spatio_temporelle" rows="2" maxlength="500">' +
+              escapeHtml(b.organisation_spatio_temporelle || '') +
+            '</textarea>' +
+          '</label>' +
+
+          '<label class="seance-field seance-field--full">' +
+            '<span class="seance-field__label">Notes / commentaires</span>' +
+            '<textarea class="seance-field__input seance-field__textarea" ' +
+                      'data-bloc-field="notes_bloc" rows="2" maxlength="1000">' +
+              escapeHtml(b.notes_bloc || '') +
+            '</textarea>' +
+          '</label>' +
+
+        '</div>' +
+      '</details>';
+
+    // ----- Footer : bouton save + hint -----
+    html +=
+      '<div class="seance-bloc-detail__footer">' +
+        '<button type="button" id="seance-bloc-btn-save" class="seance-form__save-btn">' +
+          '✓ Enregistré' +
+        '</button>' +
+        '<span class="seance-form__hint">' +
+          'Phase 5.7 · Sauvegarde manuelle + autosave 30s du bloc' +
+        '</span>' +
+      '</div>';
+
+    section.innerHTML = html;
+
+    // ----- Binds -----
+    const btnRetour = DOM.blocBtnRetour();
+    if (btnRetour) btnRetour.addEventListener('click', onCloseBlocDetail);
+
+    const btnSave = DOM.blocBtnSave();
+    if (btnSave) {
+      btnSave.disabled = true;
+      btnSave.addEventListener('click', onSaveBloc);
+    }
+
+    // Bind dirty sur tous les champs du bloc
+    DOM.blocInputs().forEach(function (el) {
+      el.addEventListener('input',  function () { setBlocDirty(true); });
+      el.addEventListener('change', function () { setBlocDirty(true); });
+    });
+  }
+
+  // ============================================================
   // 6. ACTIONS
   // ============================================================
 
@@ -864,8 +1196,11 @@
     State.currentSeance = res.data;
     State.seances.unshift(res.data); // ajoute en tête de liste
     State.blocs = [];                 // nouvelle séance = 0 bloc (Phase 5.6.A)
+    State.currentBloc = null;         // Phase 5.7
+    State.view = 'trame';             // Phase 5.7
     State.formCollapsed = false;      // nouvelle séance = form déployé (Phase 5.6.B)
     setDirty(false);                  // séance fraîche = pas de modif
+    State.blocIsDirty = false;        // Phase 5.7
     renderSidebar();
     renderForm();
     setAutosaveStatus('idle');
@@ -1014,7 +1349,11 @@
     }
 
     stopAutosave();
+    stopBlocAutosave();              // Phase 5.7 : si on était en vue détail bloc d'une autre séance
     State.currentSeance = target;
+    State.currentBloc = null;        // Phase 5.7
+    State.view = 'trame';            // Phase 5.7
+    State.blocIsDirty = false;
     setDirty(false);
     // Phase 5.6.A : charger les blocs de cette séance
     await loadBlocs();
@@ -1168,6 +1507,141 @@
     renderTrame();
   }
 
+  // ----------------------------------------------------------
+  // Phase 5.7 — Actions vue détail bloc
+  // ----------------------------------------------------------
+
+  /**
+   * Ouvre la vue détail d'un bloc (remplace la trame).
+   * @param {string} blocId UUID du bloc à éditer
+   */
+  function onOpenBlocDetail(blocId) {
+    const bloc = State.blocs.find(function (b) { return b.id === blocId; });
+    if (!bloc) {
+      console.error('SeanceEditor: onOpenBlocDetail() bloc introuvable', blocId);
+      return;
+    }
+    State.currentBloc = bloc;
+    State.blocIsDirty = false;
+    State.view = 'bloc-detail';
+    renderTrame();             // bascule la vue (renderTrame appelle renderBlocDetail si view='bloc-detail')
+    setBlocAutosaveStatus('idle');
+    startBlocAutosave();
+  }
+
+  /**
+   * Ferme la vue détail (retour à la trame).
+   * Si des modifs sont en cours sur le bloc, confirm().
+   */
+  function onCloseBlocDetail() {
+    if (State.blocIsDirty) {
+      const ok = window.confirm(
+        'Tu as des modifications non sauvées sur ce bloc.\n\n' +
+        'Retour à la trame sans sauver ? (Annuler pour rester)'
+      );
+      if (!ok) return;
+    }
+    stopBlocAutosave();
+    State.view = 'trame';
+    State.currentBloc = null;
+    State.blocIsDirty = false;
+    renderTrame();
+  }
+
+  /**
+   * Sauvegarde du bloc courant (manuel ou silencieux selon opts.silent).
+   * Partagée par onSaveBloc (clic bouton) et onTickBlocAutosave (timer).
+   *
+   * @param {object} [opts]
+   * @param {boolean} [opts.silent=false]
+   * @returns {Promise<boolean>}
+   */
+  async function saveBloc(opts) {
+    if (!State.currentBloc) return false;
+    if (!State.blocIsDirty) return false;
+    const silent = !!(opts && opts.silent);
+
+    const btn = DOM.blocBtnSave();
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = '⏳ Enregistrement…';
+    }
+    setBlocAutosaveStatus('saving');
+
+    // Collecte des valeurs depuis le DOM
+    const patch = {};
+    DOM.blocInputs().forEach(function (el) {
+      const field = el.getAttribute('data-bloc-field');
+      const axe4Slug = el.getAttribute('data-bloc-field-axe4');
+      if (field) {
+        let val = el.value;
+        // Trim pour les chaînes, parseInt pour duree_min
+        if (field === 'duree_min') {
+          val = parseInt(val, 10);
+          if (isNaN(val) || val < 1) val = 1;
+        } else if (typeof val === 'string') {
+          val = val.trim() || null;
+        }
+        patch[field] = val;
+      }
+    });
+
+    // Reconstruction du jsonb contenu_pedagogique_axe4
+    const axe4Patch = {};
+    document.querySelectorAll('[data-bloc-field-axe4]').forEach(function (el) {
+      const slug = el.getAttribute('data-bloc-field-axe4');
+      const v = (el.value || '').trim();
+      if (v) axe4Patch[slug] = v;
+    });
+    patch.contenu_pedagogique_axe4 = axe4Patch;
+
+    const res = await SupabaseHub.updateBloc(State.currentBloc.id, patch);
+
+    if (!res.ok) {
+      console.error('SeanceEditor: saveBloc() KO', res.error);
+      setBlocAutosaveStatus('error');
+      if (!silent) alert('Erreur sauvegarde du bloc : ' + res.error);
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '💾 Enregistrer le bloc';
+      }
+      return false;
+    }
+
+    // Succès : MAJ State.currentBloc + ligne dans State.blocs
+    State.currentBloc = res.data;
+    const idx = State.blocs.findIndex(function (b) { return b.id === res.data.id; });
+    if (idx !== -1) State.blocs[idx] = res.data;
+    setBlocDirty(false);
+    setBlocAutosaveStatus('idle');
+
+    // Si le type a changé, on doit re-render le détail (étiquettes peuvent changer)
+    // + on re-render la trame (emoji/libellé du type peut changer) — au retour seulement
+    return true;
+  }
+
+  async function onSaveBloc() {
+    await saveBloc({ silent: false });
+  }
+
+  async function onTickBlocAutosave() {
+    if (!State.blocIsDirty) return;
+    if (State.blocAutosaveStatus === 'saving') return;
+    await saveBloc({ silent: true });
+  }
+
+  function startBlocAutosave() {
+    stopBlocAutosave();
+    State.blocAutosaveTimer = setInterval(onTickBlocAutosave, AUTOSAVE_INTERVAL_MS);
+  }
+
+  function stopBlocAutosave() {
+    if (State.blocAutosaveTimer) {
+      clearInterval(State.blocAutosaveTimer);
+      State.blocAutosaveTimer = null;
+    }
+  }
+
   // ============================================================
   // 7. CHARGEMENTS
   // ============================================================
@@ -1204,6 +1678,22 @@
   }
 
   /**
+   * Charge le référentiel data/vocabulaire-seance.json (Phase 5.7).
+   * 4 axes du Vocabulaire MOM Hub. Utilisé pour les dropdowns Axe 2 / Axe 3
+   * et les 10 champs FFR Axe 4 dans la vue détail bloc.
+   */
+  async function loadVocabulaireRef() {
+    try {
+      const resp = await fetch('data/vocabulaire-seance.json', { cache: 'force-cache' });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      State.vocabulaireRef = await resp.json();
+    } catch (e) {
+      console.error('SeanceEditor: loadVocabulaireRef() KO', e);
+      State.vocabulaireRef = null;
+    }
+  }
+
+  /**
    * Charge les blocs de la séance courante (Phase 5.6.A).
    */
   async function loadBlocs() {
@@ -1220,12 +1710,14 @@
 
   async function init() {
     // Chargements parallèles : séances pour la sidebar, sites et événements
-    // pour les dropdowns du formulaire, types-blocs.json pour la trame (5.6.A)
+    // pour les dropdowns du formulaire, types-blocs.json pour la trame (5.6.A),
+    // vocabulaire-seance.json pour le détail bloc (5.7)
     await Promise.all([
       loadSeances(),
       loadSites(),
       loadEvenements(),
-      loadTypesBlocsRef()
+      loadTypesBlocsRef(),
+      loadVocabulaireRef()
     ]);
 
     renderSidebar();
@@ -1248,10 +1740,11 @@
     bindPickerOutsideClick();
 
     // Warn si modif non sauvée à la fermeture de l'onglet (V1A : check basique)
-    // + arrêt propre du timer autosave (Phase 5.5.B2)
+    // + arrêt propre des 2 timers autosave (Phase 5.5.B2 + 5.7)
     window.addEventListener('beforeunload', function (e) {
       stopAutosave();
-      if (State.isDirty) {
+      stopBlocAutosave();
+      if (State.isDirty || State.blocIsDirty) {
         e.preventDefault();
         e.returnValue = '';
         return '';
@@ -1259,13 +1752,14 @@
     });
 
     console.log(
-      '%c🏉 Seance Editor v1.4.1 (Phase 5.6.B + fix UX repli) chargé',
+      '%c🏉 Seance Editor v1.5 (Phase 5.7) chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         seances: State.seances.length,
         sites: State.sites.length,
         evenements: State.evenements.length,
         types_blocs_ref: State.typesBlocsRef ? 'OK' : 'KO',
+        vocabulaire_ref: State.vocabulaireRef ? 'OK' : 'KO',
         autosave_interval_ms: AUTOSAVE_INTERVAL_MS
       }
     );
@@ -1282,9 +1776,13 @@
     loadSites: loadSites,
     loadEvenements: loadEvenements,
     loadBlocs: loadBlocs,
+    loadVocabulaireRef: loadVocabulaireRef,
     // Phase 5.5.B2 : exposition autosave pour debug console
     startAutosave: startAutosave,
-    stopAutosave: stopAutosave
+    stopAutosave: stopAutosave,
+    // Phase 5.7 : exposition autosave bloc
+    startBlocAutosave: startBlocAutosave,
+    stopBlocAutosave: stopBlocAutosave
   };
 
 })();
