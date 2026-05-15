@@ -1,0 +1,1180 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MOM Hub · Joueurs M14</title>
+<link rel="icon" type="image/png" href="assets/logo-m2m.png">
+<link rel="stylesheet" href="css/hub.css">
+<style>
+  /* ========================================================
+   * Styles spécifiques à joueurs.html
+   * Préfixe .joueur-* strictement appliqué pour éviter collisions
+   * Patterns calqués sur evenements.html v4 (S2.1 squelette)
+   * Version : v0 — 15 mai 2026
+   * Phase 5.14 · Module Joueurs · S2.1
+   * ====================================================== */
+
+  /* ========== LAYOUT GLOBAL ========== */
+  .app {
+    position: relative;
+    z-index: 2;
+    height: 100vh;
+    display: grid;
+    grid-template-rows: 56px 1fr;
+  }
+
+  /* ========== LAYOUT PRINCIPAL ========== */
+  .joueur-layout {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    gap: 18px;
+    padding: 18px 24px;
+    overflow: hidden;
+    height: 100%;
+  }
+  .joueur-main-col { overflow-y: auto; padding-right: 4px; }
+  .joueur-side-col { overflow-y: auto; }
+
+  /* Responsive : sidebar masquée sous 1024px */
+  @media (max-width: 1024px) {
+    .joueur-layout { grid-template-columns: 1fr; }
+    .joueur-side-col { display: none; }
+  }
+
+  /* ========== BANDEAU PAGE (en-tête du module) ========== */
+  .joueur-header {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 16px;
+    align-items: center;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 16px;
+  }
+  .joueur-header-meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    color: var(--ink-mute);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+  .joueur-header h2 {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 500;
+    font-size: 24px;
+    letter-spacing: 0.01em;
+    line-height: 1;
+    color: var(--ink);
+    text-transform: uppercase;
+  }
+  .joueur-header h2 .joueur-team {
+    color: var(--vert-prairie);
+    font-weight: 600;
+  }
+  .joueur-header-sub {
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    margin-top: 6px;
+  }
+  .joueur-header-kpis {
+    display: flex;
+    gap: 18px;
+    align-items: stretch;
+  }
+  .joueur-kpi {
+    text-align: center;
+    min-width: 60px;
+    padding: 4px 10px;
+    border-left: 1px solid var(--line);
+  }
+  .joueur-kpi:first-child { border-left: none; }
+  .joueur-kpi-num {
+    font-family: 'Oswald', sans-serif;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--vert-prairie);
+    line-height: 1;
+  }
+  .joueur-kpi-num.warn { color: var(--clay, #c8896a); }
+  .joueur-kpi-num.alert { color: #8b3a1a; }
+  .joueur-kpi-lbl {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 0.14em;
+    color: var(--ink-mute);
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  /* ========== RECHERCHE + FILTRES ========== */
+  .joueur-search-row {
+    margin-bottom: 12px;
+  }
+  .joueur-search {
+    width: 100%;
+    padding: 9px 14px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--paper-warm);
+    font-size: 13px;
+    color: var(--ink);
+    font-family: inherit;
+  }
+  .joueur-search:focus {
+    outline: none;
+    border-color: var(--vert-prairie);
+    background: var(--paper);
+  }
+
+  .joueur-filters-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+  }
+  .joueur-filters-row .joueur-filter-label {
+    color: var(--ink-mute);
+    flex-shrink: 0;
+    min-width: 70px;
+  }
+  .joueur-chip {
+    display: inline-block;
+    padding: 4px 10px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--paper-warm);
+    color: var(--ink-soft);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 9px;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    transition: all 0.12s;
+    user-select: none;
+  }
+  .joueur-chip:hover {
+    background: var(--paper-deep);
+    border-color: var(--vert-pelouse);
+  }
+  .joueur-chip.active {
+    background: var(--vert-prairie);
+    color: var(--paper);
+    border-color: var(--vert-prairie);
+  }
+  /* Chips PROFIL : colorées selon profil joueur (S2.2 affinera) */
+  .joueur-chip.profil-mom.active      { background: var(--vert-prairie); border-color: var(--vert-prairie); }
+  .joueur-chip.profil-partenaire.active { background: #2e63a8; border-color: #2e63a8; }
+  .joueur-chip.profil-coach.active     { background: #cf6a1a; border-color: #cf6a1a; }
+  .joueur-chip.profil-staff.active     { background: #8b3a3a; border-color: #8b3a3a; }
+  /* Chips ÉTAT : couleur fonction de l'urgence */
+  .joueur-chip.etat-actif.active       { background: var(--vert-prairie); border-color: var(--vert-prairie); }
+  .joueur-chip.etat-indispo.active     { background: #c8896a; border-color: #c8896a; }
+  .joueur-chip.etat-blesse.active      { background: #8b3a1a; border-color: #8b3a1a; }
+  .joueur-chip.etat-suspendu.active    { background: #6b3fa0; border-color: #6b3fa0; }
+  .joueur-chip.etat-inactif.active     { background: #5f6b75; border-color: #5f6b75; }
+
+  /* ========== ZONE LISTE ========== */
+  .joueur-list {
+    margin-top: 16px;
+  }
+  .joueur-list-empty {
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--ink-mute);
+    font-size: 13px;
+    background: var(--paper-warm);
+    border: 1px dashed var(--line);
+    border-radius: 6px;
+  }
+  .joueur-list-loading {
+    padding: 30px 20px;
+    text-align: center;
+    color: var(--ink-soft);
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .joueur-list-error {
+    padding: 30px 20px;
+    text-align: center;
+    color: var(--clay-deep, #8b3a1a);
+    font-size: 13px;
+    background: var(--paper-warm);
+    border: 1px solid var(--clay, #c8896a);
+    border-radius: 6px;
+  }
+
+  /* ========== SIDEBAR ========== */
+  .joueur-sb-card {
+    background: var(--paper-warm);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+  .joueur-sb-title {
+    font-family: 'Oswald', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    color: var(--ink);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .joueur-sb-placeholder {
+    font-size: 11px;
+    color: var(--ink-mute);
+    line-height: 1.5;
+    text-align: center;
+    padding: 20px 4px;
+    font-style: italic;
+  }
+  .joueur-sb-alert-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 11px;
+  }
+  .joueur-sb-alert-item:last-child { border-bottom: none; }
+  .joueur-sb-alert-lbl { color: var(--ink-soft); }
+  .joueur-sb-alert-cnt {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 600;
+    color: var(--vert-prairie);
+    font-size: 13px;
+  }
+  .joueur-sb-alert-cnt.warn { color: var(--clay, #c8896a); }
+
+  /* ========== MODALES (J3 / J4 / J5) ========== */
+  .joueur-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 20, 20, 0.42);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 16px;
+  }
+  .joueur-overlay.show { display: flex; }
+  .joueur-modal {
+    background: var(--paper);
+    border-radius: 8px;
+    padding: 22px 24px;
+    max-width: 540px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.22);
+  }
+  .joueur-modal-title {
+    font-family: 'Oswald', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.10em;
+    color: var(--ink);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--line);
+  }
+  .joueur-modal-body {
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+  .joueur-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+  }
+  .joueur-btn {
+    background: var(--paper-warm);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    padding: 8px 14px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .joueur-btn:hover { background: var(--paper-deep); }
+  .joueur-btn-primary {
+    background: var(--vert-prairie);
+    color: var(--paper);
+    border-color: var(--vert-prairie);
+  }
+  .joueur-btn-primary:hover {
+    background: var(--vert-bouteille, #0f4f28);
+  }
+  .joueur-btn-danger {
+    background: var(--clay, #c8896a);
+    color: var(--paper);
+    border-color: var(--clay, #c8896a);
+  }
+  .joueur-btn[disabled] {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  /* ========== FOOTER smoke-check ========== */
+  .joueur-footer-smoke {
+    margin-top: 28px;
+    padding: 10px 0;
+    border-top: 1px dashed var(--line);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--ink-mute);
+    text-align: center;
+    letter-spacing: 0.10em;
+  }
+
+  /* =====================================================
+   * ========== S2.2 — CARTES JOUEURS (v1.0) ============
+   * ===================================================== */
+
+  .joueur-card {
+    position: relative;
+    display: flex;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: box-shadow 0.12s, transform 0.12s;
+    overflow: hidden;
+  }
+  .joueur-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.10);
+    transform: translateY(-1px);
+  }
+  .joueur-card.is-indisponible { opacity: 0.92; }
+  .joueur-card.is-blesse        { background: rgba(200, 137, 106, 0.06); }
+  .joueur-card.is-suspendu      { background: rgba(107, 63, 160, 0.06); }
+  .joueur-card.is-inactif       { opacity: 0.55; }
+
+  .joueur-card-stripe {
+    flex-shrink: 0;
+    width: 5px;
+    background: var(--vert-prairie);
+  }
+
+  .joueur-card-body {
+    flex: 1;
+    padding: 12px 14px;
+    min-width: 0;
+  }
+
+  .joueur-card-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  .joueur-card-avatar {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--vert-prairie);
+    color: var(--paper);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Oswald', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 0.04em;
+  }
+
+  .joueur-card-identite {
+    flex: 1;
+    min-width: 0;
+  }
+  .joueur-card-name {
+    font-size: 14px;
+    color: var(--ink);
+    line-height: 1.2;
+    margin-bottom: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .joueur-card-name strong {
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+  .joueur-card-badges {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+
+  .joueur-badge {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 9px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8.5px;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    font-weight: 600;
+    border: 1px solid var(--line);
+    background: var(--paper-warm);
+    color: var(--ink-soft);
+  }
+  .joueur-badge-club    { background: var(--vert-prairie); color: var(--paper); border-color: var(--vert-prairie); }
+  .joueur-badge-cat     { background: var(--paper-deep); color: var(--ink); }
+  .joueur-badge-f15     { background: #c93a8a; color: var(--paper); border-color: #c93a8a; }
+  .joueur-badge-coach   { background: #cf6a1a; color: var(--paper); border-color: #cf6a1a; }
+  .joueur-badge-staff   { background: #8b3a3a; color: var(--paper); border-color: #8b3a3a; }
+
+  .joueur-badge-etat {
+    flex-shrink: 0;
+    padding: 3px 8px;
+    border-radius: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8.5px;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--paper);
+  }
+  .joueur-badge-etat-indisponible { background: #c8896a; }
+  .joueur-badge-etat-blesse       { background: #8b3a1a; }
+  .joueur-badge-etat-suspendu     { background: #6b3fa0; }
+  .joueur-badge-etat-inactif      { background: #5f6b75; }
+
+  /* Postes pills (multi-postes) */
+  .joueur-card-postes {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+  }
+  .joueur-pill {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 10px;
+    font-size: 10.5px;
+    font-weight: 500;
+    color: var(--paper);
+  }
+  .joueur-pill-poste {
+    background: #1f2d4a;
+  }
+  .joueur-pill-apt {
+    /* couleur de fond inline (depuis aptitudes.json) */
+    color: var(--paper);
+  }
+
+  /* Aptitudes (pills colorées) */
+  .joueur-card-aptitudes {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+  }
+
+  /* Ligne physique (taille / poids / qualité FFR) */
+  .joueur-card-physique {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    color: var(--ink-mute);
+    letter-spacing: 0.02em;
+  }
+
+  /* Ligne "Postes non définis" */
+  .joueur-card-empty-line {
+    font-size: 11.5px;
+    color: var(--ink-mute);
+    font-style: italic;
+    margin-bottom: 6px;
+  }
+
+  /* =====================================================
+   * ========== S2.3 — FICHE DÉTAILLÉE J2 ===============
+   * Pattern identique evenements.html slide-in droite 480px
+   * ===================================================== */
+
+  /* Overlay (clic = ferme) */
+  .joueur-fiche-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 20, 20, 0.32);
+    z-index: 200;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease;
+  }
+  .joueur-fiche-overlay.show {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Panneau slide-in droite */
+  .joueur-fiche-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 480px;
+    max-width: 92vw;
+    background: var(--paper);
+    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.18);
+    transform: translateX(100%);
+    transition: transform 0.22s ease;
+    z-index: 201;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .joueur-fiche-overlay.show .joueur-fiche-panel {
+    transform: translateX(0);
+  }
+
+  /* Header sticky */
+  .joueur-fiche-header {
+    flex-shrink: 0;
+    padding: 16px 20px 12px 20px;
+    border-bottom: 1px solid var(--line);
+    background: var(--paper-warm);
+    position: relative;
+  }
+  .joueur-fiche-close {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    background: transparent;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    color: var(--ink-mute);
+    padding: 4px 8px;
+    border-radius: 4px;
+    line-height: 1;
+  }
+  .joueur-fiche-close:hover {
+    background: var(--paper-deep);
+    color: var(--ink);
+  }
+  .joueur-fiche-code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--ink-mute);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    padding-right: 30px;
+  }
+  .joueur-fiche-title {
+    font-family: 'Oswald', sans-serif;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--ink);
+    line-height: 1.2;
+    padding-right: 30px;
+  }
+
+  /* Body scrollable */
+  .joueur-fiche-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 18px 20px;
+  }
+  .joueur-fiche-loading,
+  .joueur-fiche-error {
+    padding: 30px 10px;
+    text-align: center;
+    color: var(--ink-mute);
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .joueur-fiche-error {
+    color: var(--clay-deep, #8b3a1a);
+    background: var(--paper-warm);
+    border: 1px solid var(--clay, #c8896a);
+    border-radius: 6px;
+    text-transform: none;
+    letter-spacing: normal;
+    font-family: inherit;
+    font-size: 13px;
+  }
+
+  /* Sections empilées (S2.3 peuplera) */
+  .joueur-fiche-section {
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--line);
+  }
+  .joueur-fiche-section:last-of-type {
+    border-bottom: none;
+  }
+  .joueur-fiche-section-title {
+    font-family: 'Oswald', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    color: var(--vert-prairie);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* Bandeau identité (1ère section, sans titre) */
+  .joueur-fiche-identite {
+    background: var(--paper-warm);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 14px;
+    margin-bottom: 20px;
+  }
+  .joueur-fiche-identite-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .joueur-fiche-avatar {
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--vert-prairie);
+    color: var(--paper);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Oswald', sans-serif;
+    font-weight: 600;
+    font-size: 15px;
+    letter-spacing: 0.04em;
+  }
+  .joueur-fiche-identite-meta-block {
+    flex: 1;
+    min-width: 0;
+  }
+  .joueur-fiche-identite-meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    color: var(--vert-prairie);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    font-weight: 600;
+  }
+  .joueur-fiche-identite-secondaire {
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+  .joueur-fiche-identite-badges {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .joueur-fiche-badge {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 10px;
+    font-size: 10.5px;
+    color: var(--ink-soft);
+    background: var(--paper);
+    border: 1px solid var(--line);
+  }
+
+  /* Rows clé/valeur dans les sections */
+  .joueur-fiche-row {
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    gap: 10px;
+    align-items: baseline;
+    padding: 4px 0;
+    font-size: 12.5px;
+  }
+  .joueur-fiche-row-block {
+    grid-template-columns: 1fr;
+    margin-top: 8px;
+  }
+  .joueur-fiche-row-lbl {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.10em;
+    color: var(--ink-mute);
+    text-transform: uppercase;
+  }
+  .joueur-fiche-row-val {
+    color: var(--ink);
+    word-break: break-word;
+  }
+  .joueur-fiche-row-val.joueur-fiche-warn  { color: #8b5a1a; }
+  .joueur-fiche-row-val.joueur-fiche-alert { color: #8b3a1a; font-weight: 600; }
+  .joueur-fiche-row-val.joueur-fiche-meta  { color: var(--ink-mute); font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+
+  .joueur-fiche-empty {
+    color: var(--ink-mute);
+    font-style: italic;
+    font-size: 12px;
+  }
+
+  .joueur-fiche-notes {
+    background: var(--paper-warm);
+    border-left: 3px solid var(--vert-prairie);
+    padding: 8px 10px;
+    border-radius: 3px;
+    white-space: pre-wrap;
+    line-height: 1.5;
+  }
+
+  /* Actions édition (boutons disabled S2.4) */
+  .joueur-fiche-actions-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .joueur-fiche-actions .joueur-btn {
+    font-size: 11px;
+    padding: 6px 10px;
+  }
+
+  /* =====================================================
+   * ========== S2.4 — FORMULAIRES MODALES ==============
+   * ===================================================== */
+
+  .joueur-modal-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .joueur-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .joueur-form-group-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .joueur-form-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+  }
+  .joueur-form-label.required::after {
+    content: ' *';
+    color: var(--clay, #c8896a);
+  }
+  .joueur-form-input,
+  .joueur-form-select,
+  .joueur-form-textarea {
+    width: 100%;
+    padding: 7px 11px;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    background: var(--paper);
+    font-size: 13px;
+    color: var(--ink);
+    font-family: inherit;
+    box-sizing: border-box;
+  }
+  .joueur-form-input:focus,
+  .joueur-form-select:focus,
+  .joueur-form-textarea:focus {
+    outline: none;
+    border-color: var(--vert-prairie);
+    background: var(--paper);
+  }
+  .joueur-form-textarea {
+    min-height: 70px;
+    resize: vertical;
+    font-family: inherit;
+  }
+  .joueur-form-hint {
+    font-size: 10px;
+    color: var(--ink-mute);
+    font-style: italic;
+    margin-top: 2px;
+  }
+  .joueur-form-error {
+    background: rgba(200, 137, 106, 0.12);
+    color: #8b3a1a;
+    border: 1px solid var(--clay, #c8896a);
+    border-radius: 5px;
+    padding: 8px 10px;
+    font-size: 12px;
+    margin-bottom: 8px;
+  }
+  .joueur-form-success {
+    background: rgba(45, 125, 70, 0.10);
+    color: var(--vert-prairie);
+    border: 1px solid rgba(45, 125, 70, 0.3);
+    border-radius: 5px;
+    padding: 8px 10px;
+    font-size: 12px;
+    margin-bottom: 8px;
+  }
+  .joueur-modal-info {
+    background: var(--paper-warm);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 10px 12px;
+    font-size: 12px;
+    color: var(--ink-soft);
+    line-height: 1.45;
+    margin-bottom: 12px;
+  }
+  .joueur-modal-info-strong {
+    color: var(--ink);
+    font-weight: 600;
+  }
+</style>
+</head>
+<body class="fullscreen-app">
+<div class="app">
+
+  <!-- ============ TOPBAR (héritée Phase 3, identique evenements.html / index.html) ============ -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo">
+        <img src="assets/logo-m2m.png" alt="MOM Rugby">
+      </div>
+      <div class="brand-text">
+        <h1>MOM Hub</h1>
+        <p>Mutzig Ovalie Molsheim</p>
+      </div>
+    </div>
+
+    <div class="season-pill">SAISON 2025 / 2026</div>
+
+    <nav class="main-nav">
+      <a href="index.html">Tableau de bord</a>
+      <a class="active">Mes outils</a>
+      <a>Annuaire</a>
+      <a>Configuration</a>
+    </nav>
+
+    <div class="icon-row">
+      <button class="icon-btn" title="Recherche">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      </button>
+      <button class="icon-btn has-notif" title="Notifications">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+      </button>
+    </div>
+
+    <div class="user-profile">
+      <div class="avatar">EJ</div>
+      <div class="user-info">
+        <div class="user-name">Emmanuel Jung</div>
+        <div class="user-role">Référent M14</div>
+      </div>
+      <a href="dashboard.html" class="user-action" id="action-admin" title="Tableau de bord admin" aria-label="Tableau de bord admin">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      </a>
+      <button type="button" class="user-action" id="btn-signout" title="Se déconnecter" aria-label="Se déconnecter">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+
+    <a href="login.html" class="login-pill" id="login-pill">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+      Se connecter
+    </a>
+  </header>
+
+  <!-- ============ MAIN LAYOUT ============ -->
+  <main class="joueur-layout">
+
+    <!-- =================== COLONNE PRINCIPALE =================== -->
+    <div class="joueur-main-col">
+
+      <!-- BANDEAU PAGE -->
+      <div class="joueur-header">
+        <div>
+          <div class="joueur-header-meta" id="joueur-header-meta">SAISON 2025-2026 · MES JOUEURS</div>
+          <h2>Mes joueurs — <span class="joueur-team">M14 SAR×MOM</span></h2>
+          <div class="joueur-header-sub" id="joueur-header-sub">Chargement…</div>
+        </div>
+        <div class="joueur-header-kpis">
+          <div class="joueur-kpi">
+            <div class="joueur-kpi-num" id="kpi-actifs">…</div>
+            <div class="joueur-kpi-lbl">Actifs</div>
+          </div>
+          <div class="joueur-kpi">
+            <div class="joueur-kpi-num warn" id="kpi-indispo">…</div>
+            <div class="joueur-kpi-lbl">Indispo</div>
+          </div>
+          <div class="joueur-kpi">
+            <div class="joueur-kpi-num alert" id="kpi-blesses">…</div>
+            <div class="joueur-kpi-lbl">Blessés</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BARRE DE RECHERCHE -->
+      <div class="joueur-search-row">
+        <input
+          type="text"
+          class="joueur-search"
+          id="joueur-search"
+          placeholder="🔍 Rechercher un joueur (nom, prénom)…"
+          autocomplete="off"
+        >
+      </div>
+
+      <!-- FILTRES PROFIL -->
+      <div class="joueur-filters-row">
+        <span class="joueur-filter-label">Profil :</span>
+        <span class="joueur-chip active" data-profil="all">Tous</span>
+        <span class="joueur-chip profil-mom"        data-profil="mom">MOM régulier</span>
+        <span class="joueur-chip profil-mom"        data-profil="f15">F-15</span>
+        <span class="joueur-chip profil-partenaire" data-profil="partenaire">Partenaire</span>
+        <span class="joueur-chip profil-coach"      data-profil="coach">Coach</span>
+        <span class="joueur-chip profil-staff"      data-profil="staff">Staff méd.</span>
+      </div>
+
+      <!-- FILTRES ÉTAT -->
+      <div class="joueur-filters-row">
+        <span class="joueur-filter-label">État :</span>
+        <span class="joueur-chip active" data-etat="all">Tous</span>
+        <span class="joueur-chip etat-actif"    data-etat="actif">Actif</span>
+        <span class="joueur-chip etat-indispo"  data-etat="indisponible">Indispo</span>
+        <span class="joueur-chip etat-blesse"   data-etat="blesse">Blessé</span>
+        <span class="joueur-chip etat-suspendu" data-etat="suspendu">Suspendu</span>
+        <span class="joueur-chip etat-inactif"  data-etat="inactif">Inactif</span>
+      </div>
+
+      <!-- FILTRES POSTE (regroupés — postes.json v1.1) -->
+      <div class="joueur-filters-row" id="joueur-filters-poste">
+        <span class="joueur-filter-label">Poste :</span>
+        <span class="joueur-chip active" data-poste="all">Tous</span>
+        <span class="joueur-chip" data-poste="pst-grp-001">Piliers</span>
+        <span class="joueur-chip" data-poste="pst-002">Talon.</span>
+        <span class="joueur-chip" data-poste="pst-grp-002">2es lignes</span>
+        <span class="joueur-chip" data-poste="pst-grp-003">3es lignes</span>
+        <span class="joueur-chip" data-poste="pst-009">Demi mêl.</span>
+        <span class="joueur-chip" data-poste="pst-010">Ouv.</span>
+        <span class="joueur-chip" data-poste="pst-grp-004">Centres</span>
+        <span class="joueur-chip" data-poste="pst-grp-005">Ailiers</span>
+        <span class="joueur-chip" data-poste="pst-015">Arrière</span>
+      </div>
+
+      <!-- ZONE LISTE (S2.2 peuplera ceci) -->
+      <div class="joueur-list" id="joueur-list">
+        <div class="joueur-list-loading" id="joueur-list-loading">Chargement des joueurs…</div>
+      </div>
+
+      <!-- FOOTER smoke check -->
+      <div class="joueur-footer-smoke" id="joueur-footer-smoke">
+        MOM Hub · Module Joueurs · v1.0 (S2.2 + S2.3 lecture)
+      </div>
+
+    </div>
+
+    <!-- =================== SIDEBAR =================== -->
+    <aside class="joueur-side-col">
+      <div class="joueur-sb-card">
+        <div class="joueur-sb-title">⚠️ Alertes</div>
+        <div id="joueur-sb-alerts">
+          <div class="joueur-sb-placeholder">Chargement…</div>
+        </div>
+      </div>
+      <div class="joueur-sb-card">
+        <div class="joueur-sb-title">Aide</div>
+        <div class="joueur-sb-placeholder" style="text-align: left; font-style: normal;">
+          Cliquez sur une carte pour ouvrir la fiche détaillée.<br><br>
+          Édition réservée aux champs métier (postes, aptitudes, indispo, blessure, suspension, notes).<br><br>
+          L'identité (nom, licence, contacts) s'édite dans l'Annuaire.
+        </div>
+      </div>
+    </aside>
+
+  </main>
+
+</div>
+
+<!-- ============ MODALES (squelettes vides, contenu S2.4) ============ -->
+
+<!-- J3 — Modale Édition postes & aptitudes -->
+<div class="joueur-overlay" id="joueur-overlay-profil" role="dialog" aria-modal="true" aria-labelledby="joueur-profil-title">
+  <div class="joueur-modal">
+    <div class="joueur-modal-title" id="joueur-profil-title">Modifier le profil sportif</div>
+    <div class="joueur-modal-body">
+      <div id="joueur-profil-msg"></div>
+      <div class="joueur-modal-info" id="joueur-profil-info">
+        <em>Chargement…</em>
+      </div>
+      <form class="joueur-modal-form" id="joueur-profil-form" onsubmit="return false;">
+        <!-- S2.4.b : postes (multi-select chips) + aptitudes A/B grille -->
+        <div class="joueur-form-group">
+          <label class="joueur-form-label">Postes joués</label>
+          <div class="joueur-form-hint">À câbler en S2.4.b (chips multi-select depuis postes.json)</div>
+        </div>
+        <div class="joueur-form-group">
+          <label class="joueur-form-label">Aptitudes (Cat. A + Cat. B M14)</label>
+          <div class="joueur-form-hint">À câbler en S2.4.b (grille 6 A + 7 B depuis aptitudes.json)</div>
+        </div>
+      </form>
+    </div>
+    <div class="joueur-modal-actions">
+      <button type="button" class="joueur-btn" data-action="close-profil">Annuler</button>
+      <button type="button" class="joueur-btn joueur-btn-primary" id="joueur-profil-submit" disabled>Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- J4 — Modale Édition état métier (indispo / blessure / suspension) -->
+<div class="joueur-overlay" id="joueur-overlay-etat" role="dialog" aria-modal="true" aria-labelledby="joueur-etat-title">
+  <div class="joueur-modal">
+    <div class="joueur-modal-title" id="joueur-etat-title">Modifier l'état du joueur</div>
+    <div class="joueur-modal-body">
+      <div id="joueur-etat-msg"></div>
+      <div class="joueur-modal-info" id="joueur-etat-info">
+        <em>Chargement…</em>
+      </div>
+      <form class="joueur-modal-form" id="joueur-etat-form" onsubmit="return false;">
+        <div class="joueur-form-group">
+          <label class="joueur-form-label" for="joueur-etat-indispo">Indisponibilité (motif court)</label>
+          <textarea class="joueur-form-textarea" id="joueur-etat-indispo" name="indisponibilite" placeholder="Ex : Vacances du 20 au 27 juillet" maxlength="500"></textarea>
+          <div class="joueur-form-hint">Laisser vide si pas d'indisponibilité</div>
+        </div>
+        <div class="joueur-form-group">
+          <label class="joueur-form-label" for="joueur-etat-blessure">Blessure (résumé court)</label>
+          <textarea class="joueur-form-textarea" id="joueur-etat-blessure" name="blessure_resume" placeholder="Ex : Entorse cheville gauche, retour estimé fin mai" maxlength="500"></textarea>
+          <div class="joueur-form-hint">Laisser vide si pas de blessure</div>
+        </div>
+        <div class="joueur-form-group">
+          <label class="joueur-form-label" for="joueur-etat-suspension">Suspension jusqu'au (FFR)</label>
+          <input type="date" class="joueur-form-input" id="joueur-etat-suspension" name="suspension_jusqu_au">
+          <div class="joueur-form-hint">Laisser vide si pas de suspension active</div>
+        </div>
+      </form>
+    </div>
+    <div class="joueur-modal-actions">
+      <button type="button" class="joueur-btn" data-action="close-etat">Annuler</button>
+      <button type="button" class="joueur-btn joueur-btn-primary" id="joueur-etat-submit" disabled>Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- J5 — Modale Notes coach -->
+<div class="joueur-overlay" id="joueur-overlay-notes" role="dialog" aria-modal="true" aria-labelledby="joueur-notes-title">
+  <div class="joueur-modal">
+    <div class="joueur-modal-title" id="joueur-notes-title">Notes coach</div>
+    <div class="joueur-modal-body">
+      <div id="joueur-notes-msg"></div>
+      <div class="joueur-modal-info" id="joueur-notes-info">
+        <em>Chargement…</em>
+      </div>
+      <form class="joueur-modal-form" id="joueur-notes-form" onsubmit="return false;">
+        <div class="joueur-form-group">
+          <label class="joueur-form-label" for="joueur-notes-texte">Notes libres</label>
+          <textarea class="joueur-form-textarea" id="joueur-notes-texte" name="notes_coach" placeholder="Observations, points de progression, anecdotes utiles…" maxlength="2000" style="min-height: 140px;"></textarea>
+          <div class="joueur-form-hint">Notes privées coach. Non visibles par le joueur ni les parents.</div>
+        </div>
+      </form>
+    </div>
+    <div class="joueur-modal-actions">
+      <button type="button" class="joueur-btn" data-action="close-notes">Annuler</button>
+      <button type="button" class="joueur-btn joueur-btn-primary" id="joueur-notes-submit" disabled>Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- J2 — Fiche détaillée (panneau slide-in droite) -->
+<div class="joueur-fiche-overlay" id="joueur-fiche-overlay" role="dialog" aria-modal="true" aria-labelledby="joueur-fiche-title">
+  <aside class="joueur-fiche-panel" id="joueur-fiche-panel">
+    <div class="joueur-fiche-header">
+      <button type="button" class="joueur-fiche-close" data-action="close-fiche" aria-label="Fermer la fiche">✕</button>
+      <div class="joueur-fiche-code" id="joueur-fiche-code">…</div>
+      <div class="joueur-fiche-title" id="joueur-fiche-title">Chargement…</div>
+    </div>
+    <div class="joueur-fiche-body" id="joueur-fiche-body">
+      <div class="joueur-fiche-loading">Chargement de la fiche…</div>
+    </div>
+  </aside>
+</div>
+
+<!-- ============ SCRIPTS ============ -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/joueurs-browser.js"></script>
+
+<!-- Auth (pattern identique à evenements.html, allégé pour page module) -->
+<script>
+  (async function () {
+    'use strict';
+
+    if (typeof SupabaseHub === 'undefined') {
+      console.warn('Joueurs: SupabaseHub indisponible — module en mode dégradé.');
+      return;
+    }
+
+    // Gestion classe auth-* sur body pour bouton signout
+    const body = document.body;
+    function applyState(isAdmin) {
+      if (isAdmin) {
+        body.classList.add('auth-admin');
+        body.classList.remove('auth-anon');
+      } else {
+        body.classList.add('auth-anon');
+        body.classList.remove('auth-admin');
+      }
+      body.classList.add('auth-resolved');
+    }
+    async function refreshAuthState() {
+      try {
+        const session = await SupabaseHub.getSession();
+        if (!session) { applyState(false); return; }
+        const admin = await SupabaseHub.isAdmin();
+        applyState(admin);
+      } catch (err) {
+        console.error('Joueurs: erreur résolution auth', err);
+        applyState(false);
+      }
+    }
+    const btnSignout = document.getElementById('btn-signout');
+    if (btnSignout) {
+      btnSignout.addEventListener('click', async function () {
+        btnSignout.disabled = true;
+        btnSignout.textContent = 'Déconnexion…';
+        await SupabaseHub.signOut({ redirect: false });
+      });
+    }
+    SupabaseHub.onAuthChange(function (_event, _session) { refreshAuthState(); });
+    refreshAuthState();
+
+    // Démarrage du module Joueurs
+    try {
+      await window.JoueursBrowser.init();
+    } catch (err) {
+      console.error('Joueurs: échec init', err);
+      const list = document.getElementById('joueur-list');
+      if (list) {
+        list.innerHTML = '<div class="joueur-list-error">Erreur d\'initialisation : ' + (err && err.message ? err.message : err) + '</div>';
+      }
+    }
+  })();
+</script>
+
+</body>
+</html>
