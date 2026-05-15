@@ -11,7 +11,7 @@
  *   - 5.5.A : éditeur méta + sauvegarde manuelle (CETTE VERSION)
  *   - 5.5.B : autosave 30s + dropdowns lieu/événement + champs secondaires
  *
- * Version : 1.6 — Phase 5.8 (15 mai 2026)
+ * Version : 1.7 — Phase 5.9 (15 mai 2026)
  *   v1.0 : squelette IIFE, sidebar liste séances, bouton "+ Nouvelle séance",
  *          formulaire 6 champs méta (date, heure, durée, effectif, thème,
  *          axe de travail), sauvegarde manuelle via updateSeance(), feedback
@@ -93,14 +93,34 @@
  *          parallèle des autres référentiels. Cache navigateur activé
  *          (force-cache) car miroir Drive régénéré manuellement par
  *          le converter Python (pas en temps réel).
+ *   v1.7 : Phase 5.9 — groupes G1/G2/G3 par bloc.
+ *          Section "Groupes" ajoutée en bas de la vue détail bloc, après
+ *          la section "Ateliers rattachés". 3 groupes fixes alimentés par
+ *          data/groupes-joueur.json (Performance / Développement /
+ *          Initiation, couleurs respectives bordeaux / orange / bleu).
+ *          Joueurs sélectionnables depuis le vivier M14 via RPC
+ *          get_vivier_compo (wrapper getVivierCompo v1.6, 62 joueurs).
+ *          UX : 3 popovers indépendants (un par groupe, calque sur
+ *          pattern Compositions v3.4). Un joueur déjà placé dans un
+ *          autre groupe est grisé + clic interdit (unicité par bloc).
+ *          Héritage automatique à la création de bloc : les groupes du
+ *          bloc immédiatement précédent sont copiés (commodité,
+ *          arbitrage Manu 15 mai après brief Phase 5.9). Bloc sans
+ *          prédécesseur ou trame vide → groupes vides à la création.
+ *          Stockage : champ jsonb groupes_jsonb sur seances_blocs
+ *          (existant Phase 5.1). Format :
+ *          [{nom:"G1", joueurs:[uuid,...]}, ...]
+ *          Pas de nouveau wrapper Supabase : updateBloc accepte déjà
+ *          groupes_jsonb dans sa whitelist (v1.8.3).
  *
  * Dépendances :
  *   - window.SupabaseHub v1.8.3 (wrappers Phase 5.3 + listSitesActifs +
- *     listBlocsBySeance + updateBloc + listAteliersRattachesAuBloc)
+ *     listBlocsBySeance + updateBloc + listAteliersRattachesAuBloc +
+ *     getVivierCompo)
  *   - data/types-blocs.json v1.1 (fetched à l'init)
  *   - data/vocabulaire-seance.json v1.1 (fetched à l'init, Phase 5.7)
- *   - data/fiches-all.json (fetched à l'init, Phase 5.8, miroir Drive
- *     de la Bibliothèque ateliers ; clé = fileId_dossier, 62 fiches)
+ *   - data/fiches-all.json (fetched à l'init, Phase 5.8)
+ *   - data/groupes-joueur.json (fetched à l'init, Phase 5.9, 3 groupes)
  *   - DOM : #seance-sidebar-body, #btn-nouvelle-seance, #seance-editor-area,
  *     #btn-nouvelle-seance-cta (placeholder existants de seance.html v1)
  */
@@ -138,7 +158,12 @@
     // Phase 5.8 : picker ateliers Bibliothèque
     fichesRef: null,        // miroir data/fiches-all.json ({fileId_dossier: {...}})
     ateliersRattaches: [],  // rattachements du bloc courant (cache, rechargé à chaque ouverture)
-    fichePicker: null       // état modale picker ({open: bool, query: string})
+    fichePicker: null,      // état modale picker ({open: bool, query: string})
+    // Phase 5.9 : groupes G1/G2/G3 par bloc
+    groupesRef: null,       // miroir data/groupes-joueur.json ({_meta, groupes:[...]})
+    vivier: [],             // vivier M14 via getVivierCompo (62 joueurs)
+    vivierById: null,       // Map (joueur_id → joueur) pour lookup rapide
+    groupePicker: null      // état popover groupe ({open: bool, nomGroupe: 'G1'|'G2'|'G3', query: string})
   };
 
   // ============================================================
@@ -183,7 +208,10 @@
     ateliersSection: () => document.getElementById('seance-ateliers-section'),
     ateliersList:    () => document.getElementById('seance-ateliers-list'),
     btnAddAtelier:   () => document.getElementById('seance-btn-add-atelier'),
-    pickerFicheRoot: () => document.getElementById('seance-picker-fiche-root')
+    pickerFicheRoot: () => document.getElementById('seance-picker-fiche-root'),
+    // Phase 5.9 : groupes G1/G2/G3
+    groupesSection:   () => document.getElementById('seance-groupes-section'),
+    pickerGroupeRoot: () => document.getElementById('seance-picker-groupe-root')
   };
 
   // ============================================================
@@ -1170,6 +1198,14 @@
         renderAteliersSectionInner() +
       '</div>';
 
+    // ----- Phase 5.9 : Section "Groupes" (G1/G2/G3) -----
+    // Idem : rendue à part dans renderGroupesSection() pour ré-render isolé
+    // après modification d'un groupe via le popover joueurs.
+    html +=
+      '<div id="seance-groupes-section" class="seance-groupes-section">' +
+        renderGroupesSectionInner() +
+      '</div>';
+
     // ----- Footer : bouton save + hint -----
     html +=
       '<div class="seance-bloc-detail__footer">' +
@@ -1183,6 +1219,9 @@
 
     // ----- Phase 5.8 : Racine modale picker fiche (vide par défaut) -----
     html += '<div id="seance-picker-fiche-root"></div>';
+
+    // ----- Phase 5.9 : Racine popover picker joueurs (vide par défaut) -----
+    html += '<div id="seance-picker-groupe-root"></div>';
 
     section.innerHTML = html;
 
@@ -1204,6 +1243,9 @@
 
     // Phase 5.8 : binds section ateliers
     bindAteliersSection();
+
+    // Phase 5.9 : binds section groupes
+    bindGroupesSection();
   }
 
   // ============================================================
@@ -1580,6 +1622,451 @@
   }
 
   // ============================================================
+  // 5.ter  PHASE 5.9 — GROUPES G1/G2/G3 PAR BLOC
+  // ============================================================
+
+  /**
+   * Helper : retourne le libellé enrichi d'un groupe à partir de son nom
+   * court (G1, G2, G3). Mappe sur les 3 groupes du référentiel par ordre
+   * croissant : G1=Performance, G2=Développement, G3=Initiation.
+   * Tolère un référentiel partiel (fallback sur le nom court).
+   */
+  function getGroupeDef(nomGroupe) {
+    if (!nomGroupe) return null;
+    const idx = parseInt(String(nomGroupe).replace(/[^0-9]/g, ''), 10) - 1;
+    if (isNaN(idx) || idx < 0) return null;
+    const list = (State.groupesRef && State.groupesRef.groupes) ? State.groupesRef.groupes : [];
+    if (idx >= list.length) return null;
+    return list[idx];
+  }
+
+  /**
+   * Helper : normalise un nom court de joueur ("Dupont J.").
+   */
+  function libelleJoueurCourt(joueur) {
+    if (!joueur) return '— joueur inconnu —';
+    const nom = (joueur.nom || '').trim();
+    const prenom = (joueur.prenom || '').trim();
+    return prenom + ' ' + nom;
+  }
+
+  /**
+   * Helper : récupère les groupes du bloc courant (lecture depuis State.currentBloc).
+   * Retourne toujours un tableau de 3 entrées (G1, G2, G3), avec joueurs vides
+   * pour les groupes non encore définis. Garantit l'invariant attendu par l'UI.
+   */
+  function getGroupesCourants() {
+    const stored = (State.currentBloc && Array.isArray(State.currentBloc.groupes_jsonb))
+      ? State.currentBloc.groupes_jsonb
+      : [];
+    const result = [];
+    ['G1', 'G2', 'G3'].forEach(function (nom) {
+      const found = stored.find(function (g) { return g && g.nom === nom; });
+      result.push({
+        nom: nom,
+        joueurs: (found && Array.isArray(found.joueurs)) ? found.joueurs.slice() : []
+      });
+    });
+    return result;
+  }
+
+  /**
+   * Helper : Set des joueur_id placés dans un autre groupe que celui passé.
+   * Sert à griser les joueurs déjà pris dans le popover (unicité par bloc).
+   */
+  function getJoueursPlacesDansAutresGroupes(nomGroupeCible) {
+    const set = new Set();
+    getGroupesCourants().forEach(function (g) {
+      if (g.nom !== nomGroupeCible) {
+        g.joueurs.forEach(function (uid) { set.add(uid); });
+      }
+    });
+    return set;
+  }
+
+  /**
+   * Helper : Set des joueur_id du groupe cible (= déjà cochés dans ce popover).
+   */
+  function getJoueursDansGroupe(nomGroupeCible) {
+    const set = new Set();
+    getGroupesCourants().forEach(function (g) {
+      if (g.nom === nomGroupeCible) {
+        g.joueurs.forEach(function (uid) { set.add(uid); });
+      }
+    });
+    return set;
+  }
+
+  /**
+   * Rendu HTML interne de la section "Groupes".
+   * 3 cartes (G1/G2/G3), chacune avec son badge couleur, son compteur,
+   * la liste compacte des joueurs assignés, et un bouton "+ Ajouter…".
+   */
+  function renderGroupesSectionInner() {
+    const groupes = getGroupesCourants();
+    const vivierTotal = State.vivier ? State.vivier.length : 0;
+    const totalPlaces = groupes.reduce(function (acc, g) { return acc + g.joueurs.length; }, 0);
+
+    let html =
+      '<div class="seance-groupes-section__header">' +
+        '<h3 class="seance-groupes-section__title">' +
+          '👥 Groupes (' + totalPlaces + ' / ' + vivierTotal + ' joueurs placés)' +
+        '</h3>' +
+      '</div>';
+
+    if (!State.vivier || State.vivier.length === 0) {
+      html +=
+        '<p class="seance-groupes-section__empty seance-groupes-section__empty--warn">' +
+          '⚠️ Vivier M14 vide ou non chargé — vérifier la RPC get_vivier_compo.' +
+        '</p>';
+      return html;
+    }
+
+    html += '<div class="seance-groupes-grid">';
+    groupes.forEach(function (g) {
+      const def = getGroupeDef(g.nom);
+      const couleur = (def && def.couleur) ? def.couleur : '#666666';
+      const libelle = (def && def.libelle_court) ? def.libelle_court : g.nom;
+
+      html +=
+        '<div class="seance-groupe-card" data-groupe="' + escapeHtml(g.nom) + '" ' +
+              'style="border-color: ' + escapeHtml(couleur) + ';">' +
+          '<div class="seance-groupe-card__header" ' +
+                'style="background: ' + escapeHtml(couleur) + ';">' +
+            '<span class="seance-groupe-card__nom">' + escapeHtml(g.nom) + '</span>' +
+            '<span class="seance-groupe-card__label">' + escapeHtml(libelle) + '</span>' +
+            '<span class="seance-groupe-card__count">' + g.joueurs.length + '</span>' +
+          '</div>' +
+          '<div class="seance-groupe-card__body">';
+
+      if (g.joueurs.length === 0) {
+        html += '<p class="seance-groupe-card__empty">Aucun joueur assigné.</p>';
+      } else {
+        html += '<ul class="seance-groupe-card__list">';
+        g.joueurs.forEach(function (uid) {
+          const j = State.vivierById ? State.vivierById.get(uid) : null;
+          const nom = libelleJoueurCourt(j);
+          html +=
+            '<li class="seance-groupe-card__item">' +
+              '<span class="seance-groupe-card__joueur">' + escapeHtml(nom) + '</span>' +
+              '<button type="button" class="seance-groupe-card__remove" ' +
+                      'data-groupe="' + escapeHtml(g.nom) + '" ' +
+                      'data-joueur-id="' + escapeHtml(uid) + '" ' +
+                      'title="Retirer du groupe">✕</button>' +
+            '</li>';
+        });
+        html += '</ul>';
+      }
+
+      html +=
+            '<button type="button" class="seance-groupe-card__add" ' +
+                    'data-groupe="' + escapeHtml(g.nom) + '">' +
+              '+ Ajouter…' +
+            '</button>' +
+          '</div>' +
+        '</div>';
+    });
+    html += '</div>';
+
+    return html;
+  }
+
+  /**
+   * Re-rend la section "Groupes" seule et re-bind ses handlers.
+   * Appelé après chaque modification d'un groupe (ajout/retrait joueur).
+   * Ne touche ni au reste du formulaire bloc ni à l'autosave principal.
+   */
+  function renderGroupesSection() {
+    const section = DOM.groupesSection();
+    if (!section) return;
+    section.innerHTML = renderGroupesSectionInner();
+    bindGroupesSection();
+  }
+
+  /**
+   * Bind les boutons de la section "Groupes" :
+   * - "+ Ajouter…" par carte → ouvre le popover joueurs pour ce groupe
+   * - "✕" par joueur → retrait du groupe
+   */
+  function bindGroupesSection() {
+    const section = DOM.groupesSection();
+    if (!section) return;
+
+    section.querySelectorAll('.seance-groupe-card__add').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const nomGroupe = btn.getAttribute('data-groupe');
+        openGroupePicker(nomGroupe);
+      });
+    });
+
+    section.querySelectorAll('.seance-groupe-card__remove').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const nomGroupe = btn.getAttribute('data-groupe');
+        const joueurId = btn.getAttribute('data-joueur-id');
+        onRemoveJoueurFromGroupe(nomGroupe, joueurId);
+      });
+    });
+  }
+
+  /**
+   * Ouvre le popover joueurs pour un groupe donné.
+   * 3 popovers indépendants (un par G1/G2/G3). Pattern modale calqué sur
+   * le picker fiche (Phase 5.8) : overlay sombre, modale centrée, champ
+   * recherche, liste filtrée, fermeture par Échap/overlay/croix.
+   */
+  function openGroupePicker(nomGroupe) {
+    if (!State.vivier || State.vivier.length === 0) {
+      window.alert('Vivier M14 non chargé — impossible d\'ouvrir le sélecteur.');
+      return;
+    }
+    State.groupePicker = { open: true, nomGroupe: nomGroupe, query: '' };
+    renderGroupePicker();
+    document.addEventListener('keydown', onGroupePickerEsc);
+  }
+
+  function closeGroupePicker() {
+    State.groupePicker = null;
+    const root = DOM.pickerGroupeRoot();
+    if (root) root.innerHTML = '';
+    document.removeEventListener('keydown', onGroupePickerEsc);
+  }
+
+  function onGroupePickerEsc(e) {
+    if (e.key === 'Escape') closeGroupePicker();
+  }
+
+  /**
+   * Rend le popover picker joueurs.
+   * Re-rendu à chaque frappe dans le champ recherche (avec restauration du focus).
+   */
+  function renderGroupePicker() {
+    const root = DOM.pickerGroupeRoot();
+    if (!root) return;
+    if (!State.groupePicker || !State.groupePicker.open) {
+      root.innerHTML = '';
+      return;
+    }
+
+    const nomGroupe = State.groupePicker.nomGroupe;
+    const query = State.groupePicker.query || '';
+    const qNorm = normalizeForSearch(query);
+
+    const def = getGroupeDef(nomGroupe);
+    const couleur = (def && def.couleur) ? def.couleur : '#666666';
+    const libelle = (def && def.libelle_court) ? def.libelle_court : nomGroupe;
+
+    // Filtre par recherche (nom + prénom + niveau_profil + poste éventuel)
+    const allJoueurs = State.vivier || [];
+    const joueursFiltres = qNorm.length === 0
+      ? allJoueurs
+      : allJoueurs.filter(function (j) {
+          const fields = [j.nom, j.prenom, j.niveau_profil, j.poste, j.poste_libelle];
+          return fields.some(function (f) {
+            return f && normalizeForSearch(f).indexOf(qNorm) !== -1;
+          });
+        });
+
+    const dansCeGroupe   = getJoueursDansGroupe(nomGroupe);
+    const dansAutresGrp  = getJoueursPlacesDansAutresGroupes(nomGroupe);
+
+    let html =
+      '<div class="seance-picker-groupe__overlay" id="seance-picker-groupe-overlay">' +
+        '<div class="seance-picker-groupe__modal" role="dialog" aria-modal="true">' +
+          '<div class="seance-picker-groupe__header" style="background: ' + escapeHtml(couleur) + ';">' +
+            '<h3 class="seance-picker-groupe__title">' +
+              '👥 ' + escapeHtml(nomGroupe) + ' — ' + escapeHtml(libelle) +
+            '</h3>' +
+            '<button type="button" id="seance-picker-groupe-close" ' +
+                    'class="seance-picker-groupe__close" title="Fermer (Échap)">✕</button>' +
+          '</div>' +
+          '<div class="seance-picker-groupe__search">' +
+            '<input type="text" id="seance-picker-groupe-query" ' +
+                   'class="seance-picker-groupe__input" ' +
+                   'placeholder="🔍 Rechercher (nom, prénom, niveau)…" ' +
+                   'value="' + escapeHtml(query) + '" ' +
+                   'autocomplete="off">' +
+            '<span class="seance-picker-groupe__count">' +
+              joueursFiltres.length + ' / ' + allJoueurs.length + ' joueurs' +
+            '</span>' +
+          '</div>' +
+          '<div class="seance-picker-groupe__list-wrap">';
+
+    if (joueursFiltres.length === 0) {
+      html += '<p class="seance-picker-groupe__empty">Aucun joueur ne correspond à cette recherche.</p>';
+    } else {
+      html += '<ul class="seance-picker-groupe__list">';
+      joueursFiltres.forEach(function (j) {
+        const uid = j.joueur_id;
+        const estDansCeGrp = dansCeGroupe.has(uid);
+        const estAilleurs  = dansAutresGrp.has(uid);
+        const niveau = j.niveau_profil || '';
+
+        let cls = 'seance-picker-groupe__item';
+        if (estDansCeGrp) cls += ' seance-picker-groupe__item--coche';
+        if (estAilleurs)  cls += ' seance-picker-groupe__item--ailleurs';
+
+        let titleAttr = '';
+        if (estAilleurs) titleAttr = ' title="Déjà placé dans un autre groupe"';
+        else if (estDansCeGrp) titleAttr = ' title="Cliquer pour retirer du groupe"';
+
+        html +=
+          '<li class="' + cls + '" data-joueur-id="' + escapeHtml(uid) + '"' + titleAttr + '>' +
+            '<span class="seance-picker-groupe__check">' +
+              (estDansCeGrp ? '☑' : (estAilleurs ? '⛔' : '☐')) +
+            '</span>' +
+            '<span class="seance-picker-groupe__nom">' +
+              escapeHtml(libelleJoueurCourt(j)) +
+            '</span>';
+        if (niveau) {
+          html += '<span class="seance-picker-groupe__niveau">' + escapeHtml(niveau) + '</span>';
+        }
+        html += '</li>';
+      });
+      html += '</ul>';
+    }
+
+    html +=
+          '</div>' +
+          '<div class="seance-picker-groupe__footer">' +
+            '<span class="seance-picker-groupe__hint">' +
+              '💡 Cliquer pour ajouter/retirer · ⛔ = déjà dans un autre groupe' +
+            '</span>' +
+            '<button type="button" id="seance-picker-groupe-done" ' +
+                    'class="seance-form__save-btn">Terminer</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    root.innerHTML = html;
+
+    // ----- Binds modale -----
+    const overlay = document.getElementById('seance-picker-groupe-overlay');
+    if (overlay) {
+      overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) closeGroupePicker();
+      });
+    }
+    const btnClose = document.getElementById('seance-picker-groupe-close');
+    if (btnClose) btnClose.addEventListener('click', closeGroupePicker);
+    const btnDone = document.getElementById('seance-picker-groupe-done');
+    if (btnDone) btnDone.addEventListener('click', closeGroupePicker);
+
+    const inputQuery = document.getElementById('seance-picker-groupe-query');
+    if (inputQuery) {
+      inputQuery.addEventListener('input', function () {
+        if (!State.groupePicker) return;
+        State.groupePicker.query = inputQuery.value;
+        renderGroupePicker();
+        const newInput = document.getElementById('seance-picker-groupe-query');
+        if (newInput) {
+          newInput.focus();
+          const len = newInput.value.length;
+          newInput.setSelectionRange(len, len);
+        }
+      });
+      setTimeout(function () { inputQuery.focus(); }, 0);
+    }
+
+    // Click sur un item → toggle (sauf si déjà ailleurs)
+    document.querySelectorAll('.seance-picker-groupe__item').forEach(function (item) {
+      item.addEventListener('click', function () {
+        if (item.classList.contains('seance-picker-groupe__item--ailleurs')) {
+          // Bloqué : déjà dans un autre groupe
+          return;
+        }
+        const uid = item.getAttribute('data-joueur-id');
+        const estCoche = item.classList.contains('seance-picker-groupe__item--coche');
+        if (estCoche) {
+          onRemoveJoueurFromGroupe(nomGroupe, uid, { silent: true });
+        } else {
+          onAddJoueurToGroupe(nomGroupe, uid);
+        }
+      });
+    });
+  }
+
+  /**
+   * Ajoute un joueur à un groupe (sans doublon, en respectant l'unicité
+   * par bloc : retire d'abord d'un autre groupe si présent — défensif,
+   * normalement bloqué par l'UI).
+   * Persiste via updateBloc({groupes_jsonb}) puis re-render la section
+   * et le popover.
+   */
+  async function onAddJoueurToGroupe(nomGroupe, joueurId) {
+    if (!State.currentBloc) return;
+    if (!nomGroupe || !joueurId) return;
+
+    const groupes = getGroupesCourants();
+    // Défense : retire le joueur de tout autre groupe (au cas où)
+    groupes.forEach(function (g) {
+      if (g.nom !== nomGroupe) {
+        g.joueurs = g.joueurs.filter(function (uid) { return uid !== joueurId; });
+      }
+    });
+    // Ajoute dans le groupe cible si pas déjà présent
+    const cible = groupes.find(function (g) { return g.nom === nomGroupe; });
+    if (cible && cible.joueurs.indexOf(joueurId) === -1) {
+      cible.joueurs.push(joueurId);
+    }
+
+    await persistGroupes(groupes);
+    renderGroupesSection();
+    renderGroupePicker(); // garde le popover ouvert et synchronise les ☐/☑
+  }
+
+  /**
+   * Retire un joueur d'un groupe.
+   * @param {object} [opts]
+   * @param {boolean} [opts.silent] si true, n'affiche pas de feedback
+   */
+  async function onRemoveJoueurFromGroupe(nomGroupe, joueurId, opts) {
+    if (!State.currentBloc) return;
+    if (!nomGroupe || !joueurId) return;
+
+    const groupes = getGroupesCourants();
+    const cible = groupes.find(function (g) { return g.nom === nomGroupe; });
+    if (cible) {
+      cible.joueurs = cible.joueurs.filter(function (uid) { return uid !== joueurId; });
+    }
+
+    await persistGroupes(groupes);
+    renderGroupesSection();
+    // Si popover ouvert, le rafraîchir aussi
+    if (State.groupePicker && State.groupePicker.open) {
+      renderGroupePicker();
+    }
+    if (!(opts && opts.silent)) {
+      showFeedback('Joueur retiré ✓', 'success');
+    }
+  }
+
+  /**
+   * Persiste les groupes du bloc courant via updateBloc.
+   * Met à jour aussi State.currentBloc.groupes_jsonb et l'entrée
+   * correspondante dans State.blocs (pour cohérence inter-renders).
+   */
+  async function persistGroupes(groupes) {
+    if (!State.currentBloc) return;
+    // Nettoyage : on ne persiste pas les groupes vides ? Si, on garde tout
+    // (3 entrées G1/G2/G3) pour conserver l'invariant côté UI au reload.
+    const clean = groupes.map(function (g) {
+      return { nom: g.nom, joueurs: g.joueurs.slice() };
+    });
+
+    const res = await SupabaseHub.updateBloc(State.currentBloc.id, {
+      groupes_jsonb: clean
+    });
+    if (!res.ok) {
+      window.alert('Échec de la sauvegarde des groupes :\n' + (res.error || 'erreur inconnue'));
+      return;
+    }
+    // Synchro mémoire
+    State.currentBloc.groupes_jsonb = clean;
+    const idx = State.blocs.findIndex(function (b) { return b.id === State.currentBloc.id; });
+    if (idx !== -1) State.blocs[idx].groupes_jsonb = clean;
+  }
+
+  // ============================================================
   // 6. ACTIONS
   // ============================================================
 
@@ -1830,6 +2317,18 @@
       params.intensite = typeDef.intensite_defaut;
     }
 
+    // Phase 5.9 : héritage auto des groupes du bloc précédent.
+    // Si la trame contient déjà au moins un bloc avec des groupes non vides,
+    // on copie ces groupes dans le nouveau bloc (commodité doctrinale).
+    // Le clone est volontairement profond (JSON parse/stringify) pour éviter
+    // qu'une modification ultérieure du nouveau bloc ne contamine l'ancien.
+    if (State.blocs && State.blocs.length > 0) {
+      const dernier = State.blocs[State.blocs.length - 1];
+      if (dernier && Array.isArray(dernier.groupes_jsonb) && dernier.groupes_jsonb.length > 0) {
+        params.groupes_jsonb = JSON.parse(JSON.stringify(dernier.groupes_jsonb));
+      }
+    }
+
     const res = await SupabaseHub.addBlocToSeance(State.currentSeance.id, params);
     if (!res.ok) {
       console.error('SeanceEditor: onAddBloc() KO', res.error);
@@ -1965,6 +2464,7 @@
     State.blocIsDirty = false;
     State.ateliersRattaches = []; // Phase 5.8 : vider le cache
     closeFichePicker();           // Phase 5.8 : fermer le picker si ouvert
+    closeGroupePicker();          // Phase 5.9 : idem pour le picker groupe
     renderTrame();
   }
 
@@ -2134,6 +2634,51 @@
   }
 
   /**
+   * Charge le référentiel des 3 groupes (Phase 5.9).
+   * Structure : { _meta:{...}, groupes:[{uuid, libelle_court, couleur, ordre, ...}, ...] }
+   * En cas d'échec, fallback hardcodé sur les 3 libellés par défaut.
+   */
+  async function loadGroupesRef() {
+    try {
+      const resp = await fetch('data/groupes-joueur.json', { cache: 'force-cache' });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      State.groupesRef = await resp.json();
+      const nb = (State.groupesRef && State.groupesRef.groupes) ? State.groupesRef.groupes.length : 0;
+      console.log('SeanceEditor: groupes-joueur.json chargé (' + nb + ' groupes)');
+    } catch (e) {
+      console.error('SeanceEditor: loadGroupesRef() KO, fallback hardcodé', e);
+      // Fallback en cas d'absence du fichier : on garde la fonctionnalité
+      State.groupesRef = {
+        groupes: [
+          { libelle_court: 'Performance',   couleur: '#8B0000', ordre: 10, actif: true },
+          { libelle_court: 'Développement', couleur: '#FF8C00', ordre: 20, actif: true },
+          { libelle_court: 'Initiation',    couleur: '#4682B4', ordre: 30, actif: true }
+        ]
+      };
+    }
+  }
+
+  /**
+   * Charge le vivier M14 (Phase 5.9) via la RPC get_vivier_compo.
+   * Indexe les joueurs par joueur_id dans une Map pour lookup rapide.
+   * Pattern identique à compositions-editor.js (Phase 4.4).
+   */
+  async function loadVivierM14() {
+    try {
+      State.vivier = await SupabaseHub.getVivierCompo(M14_TEAM_UUID);
+      State.vivierById = new Map();
+      (State.vivier || []).forEach(function (j) {
+        if (j && j.joueur_id) State.vivierById.set(j.joueur_id, j);
+      });
+      console.log('SeanceEditor: vivier M14 chargé (' + (State.vivier ? State.vivier.length : 0) + ' joueurs)');
+    } catch (e) {
+      console.error('SeanceEditor: loadVivierM14() KO', e);
+      State.vivier = [];
+      State.vivierById = new Map();
+    }
+  }
+
+  /**
    * Charge les blocs de la séance courante (Phase 5.6.A).
    */
   async function loadBlocs() {
@@ -2152,14 +2697,17 @@
     // Chargements parallèles : séances pour la sidebar, sites et événements
     // pour les dropdowns du formulaire, types-blocs.json pour la trame (5.6.A),
     // vocabulaire-seance.json pour le détail bloc (5.7), fiches-all.json pour
-    // le picker ateliers (5.8)
+    // le picker ateliers (5.8), groupes-joueur.json + vivier M14 pour les
+    // groupes G1/G2/G3 par bloc (5.9)
     await Promise.all([
       loadSeances(),
       loadSites(),
       loadEvenements(),
       loadTypesBlocsRef(),
       loadVocabulaireRef(),
-      loadFichesRef()
+      loadFichesRef(),
+      loadGroupesRef(),
+      loadVivierM14()
     ]);
 
     renderSidebar();
