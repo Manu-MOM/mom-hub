@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.10 — mai 2026
+ * Version : 1.11 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -135,6 +135,57 @@
  *          temps une autre conv a livré v1.8.5 + v1.8.6 sur le module
  *          Préparation séance (transitions état + suppression séance).
  *          Merge propre en v1.10 par-dessus v1.8.6 sans rien écraser.
+ *   v1.11 : Phase 4.4 UI Évènements S2.4.a — 7 wrappers ÉCRITURE pour
+ *          le cycle Évènements (création, duplication, annulation,
+ *          réactivation, update champs métier, update logistique,
+ *          ajout match au tournoi). Tous suivent le pattern Hub
+ *          { ok, data?, error? } cohérent avec les wrappers
+ *          compositions v1.7. Whitelist explicite des champs autorisés
+ *          en UPDATE pour sécurité (séparation transitions / updates
+ *          métier).
+ *
+ *          (1) createEvenement(payload) : INSERT évent (parent ou
+ *              enfant). Champs autorisés : code, libelle, type_evenement,
+ *              type_competition, equipe_id, saison_id, format_de_jeu,
+ *              date_debut, date_fin, site_id, organisateur_principal_id,
+ *              evenement_parent_id, phase_libelle, ordre_dans_phase,
+ *              adversaire_nom, domicile_exterieur, notes_internes.
+ *              Etat initial forcé à 'creation'.
+ *
+ *          (2) duplicateEvenement(srcId, overrides) : SELECT source +
+ *              INSERT nouveau évent avec champs hérités. V1 ne duplique
+ *              QUE le parent (pas les enfants — dette
+ *              P4-UI-evenements-2 V2). code et libelle auto-générés
+ *              ou via overrides.
+ *
+ *          (3) addMatchToTournoi(tournoiId, payload) : wrapper spécialisé
+ *              create avec evenement_parent_id forcé. Hérite
+ *              type_competition + saison_id + equipe_id +
+ *              organisateur_principal_id du parent si non fournis.
+ *
+ *          (4) updateEvenement(evenementId, patch) : UPDATE whitelist.
+ *              Champs autorisés : libelle, type_competition, date_debut,
+ *              date_fin, site_id, format_de_jeu, adversaire_nom,
+ *              domicile_exterieur, phase_libelle, ordre_dans_phase,
+ *              notes_internes, score_mom, score_adverse, classement_final,
+ *              notes_resultat. PAS de etat dans la whitelist (transitions
+ *              gérées par cancelEvenement / reactivateEvenement).
+ *
+ *          (5) cancelEvenement(evenementId, motif) : UPDATE etat='annule'.
+ *              Garde-fou .eq('etat',...) pour interdire de re-annuler ou
+ *              d'annuler depuis 'archive'. Stocke le motif dans
+ *              notes_resultat (V1 simple, pas de colonne dédiée).
+ *
+ *          (6) reactivateEvenement(evenementId) : UPDATE etat='annule'
+ *              → 'creation'. Garde-fou .eq('etat','annule') pour
+ *              empêcher la réactivation depuis un autre état.
+ *
+ *          (7) updateLogistique(evenementId, jsonbPayload) : UPDATE
+ *              de la seule colonne logistique_deplacement JSONB.
+ *              Validation côté wrapper : doit être un object ou null.
+ *
+ *          Tous les wrappers exploitent la RLS write en place (sql/25)
+ *          via has_role('admin') OR has_role('coach') côté authenticated.
  */
 
 (function (global) {
@@ -478,6 +529,386 @@
       });
       if (error) { console.error('MOM Hub: getEvenementWithEncadrants()', error); return null; }
       return Array.isArray(data) && data.length > 0 ? data[0] : null;
+    },
+
+    // ============================================================
+    // PHASE 4.4 UI ÉVÈNEMENTS — WRAPPERS ÉCRITURE v1.11 (S2.4.a)
+    // ============================================================
+
+    /**
+     * Crée un nouvel évènement (parent ou enfant).
+     *
+     * Whitelist champs autorisés (les autres sont ignorés silencieusement
+     * pour sécurité) :
+     *   - code               (string, requis, UNIQUE en base)
+     *   - libelle            (string, requis)
+     *   - type_evenement     (string, requis, CHECK : match/entrainement/
+     *                         stage/tournoi/journee_championnat)
+     *   - type_competition   (string, optionnel, CHECK : championnat/
+     *                         amical/coupe/tournoi)
+     *   - equipe_id          (UUID, requis sauf cas parent stage/tournoi)
+     *   - saison_id          (UUID, requis)
+     *   - format_de_jeu      (string, requis pour match/journee_champ)
+     *   - date_debut         (ISO string, requis)
+     *   - date_fin           (ISO string, optionnel)
+     *   - site_id            (UUID, optionnel)
+     *   - organisateur_principal_id (UUID, requis)
+     *   - evenement_parent_id (UUID, optionnel — pour enfants)
+     *   - phase_libelle      (string, optionnel)
+     *   - ordre_dans_phase   (integer, optionnel)
+     *   - adversaire_nom     (string, optionnel)
+     *   - domicile_exterieur (string, optionnel, CHECK : domicile/
+     *                         exterieur/neutre)
+     *   - notes_internes     (string, optionnel)
+     *
+     * État initial forcé à 'creation' (CHECK valide).
+     *
+     * @param {Object} payload Objet contenant les champs autorisés
+     * @returns {Promise<{ok: boolean, data?: Object, error?: string}>}
+     */
+    async createEvenement(payload) {
+      if (!payload || typeof payload !== 'object') {
+        return { ok: false, error: 'Payload manquant ou invalide' };
+      }
+      // Champs minimaux requis pour passer les CHECK SQL
+      if (!payload.code || !payload.libelle || !payload.type_evenement
+          || !payload.date_debut || !payload.saison_id || !payload.organisateur_principal_id) {
+        return { ok: false, error: 'Champs requis manquants : code, libelle, type_evenement, date_debut, saison_id, organisateur_principal_id' };
+      }
+      const allowedFields = [
+        'code', 'libelle', 'type_evenement', 'type_competition',
+        'equipe_id', 'saison_id', 'format_de_jeu',
+        'date_debut', 'date_fin', 'site_id',
+        'organisateur_principal_id',
+        'evenement_parent_id', 'phase_libelle', 'ordre_dans_phase',
+        'adversaire_nom', 'domicile_exterieur',
+        'notes_internes'
+      ];
+      const insertPayload = { etat: 'creation' };
+      allowedFields.forEach(f => {
+        if (payload[f] !== undefined) insertPayload[f] = payload[f];
+      });
+
+      const { data, error } = await client
+        .from('evenements')
+        .insert(insertPayload)
+        .select()
+        .maybeSingle();
+
+      if (error) {
+        console.error('MOM Hub: createEvenement()', error);
+        return { ok: false, error: error.message || 'Erreur INSERT evenements' };
+      }
+      return { ok: true, data: data };
+    },
+
+    /**
+     * Duplique un évènement existant. V1 ne duplique QUE le parent
+     * (les enfants ne sont PAS dupliqués — cf. dette P4-UI-evenements-2
+     * pour la duplication arborescente V2).
+     *
+     * @param {string} srcId UUID de l'évènement source
+     * @param {Object} [overrides] Champs à surcharger (code, libelle, date_debut...)
+     *                              Si code non fourni, généré auto avec suffixe '-COPIE'.
+     * @returns {Promise<{ok: boolean, data?: Object, error?: string}>}
+     */
+    async duplicateEvenement(srcId, overrides) {
+      if (!srcId) return { ok: false, error: 'srcId manquant' };
+      overrides = overrides || {};
+
+      // 1. Récupère l'évènement source
+      const { data: src, error: errSrc } = await client
+        .from('evenements')
+        .select('*')
+        .eq('id', srcId)
+        .maybeSingle();
+
+      if (errSrc) {
+        console.error('MOM Hub: duplicateEvenement() lecture source', errSrc);
+        return { ok: false, error: errSrc.message };
+      }
+      if (!src) {
+        return { ok: false, error: 'Évènement source introuvable' };
+      }
+
+      // 2. Construit le payload du nouvel évent (champs whitelistés)
+      const fieldsToCopy = [
+        'libelle', 'type_evenement', 'type_competition',
+        'equipe_id', 'saison_id', 'format_de_jeu',
+        'date_debut', 'date_fin', 'site_id',
+        'organisateur_principal_id',
+        'adversaire_nom', 'domicile_exterieur'
+        // NB : evenement_parent_id, phase_libelle, ordre_dans_phase NON copiés
+        // (V1 ne duplique que les parents/orphelins). score, classement,
+        // notes_resultat, logistique : ne pas copier non plus.
+      ];
+      const newPayload = { etat: 'creation' };
+      fieldsToCopy.forEach(f => {
+        if (src[f] !== undefined && src[f] !== null) newPayload[f] = src[f];
+      });
+
+      // 3. Applique les overrides + auto-génère code si absent
+      Object.keys(overrides).forEach(k => { newPayload[k] = overrides[k]; });
+      if (!newPayload.code) {
+        newPayload.code = src.code + '-COPIE-' + Date.now().toString().substring(7);
+      }
+      if (!newPayload.libelle) {
+        newPayload.libelle = (src.libelle || '') + ' (copie)';
+      }
+
+      // 4. INSERT
+      const { data, error } = await client
+        .from('evenements')
+        .insert(newPayload)
+        .select()
+        .maybeSingle();
+
+      if (error) {
+        console.error('MOM Hub: duplicateEvenement() insertion', error);
+        return { ok: false, error: error.message };
+      }
+      return { ok: true, data: data };
+    },
+
+    /**
+     * Ajoute un match enfant à un tournoi existant. Hérite par défaut du
+     * parent : type_competition, saison_id, equipe_id, organisateur_principal_id,
+     * format_de_jeu, site_id. type_evenement forcé à 'match'.
+     *
+     * @param {string} tournoiId UUID du tournoi parent
+     * @param {Object} payload Champs spécifiques au match
+     *   - libelle           (string, requis — ex: "vs Nancy Seichamps")
+     *   - date_debut        (ISO string, requis)
+     *   - phase_libelle     (string, optionnel — ex: "Poule de brassage")
+     *   - ordre_dans_phase  (integer, optionnel)
+     *   - adversaire_nom    (string, optionnel)
+     *   - format_de_jeu     (string, optionnel — sinon hérité du parent)
+     *   - code              (string, optionnel — sinon auto-généré)
+     * @returns {Promise<{ok: boolean, data?: Object, error?: string}>}
+     */
+    async addMatchToTournoi(tournoiId, payload) {
+      if (!tournoiId) return { ok: false, error: 'tournoiId manquant' };
+      if (!payload || !payload.libelle || !payload.date_debut) {
+        return { ok: false, error: 'Champs requis manquants : libelle, date_debut' };
+      }
+
+      // 1. Récupère le parent pour hériter
+      const { data: parent, error: errParent } = await client
+        .from('evenements')
+        .select('id, code, type_evenement, type_competition, saison_id, equipe_id, organisateur_principal_id, format_de_jeu, site_id, domicile_exterieur')
+        .eq('id', tournoiId)
+        .maybeSingle();
+
+      if (errParent) {
+        console.error('MOM Hub: addMatchToTournoi() lecture parent', errParent);
+        return { ok: false, error: errParent.message };
+      }
+      if (!parent) return { ok: false, error: 'Tournoi parent introuvable' };
+      if (parent.type_evenement !== 'tournoi') {
+        return { ok: false, error: "L'évènement parent n'est pas un tournoi (type=" + parent.type_evenement + ")" };
+      }
+
+      // 2. Construit le payload enfant
+      const childPayload = {
+        type_evenement:            'match',
+        evenement_parent_id:       parent.id,
+        type_competition:          payload.type_competition || parent.type_competition || 'tournoi',
+        saison_id:                 parent.saison_id,
+        equipe_id:                 parent.equipe_id,
+        organisateur_principal_id: parent.organisateur_principal_id,
+        format_de_jeu:             payload.format_de_jeu || parent.format_de_jeu,
+        site_id:                   payload.site_id !== undefined ? payload.site_id : parent.site_id,
+        domicile_exterieur:        payload.domicile_exterieur || parent.domicile_exterieur || 'neutre',
+        libelle:                   payload.libelle,
+        date_debut:                payload.date_debut,
+        etat:                      'creation'
+      };
+      // Champs optionnels
+      if (payload.phase_libelle)    childPayload.phase_libelle    = payload.phase_libelle;
+      if (payload.ordre_dans_phase) childPayload.ordre_dans_phase = payload.ordre_dans_phase;
+      if (payload.adversaire_nom)   childPayload.adversaire_nom   = payload.adversaire_nom;
+      if (payload.date_fin)         childPayload.date_fin         = payload.date_fin;
+
+      // Code auto-généré si absent
+      if (payload.code) {
+        childPayload.code = payload.code;
+      } else {
+        const ts = Date.now().toString().substring(7);
+        childPayload.code = parent.code + '-M' + ts;
+      }
+
+      // 3. INSERT
+      const { data, error } = await client
+        .from('evenements')
+        .insert(childPayload)
+        .select()
+        .maybeSingle();
+
+      if (error) {
+        console.error('MOM Hub: addMatchToTournoi() insertion', error);
+        return { ok: false, error: error.message };
+      }
+      return { ok: true, data: data };
+    },
+
+    /**
+     * Met à jour les champs métier d'un évènement existant.
+     *
+     * Whitelist : libelle, type_competition, date_debut, date_fin, site_id,
+     * format_de_jeu, adversaire_nom, domicile_exterieur, phase_libelle,
+     * ordre_dans_phase, notes_internes, score_mom, score_adverse,
+     * classement_final, notes_resultat.
+     *
+     * NON modifiable via ce wrapper (volontaire) :
+     *   - etat (utiliser cancelEvenement / reactivateEvenement)
+     *   - type_evenement (changement de nature = nouvel évent)
+     *   - equipe_id, saison_id (changement structurant)
+     *   - evenement_parent_id (rattachement structurant)
+     *   - logistique_deplacement (utiliser updateLogistique)
+     *   - organisateur_principal_id (gestion encadrants à part)
+     *
+     * @param {string} evenementId UUID
+     * @param {Object} patch Champs à modifier
+     * @returns {Promise<{ok: boolean, data?: Object, error?: string}>}
+     */
+    async updateEvenement(evenementId, patch) {
+      if (!evenementId) return { ok: false, error: 'evenementId manquant' };
+      if (!patch || typeof patch !== 'object') {
+        return { ok: false, error: 'Patch manquant ou invalide' };
+      }
+      const allowedFields = [
+        'libelle', 'type_competition',
+        'date_debut', 'date_fin', 'site_id', 'format_de_jeu',
+        'adversaire_nom', 'domicile_exterieur',
+        'phase_libelle', 'ordre_dans_phase',
+        'notes_internes',
+        'score_mom', 'score_adverse', 'classement_final', 'notes_resultat'
+      ];
+      const safePatch = {};
+      allowedFields.forEach(f => {
+        if (patch[f] !== undefined) safePatch[f] = patch[f];
+      });
+      if (Object.keys(safePatch).length === 0) {
+        return { ok: false, error: 'Aucun champ modifiable dans ce patch' };
+      }
+
+      const { data, error } = await client
+        .from('evenements')
+        .update(safePatch)
+        .eq('id', evenementId)
+        .select()
+        .maybeSingle();
+
+      if (error) {
+        console.error('MOM Hub: updateEvenement()', error);
+        return { ok: false, error: error.message };
+      }
+      if (!data) {
+        return { ok: false, error: 'Évènement introuvable' };
+      }
+      return { ok: true, data: data };
+    },
+
+    /**
+     * Annule un évènement (etat → 'annule'). Stocke le motif dans
+     * notes_resultat (V1 simple, pas de colonne motif_annulation dédiée).
+     *
+     * Garde-fou : ne peut annuler que depuis 'creation', 'compo', 'joue',
+     * 'resultat'. Pas depuis 'annule' (déjà annulé) ni 'archive'.
+     *
+     * @param {string} evenementId UUID
+     * @param {string} [motif] Motif libre stocké dans notes_resultat
+     * @returns {Promise<{ok: boolean, data?: Object, error?: string}>}
+     */
+    async cancelEvenement(evenementId, motif) {
+      if (!evenementId) return { ok: false, error: 'evenementId manquant' };
+
+      const patch = { etat: 'annule' };
+      if (motif && typeof motif === 'string' && motif.trim()) {
+        // Préfixe pour identification ultérieure du motif d'annulation
+        patch.notes_resultat = '[ANNULÉ] ' + motif.trim();
+      }
+
+      const { data, error } = await client
+        .from('evenements')
+        .update(patch)
+        .eq('id', evenementId)
+        .in('etat', ['creation', 'compo', 'joue', 'resultat'])
+        .select()
+        .maybeSingle();
+
+      if (error) {
+        console.error('MOM Hub: cancelEvenement()', error);
+        return { ok: false, error: error.message };
+      }
+      if (!data) {
+        return { ok: false, error: "L'évènement n'est pas dans un état permettant l'annulation (déjà annulé, archivé ou introuvable)" };
+      }
+      return { ok: true, data: data };
+    },
+
+    /**
+     * Réactive un évènement annulé (etat='annule' → 'creation').
+     * Cohérent doctrine P4 : le Hub n'enferme pas, réversibilité libre
+     * sans condition temporelle.
+     *
+     * Garde-fou : ne peut réactiver que depuis 'annule'.
+     *
+     * @param {string} evenementId UUID
+     * @returns {Promise<{ok: boolean, data?: Object, error?: string}>}
+     */
+    async reactivateEvenement(evenementId) {
+      if (!evenementId) return { ok: false, error: 'evenementId manquant' };
+
+      const { data, error } = await client
+        .from('evenements')
+        .update({ etat: 'creation' })
+        .eq('id', evenementId)
+        .eq('etat', 'annule')
+        .select()
+        .maybeSingle();
+
+      if (error) {
+        console.error('MOM Hub: reactivateEvenement()', error);
+        return { ok: false, error: error.message };
+      }
+      if (!data) {
+        return { ok: false, error: "L'évènement n'est pas en état 'annule' (déjà actif ou introuvable)" };
+      }
+      return { ok: true, data: data };
+    },
+
+    /**
+     * Met à jour la colonne logistique_deplacement (JSONB) d'un évènement.
+     * Wrapper séparé d'updateEvenement par souci de doctrine : la
+     * logistique est un objet structuré qu'on veut pouvoir vider (passer
+     * à NULL) sans toucher au reste.
+     *
+     * @param {string} evenementId UUID
+     * @param {Object|null} jsonbPayload Objet JSONB libre (ou null pour vider)
+     * @returns {Promise<{ok: boolean, data?: Object, error?: string}>}
+     */
+    async updateLogistique(evenementId, jsonbPayload) {
+      if (!evenementId) return { ok: false, error: 'evenementId manquant' };
+      if (jsonbPayload !== null && (typeof jsonbPayload !== 'object' || Array.isArray(jsonbPayload))) {
+        return { ok: false, error: 'logistique_deplacement doit être un object JSONB ou null' };
+      }
+
+      const { data, error } = await client
+        .from('evenements')
+        .update({ logistique_deplacement: jsonbPayload })
+        .eq('id', evenementId)
+        .select()
+        .maybeSingle();
+
+      if (error) {
+        console.error('MOM Hub: updateLogistique()', error);
+        return { ok: false, error: error.message };
+      }
+      if (!data) {
+        return { ok: false, error: 'Évènement introuvable' };
+      }
+      return { ok: true, data: data };
     },
 
     // ============================================================
@@ -1740,7 +2171,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.10 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.11 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
