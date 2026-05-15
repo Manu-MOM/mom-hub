@@ -3614,11 +3614,15 @@
       console.warn('SeanceEditor: loadPropositionsRef() KO, datalist vides', e);
       State.propositionsRef = null;
     }
+  }
 
   /**
+   * Charge le vivier M14 (Phase 5.9) via la RPC get_vivier_compo.
+   * Indexe les joueurs par joueur_id dans une Map pour lookup rapide.
+   * Pattern identique à compositions-editor.js (Phase 4.4).
+   */
+  /**
    * Charge les encadrants de la catégorie de l'utilisateur (Phase 5.12 TER).
-   * Source : data/encadrants-par-categorie.json, basé sur window.momSeanceContext.categorie_uuid.
-   * Indexe en Array puis utilise bindEncadrantsTags() pour le rendu.
    */
   async function loadEncadrantsForCategorie() {
     try {
@@ -3637,13 +3641,7 @@
       State.encadrantsRef = [];
     }
   }
-  }
 
-  /**
-   * Charge le vivier M14 (Phase 5.9) via la RPC get_vivier_compo.
-   * Indexe les joueurs par joueur_id dans une Map pour lookup rapide.
-   * Pattern identique à compositions-editor.js (Phase 4.4).
-   */
   async function loadVivierM14() {
     try {
       State.vivier = await SupabaseHub.getVivierCompo(M14_TEAM_UUID);
