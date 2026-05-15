@@ -688,6 +688,327 @@
   .evt-mini-day.is-today .evt-mini-dot {
     background: var(--paper);
   }
+
+  /* =====================================================
+   * ========== S2.3 — FICHE DÉTAILLÉE E2 ===============
+   * ===================================================== */
+
+  /* Overlay (clic = ferme) */
+  .evt-fiche-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 20, 20, 0.32);
+    z-index: 200;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease;
+  }
+  .evt-fiche-overlay.show {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Panneau slide-in droite */
+  .evt-fiche-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 480px;
+    max-width: 92vw;
+    background: var(--paper);
+    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.18);
+    transform: translateX(100%);
+    transition: transform 0.22s ease;
+    z-index: 201;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .evt-fiche-overlay.show .evt-fiche-panel {
+    transform: translateX(0);
+  }
+
+  /* Header sticky */
+  .evt-fiche-header {
+    flex-shrink: 0;
+    padding: 16px 20px 12px 20px;
+    border-bottom: 1px solid var(--line);
+    background: var(--paper-warm);
+    position: relative;
+  }
+  .evt-fiche-close {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    background: transparent;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    color: var(--ink-mute);
+    padding: 4px 8px;
+    border-radius: 4px;
+    line-height: 1;
+  }
+  .evt-fiche-close:hover {
+    background: var(--paper-deep);
+    color: var(--ink);
+  }
+  .evt-fiche-code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--ink-mute);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    padding-right: 30px;  /* évite chevauchement avec ✕ */
+  }
+  .evt-fiche-title {
+    font-family: 'Oswald', sans-serif;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--ink);
+    line-height: 1.2;
+    padding-right: 30px;
+  }
+
+  /* Body scrollable */
+  .evt-fiche-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 18px 20px;
+  }
+  .evt-fiche-loading,
+  .evt-fiche-error {
+    padding: 30px 10px;
+    text-align: center;
+    color: var(--ink-mute);
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .evt-fiche-error {
+    color: var(--clay-deep, #8b3a1a);
+    background: var(--paper-warm);
+    border: 1px solid var(--clay, #c8896a);
+    border-radius: 6px;
+    text-transform: none;
+    letter-spacing: normal;
+    font-family: inherit;
+    font-size: 13px;
+  }
+
+  /* Sections empilées */
+  .evt-fiche-section {
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--line);
+  }
+  .evt-fiche-section:last-of-type {
+    border-bottom: none;
+  }
+  .evt-fiche-section-title {
+    font-family: 'Oswald', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    color: var(--vert-prairie);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* Bandeau identité (1ère section, sans titre) */
+  .evt-fiche-identite {
+    background: var(--paper-warm);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 14px;
+    margin-bottom: 20px;
+  }
+  .evt-fiche-identite-meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    color: var(--ink-mute);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .evt-fiche-identite-libelle {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 4px;
+  }
+  .evt-fiche-identite-secondaire {
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-bottom: 8px;
+  }
+  .evt-fiche-identite-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+  }
+  .evt-fiche-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 9px;
+    border-radius: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    background: var(--paper-deep);
+    color: var(--ink);
+    border: 1px solid var(--line);
+  }
+  .evt-fiche-pill-etat-creation { background: var(--paper-deep); color: var(--ink-mute); }
+  .evt-fiche-pill-etat-compo    { background: rgba(212, 169, 58, 0.15); color: #8a6a1a; border-color: rgba(212, 169, 58, 0.3); }
+  .evt-fiche-pill-etat-joue     { background: rgba(45, 125, 70, 0.12); color: var(--vert-prairie); border-color: rgba(45, 125, 70, 0.3); }
+  .evt-fiche-pill-etat-resultat { background: rgba(46, 99, 168, 0.12); color: #2e63a8; border-color: rgba(46, 99, 168, 0.3); }
+  .evt-fiche-pill-etat-annule   { background: rgba(200, 137, 106, 0.15); color: #8b3a1a; border-color: var(--clay, #c8896a); }
+  .evt-fiche-pill-etat-archive  { background: var(--paper); color: var(--ink-mute); }
+
+  /* Listes (encadrants, phases) */
+  .evt-fiche-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .evt-fiche-list-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 6px 0;
+    font-size: 13px;
+    color: var(--ink);
+    border-bottom: 1px solid var(--paper-warm);
+  }
+  .evt-fiche-list-item:last-child {
+    border-bottom: none;
+  }
+  .evt-fiche-list-puce {
+    color: var(--vert-prairie);
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .evt-fiche-list-content { flex: 1; }
+  .evt-fiche-list-name {
+    font-weight: 500;
+    color: var(--ink);
+  }
+  .evt-fiche-list-meta {
+    font-size: 11px;
+    color: var(--ink-mute);
+    margin-top: 2px;
+  }
+
+  /* Phases enfants */
+  .evt-fiche-phase-titre {
+    font-family: 'Oswald', sans-serif;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    color: var(--vert-prairie);
+    text-transform: uppercase;
+    margin: 10px 0 4px 0;
+  }
+  .evt-fiche-phase-titre:first-child {
+    margin-top: 0;
+  }
+  .evt-fiche-phase-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    font-size: 12px;
+    color: var(--ink-soft);
+    border-bottom: 1px solid var(--paper-warm);
+  }
+  .evt-fiche-phase-row:last-child {
+    border-bottom: none;
+  }
+  .evt-fiche-phase-heure {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-mute);
+    min-width: 36px;
+    flex-shrink: 0;
+  }
+
+  /* Score */
+  .evt-fiche-score {
+    text-align: center;
+    padding: 12px;
+    background: var(--paper-warm);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    margin-bottom: 12px;
+  }
+  .evt-fiche-score-num {
+    font-family: 'Oswald', sans-serif;
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--ink);
+    letter-spacing: 0.04em;
+  }
+  .evt-fiche-score-vs {
+    margin: 0 14px;
+    color: var(--ink-mute);
+    font-size: 14px;
+  }
+
+  /* Notes / Logistique : texte libre */
+  .evt-fiche-text {
+    font-size: 13px;
+    color: var(--ink);
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .evt-fiche-empty {
+    color: var(--ink-mute);
+    font-style: italic;
+    font-size: 12px;
+  }
+
+  /* Actions en pied */
+  .evt-fiche-actions {
+    display: flex;
+    gap: 8px;
+    padding: 14px 0 4px 0;
+    border-top: 1px solid var(--line);
+    margin-top: 12px;
+  }
+  .evt-fiche-actions .evt-btn { font-size: 12px; }
+  .evt-fiche-actions-spacer { flex: 1; }
+
+  /* JSON brut pour debug logistique (V1) */
+  .evt-fiche-jsonbloc {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    background: var(--paper-warm);
+    padding: 8px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--line);
+    color: var(--ink-soft);
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0;
+  }
+
+  /* Responsive : sur mobile, panneau plein écran */
+  @media (max-width: 768px) {
+    .evt-fiche-panel {
+      width: 100%;
+      max-width: 100%;
+    }
+  }
 </style>
 </head>
 <body class="fullscreen-app">
@@ -880,6 +1201,20 @@
       <button type="button" class="evt-btn evt-btn-primary" disabled>Ajouter le match</button>
     </div>
   </div>
+</div>
+
+<!-- E2 — Fiche détaillée (panneau slide-in droite) -->
+<div class="evt-fiche-overlay" id="evt-fiche-overlay" role="dialog" aria-modal="true" aria-labelledby="evt-fiche-title">
+  <aside class="evt-fiche-panel" id="evt-fiche-panel">
+    <div class="evt-fiche-header">
+      <button type="button" class="evt-fiche-close" data-action="close-fiche" aria-label="Fermer la fiche">✕</button>
+      <div class="evt-fiche-code" id="evt-fiche-code">…</div>
+      <div class="evt-fiche-title" id="evt-fiche-title">Chargement…</div>
+    </div>
+    <div class="evt-fiche-body" id="evt-fiche-body">
+      <div class="evt-fiche-loading">Chargement de la fiche…</div>
+    </div>
+  </aside>
 </div>
 
 <!-- ============ SCRIPTS ============ -->
