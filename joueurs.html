@@ -846,6 +846,87 @@
     color: var(--ink);
     font-weight: 600;
   }
+
+  /* Loading state pendant submit (form-wide) */
+  .joueur-modal-form.is-submitting .joueur-chip-select,
+  .joueur-modal-form.is-submitting .joueur-modal-chip-poste,
+  .joueur-modal-form.is-submitting .joueur-modal-apt-cell,
+  .joueur-modal-form.is-submitting input,
+  .joueur-modal-form.is-submitting textarea {
+    pointer-events: none;
+    opacity: 0.6;
+  }
+
+  /* =====================================================
+   * ========== S2.4 — MODALE J3 : POSTES + APTITUDES ===
+   * ===================================================== */
+
+  /* Chips postes (toggle multi-select) */
+  .joueur-modal-chips-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 4px;
+  }
+  .joueur-modal-chip-poste {
+    display: inline-block;
+    padding: 6px 11px;
+    border-radius: 14px;
+    background: var(--paper-warm);
+    border: 1px solid var(--line);
+    color: var(--ink-soft);
+    font-size: 11.5px;
+    font-weight: 500;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.12s;
+  }
+  .joueur-modal-chip-poste:hover {
+    background: var(--paper-deep);
+    border-color: var(--vert-pelouse);
+  }
+  .joueur-modal-chip-poste.is-active {
+    background: #1f2d4a;
+    color: var(--paper);
+    border-color: #1f2d4a;
+    font-weight: 600;
+  }
+
+  /* Grille aptitudes (cases à cocher avec pill colorée) */
+  .joueur-modal-apt-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 6px;
+    margin-top: 4px;
+  }
+  .joueur-modal-apt-cell {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 8px;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    background: var(--paper-warm);
+    cursor: pointer;
+    font-size: 11.5px;
+    transition: background 0.12s;
+  }
+  .joueur-modal-apt-cell:hover {
+    background: var(--paper-deep);
+  }
+  .joueur-modal-apt-cell.is-active {
+    background: var(--paper);
+    border-color: var(--vert-prairie);
+  }
+  .joueur-modal-apt-checkbox {
+    margin: 0;
+    accent-color: var(--vert-prairie);
+    flex-shrink: 0;
+  }
+  /* La pill colorée prend la couleur depuis aptitudes.json (inline style) */
+  .joueur-modal-apt-cell .joueur-pill {
+    margin: 0;
+  }
 </style>
 </head>
 <body class="fullscreen-app">
@@ -985,7 +1066,7 @@
 
       <!-- FOOTER smoke check -->
       <div class="joueur-footer-smoke" id="joueur-footer-smoke">
-        MOM Hub · Module Joueurs · v1.0 (S2.2 + S2.3 lecture)
+        MOM Hub · Module Joueurs · v1.1 (S2.2 + S2.3 + S2.4 édition)
       </div>
 
     </div>
@@ -1018,26 +1099,41 @@
 <div class="joueur-overlay" id="joueur-overlay-profil" role="dialog" aria-modal="true" aria-labelledby="joueur-profil-title">
   <div class="joueur-modal">
     <div class="joueur-modal-title" id="joueur-profil-title">Modifier le profil sportif</div>
-    <div class="joueur-modal-body">
+    <div class="joueur-modal-body" id="joueur-profil-body">
       <div id="joueur-profil-msg"></div>
       <div class="joueur-modal-info" id="joueur-profil-info">
         <em>Chargement…</em>
       </div>
       <form class="joueur-modal-form" id="joueur-profil-form" onsubmit="return false;">
-        <!-- S2.4.b : postes (multi-select chips) + aptitudes A/B grille -->
+
         <div class="joueur-form-group">
-          <label class="joueur-form-label">Postes joués</label>
-          <div class="joueur-form-hint">À câbler en S2.4.b (chips multi-select depuis postes.json)</div>
+          <label class="joueur-form-label">Postes joués · cliquez pour activer/désactiver</label>
+          <div id="joueur-profil-postes-chips" class="joueur-modal-chips-grid"></div>
+          <div class="joueur-form-hint">Multi-postes possible (ex : Pilier G + Pilier D + Arrière)</div>
         </div>
+
         <div class="joueur-form-group">
-          <label class="joueur-form-label">Aptitudes (Cat. A + Cat. B M14)</label>
-          <div class="joueur-form-hint">À câbler en S2.4.b (grille 6 A + 7 B depuis aptitudes.json)</div>
+          <label class="joueur-form-label">Aptitudes · cochez celles qui s'appliquent</label>
+          <div id="joueur-profil-aptitudes-grid" class="joueur-modal-apt-grid"></div>
+          <div class="joueur-form-hint">Catégorie A universelle + Catégorie B M14</div>
         </div>
+
+        <div class="joueur-form-group-row">
+          <div class="joueur-form-group">
+            <label class="joueur-form-label" for="joueur-profil-taille">Taille (cm)</label>
+            <input type="number" class="joueur-form-input" id="joueur-profil-taille" name="taille_cm" min="50" max="250" step="1" placeholder="Ex : 157">
+          </div>
+          <div class="joueur-form-group">
+            <label class="joueur-form-label" for="joueur-profil-poids">Poids (kg)</label>
+            <input type="number" class="joueur-form-input" id="joueur-profil-poids" name="poids_kg" min="5" max="250" step="0.1" placeholder="Ex : 42,8">
+          </div>
+        </div>
+
       </form>
     </div>
     <div class="joueur-modal-actions">
       <button type="button" class="joueur-btn" data-action="close-profil">Annuler</button>
-      <button type="button" class="joueur-btn joueur-btn-primary" id="joueur-profil-submit" disabled>Enregistrer</button>
+      <button type="button" class="joueur-btn joueur-btn-primary" id="joueur-profil-submit">Enregistrer</button>
     </div>
   </div>
 </div>
@@ -1046,7 +1142,7 @@
 <div class="joueur-overlay" id="joueur-overlay-etat" role="dialog" aria-modal="true" aria-labelledby="joueur-etat-title">
   <div class="joueur-modal">
     <div class="joueur-modal-title" id="joueur-etat-title">Modifier l'état du joueur</div>
-    <div class="joueur-modal-body">
+    <div class="joueur-modal-body" id="joueur-etat-body">
       <div id="joueur-etat-msg"></div>
       <div class="joueur-modal-info" id="joueur-etat-info">
         <em>Chargement…</em>
@@ -1071,7 +1167,7 @@
     </div>
     <div class="joueur-modal-actions">
       <button type="button" class="joueur-btn" data-action="close-etat">Annuler</button>
-      <button type="button" class="joueur-btn joueur-btn-primary" id="joueur-etat-submit" disabled>Enregistrer</button>
+      <button type="button" class="joueur-btn joueur-btn-primary" id="joueur-etat-submit">Enregistrer</button>
     </div>
   </div>
 </div>
@@ -1080,7 +1176,7 @@
 <div class="joueur-overlay" id="joueur-overlay-notes" role="dialog" aria-modal="true" aria-labelledby="joueur-notes-title">
   <div class="joueur-modal">
     <div class="joueur-modal-title" id="joueur-notes-title">Notes coach</div>
-    <div class="joueur-modal-body">
+    <div class="joueur-modal-body" id="joueur-notes-body">
       <div id="joueur-notes-msg"></div>
       <div class="joueur-modal-info" id="joueur-notes-info">
         <em>Chargement…</em>
@@ -1095,7 +1191,7 @@
     </div>
     <div class="joueur-modal-actions">
       <button type="button" class="joueur-btn" data-action="close-notes">Annuler</button>
-      <button type="button" class="joueur-btn joueur-btn-primary" id="joueur-notes-submit" disabled>Enregistrer</button>
+      <button type="button" class="joueur-btn joueur-btn-primary" id="joueur-notes-submit">Enregistrer</button>
     </div>
   </div>
 </div>
