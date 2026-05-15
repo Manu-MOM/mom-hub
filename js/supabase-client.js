@@ -96,6 +96,20 @@
  *          Bug d'origine : la Phase 5.12 v1.9 de seance-editor appelait
  *          updateSeance({etat:'validee'}) → patch filtré → erreur
  *          "Aucun champ modifiable dans ce patch".
+ *   v1.8.6 : Phase 5.12 — suppression libre de séances.
+ *          (1) deleteSeance(seanceId) : DELETE physique d'une séance.
+ *          Garde-fou métier serveur via .eq('etat', 'brouillon') :
+ *          seuls les brouillons sont supprimables, les validées et
+ *          utilisées sont protégées (doctrine : conserver l'historique).
+ *          Si on veut supprimer une séance validée, il faut d'abord la
+ *          repasser en brouillon. Les archivées NE sont PAS supprimables
+ *          via ce wrapper (utiliser un éventuel deleteSeanceArchivee
+ *          plus tard si le besoin émerge).
+ *          (2) deleteSeancesEnLot(seanceIds) : variante batch, accepte
+ *          un tableau d'UUIDs, applique la même règle de garde-fou
+ *          (uniquement brouillons). Renvoie {ok, deleted_count}.
+ *          Le CASCADE FK supprime automatiquement les seances_blocs et
+ *          seances_blocs_ateliers liés.
  */
 
 (function (global) {
@@ -1179,6 +1193,57 @@
     },
 
     /**
+     * Supprime physiquement une séance (Phase 5.12).
+     * Garde-fou métier : seuls les brouillons sont supprimables.
+     * Le CASCADE FK supprime automatiquement les seances_blocs et
+     * seances_blocs_ateliers liés.
+     */
+    async deleteSeance(seanceId) {
+      if (!seanceId) return { ok: false, error: 'seanceId requis' };
+      const { data, error } = await client
+        .from('seances')
+        .delete()
+        .eq('id', seanceId)
+        .eq('etat', 'brouillon')
+        .select('id')
+        .maybeSingle();
+      if (error) {
+        console.error('MOM Hub: deleteSeance()', error);
+        return { ok: false, error: error.message };
+      }
+      if (!data) {
+        return { ok: false, error: 'Séance introuvable ou pas un brouillon (seuls les brouillons sont supprimables)' };
+      }
+      return { ok: true, data };
+    },
+
+    /**
+     * Supprime plusieurs séances par lot (Phase 5.12).
+     * Même garde-fou que deleteSeance : uniquement les brouillons.
+     * Les séances non-brouillon dans la liste seront silencieusement
+     * ignorées (PostgREST filtre côté serveur via .eq('etat','brouillon')).
+     */
+    async deleteSeancesEnLot(seanceIds) {
+      if (!Array.isArray(seanceIds)) {
+        return { ok: false, error: 'seanceIds (tableau) requis' };
+      }
+      if (seanceIds.length === 0) {
+        return { ok: true, deleted_count: 0 };
+      }
+      const { data, error } = await client
+        .from('seances')
+        .delete()
+        .in('id', seanceIds)
+        .eq('etat', 'brouillon')
+        .select('id');
+      if (error) {
+        console.error('MOM Hub: deleteSeancesEnLot()', error);
+        return { ok: false, error: error.message };
+      }
+      return { ok: true, deleted_count: Array.isArray(data) ? data.length : 0 };
+    },
+
+    /**
      * Liste les brouillons "vides" d'une équipe (Phase 5.10).
      * Définition : etat='brouillon' ET date_seance IS NULL ET aucun bloc
      * rattaché (count seances_blocs = 0). Implémentation JS en 2 passes
@@ -1583,7 +1648,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.8.5 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.8.6 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
