@@ -11,7 +11,7 @@
  *   - 5.5.A : éditeur méta + sauvegarde manuelle (CETTE VERSION)
  *   - 5.5.B : autosave 30s + dropdowns lieu/événement + champs secondaires
  *
- * Version : 1.4 — Phase 5.6.B (15 mai 2026)
+ * Version : 1.4.1 — Phase 5.6.B fix UX (15 mai 2026)
  *   v1.0 : squelette IIFE, sidebar liste séances, bouton "+ Nouvelle séance",
  *          formulaire 6 champs méta (date, heure, durée, effectif, thème,
  *          axe de travail), sauvegarde manuelle via updateSeance(), feedback
@@ -52,6 +52,13 @@
  *          State.formCollapsed (default true si séance chargée avec
  *          date_seance non null, sinon false pour rester ouvert sur
  *          nouvelles séances vides). Donne toute la place à la trame.
+ *   v1.4.1 : Fix UX post-déploiement v1.4 — le bouton "✏️ Modifier"
+ *          ouvrait le formulaire mais on ne pouvait le refermer qu'en
+ *          modifiant un champ + cliquant Enregistrer. Désormais, un
+ *          bouton "↑ Replier" est ajouté en haut à droite du formulaire
+ *          déplié (à côté de la pastille autosave + badge état) et
+ *          permet de revenir au résumé compact sans modification.
+ *          Si modifs en cours, confirm() avant repli.
  *
  * Dépendances :
  *   - window.SupabaseHub v1.8.2 (wrappers Phase 5.3 + listSitesActifs +
@@ -419,6 +426,9 @@
           '<div class="seance-form__header-right">' +
             '<span id="seance-autosave-pill" class="seance-autosave-pill is-idle" title="État de la sauvegarde automatique (30s si modifications)">● Sauvé</span>' +
             '<span class="seance-form__etat etat-' + escapeHtml(s.etat) + '">' + libelleEtatSeance(s.etat) + '</span>' +
+            '<button type="button" id="seance-btn-collapse-form" class="seance-form__collapse-btn" title="Replier le formulaire (raccourci : sans modifier)">' +
+              '↑ Replier' +
+            '</button>' +
           '</div>' +
         '</header>' +
 
@@ -568,6 +578,12 @@
     if (btnSave) {
       btnSave.disabled = true; // état initial : rien à enregistrer
       btnSave.addEventListener('click', onSaveSeance);
+    }
+
+    // Phase 5.6.B (fix v1.4.1) : bouton ↑ Replier
+    const btnCollapse = document.getElementById('seance-btn-collapse-form');
+    if (btnCollapse) {
+      btnCollapse.addEventListener('click', onCollapseForm);
     }
 
     // Phase 5.6.A : rendu de la trame chronologique sous le formulaire
@@ -1011,6 +1027,29 @@
   }
 
   /**
+   * Replie le formulaire méta sans modifier la séance. Phase 5.6.B fix v1.4.1.
+   * Le bouton "↑ Replier" en haut du formulaire déplié déclenche cette fonction.
+   * Si des modifs sont en cours (isDirty), confirm() avant repli.
+   */
+  function onCollapseForm() {
+    if (!State.currentSeance) return;
+
+    if (State.isDirty) {
+      const ok = window.confirm(
+        'Tu as des modifications non sauvées.\n\n' +
+        'Replier sans sauver ? (clique Annuler pour rester sur le formulaire)'
+      );
+      if (!ok) return;
+      // Reset dirty + état autosave : on a délibérément choisi d'ignorer les modifs
+      setDirty(false);
+      setAutosaveStatus('idle');
+    }
+
+    State.formCollapsed = true;
+    renderForm();
+  }
+
+  /**
    * Crée un nouveau bloc dans la séance courante avec les valeurs par défaut
    * du type sélectionné. Phase 5.6.A.
    * @param {string} slug Slug du type de bloc (ex : 'echauffement')
@@ -1220,7 +1259,7 @@
     });
 
     console.log(
-      '%c🏉 Seance Editor v1.4 (Phase 5.6.B) chargé',
+      '%c🏉 Seance Editor v1.4.1 (Phase 5.6.B + fix UX repli) chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         seances: State.seances.length,
