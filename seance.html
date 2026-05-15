@@ -1201,6 +1201,308 @@
     }
 
     /* ----------------------------------------------------------
+     * Section "Groupes" G1/G2/G3 (Phase 5.9)
+     * ---------------------------------------------------------- */
+    .seance-groupes-section {
+      margin-top: 24px;
+      padding: 16px;
+      background: #f5f7fa;
+      border: 1px solid #d4dce6;
+      border-radius: 8px;
+    }
+    .seance-groupes-section__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .seance-groupes-section__title {
+      margin: 0;
+      font-size: 15px;
+      color: #2D7D46;
+      font-weight: 600;
+    }
+    .seance-groupes-section__empty {
+      margin: 8px 0 0 0;
+      padding: 12px;
+      background: white;
+      border: 1px dashed #c2d4ca;
+      border-radius: 6px;
+      color: #5b6f64;
+      font-size: 13px;
+      text-align: center;
+    }
+    .seance-groupes-section__empty--warn {
+      background: #fff7e6;
+      border-color: #ffd591;
+      color: #874d00;
+    }
+    .seance-groupes-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    .seance-groupe-card {
+      background: white;
+      border: 2px solid #d4dce6;
+      border-radius: 6px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .seance-groupe-card__header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      color: white;
+      font-weight: 600;
+    }
+    .seance-groupe-card__nom {
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .seance-groupe-card__label {
+      flex: 1;
+      font-size: 12px;
+      font-weight: 400;
+      opacity: 0.95;
+    }
+    .seance-groupe-card__count {
+      background: rgba(255, 255, 255, 0.25);
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .seance-groupe-card__body {
+      padding: 10px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .seance-groupe-card__empty {
+      margin: 0;
+      padding: 8px;
+      font-size: 12px;
+      color: #8a98a5;
+      text-align: center;
+      font-style: italic;
+    }
+    .seance-groupe-card__list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .seance-groupe-card__item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      padding: 4px 8px;
+      background: #f6f9f7;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+    .seance-groupe-card__joueur {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #1a3a28;
+    }
+    .seance-groupe-card__remove {
+      background: transparent;
+      border: none;
+      color: #9b2c2c;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 0 4px;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .seance-groupe-card__remove:hover {
+      background: #fde8e8;
+      border-radius: 3px;
+    }
+    .seance-groupe-card__add {
+      padding: 6px 10px;
+      background: white;
+      border: 1px dashed #c2d4ca;
+      border-radius: 4px;
+      color: #2d5b41;
+      cursor: pointer;
+      font-size: 12px;
+      text-align: center;
+      transition: background 0.15s;
+    }
+    .seance-groupe-card__add:hover {
+      background: #e8f0ec;
+      border-style: solid;
+    }
+
+    /* ----------------------------------------------------------
+     * Popover picker joueurs (Phase 5.9)
+     * Pattern modale calqué sur le picker fiche (5.8).
+     * ---------------------------------------------------------- */
+    .seance-picker-groupe__overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 16px;
+    }
+    .seance-picker-groupe__modal {
+      background: white;
+      border-radius: 8px;
+      width: 100%;
+      max-width: 560px;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+      overflow: hidden;
+    }
+    .seance-picker-groupe__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      color: white;
+      flex-shrink: 0;
+      /* background-color appliqué inline via style="" selon couleur du groupe */
+    }
+    .seance-picker-groupe__title {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .seance-picker-groupe__close {
+      background: transparent;
+      border: none;
+      color: white;
+      font-size: 20px;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 4px;
+      line-height: 1;
+    }
+    .seance-picker-groupe__close:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+    .seance-picker-groupe__search {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 18px;
+      border-bottom: 1px solid #e8f0ec;
+      background: #f5f7fa;
+      flex-shrink: 0;
+    }
+    .seance-picker-groupe__input {
+      flex: 1;
+      padding: 8px 12px;
+      font-size: 14px;
+      border: 1px solid #c2d4ca;
+      border-radius: 4px;
+      outline: none;
+    }
+    .seance-picker-groupe__input:focus {
+      border-color: #2D7D46;
+      box-shadow: 0 0 0 2px rgba(45, 125, 70, 0.15);
+    }
+    .seance-picker-groupe__count {
+      font-size: 12px;
+      color: #5b6f64;
+      white-space: nowrap;
+    }
+    .seance-picker-groupe__list-wrap {
+      overflow-y: auto;
+      flex: 1;
+      padding: 8px 0;
+    }
+    .seance-picker-groupe__empty {
+      margin: 32px;
+      text-align: center;
+      color: #5b6f64;
+      font-size: 13px;
+    }
+    .seance-picker-groupe__list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .seance-picker-groupe__item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 18px;
+      border-bottom: 1px solid #f0f4f2;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .seance-picker-groupe__item:hover {
+      background: #f6f9f7;
+    }
+    .seance-picker-groupe__item--coche {
+      background: #e8f5ec;
+      font-weight: 600;
+    }
+    .seance-picker-groupe__item--coche:hover {
+      background: #d4ecdb;
+    }
+    .seance-picker-groupe__item--ailleurs {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .seance-picker-groupe__item--ailleurs:hover {
+      background: transparent;
+    }
+    .seance-picker-groupe__check {
+      font-size: 16px;
+      width: 20px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .seance-picker-groupe__nom {
+      flex: 1;
+      font-size: 14px;
+      color: #1a3a28;
+    }
+    .seance-picker-groupe__niveau {
+      display: inline-block;
+      padding: 1px 8px;
+      background: #e8f0ec;
+      color: #2d5b41;
+      font-size: 11px;
+      border-radius: 10px;
+      white-space: nowrap;
+    }
+    .seance-picker-groupe__footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 18px;
+      border-top: 1px solid #e8f0ec;
+      background: #f5f7fa;
+      flex-shrink: 0;
+    }
+    .seance-picker-groupe__hint {
+      font-size: 12px;
+      color: #5b6f64;
+    }
+
+    /* ----------------------------------------------------------
      * Responsive
      * ---------------------------------------------------------- */
     @media (max-width: 1024px) {
@@ -1237,6 +1539,14 @@
       }
       .seance-ateliers-list__actions {
         justify-content: flex-end;
+      }
+      /* Phase 5.9 : grille des 3 groupes en colonne sur mobile */
+      .seance-groupes-grid {
+        grid-template-columns: 1fr;
+      }
+      .seance-picker-groupe__modal {
+        max-width: 100%;
+        max-height: 95vh;
       }
     }
   </style>
@@ -1335,7 +1645,7 @@
 
     <p class="seance-footer">
       <span class="footer-club">Mutzig Ovalie Molsheim</span><br>
-      MOM Hub · Module Préparation de séance · Phase 5.8 (picker ateliers Bibliothèque)
+      MOM Hub · Module Préparation de séance · Phase 5.9 (groupes G1/G2/G3 par bloc)
     </p>
   </main>
 
