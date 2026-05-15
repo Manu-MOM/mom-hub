@@ -955,6 +955,252 @@
     }
 
     /* ----------------------------------------------------------
+     * Section "Ateliers rattachés" (Phase 5.8)
+     * ---------------------------------------------------------- */
+    .seance-ateliers-section {
+      margin-top: 24px;
+      padding: 16px;
+      background: #f6f9f7;
+      border: 1px solid #d9e6df;
+      border-radius: 8px;
+    }
+    .seance-ateliers-section__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .seance-ateliers-section__title {
+      margin: 0;
+      font-size: 15px;
+      color: #2D7D46;
+      font-weight: 600;
+    }
+    .seance-ateliers-section__empty {
+      margin: 8px 0 0 0;
+      padding: 12px;
+      background: white;
+      border: 1px dashed #c2d4ca;
+      border-radius: 6px;
+      color: #5b6f64;
+      font-size: 13px;
+      text-align: center;
+    }
+    .seance-ateliers-section__empty--warn {
+      background: #fff7e6;
+      border-color: #ffd591;
+      color: #874d00;
+    }
+    .seance-ateliers-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .seance-ateliers-list__item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 12px;
+      background: white;
+      border: 1px solid #d9e6df;
+      border-radius: 6px;
+    }
+    .seance-ateliers-list__main {
+      flex: 1;
+      min-width: 0;
+    }
+    .seance-ateliers-list__titre {
+      font-weight: 600;
+      font-size: 14px;
+      color: #1a3a28;
+      margin-bottom: 4px;
+      word-wrap: break-word;
+    }
+    .seance-ateliers-list__meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .seance-ateliers-list__chip {
+      display: inline-block;
+      padding: 2px 8px;
+      background: #e8f0ec;
+      color: #2d5b41;
+      font-size: 11px;
+      border-radius: 12px;
+      white-space: nowrap;
+    }
+    .seance-ateliers-list__actions {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .seance-ateliers-list__btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 10px;
+      font-size: 12px;
+      border: 1px solid #c2d4ca;
+      background: white;
+      border-radius: 4px;
+      cursor: pointer;
+      text-decoration: none;
+      color: #2d5b41;
+      transition: background 0.15s;
+    }
+    .seance-ateliers-list__btn:hover {
+      background: #e8f0ec;
+    }
+    .seance-ateliers-list__btn--drive {
+      color: #1a4d70;
+    }
+    .seance-ateliers-list__btn--remove {
+      color: #9b2c2c;
+      border-color: #f1c5c5;
+    }
+    .seance-ateliers-list__btn--remove:hover {
+      background: #fde8e8;
+    }
+
+    /* ----------------------------------------------------------
+     * Modale picker fiche Bibliothèque (Phase 5.8)
+     * ---------------------------------------------------------- */
+    .seance-picker-fiche__overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 16px;
+    }
+    .seance-picker-fiche__modal {
+      background: white;
+      border-radius: 8px;
+      width: 100%;
+      max-width: 720px;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+      overflow: hidden;
+    }
+    .seance-picker-fiche__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      background: #2D7D46;
+      color: white;
+      flex-shrink: 0;
+    }
+    .seance-picker-fiche__title {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .seance-picker-fiche__close {
+      background: transparent;
+      border: none;
+      color: white;
+      font-size: 20px;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 4px;
+      line-height: 1;
+    }
+    .seance-picker-fiche__close:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+    .seance-picker-fiche__search {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 18px;
+      border-bottom: 1px solid #e8f0ec;
+      background: #f6f9f7;
+      flex-shrink: 0;
+    }
+    .seance-picker-fiche__input {
+      flex: 1;
+      padding: 8px 12px;
+      font-size: 14px;
+      border: 1px solid #c2d4ca;
+      border-radius: 4px;
+      outline: none;
+    }
+    .seance-picker-fiche__input:focus {
+      border-color: #2D7D46;
+      box-shadow: 0 0 0 2px rgba(45, 125, 70, 0.15);
+    }
+    .seance-picker-fiche__count {
+      font-size: 12px;
+      color: #5b6f64;
+      white-space: nowrap;
+    }
+    .seance-picker-fiche__list-wrap {
+      overflow-y: auto;
+      flex: 1;
+      padding: 8px 0;
+    }
+    .seance-picker-fiche__empty {
+      margin: 32px;
+      text-align: center;
+      color: #5b6f64;
+      font-size: 13px;
+    }
+    .seance-picker-fiche__list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .seance-picker-fiche__item {
+      padding: 10px 18px;
+      border-bottom: 1px solid #f0f4f2;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .seance-picker-fiche__item:hover {
+      background: #f6f9f7;
+    }
+    .seance-picker-fiche__item--deja {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    .seance-picker-fiche__item--deja:hover {
+      background: #fff;
+    }
+    .seance-picker-fiche__item-titre {
+      font-weight: 600;
+      font-size: 14px;
+      color: #1a3a28;
+      margin-bottom: 4px;
+    }
+    .seance-picker-fiche__badge-deja {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 1px 6px;
+      background: #ffd591;
+      color: #874d00;
+      font-size: 10px;
+      font-weight: 500;
+      border-radius: 8px;
+      vertical-align: middle;
+    }
+    .seance-picker-fiche__item-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    /* ----------------------------------------------------------
      * Responsive
      * ---------------------------------------------------------- */
     @media (max-width: 1024px) {
@@ -979,6 +1225,18 @@
       }
       .seance-bloc-detail__title {
         font-size: 15px;
+      }
+      /* Phase 5.8 : modale picker responsive */
+      .seance-picker-fiche__modal {
+        max-width: 100%;
+        max-height: 95vh;
+      }
+      .seance-ateliers-list__item {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .seance-ateliers-list__actions {
+        justify-content: flex-end;
       }
     }
   </style>
@@ -1077,7 +1335,7 @@
 
     <p class="seance-footer">
       <span class="footer-club">Mutzig Ovalie Molsheim</span><br>
-      MOM Hub · Module Préparation de séance · Phase 5.4 (squelette)
+      MOM Hub · Module Préparation de séance · Phase 5.8 (picker ateliers Bibliothèque)
     </p>
   </main>
 
@@ -1136,17 +1394,18 @@
         }
       });
 
-      // Smoke check console : confirme que les wrappers v1.8.2 sont disponibles
+      // Smoke check console : confirme que les wrappers v1.8.3 sont disponibles
       if (typeof SupabaseHub.getSeancesAVenir === 'function'
           && typeof SupabaseHub.createSeance === 'function'
           && typeof SupabaseHub.listSitesActifs === 'function'
-          && typeof SupabaseHub.listBlocsBySeance === 'function') {
+          && typeof SupabaseHub.listBlocsBySeance === 'function'
+          && typeof SupabaseHub.listAteliersRattachesAuBloc === 'function') {
         console.log(
-          '%c✅ MOM Hub · Préparation de séance — wrappers v1.8.2 disponibles',
+          '%c✅ MOM Hub · Préparation de séance — wrappers v1.8.3 disponibles',
           'color: #2D7D46; font-weight: bold;'
         );
       } else {
-        console.error('❌ MOM Hub · Préparation de séance : wrappers v1.8.2 absents — vérifier js/supabase-client.js');
+        console.error('❌ MOM Hub · Préparation de séance : wrappers v1.8.3 absents — vérifier js/supabase-client.js');
       }
 
       // Phase 5.5.A : initialisation de l'éditeur de séance
