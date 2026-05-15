@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.9 — mai 2026
+ * Version : 1.8.2 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -81,23 +81,21 @@
  *          Résout la dette D-SEANCE-STUB-VIDES héritée de Phase 5.5
  *          (le bouton "+ Nouvelle séance" crée un stub DB immédiatement,
  *          laissant des brouillons vides en cas d'abandon).
- *   v1.9 : Phase 4.4 UI Évènements — clôture dette C9-c (audit Évènements §8).
- *          2 nouveaux wrappers LECTURE pour le cycle Évènements :
- *          (1) getEvenementsPasses(equipeId, joursPasses, limit) :
- *              symétrique de getEvenementsAVenir, consomme la nouvelle
- *              RPC get_evenements_passes (sql/29, dette C9-a). Tri DESC,
- *              inclut les événements 'annule' (visibles barrés côté UI).
- *          (2) getEvenementWithEncadrants(evenementId) : fiche détaillée
- *              E2, consomme la RPC get_evenement_with_encadrants
- *              (sql/29, dette C9-b). Retourne l'événement complet (24
- *              colonnes) avec son array JSONB encadrants enrichi
- *              (nom, prénom, rôles, ordre, notes).
- *          Note : les 2 wrappers existants getEvenementsAVenir et
- *          getProchainEvenementParEquipe n'ont PAS été modifiés. Leur
- *          signature d'entrée reste identique. PostgREST ramène
- *          naturellement la nouvelle colonne compo_status_summary
- *          (sql/29, dette C9-d) ajoutée aux 4 RPC événements pour
- *          alimenter les pastilles statut compo des cartes UI.
+ *   v1.8.5 : Phase 5.12 fix — 2 wrappers de transition d'état séance.
+ *          (1) validerSeance(seanceId) : bascule etat='brouillon' →
+ *          'validee'. Garde-fou serveur via .eq('etat','brouillon')
+ *          côté UPDATE pour éviter de valider une séance déjà validée
+ *          ou archivée par accident.
+ *          (2) repasserSeanceBrouillon(seanceId) : bascule
+ *          etat='validee'|'utilisee' → 'brouillon'. Permet la
+ *          re-modification après validation. Garde-fou serveur via
+ *          .in('etat', ['validee','utilisee']).
+ *          Pattern identique à archiveSeance (existant). Nécessaire
+ *          car updateSeance() a une whitelist qui exclut volontairement
+ *          le champ 'etat' (séparation transitions / updates métier).
+ *          Bug d'origine : la Phase 5.12 v1.9 de seance-editor appelait
+ *          updateSeance({etat:'validee'}) → patch filtré → erreur
+ *          "Aucun champ modifiable dans ce patch".
  */
 
 (function (global) {
@@ -373,73 +371,6 @@
         p_equipe_id: equipeId
       });
       if (error) { console.error('MOM Hub: getProchainEvenementParEquipe()', error); return null; }
-      return Array.isArray(data) && data.length > 0 ? data[0] : null;
-    },
-
-    // ============================================================
-    // PHASE 4.4 UI ÉVÈNEMENTS — RPC événements v1.9 (C9-a/b)
-    // ============================================================
-
-    /**
-     * Liste les événements passés d'une équipe (ou toutes équipes si null).
-     * Symétrique de getEvenementsAVenir. ORDER BY date_debut DESC, plafond
-     * configurable. Inclut les événements en état 'annule' (visibles barrés
-     * côté UI, cohérent doc Conception §3.5). Exclut 'archive' (état
-     * explicite de sortie de circulation).
-     *
-     * Chaque ligne contient la nouvelle colonne compo_status_summary JSONB
-     * { total, brouillon, validee, utilisee } pour les pastilles statut compo.
-     *
-     * @param {string|null} [equipeId=null] UUID de l'équipe (null = toutes)
-     * @param {number} [joursPasses=30] Fenêtre temporelle passée en jours
-     * @param {number} [limit=50] Plafond résultats (cf. RPC p_limit)
-     * @returns {Promise<Array>} 0..N événements passés, [] si erreur
-     */
-    async getEvenementsPasses(equipeId = null, joursPasses = 30, limit = 50) {
-      const { data, error } = await client.rpc('get_evenements_passes', {
-        p_equipe_id:    equipeId,
-        p_jours_passes: joursPasses,
-        p_limit:        limit
-      });
-      if (error) { console.error('MOM Hub: getEvenementsPasses()', error); return []; }
-      return Array.isArray(data) ? data : [];
-    },
-
-    /**
-     * Fiche événement détaillée + array enrichi des encadrants. Aucun
-     * filtre etat côté RPC : utilisable sur un événement annulé ou
-     * archivé (cas réactivation, audit, lecture historique).
-     *
-     * Format de la colonne encadrants (jsonb array) retournée par la RPC :
-     *   [
-     *     {
-     *       personne_id: "uuid",
-     *       nom: "JUNG",
-     *       prenom: "Emmanuel",
-     *       roles_encadrement: ["coach_principal"],
-     *       ordre: 1,
-     *       notes: null
-     *     },
-     *     ...
-     *   ]
-     * Tri encadrants côté serveur : ordre NULLS LAST, puis date_creation ASC.
-     *
-     * Le retour inclut aussi compo_status_summary (JSONB des compteurs
-     * de compos par état) + les colonnes héritées du noyau événement.
-     *
-     * @param {string} evenementId UUID de l'événement
-     * @returns {Promise<Object|null>} L'événement complet (24 colonnes)
-     *                                  ou null si non trouvé / erreur
-     */
-    async getEvenementWithEncadrants(evenementId) {
-      if (!evenementId) {
-        console.error('MOM Hub: getEvenementWithEncadrants() requiert un evenementId');
-        return null;
-      }
-      const { data, error } = await client.rpc('get_evenement_with_encadrants', {
-        p_evenement_id: evenementId
-      });
-      if (error) { console.error('MOM Hub: getEvenementWithEncadrants()', error); return null; }
       return Array.isArray(data) && data.length > 0 ? data[0] : null;
     },
 
@@ -1199,6 +1130,55 @@
     },
 
     /**
+     * Valide une séance (Phase 5.12) : bascule etat='brouillon' → 'validee'.
+     * Garde-fou serveur via .eq('etat','brouillon') : refuse de valider
+     * une séance déjà validée, utilisée ou archivée. Renvoie {ok:false}
+     * si la séance n'est pas dans l'état attendu (data sera null).
+     */
+    async validerSeance(seanceId) {
+      if (!seanceId) return { ok: false, error: 'seanceId requis' };
+      const { data, error } = await client
+        .from('seances')
+        .update({ etat: 'validee' })
+        .eq('id', seanceId)
+        .eq('etat', 'brouillon')
+        .select()
+        .maybeSingle();
+      if (error) {
+        console.error('MOM Hub: validerSeance()', error);
+        return { ok: false, error: error.message };
+      }
+      if (!data) {
+        return { ok: false, error: 'Séance introuvable ou pas en état brouillon' };
+      }
+      return { ok: true, data };
+    },
+
+    /**
+     * Repasse une séance en brouillon (Phase 5.12) : bascule
+     * etat='validee'|'utilisee' → 'brouillon'. Permet la re-modification
+     * libre après validation. Garde-fou serveur via .in('etat', [...]).
+     */
+    async repasserSeanceBrouillon(seanceId) {
+      if (!seanceId) return { ok: false, error: 'seanceId requis' };
+      const { data, error } = await client
+        .from('seances')
+        .update({ etat: 'brouillon' })
+        .eq('id', seanceId)
+        .in('etat', ['validee', 'utilisee'])
+        .select()
+        .maybeSingle();
+      if (error) {
+        console.error('MOM Hub: repasserSeanceBrouillon()', error);
+        return { ok: false, error: error.message };
+      }
+      if (!data) {
+        return { ok: false, error: 'Séance introuvable ou pas en état validée/utilisée' };
+      }
+      return { ok: true, data };
+    },
+
+    /**
      * Liste les brouillons "vides" d'une équipe (Phase 5.10).
      * Définition : etat='brouillon' ET date_seance IS NULL ET aucun bloc
      * rattaché (count seances_blocs = 0). Implémentation JS en 2 passes
@@ -1228,6 +1208,8 @@
       if (!brouillons || brouillons.length === 0) return [];
 
       // Étape 2 : pour chaque brouillon, count des blocs ; garde ceux à 0
+      // Note : count peut être null si la RLS retourne 0 lignes — dans ce cas
+      // on considère aussi le brouillon comme vide (pas de blocs visibles).
       const vides = [];
       for (const b of brouillons) {
         const { count, error: e2 } = await client
@@ -1238,7 +1220,10 @@
           console.error('MOM Hub: listBrouillonsVides() étape 2 sur', b.id, e2);
           continue; // Skip ce brouillon mais continue les autres
         }
-        if (count === 0) vides.push(b);
+        // count peut être 0 (clair), null (RLS / aucune ligne), ou un nombre
+        if (count === 0 || count === null || count === undefined) {
+          vides.push(b);
+        }
       }
       return vides;
     },
@@ -1598,7 +1583,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.9 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.8.5 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 

@@ -154,9 +154,10 @@
  *          titre_precision, encadrants, notes_bloc, notes_atelier.
  *
  * Dépendances :
- *   - window.SupabaseHub v1.8.4 (wrappers Phase 5.3 + listSitesActifs +
+ *   - window.SupabaseHub v1.8.5 (wrappers Phase 5.3 + listSitesActifs +
  *     listBlocsBySeance + updateBloc + listAteliersRattachesAuBloc +
- *     getVivierCompo + listBrouillonsVides + deleteBrouillonsVides)
+ *     getVivierCompo + listBrouillonsVides + deleteBrouillonsVides +
+ *     validerSeance + repasserSeanceBrouillon)
  *   - data/types-blocs.json v1.1 (fetched à l'init)
  *   - data/vocabulaire-seance.json v1.1 (fetched à l'init, Phase 5.7)
  *   - data/fiches-all.json (fetched à l'init, Phase 5.8)
@@ -2658,9 +2659,7 @@
       await saveSeance({ silent: true });
     }
 
-    const res = await SupabaseHub.updateSeance(State.currentSeance.id, {
-      etat: 'validee'
-    });
+    const res = await SupabaseHub.validerSeance(State.currentSeance.id);
     if (!res.ok) {
       window.alert('Échec de la validation :\n' + (res.error || 'erreur inconnue'));
       return;
@@ -2697,9 +2696,7 @@
       await saveSeance({ silent: true });
     }
 
-    const res = await SupabaseHub.updateSeance(State.currentSeance.id, {
-      etat: 'brouillon'
-    });
+    const res = await SupabaseHub.repasserSeanceBrouillon(State.currentSeance.id);
     if (!res.ok) {
       window.alert('Échec du retour en brouillon :\n' + (res.error || 'erreur inconnue'));
       return;
