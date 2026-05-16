@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<!-- Mobile portrait, une seule main, pluie/gants : viewport-fit pour
+     les encoches, zoom accessibilité conservé (jamais user-scalable=no). -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<meta name="robots" content="noindex,nofollow">
+<title>Suivi de rencontre · MOM Hub</title>
+
+<!-- Charte commune. La couche .suivi-* ci-dessous RÉCONCILIE ses tokens
+     sur les variables canoniques de hub.css (réelles, vérifiées) au
+     lieu d'un set parallèle. Polices Oswald/Manrope/JetBrains Mono
+     fournies par le @import de hub.css → coût nul ici. -->
+<link rel="stylesheet" href="css/hub.css">
+
+<style>
+/* =====================================================================
+   MOM Hub · Suivi de rencontre — couche .suivi-* (S-1.a · scaffold)
+   =====================================================================
+   Parti-pris IMPOSÉ par la doctrine (pas libre) : persona bénévole,
+   mobile portrait, une seule main, pluie/gants, pressé, non formé.
+   → minimalisme fonctionnel brutal : cibles tactiles énormes,
+     contraste fort, zéro décor, lisibilité avant tout (P1).
+
+   RÉCONCILIATION hub.css : les tokens .suivi-* pointent sur les
+   variables canoniques Hub (charte réelle). Le namespace .suivi-*
+   ne sert qu'à ce que hub.css n'a pas : dimensions tactiles géantes
+   propres au persona terrain. AUCUNE variable hub.css n'est
+   redéfinie ; on ne fait qu'y faire référence.
+
+   S-1.a = structure + système visuel SEULEMENT. Aucune logique
+   (boot/route = S-1.b ; contenu du tampon = S-1.c ; sas I4 = S-1.d).
+   ===================================================================== */
+
+:root {
+  /* --- Mappage sur la charte canonique hub.css (pas de couleurs
+         inventées : on référence les variables réelles) --- */
+  --suivi-vert:        var(--vert-prairie);     /* #2d7a3e action primaire */
+  --suivi-vert-fonce:  var(--vert-bouteille);   /* #0c3d24 état actif/pressé */
+  --suivi-vert-clair:  var(--vert-light);       /* rgba(45,122,62,.1) */
+
+  --suivi-encre:       var(--ink);              /* #0c3d24 texte principal */
+  --suivi-encre-doux:  var(--ink-mute);         /* #6b7a6f texte secondaire */
+  --suivi-fond:        var(--paper);            /* #f8f5ec (géré par body hub.css) */
+  --suivi-surface:     #fff;                    /* cohérent .card hub.css */
+  --suivi-bord:        var(--line);             /* #cabe9f */
+
+  --suivi-danger:      var(--rouge-blesse);     /* #C73E3E annuler / −1 (S-2/S-3) */
+  --suivi-alerte:      var(--gold);             /* #d4a93a avertissements (P4) */
+
+  /* --- Couleurs d'état joueur : DOCTRINALEMENT NON NÉGOCIABLES ---
+     Héritage SAR×MOM Compos (audit v3 §0.4 / hub.css Phase 4.4 §6.2).
+     Le Suivi LIT ces 4 états pour colorer les joueurs (grille S-3.1,
+     feedback blessure S-3.4.c). Il ne les GÈRE pas : la seule
+     écriture autorisée est etat_joueur='blesse', via le backend
+     (PI-6, double effet). Alias posés ici pour S-1.c → S-2/S-3. */
+  --suivi-joueur-base:        var(--bleu-base);     /* #3066BE base */
+  --suivi-joueur-modifie:     var(--clay);          /* #b8451f modifié */
+  --suivi-joueur-independant: var(--vert-prairie);  /* #2d7a3e indépendant */
+  --suivi-joueur-blesse:      var(--rouge-blesse);  /* #C73E3E blessé */
+
+  /* --- Dimensions propres au persona terrain (hub.css n'en a pas) --- */
+  --suivi-tap-min:     64px;       /* gros doigts + gants */
+  --suivi-tap-geant:   88px;       /* bouton de sas ▶ Coup d'envoi */
+  --suivi-rayon:       14px;
+  --suivi-gap:         16px;
+  --suivi-max:         480px;      /* portrait téléphone ; sain en desktop */
+  --suivi-focus:       0 0 0 4px rgba(45,122,62,.35);
+}
+
+/* hub.css fournit déjà : reset *{box-sizing}, html/body height:100%,
+   body{font Manrope, background paper + texture, ::before noise z-index:1}.
+   On NE redéfinit donc PAS le reset ni le fond — on s'aligne dessus. */
+
+body.suivi-body {
+  /* hérite font Manrope + fond papier + texture de hub.css.
+     On ajoute seulement ce qui manque au persona terrain. */
+  font-size: 18px;            /* base généreuse : lecture sous la pluie */
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  padding:
+    env(safe-area-inset-top)
+    env(safe-area-inset-right)
+    env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+  min-height: 100dvh;
+}
+
+/* Conteneur racine : colonne centrée, pleine hauteur dynamique.
+   z-index:2 pour passer AU-DESSUS de body::before (texture hub.css
+   en z-index:1) — même technique que .page-centered de hub.css. */
+.suivi-app {
+  position: relative;
+  z-index: 2;
+  max-width: var(--suivi-max);
+  margin: 0 auto;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------------------------------------------------------------------
+   ÉTATS D'ÉCRAN — un seul visible à la fois.
+   La bascule entre états est de la LOGIQUE → S-1.b. Ici : structure
+   vide + masquage par défaut. [hidden] est respecté nativement.
+   --------------------------------------------------------------------- */
+.suivi-screen {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  padding: 24px 20px;
+}
+.suivi-screen[hidden] { display: none; }
+
+/* État neutre de chargement (sobre, sans spinner tape-à-l'œil) */
+.suivi-loading {
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: var(--suivi-encre-doux);
+  text-align: center;
+}
+.suivi-loading__pulse {
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  border: 5px solid var(--suivi-vert-clair);
+  border-top-color: var(--suivi-vert);
+  animation: suivi-spin 1s linear infinite;
+}
+@keyframes suivi-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .suivi-loading__pulse { animation: none; }
+}
+
+/* État erreur (lien invalide/expiré) — sobre, sans dramatisation */
+.suivi-error {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 16px;
+}
+.suivi-error__title {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  font-size: 24px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  margin: 0;
+}
+.suivi-error__msg {
+  margin: 0;
+  color: var(--suivi-encre-doux);
+  max-width: 32ch;
+}
+
+/* Conteneurs de placeholder pour les écrans à venir.
+   Vides en S-1.a — remplis : tampon (S-1.c), En cours (S-2),
+   reprise (S-5). Balisage sémantique posé pour ne pas refondre. */
+.suivi-tampon,
+.suivi-encours,
+.suivi-reprise {
+  gap: var(--suivi-gap);
+}
+
+/* ---------------------------------------------------------------------
+   PRIMITIVES VISUELLES réutilisées par S-1.c → S-6
+   --------------------------------------------------------------------- */
+
+/* Bouton de sas (▶ Coup d'envoi, Fin du match…) : le geste le plus
+   engageant → le plus gros, le plus contrasté. Oswald = registre
+   "tableau d'affichage" lisible de loin, cohérent charte Hub. */
+.suivi-btn-sas {
+  appearance: none;
+  width: 100%;
+  min-height: var(--suivi-tap-geant);
+  border: none;
+  border-radius: var(--suivi-rayon);
+  background: var(--suivi-vert);
+  color: #fff;
+  font-family: 'Oswald', sans-serif;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 20px;
+  transition: transform .05s ease, background-color .15s ease;
+}
+.suivi-btn-sas:active { transform: scale(.985); background: var(--suivi-vert-fonce); }
+.suivi-btn-sas:focus-visible { outline: none; box-shadow: var(--suivi-focus); }
+.suivi-btn-sas[disabled] { opacity: .5; cursor: not-allowed; }
+
+/* Bouton secondaire neutre (réessayer, fermer un repli…) */
+.suivi-btn-neutre {
+  appearance: none;
+  min-height: var(--suivi-tap-min);
+  border: 2px solid var(--suivi-bord);
+  border-radius: var(--suivi-rayon);
+  background: var(--suivi-surface);
+  color: var(--suivi-encre);
+  font-family: 'Manrope', sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.suivi-btn-neutre:active { background: var(--suivi-fond); }
+.suivi-btn-neutre:focus-visible { outline: none; box-shadow: var(--suivi-focus); }
+
+/* Bloc dépliable (patron commun : ⚙ chrono replié, « Voir la compo »
+   AV-2 — tous deux S-1.c). Structure native <details>. */
+.suivi-repli {
+  border: 1px solid var(--suivi-bord);
+  border-radius: var(--suivi-rayon);
+  background: var(--suivi-surface);
+  overflow: hidden;
+}
+.suivi-repli > summary {
+  list-style: none;
+  cursor: pointer;
+  min-height: var(--suivi-tap-min);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 18px;
+  font-weight: 700;
+  color: var(--suivi-encre);
+  user-select: none;
+}
+.suivi-repli > summary::-webkit-details-marker { display: none; }
+.suivi-repli > summary:focus-visible { outline: none; box-shadow: var(--suivi-focus); }
+.suivi-repli[open] > summary { border-bottom: 1px solid var(--suivi-bord); }
+.suivi-repli__corps { padding: 16px 18px; }
+
+/* Indicateur lecture seule (« Mode : Normal » S-3.3) : visible,
+   non tapable, discret. JetBrains Mono = registre "tag technique"
+   cohérent avec .season-pill / .user-role de hub.css. */
+.suivi-readonly-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  font-weight: 500;
+  color: var(--suivi-encre-doux);
+  background: var(--suivi-vert-clair);
+  border-radius: 999px;
+  padding: 7px 14px;
+}
+
+/* Bouton d'aide « ? » permanent (I3, mécanisme 2C) — primitive posée,
+   branchée à S-1.c/S-2. */
+.suivi-help {
+  position: fixed;
+  right: calc(14px + env(safe-area-inset-right));
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  border: 2px solid var(--suivi-bord);
+  background: var(--suivi-surface);
+  color: var(--suivi-encre);
+  font-family: 'Oswald', sans-serif;
+  font-size: 22px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px var(--shadow);
+  z-index: 3;
+  display: none;            /* activé à partir de S-1.c */
+}
+.suivi-help:focus-visible { outline: none; box-shadow: var(--suivi-focus); }
+
+/* Accessibilité : masquage visuel sans masquage lecteur d'écran */
+.suivi-sr {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0);
+  white-space: nowrap; border: 0;
+}
+</style>
+</head>
+
+<body class="suivi-body">
+
+  <!-- =================================================================
+       COQUILLE S-1.a — structure vide + système visuel réconcilié.
+       Aucun script de logique : le routage entre états (loading →
+       erreur | tampon | en cours | reprise) est S-1.b. Les écrans
+       sont présents mais vides et masqués ([hidden]).
+       Pas de topbar Hub ici : écran SANS login (pas de SupabaseHub).
+       ================================================================= -->
+  <main class="suivi-app" id="suiviApp" aria-live="polite">
+
+    <!-- État 1 — chargement (état initial visible) -->
+    <section class="suivi-screen suivi-loading" id="scrLoading" aria-label="Chargement">
+      <div class="suivi-loading__pulse" aria-hidden="true"></div>
+      <p>Ouverture du suivi…</p>
+    </section>
+
+    <!-- État 2 — lien invalide / expiré (S-1.b remplira le message) -->
+    <section class="suivi-screen suivi-error" id="scrError" hidden aria-label="Lien invalide">
+      <h1 class="suivi-error__title">Lien inutilisable</h1>
+      <p class="suivi-error__msg" id="errMsg">
+        Ce lien de suivi n'est plus valide. Demande un nouveau lien au coach.
+      </p>
+    </section>
+
+    <!-- État 3 — tampon « Avant » (assemblage S-4.1) → rempli en S-1.c -->
+    <section class="suivi-screen suivi-tampon" id="scrTampon" hidden aria-label="Avant le match">
+      <!-- S-1.c : confirmation rencontre (ou dégradé via aperçu compo),
+           phrase de cadrage, ⚙ chrono replié, indicateur Mode lecture
+           seule, aperçu compo replié AV-2, bouton ▶ Coup d'envoi (I4). -->
+    </section>
+
+    <!-- État 4 — « En cours » (le cœur) → S-2 -->
+    <section class="suivi-screen suivi-encours" id="scrEnCours" hidden aria-label="Match en cours">
+      <!-- S-2 : bandeau score+chrono, bascule camp, palette, historique. -->
+    </section>
+
+    <!-- État 5 — reprise/relais (train en marche) → S-5 -->
+    <section class="suivi-screen suivi-reprise" id="scrReprise" hidden aria-label="Reprise du suivi">
+      <!-- S-5.2 : résumé d'état + « Je reprends » → reconstruit En cours. -->
+    </section>
+
+  </main>
+
+  <!-- Aide « ? » permanente (I3 / 2C). Présente, masquée jusqu'à S-1.c. -->
+  <button class="suivi-help" id="btnHelp" type="button" aria-label="Aide" hidden>?</button>
+
+  <!-- =================================================================
+       DÉPENDANCES — supabase-js (CDN UMD) PUIS suivi-client.js.
+       Écran SANS login : pas de supabase-client.js / SupabaseHub ici
+       (le jeton de l'URL est l'autorisation). suivi-client.js crée
+       son client de repli persistSession:false (I5).
+       Aucun script de logique applicative en S-1.a.
+       ================================================================= -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/suivi-client.js"></script>
+
+</body>
+</html>
