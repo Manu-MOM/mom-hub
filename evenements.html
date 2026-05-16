@@ -1291,6 +1291,24 @@
       <div id="evt-create-msg"></div>
       <form class="evt-modal-form" id="evt-create-form" onsubmit="return false;">
 
+        <!-- P2-E.1 : Comment commencer ? (Créer vierge / Dupliquer un précédent) -->
+        <div class="evt-form-group">
+          <label class="evt-form-label">Comment commencer ?</label>
+          <div class="evt-form-radio-group">
+            <label class="evt-form-radio-option"><input type="radio" name="create_mode" value="vierge" checked> Créer vierge</label>
+            <label class="evt-form-radio-option"><input type="radio" name="create_mode" value="dupliquer"> ↩ Dupliquer un événement précédent</label>
+          </div>
+        </div>
+        <div class="evt-form-group evt-create-dup-group" id="evt-create-dup-group" style="display:none;">
+          <label class="evt-form-label" for="evt-create-dup-source">Événement source</label>
+          <select class="evt-form-select" id="evt-create-dup-source">
+            <option value="">— Sélectionner l'événement à dupliquer —</option>
+          </select>
+          <div class="evt-form-hint">Les champs seront pré-remplis depuis cet événement. Vous pourrez les modifier avant de valider.</div>
+        </div>
+
+        <hr style="border:none;border-top:1px solid var(--line);margin:12px 0;">
+
         <div class="evt-form-group">
           <label class="evt-form-label required">Type d'évènement</label>
           <div class="evt-form-radio-group">
