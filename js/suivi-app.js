@@ -7,7 +7,7 @@
  * Consomme SuiviClient (suivi-client.js) ; ne touche jamais
  * Supabase directement.
  *
- * Version : 0.1 — S-1.b (mai 2026)
+ * Version : 0.2 — S-1.c (mai 2026)
  *   v0.1 : LOGIQUE DE BOOT SEULEMENT (paquet S-1, parcours d'entrée).
  *          getToken() → chargerEtatInitial() → routage entre les 5
  *          états posés en S-1.a (loading|error|tampon|encours|
@@ -16,6 +16,16 @@
  *          Zéro localStorage / sessionStorage (I5 : tout l'état vit
  *          dans le Core, rien dans le navigateur — c'est ce qui rend
  *          le relais/reconnexion sans perte).
+ *   v0.2 : S-1.c — peuplement du contenu du tampon. Aperçu compo
+ *          (AV-2) chargé PARESSEUSEMENT au 1er dépliement du repli
+ *          (I2 tampon léger + persona réseau), via
+ *          SuiviClient.getCompoReduiteRencontre + libelleJoueur ;
+ *          dégradation propre si compo indisponible (message +
+ *          Réessayer). Jeton mémorisé en variable runtime
+ *          transitoire (re-dérivée de l'URL à chaque chargement,
+ *          JAMAIS persistée → I5 tenu). ⚙ chrono = repli structurel
+ *          (moteur = S-2.3) ; sas ▶ Coup d'envoi présent, son
+ *          comportement = S-1.d.
  *
  * INVARIANTS :
  *   I5 — ce module ne persiste RIEN côté navigateur. L'état de
@@ -35,6 +45,16 @@
   'use strict';
 
   var doc = global.document;
+
+  // Jeton courant. Variable runtime TRANSITOIRE : re-dérivée de
+  // l'URL (getToken) à chaque chargement, JAMAIS écrite dans un
+  // stockage navigateur. I5 = pas d'état PERSISTANT côté navigateur ;
+  // une variable mémoire reconstruite à chaque load ne viole pas I5
+  // (c'est même ce qui rend la reconnexion sûre : rien de figé).
+  var _token = null;
+
+  // Garde le repli compo de ne charger qu'une fois (paresseux).
+  var _compoChargee = false;
 
   // ------------------------------------------------------------
   // Garde : suivi-client.js doit être chargé AVANT ce module.
@@ -99,6 +119,81 @@
   }
 
   // ------------------------------------------------------------
+  // S-1.c · TAMPON — aperçu compo (AV-2), chargement PARESSEUX.
+  // Fidèle à AV-2 (« le bénévole peut vérifier, pas obligé ») et au
+  // persona réseau : on ne fetch QU'au 1er dépliement du repli.
+  // C'est, en Option UI-stricte, LA vérification d'identité (faute
+  // de ligne d'en-tête rencontre). Lecture seule, payload réduit.
+  // ------------------------------------------------------------
+  function echapper(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c];
+    });
+  }
+
+  function rendreCompo(corps, lignes) {
+    if (!lignes || lignes.length === 0) {
+      // [] = soit compo vide soit erreur (le wrapper ne distingue
+      // pas — convention v1.12). On dégrade proprement + Réessayer
+      // (persona réseau) plutôt que d'afficher un vide muet.
+      corps.innerHTML =
+        '<p class="suivi-compo-vide">Compo indisponible pour le moment.'
+        + '<button type="button" class="suivi-btn-neutre" id="btnCompoRetry">Réessayer</button></p>';
+      var r = doc.getElementById('btnCompoRetry');
+      if (r) r.addEventListener('click', function () {
+        _compoChargee = false;
+        chargerCompo();
+      });
+      return;
+    }
+    var ul = doc.createElement('ul');
+    ul.className = 'suivi-compo-list';
+    for (var i = 0; i < lignes.length; i++) {
+      var j = lignes[i];
+      var li = doc.createElement('li');
+      li.className = 'suivi-compo-row';
+      // libelleJoueur = règle UNIQUE de dégradation nom_court NULL
+      // (ancre = numéro). Ne jamais reconstruire la règle ici.
+      var label = global.SuiviClient.libelleJoueur(j);
+      var etat = (j && j.etat_joueur) ? String(j.etat_joueur) : '';
+      var role = (j && j.role) ? String(j.role) : '';
+      li.innerHTML =
+        '<span class="suivi-compo-dot" data-etat="' + echapper(etat) + '" aria-hidden="true"></span>'
+        + '<span class="suivi-compo-label">' + echapper(label) + '</span>'
+        + (role ? '<span class="suivi-compo-role">' + echapper(role) + '</span>' : '');
+      ul.appendChild(li);
+    }
+    corps.innerHTML = '';
+    corps.appendChild(ul);
+  }
+
+  function chargerCompo() {
+    var corps = doc.getElementById('compoCorps');
+    if (!corps || _compoChargee) return;
+    _compoChargee = true;
+    corps.textContent = 'Chargement de la compo…';
+    global.SuiviClient.getCompoReduiteRencontre(_token).then(function (lignes) {
+      rendreCompo(corps, lignes);
+    }).catch(function (e) {
+      if (global.console) console.error('MOM Hub Suivi: chargerCompo()', e);
+      _compoChargee = false;            // permet un Réessayer
+      rendreCompo(corps, []);           // chemin dégradé + retry
+    });
+  }
+
+  // Arme le dépliement paresseux. <details> émet 'toggle' ; on ne
+  // charge qu'à la 1re ouverture (idempotent via _compoChargee).
+  function preparerTampon() {
+    var repli = doc.getElementById('repliCompo');
+    if (repli && !repli._suiviArme) {
+      repli._suiviArme = true;
+      repli.addEventListener('toggle', function () {
+        if (repli.open) chargerCompo();
+      });
+    }
+  }
+
+  // ------------------------------------------------------------
   // BOOT : pilote 100 % par le Core (I5). Recalculé à chaque appel
   // (chargement initial OU clic Réessayer) — jamais de cache local.
   // ------------------------------------------------------------
@@ -117,6 +212,7 @@
     }
 
     var token = global.SuiviClient.getToken();
+    _token = token;            // runtime transitoire, jamais persisté
 
     global.SuiviClient.chargerEtatInitial(token).then(function (res) {
       switch (res && res.statut) {
@@ -151,7 +247,9 @@
         case 'non-demarre':
           // Jeton OK, aucune ligne → coup d'envoi pas encore donné
           // (I4 verrouille la saisie avant le sas). On va au TAMPON.
-          // Contenu du tampon = S-1.c (écran volontairement vide ici).
+          // Contenu du tampon = S-1.c : on arme le peuplement
+          // paresseux de l'aperçu compo (AV-2) puis on affiche.
+          preparerTampon();
           aide(true);
           montrerEcran('scrTampon');
           break;
@@ -197,7 +295,7 @@
 
   if (global.console) {
     console.log(
-      '%c🏉 MOM Hub · Suivi App v0.1 (boot) chargé',
+      '%c🏉 MOM Hub · Suivi App v0.2 (tampon) chargé',
       'color: #2d7a3e; font-weight: bold;'
     );
   }
