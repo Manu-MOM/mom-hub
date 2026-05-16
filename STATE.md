@@ -56,7 +56,7 @@
 | **Client Supabase** | `js/supabase-client.js` partagé | Chargé par tous les modules ; pattern `SupabaseHub` (auth) | 🟢 |
 | **Version supabase-client** | 🔧 MAJ Prod 16/05 — **v1.12** | +3 wrappers Joueurs (Phase 5.14) + 7 wrappers Évènements WRITE (Phase 4.4) | 🟢 |
 | **Suivi de rencontre** | **Conçu (UX), pas produit** | 🔧 MAJ Audits 16/05 (DS-1) — audit v2.1 + modélisation v1.1 + conception UX complète ; **DS-1 tranché, plus aucun verrou de modélisation** ; reste priorisation production | ⚪ |
-| **Prochaine conv métier** | Suivi : Production C12 (quand priorisé) | 🔧 MAJ Audits 16/05 (DS-1) — audit + modélisation + conception UX + DS-1 faits ; ne reste que la priorisation prod (après v2 Évènements) | ⚪ |
+| **Prochaine conv métier** | Suivi : Production C12 (quand priorisé) | 🔧 MAJ Prod 16/05 — audit + modélisation + conception UX + DS-1 faits ; **Phase 2 Évènements/Joueurs livrée** ; ne reste que la priorisation prod du Suivi par Manu | ⚪ |
 
 ---
 
