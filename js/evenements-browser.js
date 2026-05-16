@@ -779,25 +779,29 @@
 
     // ────────────────────────────────────────────────
     // 5. LOGISTIQUE DÉPLACEMENT (conditionnelle, cf. doc §5.3 Q6)
+    //    P2-E.5 : collapsible mobile
     // ────────────────────────────────────────────────
     const hasLogistique = evt.logistique_deplacement && typeof evt.logistique_deplacement === 'object' && Object.keys(evt.logistique_deplacement).length > 0;
     if (hasLogistique || evt.type_evenement === 'deplacement') {
-      html += '<div class="evt-fiche-section">';
-      html += '<div class="evt-fiche-section-title">🚐 Logistique déplacement</div>';
+      html += '<div class="evt-fiche-section evt-fiche-collapsible">';
+      html += '<div class="evt-fiche-section-title">🚐 Logistique déplacement <span class="evt-fiche-chevron">▶</span></div>';
+      html += '<div class="evt-fiche-section-body">';
       if (hasLogistique) {
-        // V1 : affichage JSON brut (formattage structuré attendu en S2.4 quand on aura les wrappers UPDATE)
         html += '<pre class="evt-fiche-jsonbloc">' + escHtml(JSON.stringify(evt.logistique_deplacement, null, 2)) + '</pre>';
       } else {
         html += '<div class="evt-fiche-empty">Aucune logistique renseignée.</div>';
       }
       html += '</div>';
+      html += '</div>';
     }
 
     // ────────────────────────────────────────────────
     // 6. ENCADRANTS (array JSONB depuis la RPC)
+    //    P2-E.5 : collapsible mobile
     // ────────────────────────────────────────────────
-    html += '<div class="evt-fiche-section">';
-    html += '<div class="evt-fiche-section-title">👥 Encadrants</div>';
+    html += '<div class="evt-fiche-section evt-fiche-collapsible">';
+    html += '<div class="evt-fiche-section-title">👥 Encadrants <span class="evt-fiche-chevron">▶</span></div>';
+    html += '<div class="evt-fiche-section-body">';
     const encadrants = Array.isArray(evt.encadrants) ? evt.encadrants : [];
     if (encadrants.length === 0) {
       html += '<div class="evt-fiche-empty">Aucun encadrant rattaché à cet évènement.</div>';
@@ -824,14 +828,18 @@
       html += '</ul>';
     }
     html += '</div>';
+    html += '</div>';
 
     // ────────────────────────────────────────────────
     // 7. NOTES INTERNES
+    //    P2-E.5 : collapsible mobile
     // ────────────────────────────────────────────────
     if (evt.notes_internes) {
-      html += '<div class="evt-fiche-section">';
-      html += '<div class="evt-fiche-section-title">📝 Notes internes</div>';
+      html += '<div class="evt-fiche-section evt-fiche-collapsible">';
+      html += '<div class="evt-fiche-section-title">📝 Notes internes <span class="evt-fiche-chevron">▶</span></div>';
+      html += '<div class="evt-fiche-section-body">';
       html += '<div class="evt-fiche-text">' + escHtml(evt.notes_internes) + '</div>';
+      html += '</div>';
       html += '</div>';
     }
 
@@ -902,6 +910,12 @@
       btn.addEventListener('click', function () {
         const id = this.getAttribute('data-event-id');
         if (id) openModalEditNotes(id);
+      });
+    });
+    // P2-E.5 : toggle collapsible mobile (logistique, encadrants, notes)
+    document.querySelectorAll('.evt-fiche-collapsible .evt-fiche-section-title').forEach(title => {
+      title.addEventListener('click', function () {
+        this.closest('.evt-fiche-collapsible').classList.toggle('is-open');
       });
     });
   }
