@@ -779,19 +779,47 @@
 
     // ────────────────────────────────────────────────
     // 5. LOGISTIQUE DÉPLACEMENT (conditionnelle, cf. doc §5.3 Q6)
+    //    P2-E.3 : formulaire structuré (remplace JSON brut)
     //    P2-E.5 : collapsible mobile
     // ────────────────────────────────────────────────
     const hasLogistique = evt.logistique_deplacement && typeof evt.logistique_deplacement === 'object' && Object.keys(evt.logistique_deplacement).length > 0;
-    if (hasLogistique || evt.type_evenement === 'deplacement') {
+    const showLogistique = hasLogistique || evt.type_evenement === 'deplacement';
+    if (showLogistique) {
       html += '<div class="evt-fiche-section evt-fiche-collapsible">';
       html += '<div class="evt-fiche-section-title">🚐 Logistique déplacement <span class="evt-fiche-chevron">▶</span></div>';
       html += '<div class="evt-fiche-section-body">';
       if (hasLogistique) {
-        html += '<pre class="evt-fiche-jsonbloc">' + escHtml(JSON.stringify(evt.logistique_deplacement, null, 2)) + '</pre>';
+        const lg = evt.logistique_deplacement;
+        const logRows = [
+          ['Transport', lg.transport],
+          ['Départ', lg.depart],
+          ['Retour', lg.retour],
+          ['Hébergement', lg.hebergement],
+          ['Conducteurs', lg.conducteurs],
+          ['Notes logistique', lg.notes_logistique]
+        ].filter(([, v]) => v);
+        if (logRows.length > 0) {
+          logRows.forEach(([k, v]) => {
+            html += '<div style="display:flex;gap:8px;padding:4px 0;font-size:13px;border-bottom:1px solid var(--paper-warm);">';
+            html += '<div style="min-width:110px;font-family:\'JetBrains Mono\',monospace;font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-mute);padding-top:3px;">' + escHtml(k) + '</div>';
+            html += '<div style="flex:1;color:var(--ink);">' + escHtml(v) + '</div>';
+            html += '</div>';
+          });
+        } else {
+          html += '<div class="evt-fiche-empty">Logistique renseignée mais vide.</div>';
+        }
       } else {
         html += '<div class="evt-fiche-empty">Aucune logistique renseignée.</div>';
       }
+      if (evt.etat !== 'annule' && evt.etat !== 'archive') {
+        html += '<div style="margin-top:8px;"><button type="button" class="evt-btn" data-action="logistique-from-fiche" data-event-id="' + escHtml(evt.id) + '" style="font-size:11px;">✏️ ' + (hasLogistique ? 'Modifier' : '+ Ajouter logistique') + '</button></div>';
+      }
       html += '</div>';
+      html += '</div>';
+    } else if (evt.etat !== 'annule' && evt.etat !== 'archive') {
+      // Pas de section logistique mais bouton discret pour en ajouter une
+      html += '<div class="evt-fiche-section">';
+      html += '<button type="button" class="evt-btn" data-action="logistique-from-fiche" data-event-id="' + escHtml(evt.id) + '" style="font-size:11px;color:var(--ink-mute);">+ Ajouter logistique de déplacement</button>';
       html += '</div>';
     }
 
@@ -916,6 +944,13 @@
     document.querySelectorAll('.evt-fiche-collapsible .evt-fiche-section-title').forEach(title => {
       title.addEventListener('click', function () {
         this.closest('.evt-fiche-collapsible').classList.toggle('is-open');
+      });
+    });
+    // P2-E.3 : bouton édition logistique
+    document.querySelectorAll('[data-action="logistique-from-fiche"]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        const id = this.getAttribute('data-event-id');
+        if (id) openModalLogistique(id);
       });
     });
   }
@@ -1142,6 +1177,100 @@
       console.error('submitModalEditNotes', err);
       msg.innerHTML = '<div class="evt-form-error">Erreur : ' + escHtml(err.message || String(err)) + '</div>';
       const mb = document.querySelector('#evt-overlay-notes .evt-modal-body');
+      if (mb) mb.scrollTop = 0;
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Enregistrer';
+    }
+  }
+
+  // ────────────────────────────────────────────────
+  // E8 — Modale Édition logistique (P2-E.3)
+  // ────────────────────────────────────────────────
+
+  let MODAL_LOGISTIQUE_EVENT_ID = null;
+
+  function openModalLogistique(evenementId) {
+    if (!evenementId) return;
+    MODAL_LOGISTIQUE_EVENT_ID = evenementId;
+    const evt = EVENTS_BY_ID[evenementId];
+
+    const msg = document.getElementById('evt-logistique-msg');
+    if (msg) msg.innerHTML = '';
+    const info = document.getElementById('evt-logistique-info');
+    if (info && evt) {
+      info.innerHTML = '<span class="evt-modal-info-strong">' + escHtml(evt.libelle || '(sans libellé)') + '</span>';
+    }
+
+    const f = document.getElementById('evt-logistique-form');
+    if (f) {
+      f.reset();
+      const lg = (evt && evt.logistique_deplacement && typeof evt.logistique_deplacement === 'object')
+        ? evt.logistique_deplacement : {};
+      f.elements.transport.value = lg.transport || '';
+      f.elements.depart.value = lg.depart || '';
+      f.elements.retour.value = lg.retour || '';
+      f.elements.hebergement.value = lg.hebergement || '';
+      f.elements.conducteurs.value = lg.conducteurs || '';
+      f.elements.notes_logistique.value = lg.notes_logistique || '';
+    }
+
+    const btn = document.getElementById('evt-logistique-submit');
+    if (btn) { btn.disabled = false; btn.textContent = 'Enregistrer'; }
+
+    document.getElementById('evt-overlay-logistique').classList.add('show');
+  }
+
+  function closeModalLogistique() {
+    MODAL_LOGISTIQUE_EVENT_ID = null;
+    document.getElementById('evt-overlay-logistique').classList.remove('show');
+  }
+
+  async function submitModalLogistique() {
+    if (!MODAL_LOGISTIQUE_EVENT_ID) return;
+    const submitBtn = document.getElementById('evt-logistique-submit');
+    const msg = document.getElementById('evt-logistique-msg');
+    if (!submitBtn || !msg) return;
+
+    const f = document.getElementById('evt-logistique-form');
+    if (!f) return;
+
+    // Construire le JSONB (champs non vides uniquement)
+    const payload = {};
+    ['transport', 'depart', 'retour', 'hebergement', 'conducteurs', 'notes_logistique'].forEach(key => {
+      const val = (f.elements[key].value || '').trim();
+      if (val) payload[key] = val;
+    });
+
+    // Si tout vide → envoyer null (supprimer la logistique)
+    const jsonbPayload = Object.keys(payload).length > 0 ? payload : null;
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Enregistrement…';
+    msg.innerHTML = '';
+    try {
+      const res = await SupabaseHub.updateLogistique(MODAL_LOGISTIQUE_EVENT_ID, jsonbPayload);
+      if (!res || !res.ok) {
+        msg.innerHTML = '<div class="evt-form-error">Échec : ' + escHtml((res && res.error) || 'erreur inconnue') + '</div>';
+        const mb = document.querySelector('#evt-overlay-logistique .evt-modal-body');
+        if (mb) mb.scrollTop = 0;
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Enregistrer';
+        return;
+      }
+      msg.innerHTML = '<div class="evt-form-success">✅ Logistique mise à jour.</div>';
+      const mb = document.querySelector('#evt-overlay-logistique .evt-modal-body');
+      if (mb) mb.scrollTop = 0;
+      const evtId = MODAL_LOGISTIQUE_EVENT_ID;
+      setTimeout(async () => {
+        closeModalLogistique();
+        closeFiche();
+        await reloadEvents();
+        openFiche(evtId);
+      }, 500);
+    } catch (err) {
+      console.error('submitModalLogistique', err);
+      msg.innerHTML = '<div class="evt-form-error">Erreur : ' + escHtml(err.message || String(err)) + '</div>';
+      const mb = document.querySelector('#evt-overlay-logistique .evt-modal-body');
       if (mb) mb.scrollTop = 0;
       submitBtn.disabled = false;
       submitBtn.textContent = 'Enregistrer';
@@ -1768,6 +1897,7 @@
     document.querySelectorAll('[data-action="close-addmatch"]').forEach(b => b.addEventListener('click', closeModalAddMatch));
     document.querySelectorAll('[data-action="close-edit"]').forEach(b => b.addEventListener('click', closeModalEdit));
     document.querySelectorAll('[data-action="close-notes"]').forEach(b => b.addEventListener('click', closeModalEditNotes));
+    document.querySelectorAll('[data-action="close-logistique"]').forEach(b => b.addEventListener('click', closeModalLogistique));
 
     // S2.4.b — Submit des 3 modales + P2-E.2 modales E6/E7
     const btnCreateSubmit = document.getElementById('evt-create-submit');
@@ -1780,6 +1910,8 @@
     if (btnEditSubmit) btnEditSubmit.addEventListener('click', submitModalEdit);
     const btnNotesSubmit = document.getElementById('evt-notes-submit');
     if (btnNotesSubmit) btnNotesSubmit.addEventListener('click', submitModalEditNotes);
+    const btnLogistiqueSubmit = document.getElementById('evt-logistique-submit');
+    if (btnLogistiqueSubmit) btnLogistiqueSubmit.addEventListener('click', submitModalLogistique);
 
     // S2.4.b — Changement de type dans E3 → afficher/masquer champs conditionnels
     document.querySelectorAll('#evt-create-form input[name=type_evenement]').forEach(radio => {
