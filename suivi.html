@@ -164,6 +164,91 @@ body.suivi-body {
   gap: var(--suivi-gap);
 }
 
+/* ---- S-1.c · contenu du tampon « Avant » (assemblage S-4.1) ---- */
+
+.suivi-tampon__role {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 500;
+  font-size: 22px;
+  letter-spacing: .02em;
+  margin: 0;
+}
+.suivi-tampon__hint {
+  margin: 4px 0 0;
+  color: var(--suivi-encre-doux);
+  font-size: 15px;
+}
+.suivi-tampon__seam {
+  margin: 0;
+  color: var(--suivi-encre-doux);
+  font-size: 15px;
+}
+.suivi-repli__aside {
+  margin-left: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--suivi-encre-doux);
+  font-weight: 500;
+}
+.suivi-tampon__mode { display: flex; }
+
+/* Le sas en zone basse (pouce, une main) : poussé en bas quel que
+   soit le volume de contenu au-dessus. */
+.suivi-tampon__sas { margin-top: auto; padding-top: 8px; }
+
+/* Aperçu compo (lecture seule, glance de vérification — pas la
+   grille de sélection interactive : ça, c'est S-3.1). */
+.suivi-compo-vide {
+  margin: 0;
+  color: var(--suivi-encre-doux);
+  font-size: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+}
+.suivi-compo-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.suivi-compo-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 2px;
+  border-bottom: 1px solid var(--suivi-bord);
+}
+.suivi-compo-row:last-child { border-bottom: none; }
+.suivi-compo-dot {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--suivi-encre-doux);   /* défaut si état inconnu */
+}
+/* Couleurs d'état joueur — DOCTRINALEMENT non négociables (alias
+   posés en S-1.a : --suivi-joueur-*). Le Suivi LIT ces états. */
+.suivi-compo-dot[data-etat="base"]        { background: var(--suivi-joueur-base); }
+.suivi-compo-dot[data-etat="modifie"]     { background: var(--suivi-joueur-modifie); }
+.suivi-compo-dot[data-etat="independant"] { background: var(--suivi-joueur-independant); }
+.suivi-compo-dot[data-etat="blesse"]      { background: var(--suivi-joueur-blesse); }
+.suivi-compo-label {
+  font-weight: 700;
+  font-size: 17px;
+}
+.suivi-compo-role {
+  margin-left: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--suivi-encre-doux);
+}
+
 /* ---------------------------------------------------------------------
    PRIMITIVES VISUELLES réutilisées par S-1.c → S-6
    --------------------------------------------------------------------- */
@@ -319,9 +404,56 @@ body.suivi-body {
 
     <!-- État 3 — tampon « Avant » (assemblage S-4.1) → rempli en S-1.c -->
     <section class="suivi-screen suivi-tampon" id="scrTampon" hidden aria-label="Avant le match">
-      <!-- S-1.c : confirmation rencontre (ou dégradé via aperçu compo),
-           phrase de cadrage, ⚙ chrono replié, indicateur Mode lecture
-           seule, aperçu compo replié AV-2, bouton ▶ Coup d'envoi (I4). -->
+
+      <!-- Cadrage de rôle, zéro jargon (S-1.2). Option UI-stricte :
+           PAS de ligne d'en-tête rencontre (aucune RPC ne la fournit) ;
+           la vérification d'identité passe par l'aperçu compo (AV-2). -->
+      <div>
+        <p class="suivi-tampon__role">Tu vas noter ce qui se passe pendant le match.</p>
+        <p class="suivi-tampon__hint">Avant de lancer, ouvre la compo et vérifie que c'est bien la bonne équipe.</p>
+      </div>
+
+      <!-- Aperçu compo replié, optionnel (AV-2). Lecture seule,
+           payload réduit RGPD. Peuplé au 1er dépliement (paresseux :
+           I2 tampon léger + persona réseau). -->
+      <details class="suivi-repli" id="repliCompo">
+        <summary>
+          <span aria-hidden="true">👥</span> Voir la compo
+          <span class="suivi-repli__aside">vérifie l'équipe</span>
+        </summary>
+        <div class="suivi-repli__corps" id="compoCorps" aria-live="polite">
+          <!-- peuplé par suivi-app.js (getCompoReduiteRencontre) -->
+        </div>
+      </details>
+
+      <!-- Réglages chrono : repli structurel SEULEMENT. Le moteur
+           chrono (durée période, nb périodes, compteur/rebours) est
+           S-2.3 ; config_chrono n'est lisible par aucune des 7 RPC
+           côté bénévole (DA-2). On ne construit pas le moteur ici. -->
+      <details class="suivi-repli" id="repliChrono">
+        <summary>
+          <span aria-hidden="true">⚙</span> Réglages du chrono
+        </summary>
+        <div class="suivi-repli__corps">
+          <p class="suivi-tampon__seam">Le chrono est pré-réglé. Les réglages détaillés arrivent avec l'écran de match.</p>
+        </div>
+      </details>
+
+      <!-- Indicateur Mode, lecture seule (S-3.3). Statique en S-1.c :
+           la bascule délibérée via ⚙ est S-3.3. -->
+      <div class="suivi-tampon__mode">
+        <span class="suivi-readonly-tag" id="tagMode">Mode&nbsp;: Normal</span>
+      </div>
+
+      <!-- Sas ▶ Coup d'envoi (S-1.4, I4). Présent et stylé ; son
+           COMPORTEMENT (verrou saisie + marquage « démarré » dans le
+           Core + bascule En cours) = S-1.d. -->
+      <div class="suivi-tampon__sas">
+        <button class="suivi-btn-sas" id="btnCoupEnvoi" type="button">
+          <span aria-hidden="true">▶</span> Coup d'envoi
+        </button>
+      </div>
+
     </section>
 
     <!-- État 4 — « En cours » (le cœur) → S-2 -->
