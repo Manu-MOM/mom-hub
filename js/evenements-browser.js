@@ -1060,6 +1060,14 @@
     updateCreateConditionalFields();
     const msg = document.getElementById('evt-create-msg');
     if (msg) msg.innerHTML = '';
+
+    // Fix P2-E.1 : reset état du bouton submit (hors <form>, pas touché par form.reset())
+    const submitBtn = document.getElementById('evt-create-submit');
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Créer l'évènement";
+    }
+
     document.getElementById('evt-overlay-create').classList.add('show');
   }
 
