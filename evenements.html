@@ -1596,6 +1596,49 @@
   </div>
 </div>
 
+<!-- E8 — Modale Édition logistique (P2-E.3) -->
+<div class="evt-overlay" id="evt-overlay-logistique" role="dialog" aria-modal="true" aria-labelledby="evt-logistique-title">
+  <div class="evt-modal">
+    <div class="evt-modal-title" id="evt-logistique-title">Logistique déplacement</div>
+    <div class="evt-modal-body">
+      <div id="evt-logistique-msg"></div>
+      <div class="evt-modal-info" id="evt-logistique-info"><em>Chargement…</em></div>
+      <form class="evt-modal-form" id="evt-logistique-form" onsubmit="return false;">
+        <div class="evt-form-group">
+          <label class="evt-form-label" for="evt-log-transport">Transport</label>
+          <input type="text" class="evt-form-input" id="evt-log-transport" name="transport" placeholder="Ex : 2 minibus (Brencklé → Rion-des-Landes)">
+        </div>
+        <div class="evt-form-group-row">
+          <div class="evt-form-group">
+            <label class="evt-form-label" for="evt-log-depart">Départ</label>
+            <input type="text" class="evt-form-input" id="evt-log-depart" name="depart" placeholder="Ex : Vendredi 22 mai · 18h00">
+          </div>
+          <div class="evt-form-group">
+            <label class="evt-form-label" for="evt-log-retour">Retour</label>
+            <input type="text" class="evt-form-input" id="evt-log-retour" name="retour" placeholder="Ex : Dimanche 24 mai · ~22h00">
+          </div>
+        </div>
+        <div class="evt-form-group">
+          <label class="evt-form-label" for="evt-log-hebergement">Hébergement</label>
+          <input type="text" class="evt-form-input" id="evt-log-hebergement" name="hebergement" placeholder="Ex : Hôtel B&B Rion · 8 chambres · ~700€">
+        </div>
+        <div class="evt-form-group">
+          <label class="evt-form-label" for="evt-log-conducteurs">Conducteurs</label>
+          <input type="text" class="evt-form-input" id="evt-log-conducteurs" name="conducteurs" placeholder="Ex : Manu JUNG, Pierre DUPONT">
+        </div>
+        <div class="evt-form-group">
+          <label class="evt-form-label" for="evt-log-notes">Notes logistique</label>
+          <textarea class="evt-form-textarea" id="evt-log-notes" name="notes_logistique" placeholder="Pic-nic prévu vendredi soir sur aire de Bordeaux…" maxlength="1000" style="min-height:80px;"></textarea>
+        </div>
+      </form>
+    </div>
+    <div class="evt-modal-actions">
+      <button type="button" class="evt-btn" data-action="close-logistique">Annuler</button>
+      <button type="button" class="evt-btn evt-btn-primary" id="evt-logistique-submit">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
 <!-- E2 — Fiche détaillée (panneau slide-in droite) -->
 <div class="evt-fiche-overlay" id="evt-fiche-overlay" role="dialog" aria-modal="true" aria-labelledby="evt-fiche-title">
   <aside class="evt-fiche-panel" id="evt-fiche-panel">
