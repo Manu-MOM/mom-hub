@@ -987,6 +987,30 @@
   .evt-fiche-actions .evt-btn { font-size: 12px; }
   .evt-fiche-actions-spacer { flex: 1; }
 
+  /* P2-E.5 : Sections repliables mobile */
+  .evt-fiche-chevron {
+    float: right;
+    font-size: 10px;
+    color: var(--ink-mute);
+    transition: transform 0.15s;
+  }
+  .evt-fiche-collapsible .evt-fiche-section-title {
+    cursor: pointer;
+    user-select: none;
+  }
+  .evt-fiche-collapsible .evt-fiche-section-title:hover {
+    color: var(--ink);
+  }
+  @media (max-width: 768px) {
+    .evt-fiche-collapsible .evt-fiche-section-body { display: none; }
+    .evt-fiche-collapsible.is-open .evt-fiche-section-body { display: block; }
+    .evt-fiche-collapsible.is-open .evt-fiche-chevron { transform: rotate(90deg); }
+  }
+  @media (min-width: 769px) {
+    .evt-fiche-collapsible .evt-fiche-section-body { display: block; }
+    .evt-fiche-chevron { display: none; }
+  }
+
   /* JSON brut pour debug logistique (V1) */
   .evt-fiche-jsonbloc {
     font-family: 'JetBrains Mono', monospace;
