@@ -7,7 +7,7 @@
  * Consomme SuiviClient (suivi-client.js) ; ne touche jamais
  * Supabase directement.
  *
- * Version : 0.2 — S-1.c (mai 2026)
+ * Version : 0.3 — S-1.d (mai 2026)
  *   v0.1 : LOGIQUE DE BOOT SEULEMENT (paquet S-1, parcours d'entrée).
  *          getToken() → chargerEtatInitial() → routage entre les 5
  *          états posés en S-1.a (loading|error|tampon|encours|
@@ -26,6 +26,23 @@
  *          JAMAIS persistée → I5 tenu). ⚙ chrono = repli structurel
  *          (moteur = S-2.3) ; sas ▶ Coup d'envoi présent, son
  *          comportement = S-1.d.
+ *   v0.3 : S-1.d — comportement du sas ▶ Coup d'envoi (I4),
+ *          PATH A (validé Manu) : transition CLIENTE pure tampon →
+ *          En cours, ZÉRO écriture Core (aucun observable structurel
+ *          « coup d'envoi » au référentiel — Path B = dette
+ *          Audits/Référentiels, contrat aval type DS-1). I4 tenu
+ *          STRUCTURELLEMENT : aucune surface de saisie avant le sas
+ *          (palette = S-2, écran En cours uniquement), le sas est
+ *          l'unique chemin vers cet écran → le routage EST le verrou.
+ *          Limite V1 ASSUMÉE et tracée (sœur de S-5.2.c hors-ligne) :
+ *          plantage/reconnexion entre le tap et la 1ʳᵉ action réelle
+ *          → chronologie encore vide → S-1.b re-route au tampon
+ *          (re-tap sans dégât). Pas de réécriture silencieuse.
+ *          Sas = tap délibéré unique, SANS confirm (le sas écran +
+ *          bouton EST l'anti-erreur, S-1.4 ; asymétrie INTENTIONNELLE
+ *          vs la clôture « Fin du match » qui, elle, confirme —
+ *          S-3.4.a). Robuste par construction : 0 appel réseau au
+ *          coup d'envoi → ne peut pas échouer (persona réseau).
  *
  * INVARIANTS :
  *   I5 — ce module ne persiste RIEN côté navigateur. L'état de
@@ -55,6 +72,12 @@
 
   // Garde le repli compo de ne charger qu'une fois (paresseux).
   var _compoChargee = false;
+
+  // « Coup d'envoi » donné dans CETTE session (S-1.d, Path A).
+  // Runtime TRANSITOIRE : jamais persisté. Ne change pas le
+  // comportement au rechargement (l'état réel = le Core, via
+  // chargerEtatInitial). Simple garde anti-re-render intra-session.
+  var _demarree = false;
 
   // ------------------------------------------------------------
   // Garde : suivi-client.js doit être chargé AVANT ce module.
@@ -181,8 +204,35 @@
     });
   }
 
-  // Arme le dépliement paresseux. <details> émet 'toggle' ; on ne
-  // charge qu'à la 1re ouverture (idempotent via _compoChargee).
+  // ------------------------------------------------------------
+  // S-1.d · SAS ▶ Coup d'envoi (I4) — PATH A.
+  // Transition CLIENTE pure : tampon → En cours, ZÉRO écriture
+  // Core (aucun observable « coup d'envoi » au référentiel —
+  // Path B = dette Audits/Référentiels). I4 tenu structurellement :
+  // aucune saisie n'existe avant le sas, le sas est l'unique chemin
+  // vers l'écran de saisie (S-2). Limite V1 assumée : reconnexion
+  // entre ce tap et la 1ʳᵉ action réelle → tampon re-routé (re-tap
+  // sans dégât). Aucun appel réseau ici → ne peut pas échouer.
+  // ------------------------------------------------------------
+  function coupEnvoi(btn) {
+    // Anti-double-tap (gros doigts/gants) : on neutralise le bouton
+    // dès le 1er tap. Idempotent même si l'event re-déclenche.
+    if (btn) {
+      if (btn.disabled) return;
+      btn.disabled = true;
+    }
+    _demarree = true;            // marqueur runtime TRANSITOIRE.
+    // NB : ne défait PAS le comportement Path A au rechargement —
+    // un vrai reload re-dérive l'état du Core (chargerEtatInitial).
+    // Ce flag n'est qu'une ceinture anti-re-render dans la session.
+    aide(true);
+    montrerEcran('scrEnCours');  // écran rempli en S-2 (vide ici)
+  }
+
+  // Arme le dépliement paresseux de la compo + le sas. <details>
+  // émet 'toggle' ; on ne charge qu'à la 1re ouverture (idempotent
+  // via _compoChargee). Le sas est armé une seule fois (garde
+  // _suiviArme dédiée).
   function preparerTampon() {
     var repli = doc.getElementById('repliCompo');
     if (repli && !repli._suiviArme) {
@@ -190,6 +240,14 @@
       repli.addEventListener('toggle', function () {
         if (repli.open) chargerCompo();
       });
+    }
+    var sas = doc.getElementById('btnCoupEnvoi');
+    if (sas && !sas._suiviArme) {
+      sas._suiviArme = true;
+      // Tap délibéré UNIQUE, sans confirm : le sas (écran + gros
+      // bouton) EST l'anti-erreur (S-1.4). Asymétrie intentionnelle
+      // vs la clôture « Fin du match » qui, elle, confirme (S-3.4.a).
+      sas.addEventListener('click', function () { coupEnvoi(sas); });
     }
   }
 
@@ -295,7 +353,7 @@
 
   if (global.console) {
     console.log(
-      '%c🏉 MOM Hub · Suivi App v0.2 (tampon) chargé',
+      '%c🏉 MOM Hub · Suivi App v0.3 (sas coup d\'envoi) chargé',
       'color: #2d7a3e; font-weight: bold;'
     );
   }
