@@ -52,7 +52,7 @@
  *   validé côté serveur (valider_lien_suivi). Le jeton 'spectateur'
  *   ne peut que lire (sûr par construction).
  *
- * Version : 1.0 — mai 2026
+ * Version : 1.1 — mai 2026
  *   v1.0 : couche d'accès initiale. 7 wrappers C12 (signatures
  *          déployées vérifiées à la source, conv Production Suivi) :
  *          genererLienEphemere, getCompoReduiteRencontre,
@@ -62,6 +62,15 @@
  *          (dégradation nom_court NULL → numéro). Réutilise
  *          SupabaseHub.client si présent, sinon client de repli
  *          léger (persistSession:false, I5).
+ *   v1.1 : ajout chargerEtatInitial(token) pour le routage de boot
+ *          (S-1.b). Les wrappers lecture renvoient [] aussi bien sur
+ *          erreur que sur vide — insuffisant pour le routeur, qui
+ *          doit distinguer jeton-absent / jeton-invalide /
+ *          erreur-réseau / non-démarré / démarré. Cette méthode est
+ *          le SEUL point qui tranche ces 5 issues + centralise
+ *          l'heuristique « démarré = chronologie non vide ». Les 7
+ *          wrappers v1.0 sont INCHANGÉS (signatures et retours
+ *          identiques). Zéro état navigateur (I5).
  */
 (function (global) {
   'use strict';
@@ -171,6 +180,63 @@
       if (num) return num;        // cas nominal tant que nom_court NULL
       if (nom) return nom;
       return '?';                 // aucun joueur identifié (cas D-7)
+    },
+
+    /**
+     * Charge l'état initial pour le ROUTAGE DE BOOT (S-1.b).
+     *
+     * Pourquoi cette méthode existe : les wrappers de lecture
+     * renvoient [] aussi bien sur erreur que sur vide (convention
+     * v1.12 « lecture → défaut sûr »). Le routeur a besoin de
+     * distinguer 5 issues — c'est le SEUL point qui le fait, et il
+     * centralise l'heuristique « démarré = chronologie non vide »
+     * (sémantique exacte du marqueur « coup d'envoi » finalisée en
+     * S-1.d, dépend du référentiel observables). Zéro état
+     * navigateur (I5) : aucune lecture/écriture de stockage.
+     *
+     * @param {string|null} token jeton lu via SuiviClient.getToken()
+     * @returns {Promise<{statut:string, chronologie?:Array, error?:string}>}
+     *   statut ∈
+     *     'jeton-absent'   — pas de ?t= dans l'URL
+     *     'jeton-invalide' — le backend rejette (lien invalide/expiré)
+     *     'erreur-reseau'  — appel impossible (persona réseau instable)
+     *     'non-demarre'    — jeton OK, 0 ligne → tampon (I4 verrouille
+     *                        la saisie avant le sas)
+     *     'demarre'        — jeton OK, ≥1 ligne → En cours / reprise
+     *                        (split = S-5)
+     */
+    async chargerEtatInitial(token) {
+      if (!token) {
+        return { statut: 'jeton-absent' };
+      }
+      let resp;
+      try {
+        resp = await getClient().rpc('get_chronologie_rencontre', {
+          p_token: token
+        });
+      } catch (e) {
+        // L'appel n'a pas abouti (réseau coupé, CDN, etc.) — distinct
+        // d'un rejet applicatif. Persona « réseau instable » : ce cas
+        // doit être réessayable côté UI (≠ jeton-invalide).
+        console.error('MOM Hub Suivi: chargerEtatInitial() réseau', e);
+        return { statut: 'erreur-reseau', error: (e && e.message) || String(e) };
+      }
+      const data = resp ? resp.data : null;
+      const error = resp ? resp.error : null;
+      if (error) {
+        // Le backend a répondu mais REJETTE : valider_lien_suivi a
+        // levé (jeton inconnu, révoqué, expiré). Réessayer n'aide pas.
+        console.error('MOM Hub Suivi: chargerEtatInitial() jeton', error);
+        return { statut: 'jeton-invalide', error: error.message || 'Jeton refusé' };
+      }
+      const lignes = Array.isArray(data) ? data : [];
+      // Heuristique de routage : 0 ligne ⇒ coup d'envoi pas encore
+      // donné (I4 verrouille la saisie avant le sas) ⇒ tampon.
+      // ≥1 ligne ⇒ match démarré ⇒ En cours / reprise (split S-5).
+      return {
+        statut: lignes.length === 0 ? 'non-demarre' : 'demarre',
+        chronologie: lignes
+      };
     },
 
     // ----------------------------------------------------------
@@ -465,7 +531,7 @@
   global.SuiviClient = SuiviClient;
 
   console.log(
-    '%c🏉 MOM Hub · Suivi Client v1.0 chargé',
+    '%c🏉 MOM Hub · Suivi Client v1.1 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
