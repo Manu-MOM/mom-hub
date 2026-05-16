@@ -21,35 +21,17 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.4.1 — S2.5 (15 mai 2026 fin d'après-midi)
+ * Version : 1.5 — P2-E.1 (16 mai 2026)
  *   v1.0 : S2.1 squelette init basique
- *   v1.1 : S2.2 — vraies cartes événements (trait coloré, pastilles type,
- *          statut compo), regroupement par mois, déploiement inline
- *          tournois avec sous-cartes matchs groupés par phase, mini-cal
- *          sidebar fonctionnel (2 mois, clic jour = scroll vers event).
- *   v1.2 : S2.2.fix — correction redondance affichage adversaire dans
- *          les enfants de tournoi : si le libellé commence déjà par
- *          "vs " (cas matchs poule de brassage), on n'ajoute pas une
- *          2e fois l'adversaire_nom. Exploite aussi les colonnes
- *          phase_libelle + ordre_dans_phase remontées par sql/31.
- *   v1.3 : S2.3 — Fiche détaillée E2 (panneau slide-in droite). Clic
- *          sur une carte (parent OU enfant) ouvre la fiche.
- *          Récupération via SupabaseHub.getEvenementWithEncadrants
- *          (sql/29 + v1.10). Sections empilées : identité, phases si
- *          tournoi (depuis CHILDREN_BY_PARENT), logistique
- *          conditionnelle, encadrants (array JSONB), notes_internes,
- *          score. Mode lecture seule (édition reportée S2.4 avec
- *          wrappers WRITE). Fermeture Escape + clic overlay + bouton ✕.
- *   v1.4 : S2.4.b — câblage complet des 3 modales E3/E4/E5 avec les
- *          wrappers WRITE v1.11. Récupération dynamique à l'init du
- *          saison_id + organisateur_principal_id depuis le prochain
- *          évent M14 (anti-invention). Chargement des sites actifs
- *          via listSitesActifs (v1.8.1). Forms validés côté client,
- *          appels createEvenement/cancelEvenement/addMatchToTournoi
- *          via wrappers v1.11, reload de la liste après succès.
- *   v1.4.1: S2.5 fix UX — auto-scrollTop des modales après affichage
- *          d'un message d'erreur ou de succès (le message s'affichait
- *          en haut du form invisible si l'utilisateur avait scrollé).
+ *   v1.1 : S2.2 — vraies cartes événements
+ *   v1.2 : S2.2.fix — correction adversaire tournois
+ *   v1.3 : S2.3 — Fiche détaillée E2
+ *   v1.4 : S2.4.b — câblage complet des 3 modales E3/E4/E5
+ *   v1.4.1: S2.5 fix UX — auto-scrollTop modales
+ *   v1.5 : P2-E.1 — Duplication événement dans E3 (option "Dupliquer
+ *          un événement précédent" + sélecteur source + pré-remplissage
+ *          + appel duplicateEvenement wrapper v1.12). Post-création
+ *          tournoi → redirect vers fiche E2 (G9 conception §4.2).
  */
 
 (function () {
@@ -991,13 +973,90 @@
   // E3 — Modale Création
   // ────────────────────────────────────────────────
 
+  // P2-E.1 : état duplication
+  let MODAL_CREATE_DUP_SRC_ID = null;
+
+  /**
+   * Peuple le dropdown source duplication dans E3 (événements parents uniquement,
+   * triés par date décroissante pour trouver vite le dernier événement similaire).
+   */
+  function populateDupSourceDropdown() {
+    const sel = document.getElementById('evt-create-dup-source');
+    if (!sel) return;
+    const allRoots = EVENEMENTS_AVENIR.concat(EVENEMENTS_PASSES)
+      .filter(e => !e.evenement_parent_id)
+      .sort((a, b) => (b.date_debut || '').localeCompare(a.date_debut || ''));
+    let html = '<option value="">— Sélectionner l\'événement à dupliquer —</option>';
+    allRoots.forEach(e => {
+      const dateLib = formatDateShort(e.date_debut);
+      const typeLbl = TYPE_LABELS[e.type_evenement] || e.type_evenement;
+      const lib = dateLib + ' · ' + typeLbl + ' · ' + (e.libelle || '(sans libellé)');
+      html += '<option value="' + escHtml(e.id) + '">' + escHtml(lib) + '</option>';
+    });
+    sel.innerHTML = html;
+  }
+
+  /**
+   * Pré-remplit le formulaire E3 depuis un événement source (pour duplication).
+   * Ne touche PAS au code (auto-généré au submit) ni à la date (l'utilisateur
+   * choisira la nouvelle date).
+   */
+  function prefillFormFromSource(srcId) {
+    const evt = EVENTS_BY_ID[srcId];
+    if (!evt) return;
+    const f = document.getElementById('evt-create-form');
+    if (!f) return;
+
+    // Type
+    const radioType = f.querySelector('input[name=type_evenement][value="' + evt.type_evenement + '"]');
+    if (radioType) radioType.checked = true;
+    updateCreateConditionalFields();
+
+    // Libellé (sans le suffixe " (copie)" — le wrapper l'ajoutera si nécessaire)
+    f.elements.libelle.value = evt.libelle || '';
+
+    // Site
+    if (f.elements.site_id && evt.site_id) {
+      f.elements.site_id.value = evt.site_id;
+    }
+    // Compétition
+    if (f.elements.type_competition && evt.type_competition) {
+      f.elements.type_competition.value = evt.type_competition;
+    }
+    // Format de jeu
+    if (f.elements.format_de_jeu && evt.format_de_jeu) {
+      f.elements.format_de_jeu.value = evt.format_de_jeu;
+    }
+    // Adversaire
+    if (f.elements.adversaire_nom) {
+      f.elements.adversaire_nom.value = evt.adversaire_nom || '';
+    }
+    // Domicile/Extérieur
+    if (f.elements.domicile_exterieur && evt.domicile_exterieur) {
+      f.elements.domicile_exterieur.value = evt.domicile_exterieur;
+    }
+    // Date début : on laisse vide (la nouvelle date est à choisir)
+    // Date fin : idem
+  }
+
   function openModalCreate() {
     // Réinitialise le form
     const form = document.getElementById('evt-create-form');
     if (form) form.reset();
     // Coche par défaut "entrainement"
-    const radioEntr = document.querySelector('#evt-create-form input[name=type_evenement][value=entrainement]');
+    const radioEntr = form && form.querySelector('input[name=type_evenement][value=entrainement]');
     if (radioEntr) radioEntr.checked = true;
+
+    // P2-E.1 : reset mode duplication → vierge
+    MODAL_CREATE_DUP_SRC_ID = null;
+    const radioVierge = form && form.querySelector('input[name=create_mode][value=vierge]');
+    if (radioVierge) radioVierge.checked = true;
+    const dupGroup = document.getElementById('evt-create-dup-group');
+    if (dupGroup) dupGroup.style.display = 'none';
+
+    // Peuple le dropdown source pour la duplication
+    populateDupSourceDropdown();
+
     updateCreateConditionalFields();
     const msg = document.getElementById('evt-create-msg');
     if (msg) msg.innerHTML = '';
@@ -1111,29 +1170,61 @@
     if (adversaire) payload.adversaire_nom = adversaire;
     if (domicile)   payload.domicile_exterieur = domicile;
 
-    // Appel wrapper
+    // Appel wrapper : branche selon mode (P2-E.1 duplication vs création vierge)
     submitBtn.disabled = true;
     submitBtn.textContent = 'Création…';
     msg.innerHTML = '';
+
+    // P2-E.1 : mode duplication ?
+    const modeChecked = f.querySelector('input[name=create_mode]:checked');
+    const isDuplication = modeChecked && modeChecked.value === 'dupliquer' && MODAL_CREATE_DUP_SRC_ID;
+
     try {
-      const res = await SupabaseHub.createEvenement(payload);
+      let res;
+      if (isDuplication) {
+        // Mode duplication : appel duplicateEvenement(srcId, overrides)
+        // Les overrides sont les champs modifiés par l'utilisateur
+        const overrides = {
+          code: generateEventCode(type, dateDebut),
+          libelle: libelle,
+          type_evenement: type,
+          date_debut: new Date(dateDebut).toISOString(),
+          equipe_id: M14_TEAM_UUID,
+          saison_id: CTX_SAISON_ID,
+          organisateur_principal_id: CTX_ORGANISATEUR_ID
+        };
+        if (dateFin)    overrides.date_fin = new Date(dateFin).toISOString();
+        if (siteId)     overrides.site_id = siteId;
+        if (typeCompet) overrides.type_competition = typeCompet;
+        if (formatJeu)  overrides.format_de_jeu = formatJeu;
+        if (adversaire) overrides.adversaire_nom = adversaire;
+        if (domicile)   overrides.domicile_exterieur = domicile;
+        res = await SupabaseHub.duplicateEvenement(MODAL_CREATE_DUP_SRC_ID, overrides);
+      } else {
+        // Mode création vierge : appel createEvenement(payload) existant
+        res = await SupabaseHub.createEvenement(payload);
+      }
+
       if (!res || !res.ok) {
         msg.innerHTML = '<div class="evt-form-error">Échec : ' + escHtml((res && res.error) || 'erreur inconnue') + '</div>';
-        // S2.5 fix UX : scroll en haut pour rendre le message visible
         const modalBody = document.querySelector('#evt-overlay-create .evt-modal-body');
         if (modalBody) modalBody.scrollTop = 0;
         submitBtn.disabled = false;
         submitBtn.textContent = "Créer l'évènement";
         return;
       }
-      // Succès → ferme la modale + reload de la liste
-      msg.innerHTML = '<div class="evt-form-success">✅ Évènement créé.</div>';
-      // S2.5 fix UX : scroll en haut pour rendre le message visible
+      // Succès
+      const createdId = res.data && res.data.id ? res.data.id : null;
+      msg.innerHTML = '<div class="evt-form-success">✅ Évènement ' + (isDuplication ? 'dupliqué' : 'créé') + '.</div>';
       const modalBody = document.querySelector('#evt-overlay-create .evt-modal-body');
       if (modalBody) modalBody.scrollTop = 0;
       setTimeout(async () => {
         closeModalCreate();
         await reloadEvents();
+        // P2-E.1 G9 : si tournoi créé, ouvrir la fiche pour ajouter les matchs
+        if (type === 'tournoi' && createdId) {
+          openFiche(createdId);
+        }
       }, 500);
     } catch (err) {
       console.error('submitModalCreate', err);
@@ -1423,6 +1514,29 @@
     document.querySelectorAll('#evt-create-form input[name=type_evenement]').forEach(radio => {
       radio.addEventListener('change', updateCreateConditionalFields);
     });
+
+    // P2-E.1 — Changement de mode dans E3 (vierge / dupliquer)
+    document.querySelectorAll('#evt-create-form input[name=create_mode]').forEach(radio => {
+      radio.addEventListener('change', function () {
+        const dupGroup = document.getElementById('evt-create-dup-group');
+        if (this.value === 'dupliquer') {
+          if (dupGroup) dupGroup.style.display = '';
+        } else {
+          if (dupGroup) dupGroup.style.display = 'none';
+          MODAL_CREATE_DUP_SRC_ID = null;
+        }
+      });
+    });
+    // P2-E.1 — Sélection de la source duplication → pré-remplissage
+    const dupSourceSel = document.getElementById('evt-create-dup-source');
+    if (dupSourceSel) {
+      dupSourceSel.addEventListener('change', function () {
+        MODAL_CREATE_DUP_SRC_ID = this.value || null;
+        if (MODAL_CREATE_DUP_SRC_ID) {
+          prefillFormFromSource(MODAL_CREATE_DUP_SRC_ID);
+        }
+      });
+    }
 
     document.querySelectorAll('.evt-overlay').forEach(overlay => {
       overlay.addEventListener('click', function (e) {
