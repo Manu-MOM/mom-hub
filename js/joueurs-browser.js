@@ -342,6 +342,13 @@ window.JoueursBrowser = (function () {
         if (e.target === ficheOverlay) ficheOverlay.classList.remove('show');
       });
     }
+    // P2-J.3 : FAB Ajouter personne → message Annuaire placeholder
+    const fabAdd = document.getElementById('joueur-fab-add');
+    if (fabAdd) {
+      fabAdd.addEventListener('click', function () {
+        alert('La création d\'une nouvelle personne (identité, licence FFR, coordonnées) se fait depuis l\'Annuaire global.\n\nLe module Annuaire est en cours de développement.\n\nPour ajouter manuellement une personne V1, contactez votre administrateur.');
+      });
+    }
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') closeAllOverlays();
     });
@@ -628,11 +635,43 @@ window.JoueursBrowser = (function () {
       + renderFicheActions(d)
       + renderFicheProfilSportif(d)
       + renderFicheEtatMetier(d)
-      + renderFicheFFR(d)
-      + renderFicheCoordonnees(d)
-      + renderFicheScolarite(d)
-      + renderFicheRGPD(d)
-      + renderFicheMetadonnees(d);
+      + wrapCollapsible(renderFicheFFR(d))
+      + wrapCollapsible(renderFicheCoordonnees(d))
+      + wrapCollapsible(renderFicheScolarite(d))
+      + wrapCollapsible(renderFicheRGPD(d))
+      + wrapCollapsible(renderFicheMetadonnees(d))
+      + renderFicheFooterAnnuaire();
+  }
+
+  /**
+   * P2-J.2 : Transforme une section fiche en section repliable mobile.
+   * Ajoute la classe .joueur-fiche-collapsible, un chevron ▶ au titre,
+   * et encadre le contenu après le titre dans .joueur-fiche-section-body.
+   */
+  function wrapCollapsible(html) {
+    if (!html || !html.trim()) return '';
+    var s = html.trim();
+    // Ajout classe collapsible
+    s = s.replace('joueur-fiche-section">', 'joueur-fiche-section joueur-fiche-collapsible">');
+    // Ajout chevron au titre
+    s = s.replace(/<\/div>\s*/, ' <span class="joueur-fiche-chevron">▶</span></div><div class="joueur-fiche-section-body">');
+    // Ajout fermeture section-body avant la dernière </div>
+    var lastClose = s.lastIndexOf('</div>');
+    s = s.substring(0, lastClose) + '</div></div>';
+    return s;
+  }
+
+  /**
+   * P2-J.3 : Footer Annuaire mention dans la fiche (conception §3.2 / §5.3 Q7).
+   */
+  function renderFicheFooterAnnuaire() {
+    return `
+      <div class="joueur-fiche-section" style="border-top: 1px solid var(--line); padding-top: 10px;">
+        <div style="font-size:11px; color:var(--ink-mute); line-height:1.5;">
+          📌 L'identité (nom, licence, contacts) s'édite dans l'Annuaire global (module à venir).
+        </div>
+      </div>
+    `;
   }
 
   function renderFicheIdentite(d) {
@@ -962,6 +1001,12 @@ window.JoueursBrowser = (function () {
         if (which === 'profil') openModalProfil(currentEditDetail);
         else if (which === 'etat') openModalEtat(currentEditDetail);
         else if (which === 'notes') openModalNotes(currentEditDetail);
+      });
+    });
+    // P2-J.2 : toggle collapsible mobile (FFR, coordonnées, scolarité, RGPD, meta)
+    document.querySelectorAll('.joueur-fiche-collapsible .joueur-fiche-section-title').forEach(title => {
+      title.addEventListener('click', function () {
+        this.closest('.joueur-fiche-collapsible').classList.toggle('is-open');
       });
     });
   }
@@ -1330,7 +1375,7 @@ window.JoueursBrowser = (function () {
   // ============================================================
 
   async function init() {
-    console.log('Joueurs: init() — v1.2 (grille + boutons haut fiche)');
+    console.log('Joueurs: init() — v1.3 (P2-J.1 FFR + P2-J.2 mobile + P2-J.3 polish)');
 
     // 1. Préfs + bindings UI
     loadPrefs();
@@ -1377,7 +1422,7 @@ window.JoueursBrowser = (function () {
     _byId: () => JOUEURS_BY_ID,
     _postesById: () => POSTES_BY_ID,
     _aptitudesById: () => APTITUDES_BY_ID,
-    _version: 'v1.2'
+    _version: 'v1.3'
   };
 
 })();
