@@ -28,10 +28,10 @@
  *   v1.3 : S2.3 — Fiche détaillée E2
  *   v1.4 : S2.4.b — câblage complet des 3 modales E3/E4/E5
  *   v1.4.1: S2.5 fix UX — auto-scrollTop modales
- *   v1.5 : P2-E.1 — Duplication événement dans E3 (option "Dupliquer
- *          un événement précédent" + sélecteur source + pré-remplissage
- *          + appel duplicateEvenement wrapper v1.12). Post-création
- *          tournoi → redirect vers fiche E2 (G9 conception §4.2).
+ *   v1.5 : P2-E.1 — Duplication événement dans E3 + redirect fiche tournoi
+ *   v1.6 : P2-E.2 — Édition fiche : modale E6 (modifier identité) +
+ *          modale E7 (notes internes). Boutons ✏️ Modifier et 📝 Notes
+ *          câblés dans la fiche. Appels updateEvenement wrapper v1.12.
  */
 
 (function () {
@@ -836,10 +836,13 @@
     }
 
     // ────────────────────────────────────────────────
-    // 8. ACTIONS EN PIED (S2.4 câblera les vrais boutons)
+    // 8. ACTIONS EN PIED (P2-E.2 : boutons câblés)
     // ────────────────────────────────────────────────
     html += '<div class="evt-fiche-actions">';
-    html += '<button type="button" class="evt-btn" disabled title="Câblage en S2.5 (V1.1)">✏️ Modifier</button>';
+    if (evt.etat !== 'annule' && evt.etat !== 'archive') {
+      html += '<button type="button" class="evt-btn" data-action="edit-from-fiche" data-event-id="' + escHtml(evt.id) + '">✏️ Modifier</button>';
+      html += '<button type="button" class="evt-btn" data-action="notes-from-fiche" data-event-id="' + escHtml(evt.id) + '">📝 Notes</button>';
+    }
     if (evt.etat === 'annule') {
       html += '<div class="evt-fiche-actions-spacer"></div>';
       html += '<button type="button" class="evt-btn evt-btn-primary" data-action="reactivate-from-fiche" data-event-id="' + escHtml(evt.id) + '">↩ Réactiver l\'évènement</button>';
@@ -877,7 +880,6 @@
             this.textContent = "↩ Réactiver l'évènement";
             return;
           }
-          // Succès : recharge + ré-ouvre fiche
           closeFiche();
           await reloadEvents();
           openFiche(id);
@@ -889,6 +891,247 @@
         }
       });
     });
+    // P2-E.2 : boutons édition identité + notes
+    document.querySelectorAll('[data-action="edit-from-fiche"]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        const id = this.getAttribute('data-event-id');
+        if (id) openModalEdit(id);
+      });
+    });
+    document.querySelectorAll('[data-action="notes-from-fiche"]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        const id = this.getAttribute('data-event-id');
+        if (id) openModalEditNotes(id);
+      });
+    });
+  }
+
+  // ────────────────────────────────────────────────
+  // E6 — Modale Édition événement (P2-E.2)
+  // ────────────────────────────────────────────────
+
+  let MODAL_EDIT_EVENT_ID = null;
+
+  function populateEditSitesDropdown() {
+    const sel = document.getElementById('evt-edit-site');
+    if (!sel) return;
+    let html = '<option value="">— Choisir un site —</option>';
+    SITES.forEach(s => {
+      const lib = s.libelle_court || s.libelle || '(sans nom)';
+      html += '<option value="' + escHtml(s.id) + '">' + escHtml(lib) + '</option>';
+    });
+    sel.innerHTML = html;
+  }
+
+  function openModalEdit(evenementId) {
+    if (!evenementId) return;
+    MODAL_EDIT_EVENT_ID = evenementId;
+    const evt = EVENTS_BY_ID[evenementId];
+    if (!evt) return;
+
+    const msg = document.getElementById('evt-edit-msg');
+    if (msg) msg.innerHTML = '';
+    const info = document.getElementById('evt-edit-info');
+    if (info) {
+      const typeLbl = TYPE_LABELS[evt.type_evenement] || evt.type_evenement;
+      info.innerHTML = '<span class="evt-modal-info-strong">' + escHtml(typeLbl) + '</span> · '
+        + escHtml(evt.libelle || '(sans libellé)');
+    }
+
+    // Peuple le dropdown sites
+    populateEditSitesDropdown();
+
+    // Pré-remplissage des champs
+    const f = document.getElementById('evt-edit-form');
+    if (!f) return;
+
+    f.elements.libelle.value = evt.libelle || '';
+
+    // Date début : convertir ISO → datetime-local (YYYY-MM-DDTHH:MM)
+    if (evt.date_debut) {
+      try {
+        const d = new Date(evt.date_debut);
+        const pad = (n) => String(n).padStart(2, '0');
+        f.elements.date_debut.value = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+      } catch (_) {}
+    }
+    if (evt.date_fin) {
+      try {
+        const d = new Date(evt.date_fin);
+        const pad = (n) => String(n).padStart(2, '0');
+        f.elements.date_fin.value = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+      } catch (_) {}
+    }
+
+    if (f.elements.domicile_exterieur) f.elements.domicile_exterieur.value = evt.domicile_exterieur || '';
+    if (f.elements.site_id) f.elements.site_id.value = evt.site_id || '';
+    if (f.elements.type_competition) f.elements.type_competition.value = evt.type_competition || '';
+    if (f.elements.format_de_jeu) f.elements.format_de_jeu.value = evt.format_de_jeu || '';
+    if (f.elements.adversaire_nom) f.elements.adversaire_nom.value = evt.adversaire_nom || '';
+
+    // Affichage conditionnel compet/format selon type
+    const showCompet = ['match', 'tournoi', 'journee_championnat'].indexOf(evt.type_evenement) !== -1;
+    const showFormat = showCompet;
+    const showDateFin = ['tournoi', 'stage'].indexOf(evt.type_evenement) !== -1;
+    const competGroup = document.getElementById('evt-edit-compet-group');
+    const formatGroup = document.getElementById('evt-edit-format-group');
+    const dateFinGroup = document.getElementById('evt-edit-date-fin-group');
+    if (competGroup) competGroup.style.display = showCompet ? '' : 'none';
+    if (formatGroup) formatGroup.style.display = showFormat ? '' : 'none';
+    if (dateFinGroup) dateFinGroup.style.display = showDateFin ? '' : 'none';
+
+    // Reset submit button
+    const btn = document.getElementById('evt-edit-submit');
+    if (btn) { btn.disabled = false; btn.textContent = 'Enregistrer'; }
+
+    document.getElementById('evt-overlay-edit').classList.add('show');
+  }
+
+  function closeModalEdit() {
+    MODAL_EDIT_EVENT_ID = null;
+    document.getElementById('evt-overlay-edit').classList.remove('show');
+  }
+
+  async function submitModalEdit() {
+    if (!MODAL_EDIT_EVENT_ID) return;
+    const submitBtn = document.getElementById('evt-edit-submit');
+    const msg = document.getElementById('evt-edit-msg');
+    if (!submitBtn || !msg) return;
+
+    const f = document.getElementById('evt-edit-form');
+    if (!f) return;
+
+    const libelle = f.elements.libelle.value.trim();
+    const dateDebut = f.elements.date_debut.value;
+
+    if (!libelle) { msg.innerHTML = '<div class="evt-form-error">Le libellé est requis</div>'; return; }
+    if (!dateDebut) { msg.innerHTML = '<div class="evt-form-error">La date de début est requise</div>'; return; }
+
+    const patch = {
+      libelle: libelle,
+      date_debut: new Date(dateDebut).toISOString()
+    };
+    const dateFin = f.elements.date_fin.value;
+    if (dateFin) patch.date_fin = new Date(dateFin).toISOString();
+    else patch.date_fin = null;
+
+    const siteId = f.elements.site_id.value;
+    patch.site_id = siteId || null;
+    const typeCompet = f.elements.type_competition.value;
+    patch.type_competition = typeCompet || null;
+    const formatJeu = f.elements.format_de_jeu.value;
+    patch.format_de_jeu = formatJeu || null;
+    const adversaire = f.elements.adversaire_nom.value.trim();
+    patch.adversaire_nom = adversaire || null;
+    const domicile = f.elements.domicile_exterieur.value;
+    patch.domicile_exterieur = domicile || null;
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Enregistrement…';
+    msg.innerHTML = '';
+    try {
+      const res = await SupabaseHub.updateEvenement(MODAL_EDIT_EVENT_ID, patch);
+      if (!res || !res.ok) {
+        msg.innerHTML = '<div class="evt-form-error">Échec : ' + escHtml((res && res.error) || 'erreur inconnue') + '</div>';
+        const mb = document.querySelector('#evt-overlay-edit .evt-modal-body');
+        if (mb) mb.scrollTop = 0;
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Enregistrer';
+        return;
+      }
+      msg.innerHTML = '<div class="evt-form-success">✅ Évènement mis à jour.</div>';
+      const mb = document.querySelector('#evt-overlay-edit .evt-modal-body');
+      if (mb) mb.scrollTop = 0;
+      const evtId = MODAL_EDIT_EVENT_ID;
+      setTimeout(async () => {
+        closeModalEdit();
+        closeFiche();
+        await reloadEvents();
+        openFiche(evtId);
+      }, 500);
+    } catch (err) {
+      console.error('submitModalEdit', err);
+      msg.innerHTML = '<div class="evt-form-error">Erreur : ' + escHtml(err.message || String(err)) + '</div>';
+      const mb = document.querySelector('#evt-overlay-edit .evt-modal-body');
+      if (mb) mb.scrollTop = 0;
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Enregistrer';
+    }
+  }
+
+  // ────────────────────────────────────────────────
+  // E7 — Modale Édition notes internes (P2-E.2)
+  // ────────────────────────────────────────────────
+
+  let MODAL_NOTES_EVENT_ID = null;
+
+  function openModalEditNotes(evenementId) {
+    if (!evenementId) return;
+    MODAL_NOTES_EVENT_ID = evenementId;
+    const evt = EVENTS_BY_ID[evenementId];
+
+    const msg = document.getElementById('evt-notes-msg');
+    if (msg) msg.innerHTML = '';
+    const info = document.getElementById('evt-notes-info');
+    if (info && evt) {
+      info.innerHTML = '<span class="evt-modal-info-strong">' + escHtml(evt.libelle || '(sans libellé)') + '</span>';
+    }
+    const textarea = document.getElementById('evt-notes-texte');
+    if (textarea) textarea.value = (evt && evt.notes_internes) || '';
+
+    const btn = document.getElementById('evt-notes-submit');
+    if (btn) { btn.disabled = false; btn.textContent = 'Enregistrer'; }
+
+    document.getElementById('evt-overlay-notes').classList.add('show');
+  }
+
+  function closeModalEditNotes() {
+    MODAL_NOTES_EVENT_ID = null;
+    document.getElementById('evt-overlay-notes').classList.remove('show');
+  }
+
+  async function submitModalEditNotes() {
+    if (!MODAL_NOTES_EVENT_ID) return;
+    const submitBtn = document.getElementById('evt-notes-submit');
+    const msg = document.getElementById('evt-notes-msg');
+    if (!submitBtn || !msg) return;
+
+    const textarea = document.getElementById('evt-notes-texte');
+    const notes = textarea ? textarea.value.trim() : '';
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Enregistrement…';
+    msg.innerHTML = '';
+    try {
+      const res = await SupabaseHub.updateEvenement(MODAL_NOTES_EVENT_ID, {
+        notes_internes: notes || null
+      });
+      if (!res || !res.ok) {
+        msg.innerHTML = '<div class="evt-form-error">Échec : ' + escHtml((res && res.error) || 'erreur inconnue') + '</div>';
+        const mb = document.querySelector('#evt-overlay-notes .evt-modal-body');
+        if (mb) mb.scrollTop = 0;
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Enregistrer';
+        return;
+      }
+      msg.innerHTML = '<div class="evt-form-success">✅ Notes mises à jour.</div>';
+      const mb = document.querySelector('#evt-overlay-notes .evt-modal-body');
+      if (mb) mb.scrollTop = 0;
+      const evtId = MODAL_NOTES_EVENT_ID;
+      setTimeout(async () => {
+        closeModalEditNotes();
+        closeFiche();
+        await reloadEvents();
+        openFiche(evtId);
+      }, 500);
+    } catch (err) {
+      console.error('submitModalEditNotes', err);
+      msg.innerHTML = '<div class="evt-form-error">Erreur : ' + escHtml(err.message || String(err)) + '</div>';
+      const mb = document.querySelector('#evt-overlay-notes .evt-modal-body');
+      if (mb) mb.scrollTop = 0;
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Enregistrer';
+    }
   }
 
   // ============================================================
@@ -1509,14 +1752,20 @@
     document.querySelectorAll('[data-action="close-create"]').forEach(b => b.addEventListener('click', closeModalCreate));
     document.querySelectorAll('[data-action="close-cancel"]').forEach(b => b.addEventListener('click', closeModalCancel));
     document.querySelectorAll('[data-action="close-addmatch"]').forEach(b => b.addEventListener('click', closeModalAddMatch));
+    document.querySelectorAll('[data-action="close-edit"]').forEach(b => b.addEventListener('click', closeModalEdit));
+    document.querySelectorAll('[data-action="close-notes"]').forEach(b => b.addEventListener('click', closeModalEditNotes));
 
-    // S2.4.b — Submit des 3 modales
+    // S2.4.b — Submit des 3 modales + P2-E.2 modales E6/E7
     const btnCreateSubmit = document.getElementById('evt-create-submit');
     if (btnCreateSubmit) btnCreateSubmit.addEventListener('click', submitModalCreate);
     const btnCancelSubmit = document.getElementById('evt-cancel-submit');
     if (btnCancelSubmit) btnCancelSubmit.addEventListener('click', submitModalCancel);
     const btnAddMatchSubmit = document.getElementById('evt-addmatch-submit');
     if (btnAddMatchSubmit) btnAddMatchSubmit.addEventListener('click', submitModalAddMatch);
+    const btnEditSubmit = document.getElementById('evt-edit-submit');
+    if (btnEditSubmit) btnEditSubmit.addEventListener('click', submitModalEdit);
+    const btnNotesSubmit = document.getElementById('evt-notes-submit');
+    if (btnNotesSubmit) btnNotesSubmit.addEventListener('click', submitModalEditNotes);
 
     // S2.4.b — Changement de type dans E3 → afficher/masquer champs conditionnels
     document.querySelectorAll('#evt-create-form input[name=type_evenement]').forEach(radio => {
