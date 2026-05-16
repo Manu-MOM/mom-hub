@@ -2,6 +2,15 @@
 
 **État global du projet au 16 mai 2026**
 
+> 🧭 **À LIRE À TOUTE REPRISE DE TRAVAUX (ordre imposé)**
+> Avant de reprendre quoi que ce soit, dans **n'importe quelle** conv (`Production`, `Audits`, `Conception`…), lire dans cet ordre :
+> 1. **`CARTE-CONVERSATIONS-MOM-Hub.md`** — index maître : quelle conv fait quoi, laquelle ouvrir. Se place *au-dessus* de ce STATE.
+> 2. **`PASSATION.md`** — kit de démarrage générique (discipline, où trouver quoi).
+> 3. **CE `STATE.md`** — vérité opérationnelle du code (la présente version, committée depuis la conv `Audits` le 16/05/2026, est la dernière en date — toute copie antérieure est périmée).
+> 4. Le **message de passation thématique** éventuel collé en tête de la conv reprise.
+>
+> Les 3 fronts vivants portent des noms courts : **`Production`** (code/SQL/déploiement), **`Audits`** (modélisation/audits/doctrine, ← *cette conv a produit ce STATE*), **`Conception`** (portail + doctrine d'interconnexion). Règle de coexistence : une conv = un sujet.
+
 > ⚠️ **Note de méthode — fiabilité de ce STATE.**
 > Ce STATE.md a été **reconstruit à partir du code réellement déployé** (9 fichiers HTML de référence au 16/05/2026 : `index.html`, `evenements.html`, `joueurs.html`, `compositions.html`, `seance.html`, `bibliotheque.html`, `dashboard.html`, `login.html`, `test-supabase.html`), recoupé avec le Drive `00 - Documentation`.
 > Il **remplace** le `STATE.md — Phase 5.12 TER (15 mai 2026)` (Drive `11R263U75dm4UkzWKQC4CrJpOo1qlfVn9ZEgy-uTCjbc`), qui était **factuellement périmé** : figé le 15 mai à 13:40, donc **avant** les livraisons Évènements (« 15/05 après-midi ») et Joueurs (« 15/05 soir, Phase 5.14 »).
@@ -132,8 +141,11 @@ Inventaire `00 - Documentation` (parentId `1CkeBrMBJGChqGui4r7mVkHa3NwaLwOSK`), 
 
 ## 🚀 Pipeline (prochaines étapes)
 
-### En cours — conv Audits
-- 🔄 **Audit-Module-Suivi-Match v1 → v2** : réalignement post-Phase 4.2/4.3 + arbitrage périmètre « Suivi Match » vs « Suivi d'événement » (question doctrinale ouverte, à trancher par Manu). Préalable à la construction du module (vignette 2.4, `todo`).
+### En cours — conv `Audits`
+- ✅ **`Audit-Module-Suivi-Match-v2.md` (v2.1) PRODUIT** (16/05) : réalignement post-Phase 4.2/4.3 (5 déphasages D1–D5), frontière `presences` clarifiée, 6 dettes C11-a→f, + patch doctrinal v2.1 (corrections C1/C2/C3/P4, alignement Doctrine-Interconnexion v1.1). À déposer sur Drive.
+- ✅ **§0bis TRANCHÉ par Manu : Option C** « Suivi de rencontre » (`type_evenement ∈ {match, tournoi}`). Vignette « Suivis de Match » conservée, fichier inchangé. Débloque la conception UX (conv `Conception`).
+- ✅ **DI-6 / dette C11-a LEVÉE** : `Modelisation-Chronologie-Suivi-v1.md` PRODUIT (16/05). DDL conceptuelle + index + RLS + 5 RPC + double effet blessure documenté (PI-6). 4 arbitrages Manu : Q1 RESTRICT évènement, Q2 RESTRICT joueur (logique d'archive), Q3 score calculé + photo `evenements` à la clôture, Q4 RPC avals différées. 6 dettes Production transmises (C12-a→f) + 1 dette instruction (DI-CHR-1 procédure RGPD effacement). À déposer sur Drive.
+- ⏳ **Trou DI-7** : suivi de la séance *réalisée* (présence/déroulé/ateliers effectifs) — non couvert, nommé comme dette d'instruction distincte. NE PAS combler par extension du Suivi. Futur audit dédié, après DI-1 (audit Préparation de séance).
 
 ### Ensuite
 - Conception UX Suivi Match (conv Conception Portail) une fois l'audit v2 validé
@@ -171,4 +183,5 @@ Non vérifiables depuis le HTML déployé. À récupérer via le dernier message
 ---
 
 **STATE.md reconstruit le 16 mai 2026 depuis le code déployé (source de vérité) + Drive.**
-**Remplace le STATE 15/05 13:40 (périmé). Prochaine MAJ : après réception d'un état Production pour lever les 🟡.**
+**Committé depuis la conv `Audits` le 16/05 — version de référence, remplace le STATE 15/05 13:40 (périmé).**
+**Chaîne documentaire : `CARTE-CONVERSATIONS` (index) → `PASSATION.md` (kit démarrage) → ce `STATE.md` (vérité code) → message de passation thématique. Prochaine MAJ : après conception UX Suivi (conv `Conception`) ou implémentation des dettes C12-a→f (conv `Production`), et après réception d'un état Production pour lever les 🟡.**
