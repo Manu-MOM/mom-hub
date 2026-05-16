@@ -340,14 +340,15 @@ body.suivi-body {
   <button class="suivi-help" id="btnHelp" type="button" aria-label="Aide" hidden>?</button>
 
   <!-- =================================================================
-       DÉPENDANCES — supabase-js (CDN UMD) PUIS suivi-client.js.
+       DÉPENDANCES — supabase-js (CDN UMD) PUIS suivi-client.js PUIS
+       suivi-app.js (contrôleur de boot S-1.b).
        Écran SANS login : pas de supabase-client.js / SupabaseHub ici
        (le jeton de l'URL est l'autorisation). suivi-client.js crée
        son client de repli persistSession:false (I5).
-       Aucun script de logique applicative en S-1.a.
        ================================================================= -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="js/suivi-client.js"></script>
+  <script src="js/suivi-app.js"></script>
 
 </body>
 </html>
