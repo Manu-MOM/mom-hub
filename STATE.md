@@ -29,6 +29,13 @@
 >
 > ⚠️ **Gouvernance — divergence signalée.** Deux STATE.md ont été édités en parallèle (conv Audits et conv Conception), exactement le risque que la `CARTE-CONVERSATIONS` anticipait. Cette version-ci est la **fusion de référence** qui réconcilie les deux. Discipline à tenir désormais : ne pas ré-éditer un STATE de son côté sans repartir de cette fusion ; tout STATE produit par une conv doit d'abord intégrer la dernière fusion connue (méthode appliquée ici).
 
+> 🔧 **MAJ Production 16/05 — Phase 5.14 + Phase 2 complétion Évènements + Joueurs.**
+> Lignes portant **🔧 MAJ Prod 16/05**. Cette MAJ **repart de la fusion Audits/Conception** et y intègre les déploiements réels de code.
+> - **Phase 5.14 Module Joueurs V1-Métier** déployée 15/05 soir : 4 SQL (32-35), supabase-client **v1.12** (+3 wrappers Joueurs), joueurs.html v1.2, joueurs-browser.js v1.2, index.html v2.1 (tuile Joueurs DISPONIBLE). Arbitrage Option 1 colonnes plates TEXT[].
+> - **Phase 2 complétion fonctionnelle** déployée 16/05 : Évènements v1.4.1 → **v1.7** (+517 lignes, 4 jalons P2-E), Joueurs v1.2 → **v1.3** (+148 lignes, 3 jalons P2-J). Cadrage doctrinal strict (Doctrine Interconnexion v1.2, 3 règles : aucune anticipation Suivi, aucun couplage module→module, aucun pont pédagogie).
+> - **Plusieurs 🟡 levés en 🟢** : versions JS confirmées, dettes C9 (Évènements) et C10-f/g/h/j (Joueurs) résolues.
+> - État du code déployé **mis à jour** : Évènements et Joueurs ne sont plus « squelette UI » mais **fonctionnellement complets** (hors photos V1.1 et encadrants CRUD V1.1).
+
 > ⚠️ **Note de méthode — fiabilité de ce STATE.**
 > Ce STATE.md a été **reconstruit à partir du code réellement déployé** (9 fichiers HTML de référence au 16/05/2026 : `index.html`, `evenements.html`, `joueurs.html`, `compositions.html`, `seance.html`, `bibliotheque.html`, `dashboard.html`, `login.html`, `test-supabase.html`), recoupé avec le Drive `00 - Documentation`, puis **enrichi par la conv Conception 16/05** (livrables documentaires, pas de code).
 > Il **remplace** le `STATE.md — Phase 5.12 TER (15 mai 2026)` (Drive `11R263U75dm4UkzWKQC4CrJpOo1qlfVn9ZEgy-uTCjbc`), périmé.
@@ -45,9 +52,9 @@
 |--------|--------|--------|-------|
 | **Modules en ligne** | **5 outils métier + 3 système** | Bibliothèque, Préparation séance, Évènements, Joueurs, Compos + index/dashboard/login | 🟢 |
 | **Modules métier todo** | Suivis de Match, Statistiques | `todo` dans index.html | 🟢 |
-| **Niveau de complétude** | Hétérogène | Compos/Séance/Biblio matures ; Évènements/Joueurs = squelette UI (Évènements en v2, conv Production) | 🟢 |
+| **Niveau de complétude** | 🔧 MAJ Prod 16/05 — **Évènements et Joueurs fonctionnellement complets** (Phase 2 livrée) | Compos/Séance/Biblio matures ; Évènements v1.7 + Joueurs v1.3 = Phase 2 complète (hors photos V1.1 et encadrants CRUD V1.1) | 🟢 |
 | **Client Supabase** | `js/supabase-client.js` partagé | Chargé par tous les modules ; pattern `SupabaseHub` (auth) | 🟢 |
-| **Version supabase-client** | v1.8.6 | Dernière version connue (STATE 15/05 + audits) | 🟡 |
+| **Version supabase-client** | 🔧 MAJ Prod 16/05 — **v1.12** | +3 wrappers Joueurs (Phase 5.14) + 7 wrappers Évènements WRITE (Phase 4.4) | 🟢 |
 | **Suivi de rencontre** | **Conçu (UX), pas produit** | 🔧 MAJ Audits 16/05 (DS-1) — audit v2.1 + modélisation v1.1 + conception UX complète ; **DS-1 tranché, plus aucun verrou de modélisation** ; reste priorisation production | ⚪ |
 | **Prochaine conv métier** | Suivi : Production C12 (quand priorisé) | 🔧 MAJ Audits 16/05 (DS-1) — audit + modélisation + conception UX + DS-1 faits ; ne reste que la priorisation prod (après v2 Évènements) | ⚪ |
 
@@ -70,8 +77,8 @@ Reconstitué depuis `index.html` (badges `on`/`todo`) + en-têtes des fichiers H
 
 | Outil | Fichier | Statut | Détail prouvé |
 |---|---|---|---|
-| **Évènements** | `evenements.html` + `js/evenements-browser.js` | ✅ **EN LIGNE (squelette UI, v2 en cours conv Production)** | Livré « 15/05 après-midi » (S2.4.b). 🔧 MAJ Conception 16/05 — la conv Production travaille actuellement sur la **v2 Évènements** (complétion fonctionnelle). CSS `.evt-*`, calqué bibliotheque/seance |
-| **Joueurs** | `joueurs.html` + `js/joueurs-browser.js` | ✅ **EN LIGNE (squelette UI)** | Livré « 15/05 soir ». En-tête code : « v0 — 15 mai 2026 · Phase 5.14 · Module Joueurs · S2.1 ». Filtres postes `postes.json` v1.1 |
+| **Évènements** | `evenements.html` + `js/evenements-browser.js` | ✅ **EN LIGNE — Phase 2 complète** | 🔧 MAJ Prod 16/05 — evenements-browser **v1.7** (2098 lignes). P2-E.1 duplication, P2-E.2 édition fiche (E6/E7), P2-E.3 logistique structurée (E8), P2-E.5 mobile repliable. Dette V1.1 : encadrants CRUD (P2-E.4). | 🟢 |
+| **Joueurs** | `joueurs.html` + `js/joueurs-browser.js` | ✅ **EN LIGNE — Phase 2 complète** | 🔧 MAJ Prod 16/05 — joueurs-browser **v1.3** (1428 lignes). Phase 5.14 V1-Métier (3 RPC + 3 modales édition) + P2-J.1 conformité FFR structurée + P2-J.2 mobile + P2-J.3 FAB/footer Annuaire. sql/32-35 (ALTER + RPC). Dette V1.1 : photos (C10-a→e). | 🟢 |
 | **Compos** | `compositions.html` + `js/compositions-editor.js` | ✅ **EN LIGNE** | « Phase 4.4 UI éditeur de compositions ». Le plus mature des trois |
 | **Suivis de Match** | — | 🔲 **todo (code)** · ⚪ **conçu (UX)** | 🔧 MAJ Audits 16/05 (DS-1) — code non démarré, **conception UX complète livrée** (`Conception-Portail-UI-Suivi.md`), périmètre Option C, **DS-1 tranché (modélisation v1.1)**. Prod en attente de **priorisation seule** (plus de verrou modélisation). Sous-titre code : « Tenue · score · événements » |
 | **Statistiques** | — | 🔲 todo | « À venir » · « Équipe · joueurs · saison » |
@@ -102,18 +109,18 @@ mom-hub/
 ├── bibliotheque.html          ✅ Bibliothèque ateliers
 ├── seance.html                ✅ Préparation séance (Phase 5.12 TER)
 ├── compositions.html          ✅ Compos (Phase 4.4 UI)
-├── evenements.html            ✅ Évènements (squelette S2.x → v2 en cours Production)
-├── joueurs.html               ✅ Joueurs (v0 squelette S2.1, déployé 15/05 soir)
+├── evenements.html            ✅ Évènements (Phase 2 complète — 1719 lignes)
+├── joueurs.html               ✅ Joueurs (Phase 2 complète — 1461 lignes)
 ├── css/
 │   └── hub.css                ✅ thème commun (chargé par tous)
 ├── js/
-│   ├── supabase-client.js     ✅ client + SupabaseHub (auth)  [v1.8.6 🟡]
+│   ├── supabase-client.js     ✅ client + SupabaseHub (auth)  [v1.12 🟢 MAJ Prod 16/05]
 │   ├── dashboard-stats.js     ✅ stats portail
 │   ├── bibliotheque-browser.js ✅
 │   ├── seance-editor.js       ✅ [v1.11 TER 🟡]
 │   ├── compositions-editor.js ✅ [v2.1.5 🟡]
-│   ├── evenements-browser.js  ✅ [version 🟡 — v2 en cours Production]
-│   └── joueurs-browser.js     ✅ [version 🟡]
+│   ├── evenements-browser.js  ✅ [v1.7 🟢 MAJ Prod 16/05 — Phase 2 complet]
+│   └── joueurs-browser.js     ✅ [v1.3 🟢 MAJ Prod 16/05 — Phase 2 complet]
 └── assets/
     └── logo-m2m.png           ✅
 ```
@@ -156,7 +163,7 @@ Inventaire `00 - Documentation` (parentId `1CkeBrMBJGChqGui4r7mVkHa3NwaLwOSK`). 
 | Front | HTML/CSS/JS statique, `css/hub.css` commun, préfixes CSS par module (`.evt-*`, `.joueur-*`, `.seance-*`) | 🟢 |
 | Auth | `SupabaseHub` (getSession / isAdmin / onAuthChange / signOut) | 🟢 |
 | Backend | Supabase (`@supabase/supabase-js@2` via CDN jsdelivr) | 🟢 |
-| Client JS | `js/supabase-client.js` v1.8.6 | 🟡 |
+| Client JS | `js/supabase-client.js` **v1.12** 🔧 MAJ Prod 16/05 | 🟢 |
 | Modèle données | Phase 4.2 (`evenements`) + 4.3 (`compositions`, `composition_joueurs`, `presences`) ; `chronologie_suivi` **modélisée v1.1 non créée** (dette C12-a — 🔧 MAJ Audits 16/05 (DS-1) : **DS-1 levé, plus de pré-requis bloquant**) | ⚪/🟡 |
 | Référentiels | 7 (postes v1.1, ateliers, aptitudes, conformité-ffr, observables-match, tests-physiques, encadrants-par-categorie) — IDs courts TEXT, pas UUID (note méthodo Architecture v1.1 §6) | ⚪ |
 
@@ -177,8 +184,8 @@ Inventaire `00 - Documentation` (parentId `1CkeBrMBJGChqGui4r7mVkHa3NwaLwOSK`). 
 
 ### ⏳ Prochaines étapes — ordre imposé par les dépendances 🔧 MAJ Audits 16/05 (DS-1)
 1. ✅ **DS-1 tranché (conv `Audits`, fait)** — n'est plus un pré-requis bloquant. La contrainte définitive de `chronologie_suivi` est connue (modélisation v1.1) : la production de C12-a est débloquée.
-2. **conv `Production` — Suivi en file d'attente, PAS prioritaire maintenant** : la conv Production travaille actuellement sur la **v2 Évènements**. Le Suivi viendra après, sur priorisation Manu. Quand priorisé : produire C12-a→f (ordre modélisation : a→b→f→c→d→e), **sans pré-requis DS-1 (levé)**.
-3. **conv `Production` — en cours** : v2 Évènements (complétion fonctionnelle). Puis complétion Joueurs (au-delà du squelette S2.1). **Cadrage rappelé : phase 2 pour ces modules eux-mêmes, pas de pont anticipé vers le Suivi (doctrine v1.2 V7).**
+2. **conv `Production` — Suivi en file d'attente, PAS prioritaire maintenant** : 🔧 MAJ Prod 16/05 — la **Phase 2 complétion Évènements + Joueurs est terminée**. Le Suivi viendra après, sur priorisation Manu. Quand priorisé : produire C12-a→f (ordre modélisation : a→b→f→c→d→e), **sans pré-requis DS-1 (levé)**.
+3. **conv `Production` — 🔧 MAJ Prod 16/05 — terminé** : Phase 2 Évènements (4/5 jalons, dette V1.1 = encadrants CRUD) + Phase 2 Joueurs (3/3 jalons). **Cadrage respecté : aucune anticipation Suivi (Règle 1), aucun couplage module→module (Règle 2), aucun pont pédagogie (Règle 3).**
 4. **DI-1** (audit Préparation de séance) puis **DI-7** (trou « suivi de séance réalisée ») — conv Audits, non urgents (temporisés par Manu).
 5. **DI-CHR-1** (procédure RGPD effacement d'une personne avec historique) — conv Audits, avant mise en service du Suivi, non bloquant production.
 6. **Statistiques** (audit v1 existant, non conçu/produit) — plus tard, quand la chaîne amont génère assez de données. Tenir compte de la note aval DS-1 (essai non attribué).
@@ -198,11 +205,15 @@ Dépendances amont tracées (pas des dettes, ne pas coder par anticipation) : DA
 **Dettes Production C12 (de la modélisation, à produire quand le Suivi sera priorisé) :**
 C12-a `CREATE TABLE chronologie_suivi` (🔴 bloquant Suivi ; 🔧 MAJ Audits 16/05 (DS-1) — **pré-requis DS-1 LEVÉ**, contrainte v1.1 connue) · C12-b RLS lien éphémère · C12-c RPC inserer/annuler/corriger + déclenche blessure · C12-d `get_chronologie_rencontre` payload réduit · C12-e `consolider_score_rencontre` · C12-f `generer_lien_ephemere` + payload compo réduit (génère aussi le lien spectateur distinct).
 
-**Dettes ouvertes — 🟡 à confirmer côté Production** (inchangées, non vérifiables depuis le HTML) :
-- Dettes Évènements (C9-a `get_evenements_passes`, C9-b `get_evenement_with_encadrants`, C9-c wrappers JS, C9-d/e mineures) — **en cours de traitement, v2 Évènements conv Production**
-- Dettes Joueurs (C10-a→j : photos Storage, champs métier, RPC dédiées)
-- C7-c (CHECK personnes), C8-d (`archivee`), (m) ASCS post-import, (n) sexe/dn partenaires, (q) durcissement `coach_equipes`
-- État réel complétude fonctionnelle Évènements/Joueurs (squelette → complet)
+**Dettes ouvertes — 🔧 MAJ Prod 16/05 — mise à jour après Phase 5.14 + Phase 2 :**
+- ✅ Dettes Évènements C9-a/b/c **RÉSOLUES** (RPC + wrappers livrés v1.11/v1.12)
+- ✅ Dettes Joueurs C10-f/g/h/j **RÉSOLUES** (Phase 5.14 : sql/32-35, RPC get_joueurs_equipe/get_joueur_detail/update_joueur_metier)
+- ⏰ Dettes Joueurs C10-a→e (photos) **REPORTÉES V1.1** (décision Phase 5.14 — pan Storage complet)
+- ⏰ Dettes Joueurs C10-i (historique) **REPORTÉE V2** (RPC cross-module, post-Stats)
+- ⏰ **P2-E.4** : Encadrants CRUD Évènements (wrappers WRITE `evenement_encadrants` + form — V1.1)
+- ⏰ **P2-J-split** : Split filtre Partenaire → SAR / ASCS (incertitude codes clubs — V1.1)
+- C7-c (CHECK personnes), C8-d (`archivee`), (m) ASCS post-import, (n) sexe/dn partenaires, (q) durcissement `coach_equipes` — **inchangés**
+- ✅ État réel complétude Évènements/Joueurs : **confirmé Phase 2 complet** (plus "squelette")
 
 ---
 
@@ -228,6 +239,5 @@ C12-a `CREATE TABLE chronologie_suivi` (🔴 bloquant Suivi ; 🔧 MAJ Audits 16
 
 ---
 
-**STATE.md — version de référence (FUSION). Reconstruite conv `Audits` → enrichie conv `Conception` 16/05 → repli résolution DS-1 conv `Audits` 16/05.**
-**État code identique tout du long (aucun déploiement dans les sessions Conception/Audits documentaires ; ajouts = livrables doc + conception UX Suivi + DS-1 tranché).**
-**Chaîne documentaire : `CARTE-CONVERSATIONS` (index) → `PASSATION.md` (kit démarrage) → ce `STATE.md` (vérité code) → message de passation thématique. ⚠️ Discipline anti-divergence : toute conv qui produit un STATE repart de cette fusion. Prochaine MAJ : fin v2 Évènements (conv Production), ou implémentation C12-a→f (Suivi priorisé), ou DI-1/DI-7 (conv Audits), et réception d'un état Production pour lever les 🟡.**
+**STATE.md — version de référence (FUSION). Reconstruite conv `Audits` → enrichie conv `Conception` 16/05 → repli résolution DS-1 conv `Audits` 16/05 → 🔧 MAJ Production 16/05 (Phase 5.14 + Phase 2 complétion).**
+**Chaîne documentaire : `CARTE-CONVERSATIONS` (index) → `PASSATION.md` (kit démarrage) → ce `STATE.md` (vérité code) → message de passation thématique. ⚠️ Discipline anti-divergence : toute conv qui produit un STATE repart de cette fusion. Prochaine MAJ : implémentation C12-a→f (Suivi priorisé), ou DI-1/DI-7 (conv Audits), ou prochaine session Production.**
