@@ -424,6 +424,25 @@ window.JoueursBrowser = (function () {
     return `<div class="joueur-card-physique">${parts.join(' · ')}</div>`;
   }
 
+  // ============================================================
+  // P2-J.1 : CONFORMITÉ FFR (pastille carte + section fiche)
+  // ============================================================
+
+  /**
+   * Retourne le HTML de la pastille conformité FFR pour une carte.
+   * Données dispo dans la vue liste : numero_licence_ffr, qualite_ffr.
+   * date_fin_affiliation et validation_ffr ne sont que dans le détail.
+   * → Pastille carte = check basique (licence présente ou pas).
+   * Pour les partenaires : pas de pastille (conformité gérée club d'origine).
+   */
+  function renderCardFFRPastille(j) {
+    if (j.profil === 'partenaire') return '';
+    if (!j.numero_licence_ffr) {
+      return '<div class="joueur-card-ffr-pastille ffr-rouge" title="Licence FFR manquante">!</div>';
+    }
+    return '';
+  }
+
   function renderCard(j) {
     const color = getProfilColor(j);
     const init = getInitiales(j);
@@ -436,6 +455,7 @@ window.JoueursBrowser = (function () {
         <div class="joueur-card-body">
           <div class="joueur-card-head">
             <div class="joueur-card-avatar" style="background:${color}">${esc(init)}</div>
+            ${renderCardFFRPastille(j)}
             <div class="joueur-card-identite">
               <div class="joueur-card-name">
                 ${esc(j.prenom)} <strong>${esc(j.nom)}</strong>
@@ -711,23 +731,107 @@ window.JoueursBrowser = (function () {
   }
 
   function renderFicheFFR(d) {
-    const items = [];
-    if (d.numero_licence_ffr) items.push(['Licence FFR', d.numero_licence_ffr]);
-    if (d.qualite_ffr) items.push(['Qualité FFR', d.qualite_ffr]);
-    if (d.type_pratique) items.push(['Type pratique', d.type_pratique]);
-    if (d.date_fin_affiliation) items.push(['Fin affiliation', formatDate(d.date_fin_affiliation)]);
-    if (d.annee_arrivee_club) items.push(['Arrivée club', d.annee_arrivee_club]);
-    if (d.validation_ffr !== null && d.validation_ffr !== undefined) {
-      items.push(['Validation FFR', d.validation_ffr ? '✓ validée' : '✗ non validée']);
+    // P2-J.1 : Section conformité FFR structurée (conception §3.2-bis + §5.4 Q10)
+    const isPartenaire = d.profil === 'partenaire';
+
+    if (isPartenaire) {
+      // Partenaires : conformité gérée par club d'origine (doctrine audit §1.7)
+      return `
+        <div class="joueur-fiche-section">
+          <div class="joueur-fiche-section-title">🩺 Conformité FFR</div>
+          <div class="joueur-fiche-ffr-partenaire">
+            Pour ce joueur partenaire ${esc(d.club_principal_code || 'club d\'origine')},
+            la conformité FFR (passeports JDD/ASR, certificat médical) est gérée
+            par le club d'origine. Non vérifiable côté MOM.
+          </div>
+          ${d.numero_licence_ffr ? `<div class="joueur-fiche-row"><div class="joueur-fiche-row-lbl">Licence FFR</div><div class="joueur-fiche-row-val">${esc(d.numero_licence_ffr)}</div></div>` : ''}
+          ${d.date_fin_affiliation ? `<div class="joueur-fiche-row"><div class="joueur-fiche-row-lbl">Fin affiliation</div><div class="joueur-fiche-row-val">${esc(formatDate(d.date_fin_affiliation))}</div></div>` : ''}
+        </div>
+      `;
     }
-    if (items.length === 0) return '';
-    const rows = items.map(([k, v]) =>
-      `<div class="joueur-fiche-row"><div class="joueur-fiche-row-lbl">${esc(k)}</div><div class="joueur-fiche-row-val">${esc(v)}</div></div>`
-    ).join('');
+
+    // Joueurs MOM / F-15 / Coach / Staff : grille conformité 4 documents
+    const now = new Date();
+    const SEUIL_JOURS = 30;
+
+    // 1. Licence FFR
+    const licenceOk = !!d.numero_licence_ffr;
+    const licenceIcon = licenceOk ? '✅' : '🔴';
+    const licenceCls = licenceOk ? 'ffr-ok' : 'ffr-alert';
+    const licenceVal = licenceOk ? d.numero_licence_ffr : 'Manquante';
+
+    // 2. Affiliation (date_fin_affiliation)
+    let affilIcon = '❓', affilCls = '', affilVal = 'Non renseignée';
+    if (d.date_fin_affiliation) {
+      const dateFin = new Date(d.date_fin_affiliation);
+      const joursRestants = Math.ceil((dateFin - now) / (1000 * 60 * 60 * 24));
+      if (joursRestants < 0) {
+        affilIcon = '🔴'; affilCls = 'ffr-alert';
+        affilVal = 'Expirée depuis le ' + formatDate(d.date_fin_affiliation);
+      } else if (joursRestants <= SEUIL_JOURS) {
+        affilIcon = '🟡'; affilCls = 'ffr-warn';
+        affilVal = 'Expire le ' + formatDate(d.date_fin_affiliation) + ' (J-' + joursRestants + ')';
+      } else {
+        affilIcon = '✅'; affilCls = 'ffr-ok';
+        affilVal = 'Valide jusqu\'au ' + formatDate(d.date_fin_affiliation);
+      }
+    }
+
+    // 3. Validation FFR
+    let validIcon = '❓', validCls = '', validVal = 'Non renseignée';
+    if (d.validation_ffr === true) {
+      validIcon = '✅'; validCls = 'ffr-ok'; validVal = 'Validée';
+    } else if (d.validation_ffr === false) {
+      validIcon = '🔴'; validCls = 'ffr-alert'; validVal = 'Non validée';
+    }
+
+    // 4. Qualité FFR
+    const qualIcon = d.qualite_ffr ? '✅' : '❓';
+    const qualCls = d.qualite_ffr ? 'ffr-ok' : '';
+    const qualVal = d.qualite_ffr ? 'Qualité ' + d.qualite_ffr : 'Non renseignée';
+
+    // Infos complémentaires
+    const extraRows = [];
+    if (d.type_pratique) extraRows.push(['Type pratique', d.type_pratique]);
+    if (d.annee_arrivee_club) extraRows.push(['Arrivée club', d.annee_arrivee_club]);
+
     return `
       <div class="joueur-fiche-section">
-        <div class="joueur-fiche-section-title">🏛️ Affiliation FFR</div>
-        ${rows}
+        <div class="joueur-fiche-section-title">🩺 Conformité FFR</div>
+        <div class="joueur-fiche-ffr-grid">
+          <div class="joueur-fiche-ffr-item">
+            <span class="joueur-fiche-ffr-icon">${licenceIcon}</span>
+            <div class="joueur-fiche-ffr-detail">
+              <div class="joueur-fiche-ffr-label">Licence FFR</div>
+              <div class="joueur-fiche-ffr-value ${licenceCls}">${esc(licenceVal)}</div>
+            </div>
+          </div>
+          <div class="joueur-fiche-ffr-item">
+            <span class="joueur-fiche-ffr-icon">${affilIcon}</span>
+            <div class="joueur-fiche-ffr-detail">
+              <div class="joueur-fiche-ffr-label">Affiliation</div>
+              <div class="joueur-fiche-ffr-value ${affilCls}">${esc(affilVal)}</div>
+            </div>
+          </div>
+          <div class="joueur-fiche-ffr-item">
+            <span class="joueur-fiche-ffr-icon">${validIcon}</span>
+            <div class="joueur-fiche-ffr-detail">
+              <div class="joueur-fiche-ffr-label">Validation FFR</div>
+              <div class="joueur-fiche-ffr-value ${validCls}">${esc(validVal)}</div>
+            </div>
+          </div>
+          <div class="joueur-fiche-ffr-item">
+            <span class="joueur-fiche-ffr-icon">${qualIcon}</span>
+            <div class="joueur-fiche-ffr-detail">
+              <div class="joueur-fiche-ffr-label">Qualité</div>
+              <div class="joueur-fiche-ffr-value ${qualCls}">${esc(qualVal)}</div>
+            </div>
+          </div>
+        </div>
+        ${extraRows.map(([k, v]) =>
+          `<div class="joueur-fiche-row" style="margin-top:6px;"><div class="joueur-fiche-row-lbl">${esc(k)}</div><div class="joueur-fiche-row-val">${esc(v)}</div></div>`
+        ).join('')}
+        <div class="joueur-form-hint" style="margin-top:8px;">⚠️ Le Hub signale ces points sans bloquer. La conformité reste sous votre responsabilité.</div>
       </div>
     `;
   }
