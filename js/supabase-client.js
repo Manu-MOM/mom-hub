@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.14 — mai 2026
+ * Version : 1.15 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -271,6 +271,70 @@
  *          volet jeton rejeté backend pour escalade spectateur→
  *          rédacteur). Itération : persistance match simple ; tournoi
  *          reste borné session (décision de périmètre Manu).
+ *   v1.15 : SUIVI-COACH-1 Objet B (Mode Vidéo) — couche données
+ *          coach du Suivi. 5 wrappers + 1 helper. Ajout pur :
+ *          aucun wrapper v1.0→v1.14 modifié (signatures et
+ *          retours identiques). Signatures SQL vérifiées À LA
+ *          SOURCE (sql/C12-j, sql/C12-k, sql/C12-e via
+ *          suivi-client.js v1.1) — rien deviné.
+ *
+ *          ÉCRITURE coach (sql/C12-j, SUIVI-COACH-3, chemin
+ *          coach-authentifié ; C12-c NON touché) :
+ *          (1) insererObservableCoach(evenementUuid, obs) →
+ *              inserer_observable_coach. Le backend FORCE
+ *              source_saisie='video' + saisi_par_role='coach'
+ *              + saisi_par='coach:auth:'<auth.uid()> : le
+ *              wrapper n'envoie donc NI p_saisi_par_role NI
+ *              p_source_saisie (n'existent pas dans la
+ *              signature coach — diffère de C12-c bénévole).
+ *          (2) annulerObservableCoach(evenementUuid, ligneId) →
+ *              annuler_observable_coach (annule=TRUE, JAMAIS de
+ *              DELETE).
+ *          (3) corrigerObservableCoach(evenementUuid, ligneId,
+ *              joueurUuid, timecodeVideo?) →
+ *              corriger_observable_coach. timecode_video comblé
+ *              PAR AJOUT côté SQL (NULL ⇒ COALESCE préserve
+ *              l'existant) — interprétation B-Q2/B-Q4 tranchée
+ *              par le code C12-j, pas par le client.
+ *
+ *          LECTURE coach (sql/C12-k, SUIVI-COACH-4, jumelle
+ *          lecture de C12-j ; C12-d NON touché) :
+ *          (4) getChronologieRencontreCoach(evenementUuid,
+ *              inclureAnnulees?) → get_chronologie_rencontre_
+ *              coach. Payload contrat-IDENTIQUE à C12-d
+ *              (15 colonnes, dont source_saisie & timecode_
+ *              video pour B-Q2/B-Q4 ; nom_court PEUT être NULL
+ *              tant que C12-nom non câblé). Convention lecture
+ *              projet : renvoie un Array, [] sur erreur/vide
+ *              (identique SuiviClient.getChronologieRencontre).
+ *
+ *          CONSOLIDATION coach (sql/C12-e 2-arg, SUIVI-UI-5 ;
+ *          C12-e NON modifié — la 2-arg résout déjà l'event et
+ *          couvre le coach quand p_token est absent) :
+ *          (5) consoliderScoreRencontreCoach(evenementUuid) →
+ *              consolider_score_rencontre(p_evenement_uuid)
+ *              SANS p_token (= chemin coach). Le score n'est
+ *              JAMAIS saisi (I1) : la RPC le LIT et le recopie ;
+ *              le coach CONSTATE, ne valide pas (B-Q3 / S-4.2.a).
+ *
+ *          HELPER :
+ *          libelleJoueurSuivi(row) : RÉPLIQUE EXACTE de
+ *          SuiviClient.libelleJoueur v1.1 (règle UNIQUE de
+ *          dégradation nom_court NULL — ancre = numero_maillot
+ *          quand présent, sinon nom_court, sinon '?'). NON une
+ *          2ᵉ règle : copie fidèle, car mode-video.html ne
+ *          charge PAS suivi-client.js (écran coach). Sur une
+ *          ligne de chronologie le payload n'a pas de
+ *          numero_maillot → dégrade en nom_court / '?' (limite
+ *          acceptée projet tant que C12-nom non câblé).
+ *
+ *          Posture : tous via SupabaseHub.client (session coach
+ *          authentifiée, persistSession:true). L'autorisation
+ *          (rôle coach/admin + équipe-staff, Option A) est
+ *          PORTÉE PAR LE BACKEND (C12-j/C12-k helpers) et
+ *          remontée fidèlement en { ok:false, error } sans être
+ *          réinterprétée ni dupliquée côté client (anti-
+ *          invention, même principe que PI-7/genererLien).
  */
 
 (function (global) {
@@ -2551,6 +2615,283 @@
       // succès avec data:null (PAS une erreur — Objet A → état 2).
       const row = Array.isArray(data) && data.length > 0 ? data[0] : null;
       return { ok: true, data: row };
+    },
+
+    // ============================================================
+    // SUIVI-COACH-1 OBJET B — MODE VIDÉO · couche données coach
+    // v1.15 · C12-j (écriture) + C12-k (lecture) + C12-e (conso)
+    // Signatures SQL vérifiées à la source. Ajouts purs.
+    // ============================================================
+
+    /**
+     * Helper d'affichage joueur — RÉPLIQUE EXACTE de
+     * SuiviClient.libelleJoueur (suivi-client.js v1.1). Règle
+     * UNIQUE de dégradation nom_court NULL, NON dupliquée-
+     * divergente : copie fidèle car l'écran coach Mode Vidéo ne
+     * charge pas suivi-client.js. Ancre = numero_maillot si
+     * présent ; sinon nom_court ; sinon '?'. Ne casse jamais
+     * l'écran. NB : une ligne de get_chronologie_rencontre_coach
+     * n'a PAS de numero_maillot → dégrade en nom_court / '?'
+     * (limite acceptée projet tant que C12-nom non câblé).
+     *
+     * @param {Object} row ligne portant numero_maillot? + nom_court?
+     * @returns {string} ex. "7 ROOS" · "ROOS" · "7" · "?"
+     */
+    libelleJoueurSuivi(row) {
+      if (!row) return '?';
+      const num = (row.numero_maillot !== undefined && row.numero_maillot !== null)
+        ? String(row.numero_maillot) : null;
+      const nom = (row.nom_court && String(row.nom_court).trim() !== '')
+        ? String(row.nom_court).trim() : null;
+      if (num && nom) return num + ' ' + nom;
+      if (num) return num;
+      if (nom) return nom;
+      return '?';
+    },
+
+    /**
+     * Charge la chronologie d'une rencontre pour le COACH
+     * authentifié (Mode Vidéo). Encapsule la RPC SECURITY
+     * DEFINER get_chronologie_rencontre_coach (sql/C12-k).
+     * Signature SQL réelle (fait foi) :
+     *   get_chronologie_rencontre_coach(
+     *     p_evenement_uuid   UUID,
+     *     p_inclure_annulees BOOLEAN DEFAULT FALSE
+     *   ) RETURNS TABLE (15 colonnes, contrat IDENTIQUE à C12-d :
+     *     id, horodatage, minute_match, periode, observable_id,
+     *     categorie_obs, valeur_points, mode_saisie,
+     *     equipe_concernee, joueur_uuid, nom_court,
+     *     saisi_par_role, source_saisie, timecode_video, annule)
+     *
+     * Autorisation Option A (rôle coach/admin + équipe-staff)
+     * portée par C12-k (helpers C12-j) : un refus revient en
+     * error SQL — ici, convention lecture projet = renvoyer []
+     * (jamais d'exception propagée), comme
+     * SuiviClient.getChronologieRencontre. L'écran distingue
+     * « vide » vs « refus » via un appel témoin si besoin ;
+     * le détail du refus reste loggé en console.
+     *
+     * Tri horodatage ASC (ordre de jeu). nom_court PEUT être
+     * NULL (dette C12-nom) → libelleJoueurSuivi() pour afficher.
+     *
+     * @param {string} evenementUuid UUID de la rencontre
+     * @param {boolean} [inclureAnnulees=false] true = vue audit
+     * @returns {Promise<Array>} lignes (15 champs), [] si
+     *          erreur/refus/vide
+     */
+    async getChronologieRencontreCoach(evenementUuid, inclureAnnulees) {
+      if (!evenementUuid) {
+        console.error('MOM Hub: getChronologieRencontreCoach() requiert un evenementUuid');
+        return [];
+      }
+      const params = { p_evenement_uuid: evenementUuid };
+      if (inclureAnnulees === true) params.p_inclure_annulees = true;
+      const { data, error } = await client.rpc('get_chronologie_rencontre_coach', params);
+      if (error) {
+        console.error('MOM Hub: getChronologieRencontreCoach()', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * Insère une ligne chronologie en Mode Vidéo (coach).
+     * Encapsule la RPC SECURITY DEFINER inserer_observable_coach
+     * (sql/C12-j). Signature SQL réelle (fait foi) :
+     *   inserer_observable_coach(
+     *     p_evenement_uuid   UUID,
+     *     p_observable_id    TEXT,
+     *     p_categorie_obs    TEXT,
+     *     p_valeur_points    INTEGER,
+     *     p_equipe_concernee TEXT,
+     *     p_joueur_uuid      UUID     DEFAULT NULL,
+     *     p_mode_saisie      TEXT     DEFAULT 'normal',
+     *     p_minute_match     INTEGER  DEFAULT NULL,
+     *     p_periode          INTEGER  DEFAULT 1,
+     *     p_timecode_video   INTERVAL DEFAULT NULL,
+     *     p_est_blessure     BOOLEAN  DEFAULT FALSE
+     *   ) RETURNS TABLE (id UUID, horodatage TIMESTAMPTZ)
+     *
+     * Le backend FORCE source_saisie='video', saisi_par_role=
+     * 'coach', saisi_par='coach:auth:'<auth.uid()> : la signature
+     * coach NE PREND PAS p_saisi_par_role / p_source_saisie
+     * (diffère de C12-c bénévole) → on ne les envoie jamais.
+     * Garde-fou DS-1 (adverse→joueur NULL) et double effet
+     * blessure PI-6 portés PAR LE BACKEND (non ré-implémentés).
+     * Champs optionnels : on n'envoie QUE ce qui est fourni,
+     * les DEFAULT SQL s'appliquent au reste (doctrine).
+     *
+     * @param {string} evenementUuid UUID de la rencontre
+     * @param {Object} obs
+     *   @param {string}  obs.observableId    ref ('obs-A-…')
+     *   @param {string}  obs.categorieObs    'A' | 'B'
+     *   @param {number}  obs.valeurPoints    points (0 si non scorant)
+     *   @param {string}  obs.equipeConcernee 'notre' | 'adverse'
+     *   @param {string}  [obs.joueurUuid]    joueur (NULL si adverse / D-7)
+     *   @param {string}  [obs.modeSaisie]    'normal' | 'expert'
+     *   @param {number}  [obs.minuteMatch]
+     *   @param {number}  [obs.periode]
+     *   @param {string}  [obs.timecodeVideo] INTERVAL (position vidéo)
+     *   @param {boolean} [obs.estBlessure]   true → double effet PI-6
+     * @returns {Promise<{ok:boolean, data?:{id:string,
+     *          horodatage:string}, error?:string}>}
+     */
+    async insererObservableCoach(evenementUuid, obs) {
+      if (!evenementUuid) {
+        return { ok: false, error: 'evenementUuid manquant' };
+      }
+      if (!obs || typeof obs !== 'object') {
+        return { ok: false, error: 'Observable manquant ou invalide' };
+      }
+      if (!obs.observableId || !obs.categorieObs || !obs.equipeConcernee) {
+        return { ok: false, error: 'Champs requis manquants : observableId, categorieObs, equipeConcernee' };
+      }
+      const params = {
+        p_evenement_uuid:   evenementUuid,
+        p_observable_id:    obs.observableId,
+        p_categorie_obs:    obs.categorieObs,
+        p_valeur_points:    (typeof obs.valeurPoints === 'number') ? obs.valeurPoints : 0,
+        p_equipe_concernee: obs.equipeConcernee
+      };
+      if (obs.joueurUuid !== undefined && obs.joueurUuid !== null) {
+        params.p_joueur_uuid = obs.joueurUuid;
+      }
+      if (obs.modeSaisie !== undefined) params.p_mode_saisie = obs.modeSaisie;
+      if (obs.minuteMatch !== undefined && obs.minuteMatch !== null) {
+        params.p_minute_match = obs.minuteMatch;
+      }
+      if (obs.periode !== undefined && obs.periode !== null) {
+        params.p_periode = obs.periode;
+      }
+      if (obs.timecodeVideo !== undefined && obs.timecodeVideo !== null) {
+        params.p_timecode_video = obs.timecodeVideo;
+      }
+      if (obs.estBlessure === true) params.p_est_blessure = true;
+
+      const { data, error } = await client.rpc('inserer_observable_coach', params);
+      if (error) {
+        console.error('MOM Hub: insererObservableCoach()', error);
+        return { ok: false, error: error.message || 'Erreur inserer_observable_coach' };
+      }
+      const r = Array.isArray(data) ? (data[0] || null) : data;
+      return { ok: true, data: r };
+    },
+
+    /**
+     * Annule une ligne chronologie en Mode Vidéo (coach).
+     * Encapsule annuler_observable_coach (sql/C12-j). Signature
+     * SQL réelle (fait foi) :
+     *   annuler_observable_coach(p_evenement_uuid UUID,
+     *                            p_ligne_id UUID) RETURNS VOID
+     * Met annule=TRUE, JAMAIS de DELETE (trace conservée, exclue
+     * du score recalculé). Le backend vérifie que la ligne
+     * appartient bien à la rencontre.
+     *
+     * @param {string} evenementUuid UUID de la rencontre
+     * @param {string} ligneId       UUID de la ligne à annuler
+     * @returns {Promise<{ok:boolean, error?:string}>}
+     */
+    async annulerObservableCoach(evenementUuid, ligneId) {
+      if (!evenementUuid) {
+        return { ok: false, error: 'evenementUuid manquant' };
+      }
+      if (!ligneId) {
+        return { ok: false, error: 'ligneId manquant' };
+      }
+      const { error } = await client.rpc('annuler_observable_coach', {
+        p_evenement_uuid: evenementUuid,
+        p_ligne_id:       ligneId
+      });
+      if (error) {
+        console.error('MOM Hub: annulerObservableCoach()', error);
+        return { ok: false, error: error.message || 'Erreur annuler_observable_coach' };
+      }
+      return { ok: true };
+    },
+
+    /**
+     * Corrige l'attribution joueur (et/ou comble le timecode
+     * vidéo) d'une ligne, en Mode Vidéo (coach). Encapsule
+     * corriger_observable_coach (sql/C12-j). Signature SQL
+     * réelle (fait foi) :
+     *   corriger_observable_coach(
+     *     p_evenement_uuid UUID,
+     *     p_ligne_id       UUID,
+     *     p_joueur_uuid    UUID,
+     *     p_timecode_video INTERVAL DEFAULT NULL
+     *   ) RETURNS VOID
+     * p_joueur_uuid n'a PAS de défaut SQL → toujours transmis
+     * (valeur null acceptée = désattribution ; le backend
+     * applique DS-1 : adverse + joueur non NULL ⇒ refus).
+     * p_timecode_video comblé PAR AJOUT côté SQL : NULL ⇒
+     * COALESCE conserve l'existant (ne l'écrase jamais avec
+     * NULL). corrigee_le horodaté côté serveur. Jamais de
+     * DELETE (trace conservée).
+     *
+     * @param {string} evenementUuid UUID de la rencontre
+     * @param {string} ligneId       UUID de la ligne à corriger
+     * @param {string|null} joueurUuid nouveau joueur (null =
+     *        désattribuer)
+     * @param {string} [timecodeVideo] INTERVAL ; omis/null =
+     *        ne touche pas au timecode existant
+     * @returns {Promise<{ok:boolean, error?:string}>}
+     */
+    async corrigerObservableCoach(evenementUuid, ligneId, joueurUuid, timecodeVideo) {
+      if (!evenementUuid) {
+        return { ok: false, error: 'evenementUuid manquant' };
+      }
+      if (!ligneId) {
+        return { ok: false, error: 'ligneId manquant' };
+      }
+      const params = {
+        p_evenement_uuid: evenementUuid,
+        p_ligne_id:       ligneId,
+        p_joueur_uuid:    (joueurUuid !== undefined ? joueurUuid : null)
+      };
+      if (timecodeVideo !== undefined && timecodeVideo !== null) {
+        params.p_timecode_video = timecodeVideo;
+      }
+      const { error } = await client.rpc('corriger_observable_coach', params);
+      if (error) {
+        console.error('MOM Hub: corrigerObservableCoach()', error);
+        return { ok: false, error: error.message || 'Erreur corriger_observable_coach' };
+      }
+      return { ok: true };
+    },
+
+    /**
+     * Re-consolide le score après la revue vidéo (geste explicite
+     * « Terminer la revue vidéo », B-Q3). Encapsule la fonction
+     * 2-arg consolider_score_rencontre (sql/C12-e, NON modifié).
+     * Signature SQL réelle (fait foi) :
+     *   consolider_score_rencontre(p_evenement_uuid UUID
+     *                              [, p_token TEXT])
+     * Chemin COACH = p_evenement_uuid SEUL, SANS p_token (la
+     * 2-arg résout déjà l'événement ; STATE SUIVI-UI-5 : couvre
+     * la consolidation coach authentifié). Le score n'est JAMAIS
+     * saisi (I1) : la RPC SOMME valeur_points par camp des
+     * lignes non annulées et photographie evenements.score_mom/
+     * score_adverse. Le coach CONSTATE le résultat, ne le valide
+     * pas (S-4.2.a). Même forme de retour que
+     * SuiviClient.consoliderScoreRencontre.
+     *
+     * @param {string} evenementUuid UUID de la rencontre
+     * @returns {Promise<{ok:boolean, data?:{score_mom:number,
+     *          score_adverse:number}, error?:string}>}
+     */
+    async consoliderScoreRencontreCoach(evenementUuid) {
+      if (!evenementUuid) {
+        return { ok: false, error: 'evenementUuid manquant' };
+      }
+      const { data, error } = await client.rpc('consolider_score_rencontre', {
+        p_evenement_uuid: evenementUuid
+      });
+      if (error) {
+        console.error('MOM Hub: consoliderScoreRencontreCoach()', error);
+        return { ok: false, error: error.message || 'Erreur consolider_score_rencontre' };
+      }
+      const r = Array.isArray(data) ? (data[0] || null) : data;
+      return { ok: true, data: r };
     }
 
   };
@@ -2561,7 +2902,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.14 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.15 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
