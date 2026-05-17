@@ -7,7 +7,7 @@
  * Consomme SuiviClient (suivi-client.js) ; ne touche jamais
  * Supabase directement.
  *
- * Version : 0.6 — S-2.d (mai 2026)
+ * Version : 0.7 — S-2.e (mai 2026)
  *   v0.1 : LOGIQUE DE BOOT SEULEMENT (paquet S-1, parcours d'entrée).
  *          getToken() → chargerEtatInitial() → routage entre les 5
  *          états posés en S-1.a (loading|error|tampon|encours|
@@ -101,6 +101,19 @@
  *          (annuler dernière action adverse) câblé via
  *          annulerObservable. Dépliement historique = S-2.e.
  *          Zéro storage (I5).
+ *   v0.7 : S-2.e — dépliement de l'historique (Zone E complète).
+ *          Clôt le paquet S-2. La liste COMPLÈTE s'affiche IN SITU
+ *          par-dessus la palette (overlay dans #scrEnCours),
+ *          refermable d'1 tap, JAMAIS une autre page (spec S-2.1 ;
+ *          aucun montrerEcran, aucune navigation). Toutes les
+ *          lignes non annulées, plus récente en tête, format
+ *          provisoire S-2.b réutilisé (ligneTexte, format
+ *          définitif = S-3). Le tap sur une ligne (annuler/
+ *          corriger) est explicitement RENVOYÉ à S-3 (S-2.5) :
+ *          marqué seam, non câblé — pas d'invention. Fermeture :
+ *          bouton, tap hors-liste, Échap. Re-render à chaque
+ *          ouverture depuis _chrono (cohérent I5 : pas d'état figé,
+ *          on relit le mémo du Core). Zéro écriture, zéro storage.
  *
  * INVARIANTS :
  *   I5 — ce module ne persiste RIEN côté navigateur. L'état de
@@ -583,9 +596,11 @@
       li.textContent = ligneTexte(deux[j]);   // textContent : anti-injection
       liste.appendChild(li);
     }
-    // Le dépliement « tout voir » est S-2.e : bouton actif SEULEMENT
-    // s'il y a plus de 2 lignes, mais sans handler ici (S-2.e).
-    if (toggle) { toggle.disabled = (actives.length <= 2); }
+    // Bouton « Tout voir » : actif dès qu'il y a au moins une
+    // ligne (l'historique complet a du sens même à 1-2 lignes —
+    // c'est le mode consultation/relecture, pas qu'un « voir plus »).
+    // Handler câblé une seule fois par armerHistorique (S-2.e).
+    if (toggle) { toggle.disabled = (actives.length === 0); }
   }
 
   /**
@@ -606,6 +621,11 @@
     // Palette Zone C : rendue selon _camp (S-2.c). Structurelle —
     // les comportements au tap sont câblés en S-2.d.
     rendrePalette();
+    // Si l'historique complet (S-2.e) est ouvert au moment d'un
+    // refresh (cas S-5 polling), on le re-dérive aussi pour qu'il
+    // reste cohérent avec le Core. Sans rouvrir/fermer.
+    var ov = doc.getElementById('histoOverlay');
+    if (ov && !ov.hasAttribute('hidden')) rendreHistoComplet();
   }
 
   // Bascule camp (Zone B) — VISUEL seulement en S-2.b. Le contenu
@@ -635,7 +655,95 @@
    */
   function entrerEnCours(lignes) {
     armerBascule();
+    armerHistorique();
     rafraichirEnCours(lignes || []);
+  }
+
+  // ============================================================
+  // S-2.e · HISTORIQUE COMPLET — overlay IN SITU
+  // La liste complète s'affiche PAR-DESSUS la palette, dans
+  // #scrEnCours, refermable d'1 tap — JAMAIS une autre page
+  // (spec S-2.1 : aucun montrerEcran, aucune navigation).
+  // ============================================================
+
+  function rendreHistoComplet() {
+    var ul = doc.getElementById('histoList');
+    if (!ul) return;
+    // Re-dérivé de _chrono à CHAQUE ouverture (cohérent I5 : pas
+    // d'état figé ; _chrono est le dernier mémo du Core). Non
+    // annulées, plus récente en tête.
+    var actives = [];
+    for (var i = 0; i < _chrono.length; i++) {
+      if (_chrono[i] && _chrono[i].annule === true) continue;
+      actives.push(_chrono[i]);
+    }
+    ul.innerHTML = '';
+    if (actives.length === 0) {
+      var li0 = doc.createElement('li');
+      li0.className = 'suivi-histo__empty';
+      li0.textContent = 'Aucune action notée pour l\'instant.';
+      ul.appendChild(li0);
+      return;
+    }
+    for (var j = actives.length - 1; j >= 0; j--) {
+      var li = doc.createElement('li');
+      // Format provisoire S-2.b réutilisé (ligneTexte). Le format
+      // DÉFINITIF (1MT 0' + libellés lisibles) est tranché S-3.
+      li.textContent = ligneTexte(actives[j]);   // anti-injection
+      // SEAM S-3 : le tap sur une ligne (annuler / corriger « mauvais
+      // numéro ») est explicitement renvoyé à S-3 (S-2.5 / S-3.2).
+      // Volontairement NON câblé ici — pas d'invention de mécanique.
+      ul.appendChild(li);
+    }
+  }
+
+  function ouvrirHisto() {
+    var ov = doc.getElementById('histoOverlay');
+    var tg = doc.getElementById('zeToggle');
+    if (!ov) return;
+    rendreHistoComplet();
+    ov.removeAttribute('hidden');
+    if (tg) tg.setAttribute('aria-expanded', 'true');
+  }
+
+  function fermerHisto() {
+    var ov = doc.getElementById('histoOverlay');
+    var tg = doc.getElementById('zeToggle');
+    if (!ov) return;
+    ov.setAttribute('hidden', '');
+    if (tg) tg.setAttribute('aria-expanded', 'false');
+  }
+
+  // Armé UNE seule fois (idempotent via garde _suiviArme). Ouvre
+  // via le bouton « Tout voir » de Zone E ; ferme via le bouton
+  // Fermer, ou la touche Échap (clavier/accessibilité). Pas de
+  // fermeture au tap hors-liste : l'overlay est plein écran, il
+  // n'y a pas de « hors-liste » exploitable — la fermeture est
+  // explicite (1 tap sur Fermer), conforme « refermable d'1 tap ».
+  function armerHistorique() {
+    var tg = doc.getElementById('zeToggle');
+    var cl = doc.getElementById('histoClose');
+    if (tg && !tg._suiviArme) {
+      tg._suiviArme = true;
+      tg.addEventListener('click', function () {
+        var ov = doc.getElementById('histoOverlay');
+        if (ov && ov.hasAttribute('hidden')) ouvrirHisto();
+        else fermerHisto();
+      });
+    }
+    if (cl && !cl._suiviArme) {
+      cl._suiviArme = true;
+      cl.addEventListener('click', fermerHisto);
+    }
+    if (!doc._suiviHistoEsc) {
+      doc._suiviHistoEsc = true;
+      doc.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+          var ov = doc.getElementById('histoOverlay');
+          if (ov && !ov.hasAttribute('hidden')) fermerHisto();
+        }
+      });
+    }
   }
 
   // ============================================================
@@ -903,7 +1011,7 @@
 
   if (global.console) {
     console.log(
-      '%c🏉 MOM Hub · Suivi App v0.6 (En cours · saisie) chargé',
+      '%c🏉 MOM Hub · Suivi App v0.7 (En cours · historique) chargé',
       'color: #2d7a3e; font-weight: bold;'
     );
   }
