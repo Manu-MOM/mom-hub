@@ -7,7 +7,7 @@
  * Consomme SuiviClient (suivi-client.js) ; ne touche jamais
  * Supabase directement.
  *
- * Version : 0.12 — S-3.e (mai 2026)
+ * Version : 0.13 — S-4 (mai 2026)
  *   v0.1 : LOGIQUE DE BOOT SEULEMENT (paquet S-1, parcours d'entrée).
  *          getToken() → chargerEtatInitial() → routage entre les 5
  *          états posés en S-1.a (loading|error|tampon|encours|
@@ -203,6 +203,23 @@
  *          coach, dette SUIVI-UI-5 tracée. Le score live calculé
  *          (I1) est juste et suffit en V1. État période = var
  *          runtime transitoire (I5). Zéro storage.
+ *   v0.13: S-4 — Avant / Après. S-4.1 (écran « Avant ») était
+ *          DÉJÀ livré par le tampon S-1.c (cadrage, ⚙ chrono
+ *          replié, Mode lecture seule, aperçu compo AV-2,
+ *          Coup d'envoi) : conformité vérifiée vs checklist
+ *          S-4.1, RIEN à retoucher (la ligne d'en-tête rencontre
+ *          manquante = dette SUIVI-UI-1 déjà actée, Option
+ *          UI-stricte). S-4.2 : l'overlay de fin S-3.e devient
+ *          l'écran « Après » conforme S-4.2.b — score final en
+ *          grand (déjà) + RÉCAP SOBRE calculé depuis _chrono
+ *          (nb actions notées, nb blessures signalées ; zéro
+ *          appel réseau) + message de fin de mission. PAS de
+ *          stats (frontière aval Rapport/Stats — S-4.2.b).
+ *          Verrouillage DUR AP-3 confirmé : aucun bouton de
+ *          correction sur l'écran bénévole (_termine verrouille
+ *          déjà tout depuis S-3.e ; documenté). Pas de
+ *          consoliderScoreRencontre (SUIVI-UI-5 inchangé). Zéro
+ *          storage (I5).
  *
  * INVARIANTS :
  *   I5 — ce module ne persiste RIEN côté navigateur. L'état de
@@ -891,15 +908,37 @@
   function terminerMatch() {
     _termine = true;                         // verrouille la saisie (I4)
     majBoutonPeriode();
-    // Écran de fin MINIMAL (l'écran Après riche = S-4). Score =
-    // celui déjà calculé client (juste, I1) ; PAS de
-    // consoliderScoreRencontre (evenementUuid indisponible sans
-    // login — SUIVI-UI-5 ; consolidation = côté coach).
+    // Écran « Après » (S-4.2.b). Score = calculé client (juste,
+    // I1) ; PAS de consoliderScoreRencontre (evenementUuid
+    // indisponible sans login — SUIVI-UI-5 ; consolidation = coach).
     var s = calculerScore(_chrono);
     var fin = doc.getElementById('finOverlay');
     var sc  = doc.getElementById('finScore');
     if (sc) sc.textContent = 'MOM ' + s.mom + ' — ' + s.adv + ' ADV';
+    // Récap SOBRE (S-4.2.b) : nb d'actions notées (non annulées)
+    // + nb de blessures signalées. Calculé depuis _chrono, zéro
+    // appel réseau. PAS de stats (frontière aval Rapport/Stats).
+    var nbActions = 0, nbBlessures = 0;
+    for (var k = 0; k < _chrono.length; k++) {
+      var l = _chrono[k];
+      if (!l || l.annule === true) continue;
+      nbActions++;
+      if (l.observable_id === 'obs-A-blessure') nbBlessures++;
+    }
+    var rec = doc.getElementById('finRecap');
+    if (rec) {
+      var txt = nbActions + (nbActions > 1 ? ' actions notées' : ' action notée');
+      if (nbBlessures > 0) {
+        txt += ' · ' + nbBlessures
+             + (nbBlessures > 1 ? ' blessures signalées' : ' blessure signalée');
+      }
+      rec.textContent = txt;
+    }
     if (fin) fin.removeAttribute('hidden');
+    // Verrouillage DUR AP-3 : aucun bouton de correction sur cet
+    // écran (le bénévole constate, il ne corrige pas — la
+    // correction post-match = coach/Mode Vidéo S-5). _termine
+    // verrouille déjà toute saisie (gardes S-3.e).
     var ovs = ['histoOverlay', 'selJoueurOverlay', 'reglagesOverlay'];
     for (var i = 0; i < ovs.length; i++) {
       var o = doc.getElementById(ovs[i]);
@@ -1579,7 +1618,7 @@
 
   if (global.console) {
     console.log(
-      '%c🏉 MOM Hub · Suivi App v0.12 (bouton Période — S-3 complet) chargé',
+      '%c🏉 MOM Hub · Suivi App v0.13 (Avant/Après — S-4) chargé',
       'color: #2d7a3e; font-weight: bold;'
     );
   }
