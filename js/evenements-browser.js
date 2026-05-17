@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.5 — P2-E.1 (16 mai 2026)
+ * Version : 1.8 — SUIVI-COACH-1 Objet A (17 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -32,6 +32,39 @@
  *   v1.6 : P2-E.2 — Édition fiche : modale E6 (modifier identité) +
  *          modale E7 (notes internes). Boutons ✏️ Modifier et 📝 Notes
  *          câblés dans la fiche. Appels updateEvenement wrapper v1.12.
+ *   v1.7 : RÉCONCILIATION DE BANDEAU (pas de nouveau code ici).
+ *          Le corps contenait déjà P2-E.3 (formulaire logistique
+ *          structuré + modale E8, ~ligne 1187) et P2-E.5 (sections
+ *          fiche collapsibles mobile), conformes à l'état attendu par
+ *          STATE.md (« evenements-browser v1.7 »), mais le bandeau
+ *          était resté à v1.5/v1.6. Bandeau corrigé pour refléter le
+ *          contenu réellement présent. Aucune ligne fonctionnelle
+ *          modifiée par cette réconciliation.
+ *   v1.8 : SUIVI-COACH-1 Objet A — point d'entrée coach « générer le
+ *          lien de suivi ». Section dédiée « Suivi de la rencontre »
+ *          sur la fiche (renderSuiviSection), visible pour
+ *          type_evenement ∈ {match, tournoi} uniquement, gardée
+ *          etat ∉ {annule, archive} (calque le pattern existant des
+ *          autres actions de la fiche ; seuil exact = dette Audits
+ *          C12-gate, signalée, non inventée).
+ *          3 états adaptatifs (A-Q2) : compo pas prête (message +
+ *          raccourci compositions) / compo prête (bouton générer) /
+ *          lien actif (lien + copier·partager·régénérer). Tournoi
+ *          (A-Q3) : 1 lien par match enfant, dans le regroupement par
+ *          phase déjà utilisé par la section « Phases du tournoi »
+ *          (structure réutilisée, jamais à plat). Lien de SAISIE seul
+ *          (A-Q4) ; lien spectateur NON exposé (évolution tracée
+ *          Objet C-2 / SUIVI-UI-6, hors cycle).
+ *          État 3 borné à la SESSION (option i) : la table lien_suivi
+ *          est fermée et aucune RPC ne relit un lien existant — le
+ *          lien généré est gardé en RAM le temps de la session (jamais
+ *          localStorage). Après rechargement : retour état 2 ;
+ *          re-générer est sûr (relais backend C12-f révoque l'ancien).
+ *          « Compo prête » réutilise statutCompoBadge (notion DÉJÀ
+ *          connue de la fiche) — aucun seuil inventé. Autorité réelle
+ *          = garde-fou serveur PI-7 : un refus PI-7 est retraduit en
+ *          « compo pas réellement prête », pas en erreur brute.
+ *          Dépend de supabase-client v1.13 (wrapper genererLienEphemere).
  */
 
 (function () {
@@ -64,6 +97,15 @@
   // S2.4.b — Contexte courant des modales (event sélectionné pour E4, tournoi pour E5)
   let MODAL_CANCEL_EVENT_ID  = null;
   let MODAL_ADDMATCH_TOURNOI = null;   // objet event complet
+
+  // SUIVI-COACH-1 Objet A — état borné à la SESSION (option i).
+  // FICHE_EVT_COURANT : dernier évènement ouvert dans la fiche, pour
+  // rafraîchir la section Suivi en place sans re-fetch réseau.
+  let FICHE_EVT_COURANT = null;
+  // Lien de suivi généré pendant la session, par UUID de rencontre.
+  // En RAM UNIQUEMENT (jamais localStorage — cohérent avec l'invariant
+  // I5 du module Suivi). evtId -> { token, role, expire_le, url }
+  const SUIVI_LIENS_SESSION = new Map();
 
   const state = {
     typesActifs:   new Set(['all']),
@@ -635,6 +677,10 @@
       if (code)  code.textContent  = evt.code || '';
       if (title) title.textContent = evt.libelle || '(sans libellé)';
 
+      // SUIVI-COACH-1 Objet A : mémorise l'évènement courant pour le
+      // rafraîchissement en place de la section Suivi (sans re-fetch).
+      FICHE_EVT_COURANT = evt;
+
       // Rend le corps de la fiche
       body.innerHTML = renderFiche(evt);
 
@@ -651,6 +697,266 @@
   function closeFiche() {
     const overlay = document.getElementById('evt-fiche-overlay');
     if (overlay) overlay.classList.remove('show');
+  }
+
+  // ============================================================
+  // SUIVI DE LA RENCONTRE — SUIVI-COACH-1 Objet A
+  // ============================================================
+  // Point d'entrée coach : génère le lien éphémère de Suivi d'une
+  // rencontre via SupabaseHub.genererLienEphemere (RPC C12-f) et le
+  // transmet au bénévole. Spec : Conception-SUIVI-COACH-1-ObjetA.md.
+  // Hors périmètre intangible : suivi.html / suivi-app.js /
+  // suivi-client.js (module bénévole clôturé, sans login) NE sont PAS
+  // touchés ; on ne fait qu'émettre le lien que ce module consomme.
+
+  // URL de saisie du module bénévole (suivi.html).
+  // Contrat documenté (STATE.md) : suivi.html est sans login et lit le
+  // jeton dans le paramètre ?t=. Rien d'inventé ici.
+  function suiviBuildUrl(token) {
+    const u = new URL('suivi.html', window.location.href);
+    u.search = '?t=' + encodeURIComponent(token);
+    return u.toString();
+  }
+
+  // Compo « prête » selon la notion DÉJÀ connue de la fiche.
+  // AUCUN seuil inventé : on réutilise statutCompoBadge
+  // (prête ⟺ validee+utilisee===total && total>0).
+  function suiviCompoPrete(rencontre) {
+    const b = statutCompoBadge(rencontre && rencontre.compo_status_summary);
+    return b.cls === 'validee' || b.cls === 'utilisee';
+  }
+
+  // Le Suivi est-il proposable pour cette rencontre ?
+  // A-Q1 : match|tournoi uniquement. Garde etat ∉ {annule,archive} =
+  // calque du pattern existant des autres actions de la fiche
+  // (le seuil exact reste la dette Audits C12-gate — signalée).
+  function suiviActionnable(rencontre) {
+    if (!rencontre) return false;
+    if (rencontre.type_evenement !== 'match' && rencontre.type_evenement !== 'tournoi') return false;
+    return rencontre.etat !== 'annule' && rencontre.etat !== 'archive';
+  }
+
+  // Bloc 3-états pour UNE rencontre (match simple OU match enfant).
+  function renderSuiviRencontreBloc(rencontre) {
+    const evtId = rencontre.id;
+    const lien  = SUIVI_LIENS_SESSION.get(evtId);
+
+    // ÉTAT 3 — lien actif (borné session)
+    if (lien) {
+      let h = '<div style="padding:8px 0;">';
+      h += '<div style="font-family:\'JetBrains Mono\',monospace;font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-mute);margin-bottom:4px;">Lien de saisie (à transmettre au bénévole)</div>';
+      h += '<div style="font-family:\'JetBrains Mono\',monospace;font-size:12px;color:var(--ink);word-break:break-all;background:var(--paper-warm);padding:8px;border-radius:6px;">' + escHtml(lien.url) + '</div>';
+      h += '<div style="font-size:11px;color:var(--ink-mute);margin-top:4px;">Valable jusqu\'au ' + escHtml(formatDateShort(lien.expire_le)) + '</div>';
+      h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">';
+      h += '<button type="button" class="evt-btn" data-action="suivi-copier" data-event-id="' + escHtml(evtId) + '">📋 Copier</button>';
+      h += '<button type="button" class="evt-btn" data-action="suivi-partager" data-event-id="' + escHtml(evtId) + '">📤 Partager</button>';
+      h += '<button type="button" class="evt-btn evt-btn-danger" data-action="suivi-regenerer" data-event-id="' + escHtml(evtId) + '">🔄 Régénérer</button>';
+      h += '</div>';
+      h += '<div style="font-size:11px;color:var(--ink-mute);margin-top:6px;">Régénérer crée un nouveau lien : l\'ancien cessera <strong>immédiatement</strong> de fonctionner.</div>';
+      h += '</div>';
+      return h;
+    }
+
+    // ÉTAT 1 — compo pas prête
+    if (!suiviCompoPrete(rencontre)) {
+      let h = '<div style="padding:8px 0;">';
+      h += '<div style="font-size:13px;color:var(--ink);margin-bottom:8px;">La composition de cette rencontre doit être <strong>validée</strong> avant de pouvoir générer le lien de suivi.</div>';
+      // Raccourci honnête : compositions.html est une page réelle. Le
+      // deep-link vers la compo de CETTE rencontre nécessiterait la
+      // convention d'URL de compositions.html — NON inventée ici.
+      h += '<button type="button" class="evt-btn" data-action="suivi-aller-compo">→ Aller aux compositions</button>';
+      h += '</div>';
+      return h;
+    }
+
+    // ÉTAT 2 — compo prête → bouton générer
+    let h = '<div style="padding:8px 0;">';
+    h += '<button type="button" class="evt-btn evt-btn-primary" data-action="suivi-generer" data-event-id="' + escHtml(evtId) + '">🔗 Générer le lien de suivi</button>';
+    h += '<div style="font-size:11px;color:var(--ink-mute);margin-top:6px;">Générer peut remplacer un lien émis précédemment pour cette rencontre (l\'ancien serait alors révoqué).</div>';
+    h += '</div>';
+    return h;
+  }
+
+  // Section complète « Suivi de la rencontre » (ou '' si non
+  // applicable). id stable evt-suivi-section pour le rafraîchissement
+  // en place après génération.
+  function renderSuiviSection(evt) {
+    if (!suiviActionnable(evt)) return '';
+
+    let html = '<div class="evt-fiche-section" id="evt-suivi-section">';
+    html += '<div class="evt-fiche-section-title">🔗 Suivi de la rencontre</div>';
+
+    if (evt.type_evenement === 'tournoi') {
+      // A-Q3 : 1 lien par match enfant, DANS la structure du tournoi.
+      // Réutilise le regroupement par phase déjà utilisé par la
+      // section « Phases du tournoi » (structure non réinventée).
+      const enfants = CHILDREN_BY_PARENT[evt.id] || [];
+      if (enfants.length === 0) {
+        html += '<div class="evt-fiche-empty">Aucun match interne pour ce tournoi — créez les matchs pour générer leurs liens de suivi.</div>';
+      } else {
+        const phases = [];
+        const byPhase = {};
+        enfants.forEach(c => {
+          const p = c.phase_libelle || '(sans phase)';
+          if (!byPhase[p]) { byPhase[p] = []; phases.push(p); }
+          byPhase[p].push(c);
+        });
+        phases.forEach(phaseName => {
+          html += '<div class="evt-fiche-phase-titre">📍 ' + escHtml(phaseName) + '</div>';
+          byPhase[phaseName].forEach(child => {
+            const heure = formatHeureOnly(child.date_debut);
+            const childLibStartsVs = (child.libelle || '').toLowerCase().indexOf('vs ') === 0;
+            const advBlock = childLibStartsVs
+              ? ''
+              : (child.adversaire_nom ? ' · vs ' + escHtml(child.adversaire_nom) : '');
+            html += '<div style="border-top:1px solid var(--paper-warm);padding-top:6px;margin-top:6px;">';
+            html += '<div style="font-size:13px;color:var(--ink);font-weight:600;">' + escHtml(heure) + ' · ' + escHtml(child.libelle || '') + advBlock + '</div>';
+            if (child.etat === 'annule' || child.etat === 'archive') {
+              html += '<div style="font-size:12px;color:var(--ink-mute);padding:6px 0;">Match ' + escHtml(child.etat) + ' — pas de lien de suivi.</div>';
+            } else {
+              html += renderSuiviRencontreBloc(child);
+            }
+            html += '</div>';
+          });
+        });
+      }
+    } else {
+      // Match simple
+      html += renderSuiviRencontreBloc(evt);
+    }
+
+    html += '</div>';
+    return html;
+  }
+
+  // Rafraîchit la seule section Suivi en place (pas de re-fetch, pas
+  // de re-render de toute la fiche → ne perturbe pas les collapsibles).
+  function refreshSuiviSection() {
+    const cur = document.getElementById('evt-suivi-section');
+    if (!cur || !FICHE_EVT_COURANT) return;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = renderSuiviSection(FICHE_EVT_COURANT);
+    const fresh = tmp.firstElementChild;
+    if (fresh) {
+      cur.replaceWith(fresh);
+      bindSuiviActions();
+    }
+  }
+
+  // Génération / régénération d'un lien de saisie.
+  async function suiviGenerer(evtId, btn, isRegen) {
+    if (!evtId) return;
+    if (isRegen) {
+      const ok = window.confirm(
+        'Régénérer le lien de suivi ?\n\n' +
+        "L'ancien lien de cette rencontre cessera IMMÉDIATEMENT de " +
+        'fonctionner. Le bénévole devra utiliser le nouveau lien.'
+      );
+      if (!ok) return;
+    }
+    const labelInitial = isRegen ? '🔄 Régénérer' : '🔗 Générer le lien de suivi';
+    if (btn) { btn.disabled = true; btn.textContent = isRegen ? 'Régénération…' : 'Génération…'; }
+    try {
+      const res = await SupabaseHub.genererLienEphemere(evtId);
+      if (!res || !res.ok) {
+        const msg = (res && res.error) || 'erreur inconnue';
+        // PI-7 : refus serveur faute de compo validée active. Retraduit
+        // en message métier clair (pas une erreur brute).
+        if (/PI-7|composition\s+valid|compo/i.test(msg)) {
+          alert(
+            "La composition de cette rencontre n'est pas validée côté " +
+            'serveur : le suivi ne peut pas démarrer.\n\n' +
+            'Validez la compo de la rencontre puis réessayez.'
+          );
+        } else {
+          alert('Échec de la génération du lien : ' + msg);
+        }
+        if (btn) { btn.disabled = false; btn.textContent = labelInitial; }
+        return;
+      }
+      const d = res.data;   // { token, role, expire_le }
+      SUIVI_LIENS_SESSION.set(evtId, {
+        token:     d.token,
+        role:      d.role,
+        expire_le: d.expire_le,
+        url:       suiviBuildUrl(d.token)
+      });
+      refreshSuiviSection();
+    } catch (err) {
+      console.error('MOM Hub: suiviGenerer()', err);
+      alert('Erreur inattendue : ' + (err && err.message ? err.message : err));
+      if (btn) { btn.disabled = false; btn.textContent = labelInitial; }
+    }
+  }
+
+  async function suiviCopier(evtId) {
+    const lien = SUIVI_LIENS_SESSION.get(evtId);
+    if (!lien) return;
+    try {
+      await navigator.clipboard.writeText(lien.url);
+      alert('Lien copié dans le presse-papiers.');
+    } catch (e) {
+      // Repli si Clipboard API indisponible / refusée
+      window.prompt('Copiez le lien de suivi :', lien.url);
+    }
+  }
+
+  async function suiviPartager(evtId) {
+    const lien = SUIVI_LIENS_SESSION.get(evtId);
+    if (!lien) return;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Suivi de la rencontre',
+          text:  'Lien de saisie du suivi de la rencontre',
+          url:   lien.url
+        });
+      } catch (e) {
+        // Partage annulé par l'utilisateur : silencieux
+      }
+      return;
+    }
+    // Pas de Web Share → repli copie
+    try {
+      await navigator.clipboard.writeText(lien.url);
+      alert('Partage non disponible sur cet appareil — lien copié à la place.');
+    } catch (e) {
+      window.prompt('Copiez le lien de suivi :', lien.url);
+    }
+  }
+
+  // Câble les actions de la section Suivi. Appelée par
+  // bindFicheActions() (rendu complet) ET refreshSuiviSection()
+  // (rafraîchissement partiel — les anciens noeuds ont été remplacés,
+  // donc aucun double-binding).
+  function bindSuiviActions() {
+    document.querySelectorAll('[data-action="suivi-generer"]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        suiviGenerer(this.getAttribute('data-event-id'), this, false);
+      });
+    });
+    document.querySelectorAll('[data-action="suivi-regenerer"]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        suiviGenerer(this.getAttribute('data-event-id'), this, true);
+      });
+    });
+    document.querySelectorAll('[data-action="suivi-copier"]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        suiviCopier(this.getAttribute('data-event-id'));
+      });
+    });
+    document.querySelectorAll('[data-action="suivi-partager"]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        suiviPartager(this.getAttribute('data-event-id'));
+      });
+    });
+    document.querySelectorAll('[data-action="suivi-aller-compo"]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        // Raccourci honnête vers la page compositions (pas de deep-link
+        // inventé — convention d'URL de compositions.html non connue).
+        window.location.href = 'compositions.html';
+      });
+    });
   }
 
   /**
@@ -714,6 +1020,14 @@
       html += '</div>';
       html += '</div>';
     }
+
+    // ────────────────────────────────────────────────
+    // SUIVI DE LA RENCONTRE (SUIVI-COACH-1 Objet A)
+    //   Section dédiée — match|tournoi, etat ∉ {annule,archive}.
+    //   Rendu vide ('') si non applicable (P7 : ne se manifeste que
+    //   quand pertinente).
+    // ────────────────────────────────────────────────
+    html += renderSuiviSection(evt);
 
     // ────────────────────────────────────────────────
     // 3. PHASES (si tournoi avec enfants — repris depuis CHILDREN_BY_PARENT)
@@ -953,6 +1267,8 @@
         if (id) openModalLogistique(id);
       });
     });
+    // SUIVI-COACH-1 Objet A : actions de la section Suivi
+    bindSuiviActions();
   }
 
   // ────────────────────────────────────────────────
