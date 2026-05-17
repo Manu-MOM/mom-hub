@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.12 — mai 2026
+ * Version : 1.13 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -221,6 +221,30 @@
  *          confidentialité par construction, audit §2.2). Les RPC
  *          SECURITY DEFINER bypassent la RLS et appliquent leur propre
  *          contrôle d'accès (has_role + auth.uid).
+ *
+ *   v1.13 : SUIVI-COACH-1 Objet A — 1 wrapper C12-f.
+ *          genererLienEphemere(evenementUuid, role, creePar) : ÉCRITURE
+ *          via la RPC SECURITY DEFINER generer_lien_ephemere
+ *          (sql/C12-f), qui RETURNS TABLE(token, role, expire_le) →
+ *          on prend data[0] (même pattern que updateJoueurMetier /
+ *          getEvenementWithEncadrants).
+ *          Le garde-fou métier PI-7 (compo 'validee' active = pré-
+ *          condition dure d'un lien 'saisie') est porté PAR LA RPC :
+ *          elle lève une exception explicite, remontée fidèlement ici
+ *          en { ok:false, error: <message PI-7> } sans réinterpréter
+ *          ni dupliquer la règle côté client (anti-invention).
+ *          p_config_chrono (DA-2) volontairement NON transmis : le SQL
+ *          le stocke tel quel sans l'interpréter ; le moteur chrono
+ *          n'est pas du périmètre Objet A (anti-anticipation). p_duree
+ *          laissé au défaut serveur (36 h). p_cree_par : pass-through
+ *          optionnel, jamais fabriqué ici.
+ *          Périmètre Objet A : seul le rôle 'saisie' est appelé par
+ *          l'UI ; le wrapper reflète fidèlement la RPC (param role
+ *          présent, validé sur le même CHECK que le SQL) mais la
+ *          non-exposition du lien spectateur est une décision d'UI
+ *          (A-Q4), appliquée côté evenements-browser, pas un verrou
+ *          client. Exposition spectateur tracée : Objet C-2 /
+ *          SUIVI-UI-6 (hors de ce cycle).
  */
 
 (function (global) {
@@ -2358,6 +2382,90 @@
       // La RPC retourne SETOF personnes : prendre la 1ère ligne
       const row = Array.isArray(data) && data.length > 0 ? data[0] : null;
       return { ok: true, data: row };
+    },
+
+    // ============================================================
+    // C12-f — WRAPPER SUIVI DE RENCONTRE v1.13 (SUIVI-COACH-1 Objet A)
+    // ============================================================
+
+    /**
+     * Génère un lien éphémère de Suivi de rencontre pour un évènement
+     * (point d'entrée coach — le chaînon Hub↔Suivi, Objet A).
+     *
+     * Encapsule la RPC SECURITY DEFINER generer_lien_ephemere
+     * (sql/C12-f). Signature SQL réelle (fait foi) :
+     *   generer_lien_ephemere(
+     *     p_evenement_uuid UUID,
+     *     p_role           TEXT     DEFAULT 'saisie',
+     *     p_config_chrono  JSONB    DEFAULT NULL,
+     *     p_duree          INTERVAL DEFAULT INTERVAL '36 hours',
+     *     p_cree_par       TEXT     DEFAULT NULL
+     *   ) RETURNS TABLE (token TEXT, role TEXT, expire_le TIMESTAMPTZ)
+     *
+     * La RPC RETURNS TABLE → data est un tableau ; on prend data[0]
+     * (même pattern que getEvenementWithEncadrants / updateJoueurMetier).
+     *
+     * Garde-fou PI-7 (compo 'validee' active = pré-condition dure d'un
+     * lien 'saisie') : porté PAR LA RPC, qui lève une exception
+     * explicite. Elle revient ici en error.message et est remontée
+     * fidèlement en { ok:false, error } — la règle n'est NI réinterprétée
+     * NI dupliquée côté client (anti-invention ; la traduction UX
+     * "compo pas réellement prête" se fait dans evenements-browser).
+     *
+     * Relais (S-5.2.a) : régénérer un lien 'saisie' pour la même
+     * rencontre révoque côté serveur les liens 'saisie' actifs
+     * précédents. C'est un effet de bord assumé de la RPC ; l'UI
+     * (Objet A, état 3) doit en avertir l'utilisateur AVANT l'action.
+     *
+     * Notes de périmètre Objet A :
+     *   - p_config_chrono (DA-2) NON transmis : le SQL le stocke tel
+     *     quel sans l'interpréter ; le moteur chrono EDR n'est pas du
+     *     périmètre Objet A (anti-anticipation, doctrine).
+     *   - p_duree laissé au défaut serveur (36 h).
+     *   - p_cree_par : pass-through optionnel, jamais fabriqué ici.
+     *   - role : le wrapper reflète fidèlement la RPC (valeurs validées
+     *     sur le même CHECK que le SQL). La non-exposition du lien
+     *     'spectateur' est une décision d'UI (A-Q4), appliquée côté
+     *     evenements-browser — PAS un verrou client. L'UI Objet A
+     *     n'appelle JAMAIS ce wrapper avec 'spectateur'. Exposition
+     *     spectateur tracée : Objet C-2 / SUIVI-UI-6 (hors cycle).
+     *
+     * @param {string} evenementUuid UUID de la rencontre
+     * @param {string} [role='saisie'] 'saisie' | 'spectateur'
+     * @param {string} [creePar] Trace libre optionnelle (coach)
+     * @returns {Promise<{ok: boolean, data?: {token: string, role: string, expire_le: string}, error?: string}>}
+     */
+    async genererLienEphemere(evenementUuid, role, creePar) {
+      if (!evenementUuid) {
+        return { ok: false, error: 'evenementUuid manquant' };
+      }
+      const r = role || 'saisie';
+      // Miroir du CHECK SQL lien_suivi_role_check (saisie|spectateur)
+      if (r !== 'saisie' && r !== 'spectateur') {
+        return { ok: false, error: 'Rôle de lien invalide (attendu : saisie | spectateur)' };
+      }
+
+      const params = { p_evenement_uuid: evenementUuid, p_role: r };
+      // p_cree_par : transmis seulement si fourni (jamais fabriqué).
+      // p_config_chrono / p_duree : laissés aux défauts serveur.
+      if (creePar && typeof creePar === 'string' && creePar.trim()) {
+        params.p_cree_par = creePar.trim();
+      }
+
+      const { data, error } = await client.rpc('generer_lien_ephemere', params);
+
+      if (error) {
+        // Inclut le refus PI-7 (RAISE EXCEPTION côté RPC) : remonté tel
+        // quel, l'UI le traduit en "compo pas réellement prête".
+        console.error('MOM Hub: genererLienEphemere()', error);
+        return { ok: false, error: error.message || 'Erreur generer_lien_ephemere' };
+      }
+      // RETURNS TABLE → prendre la 1ère ligne
+      const row = Array.isArray(data) && data.length > 0 ? data[0] : null;
+      if (!row) {
+        return { ok: false, error: "La RPC generer_lien_ephemere n'a renvoyé aucun jeton" };
+      }
+      return { ok: true, data: row };
     }
 
   };
@@ -2368,7 +2476,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.12 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.13 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
