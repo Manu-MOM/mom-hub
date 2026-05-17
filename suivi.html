@@ -320,6 +320,73 @@ body.suivi-body {
   padding-top: 24px;
 }
 
+/* ---- S-2.c · palette à contenu variable (le geste central) ----
+   Gros boutons, zone pouce, sections étiquetées (spec S-2.2.a :
+   hiérarchie par urgence matérialisée par étiquettes, pas par
+   tailles seules — apport terrain). */
+.suivi-pal__section { margin-bottom: 18px; }
+.suivi-pal__section:last-child { margin-bottom: 0; }
+.suivi-pal__label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--suivi-encre-doux);
+  margin: 0 0 8px;
+}
+.suivi-pal__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+/* Bouton d'observable : gros, tapable sous gants/pluie. */
+.suivi-obs {
+  appearance: none;
+  min-height: var(--suivi-tap-min);
+  border: 2px solid var(--suivi-bord);
+  border-radius: var(--suivi-rayon);
+  background: var(--suivi-surface);
+  color: var(--suivi-encre);
+  font-family: 'Manrope', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  text-align: center;
+}
+.suivi-obs:active { transform: scale(.985); }
+.suivi-obs:focus-visible { outline: none; box-shadow: var(--suivi-focus); }
+.suivi-obs__pts {
+  font-family: 'Oswald', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--suivi-vert);
+}
+/* Scorantes mises en avant (Section 1, urgence max). */
+.suivi-obs--score {
+  border-color: var(--suivi-vert);
+  background: var(--suivi-vert-clair);
+}
+.suivi-obs--score .suivi-obs__pts { color: var(--suivi-vert-fonce); }
+/* Bouton −1 adverse (correction réflexe, S-2.2.b / S-3.4.b). */
+.suivi-obs--moins {
+  border-color: var(--suivi-danger);
+  color: var(--suivi-danger);
+  grid-column: 1 / -1;
+}
+/* Marque visuelle du seam « sélection joueur à venir » (S-3).
+   Discret : un liseré, pas un blocage (le tap est S-2.d). */
+.suivi-obs[data-seam="joueur"]::after {
+  content: "·";
+  color: var(--suivi-encre-doux);
+  font-weight: 700;
+}
+
 /* ---- S-1.c · contenu du tampon « Avant » (assemblage S-4.1) ---- */
 
 .suivi-tampon__role {
