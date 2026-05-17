@@ -575,6 +575,29 @@ body.suivi-body {
 }
 .suivi-seljoueur__foot .suivi-btn-neutre { width: 100%; }
 
+/* ---- S-3.d · panneau Réglages (bascule mode) ----
+   Réutilise .suivi-seljoueur-ov pour l'overlay + .suivi-histo__bar
+   pour le bandeau. Corps propre. */
+.suivi-reglages__corps {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 24px 18px calc(20px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.suivi-reglages__label {
+  margin: 0;
+  font-weight: 700;
+  font-size: 17px;
+}
+.suivi-reglages__note {
+  margin: 0;
+  color: var(--suivi-encre-doux);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
 /* ---- S-1.c · contenu du tampon « Avant » (assemblage S-4.1) ---- */
 
 .suivi-tampon__role {
@@ -944,6 +967,31 @@ body.suivi-body {
           <button class="suivi-btn-neutre" id="selJoueurEquipe" type="button">
             Équipe / je ne sais pas
           </button>
+        </div>
+      </div>
+
+      <!-- S-3.d — panneau Réglages (ouvert par le ⚙ de Zone A).
+           Overlay in situ. Porte la bascule de mode (geste
+           délibéré). Le moteur chrono (réglages de période) =
+           lot ultérieur, NON ici. -->
+      <div class="suivi-seljoueur-ov" id="reglagesOverlay" hidden
+           role="dialog" aria-modal="true" aria-label="Réglages">
+        <div class="suivi-histo__bar">
+          <span class="suivi-histo__title">Réglages</span>
+          <button class="suivi-histo__close" id="reglagesFermer" type="button"
+                  aria-label="Fermer les réglages">✕ Fermer</button>
+        </div>
+        <div class="suivi-reglages__corps">
+          <p class="suivi-reglages__label" id="reglagesModeLabel">
+            Mode de saisie actuel : Normal
+          </p>
+          <button class="suivi-btn-sas" id="reglagesModeBtn" type="button">
+            Basculer Normal / Expert
+          </button>
+          <p class="suivi-reglages__note">
+            Le mode s'applique aux actions notées <em>à partir de
+            maintenant</em>. Les actions déjà notées ne changent pas.
+          </p>
         </div>
       </div>
 
