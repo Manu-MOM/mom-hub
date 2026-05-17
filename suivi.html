@@ -481,6 +481,78 @@ body.suivi-body {
   text-align: center;
 }
 
+/* ---- S-3.a · Zone D — sélecteur joueur (overlay in situ) ----
+   Même principe d'overlay que l'historique : absolu dans
+   #scrEnCours, jamais une autre page. Réutilise .suivi-histo__bar
+   pour le bandeau (cohérence visuelle). */
+.suivi-seljoueur-ov {
+  position: absolute;
+  inset: 0;
+  background: var(--suivi-surface);
+  display: flex;
+  flex-direction: column;
+  z-index: 6;                      /* au-dessus de l'historique (5) */
+}
+.suivi-seljoueur-ov[hidden] { display: none; }
+.suivi-seljoueur__grille {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding: 16px;
+  align-content: start;
+}
+/* Pavé joueur : numéro en gros (l'ancre — lisible de loin sous
+   la pluie), nom court dessous (filet de vérification). */
+.suivi-seljoueur {
+  appearance: none;
+  min-height: 76px;
+  border: 2px solid var(--suivi-bord);
+  border-radius: var(--suivi-rayon);
+  background: var(--suivi-surface);
+  color: var(--suivi-encre);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 8px 6px;
+}
+.suivi-seljoueur:active { transform: scale(.97); }
+.suivi-seljoueur:focus-visible { outline: none; box-shadow: var(--suivi-focus); }
+.suivi-seljoueur__num {
+  font-family: 'Oswald', sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+}
+.suivi-seljoueur__nom {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--suivi-encre-doux);
+  text-align: center;
+  word-break: break-word;
+}
+/* Remplaçants : grisés mais TAPABLES (D-5, guidage pas blocage). */
+.suivi-seljoueur--rempla {
+  opacity: .5;
+  border-style: dashed;
+}
+/* Liseré d'état joueur (glossaire doctrinal, S-2.4) — indicatif. */
+.suivi-seljoueur[data-etat="base"]        { border-left: 5px solid var(--suivi-joueur-base); }
+.suivi-seljoueur[data-etat="modifie"]     { border-left: 5px solid var(--suivi-joueur-modifie); }
+.suivi-seljoueur[data-etat="independant"] { border-left: 5px solid var(--suivi-joueur-independant); }
+.suivi-seljoueur[data-etat="blesse"]      { border-left: 5px solid var(--suivi-joueur-blesse); }
+.suivi-seljoueur__foot {
+  flex: 0 0 auto;
+  padding: 12px 16px calc(16px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--suivi-bord);
+}
+.suivi-seljoueur__foot .suivi-btn-neutre { width: 100%; }
+
 /* ---- S-1.c · contenu du tampon « Avant » (assemblage S-4.1) ---- */
 
 .suivi-tampon__role {
@@ -832,6 +904,25 @@ body.suivi-body {
                   aria-label="Fermer l'historique">✕ Fermer</button>
         </div>
         <ul class="suivi-histo__list" id="histoList" aria-live="polite"></ul>
+      </div>
+
+      <!-- S-3.a — Zone D : sélecteur joueur. Overlay IN SITU dans
+           #scrEnCours (jamais une autre page, même principe que
+           l'historique). Surgit après une scorante côté Notre ;
+           annulable sans rien écrire. -->
+      <div class="suivi-seljoueur-ov" id="selJoueurOverlay" hidden
+           role="dialog" aria-modal="true" aria-label="Qui a marqué ?">
+        <div class="suivi-histo__bar">
+          <span class="suivi-histo__title" id="selJoueurTitre">Qui a marqué ?</span>
+          <button class="suivi-histo__close" id="selJoueurFermer" type="button"
+                  aria-label="Annuler">✕ Annuler</button>
+        </div>
+        <div class="suivi-seljoueur__grille" id="selJoueurGrille"></div>
+        <div class="suivi-seljoueur__foot">
+          <button class="suivi-btn-neutre" id="selJoueurEquipe" type="button">
+            Équipe / je ne sais pas
+          </button>
+        </div>
       </div>
 
     </section>
