@@ -7,7 +7,7 @@
  * Consomme SuiviClient (suivi-client.js) ; ne touche jamais
  * Supabase directement.
  *
- * Version : 0.5 — S-2.c (mai 2026)
+ * Version : 0.6 — S-2.d (mai 2026)
  *   v0.1 : LOGIQUE DE BOOT SEULEMENT (paquet S-1, parcours d'entrée).
  *          getToken() → chargerEtatInitial() → routage entre les 5
  *          états posés en S-1.a (loading|error|tampon|encours|
@@ -80,6 +80,27 @@
  *          marqué visuellement, non câblé (data-seam). Re-render au
  *          changement de camp (branché sur le point posé en S-2.b).
  *          Zéro écriture, zéro storage (I5).
+ *   v0.6 : S-2.d — feedback au tap + ÉCRITURE. 1 tap = 1 ligne
+ *          via SuiviClient.insererObservable (categorie_obs='A',
+ *          observableId+valeurPoints du référentiel figé,
+ *          equipeConcernee=_camp, saisiParRole='benevole',
+ *          sourceSaisie='live' ; minute/periode NON fournies —
+ *          moteur chrono = lot ultérieur, DEFAULT SQL). Après
+ *          succès : refresh via getChronologieRencontre →
+ *          rafraichirEnCours (le fil qui s'enrichit EST le
+ *          feedback, I1 / S-2.2.c ; pas de notif séparée). SEAM
+ *          S-3 géré par DÉGRADATION (validé Manu) : scorante côté
+ *          Notre → enregistrée pour l'ÉQUIPE, joueur_uuid omis
+ *          (=fallback DS-1, contrainte tranchée Option A : 'notre'
+ *          + joueur NULL autorisé). Fallback TEMPORAIRE (Zone D
+ *          pas encore là) ≠ choix délibéré D-7 ; ligne marquée
+ *          « à compléter » dans l'historique. Anti-double-tap
+ *          (bouton neutralisé pendant l'appel). Erreur réseau :
+ *          message non bloquant, bouton réactivé (persona réseau ;
+ *          rien perdu, l'état vrai reste le Core — I5). −1 adverse
+ *          (annuler dernière action adverse) câblé via
+ *          annulerObservable. Dépliement historique = S-2.e.
+ *          Zéro storage (I5).
  *
  * INVARIANTS :
  *   I5 — ce module ne persiste RIEN côté navigateur. L'état de
@@ -305,6 +326,17 @@
   // (cohérent aria-selected du markup S-2.a).
   var _camp = 'notre';
 
+  // Dernière chronologie connue (mémo runtime transitoire, I5 :
+  // jamais persisté, re-dérivé du Core à chaque boot). Sert au
+  // refresh local et au ciblage du −1 adverse. Posé par
+  // rafraichirEnCours.
+  var _chrono = [];
+
+  // Verrou anti-réentrance pendant un appel réseau d'écriture
+  // (anti-double-tap global : un tap en cours bloque les autres
+  // pour éviter doublons sous gants/stress).
+  var _ecritureEnCours = false;
+
   // ------------------------------------------------------------
   // RÉFÉRENTIEL observables-match.json v1.1 — FIGÉ EN DUR.
   // Justification : c'est un fichier Drive, PAS une RPC. L'écran
@@ -369,8 +401,14 @@
       p.textContent = (o.points > 0 ? '+' : '') + o.points;
       b.appendChild(p);
     }
-    // S-2.c : AUCUN handler de tap. L'écriture (inserer_observable)
-    // et la dégradation du seam joueur sont S-2.d. Volontaire.
+    // S-2.d : tap câblé. On capture l'observable + le camp AU
+    // MOMENT du rendu (closure) — _camp peut changer ensuite via
+    // la bascule, mais ce bouton appartient au camp où il a été
+    // rendu (rendrePalette reconstruit tout au changement de camp).
+    var campDuBouton = _camp;
+    b.addEventListener('click', function () {
+      taperObservable(o, campDuBouton, scorante, b);
+    });
     return b;
   }
 
@@ -401,13 +439,18 @@
       for (var i = 0; i < OBS.length; i++) {
         if (OBS[i].sec === 'score') grid.appendChild(btnObservable(OBS[i], true));
       }
-      // Bouton −1 (correction réflexe, S-2.2.b / S-3.4.b).
-      // Comportement = S-2.d / S-3 ; ici rendu seulement.
+      // Bouton −1 (correction réflexe, S-2.2.b / S-3.4.b) :
+      // annule la DERNIÈRE action adverse non encore annulée,
+      // sans déplier l'historique. Geste réflexe borné (pas de
+      // dégât en cascade). Câblé S-2.d.
       var moins = doc.createElement('button');
       moins.type = 'button';
       moins.className = 'suivi-obs suivi-obs--moins';
       moins.setAttribute('data-action', 'moins-adverse');
       moins.textContent = '−1 (annuler le dernier)';
+      moins.addEventListener('click', function () {
+        moinsAdverse(moins);
+      });
       grid.appendChild(moins);
       secA.appendChild(grid);
       zc.appendChild(secA);
@@ -496,6 +539,13 @@
     if (l.equipe_concernee !== 'adverse'
         && (l.joueur_uuid || l.nom_court)) {
       joueur = ' · ' + global.SuiviClient.libelleJoueur(l);
+    } else if (l.equipe_concernee !== 'adverse'
+               && typeof l.valeur_points === 'number'
+               && l.valeur_points > 0) {
+      // Scorante côté nous SANS joueur = fallback DS-1 (Zone D /
+      // S-3 pas encore là, ou choix D-7 « je ne sais pas »). On le
+      // signale : le coach complétera (Mode Vidéo S-5 / Zone D S-3).
+      joueur = ' · (joueur à compléter)';
     }
     return 'P' + per + ' ' + min + "' · " + camp + ' · ' + obs + pts + joueur;
   }
@@ -544,12 +594,17 @@
    * (après écriture) et S-5 (polling). Public sur SuiviApp.
    */
   function rafraichirEnCours(lignes) {
-    rendreScore(lignes);
-    rendreHistorique(lignes);
+    // Mémo runtime TRANSITOIRE de la dernière chronologie connue.
+    // Sert au −1 adverse (cibler la dernière action adverse) et
+    // évite une relecture réseau pour ce calcul. JAMAIS persisté
+    // (I5) : un reload re-dérive tout du Core via boot().
+    _chrono = Array.isArray(lignes) ? lignes : [];
+    rendreScore(_chrono);
+    rendreHistorique(_chrono);
     // Zone A chrono : placeholder statique laissé tel quel (markup
     // S-2.a). Le moteur chrono est un lot dédié ultérieur.
     // Palette Zone C : rendue selon _camp (S-2.c). Structurelle —
-    // les comportements au tap sont S-2.d.
+    // les comportements au tap sont câblés en S-2.d.
     rendrePalette();
   }
 
@@ -581,6 +636,158 @@
   function entrerEnCours(lignes) {
     armerBascule();
     rafraichirEnCours(lignes || []);
+  }
+
+  // ============================================================
+  // S-2.d · FEEDBACK AU TAP + ÉCRITURE
+  // 1 tap = 1 ligne (insererObservable). Le fil de l'historique
+  // qui s'enrichit EST le feedback (I1 / S-2.2.c) — pas de notif
+  // séparée. Le score se recalcule du Core (jamais saisi — I1).
+  // ============================================================
+
+  // Petit feedback visuel immédiat au tap (certitude sous pluie/
+  // stress, S-2.2.c) AVANT même le retour réseau : le bouton
+  // s'enfonce. La confirmation RÉELLE = la ligne qui apparaît
+  // après refresh (I1).
+  function flashBouton(btn) {
+    if (!btn) return;
+    btn.classList.add('suivi-obs--flash');
+    global.setTimeout(function () {
+      btn.classList.remove('suivi-obs--flash');
+    }, 220);
+  }
+
+  // Bandeau d'erreur non bloquant (persona réseau instable : une
+  // erreur d'écriture n'est pas un drame, rien n'est perdu —
+  // l'état vrai reste le Core, I5 ; le bénévole peut re-taper).
+  function erreurEphemere(msg) {
+    var zc = doc.getElementById('zoneC');
+    if (!zc) return;
+    var old = doc.getElementById('suiviErrFlash');
+    if (old) old.remove();
+    var d = doc.createElement('div');
+    d.id = 'suiviErrFlash';
+    d.className = 'suivi-err-flash';
+    d.setAttribute('role', 'status');
+    d.textContent = msg;
+    zc.insertBefore(d, zc.firstChild);
+    global.setTimeout(function () {
+      var e = doc.getElementById('suiviErrFlash');
+      if (e) e.remove();
+    }, 4000);
+  }
+
+  // Relit la chronologie du Core et rafraîchit l'écran. SEUL point
+  // de relecture réseau après écriture (I5 : on ne fait jamais
+  // confiance à un état local ; on re-dérive du Core). Réutilisé
+  // par S-5 (polling).
+  function refreshDepuisCore() {
+    return global.SuiviClient.getChronologieRencontre(_token)
+      .then(function (lignes) {
+        rafraichirEnCours(lignes || []);
+      })
+      .catch(function (e) {
+        if (global.console) console.error('MOM Hub Suivi: refreshDepuisCore()', e);
+        // On NE casse pas l'écran : l'ancienne vue reste affichée,
+        // un prochain tap/polling re-tentera (persona réseau).
+      });
+  }
+
+  /**
+   * Tap sur un observable de la palette. Construit le payload
+   * conforme à la signature insererObservable (vérifiée à la
+   * source) et écrit. SEAM S-3 géré par DÉGRADATION (validé) :
+   * scorante côté Notre → enregistrée pour l'ÉQUIPE, joueurUuid
+   * OMIS (= fallback DS-1, contrainte tranchée Option A). Fallback
+   * TEMPORAIRE (Zone D = S-3 pas encore là), ≠ choix délibéré D-7 :
+   * la ligne sera marquée « à compléter ».
+   *
+   * @param o          observable du référentiel figé {id,libelle,points,sec}
+   * @param camp        'notre' | 'adverse' (capturé au rendu)
+   * @param scorante    true si section 'score'
+   * @param btn         le bouton tapé (anti-double-tap + flash)
+   */
+  function taperObservable(o, camp, scorante, btn) {
+    if (_ecritureEnCours) return;          // verrou global anti-doublon
+    if (!o || !o.id) return;
+    _ecritureEnCours = true;
+    if (btn) btn.disabled = true;
+    flashBouton(btn);
+
+    var obs = {
+      observableId:  o.id,
+      categorieObs:  'A',                  // référentiel = Cat A (S-2.c)
+      valeurPoints:  (typeof o.points === 'number') ? o.points : 0,
+      equipeConcernee: (camp === 'adverse') ? 'adverse' : 'notre',
+      saisiParRole:  'benevole',
+      sourceSaisie:  'live'
+      // joueurUuid VOLONTAIREMENT omis :
+      //  - adverse → jamais de joueur (asymétrie S-2.2.b)
+      //  - notre   → seam S-3 : Zone D (sélection joueur) pas
+      //    encore là ; on dégrade en action ÉQUIPE (joueur NULL),
+      //    autorisé par DS-1 (Option A). Fallback temporaire.
+      // minuteMatch / periode NON fournis : moteur chrono = lot
+      //  ultérieur ; les DEFAULT SQL s'appliquent (pas d'invention).
+      // estBlessure : non géré ici. Le double effet PI-6 (blessure)
+      //  sera traité avec sa confirmation dédiée en S-3 (S-3.4.c) —
+      //  taper « Blessure » ici insère juste la ligne observable
+      //  SANS p_est_blessure (constat simple). Le déclenchement du
+      //  double effet est explicitement renvoyé à S-3.
+    };
+
+    global.SuiviClient.insererObservable(_token, obs).then(function (res) {
+      if (!res || !res.ok) {
+        erreurEphemere("Action non enregistrée. Vérifie le réseau et retape.");
+        return;
+      }
+      // Succès : on re-dérive du Core. Le fil qui s'enrichit EST
+      // le feedback (I1) — la ligne apparaît dans Zone E.
+      return refreshDepuisCore();
+    }).catch(function (e) {
+      if (global.console) console.error('MOM Hub Suivi: taperObservable()', e);
+      erreurEphemere("Action non enregistrée. Vérifie le réseau et retape.");
+    }).then(function () {
+      _ecritureEnCours = false;
+      if (btn) btn.disabled = false;       // réactivé (re-tap possible)
+    });
+  }
+
+  /**
+   * −1 adverse (S-2.2.b / S-3.4.b) : annule la DERNIÈRE action
+   * adverse non encore annulée, sans déplier l'historique. Borné
+   * (pas de cascade). Utilise annulerObservable. La cible est
+   * trouvée dans _chrono (dernière ligne equipe='adverse' &
+   * annule!=true, par horodatage = fin de tableau).
+   */
+  function moinsAdverse(btn) {
+    if (_ecritureEnCours) return;
+    var cible = null;
+    for (var i = _chrono.length - 1; i >= 0; i--) {
+      var l = _chrono[i];
+      if (l && l.equipe_concernee === 'adverse' && l.annule !== true) {
+        cible = l; break;
+      }
+    }
+    if (!cible || !cible.id) {
+      erreurEphemere("Aucune action adverse à annuler.");
+      return;
+    }
+    _ecritureEnCours = true;
+    if (btn) btn.disabled = true;
+    flashBouton(btn);
+    global.SuiviClient.annulerObservable(_token, cible.id).then(function (res) {
+      if (!res || !res.ok) {
+        erreurEphemere("Annulation non enregistrée. Vérifie le réseau.");
+        return;
+      }
+      return refreshDepuisCore();
+    }).catch(function (e) {
+      if (global.console) console.error('MOM Hub Suivi: moinsAdverse()', e);
+      erreurEphemere("Annulation non enregistrée. Vérifie le réseau.");
+    }).then(function () {
+      _ecritureEnCours = false;
+      if (btn) btn.disabled = false;
+    });
   }
 
   // ------------------------------------------------------------
@@ -696,7 +903,7 @@
 
   if (global.console) {
     console.log(
-      '%c🏉 MOM Hub · Suivi App v0.5 (En cours · palette) chargé',
+      '%c🏉 MOM Hub · Suivi App v0.6 (En cours · saisie) chargé',
       'color: #2d7a3e; font-weight: bold;'
     );
   }
