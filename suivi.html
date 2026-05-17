@@ -156,12 +156,168 @@ body.suivi-body {
 }
 
 /* Conteneurs de placeholder pour les écrans à venir.
-   Vides en S-1.a — remplis : tampon (S-1.c), En cours (S-2),
-   reprise (S-5). Balisage sémantique posé pour ne pas refondre. */
+   tampon (S-1.c), reprise (S-5). .suivi-encours a SON layout
+   spatial propre (Option B aménagée) — sorti du groupe. */
 .suivi-tampon,
-.suivi-encours,
 .suivi-reprise {
   gap: var(--suivi-gap);
+}
+
+/* =====================================================================
+   S-2.a · écran « En cours » — structure spatiale Option B aménagée
+   =====================================================================
+   Contrainte : portrait, UNE MAIN, pouce moitié basse, pluie/gants.
+   Hiérarchie verticale imposée (spec S-2.1) :
+     A bandeau fin (score+chrono, lecture seule)  — haut, compact
+     B bascule camp (onglet large)                — pleine largeur
+     E historique 2 lignes (dépliable in situ)    — ~15 %
+     C palette d'observables (zone pouce)         — ~55-60 % DOMINANTE
+   Zone D (sélecteur joueur) = modale S-3, hors S-2.
+   S-2.a = structure + style SEULEMENT. Zéro logique (lecture =
+   S-2.b, palette variable = S-2.c, tap/écriture = S-2.d,
+   dépliement = S-2.e). Conteneurs vides ici.
+   ===================================================================== */
+.suivi-encours {
+  /* annule le padding standard .suivi-screen : layout pleine hauteur */
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;          /* le scroll vit DANS la palette/historique */
+}
+
+/* ---- Zone A — bandeau score + chrono (lecture seule, I1) ---- */
+.suivi-za {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--suivi-vert-fonce);
+  color: #fff;
+}
+.suivi-za__score {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  font-size: 22px;
+  letter-spacing: .02em;
+  white-space: nowrap;
+}
+.suivi-za__score .pts { font-variant-numeric: tabular-nums; }
+/* chrono : PLACEHOLDER statique en S-2 (moteur = lot dédié ultérieur,
+   décision validée). Visuellement présent, non animé. */
+.suivi-za__chrono {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  letter-spacing: .06em;
+  opacity: .85;
+  white-space: nowrap;
+}
+.suivi-za__spacer { margin-left: auto; }
+.suivi-za__btn {
+  appearance: none;
+  border: none;
+  background: rgba(255,255,255,.14);
+  color: #fff;
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.suivi-za__btn:active { background: rgba(255,255,255,.26); }
+.suivi-za__btn:focus-visible { outline: none; box-shadow: var(--suivi-focus); }
+
+/* ---- Zone B — bascule camp Notre / Adversaire ---- */
+.suivi-zb {
+  flex: 0 0 auto;
+  display: flex;
+  border-bottom: 1px solid var(--suivi-bord);
+}
+.suivi-zb__tab {
+  appearance: none;
+  flex: 1 1 50%;
+  min-height: 56px;
+  border: none;
+  background: var(--suivi-surface);
+  color: var(--suivi-encre-doux);
+  font-family: 'Oswald', sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+}
+.suivi-zb__tab[aria-selected="true"] {
+  color: var(--suivi-encre);
+  border-bottom-color: var(--suivi-vert);
+  background: var(--suivi-vert-clair);
+}
+.suivi-zb__tab:focus-visible { outline: none; box-shadow: var(--suivi-focus); }
+
+/* ---- Zone E — historique : 2 lignes permanentes + dépliable ----
+   S-2.a pose la structure ; dépliement réel = S-2.e. */
+.suivi-ze {
+  flex: 0 0 auto;
+  background: var(--suivi-fond);
+  border-bottom: 1px solid var(--suivi-bord);
+  padding: 6px 16px;
+  min-height: 64px;
+}
+.suivi-ze__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.suivi-ze__title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--suivi-encre-doux);
+}
+.suivi-ze__toggle {
+  margin-left: auto;
+  appearance: none;
+  border: 1px solid var(--suivi-bord);
+  background: var(--suivi-surface);
+  color: var(--suivi-encre-doux);
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.suivi-ze__toggle:focus-visible { outline: none; box-shadow: var(--suivi-focus); }
+.suivi-ze__list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  font-size: 15px;
+}
+.suivi-ze__empty {
+  margin: 6px 0 0;
+  color: var(--suivi-encre-doux);
+  font-size: 14px;
+}
+
+/* ---- Zone C — palette d'observables (DOMINANTE, zone pouce) ----
+   S-2.a : conteneur scrollable vide. Contenu = S-2.c. */
+.suivi-zc {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 14px 16px calc(18px + env(safe-area-inset-bottom));
+}
+.suivi-zc__placeholder {
+  color: var(--suivi-encre-doux);
+  font-size: 14px;
+  text-align: center;
+  padding-top: 24px;
 }
 
 /* ---- S-1.c · contenu du tampon « Avant » (assemblage S-4.1) ---- */
@@ -458,7 +614,51 @@ body.suivi-body {
 
     <!-- État 4 — « En cours » (le cœur) → S-2 -->
     <section class="suivi-screen suivi-encours" id="scrEnCours" hidden aria-label="Match en cours">
-      <!-- S-2 : bandeau score+chrono, bascule camp, palette, historique. -->
+
+      <!-- ZONE A — bandeau score + chrono (lecture seule, I1 : le
+           score s'affiche, ne se saisit JAMAIS). Valeurs peuplées
+           en S-2.b. Chrono = placeholder statique (décision validée :
+           moteur chrono = lot dédié ultérieur). -->
+      <div class="suivi-za" id="zoneA">
+        <span class="suivi-za__score" id="zaScore" aria-live="polite">
+          MOM <span class="pts">0</span> — <span class="pts">0</span> ADV
+        </span>
+        <span class="suivi-za__chrono" id="zaChrono">— ·&nbsp;—'</span>
+        <span class="suivi-za__spacer"></span>
+        <button class="suivi-za__btn" id="zaCog" type="button" aria-label="Réglages">⚙</button>
+        <button class="suivi-za__btn" id="zaHelp" type="button" aria-label="Aide">?</button>
+      </div>
+
+      <!-- ZONE B — bascule camp. Logique de bascule = S-2.b ;
+           contenu de palette dépendant du camp = S-2.c. -->
+      <div class="suivi-zb" id="zoneB" role="tablist" aria-label="Camp">
+        <button class="suivi-zb__tab" id="zbNotre" type="button"
+                role="tab" aria-selected="true">Notre équipe</button>
+        <button class="suivi-zb__tab" id="zbAdverse" type="button"
+                role="tab" aria-selected="false">Adversaire</button>
+      </div>
+
+      <!-- ZONE E — historique : 2 dernières lignes permanentes,
+           dépliable in situ (S-2.e), jamais une autre page (I1).
+           Peuplé en S-2.b. -->
+      <div class="suivi-ze" id="zoneE">
+        <div class="suivi-ze__head">
+          <span class="suivi-ze__title">Historique</span>
+          <button class="suivi-ze__toggle" id="zeToggle" type="button"
+                  aria-expanded="false" disabled>Tout voir</button>
+        </div>
+        <p class="suivi-ze__empty" id="zeEmpty">Aucune action notée pour l'instant.</p>
+        <ul class="suivi-ze__list" id="zeList" hidden aria-live="polite"></ul>
+      </div>
+
+      <!-- ZONE C — palette d'observables (DOMINANTE, zone pouce).
+           Contenu variable selon Zone B = S-2.c. Vide en S-2.a. -->
+      <div class="suivi-zc" id="zoneC" aria-label="Actions">
+        <p class="suivi-zc__placeholder" id="zcPlaceholder">
+          La palette d'actions s'affichera ici.
+        </p>
+      </div>
+
     </section>
 
     <!-- État 5 — reprise/relais (train en marche) → S-5 -->
