@@ -214,6 +214,61 @@ body.suivi-body {
   white-space: nowrap;
 }
 .suivi-za__spacer { margin-left: auto; }
+/* S-3.e — bouton Période (Zone A) : libellé = prochaine action.
+   Visible mais compact ; disparaît une fois le match terminé. */
+.suivi-za__periode {
+  appearance: none;
+  border: 1px solid rgba(255,255,255,.4);
+  background: rgba(255,255,255,.12);
+  color: #fff;
+  font-family: 'Oswald', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  border-radius: 8px;
+  padding: 8px 12px;
+  min-height: 40px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.suivi-za__periode:active { background: rgba(255,255,255,.26); }
+.suivi-za__periode:focus-visible { outline: none; box-shadow: var(--suivi-focus); }
+.suivi-za__periode[hidden] { display: none; }
+/* Écran de fin minimal (S-3.e). Overlay in situ, sobre. */
+.suivi-fin {
+  position: absolute;
+  inset: 0;
+  background: var(--suivi-vert-fonce);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 7;
+  padding: 24px;
+}
+.suivi-fin[hidden] { display: none; }
+.suivi-fin__inner { text-align: center; max-width: 30ch; }
+.suivi-fin__title {
+  font-family: 'Oswald', sans-serif;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  margin: 0 0 12px;
+}
+.suivi-fin__score {
+  font-family: 'Oswald', sans-serif;
+  font-size: 38px;
+  font-weight: 700;
+  margin: 0 0 16px;
+}
+.suivi-fin__note {
+  margin: 0;
+  font-size: 15px;
+  opacity: .85;
+  line-height: 1.5;
+}
 .suivi-za__btn {
   appearance: none;
   border: none;
@@ -902,6 +957,7 @@ body.suivi-body {
           MOM <span class="pts">0</span> — <span class="pts">0</span> ADV
         </span>
         <span class="suivi-za__chrono" id="zaChrono">— ·&nbsp;—'</span>
+        <button class="suivi-za__periode" id="zaPeriode" type="button">Fin 1ʳᵉ MT</button>
         <span class="suivi-za__spacer"></span>
         <button class="suivi-za__btn" id="zaCog" type="button" aria-label="Réglages">⚙</button>
         <button class="suivi-za__btn" id="zaHelp" type="button" aria-label="Aide">?</button>
@@ -991,6 +1047,21 @@ body.suivi-body {
           <p class="suivi-reglages__note">
             Le mode s'applique aux actions notées <em>à partir de
             maintenant</em>. Les actions déjà notées ne changent pas.
+          </p>
+        </div>
+      </div>
+
+      <!-- S-3.e — écran de fin MINIMAL (post « Fin du match »).
+           L'écran Après riche (récap, message de mission) = S-4.
+           Verrouillage : la saisie est figée sur place, cet
+           overlat couvre l'écran. -->
+      <div class="suivi-fin" id="finOverlay" hidden
+           role="dialog" aria-modal="true" aria-label="Match terminé">
+        <div class="suivi-fin__inner">
+          <p class="suivi-fin__title">Match terminé</p>
+          <p class="suivi-fin__score" id="finScore">MOM 0 — 0 ADV</p>
+          <p class="suivi-fin__note">
+            La saisie est terminée. Tu peux rendre le téléphone au coach.
           </p>
         </div>
       </div>
