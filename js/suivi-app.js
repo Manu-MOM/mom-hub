@@ -7,7 +7,7 @@
  * Consomme SuiviClient (suivi-client.js) ; ne touche jamais
  * Supabase directement.
  *
- * Version : 0.9 — S-3.b (mai 2026)
+ * Version : 0.11 — S-3.c + S-3.d (mai 2026)
  *   v0.1 : LOGIQUE DE BOOT SEULEMENT (paquet S-1, parcours d'entrée).
  *          getToken() → chargerEtatInitial() → routage entre les 5
  *          états posés en S-1.a (loading|error|tampon|encours|
@@ -154,6 +154,35 @@
  *          (Zone E reste lecture-rassurance ; la spec situe le
  *          geste « je déplie, je tape » dans l'historique
  *          complet). Zéro storage (I5).
+ *   v0.10: S-3.c — blessure = CONSTAT (PI-6, bloc S-3-β). Taper
+ *          « Blessure » (palette Événements, côté Notre) ouvre la
+ *          Zone D en MODE 'blessure' : « Qui est blessé ? » → 
+ *          confirmation « Signaler {joueur} blessé » → 
+ *          insererObservable estBlessure:true (double effet PI-6
+ *          géré par le BACKEND : ligne chronologie + 
+ *          composition_joueurs.etat_joueur='blesse'). AUCUNE
+ *          recomposition (pas de « qui remplace ? » — PI-6 strict ;
+ *          l'alerte coach = côté Compositions, dette DS-2, hors
+ *          Suivi). Feedback double : ligne historique (refresh) +
+ *          le joueur repasse 'blesse' (rouge) dans la grille au
+ *          prochain rendu (compo re-fetchée). Bouton « Équipe / je
+ *          ne sais pas » MASQUÉ en mode blessure (une blessure
+ *          sans joueur n'a pas de sens — micro-décision signalée).
+ *          Adverse : pas de blessure (pas de joueur), inchangé.
+ *   v0.11: S-3.d — bascule mode Normal/Expert (M-3, bloc S-3-α).
+ *          Tag « Mode : Normal » Zone A reste LECTURE SEULE. La
+ *          bascule se fait via le ⚙ (#zaCog) = geste DÉLIBÉRÉ
+ *          (jamais accidentel sous la pluie). Mode = var runtime
+ *          transitoire (I5), envoyé via modeSaisie sur CHAQUE
+ *          insererObservable → tracé PAR LIGNE (doctrine v1.2 §5 :
+ *          « à partir de maintenant », zéro migration des lignes
+ *          déjà saisies). LIMITE SIGNALÉE : le Mode Expert ajoute
+ *          les observables Cat B ; le référentiel figé S-2.c ne
+ *          porte que les 13 Cat A. S-3.d livre le MÉCANISME de
+ *          bascule + le marquage modeSaisie ; la palette Expert
+ *          (contenu Cat B) = question référentiel/conception
+ *          tracée (dette SUIVI-UI-4), NON inventée ici.
+ *          Zéro storage (I5).
  *
  * INVARIANTS :
  *   I5 — ce module ne persiste RIEN côté navigateur. L'état de
@@ -402,6 +431,14 @@
   // numéro ». null = mode saisie (S-3.a) ; non-null = mode
   // correction (réattribuer le joueur de cette ligne). Transitoire.
   var _ligneACorriger = null;
+  // S-3.c — observable « Blessure » en attente du choix « qui est
+  // blessé ? » (Zone D mode blessure). Transitoire.
+  var _blessureObs = null;
+  // S-3.d — mode de saisie courant (capacité du moment, doctrine
+  // v1.2 §5). 'normal' | 'expert'. Var runtime TRANSITOIRE (I5 :
+  // jamais persisté). Tracé PAR LIGNE via modeSaisie ; basculer
+  // n'affecte que les saisies À PARTIR de la bascule.
+  var _mode = 'normal';
 
   // ------------------------------------------------------------
   // RÉFÉRENTIEL observables-match.json v1.1 — FIGÉ EN DUR.
@@ -710,7 +747,73 @@
     armerBascule();
     armerHistorique();
     armerSelecteurJoueur();
+    armerMode();
     rafraichirEnCours(lignes || []);
+  }
+
+  // ============================================================
+  // S-3.d · BASCULE MODE Normal / Expert (M-3, bloc S-3-α)
+  // Tag « Mode : … » Zone A = LECTURE SEULE. La bascule passe par
+  // le ⚙ = geste DÉLIBÉRÉ (jamais accidentel sous la pluie).
+  // Mode tracé PAR LIGNE via modeSaisie (doctrine v1.2 §5 : « à
+  // partir de maintenant », zéro migration). Le contenu Cat B de
+  // la palette Expert = dette SUIVI-UI-4 (référentiel/conception),
+  // NON inventé ici : S-3.d livre le mécanisme + le marquage.
+  // ============================================================
+
+  function majTagMode() {
+    var tag = doc.getElementById('tagMode');
+    if (tag) {
+      tag.innerHTML = 'Mode&nbsp;: ' + (_mode === 'expert' ? 'Expert' : 'Normal');
+    }
+  }
+
+  function basculerMode() {
+    _mode = (_mode === 'expert') ? 'normal' : 'expert';
+    majTagMode();
+    fermerPanneauReglages();
+  }
+
+  function ouvrirPanneauReglages() {
+    var ov = doc.getElementById('reglagesOverlay');
+    var lbl = doc.getElementById('reglagesModeLabel');
+    if (lbl) {
+      lbl.textContent = 'Mode de saisie actuel : '
+        + (_mode === 'expert' ? 'Expert' : 'Normal');
+    }
+    if (ov) ov.removeAttribute('hidden');
+  }
+  function fermerPanneauReglages() {
+    var ov = doc.getElementById('reglagesOverlay');
+    if (ov) ov.setAttribute('hidden', '');
+  }
+
+  function armerMode() {
+    majTagMode();
+    var cog = doc.getElementById('zaCog');
+    var fermer = doc.getElementById('reglagesFermer');
+    var toggle = doc.getElementById('reglagesModeBtn');
+    if (cog && !cog._suiviArme) {
+      cog._suiviArme = true;
+      cog.addEventListener('click', ouvrirPanneauReglages);
+    }
+    if (fermer && !fermer._suiviArme) {
+      fermer._suiviArme = true;
+      fermer.addEventListener('click', fermerPanneauReglages);
+    }
+    if (toggle && !toggle._suiviArme) {
+      toggle._suiviArme = true;
+      toggle.addEventListener('click', basculerMode);
+    }
+    if (!doc._suiviReglEsc) {
+      doc._suiviReglEsc = true;
+      doc.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+          var ov = doc.getElementById('reglagesOverlay');
+          if (ov && !ov.hasAttribute('hidden')) fermerPanneauReglages();
+        }
+      });
+    }
   }
 
   // ============================================================
@@ -911,6 +1014,17 @@
       return;
     }
 
+    // S-3.c — Blessure = CONSTAT (PI-6). Côté Notre, « Blessure »
+    // n'insère pas directement : il faut savoir QUI (Zone D mode
+    // blessure) puis confirmer. AUCUNE recomposition. Côté adverse,
+    // pas de joueur → pas de blessure joueur (le bouton n'existe
+    // pas dans la palette adverse, mais garde défensive ici).
+    if (!estAdverse && o.id === 'obs-A-blessure') {
+      flashBouton(btn);
+      ouvrirBlessure(o);                    // pas d'écriture tant que pas confirmé
+      return;
+    }
+
     _ecritureEnCours = true;
     if (btn) btn.disabled = true;
     flashBouton(btn);
@@ -921,18 +1035,16 @@
       valeurPoints:  (typeof o.points === 'number') ? o.points : 0,
       equipeConcernee: estAdverse ? 'adverse' : 'notre',
       saisiParRole:  'benevole',
-      sourceSaisie:  'live'
+      sourceSaisie:  'live',
+      modeSaisie:    _mode                 // S-3.d : tracé PAR LIGNE
       // joueurUuid omis ici à dessein :
       //  - adverse → jamais de joueur (asymétrie S-2.2.b)
       //  - notre NON scorante → pas de joueur requis (événement
       //    d'équipe : mêlée, touche… ; ou événement de jeu).
-      // Les SCORANTES Notre passent par ouvrirSelecteurJoueur
-      // (branche ci-dessus) et n'arrivent jamais ici.
+      // Les SCORANTES Notre passent par ouvrirSelecteurJoueur ;
+      // « Blessure » Notre par ouvrirBlessure (branches ci-dessus).
       // minuteMatch / periode NON fournis : moteur chrono = lot
       //  ultérieur ; DEFAULT SQL (pas d'invention).
-      // estBlessure : non géré ici. Le double effet PI-6 (blessure)
-      //  a sa confirmation dédiée en S-3.c (renvoyé). Taper
-      //  « Blessure » ici insère la ligne SANS p_est_blessure.
     };
 
     envoyerObservable(obs, btn);
@@ -1087,22 +1199,69 @@
     if (ov) ov.removeAttribute('hidden');
   }
 
+  // S-3.c — ouvre la MÊME modale en mode blessure : « Qui est
+  // blessé ? ». Le bouton « Équipe / je ne sais pas » est MASQUÉ
+  // (une blessure sans joueur n'a pas de sens — micro-décision
+  // signalée). AUCUNE recomposition proposée (PI-6).
+  function ouvrirBlessure(observable) {
+    _blessureObs = observable;
+    _obsEnAttente = null;
+    _ligneACorriger = null;
+    var ov = doc.getElementById('selJoueurOverlay');
+    var titre = doc.getElementById('selJoueurTitre');
+    var equipe = doc.getElementById('selJoueurEquipe');
+    if (titre) titre.textContent = 'Qui est blessé ?';
+    if (equipe) equipe.style.display = 'none';   // pas de blessure « équipe »
+    chargerCompoZoneD();
+    if (ov) ov.removeAttribute('hidden');
+  }
+
   function fermerSelecteurJoueur() {
     var ov = doc.getElementById('selJoueurOverlay');
     if (ov) ov.setAttribute('hidden', '');
     _obsEnAttente = null;                      // annulation = rien écrit
     _ligneACorriger = null;
+    _blessureObs = null;
+    // Restaure le bouton « Équipe / je ne sais pas » masqué en
+    // mode blessure (les modes saisie/correction le réutilisent).
+    var equipe = doc.getElementById('selJoueurEquipe');
+    if (equipe) equipe.style.display = '';
   }
 
   // Choix d'un joueur (ou null via « Équipe / je ne sais pas »).
-  // Deux modes :
+  // Trois modes :
   //  - SAISIE (S-3.a, _obsEnAttente) : nouvelle ligne via
   //    envoyerObservable. joueur null = D-7 délibéré (DS-1).
   //  - CORRECTION (S-3.b, _ligneACorriger) : corrigerObservable
-  //    sur la ligne existante. joueur null = DÉSATTRIBUER
-  //    (pendant logique de D-7 ; micro-décision signalée — la
-  //    spec S-3.2 ne la tranche pas explicitement).
+  //    sur la ligne existante. joueur null = DÉSATTRIBUER.
+  //  - BLESSURE (S-3.c, _blessureObs) : insererObservable
+  //    estBlessure:true (double effet PI-6 géré BACKEND). Joueur
+  //    obligatoire (bouton équipe masqué) ; AUCUNE recomposition.
   function choisirJoueur(joueurUuid) {
+    if (_blessureObs) {
+      var ob = _blessureObs;
+      fermerSelecteurJoueur();
+      if (!joueurUuid) return;                 // garde : blessure sans joueur ignorée
+      var obsB = {
+        observableId:  ob.id,
+        categorieObs:  'A',
+        valeurPoints:  0,
+        equipeConcernee: 'notre',
+        joueurUuid:    joueurUuid,
+        saisiParRole:  'benevole',
+        sourceSaisie:  'live',
+        modeSaisie:    _mode,                  // S-3.d : tracé PAR LIGNE
+        estBlessure:   true                    // → double effet PI-6 (backend)
+      };
+      // Feedback double : la ligne arrive via refresh (envoyer…),
+      // et le joueur repasse 'blesse' (rouge) dans la grille au
+      // prochain rendu — on force un re-fetch compo en invalidant
+      // le mémo (sinon la couleur ne bouge pas tant que la session
+      // dure). Cohérent I5 : la vérité reste le Core.
+      _compo = null;
+      envoyerObservable(obsB, null);
+      return;
+    }
     if (_ligneACorriger) {
       var ligne = _ligneACorriger;
       fermerSelecteurJoueur();
@@ -1124,7 +1283,7 @@
       });
       return;
     }
-    // Mode saisie (S-3.a) — inchangé.
+    // Mode saisie (S-3.a).
     var o = _obsEnAttente;
     if (!o) { fermerSelecteurJoueur(); return; }
     var obs = {
@@ -1133,7 +1292,8 @@
       valeurPoints:  (typeof o.points === 'number') ? o.points : 0,
       equipeConcernee: 'notre',               // Zone D = côté Notre uniquement
       saisiParRole:  'benevole',
-      sourceSaisie:  'live'
+      sourceSaisie:  'live',
+      modeSaisie:    _mode                    // S-3.d : tracé PAR LIGNE
     };
     if (joueurUuid) obs.joueurUuid = joueurUuid;
     // joueurUuid absent ⇒ « Équipe / je ne sais pas » (D-7) :
@@ -1317,7 +1477,7 @@
 
   if (global.console) {
     console.log(
-      '%c🏉 MOM Hub · Suivi App v0.9 (En cours · correction joueur) chargé',
+      '%c🏉 MOM Hub · Suivi App v0.11 (blessure + mode) chargé',
       'color: #2d7a3e; font-weight: bold;'
     );
   }
