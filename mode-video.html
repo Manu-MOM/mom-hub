@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1024">
+  <title>Mode Vidéo · Suivi de rencontre · MOM Hub</title>
+
+  <!-- Charte commune du Hub (tokens, polices, couleurs doctrinales) -->
+  <link rel="stylesheet" href="css/hub.css">
+
+  <!-- Client Supabase (coach authentifié) + wrappers Hub -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/supabase-client.js"></script>
+
+  <style>
+    /* ---------------------------------------------------------------
+       Mode Vidéo — plan de travail desktop/tablette (anti-écran-live).
+       Préfixe .mv-* (convention projet : 1 module = 1 préfixe CSS).
+       Couleurs/polices héritées de hub.css ; ici, uniquement la
+       structure propre à cet écran.
+       --------------------------------------------------------------- */
+
+    .mv-shell {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+      font-family: var(--font-corps, 'Manrope', system-ui, sans-serif);
+      color: var(--encre, #1a1f24);
+    }
+
+    /* En-tête sobre : de quelle rencontre on parle + retour */
+    .mv-entete {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid var(--trait, #e2e6ea);
+      margin-bottom: 20px;
+    }
+    .mv-entete h1 {
+      font-family: var(--font-titre, 'Oswald', sans-serif);
+      font-size: 1.6rem;
+      margin: 0;
+      letter-spacing: .02em;
+    }
+    .mv-entete .mv-sous {
+      color: var(--encre-douce, #5b6670);
+      font-size: .95rem;
+    }
+    .mv-retour {
+      color: var(--bleu-base, #1f6feb);
+      text-decoration: none;
+      font-size: .9rem;
+      white-space: nowrap;
+    }
+    .mv-retour:hover { text-decoration: underline; }
+
+    /* Bandeau de score (constaté, jamais saisi — invariant I1) */
+    .mv-score {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      background: var(--fond-doux, #f5f7f9);
+      border: 1px solid var(--trait, #e2e6ea);
+      border-radius: 10px;
+      padding: 12px 18px;
+      margin-bottom: 20px;
+    }
+    .mv-score .mv-score-val {
+      font-family: var(--font-mono, 'JetBrains Mono', monospace);
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+    .mv-score .mv-score-lbl {
+      color: var(--encre-douce, #5b6670);
+      font-size: .8rem;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    /* Plan de travail : chronologie (centre) + palette (appui) */
+    .mv-plan {
+      display: grid;
+      grid-template-columns: 1fr 280px;
+      gap: 24px;
+      align-items: start;
+    }
+    @media (max-width: 860px) {
+      .mv-plan { grid-template-columns: 1fr; }
+    }
+
+    /* --- Colonne centrale : la chronologie domine --- */
+    .mv-chrono h2,
+    .mv-palette h2 {
+      font-family: var(--font-titre, 'Oswald', sans-serif);
+      font-size: 1.05rem;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: var(--encre-douce, #5b6670);
+      margin: 0 0 12px;
+    }
+
+    .mv-ligne {
+      display: grid;
+      grid-template-columns: 64px 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 10px 12px;
+      border: 1px solid var(--trait, #e2e6ea);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      background: #fff;
+    }
+    .mv-ligne.mv-annulee {
+      opacity: .5;
+      text-decoration: line-through;
+    }
+    .mv-ligne .mv-min {
+      font-family: var(--font-mono, 'JetBrains Mono', monospace);
+      font-size: .9rem;
+      color: var(--encre-douce, #5b6670);
+    }
+    .mv-ligne .mv-quoi { font-size: .98rem; }
+    .mv-ligne .mv-quoi .mv-joueur {
+      color: var(--encre-douce, #5b6670);
+      font-size: .88rem;
+    }
+
+    /* Pastille de provenance : terrain (live) vs vidéo (coach) */
+    .mv-prov {
+      display: inline-block;
+      font-size: .72rem;
+      padding: 2px 7px;
+      border-radius: 999px;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+    .mv-prov.mv-live  { background: #e6f0ff; color: var(--bleu-base, #1f6feb); }
+    .mv-prov.mv-video { background: #ede7ff; color: #6b46d1; }
+
+    .mv-ligne .mv-actions { display: flex; gap: 6px; }
+    .mv-mini {
+      border: 1px solid var(--trait, #e2e6ea);
+      background: #fff;
+      border-radius: 6px;
+      padding: 5px 9px;
+      font-size: .82rem;
+      cursor: pointer;
+      color: var(--encre, #1a1f24);
+    }
+    .mv-mini:hover { background: var(--fond-doux, #f5f7f9); }
+
+    /* --- Colonne d'appui : palette d'ajout (sobre) --- */
+    .mv-palette {
+      position: sticky;
+      top: 16px;
+      border: 1px solid var(--trait, #e2e6ea);
+      border-radius: 10px;
+      padding: 16px;
+      background: var(--fond-doux, #f5f7f9);
+    }
+    .mv-pal-grille {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .mv-pal-btn {
+      border: 1px solid var(--trait, #e2e6ea);
+      background: #fff;
+      border-radius: 8px;
+      padding: 10px 6px;
+      font-size: .85rem;
+      cursor: pointer;
+      text-align: center;
+      color: var(--encre, #1a1f24);
+    }
+    .mv-pal-btn:hover { border-color: var(--bleu-base, #1f6feb); }
+
+    /* Cadre Expert : présent mais VIDE et verrouillé (Cat B différé) */
+    .mv-expert {
+      margin-top: 16px;
+      border: 1px dashed var(--trait, #cdd4da);
+      border-radius: 8px;
+      padding: 12px;
+      color: var(--encre-douce, #8a949e);
+      font-size: .82rem;
+      text-align: center;
+    }
+
+    /* Pied : geste explicite de fin (B-Q3) */
+    .mv-pied {
+      margin-top: 24px;
+      padding-top: 18px;
+      border-top: 2px solid var(--trait, #e2e6ea);
+      display: flex;
+      justify-content: flex-end;
+    }
+    .mv-terminer {
+      background: var(--vert-prairie, #1f9d57);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 22px;
+      font-size: 1rem;
+      font-family: var(--font-titre, 'Oswald', sans-serif);
+      letter-spacing: .03em;
+      cursor: pointer;
+    }
+    .mv-terminer:hover { filter: brightness(.95); }
+    .mv-terminer:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* États globaux : chargement / erreur / accès refusé */
+    .mv-etat {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--encre-douce, #5b6670);
+    }
+    .mv-etat.mv-erreur { color: var(--rouge-blesse, #d1453b); }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <main class="mv-shell">
+
+    <!-- État : chargement -->
+    <div id="mv-loading" class="mv-etat">Chargement de la revue vidéo…</div>
+
+    <!-- État : accès refusé / erreur (message porté par le backend) -->
+    <div id="mv-erreur" class="mv-etat mv-erreur" hidden></div>
+
+    <!-- Écran principal (masqué tant que non chargé) -->
+    <div id="mv-ecran" hidden>
+
+      <header class="mv-entete">
+        <div>
+          <h1 id="mv-titre">Revue vidéo</h1>
+          <div class="mv-sous" id="mv-sous"></div>
+        </div>
+        <a class="mv-retour" id="mv-retour" href="#">← Retour à la fiche événement</a>
+      </header>
+
+      <section class="mv-score" aria-label="Score constaté">
+        <div>
+          <div class="mv-score-val" id="mv-score-val">— : —</div>
+          <div class="mv-score-lbl">Score constaté (recalculé, non saisi)</div>
+        </div>
+      </section>
+
+      <div class="mv-plan">
+
+        <!-- Centre : la chronologie domine -->
+        <section class="mv-chrono" aria-label="Chronologie de la rencontre">
+          <h2>Déroulé du match</h2>
+          <div id="mv-liste"><!-- lignes injectées par js/mode-video.js --></div>
+        </section>
+
+        <!-- Appui : palette d'ajout (Cat A) + cadre Expert vide -->
+        <aside class="mv-palette" aria-label="Ajouter une action">
+          <h2>Ajouter</h2>
+          <div class="mv-pal-grille" id="mv-palette-grille">
+            <!-- 13 observables Cat A injectés par js/mode-video.js -->
+          </div>
+          <div class="mv-expert" aria-disabled="true">
+            Mode Expert — disponible ultérieurement
+          </div>
+        </aside>
+
+      </div>
+
+      <footer class="mv-pied">
+        <button class="mv-terminer" id="mv-terminer">
+          Terminer la revue vidéo
+        </button>
+      </footer>
+
+    </div>
+
+  </main>
+
+  <!-- Cerveau de l'écran (fichier 2, livré juste après) -->
+  <script src="js/mode-video.js"></script>
+</body>
+</html>
