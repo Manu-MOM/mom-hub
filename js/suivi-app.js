@@ -7,7 +7,7 @@
  * Consomme SuiviClient (suivi-client.js) ; ne touche jamais
  * Supabase directement.
  *
- * Version : 0.4 — S-2.b (mai 2026)
+ * Version : 0.5 — S-2.c (mai 2026)
  *   v0.1 : LOGIQUE DE BOOT SEULEMENT (paquet S-1, parcours d'entrée).
  *          getToken() → chargerEtatInitial() → routage entre les 5
  *          états posés en S-1.a (loading|error|tampon|encours|
@@ -60,6 +60,26 @@
  *          dégradation honnête, pas d'invention de spec. Zéro
  *          écriture, zéro localStorage (I5). Palette/tap/dépliement
  *          = S-2.c/d/e (hors ce lot).
+ *   v0.5 : S-2.c — palette à contenu variable (Zone C), le geste
+ *          central. STRUCTUREL/VISUEL : la palette s'affiche et
+ *          varie selon le camp ; AUCUN tap n'écrit encore (le
+ *          comportement au tap, et la dégradation du seam joueur
+ *          Zone D, sont S-2.d). Référentiel observables-match.json
+ *          v1.1 figé EN DUR côté module (fichier Drive, pas une
+ *          RPC : le bénévole sans login ne peut pas le fetcher —
+ *          convention projet pour référentiels figés), données
+ *          vérifiées À LA SOURCE (13 obs Cat A). Côté Notre :
+ *          3 sections étiquetées — Scorantes / Événements / Jeu.
+ *          La 3ᵉ « Jeu » (4 obs jeu_collectif mêlées/touches) est
+ *          un AJOUT signalé : la spec S-2.2.a ne place pas ces 4
+ *          observables ; section neutre non scorante = dégradation
+ *          honnête (rien de caché, aucune urgence inventée) →
+ *          micro-dette de placement à confirmer Conception. Côté
+ *          Adverse : score seul (+5/+2/+3/+3) + bouton −1 (S-2.2.b,
+ *          zéro joueur). Seam joueur (scorante Notre → Zone D = S-3)
+ *          marqué visuellement, non câblé (data-seam). Re-render au
+ *          changement de camp (branché sur le point posé en S-2.b).
+ *          Zéro écriture, zéro storage (I5).
  *
  * INVARIANTS :
  *   I5 — ce module ne persiste RIEN côté navigateur. L'état de
@@ -285,6 +305,136 @@
   // (cohérent aria-selected du markup S-2.a).
   var _camp = 'notre';
 
+  // ------------------------------------------------------------
+  // RÉFÉRENTIEL observables-match.json v1.1 — FIGÉ EN DUR.
+  // Justification : c'est un fichier Drive, PAS une RPC. L'écran
+  // bénévole est sans login → il ne peut pas le fetcher. La
+  // convention projet fige les référentiels stables côté client.
+  // Données vérifiées À LA SOURCE (décodées en S-1.d, 13 obs
+  // Cat A). uuid + libellé + points = contrat backend exact ;
+  // tout tap S-2.d passera ces valeurs telles quelles à
+  // inserer_observable (categorie_obs='A').
+  //
+  // Sections d'affichage (spec S-2.2.a) :
+  //   'score'  → Section 1 SCORANTES (urgence max, mises en avant)
+  //   'event'  → Section 2 ÉVÉNEMENTS DE JEU (second rang)
+  //   'jeu'    → Section 3 JEU — AJOUT SIGNALÉ : la spec S-2.2.a
+  //              ne place PAS les 4 obs jeu_collectif (mêlées/
+  //              touches). Section neutre non scorante = choix
+  //              honnête (rien de caché, aucune urgence inventée).
+  //              MICRO-DETTE : placement définitif à confirmer
+  //              côté Conception. Signalé, pas tranché unilatéral.
+  // ------------------------------------------------------------
+  var OBS = [
+    // Section 1 — scorantes (ordre spec : Essai/Transfo/Pénalité/Drop)
+    { id: 'obs-A-essai',         libelle: 'Essai',          points: 5, sec: 'score' },
+    { id: 'obs-A-transfo',       libelle: 'Transformation', points: 2, sec: 'score' },
+    { id: 'obs-A-penalite',      libelle: 'Pénalité',       points: 3, sec: 'score' },
+    { id: 'obs-A-drop',          libelle: 'Drop',           points: 3, sec: 'score' },
+    // Section 2 — événements de jeu (non scorants)
+    { id: 'obs-A-substitution',  libelle: 'Remplacement',   points: 0, sec: 'event' },
+    { id: 'obs-A-avertissement', libelle: 'Avertissement',  points: 0, sec: 'event' },
+    { id: 'obs-A-jaune',         libelle: 'Carton jaune',   points: 0, sec: 'event' },
+    { id: 'obs-A-rouge',         libelle: 'Carton rouge',   points: 0, sec: 'event' },
+    { id: 'obs-A-blessure',      libelle: 'Blessure',       points: 0, sec: 'event' },
+    // Section 3 — jeu (AJOUT signalé : non placé par S-2.2.a)
+    { id: 'obs-A-melee-gagnee',  libelle: 'Mêlée gagnée',   points: 0, sec: 'jeu' },
+    { id: 'obs-A-melee-perdue',  libelle: 'Mêlée perdue',   points: 0, sec: 'jeu' },
+    { id: 'obs-A-touche-gagnee', libelle: 'Touche gagnée',  points: 0, sec: 'jeu' },
+    { id: 'obs-A-touche-perdue', libelle: 'Touche perdue',  points: 0, sec: 'jeu' }
+  ];
+  var SECTIONS = [
+    { key: 'score', label: 'Scorantes' },
+    { key: 'event', label: 'Événements de jeu' },
+    { key: 'jeu',   label: 'Jeu' }
+  ];
+
+  function btnObservable(o, scorante) {
+    var b = doc.createElement('button');
+    b.type = 'button';
+    b.className = 'suivi-obs' + (scorante ? ' suivi-obs--score' : '');
+    b.setAttribute('data-obs', o.id);
+    // Seam S-3 : côté Notre, une scorante devra ouvrir la
+    // sélection joueur (Zone D = S-3). Marqué visuellement ;
+    // le COMPORTEMENT au tap (et la dégradation) = S-2.d.
+    if (_camp === 'notre' && scorante) {
+      b.setAttribute('data-seam', 'joueur');
+    }
+    var lib = doc.createElement('span');
+    lib.textContent = o.libelle;                 // anti-injection
+    b.appendChild(lib);
+    if (o.points) {
+      var p = doc.createElement('span');
+      p.className = 'suivi-obs__pts';
+      p.textContent = (o.points > 0 ? '+' : '') + o.points;
+      b.appendChild(p);
+    }
+    // S-2.c : AUCUN handler de tap. L'écriture (inserer_observable)
+    // et la dégradation du seam joueur sont S-2.d. Volontaire.
+    return b;
+  }
+
+  /**
+   * Rend la palette Zone C selon _camp (spec S-2.2.b — asymétrie
+   * forte). Côté Notre : 3 sections étiquetées. Côté Adverse :
+   * score seul + bouton −1 (zéro joueur). STRUCTUREL : aucun tap
+   * actif (S-2.d câblera les comportements).
+   */
+  function rendrePalette() {
+    var zc = doc.getElementById('zoneC');
+    if (!zc) return;
+    var ph = doc.getElementById('zcPlaceholder');
+    if (ph) ph.remove();
+    zc.innerHTML = '';
+
+    if (_camp === 'adverse') {
+      // Adverse = score seul + −1 (S-2.2.b). Pas de sections, pas
+      // d'événements, pas de joueur. Radicalement plus simple.
+      var secA = doc.createElement('div');
+      secA.className = 'suivi-pal__section';
+      var labA = doc.createElement('p');
+      labA.className = 'suivi-pal__label';
+      labA.textContent = 'Score adverse';
+      secA.appendChild(labA);
+      var grid = doc.createElement('div');
+      grid.className = 'suivi-pal__grid';
+      for (var i = 0; i < OBS.length; i++) {
+        if (OBS[i].sec === 'score') grid.appendChild(btnObservable(OBS[i], true));
+      }
+      // Bouton −1 (correction réflexe, S-2.2.b / S-3.4.b).
+      // Comportement = S-2.d / S-3 ; ici rendu seulement.
+      var moins = doc.createElement('button');
+      moins.type = 'button';
+      moins.className = 'suivi-obs suivi-obs--moins';
+      moins.setAttribute('data-action', 'moins-adverse');
+      moins.textContent = '−1 (annuler le dernier)';
+      grid.appendChild(moins);
+      secA.appendChild(grid);
+      zc.appendChild(secA);
+      return;
+    }
+
+    // Notre équipe = 3 sections étiquetées.
+    for (var s = 0; s < SECTIONS.length; s++) {
+      var sec = SECTIONS[s];
+      var wrap = doc.createElement('div');
+      wrap.className = 'suivi-pal__section';
+      var lab = doc.createElement('p');
+      lab.className = 'suivi-pal__label';
+      lab.textContent = sec.label;
+      wrap.appendChild(lab);
+      var g = doc.createElement('div');
+      g.className = 'suivi-pal__grid';
+      var n = 0;
+      for (var k = 0; k < OBS.length; k++) {
+        if (OBS[k].sec !== sec.key) continue;
+        g.appendChild(btnObservable(OBS[k], sec.key === 'score'));
+        n++;
+      }
+      if (n > 0) { wrap.appendChild(g); zc.appendChild(wrap); }
+    }
+  }
+
   /**
    * Score live = SOMME des valeur_points par camp, lignes NON
    * annulées. Pure lecture, ZÉRO écriture (I1 : le score est un
@@ -398,7 +548,9 @@
     rendreHistorique(lignes);
     // Zone A chrono : placeholder statique laissé tel quel (markup
     // S-2.a). Le moteur chrono est un lot dédié ultérieur.
-    // Palette Zone C : remplie en S-2.c (dépend de _camp).
+    // Palette Zone C : rendue selon _camp (S-2.c). Structurelle —
+    // les comportements au tap sont S-2.d.
+    rendrePalette();
   }
 
   // Bascule camp (Zone B) — VISUEL seulement en S-2.b. Le contenu
@@ -414,7 +566,8 @@
       var n = (camp === 'notre');
       tNotre.setAttribute('aria-selected', n ? 'true' : 'false');
       tAdv.setAttribute('aria-selected', n ? 'false' : 'true');
-      // S-2.c branchera ici le re-rendu de la palette Zone C.
+      // S-2.c : re-rendu de la palette Zone C selon le camp.
+      rendrePalette();
     }
     tNotre.addEventListener('click', function () { set('notre'); });
     tAdv.addEventListener('click', function () { set('adverse'); });
@@ -543,7 +696,7 @@
 
   if (global.console) {
     console.log(
-      '%c🏉 MOM Hub · Suivi App v0.4 (En cours · lecture) chargé',
+      '%c🏉 MOM Hub · Suivi App v0.5 (En cours · palette) chargé',
       'color: #2d7a3e; font-weight: bold;'
     );
   }
