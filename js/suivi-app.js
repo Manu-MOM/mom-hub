@@ -7,7 +7,7 @@
  * Consomme SuiviClient (suivi-client.js) ; ne touche jamais
  * Supabase directement.
  *
- * Version : 0.8 — S-3.a (mai 2026)
+ * Version : 0.9 — S-3.b (mai 2026)
  *   v0.1 : LOGIQUE DE BOOT SEULEMENT (paquet S-1, parcours d'entrée).
  *          getToken() → chargerEtatInitial() → routage entre les 5
  *          états posés en S-1.a (loading|error|tampon|encours|
@@ -135,6 +135,25 @@
  *          storage (I5). Correction mauvais numéro = S-3.b ;
  *          blessure double effet = S-3.c ; mode = S-3.d ;
  *          Période = S-3.e.
+ *   v0.9 : S-3.b — correction « mauvais numéro » (D-8, bloc
+ *          S-3-α). Branche le seam laissé par S-2.e : dans
+ *          l'overlay historique complet, tap sur une ligne
+ *          CORRIGIBLE (equipe='notre' uniquement — l'adverse n'a
+ *          jamais de joueur, S-2.2.b ; inclut le cas D-7 « joueur
+ *          à compléter ») → ré-ouvre le sélecteur Zone D en MODE
+ *          'correction' (réutilise la même modale = cohérence UX,
+ *          pas de nouvelle surface, P1) → corrigerObservable
+ *          (mutation directe, corrigee_le horodaté, trace
+ *          conservée — modélisation §6.2). Le bouton « Équipe /
+ *          je ne sais pas » en mode correction = DÉSATTRIBUER
+ *          (joueur → null) : pendant logique de D-7, micro-
+ *          décision signalée (la spec S-3.2 ne la tranche pas
+ *          explicitement). Repli D-9 (annuler+ressaisir) NON
+ *          fait ici : explicitement renvoyé à S-3-β (spec S-3.2).
+ *          Tap sur les 2 lignes courtes de Zone E NON câblé
+ *          (Zone E reste lecture-rassurance ; la spec situe le
+ *          geste « je déplie, je tape » dans l'historique
+ *          complet). Zéro storage (I5).
  *
  * INVARIANTS :
  *   I5 — ce module ne persiste RIEN côté navigateur. L'état de
@@ -379,6 +398,10 @@
   // Observable scorant en attente de l'attribution joueur (entre
   // l'ouverture de Zone D et le choix). Transitoire.
   var _obsEnAttente = null;
+  // S-3.b — ligne d'historique en cours de correction « mauvais
+  // numéro ». null = mode saisie (S-3.a) ; non-null = mode
+  // correction (réattribuer le joueur de cette ligne). Transitoire.
+  var _ligneACorriger = null;
 
   // ------------------------------------------------------------
   // RÉFÉRENTIEL observables-match.json v1.1 — FIGÉ EN DUR.
@@ -717,14 +740,38 @@
       return;
     }
     for (var j = actives.length - 1; j >= 0; j--) {
-      var li = doc.createElement('li');
-      // Format provisoire S-2.b réutilisé (ligneTexte). Le format
-      // DÉFINITIF (1MT 0' + libellés lisibles) est tranché S-3.
-      li.textContent = ligneTexte(actives[j]);   // anti-injection
-      // SEAM S-3 : le tap sur une ligne (annuler / corriger « mauvais
-      // numéro ») est explicitement renvoyé à S-3 (S-2.5 / S-3.2).
-      // Volontairement NON câblé ici — pas d'invention de mécanique.
-      ul.appendChild(li);
+      (function (ligne) {
+        var li = doc.createElement('li');
+        // Format provisoire S-2.b réutilisé (ligneTexte). Le format
+        // DÉFINITIF (1MT 0' + libellés lisibles) est tranché S-3.
+        li.textContent = ligneTexte(ligne);        // anti-injection
+        // S-3.b — correction « mauvais numéro » (D-8) : SEUL le tap
+        // pour CORRIGER LE JOUEUR est câblé ici, et UNIQUEMENT sur
+        // les lignes côté Notre (l'adverse n'a jamais de joueur —
+        // S-2.2.b ; rien à réattribuer). Inclut le cas D-7 « joueur
+        // à compléter » → permet justement de l'attribuer.
+        // L'annulation par tap (mécanique 1, S-3.4.b) et le repli
+        // D-9 restent renvoyés à S-3-β — NON câblés ici.
+        var corrigible = ligne
+          && ligne.equipe_concernee !== 'adverse'
+          && ligne.id;
+        if (corrigible) {
+          li.className = 'suivi-histo__corrigible';
+          li.setAttribute('role', 'button');
+          li.setAttribute('tabindex', '0');
+          li.setAttribute('aria-label', 'Corriger le joueur de cette action');
+          li.addEventListener('click', function () {
+            ouvrirCorrectionJoueur(ligne);
+          });
+          li.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              ouvrirCorrectionJoueur(ligne);
+            }
+          });
+        }
+        ul.appendChild(li);
+      })(actives[j]);
     }
   }
 
@@ -1013,6 +1060,7 @@
 
   function ouvrirSelecteurJoueur(observable) {
     _obsEnAttente = observable;               // scorante à attribuer
+    _ligneACorriger = null;                   // mode saisie (S-3.a)
     var ov = doc.getElementById('selJoueurOverlay');
     var titre = doc.getElementById('selJoueurTitre');
     if (titre && observable) {
@@ -1022,17 +1070,61 @@
     if (ov) ov.removeAttribute('hidden');
   }
 
+  // S-3.b — ouvre la MÊME modale en mode correction « mauvais
+  // numéro ». ligne = ligne de chronologie à réattribuer.
+  function ouvrirCorrectionJoueur(ligne) {
+    if (!ligne || !ligne.id) return;
+    _ligneACorriger = ligne;                  // mode correction (S-3.b)
+    _obsEnAttente = null;
+    var ov = doc.getElementById('selJoueurOverlay');
+    var titre = doc.getElementById('selJoueurTitre');
+    if (titre) {
+      // Repère pour le bénévole : quelle action il rectifie.
+      var obsLib = ligne.observable_id ? String(ligne.observable_id) : 'action';
+      titre.textContent = 'Corriger le joueur — ' + obsLib;
+    }
+    chargerCompoZoneD();
+    if (ov) ov.removeAttribute('hidden');
+  }
+
   function fermerSelecteurJoueur() {
     var ov = doc.getElementById('selJoueurOverlay');
     if (ov) ov.setAttribute('hidden', '');
     _obsEnAttente = null;                      // annulation = rien écrit
+    _ligneACorriger = null;
   }
 
   // Choix d'un joueur (ou null via « Équipe / je ne sais pas »).
-  // Construit le payload et envoie. joueurUuid null = cas DS-1
-  // (Option A) mais ici choix DÉLIBÉRÉ du bénévole (D-7), pas un
-  // fallback subi.
+  // Deux modes :
+  //  - SAISIE (S-3.a, _obsEnAttente) : nouvelle ligne via
+  //    envoyerObservable. joueur null = D-7 délibéré (DS-1).
+  //  - CORRECTION (S-3.b, _ligneACorriger) : corrigerObservable
+  //    sur la ligne existante. joueur null = DÉSATTRIBUER
+  //    (pendant logique de D-7 ; micro-décision signalée — la
+  //    spec S-3.2 ne la tranche pas explicitement).
   function choisirJoueur(joueurUuid) {
+    if (_ligneACorriger) {
+      var ligne = _ligneACorriger;
+      fermerSelecteurJoueur();
+      if (_ecritureEnCours) return;
+      _ecritureEnCours = true;
+      global.SuiviClient.corrigerObservable(
+        _token, ligne.id, joueurUuid ? joueurUuid : null
+      ).then(function (res) {
+        if (!res || !res.ok) {
+          erreurEphemere("Correction non enregistrée. Vérifie le réseau.");
+          return;
+        }
+        return refreshDepuisCore();
+      }).catch(function (e) {
+        if (global.console) console.error('MOM Hub Suivi: choisirJoueur/correction', e);
+        erreurEphemere("Correction non enregistrée. Vérifie le réseau.");
+      }).then(function () {
+        _ecritureEnCours = false;
+      });
+      return;
+    }
+    // Mode saisie (S-3.a) — inchangé.
     var o = _obsEnAttente;
     if (!o) { fermerSelecteurJoueur(); return; }
     var obs = {
@@ -1225,7 +1317,7 @@
 
   if (global.console) {
     console.log(
-      '%c🏉 MOM Hub · Suivi App v0.8 (En cours · sélecteur joueur) chargé',
+      '%c🏉 MOM Hub · Suivi App v0.9 (En cours · correction joueur) chargé',
       'color: #2d7a3e; font-weight: bold;'
     );
   }
