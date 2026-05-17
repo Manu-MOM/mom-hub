@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.9 — SUIVI-COACH-2 (17 mai 2026)
+ * Version : 1.10 — SUIVI-COACH-1 Objet B accroche (17 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -93,6 +93,27 @@
  *          fait foi) ; (4) data:null (aucun lien actif) = cas NORMAL,
  *          jamais une erreur (Objet A → état 2). Filtrage actif/non
  *          révoqué/non expiré fait PAR la RPC, non re-vérifié client.
+ *
+ *   v1.10 : SUIVI-COACH-1 Objet B — ACCROCHE Mode Vidéo.
+ *          Continuation adaptative de la section « Suivi de la
+ *          rencontre » d'Objet A (B-Q1) : une fois la rencontre
+ *          JOUÉE (etat ∈ {joue,resultat}, ∉ {archive,annule}),
+ *          un accès « 🎬 Revoir ce match (Mode Vidéo) » ouvre
+ *          l'écran coach distinct mode-video.html?e=<uuid>
+ *          (convention ?e= posée dans js/mode-video.js, réutilisée
+ *          à l'identique — un seul contrat). ADDITION PURE,
+ *          modèle SUIVI-COACH-2 STRICT : 3 nouvelles fonctions
+ *          (modeVideoBuildUrl, suiviRevoirActionnable,
+ *          renderModeVideoAcces) + 2 appels EN AVAL de
+ *          renderSuiviRencontreBloc (match simple & matchs
+ *          enfants — A-Q3, hiérarchie réutilisée) + 1 forEach
+ *          de binding. AUCUNE fonction d'Objet A modifiée,
+ *          AUCUNE branche d'état / génération de lien touchée.
+ *          Seuil « jouée » aligné dette Audits C12-gate (même
+ *          posture qu'A-Q2/suiviActionnable, non inventé).
+ *          Spec : Conception-SUIVI-COACH-1-ObjetB.md (validé
+ *          Manu). Dépend de mode-video.html + mode-video.js +
+ *          supabase-client v1.15 (couche données coach).
  */
 
 (function () {
@@ -782,6 +803,52 @@
     return u.toString();
   }
 
+  // ============================================================
+  // SUIVI-COACH-1 Objet B — ACCROCHE Mode Vidéo (ADDITION PURE)
+  // ============================================================
+  // Continuation adaptative de la section « Suivi de la rencontre »
+  // d'Objet A (B-Q1). NOUVELLES fonctions uniquement, appelées EN
+  // AVAL de renderSuiviRencontreBloc : ZÉRO retouche de la logique
+  // d'Objet A (modèle SUIVI-COACH-2, comme v1.9). Spec :
+  // Conception-SUIVI-COACH-1-ObjetB.md (validé Manu).
+
+  // URL de l'écran Mode Vidéo (coach authentifié, fichier distinct
+  // — B-Q1). Convention ?e= POSÉE dans js/mode-video.js (EVT_PARAM)
+  // et réutilisée ici À L'IDENTIQUE (un seul contrat, pas deux).
+  // Pattern calqué sur suiviBuildUrl — rien inventé.
+  function modeVideoBuildUrl(evtId) {
+    const u = new URL('mode-video.html', window.location.href);
+    u.search = '?e=' + encodeURIComponent(evtId);
+    return u.toString();
+  }
+
+  // La rencontre est-elle « revoyable » en Mode Vidéo ? B-Q1 :
+  // visible une fois la rencontre JOUÉE. États evenements réels
+  // (STATE / C12-a) : creation|compo|joue|resultat|archive|annule.
+  // « Jouée » = {joue, resultat} (le match a eu lieu) ; avant, rien
+  // à revoir ; archive/annule exclus. Même posture qu'A-Q2 /
+  // suiviActionnable : on conçoit le COMPORTEMENT, le SEUIL exact
+  // reste la dette Audits C12-gate — aligné, NON inventé.
+  function suiviRevoirActionnable(rencontre) {
+    if (!rencontre) return false;
+    return rencontre.etat === 'joue' || rencontre.etat === 'resultat';
+  }
+
+  // Élément d'accès Mode Vidéo pour UNE rencontre (match simple OU
+  // match enfant — A-Q3 : même unité réutilisée, hiérarchie tournoi
+  // respectée sans la réinventer). '' si non applicable. Appelé EN
+  // AVAL de renderSuiviRencontreBloc, ne le modifie pas. Style
+  // calqué sur les blocs Objet A (mêmes variables CSS).
+  function renderModeVideoAcces(rencontre) {
+    if (!suiviRevoirActionnable(rencontre)) return '';
+    const evtId = rencontre.id;
+    let h = '<div style="padding:6px 0;border-top:1px solid var(--paper-warm);margin-top:8px;">';
+    h += '<button type="button" class="evt-btn" data-action="suivi-revoir-video" data-event-id="' + escHtml(evtId) + '">🎬 Revoir ce match (Mode Vidéo)</button>';
+    h += '<div style="font-size:11px;color:var(--ink-mute);margin-top:6px;">Écran coach a posteriori : compléter / corriger le déroulé depuis la vidéo, au calme.</div>';
+    h += '</div>';
+    return h;
+  }
+
   // Compo « prête » selon la notion DÉJÀ connue de la fiche.
   // AUCUN seuil inventé : on réutilise statutCompoBadge
   // (prête ⟺ validee+utilisee===total && total>0).
@@ -879,6 +946,7 @@
               html += '<div style="font-size:12px;color:var(--ink-mute);padding:6px 0;">Match ' + escHtml(child.etat) + ' — pas de lien de suivi.</div>';
             } else {
               html += renderSuiviRencontreBloc(child);
+              html += renderModeVideoAcces(child);
             }
             html += '</div>';
           });
@@ -887,6 +955,7 @@
     } else {
       // Match simple
       html += renderSuiviRencontreBloc(evt);
+      html += renderModeVideoAcces(evt);
     }
 
     html += '</div>';
@@ -1019,6 +1088,17 @@
         // Raccourci honnête vers la page compositions (pas de deep-link
         // inventé — convention d'URL de compositions.html non connue).
         window.location.href = 'compositions.html';
+      });
+    });
+    // SUIVI-COACH-1 Objet B : accès Mode Vidéo (ADDITION PURE —
+    // sibling des bindings ci-dessus, pattern identique ; les
+    // bindings d'Objet A ne sont pas touchés). Câblé sur full
+    // render ET refreshSuiviSection (noeuds remplacés → pas de
+    // double-binding, même garantie que les data-action d'A).
+    document.querySelectorAll('[data-action="suivi-revoir-video"]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        // Ouvre l'écran Mode Vidéo coach (fichier distinct, B-Q1).
+        window.location.href = modeVideoBuildUrl(this.getAttribute('data-event-id'));
       });
     });
   }
