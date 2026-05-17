@@ -4,7 +4,7 @@
 > et `PASSATION.md` (kit de démarrage). Ce document ne remplace ni l'un ni l'autre : il dit
 > *quelle conversation fait quoi, où elle en est, et laquelle ouvrir pour quoi*.
 >
-> Établi le 16 mai 2026 · révisé le 17 mai 2026 (MAJ Prod — UI Suivi : **module bénévole CLÔTURÉ S-1→S-6**, revue invariants OK ; suite = cycle coach séparé `SUIVI-COACH-1`) · 21 conversations recensées · À garder à jour à la main.
+> Établi le 16 mai 2026 · révisé le 17 mai 2026 (MAJ Prod — UI Suivi : **module bénévole CLÔTURÉ S-1→S-6** ; **`SUIVI-COACH-1` Objet A LIVRÉ** (evenements-browser v1.8 / supabase-client v1.13) ; **couloir `Production · Suivi backend` CLOS** : C12-g/h/i livrés, dettes SUIVI-UI-1/5/6 + SUIVI-COACH-2 soldées ; **Objets B/C de `SUIVI-COACH-1` débloqués**) · 23 lignes de conversation recensées (dont 1 couloir à localiser ; couloir backend Suivi désormais clos) · À garder à jour à la main.
 >
 > **Convention de nommage adoptée :** les 3 fronts vivants portent un nom court — `Production`,
 > `Audits`, `Conception`. Les fils clos/en pause gardent leur nom d'origine (préfixé `[ARCHIVE]`
@@ -61,11 +61,13 @@ C'est la colonne vertébrale technique. Elle s'est compactée plusieurs fois.
 | MOM Hub - Production 2 | 13/05 | ⚪ | Reprise post-compactage. Phase 4, commits GitHub propres. |
 | MOM Hub · Production · Phases 4.3-4.4 — Compositions & Présences | 15/05 | 🟡 | Compositions/Présences + intégration Bibliothèque. 3 chantiers laissés ouverts. |
 | MOM Hub - Production Modules Joueurs | 16/05 | ⚪ | **Close.** Phase 5.14 Module Joueurs V1-Métier + Phase 2 complétion Évènements (v1.7) + Joueurs (v1.3). |
+| **Production · Évènements** (`evenements.html`) | 17/05 | ⚠️ **non localisée** | Couloir de production du module Évènements. **`SUIVI-COACH-1` Objet A = LIVRÉ 17/05** ici (section « Suivi de la rencontre » sur la fiche événement : `evenements-browser.js` v1.7→**v1.8** + `supabase-client.js` v1.12→**v1.13** wrapper `genererLienEphemere`). La conv exacte qui a produit Objet A **n'est pas identifiée** (le « lot v2 Évènements » mentionné par Manu n'a pas été localisé, confirmé 17/05) — mais le livrable est acté au STATE. ➡️ **Si reprise Évènements nécessaire (Objet A déjà fait) : retrouver la conv ou en ouvrir une dédiée**, 1er message = lecture STATE/CARTE. |
 | **Production · Suivi de rencontre** (backend C12) | 16/05 | ⚪ | **Close.** Backend Suivi `chronologie_suivi`/`lien_suivi` : C12-a→f produits, **exécutés en base Supabase + rangés `sql/` + committés**. Mission backend accomplie. À rouvrir uniquement si retouche SQL C12 nécessaire. |
-| **Production · UI Suivi de rencontre** | 16/05 | 🟢 | **Module bénévole CLÔTURÉ (S-1 → S-6).** UI du Suivi par-dessus le backend C12 : `suivi.html` + `js/suivi-client.js` v1.1 + `js/suivi-app.js` **v0.14**. Complet, utilisable en live de bout en bout (entrée→coup d'envoi→saisie complète→correction→blessure→mode→fin verrouillée→reprise/relais). S-6 fait (revue vs 5 invariants OK, sans code). **Plus aucun code prévu côté bénévole.** Suite = **cycle coach séparé `SUIVI-COACH-1`** (Mode Vidéo + temps de jeu + pont Hub↔Suivi), à cadrer en conv Conception après instruction des dettes backend. Dettes ouvertes : SUIVI-UI-1/2/3/4/5/6 + SUIVI-COACH-1 (voir STATE). |
+| **Production · Suivi backend (dettes SUIVI-UI)** | 17/05 | ⚪ | **CLOSE.** Couloir backend rouvert pour instruire les 4 dettes backend du cycle coach. **LIVRÉ 17/05** (exécutés en base + rangés `sql/` + committés, 1 fichier = 1 commit) : **`C12-g`** (`get_entete_rencontre` — SUIVI-UI-1 + SUIVI-UI-6 absorbée en piggy-back `role_lien`), **`C12-h`** (`get_lien_saisie_actif` — SUIVI-COACH-2 ; **décision d'archi : event-bornée authentifiée seule, volet jeton rejeté pour escalade spectateur→rédacteur**), **`C12-i`** (surcharge jeton-seul `consolider_score_rencontre` — SUIVI-UI-5, délègue à C12-e non modifié). Lecture protocole 5/5 à la source ; module bénévole et Objet A NON touchés (ajouts purs). Cadrage `Cadrage-SUIVI-COACH-1-Dettes-Backend.md` **réconcilié** (version Drive périmée à remplacer). **Sous-point ouvert remonté** : catégorie d'âge dans l'en-tête SUIVI-UI-1 (décision Manu). À rouvrir uniquement si retouche SQL nécessaire. |
+| **Production · UI Suivi de rencontre** | 16/05 | 🟢 | **Module bénévole CLÔTURÉ (S-1 → S-6).** UI du Suivi par-dessus le backend C12 : `suivi.html` + `js/suivi-client.js` v1.1 + `js/suivi-app.js` **v0.14**. Complet, utilisable en live de bout en bout (entrée→coup d'envoi→saisie complète→correction→blessure→mode→fin verrouillée→reprise/relais). S-6 fait (revue vs 5 invariants OK, sans code). **Plus aucun code prévu côté bénévole.** Suite = **cycle coach séparé `SUIVI-COACH-1`** (Mode Vidéo + temps de jeu + pont Hub↔Suivi). Pré-requis backend (SUIVI-UI-1/5/6 + SUIVI-COACH-2) **désormais tous livrés** → Objets B/C cadrables en conv Conception. Dettes ouvertes : SUIVI-UI-2/3/4 + SUIVI-COACH-1(B/C) + SUIVI-COACH-deeplink (voir STATE). |
 | MOM Hub - Production Module Bibliothèque d'ateliers | 14/05 | 🟡 | Scripts Python migration Drive + module Bibliothèque v6. Transféré vers Production. |
 
-→ **Module Suivi bénévole CLÔTURÉ.** Plus de reprise prévue sur la conv `Production · UI Suivi de rencontre` côté bénévole. La suite du Suivi = **cycle coach `SUIVI-COACH-1`** (Mode Vidéo / temps de jeu / pont Hub↔Suivi), à **ouvrir en conv Conception** après instruction des dettes backend SUIVI-UI-1/5/6 (conv Production). La conv backend C12 reste **close** (rouvrir seulement si retouche SQL C12).
+→ **Module Suivi bénévole CLÔTURÉ + couloir backend dettes SUIVI CLOS.** Plus de reprise prévue sur la conv `Production · UI Suivi de rencontre` côté bénévole. Les dettes backend SUIVI-UI-1/5/6 + SUIVI-COACH-2 sont **instruites et livrées** (C12-g/h/i). La suite du Suivi = **cycle coach `SUIVI-COACH-1` Objets B/C** (Mode Vidéo / temps de jeu / écran spectateur), **cadrable maintenant** en conv **Conception** (pré-requis backend tombés ; Objet A déjà livré), puis conv Production. Les deux conv backend Suivi (C12 a→f, dettes g/h/i) restent **closes** (rouvrir seulement si retouche SQL). Seul câblage backend Suivi encore ouvert, hors couloir : `C12-nom`.
 
 ### Lignée C — Audits / modélisation / doctrine 🟢
 
@@ -78,7 +80,7 @@ C'est la colonne vertébrale technique. Elle s'est compactée plusieurs fois.
 | MOM Hub - Conception du Portail | 16/05 | 🟢 | **Front actif.** Nom court : **`Conception`**. Conception du portail + doctrine d'interconnexion + conception UX modules (UI Suivi S-1→S-6). |
 
 → **Reprise Audits = conv `Audits`** ; **reprise Conception = conv `Conception`**.
-→ ⚠️ **`STATE.md` à jour = fusion Audits/Conception + MAJ Prod 16/05 (Phase 5.14/Phase 2 + C12 + Suivi UI S-1).** Toute reprise lit cette version, pas une copie antérieure.
+→ ⚠️ **`STATE.md` à jour = fusion Audits/Conception → MAJ Prod 16/05 (Phase 5.14/Phase 2 + C12 + Suivi UI S-1) → MAJ Prod 17/05 (Suivi UI S-2→S-5.a + clôture S-6 module bénévole) → MAJ Prod 17/05 (couloir backend dettes SUIVI : C12-g/h/i, SUIVI-UI-1/5/6 + SUIVI-COACH-2 livrées).** Toute reprise lit cette version, pas une copie antérieure.
 → Note : 2 dettes nouvelles touchent cette lignée — **SUIVI-UI-2** (observable « coup d'envoi » au référentiel + contrat aval Rapport/Stats type DS-1) côté Audits/Référentiels ; **C12-gate** (`resultat` vs `archive`) côté Audits.
 
 ### Lignée D — Réconciliation source externe (vie courte, close) ⚪
@@ -109,8 +111,10 @@ C'est la colonne vertébrale technique. Elle s'est compactée plusieurs fois.
 
 | Je veux… | J'ouvre / je reprends |
 |---|---|
-| Reprendre le Suivi (Mode Vidéo, temps de jeu, pont Hub) | **Nouveau cycle `SUIVI-COACH-1`** : cadrer en conv **Conception** (après dettes backend SUIVI-UI-1/5/6 en conv Production). PAS dans la conv UI Suivi bénévole (clôturée). |
-| Retoucher le backend SQL C12 du Suivi | conv **`Production · Suivi de rencontre` (backend C12)** — close, à rouvrir pour ce seul motif |
+| Reprendre le Suivi (Mode Vidéo, temps de jeu, écran spectateur) | **Cycle `SUIVI-COACH-1` Objets B/C** : cadrer en conv **Conception** puis Production. **Pré-requis backend tous tombés** (SUIVI-UI-1/5/6 + SUIVI-COACH-2 livrés ; Objet A livré) — plus de blocage. PAS dans la conv UI Suivi bénévole (clôturée). |
+| Reprendre/retoucher Évènements (Objet A déjà livré) | **Couloir `Production · Évènements`** (ligne ⚠️ ci-dessus, conv à localiser ou rouvrir). Objet A `SUIVI-COACH-1` est FAIT (evenements-browser v1.8). |
+| Instruire les dettes backend SUIVI-UI-1/5/6 (+ SUIVI-COACH-2) | **FAIT** — couloir `Production · Suivi backend (dettes SUIVI-UI)` **clos** (C12-g/h/i exécutés + committés 17/05). Rien à rouvrir sauf retouche SQL. |
+| Retoucher le backend SQL C12 du Suivi (a→f ou g/h/i) | conv **`Production · Suivi de rencontre` (backend C12)** ou **`Production · Suivi backend (dettes SUIVI-UI)`** — closes, à rouvrir pour ce seul motif |
 | Coder un autre module, écrire du SQL, déployer | nouvelle conv Production (ou la conv Production pertinente) |
 | Modéliser une entité métier, écrire un audit, trancher SUIVI-UI-2 / C12-gate | conv **`Audits`** |
 | Travailler la structure du portail / la doctrine d'interconnexion | conv **`Conception`** |
@@ -125,11 +129,10 @@ C'est la colonne vertébrale technique. Elle s'est compactée plusieurs fois.
 ## 5. Recommandations de consolidation
 
 1. **3 fronts vivants seulement, aux noms courts.** `Production`, `Audits`, `Conception`.
- Pour le Suivi, le front Production actif est **`Production · UI Suivi de rencontre`** ;
- la conv backend C12 est close (rouvrir seulement pour retouche SQL C12).
-2. **Renomme les fils clos** avec un préfixe `[ARCHIVE]` (ex. `[ARCHIVE] Production · Suivi de rencontre (backend C12)`).
+ Pour le Suivi, le module bénévole est clôturé et les deux couloirs backend (C12 a→f, dettes g/h/i) sont clos ; la suite (Objets B/C) se cadre en conv `Conception`.
+2. **Renomme les fils clos** avec un préfixe `[ARCHIVE]` (ex. `[ARCHIVE] Production · Suivi de rencontre (backend C12)`, `[ARCHIVE] Production · Suivi backend (dettes SUIVI-UI)`).
  Tu réduis le bruit visuel sans rien perdre.
-3. **`STATE.md` reste l'unique source de vérité du code.** Dernière version : **fusion Audits/Conception + MAJ Prod 16/05 (Phase 5.14/Phase 2 + C12 + Suivi UI S-1)**.
+3. **`STATE.md` reste l'unique source de vérité du code.** Dernière version : **fusion Audits/Conception + MAJ Prod 16/05 (Phase 5.14/Phase 2 + C12 + Suivi UI S-1) + MAJ Prod 17/05 (Suivi UI S-2→S-5.a, clôture S-6) + MAJ Prod 17/05 (couloir backend dettes SUIVI : C12-g/h/i ; SUIVI-UI-1/5/6 + SUIVI-COACH-2 livrées ; décision archi SUIVI-COACH-2)**.
  Cette carte ne le double pas, elle pointe vers lui. Toute conv qui reprend lit d'abord le `STATE.md` committé.
 4. **Maintien de cette carte** : à chaque clôture/ouverture de fil, mettre à jour la ligne + la date d'en-tête. Fichier à éditer à la main, comme `STATE.md`.
 5. **La conv ⚠️ du 15/05** : à ouvrir, identifier son sujet, ranger ou archiver. Seul angle mort de cette carte.
