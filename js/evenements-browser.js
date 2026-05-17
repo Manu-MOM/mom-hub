@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.8 — SUIVI-COACH-1 Objet A (17 mai 2026)
+ * Version : 1.9 — SUIVI-COACH-2 (17 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -60,11 +60,39 @@
  *          lien généré est gardé en RAM le temps de la session (jamais
  *          localStorage). Après rechargement : retour état 2 ;
  *          re-générer est sûr (relais backend C12-f révoque l'ancien).
+ *          [NOTE v1.9 : ce point « borné session » est LEVÉ pour le
+ *          match simple par SUIVI-COACH-2 ci-dessous — get_lien_saisie
+ *          _actif (C12-h) permet désormais la relecture. Tournoi reste
+ *          borné session. Historique conservé pour traçabilité.]
  *          « Compo prête » réutilise statutCompoBadge (notion DÉJÀ
  *          connue de la fiche) — aucun seuil inventé. Autorité réelle
  *          = garde-fou serveur PI-7 : un refus PI-7 est retraduit en
  *          « compo pas réellement prête », pas en erreur brute.
  *          Dépend de supabase-client v1.13 (wrapper genererLienEphemere).
+ *
+ *   v1.9 : SUIVI-COACH-2 — état 3 d'Objet A PERSISTANT entre visites
+ *          (match simple). À l'ouverture d'une fiche (openFiche), si
+ *          la rencontre est un match simple et qu'aucun lien n'est
+ *          déjà en session, appel de SupabaseHub.getLienSaisieActif
+ *          (wrapper C12-h, supabase-client v1.14). Si un lien 'saisie'
+ *          actif existe → pré-remplissage de SUIVI_LIENS_SESSION →
+ *          renderSuiviSection affiche directement l'état 3 (le coach
+ *          retrouve son lien au lieu d'en regénérer un). Lève la
+ *          limitation « borné session » de v1.8 pour le match simple.
+ *          AUCUNE retouche de la logique d'Objet A : la section, les
+ *          3 états, le tournoi, génération/copier/partager/régénérer
+ *          sont inchangés — c'est une simple ALIMENTATION amont de
+ *          SUIVI_LIENS_SESSION (cohérent STATE : « état 3 alimenté par
+ *          cette RPC, aucune retouche logique »).
+ *          Garde-fous : (1) match simple UNIQUEMENT — tournoi resterait
+ *          N appels/enfant, reste borné session (décision périmètre
+ *          Manu) ; (2) STRICTEMENT non bloquant — échec RPC ou wrapper
+ *          absent n'empêche jamais l'ouverture de la fiche (persistance
+ *          = confort, pas dépendance dure) ; (3) n'écrase pas un lien
+ *          déjà en session (lien généré dans la session = plus récent,
+ *          fait foi) ; (4) data:null (aucun lien actif) = cas NORMAL,
+ *          jamais une erreur (Objet A → état 2). Filtrage actif/non
+ *          révoqué/non expiré fait PAR la RPC, non re-vérifié client.
  */
 
 (function () {
@@ -680,6 +708,42 @@
       // SUIVI-COACH-1 Objet A : mémorise l'évènement courant pour le
       // rafraîchissement en place de la section Suivi (sans re-fetch).
       FICHE_EVT_COURANT = evt;
+
+      // SUIVI-COACH-2 : état 3 persistant entre visites (match simple).
+      // Avant le rendu, si un lien 'saisie' actif existe déjà pour
+      // cette rencontre, on pré-remplit SUIVI_LIENS_SESSION → la
+      // section Suivi (Objet A) affichera directement l'état 3 au lieu
+      // de retomber à l'état 2 « générer ».
+      //   - Match simple UNIQUEMENT (décision de périmètre : les
+      //     tournois resteraient N appels/enfant ; bornés session).
+      //   - NON bloquant : un échec RPC / un wrapper absent ne doit
+      //     JAMAIS empêcher l'ouverture de la fiche (la persistance
+      //     est un confort, pas une dépendance dure).
+      //   - N'écrase PAS un lien déjà en session (un lien généré dans
+      //     cette session est le plus récent et fait foi).
+      if (evt.type_evenement === 'match'
+          && !SUIVI_LIENS_SESSION.has(evt.id)
+          && window.SupabaseHub
+          && typeof SupabaseHub.getLienSaisieActif === 'function') {
+        try {
+          const res = await SupabaseHub.getLienSaisieActif(evt.id);
+          // res.ok && res.data === null = aucun lien actif : normal,
+          // on ne fait rien (Objet A affichera l'état 2). Seul un
+          // lien réellement présent pré-remplit la session.
+          if (res && res.ok && res.data && res.data.token) {
+            SUIVI_LIENS_SESSION.set(evt.id, {
+              token:     res.data.token,
+              role:      'saisie',   // la RPC ne renvoie que des 'saisie'
+              expire_le: res.data.expire_le,
+              url:       suiviBuildUrl(res.data.token)
+            });
+          }
+        } catch (e) {
+          // Strictement non bloquant : on log et on poursuit
+          // l'ouverture de la fiche en l'état (état 2).
+          console.error('MOM Hub: openFiche() relecture lien saisie', e);
+        }
+      }
 
       // Rend le corps de la fiche
       body.innerHTML = renderFiche(evt);
