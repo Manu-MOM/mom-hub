@@ -162,6 +162,21 @@ body.suivi-body {
 .suivi-reprise {
   gap: var(--suivi-gap);
 }
+/* S-5.a — écran de reprise : sobre, centré, un seul gros bouton. */
+.suivi-reprise { justify-content: center; align-items: center; text-align: center; }
+.suivi-reprise__inner { max-width: 32ch; display: flex; flex-direction: column; gap: 14px; }
+.suivi-reprise__title {
+  font-family: 'Oswald', sans-serif; font-size: 20px; font-weight: 600;
+  letter-spacing: .05em; text-transform: uppercase; margin: 0;
+  color: var(--suivi-encre-doux);
+}
+.suivi-reprise__score {
+  font-family: 'Oswald', sans-serif; font-size: 40px; font-weight: 700; margin: 0;
+}
+.suivi-reprise__recap { margin: 0; font-size: 15px; font-weight: 600; }
+.suivi-reprise__note {
+  margin: 0; font-size: 15px; color: var(--suivi-encre-doux); line-height: 1.5;
+}
 
 /* =====================================================================
    S-2.a · écran « En cours » — structure spatiale Option B aménagée
@@ -1077,7 +1092,18 @@ body.suivi-body {
 
     <!-- État 5 — reprise/relais (train en marche) → S-5 -->
     <section class="suivi-screen suivi-reprise" id="scrReprise" hidden aria-label="Reprise du suivi">
-      <!-- S-5.2 : résumé d'état + « Je reprends » → reconstruit En cours. -->
+      <div class="suivi-reprise__inner">
+        <p class="suivi-reprise__title">Match en cours</p>
+        <p class="suivi-reprise__score" id="repriseScore">MOM 0 — 0 ADV</p>
+        <p class="suivi-reprise__recap" id="repriseRecap">0 action déjà notée</p>
+        <p class="suivi-reprise__note">
+          Tu prends la suite du suivi. Tout ce qui a déjà été noté est
+          là — rien n'est perdu.
+        </p>
+        <button class="suivi-btn-sas" id="repriseBtn" type="button">
+          Je reprends
+        </button>
+      </div>
     </section>
 
   </main>
