@@ -7,7 +7,7 @@
  * Consomme SuiviClient (suivi-client.js) ; ne touche jamais
  * Supabase directement.
  *
- * Version : 0.11 — S-3.c + S-3.d (mai 2026)
+ * Version : 0.12 — S-3.e (mai 2026)
  *   v0.1 : LOGIQUE DE BOOT SEULEMENT (paquet S-1, parcours d'entrée).
  *          getToken() → chargerEtatInitial() → routage entre les 5
  *          états posés en S-1.a (loading|error|tampon|encours|
@@ -183,6 +183,26 @@
  *          (contenu Cat B) = question référentiel/conception
  *          tracée (dette SUIVI-UI-4), NON inventée ici.
  *          Zéro storage (I5).
+ *   v0.12: S-3.e — bouton Période contextuel (S-3.4.a, bloc
+ *          S-3-β). CLÔT S-3. Bouton unique en Zone A, libellé =
+ *          prochaine action attendue. Séquence GÉNÉRIQUE 2 mi-
+ *          temps (« Fin 1ʳᵉ MT » → « Reprise 2ᵉ MT » → « Fin du
+ *          match ») : ce n'est PAS une invention — c'est le repli
+ *          P4 explicitement prévu par la spec S-2.3 (« à défaut :
+ *          défaut générique + le Hub signale »), le moteur chrono
+ *          / pré-réglage étant un lot ultérieur. Mention discrète
+ *          « format générique » assumée. Chaque transition = sas
+ *          à confirmation Oui/Non (I4 symétrique). « Fin du
+ *          match » → confirmation → VERROUILLAGE de la saisie sur
+ *          place (palette neutralisée, _termine=true) + écran de
+ *          fin MINIMAL (« Match terminé » + score déjà calculé
+ *          client). L'écran Après riche (récap, message mission)
+ *          = S-4, NON fait ici. consoliderScoreRencontre NON
+ *          appelé : exige evenementUuid que le bénévole sans
+ *          login n'a pas (lié SUIVI-UI-1) → consolidation = côté
+ *          coach, dette SUIVI-UI-5 tracée. Le score live calculé
+ *          (I1) est juste et suffit en V1. État période = var
+ *          runtime transitoire (I5). Zéro storage.
  *
  * INVARIANTS :
  *   I5 — ce module ne persiste RIEN côté navigateur. L'état de
@@ -439,6 +459,15 @@
   // jamais persisté). Tracé PAR LIGNE via modeSaisie ; basculer
   // n'affecte que les saisies À PARTIR de la bascule.
   var _mode = 'normal';
+  // S-3.e — état de période (machine à états cliente). Séquence
+  // GÉNÉRIQUE 2 mi-temps (repli P4 spec S-2.3 ; moteur chrono =
+  // lot ultérieur). Étapes : 'mt1' → 'pause' → 'mt2' → 'fin'.
+  // Var runtime TRANSITOIRE (I5 : jamais persisté ; au reload
+  // l'état réel se re-dérive du Core via boot()).
+  var _periode = 'mt1';
+  // S-3.e — match clos : la saisie est verrouillée sur place
+  // (I4 symétrique). Transitoire (cf. ci-dessus).
+  var _termine = false;
 
   // ------------------------------------------------------------
   // RÉFÉRENTIEL observables-match.json v1.1 — FIGÉ EN DUR.
@@ -748,6 +777,7 @@
     armerHistorique();
     armerSelecteurJoueur();
     armerMode();
+    armerPeriode();
     rafraichirEnCours(lignes || []);
   }
 
@@ -813,6 +843,76 @@
           if (ov && !ov.hasAttribute('hidden')) fermerPanneauReglages();
         }
       });
+    }
+  }
+
+  // ============================================================
+  // S-3.e · BOUTON PÉRIODE (S-3.4.a, bloc S-3-β) — clôt S-3
+  // Bouton unique en Zone A, libellé = prochaine action. Séquence
+  // GÉNÉRIQUE 2 mi-temps : repli P4 prévu par la spec S-2.3 (le
+  // moteur chrono / pré-réglage est un lot ultérieur). Chaque
+  // transition = sas Oui/Non (I4 symétrique). « Fin du match »
+  // verrouille la saisie SUR PLACE + écran de fin MINIMAL
+  // (l'écran Après riche = S-4). Pas de consoliderScoreRencontre
+  // (evenementUuid indisponible côté bénévole — dette SUIVI-UI-5).
+  // ============================================================
+
+  var PERIODE_SEQ = {
+    mt1:   { libelle: 'Fin 1ʳᵉ MT',    confirme: 'Terminer la 1ʳᵉ mi-temps ?', next: 'pause' },
+    pause: { libelle: 'Reprise 2ᵉ MT', confirme: 'Reprendre (2ᵉ mi-temps) ?',   next: 'mt2'   },
+    mt2:   { libelle: 'Fin du match',  confirme: 'Terminer le match ?',          next: 'fin'   }
+  };
+
+  function majBoutonPeriode() {
+    var b = doc.getElementById('zaPeriode');
+    if (!b) return;
+    var et = PERIODE_SEQ[_periode];
+    if (!et || _termine) { b.setAttribute('hidden', ''); return; }
+    b.removeAttribute('hidden');
+    b.textContent = et.libelle;
+  }
+
+  function transitionPeriode() {
+    if (_termine) return;
+    var et = PERIODE_SEQ[_periode];
+    if (!et) return;
+    // Sas à confirmation (I4 symétrique). confirm() natif : geste
+    // rare, délibéré, à fort impact — l'anti-erreur prime sur
+    // l'esthétique ici (cohérent S-3.4.a « sas à confirmation »).
+    if (!global.confirm(et.confirme)) return;
+    if (et.next === 'fin') {
+      terminerMatch();
+    } else {
+      _periode = et.next;
+      majBoutonPeriode();
+    }
+  }
+
+  function terminerMatch() {
+    _termine = true;                         // verrouille la saisie (I4)
+    majBoutonPeriode();
+    // Écran de fin MINIMAL (l'écran Après riche = S-4). Score =
+    // celui déjà calculé client (juste, I1) ; PAS de
+    // consoliderScoreRencontre (evenementUuid indisponible sans
+    // login — SUIVI-UI-5 ; consolidation = côté coach).
+    var s = calculerScore(_chrono);
+    var fin = doc.getElementById('finOverlay');
+    var sc  = doc.getElementById('finScore');
+    if (sc) sc.textContent = 'MOM ' + s.mom + ' — ' + s.adv + ' ADV';
+    if (fin) fin.removeAttribute('hidden');
+    var ovs = ['histoOverlay', 'selJoueurOverlay', 'reglagesOverlay'];
+    for (var i = 0; i < ovs.length; i++) {
+      var o = doc.getElementById(ovs[i]);
+      if (o) o.setAttribute('hidden', '');
+    }
+  }
+
+  function armerPeriode() {
+    majBoutonPeriode();
+    var b = doc.getElementById('zaPeriode');
+    if (b && !b._suiviArme) {
+      b._suiviArme = true;
+      b.addEventListener('click', transitionPeriode);
     }
   }
 
@@ -997,6 +1097,7 @@
    * @param btn         le bouton tapé (anti-double-tap + flash)
    */
   function taperObservable(o, camp, scorante, btn) {
+    if (_termine) return;                  // S-3.e : saisie verrouillée (I4)
     if (_ecritureEnCours) return;          // verrou global anti-doublon
     if (!o || !o.id) return;
 
@@ -1334,6 +1435,7 @@
    * annule!=true, par horodatage = fin de tableau).
    */
   function moinsAdverse(btn) {
+    if (_termine) return;                  // S-3.e : verrouillé (I4)
     if (_ecritureEnCours) return;
     var cible = null;
     for (var i = _chrono.length - 1; i >= 0; i--) {
@@ -1477,7 +1579,7 @@
 
   if (global.console) {
     console.log(
-      '%c🏉 MOM Hub · Suivi App v0.11 (blessure + mode) chargé',
+      '%c🏉 MOM Hub · Suivi App v0.12 (bouton Période — S-3 complet) chargé',
       'color: #2d7a3e; font-weight: bold;'
     );
   }
