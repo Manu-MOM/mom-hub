@@ -7,7 +7,7 @@
  * Consomme SuiviClient (suivi-client.js) ; ne touche jamais
  * Supabase directement.
  *
- * Version : 0.7 — S-2.e (mai 2026)
+ * Version : 0.8 — S-3.a (mai 2026)
  *   v0.1 : LOGIQUE DE BOOT SEULEMENT (paquet S-1, parcours d'entrée).
  *          getToken() → chargerEtatInitial() → routage entre les 5
  *          états posés en S-1.a (loading|error|tampon|encours|
@@ -114,6 +114,27 @@
  *          bouton, tap hors-liste, Échap. Re-render à chaque
  *          ouverture depuis _chrono (cohérent I5 : pas d'état figé,
  *          on relit le mémo du Core). Zéro écriture, zéro storage.
+ *   v0.8 : S-3.a — Zone D, le sélecteur joueur (bloc S-3-α).
+ *          Branche le seam laissé par S-2.d : une SCORANTE côté
+ *          Notre n'insère plus directement en dégradation ; elle
+ *          ouvre d'abord une modale grille de pavés numéro+nom
+ *          (D-3) via la compo déjà chargée (getCompoReduiteRencontre
+ *          + libelleJoueur, règle unique). Titulaires en avant /
+ *          remplaçants grisés mais TOUS tapables (D-5 par role
+ *          compo — guidage, pas blocage P4 ; caveat spec S-3.1.b
+ *          assumé : pas de statut live au backend, fiabilité non
+ *          survendue). Bouton « Équipe / je ne sais pas » (D-7) :
+ *          choix DÉLIBÉRÉ → joueur omis (DS-1, Option A) ; la
+ *          dégradation S-2.d devient un choix explicite, plus un
+ *          fallback subi. insererObservable extrait en
+ *          envoyerObservable(obs,btn) réutilisable (scorante après
+ *          choix joueur, ou direct). Non-scorantes Notre + tout
+ *          Adverse : tap direct INCHANGÉ (S-2.d). Modale = overlay
+ *          in situ dans #scrEnCours (jamais une autre page, même
+ *          principe que S-2.e) ; annulable sans rien écrire. Zéro
+ *          storage (I5). Correction mauvais numéro = S-3.b ;
+ *          blessure double effet = S-3.c ; mode = S-3.d ;
+ *          Période = S-3.e.
  *
  * INVARIANTS :
  *   I5 — ce module ne persiste RIEN côté navigateur. L'état de
@@ -349,6 +370,15 @@
   // (anti-double-tap global : un tap en cours bloque les autres
   // pour éviter doublons sous gants/stress).
   var _ecritureEnCours = false;
+
+  // Compo réduite mémorisée pour la Zone D (sélecteur joueur,
+  // S-3.a). Mémo runtime TRANSITOIRE (I5 : jamais persisté ;
+  // re-fetché si besoin). null = pas encore chargée.
+  var _compo = null;
+  var _compoEnCharge = false;
+  // Observable scorant en attente de l'attribution joueur (entre
+  // l'ouverture de Zone D et le choix). Transitoire.
+  var _obsEnAttente = null;
 
   // ------------------------------------------------------------
   // RÉFÉRENTIEL observables-match.json v1.1 — FIGÉ EN DUR.
@@ -656,6 +686,7 @@
   function entrerEnCours(lignes) {
     armerBascule();
     armerHistorique();
+    armerSelecteurJoueur();
     rafraichirEnCours(lignes || []);
   }
 
@@ -818,6 +849,21 @@
   function taperObservable(o, camp, scorante, btn) {
     if (_ecritureEnCours) return;          // verrou global anti-doublon
     if (!o || !o.id) return;
+
+    var estAdverse = (camp === 'adverse');
+
+    // S-3.a — SEAM résolu : une SCORANTE côté Notre ouvre d'abord
+    // la sélection joueur (Zone D). L'insertion se fait APRÈS le
+    // choix (joueur sélectionné → joueurUuid ; bouton D-7 →
+    // joueurUuid omis = DS-1 mais choix DÉLIBÉRÉ). Les
+    // non-scorantes côté Notre et tout le côté Adverse gardent le
+    // tap direct (comportement S-2.d inchangé).
+    if (!estAdverse && scorante) {
+      flashBouton(btn);
+      ouvrirSelecteurJoueur(o);            // pas d'écriture tant que pas choisi
+      return;
+    }
+
     _ecritureEnCours = true;
     if (btn) btn.disabled = true;
     flashBouton(btn);
@@ -826,38 +872,206 @@
       observableId:  o.id,
       categorieObs:  'A',                  // référentiel = Cat A (S-2.c)
       valeurPoints:  (typeof o.points === 'number') ? o.points : 0,
-      equipeConcernee: (camp === 'adverse') ? 'adverse' : 'notre',
+      equipeConcernee: estAdverse ? 'adverse' : 'notre',
       saisiParRole:  'benevole',
       sourceSaisie:  'live'
-      // joueurUuid VOLONTAIREMENT omis :
+      // joueurUuid omis ici à dessein :
       //  - adverse → jamais de joueur (asymétrie S-2.2.b)
-      //  - notre   → seam S-3 : Zone D (sélection joueur) pas
-      //    encore là ; on dégrade en action ÉQUIPE (joueur NULL),
-      //    autorisé par DS-1 (Option A). Fallback temporaire.
+      //  - notre NON scorante → pas de joueur requis (événement
+      //    d'équipe : mêlée, touche… ; ou événement de jeu).
+      // Les SCORANTES Notre passent par ouvrirSelecteurJoueur
+      // (branche ci-dessus) et n'arrivent jamais ici.
       // minuteMatch / periode NON fournis : moteur chrono = lot
-      //  ultérieur ; les DEFAULT SQL s'appliquent (pas d'invention).
+      //  ultérieur ; DEFAULT SQL (pas d'invention).
       // estBlessure : non géré ici. Le double effet PI-6 (blessure)
-      //  sera traité avec sa confirmation dédiée en S-3 (S-3.4.c) —
-      //  taper « Blessure » ici insère juste la ligne observable
-      //  SANS p_est_blessure (constat simple). Le déclenchement du
-      //  double effet est explicitement renvoyé à S-3.
+      //  a sa confirmation dédiée en S-3.c (renvoyé). Taper
+      //  « Blessure » ici insère la ligne SANS p_est_blessure.
     };
 
+    envoyerObservable(obs, btn);
+  }
+
+  /**
+   * Envoi effectif d'un observable au Core + refresh. Extrait de
+   * taperObservable pour être réutilisé par la Zone D (S-3.a :
+   * après choix joueur) et la suite (S-3.c blessure). Gère le
+   * verrou anti-doublon, l'erreur réseau non bloquante (rien
+   * perdu, l'état vrai reste le Core — I5), la réactivation du
+   * bouton. Le fil qui s'enrichit EST le feedback (I1).
+   * @param obs payload conforme à insererObservable (vérifié source)
+   * @param btn bouton à réactiver (peut être null)
+   */
+  function envoyerObservable(obs, btn) {
+    if (!obs) { _ecritureEnCours = false; if (btn) btn.disabled = false; return; }
+    _ecritureEnCours = true;
+    if (btn) btn.disabled = true;
     global.SuiviClient.insererObservable(_token, obs).then(function (res) {
       if (!res || !res.ok) {
         erreurEphemere("Action non enregistrée. Vérifie le réseau et retape.");
         return;
       }
-      // Succès : on re-dérive du Core. Le fil qui s'enrichit EST
-      // le feedback (I1) — la ligne apparaît dans Zone E.
       return refreshDepuisCore();
     }).catch(function (e) {
-      if (global.console) console.error('MOM Hub Suivi: taperObservable()', e);
+      if (global.console) console.error('MOM Hub Suivi: envoyerObservable()', e);
       erreurEphemere("Action non enregistrée. Vérifie le réseau et retape.");
     }).then(function () {
       _ecritureEnCours = false;
-      if (btn) btn.disabled = false;       // réactivé (re-tap possible)
+      if (btn) btn.disabled = false;
     });
+  }
+
+  // ============================================================
+  // S-3.a · ZONE D — SÉLECTEUR JOUEUR (bloc S-3-α)
+  // Modale grille de pavés numéro+nom (D-3) qui surgit après une
+  // SCORANTE côté Notre. Titulaires en avant / remplaçants grisés
+  // mais TOUS tapables (D-5 par role compo — guidage P4, caveat
+  // S-3.1.b assumé). Bouton « Équipe / je ne sais pas » (D-7) =
+  // choix délibéré (joueur omis, DS-1 Option A). Overlay in situ
+  // dans #scrEnCours (jamais une autre page, comme S-2.e).
+  // Annulable sans rien écrire.
+  // ============================================================
+
+  // Tri d'affichage : titulaires d'abord (role compo), puis le
+  // reste, chacun par numéro de maillot croissant. Heuristique de
+  // « titulaire » volontairement permissive (le référentiel role
+  // peut varier) : tout ce qui n'est pas explicitement remplaçant
+  // est traité comme titulaire (guidage, pas vérité — S-3.1.b).
+  function estRemplacant(j) {
+    var r = (j && j.role) ? String(j.role).toLowerCase() : '';
+    return r.indexOf('rempla') !== -1
+        || r.indexOf('banc') !== -1
+        || r.indexOf('substit') !== -1;
+  }
+
+  function trierCompo(lignes) {
+    var copie = (lignes || []).slice();
+    copie.sort(function (a, b) {
+      var ra = estRemplacant(a) ? 1 : 0;
+      var rb = estRemplacant(b) ? 1 : 0;
+      if (ra !== rb) return ra - rb;                 // titulaires d'abord
+      var na = (a && a.numero_maillot != null) ? a.numero_maillot : 999;
+      var nb = (b && b.numero_maillot != null) ? b.numero_maillot : 999;
+      return na - nb;                                 // puis par numéro
+    });
+    return copie;
+  }
+
+  function construireGrilleJoueurs(lignes) {
+    var grille = doc.getElementById('selJoueurGrille');
+    if (!grille) return;
+    grille.innerHTML = '';
+    var tri = trierCompo(lignes);
+    for (var i = 0; i < tri.length; i++) {
+      (function (j) {
+        var b = doc.createElement('button');
+        b.type = 'button';
+        b.className = 'suivi-seljoueur'
+          + (estRemplacant(j) ? ' suivi-seljoueur--rempla' : '');
+        if (j && j.etat_joueur) {
+          b.setAttribute('data-etat', String(j.etat_joueur));
+        }
+        // Numéro = ancre (gros). libelleJoueur = règle UNIQUE de
+        // dégradation nom_court NULL — NE PAS reconstruire ici.
+        var num = doc.createElement('span');
+        num.className = 'suivi-seljoueur__num';
+        num.textContent = (j && j.numero_maillot != null)
+          ? String(j.numero_maillot) : '–';
+        var nom = doc.createElement('span');
+        nom.className = 'suivi-seljoueur__nom';
+        nom.textContent = global.SuiviClient.libelleJoueur(j);
+        b.appendChild(num);
+        b.appendChild(nom);
+        b.addEventListener('click', function () {
+          choisirJoueur(j && j.joueur_uuid ? j.joueur_uuid : null);
+        });
+        grille.appendChild(b);
+      })(tri[i]);
+    }
+  }
+
+  function chargerCompoZoneD() {
+    // Réutilise _compo si déjà chargée (mémo). Sinon fetch (et
+    // garde anti-double-fetch). Échec → grille vide + le bouton
+    // D-7 reste, donc l'action reste enregistrable sans joueur.
+    if (_compo) { construireGrilleJoueurs(_compo); return; }
+    if (_compoEnCharge) return;
+    _compoEnCharge = true;
+    var grille = doc.getElementById('selJoueurGrille');
+    if (grille) grille.textContent = 'Chargement de la compo…';
+    global.SuiviClient.getCompoReduiteRencontre(_token).then(function (lignes) {
+      _compo = Array.isArray(lignes) ? lignes : [];
+      construireGrilleJoueurs(_compo);
+    }).catch(function (e) {
+      if (global.console) console.error('MOM Hub Suivi: chargerCompoZoneD()', e);
+      _compo = null;                          // re-fetch possible
+      var g = doc.getElementById('selJoueurGrille');
+      if (g) g.textContent = 'Compo indisponible — utilise « Équipe / je ne sais pas ».';
+    }).then(function () {
+      _compoEnCharge = false;
+    });
+  }
+
+  function ouvrirSelecteurJoueur(observable) {
+    _obsEnAttente = observable;               // scorante à attribuer
+    var ov = doc.getElementById('selJoueurOverlay');
+    var titre = doc.getElementById('selJoueurTitre');
+    if (titre && observable) {
+      titre.textContent = 'Qui a marqué ? — ' + (observable.libelle || 'Action');
+    }
+    chargerCompoZoneD();
+    if (ov) ov.removeAttribute('hidden');
+  }
+
+  function fermerSelecteurJoueur() {
+    var ov = doc.getElementById('selJoueurOverlay');
+    if (ov) ov.setAttribute('hidden', '');
+    _obsEnAttente = null;                      // annulation = rien écrit
+  }
+
+  // Choix d'un joueur (ou null via « Équipe / je ne sais pas »).
+  // Construit le payload et envoie. joueurUuid null = cas DS-1
+  // (Option A) mais ici choix DÉLIBÉRÉ du bénévole (D-7), pas un
+  // fallback subi.
+  function choisirJoueur(joueurUuid) {
+    var o = _obsEnAttente;
+    if (!o) { fermerSelecteurJoueur(); return; }
+    var obs = {
+      observableId:  o.id,
+      categorieObs:  'A',
+      valeurPoints:  (typeof o.points === 'number') ? o.points : 0,
+      equipeConcernee: 'notre',               // Zone D = côté Notre uniquement
+      saisiParRole:  'benevole',
+      sourceSaisie:  'live'
+    };
+    if (joueurUuid) obs.joueurUuid = joueurUuid;
+    // joueurUuid absent ⇒ « Équipe / je ne sais pas » (D-7) :
+    // action enregistrée pour l'équipe, attribuable plus tard
+    // (Mode Vidéo S-5 / corriger S-3.b). Choix délibéré.
+    fermerSelecteurJoueur();
+    envoyerObservable(obs, null);
+  }
+
+  function armerSelecteurJoueur() {
+    var fermer = doc.getElementById('selJoueurFermer');
+    var equipe = doc.getElementById('selJoueurEquipe');
+    if (fermer && !fermer._suiviArme) {
+      fermer._suiviArme = true;
+      fermer.addEventListener('click', fermerSelecteurJoueur);
+    }
+    if (equipe && !equipe._suiviArme) {
+      equipe._suiviArme = true;
+      // D-7 : « Équipe / je ne sais pas » → joueur null délibéré.
+      equipe.addEventListener('click', function () { choisirJoueur(null); });
+    }
+    if (!doc._suiviSelEsc) {
+      doc._suiviSelEsc = true;
+      doc.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+          var ov = doc.getElementById('selJoueurOverlay');
+          if (ov && !ov.hasAttribute('hidden')) fermerSelecteurJoueur();
+        }
+      });
+    }
   }
 
   /**
@@ -1011,7 +1225,7 @@
 
   if (global.console) {
     console.log(
-      '%c🏉 MOM Hub · Suivi App v0.7 (En cours · historique) chargé',
+      '%c🏉 MOM Hub · Suivi App v0.8 (En cours · sélecteur joueur) chargé',
       'color: #2d7a3e; font-weight: bold;'
     );
   }
