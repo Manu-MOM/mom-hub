@@ -480,6 +480,28 @@ body.suivi-body {
   color: var(--suivi-encre-doux);
   text-align: center;
 }
+/* S-3.b — ligne d'historique corrigible (tap = corriger le
+   joueur, D-8). Affordance discrète : curseur + chevron. Les
+   lignes adverse ne sont PAS corrigibles (pas de joueur). */
+.suivi-histo__corrigible {
+  cursor: pointer;
+  position: relative;
+  padding-right: 34px;
+}
+.suivi-histo__corrigible::after {
+  content: "✎";
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--suivi-encre-doux);
+  font-size: 15px;
+}
+.suivi-histo__corrigible:active { background: var(--suivi-vert-clair); }
+.suivi-histo__corrigible:focus-visible {
+  outline: none;
+  box-shadow: var(--suivi-focus);
+}
 
 /* ---- S-3.a · Zone D — sélecteur joueur (overlay in situ) ----
    Même principe d'overlay que l'historique : absolu dans
