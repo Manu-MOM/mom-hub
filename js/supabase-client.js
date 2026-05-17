@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.13 — mai 2026
+ * Version : 1.14 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -245,6 +245,32 @@
  *          (A-Q4), appliquée côté evenements-browser, pas un verrou
  *          client. Exposition spectateur tracée : Objet C-2 /
  *          SUIVI-UI-6 (hors de ce cycle).
+ *
+ *   v1.14 : SUIVI-COACH-2 — 1 wrapper C12-h.
+ *          getLienSaisieActif(evenementUuid) : LECTURE via la RPC
+ *          SECURITY DEFINER get_lien_saisie_actif (sql/C12-h), qui
+ *          RETURNS TABLE(token, expire_le, date_creation) → on prend
+ *          data[0] (même pattern que genererLienEphemere). Rend l'état
+ *          3 d'Objet A (« lien déjà généré ») persistant entre visites
+ *          côté coach authentifié.
+ *          La RPC renvoie 0 ou 1 ligne, JAMAIS d'exception : 0 ligne
+ *          = aucun lien 'saisie' actif → { ok:true, data:null } (PAS
+ *          une erreur ; Objet A reste/retombe à l'état 2 « générer »,
+ *          comportement correct). Une vraie erreur réseau/SQL revient
+ *          en { ok:false, error }. La distinction null vs erreur est
+ *          essentielle : ne jamais afficher de fausse erreur au coach
+ *          sur une rencontre sans lien.
+ *          Filtrage (role='saisie', revoque=FALSE, expire_le>NOW) fait
+ *          PAR LA RPC : le client ne re-filtre rien (anti-invention,
+ *          règle non dupliquée). Au plus 1 lien actif par rencontre
+ *          (invariant relais C12-f) → data[0] sans ambiguïté. Le jeton
+ *          est renvoyé BRUT tel que la RPC le donne ; la fabrication
+ *          de l'URL suivi.html?t=… reste côté evenements-browser
+ *          (suiviBuildUrl, déjà en place — fidélité à la source).
+ *          Posture grant RPC = authenticated seul (event-bornée ;
+ *          volet jeton rejeté backend pour escalade spectateur→
+ *          rédacteur). Itération : persistance match simple ; tournoi
+ *          reste borné session (décision de périmètre Manu).
  */
 
 (function (global) {
@@ -2466,6 +2492,65 @@
         return { ok: false, error: "La RPC generer_lien_ephemere n'a renvoyé aucun jeton" };
       }
       return { ok: true, data: row };
+    },
+
+    /**
+     * Relit le lien 'saisie' actif d'une rencontre, s'il existe
+     * (SUIVI-COACH-2 — rend l'état 3 d'Objet A persistant entre
+     * visites côté coach authentifié).
+     *
+     * Encapsule la RPC SECURITY DEFINER get_lien_saisie_actif
+     * (sql/C12-h). Signature SQL réelle (fait foi) :
+     *   get_lien_saisie_actif(p_evenement_uuid UUID)
+     *   RETURNS TABLE (token TEXT, expire_le TIMESTAMPTZ,
+     *                  date_creation TIMESTAMPTZ)
+     *
+     * La RPC RETURNS TABLE → data est un tableau ; on prend data[0]
+     * (même pattern que genererLienEphemere).
+     *
+     * CONTRAT CLÉ : la RPC renvoie 0 ou 1 ligne, JAMAIS d'exception.
+     *   - 0 ligne (tableau vide) = aucun lien 'saisie' actif pour
+     *     cette rencontre → { ok:true, data:null }. CE N'EST PAS UNE
+     *     ERREUR : Objet A reste/retombe à l'état 2 « générer », ce
+     *     qui est le comportement correct. Ne JAMAIS transformer ce
+     *     cas en { ok:false } (sinon fausse erreur affichée au coach
+     *     sur toute rencontre sans lien).
+     *   - 1 ligne = lien actif → { ok:true, data:{token, expire_le,
+     *     date_creation} }.
+     *   - erreur réseau/SQL réelle → { ok:false, error }.
+     *
+     * Le filtrage (role='saisie', revoque=FALSE, expire_le>NOW) est
+     * fait PAR LA RPC : aucune re-vérification côté client (la règle
+     * n'est ni dupliquée ni réinterprétée — anti-invention). Au plus
+     * un lien actif par rencontre (invariant relais C12-f) : data[0]
+     * sans ambiguïté. Le token est renvoyé BRUT ; la fabrication de
+     * l'URL suivi.html?t=… reste côté evenements-browser
+     * (suiviBuildUrl, déjà en place).
+     *
+     * Posture grant RPC = authenticated seul (event-bornée ; volet
+     * jeton rejeté backend pour éviter l'escalade spectateur→
+     * rédacteur, cf. sql/C12-h).
+     *
+     * @param {string} evenementUuid UUID de la rencontre
+     * @returns {Promise<{ok: boolean, data?: {token: string, expire_le: string, date_creation: string}|null, error?: string}>}
+     */
+    async getLienSaisieActif(evenementUuid) {
+      if (!evenementUuid) {
+        return { ok: false, error: 'evenementUuid manquant' };
+      }
+
+      const { data, error } = await client.rpc('get_lien_saisie_actif', {
+        p_evenement_uuid: evenementUuid
+      });
+
+      if (error) {
+        console.error('MOM Hub: getLienSaisieActif()', error);
+        return { ok: false, error: error.message || 'Erreur get_lien_saisie_actif' };
+      }
+      // RETURNS TABLE → 0 ou 1 ligne. 0 ligne = aucun lien actif :
+      // succès avec data:null (PAS une erreur — Objet A → état 2).
+      const row = Array.isArray(data) && data.length > 0 ? data[0] : null;
+      return { ok: true, data: row };
     }
 
   };
@@ -2476,7 +2561,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.13 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.14 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
