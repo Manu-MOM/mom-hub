@@ -7,7 +7,7 @@
  * Consomme SuiviClient (suivi-client.js) ; ne touche jamais
  * Supabase directement.
  *
- * Version : 0.13 — S-4 (mai 2026)
+ * Version : 0.14 — S-5.a (mai 2026)
  *   v0.1 : LOGIQUE DE BOOT SEULEMENT (paquet S-1, parcours d'entrée).
  *          getToken() → chargerEtatInitial() → routage entre les 5
  *          états posés en S-1.a (loading|error|tampon|encours|
@@ -219,6 +219,24 @@
  *          correction sur l'écran bénévole (_termine verrouille
  *          déjà tout depuis S-3.e ; documenté). Pas de
  *          consoliderScoreRencontre (SUIVI-UI-5 inchangé). Zéro
+ *          storage (I5).
+ *   v0.14: S-5.a — écran de reprise (S-5.2.b), SEAM résolu. Au
+ *          statut 'demarre', on route désormais vers l'écran de
+ *          reprise (et non « En cours » direct) : micro-
+ *          confirmation systématique (résumé score + nb actions)
+ *          + « Je reprends » → reconstruit « En cours » depuis la
+ *          chronologie déjà chargée (zéro appel réseau ; I5 :
+ *          rien stocké localement = rien perdu). Impossible de
+ *          distinguer reconnexion vs relais sans état navigateur
+ *          (I5 l'interdit) → écran systématique = lecture la plus
+ *          honnête, conforme S-5.2.b. Coût 1 tap au reload (rare).
+ *          LIEN SPECTATEUR (S-5.1) NON livrable côté UI : le rôle
+ *          du jeton (saisie/spectateur) est OPAQUE côté client
+ *          (tranché serveur, valider_lien_suivi) ; aucune RPC ne
+ *          l'expose. → dette SUIVI-UI-6 (exposer le rôle du jeton
+ *          côté backend = conv Production). Sécurité spectateur
+ *          déjà portée par le backend (jeton sans droit d'écriture,
+ *          RLS C12-f) ; seul l'écran UI distinct manque. Zéro
  *          storage (I5).
  *
  * INVARIANTS :
@@ -789,6 +807,43 @@
    * 'demarre' (avec la chronologie déjà chargée) ET par le coup
    * d'envoi (avec [] : chronologie vide, I4). Idempotente.
    */
+  // ============================================================
+  // S-5.a · ÉCRAN DE REPRISE (S-5.2.b) — SEAM résolu
+  // Présenté systématiquement quand on ouvre un lien sur un match
+  // DÉJÀ démarré (statut 'demarre'). Micro-confirmation : résumé
+  // d'état (score calculé + nb actions) + « Je reprends » →
+  // reconstruit « En cours » depuis la chronologie déjà chargée
+  // (zéro appel réseau ; I5 : rien n'était stocké localement, donc
+  // rien n'est perdu — c'est la récompense de I5). Impossible de
+  // distinguer reconnexion vs relais sans état navigateur (I5
+  // l'interdit) → écran systématique = lecture honnête, conforme
+  // S-5.2.b. Coût : 1 tap au reload (rare).
+  // ============================================================
+  function preparerReprise(lignes) {
+    var chrono = Array.isArray(lignes) ? lignes : [];
+    _chrono = chrono;                  // mémo (I5 transitoire) pour la reconstruction
+    var s = calculerScore(chrono);
+    var nb = 0;
+    for (var i = 0; i < chrono.length; i++) {
+      if (chrono[i] && chrono[i].annule !== true) nb++;
+    }
+    var sc = doc.getElementById('repriseScore');
+    var rc = doc.getElementById('repriseRecap');
+    if (sc) sc.textContent = 'MOM ' + s.mom + ' — ' + s.adv + ' ADV';
+    if (rc) rc.textContent = nb + (nb > 1 ? ' actions déjà notées' : ' action déjà notée');
+    var btn = doc.getElementById('repriseBtn');
+    if (btn && !btn._suiviArme) {
+      btn._suiviArme = true;
+      btn.addEventListener('click', function () {
+        // Reconstruction directe depuis le Core (chrono déjà
+        // chargée). Aucun nouvel appel réseau.
+        entrerEnCours(_chrono);
+        aide(true);
+        montrerEcran('scrEnCours');
+      });
+    }
+  }
+
   function entrerEnCours(lignes) {
     armerBascule();
     armerHistorique();
@@ -1568,16 +1623,19 @@
 
         case 'demarre':
           // Jeton OK, ≥1 ligne → le match tourne. I2 : on ne
-          // REVIENT JAMAIS au tampon. SEAM S-5 : distinguer
-          // « même bénévole reconnecté » (→ En cours direct) vs
-          // « relais d'un nouveau » (→ écran de reprise) se tranche
-          // en S-5. En attendant, route vers « En cours ».
-          // S-2.b : peuple l'écran depuis la chronologie DÉJÀ
-          // chargée par chargerEtatInitial (zéro appel réseau
-          // supplémentaire — on réutilise res.chronologie).
-          entrerEnCours(res.chronologie);
-          aide(true);
-          montrerEcran('scrEnCours');
+          // REVIENT JAMAIS au tampon. SEAM S-5 RÉSOLU (S-5.2.b,
+          // option validée) : impossible de distinguer « même
+          // bénévole reconnecté » de « relais d'un nouveau » sans
+          // état navigateur (I5 l'interdit). → écran de reprise
+          // SYSTÉMATIQUE quand on arrive sur un match déjà
+          // démarré : micro-confirmation (résumé d'état + « Je
+          // reprends »). Coût = 1 tap au reload (rare) ; conforme
+          // S-5.2.b ET I5, sans rien inventer. La chronologie est
+          // déjà chargée (chargerEtatInitial) : zéro appel réseau,
+          // on la mémorise pour la reconstruction au « Je reprends ».
+          preparerReprise(res.chronologie);
+          aide(false);                 // pas d'aide sur l'écran de reprise
+          montrerEcran('scrReprise');
           break;
 
         default:
@@ -1618,7 +1676,7 @@
 
   if (global.console) {
     console.log(
-      '%c🏉 MOM Hub · Suivi App v0.13 (Avant/Après — S-4) chargé',
+      '%c🏉 MOM Hub · Suivi App v0.14 (écran de reprise — S-5.a) chargé',
       'color: #2d7a3e; font-weight: bold;'
     );
   }
