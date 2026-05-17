@@ -412,6 +412,75 @@ body.suivi-body {
   margin-bottom: 12px;
 }
 
+/* ---- S-2.e · historique complet — overlay IN SITU ----
+   Positionné DANS #scrEnCours (rendu position:relative ci-dessous).
+   Couvre tout l'écran de saisie le temps de la consultation : son
+   propre bandeau (titre + Fermer) remplace temporairement Zone A.
+   C'est un MODE DE CONSULTATION refermable d'1 tap, PAS une autre
+   page (aucune navigation, reste dans #scrEnCours — spec S-2.1). */
+.suivi-encours { position: relative; }   /* ancre l'overlay */
+.suivi-histo {
+  position: absolute;
+  inset: 0;                        /* couvre tout #scrEnCours */
+  background: var(--suivi-surface);
+  display: flex;
+  flex-direction: column;
+  z-index: 5;
+}
+.suivi-histo[hidden] { display: none; }
+.suivi-histo__bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--suivi-vert-fonce);
+  color: #fff;
+}
+.suivi-histo__title {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  font-size: 17px;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+}
+.suivi-histo__close {
+  margin-left: auto;
+  appearance: none;
+  border: none;
+  background: rgba(255,255,255,.16);
+  color: #fff;
+  font-family: 'Manrope', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 10px 16px;
+  min-height: 44px;
+  cursor: pointer;
+}
+.suivi-histo__close:active { background: rgba(255,255,255,.28); }
+.suivi-histo__close:focus-visible { outline: none; box-shadow: var(--suivi-focus); }
+.suivi-histo__list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  list-style: none;
+  margin: 0;
+  padding: 8px 0 calc(16px + env(safe-area-inset-bottom));
+}
+.suivi-histo__list li {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--suivi-bord);
+  font-size: 15px;
+  line-height: 1.4;
+}
+.suivi-histo__list li:last-child { border-bottom: none; }
+.suivi-histo__empty {
+  padding: 24px 16px;
+  color: var(--suivi-encre-doux);
+  text-align: center;
+}
+
 /* ---- S-1.c · contenu du tampon « Avant » (assemblage S-4.1) ---- */
 
 .suivi-tampon__role {
@@ -749,6 +818,20 @@ body.suivi-body {
         <p class="suivi-zc__placeholder" id="zcPlaceholder">
           La palette d'actions s'affichera ici.
         </p>
+      </div>
+
+      <!-- S-2.e — historique COMPLET, overlay IN SITU par-dessus
+           la palette (spec S-2.1 : jamais une autre page). Masqué
+           par défaut ; ouvert/fermé par le bouton « Tout voir »
+           de Zone E. Reste DANS #scrEnCours (aucune navigation). -->
+      <div class="suivi-histo" id="histoOverlay" hidden
+           role="dialog" aria-modal="true" aria-label="Historique complet">
+        <div class="suivi-histo__bar">
+          <span class="suivi-histo__title">Historique complet</span>
+          <button class="suivi-histo__close" id="histoClose" type="button"
+                  aria-label="Fermer l'historique">✕ Fermer</button>
+        </div>
+        <ul class="suivi-histo__list" id="histoList" aria-live="polite"></ul>
       </div>
 
     </section>
