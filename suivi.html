@@ -387,6 +387,31 @@ body.suivi-body {
   font-weight: 700;
 }
 
+/* ---- S-2.d · feedback au tap + erreur non bloquante ---- */
+/* Flash immédiat au tap (certitude avant retour réseau, S-2.2.c).
+   La confirmation RÉELLE = la ligne qui s'enrichit (I1). */
+.suivi-obs--flash {
+  background: var(--suivi-vert) !important;
+  border-color: var(--suivi-vert-fonce) !important;
+  color: #fff !important;
+  transform: scale(.97);
+}
+.suivi-obs--flash .suivi-obs__pts { color: #fff !important; }
+@media (prefers-reduced-motion: reduce) {
+  .suivi-obs--flash { transform: none; }
+}
+/* Bandeau d'erreur éphémère (persona réseau : non bloquant,
+   rien perdu, l'état vrai reste le Core). */
+.suivi-err-flash {
+  background: #fdecea;             /* aligné --feedback-error-bg hub.css */
+  color: #8a1b14;                  /* aligné --feedback-error-fg hub.css */
+  border-radius: var(--suivi-rayon);
+  padding: 12px 14px;
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
 /* ---- S-1.c · contenu du tampon « Avant » (assemblage S-4.1) ---- */
 
 .suivi-tampon__role {
