@@ -4,7 +4,7 @@
 > et `PASSATION.md` (kit de démarrage). Ce document ne remplace ni l'un ni l'autre : il dit
 > *quelle conversation fait quoi, où elle en est, et laquelle ouvrir pour quoi*.
 >
-> Établi le 16 mai 2026 · révisé le 17 mai 2026 (MAJ Prod — UI Suivi : module bénévole complet de bout en bout S-1→S-5.a ; reste S-5.b périmètre coach + S-6) · 21 conversations recensées · À garder à jour à la main.
+> Établi le 16 mai 2026 · révisé le 17 mai 2026 (MAJ Prod — UI Suivi : **module bénévole CLÔTURÉ S-1→S-6**, revue invariants OK ; suite = cycle coach séparé `SUIVI-COACH-1`) · 21 conversations recensées · À garder à jour à la main.
 >
 > **Convention de nommage adoptée :** les 3 fronts vivants portent un nom court — `Production`,
 > `Audits`, `Conception`. Les fils clos/en pause gardent leur nom d'origine (préfixé `[ARCHIVE]`
@@ -62,10 +62,10 @@ C'est la colonne vertébrale technique. Elle s'est compactée plusieurs fois.
 | MOM Hub · Production · Phases 4.3-4.4 — Compositions & Présences | 15/05 | 🟡 | Compositions/Présences + intégration Bibliothèque. 3 chantiers laissés ouverts. |
 | MOM Hub - Production Modules Joueurs | 16/05 | ⚪ | **Close.** Phase 5.14 Module Joueurs V1-Métier + Phase 2 complétion Évènements (v1.7) + Joueurs (v1.3). |
 | **Production · Suivi de rencontre** (backend C12) | 16/05 | ⚪ | **Close.** Backend Suivi `chronologie_suivi`/`lien_suivi` : C12-a→f produits, **exécutés en base Supabase + rangés `sql/` + committés**. Mission backend accomplie. À rouvrir uniquement si retouche SQL C12 nécessaire. |
-| **Production · UI Suivi de rencontre** | 16/05 | 🟢 | **Front actif.** UI du Suivi par-dessus le backend C12. **Module bénévole COMPLET de bout en bout (S-1 → S-5.a)** : `suivi.html` + `js/suivi-client.js` v1.1 + `js/suivi-app.js` **v0.14**. Utilisable en live (entrée→coup d'envoi→saisie complète→correction→blessure→mode→fin verrouillée→reprise/relais). **Reste : S-5.b** (Mode Vidéo + temps de jeu = **périmètre COACH authentifié**, arbitrage de périmètre à poser) **+ S-6** (synthèse, sans code). Dettes ouvertes : SUIVI-UI-1/2/3/4/5/6 (voir STATE). |
+| **Production · UI Suivi de rencontre** | 16/05 | 🟢 | **Module bénévole CLÔTURÉ (S-1 → S-6).** UI du Suivi par-dessus le backend C12 : `suivi.html` + `js/suivi-client.js` v1.1 + `js/suivi-app.js` **v0.14**. Complet, utilisable en live de bout en bout (entrée→coup d'envoi→saisie complète→correction→blessure→mode→fin verrouillée→reprise/relais). S-6 fait (revue vs 5 invariants OK, sans code). **Plus aucun code prévu côté bénévole.** Suite = **cycle coach séparé `SUIVI-COACH-1`** (Mode Vidéo + temps de jeu + pont Hub↔Suivi), à cadrer en conv Conception après instruction des dettes backend. Dettes ouvertes : SUIVI-UI-1/2/3/4/5/6 + SUIVI-COACH-1 (voir STATE). |
 | MOM Hub - Production Module Bibliothèque d'ateliers | 14/05 | 🟡 | Scripts Python migration Drive + module Bibliothèque v6. Transféré vers Production. |
 
-→ **Reprise Production (Suivi) = conv `Production · UI Suivi de rencontre`** (front actif, reprendre à S-5.b). La conv backend C12 est **close** (rouvrir seulement si retouche SQL C12).
+→ **Module Suivi bénévole CLÔTURÉ.** Plus de reprise prévue sur la conv `Production · UI Suivi de rencontre` côté bénévole. La suite du Suivi = **cycle coach `SUIVI-COACH-1`** (Mode Vidéo / temps de jeu / pont Hub↔Suivi), à **ouvrir en conv Conception** après instruction des dettes backend SUIVI-UI-1/5/6 (conv Production). La conv backend C12 reste **close** (rouvrir seulement si retouche SQL C12).
 
 ### Lignée C — Audits / modélisation / doctrine 🟢
 
@@ -109,7 +109,7 @@ C'est la colonne vertébrale technique. Elle s'est compactée plusieurs fois.
 
 | Je veux… | J'ouvre / je reprends |
 |---|---|
-| Continuer l'UI du Suivi de rencontre (S-5.b puis S-6) | conv **`Production · UI Suivi de rencontre`** (front actif, reprendre à S-5.b) |
+| Reprendre le Suivi (Mode Vidéo, temps de jeu, pont Hub) | **Nouveau cycle `SUIVI-COACH-1`** : cadrer en conv **Conception** (après dettes backend SUIVI-UI-1/5/6 en conv Production). PAS dans la conv UI Suivi bénévole (clôturée). |
 | Retoucher le backend SQL C12 du Suivi | conv **`Production · Suivi de rencontre` (backend C12)** — close, à rouvrir pour ce seul motif |
 | Coder un autre module, écrire du SQL, déployer | nouvelle conv Production (ou la conv Production pertinente) |
 | Modéliser une entité métier, écrire un audit, trancher SUIVI-UI-2 / C12-gate | conv **`Audits`** |
