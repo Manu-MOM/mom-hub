@@ -361,6 +361,62 @@
  *              Phases est livrée et fonctionnelle ; sa persistance
  *              = commit suivant, tracée, NON un faux (le bandeau
  *              n'affirme pas un enregistrement immédiat).
+ *
+ *   v1.17 : Refonte Évènements (Production · Évènements) — PERSISTANCE
+ *          des Phases & matchs M6 (lève la dette « Phases enregistre-
+ *          ment » tracée en v1.16). Orchestration en cascade sur la
+ *          table `evenements` UNIQUEMENT (createEvenement v1.15) —
+ *          PAS M3/M5 (dette write distincte, NON levée ici).
+ *          renderSection/renderCard/openFiche/accroches Suivi A/B/C
+ *          JAMAIS touchés ; submitModalCreate étendu en addition
+ *          (la voie existante création/duplication est préservée
+ *          telle quelle, l'orchestration ne s'active QUE si Phases=OUI).
+ *
+ *          (1) persisterPhasesEtMatchs(racineId, …) : après création
+ *              réussie de la compétition racine, crée la hiérarchie
+ *              M6 à 3 NIVEAUX (v1.2 §4.4) :
+ *                racine (déjà créée)
+ *                 └─ phase-boîte = ligne evenements enfant,
+ *                    phase_libelle renseigné, PAS d'adversaire
+ *                     └─ match = ligne evenements enfant de la
+ *                        PHASE-BOÎTE, adversaire_nom renseigné,
+ *                        equipe_id (équipe précise) ou NULL (toutes)
+ *              Hérite de la racine : saison_id, organisateur,
+ *              type_competition, format_de_jeu, site_id (lecture de
+ *              la racine via createEvenement payload explicite).
+ *              addMatchToTournoi NON utilisé pour les matchs de
+ *              phase : il force parent=racine, or un match de phase
+ *              a pour parent la PHASE-BOÎTE (3 niveaux). createEvenement
+ *              est la voie correcte pour les 2 niveaux. Plafond M6 :
+ *              2 niveaux d'UI, aucune sous-phase.
+ *
+ *          (2) INVARIANT SUIVI tenu : chaque match est créé comme
+ *              une vraie LIGNE `evenements` (jamais une structure
+ *              imbriquée) → compositions.evenement_id continue de
+ *              s'y rattacher, accroches Suivi A/B/C non régressées
+ *              (v1.2 §7, cadrage §5). Vérifié par diff (zéro
+ *              modification des fonctions Suivi).
+ *
+ *          (3) STRATÉGIE D'ÉCHEC = création progressive (décision
+ *              Manu). Pas de transaction client possible (API REST) :
+ *              on n'invente pas un faux « tout ou rien ». En cas
+ *              d'échec en cours de cascade, on N'ANNULE PAS (un
+ *              nettoyage = écritures spéculatives qui peuvent elles
+ *              aussi échouer, état pire). On ARRÊTE, on garde ce qui
+ *              est créé (lignes valides et cohérentes), et on AFFICHE
+ *              exactement où ça s'est arrêté + la raison. L'utilisateur
+ *              complète manuellement via la fiche (déjà créée) et le
+ *              « + Match » existant (chemin P2-E.1 G9 réaligné v1.15).
+ *              Cohérent P4 « le Hub avertit, ne bloque pas » + doctrine
+ *              « jamais de faux » (on n'affirme jamais plus que ce
+ *              qui est réellement en base).
+ *
+ *          (4) Le redirect post-création vers la fiche (P2-E.1 G9)
+ *              est CONSERVÉ et s'applique aussi après orchestration
+ *              réussie OU partielle (l'utilisateur atterrit sur la
+ *              compétition pour voir/compléter). submitModalCreate :
+ *              addition pure, branche Phases gardée par phases_mode
+ *              = 'oui' ET sous-type éligible (UX §3.1).
  */
 
 (function () {
@@ -2690,6 +2746,105 @@
     return 'EVT-' + y + '-' + m + '-' + day + '-' + typeShort + '-M14-' + rand;
   }
 
+  // ────────────────────────────────────────────────────────────────
+  // v1.17 — Persistance Phases & matchs M6 (orchestration en cascade).
+  // 3 niveaux v1.2 §4.4 : racine (déjà créée) → phase-boîte → match.
+  // Table `evenements` UNIQUEMENT (createEvenement) — PAS M3/M5.
+  // INVARIANT SUIVI : chaque match = vraie ligne `evenements`
+  // (compositions.evenement_id s'y rattache, A/B/C non régressés).
+  // Stratégie d'échec = création PROGRESSIVE (décision Manu) : on
+  // n'annule rien, on s'arrête, on rend compte exactement.
+  //
+  // racineId   : UUID de la compétition racine déjà créée
+  // heritage   : { saison_id, organisateur_principal_id,
+  //                type_competition, format_de_jeu, site_id }
+  //              (valeurs connues au submit — pas de relecture base)
+  // Retour : { phasesOk, matchsOk, stopped:bool, stopInfo:string }
+  // ────────────────────────────────────────────────────────────────
+  async function persisterPhasesEtMatchs(racineId, heritage) {
+    const list = document.getElementById('evt-create-phases-list');
+    const result = { phasesOk: 0, matchsOk: 0, stopped: false, stopInfo: '' };
+    if (!list) return result;
+    const boxes = list.querySelectorAll('.evt-phase-box');
+
+    for (let i = 0; i < boxes.length; i++) {
+      const box = boxes[i];
+      const phaseInput = box.querySelector('.evt-phase-box-head input[type="text"]');
+      const phaseLibelle = phaseInput ? phaseInput.value.trim() : '';
+      if (!phaseLibelle) {
+        // Phase sans nom : P4 « avertir, ne pas bloquer » — on saute
+        // cette phase-boîte sans interrompre (UX §3.3 : avertir).
+        continue;
+      }
+
+      // Niveau 2 — phase-boîte : ligne evenements enfant de la racine,
+      // phase_libelle renseigné, PAS d'adversaire (M6 §4.4).
+      const phasePayload = {
+        code:                       generateEventCode('competition', new Date().toISOString()),
+        libelle:                    phaseLibelle,
+        type_evenement:             'competition',
+        type_competition:           heritage.type_competition || 'tournoi',
+        saison_id:                  heritage.saison_id,
+        organisateur_principal_id:  heritage.organisateur_principal_id,
+        date_debut:                 heritage.date_debut,
+        evenement_parent_id:        racineId,
+        phase_libelle:              phaseLibelle,
+        ordre_dans_phase:           i + 1
+      };
+      if (heritage.format_de_jeu) phasePayload.format_de_jeu = heritage.format_de_jeu;
+      if (heritage.site_id)       phasePayload.site_id       = heritage.site_id;
+
+      const phaseRes = await SupabaseHub.createEvenement(phasePayload);
+      if (!phaseRes || !phaseRes.ok || !phaseRes.data || !phaseRes.data.id) {
+        result.stopped = true;
+        result.stopInfo = 'phase « ' + phaseLibelle + ' » : '
+          + ((phaseRes && phaseRes.error) || 'erreur inconnue');
+        return result; // création progressive : on s'arrête, on garde l'acquis
+      }
+      result.phasesOk++;
+      const phaseId = phaseRes.data.id;
+
+      // Niveau 3 — matchs de CETTE phase-boîte.
+      const matchRows = box.querySelectorAll('.evt-phase-match-row');
+      for (let j = 0; j < matchRows.length; j++) {
+        const row = matchRows[j];
+        const advInput = row.querySelector('input[type="text"]');
+        const eqSelect = row.querySelector('select');
+        const adv = advInput ? advInput.value.trim() : '';
+        if (!adv) {
+          // Match sans adversaire : P4 avertir, ne pas bloquer — sauté.
+          continue;
+        }
+        const matchPayload = {
+          code:                       generateEventCode('competition', new Date().toISOString()),
+          libelle:                    phaseLibelle + ' — vs ' + adv,
+          type_evenement:             'competition',
+          type_competition:           heritage.type_competition || 'tournoi',
+          saison_id:                  heritage.saison_id,
+          organisateur_principal_id:  heritage.organisateur_principal_id,
+          date_debut:                 heritage.date_debut,
+          evenement_parent_id:        phaseId,        // parent = la PHASE-BOÎTE (3 niveaux)
+          adversaire_nom:             adv
+        };
+        if (heritage.format_de_jeu) matchPayload.format_de_jeu = heritage.format_de_jeu;
+        if (heritage.site_id)       matchPayload.site_id       = heritage.site_id;
+        // Équipe précise (valeur du select) ou NULL = « toutes les
+        // équipes engagées » (M6 §4.4 ; le select porte un UUID ou '').
+        if (eqSelect && eqSelect.value) matchPayload.equipe_id = eqSelect.value;
+
+        const matchRes = await SupabaseHub.createEvenement(matchPayload);
+        if (!matchRes || !matchRes.ok) {
+          result.stopped = true;
+          result.stopInfo = 'match « vs ' + adv + ' » (phase « ' + phaseLibelle
+            + ' ») : ' + ((matchRes && matchRes.error) || 'erreur inconnue');
+          return result;
+        }
+        result.matchsOk++;
+      }
+    }
+    return result;
+  }
+
   async function submitModalCreate() {
     const submitBtn = document.getElementById('evt-create-submit');
     const msg = document.getElementById('evt-create-msg');
@@ -2802,7 +2957,40 @@
       }
       // Succès
       const createdId = res.data && res.data.id ? res.data.id : null;
-      msg.innerHTML = '<div class="evt-form-success">✅ Évènement ' + (isDuplication ? 'dupliqué' : 'créé') + '.</div>';
+
+      // v1.17 — Si mode Phases=OUI (UX §3.2) ET racine créée :
+      // orchestration M6 (phase-boîtes + matchs). Création
+      // progressive : on rend compte exactement, on n'annule rien.
+      const phasesQ = document.getElementById('evt-create-phases-question');
+      const phasesQVisible = phasesQ && phasesQ.style.display !== 'none';
+      const phasesOuiEl = phasesQ && phasesQ.querySelector('input[name=phases_mode]:checked');
+      const phasesOui = phasesQVisible && phasesOuiEl && phasesOuiEl.value === 'oui';
+
+      let phaseReport = '';
+      if (phasesOui && createdId && !isDuplication) {
+        const orch = await persisterPhasesEtMatchs(createdId, {
+          saison_id:                 CTX_SAISON_ID,
+          organisateur_principal_id: CTX_ORGANISATEUR_ID,
+          type_competition:          typeCompet || 'tournoi',
+          format_de_jeu:             formatJeu || '',
+          site_id:                   siteId || '',
+          date_debut:                new Date(dateDebut).toISOString()
+        });
+        if (orch.stopped) {
+          phaseReport = '<div class="evt-form-error">Compétition créée · '
+            + orch.phasesOk + ' phase(s) et ' + orch.matchsOk + ' match(s) enregistrés, '
+            + 'puis arrêt sur ' + escHtml(orch.stopInfo)
+            + '.<br><small>Ce qui est créé est conservé. Complétez le reste '
+            + 'depuis la fiche du tournoi (bouton + Match).</small></div>';
+        } else {
+          phaseReport = '<div class="evt-form-success">'
+            + orch.phasesOk + ' phase(s) et ' + orch.matchsOk
+            + ' match(s) enregistrés.</div>';
+        }
+      }
+
+      msg.innerHTML = '<div class="evt-form-success">✅ Évènement '
+        + (isDuplication ? 'dupliqué' : 'créé') + '.</div>' + phaseReport;
       const modalBody = document.querySelector('#evt-overlay-create .evt-modal-body');
       if (modalBody) modalBody.scrollTop = 0;
       setTimeout(async () => {
@@ -2813,7 +3001,9 @@
         // post-migration ; successeur 1:1 fidèle = le SOUS-TYPE
         // type_competition='tournoi'. (Élargir aux autres sous-types
         // à phases = U2, dépend evenements.html — NON pré-empté ici.)
-        if (typeCompet === 'tournoi' && createdId) {
+        // v1.17 : on ouvre AUSSI la fiche après orchestration Phases
+        // (réussie ou partielle) — l'utilisateur voit/complète.
+        if ((typeCompet === 'tournoi' || phasesOui) && createdId) {
           openFiche(createdId);
         }
       }, 500);
