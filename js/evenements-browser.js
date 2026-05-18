@@ -247,6 +247,58 @@
  *              (autre fichier, NON ici) — ce JS réaligne seulement
  *              SA logique de lecture/visibilité ; le rebranchement
  *              des chips = vérification Production sur evenements.html.
+ *
+ *   v1.15 : Refonte Évènements (Production · Évènements) — U4 JS-side
+ *          (résolution M7 de classe) + mise en cohérence CONSÉQUENTE
+ *          du flux de création post-migration v1.2 §5.1. Diff borné,
+ *          prouvé ; renderSection/renderCard/openFiche/accroches
+ *          Suivi A/B/C JAMAIS touchés.
+ *
+ *          ⚠️ PÉRIMÈTRE HONNÊTE — U1 (formulaire 5 blocs adaptatif)
+ *          et U2 (bascule Phases, blocs +Phase/+Match) NE SONT PAS
+ *          implémentés ici : leur structure (radios type_evenement,
+ *          sélecteur type_competition, cases équipes, blocs
+ *          répétables, CSS .evt-compet-*) vit dans evenements.html,
+ *          NON fourni à cette conv. Fabriquer un formulaire parallèle
+ *          aveugle = anti-pattern DS-1 + violation « le code déployé
+ *          fait foi » → refusé. U1/U2 nécessitent evenements.html
+ *          (entrée manquante signalée, NON inventée).
+ *
+ *          (1) Helper familleReelle(v) : remap DÉFENSIF d'une valeur
+ *              radio (ancienne match|tournoi|journee_championnat ou
+ *              nouvelle competition|entrainement|stage) → famille
+ *              réelle. Forward-compatible : identité quand
+ *              evenements.html émettra déjà les 3 familles.
+ *
+ *          (2) RÉGRESSION création réparée : post-migration la modale
+ *              envoyait encore type_evenement='match'|'tournoi'|
+ *              'journee_championnat' → violation evenements_type_check
+ *              v1.2. type remappé via familleReelle AVANT le payload
+ *              ET les overrides duplication (P2-E.1 préservé).
+ *
+ *          (3) updateCreateConditionalFields réaligné sur la famille
+ *              réelle (competition → compét.+format ; stage → date_fin
+ *              ; logique testée sur famille, plus sur valeurs mortes).
+ *
+ *          (4) RÉGRESSION P2-E.1 G9 réparée : redirect fiche
+ *              post-création testait type==='tournoi' (mort). Remplacé
+ *              par le successeur 1:1 fidèle (sous-type type_competition
+ *              ='tournoi'). Le redirect élargi aux sous-types à phases
+ *              = U2 (dépend evenements.html), NON pré-empté ici.
+ *
+ *          (5) generateEventCode : préfixe aligné sur familles réelles
+ *              (COMP/ENTR/STAGE) ; anciennes clés = fallback défensif.
+ *
+ *          (6) U4 M7 — competClass DÉRIVE désormais 'evt-compet-' +
+ *              code (référentiel sous-types-competition.json, _ → -).
+ *              Plus de table parallèle COMPET_TO_CLASS (compet-champ-p1
+ *              /compet-vie/compet-tournoi/compet-amical SUPPRIMÉE) :
+ *              une seule source de vérité (le référentiel), le CSS la
+ *              suit (UX §5.2/5.5, résolution structurelle M7).
+ *              compet-fed n'a jamais existé dans ce JS, garanti absent.
+ *              ⚠️ Les RÈGLES CSS .evt-compet-<code> (palette §5.4)
+ *              vivent dans evenements.html (vérification Production) —
+ *              ce JS pose la classe mécaniquement, pas la couleur.
  */
 
 (function () {
@@ -330,12 +382,12 @@
     journee_championnat: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>'
   };
 
-  const COMPET_TO_CLASS = {
-    championnat: 'compet-champ-p1',
-    coupe:       'compet-vie',
-    tournoi:     'compet-tournoi',
-    amical:      'compet-amical'
-  };
+  // U4 M7 (v1.15) — plus de table parallèle code→classe (ancienne
+  // COMPET_TO_CLASS championnat/coupe/tournoi/amical SUPPRIMÉE :
+  // valeurs mortes post-migration + liste qui divergeait du
+  // référentiel). La classe est désormais DÉRIVÉE du code de
+  // sous-types-competition.json (cf. competClass) : une seule source
+  // de vérité, le CSS la suit (UX §5.2/5.5, résolution M7).
 
   // ──────────────────────────────────────────────────────────────
   // U3 (refonte Évènements, v1.14) — REGROUPEMENT PAR 3 FAMILLES M1,
@@ -361,6 +413,22 @@
     // 'competition' (valeur RÉELLE post-migration) ET fallback défensif
     // (anciennes valeurs mortes match|tournoi|journee_championnat, ou
     // tout cas imprévu) → compétition : jamais d'évènement perdu.
+    return 'competition';
+  }
+
+  // U1-conséquent (v1.15) — remap DÉFENSIF d'une valeur de radio
+  // type_evenement vers la famille RÉELLE (CHECK v1.2 §5.1 :
+  // competition|entrainement|stage). Couvre l'ancien formulaire
+  // (match|tournoi|journee_championnat encore présent dans
+  // evenements.html non fourni) ET le futur (3 familles) :
+  // FORWARD-COMPATIBLE — identité quand evenements.html émettra déjà
+  // 'competition'. Sans ce remap, la création post-migration viole
+  // evenements_type_check (régression active).
+  function familleReelle(radioValue) {
+    if (radioValue === 'entrainement') return 'entrainement';
+    if (radioValue === 'stage') return 'stage';
+    // 'competition' (futur) ET 'match'|'tournoi'|'journee_championnat'
+    // (ancien, valeurs mortes en base) ET tout cas imprévu → competition.
     return 'competition';
   }
 
@@ -511,8 +579,17 @@
     return { cls: 'neutral', libelle: total + '/' + total + ' à faire' };
   }
 
+  // U4 M7 (v1.15) — la classe CSS DÉRIVE exactement du code de
+  // sous-types-competition.json : 'evt-compet-' + code, underscores
+  // → tirets (ex. challenge_inter_ligues → evt-compet-challenge-
+  // inter-ligues, UX §5.2). Plus jamais une liste parallèle. Vide si
+  // pas de sous-type (entraînement/stage : famille, pas de classe
+  // sous-type). Les RÈGLES CSS .evt-compet-<code> (palette §5.4)
+  // vivent dans evenements.html (vérification Production) — ici on
+  // pose la classe mécaniquement, pas la couleur.
   function competClass(typeCompet) {
-    return COMPET_TO_CLASS[typeCompet] || '';
+    if (!typeCompet || typeof typeCompet !== 'string') return '';
+    return 'evt-compet-' + typeCompet.replace(/_/g, '-');
   }
 
   function typeIconSvg(type) {
@@ -2359,15 +2436,18 @@
   function updateCreateConditionalFields() {
     const checked = document.querySelector('#evt-create-form input[name=type_evenement]:checked');
     if (!checked) return;
-    const type = checked.value;
+    // v1.15 — raisonne sur la FAMILLE réelle (forward/backward compat).
+    const famille = familleReelle(checked.value);
 
     const competGroup = document.getElementById('evt-create-compet-group');
     const formatGroup = document.getElementById('evt-create-format-group');
     const dateFinGroup = document.getElementById('evt-create-date-fin-group');
 
-    const showCompet = ['match', 'tournoi', 'journee_championnat'].indexOf(type) !== -1;
-    const showFormat = ['match', 'tournoi', 'journee_championnat'].indexOf(type) !== -1;
-    const showDateFin = ['tournoi', 'stage'].indexOf(type) !== -1;
+    // Compétition → sous-type + format (M1 : type_competition non vide
+    // uniquement si competition). Stage → date_fin (plurijours). UX §2.3.
+    const showCompet  = famille === 'competition';
+    const showFormat  = famille === 'competition';
+    const showDateFin = famille === 'stage';
 
     if (competGroup)  competGroup.style.display  = showCompet  ? '' : 'none';
     if (formatGroup)  formatGroup.style.display  = showFormat  ? '' : 'none';
@@ -2383,10 +2463,12 @@
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
-    const typeShort = (type === 'entrainement' ? 'ENTR'
+    const typeShort = (type === 'competition' ? 'COMP'
+                    : type === 'entrainement' ? 'ENTR'
+                    : type === 'stage' ? 'STAGE'
+                    // fallback défensif anciennes valeurs (mortes en base)
                     : type === 'tournoi' ? 'TOURN'
                     : type === 'match' ? 'MATCH'
-                    : type === 'stage' ? 'STAGE'
                     : type === 'journee_championnat' ? 'JCHAMP'
                     : 'EVT');
     const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -2414,6 +2496,12 @@
       return;
     }
     const type = typeChecked.value;
+    // v1.15 — RÉGRESSION : la modale (evenements.html non mis à jour)
+    // émet encore match|tournoi|journee_championnat → violerait
+    // evenements_type_check v1.2. On remappe vers la famille RÉELLE
+    // pour tout ce qui part en base. `type` (valeur radio brute) reste
+    // utilisé tel quel pour les hints client lisant l'ancien form.
+    const familleEvt = familleReelle(type);
     const libelle = f.elements.libelle.value.trim();
     const dateDebut = f.elements.date_debut.value;
     const dateFin = f.elements.date_fin.value;
@@ -2439,9 +2527,9 @@
 
     // Construction du payload
     const payload = {
-      code:                       generateEventCode(type, dateDebut),
+      code:                       generateEventCode(familleEvt, dateDebut),
       libelle:                    libelle,
-      type_evenement:             type,
+      type_evenement:             familleEvt,
       equipe_id:                  M14_TEAM_UUID,
       saison_id:                  CTX_SAISON_ID,
       organisateur_principal_id:  CTX_ORGANISATEUR_ID,
@@ -2469,9 +2557,9 @@
         // Mode duplication : appel duplicateEvenement(srcId, overrides)
         // Les overrides sont les champs modifiés par l'utilisateur
         const overrides = {
-          code: generateEventCode(type, dateDebut),
+          code: generateEventCode(familleEvt, dateDebut),
           libelle: libelle,
-          type_evenement: type,
+          type_evenement: familleEvt,
           date_debut: new Date(dateDebut).toISOString(),
           equipe_id: M14_TEAM_UUID,
           saison_id: CTX_SAISON_ID,
@@ -2505,8 +2593,12 @@
       setTimeout(async () => {
         closeModalCreate();
         await reloadEvents();
-        // P2-E.1 G9 : si tournoi créé, ouvrir la fiche pour ajouter les matchs
-        if (type === 'tournoi' && createdId) {
+        // P2-E.1 G9 : si tournoi créé, ouvrir la fiche pour ajouter
+        // les matchs. v1.15 — l'ancien type='tournoi' est mort
+        // post-migration ; successeur 1:1 fidèle = le SOUS-TYPE
+        // type_competition='tournoi'. (Élargir aux autres sous-types
+        // à phases = U2, dépend evenements.html — NON pré-empté ici.)
+        if (typeCompet === 'tournoi' && createdId) {
           openFiche(createdId);
         }
       }, 500);
