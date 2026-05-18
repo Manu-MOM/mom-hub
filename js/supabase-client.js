@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.15 — mai 2026
+ * Version : 1.16 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -335,6 +335,33 @@
  *          remontée fidèlement en { ok:false, error } sans être
  *          réinterprétée ni dupliquée côté client (anti-
  *          invention, même principe que PI-7/genererLien).
+ *
+ *   v1.16 : SUIVI-COACH-1 Objet C-1 (temps de jeu) — 1 wrapper
+ *          LECTURE coach. Ajout pur : aucun wrapper v1.0→v1.15
+ *          modifié (signatures et retours identiques). Signature
+ *          SQL vérifiée À LA SOURCE (sql/C12-l).
+ *
+ *          LECTURE coach (sql/C12-l, SUIVI-COACH-5 backend levée ;
+ *          jumelle COMPO de C12-k ; C12-f NON touché) :
+ *          (6) getCompoReduiteRencontreCoach(evenementUuid) →
+ *              get_compo_reduite_rencontre_coach. Payload contrat-
+ *              IDENTIQUE à get_compo_reduite_rencontre / C12-f §5
+ *              (6 colonnes : joueur_uuid, numero_maillot,
+ *              poste_uuid, role, etat_joueur, nom_court ; nom_court
+ *              PEUT être NULL tant que C12-nom non câblé).
+ *              Convention lecture projet : renvoie un Array, []
+ *              sur erreur/refus/vide (identique
+ *              getChronologieRencontreCoach). Autorisation Option A
+ *              (rôle coach/admin + équipe-staff) portée par C12-l
+ *              (helpers C12-j réutilisés).
+ *
+ *          PÉRIMÈTRE : ce wrapper est produit pour le besoin PROPRE
+ *          d'Objet C-1 (baseline effectif : titulaires/remplaçants
+ *          de la compo de départ pour l'estimation temps de jeu).
+ *          Il est GÉNÉRIQUE et PARTAGÉ (PI-5, une seule vérité) ;
+ *          son existence NE lève PAS la dégradation picker d'Objet B
+ *          (cela exige de toucher mode-video.js, NON modifié ici —
+ *          passation §5 respectée). Ajout pur, mode-video.js intact.
  */
 
 (function (global) {
@@ -2695,6 +2722,53 @@
     },
 
     /**
+     * Charge la COMPO RÉDUITE (effectif) d'une rencontre pour le
+     * COACH authentifié. Encapsule la RPC SECURITY DEFINER
+     * get_compo_reduite_rencontre_coach (sql/C12-l). Jumelle COMPO
+     * de getChronologieRencontreCoach (C12-l est à C12-k ce que
+     * C12-f §5 est à C12-d). Signature SQL réelle (fait foi) :
+     *   get_compo_reduite_rencontre_coach(p_evenement_uuid UUID)
+     *   RETURNS TABLE (6 colonnes, contrat IDENTIQUE à
+     *     get_compo_reduite_rencontre / C12-f §5 :
+     *     joueur_uuid, numero_maillot, poste_uuid, role,
+     *     etat_joueur, nom_court)
+     *
+     * Autorisation Option A (rôle coach/admin + équipe-staff)
+     * portée par C12-l (helpers C12-j réutilisés) : un refus
+     * revient en error SQL — convention lecture projet = renvoyer
+     * [] (jamais d'exception propagée), comme
+     * getChronologieRencontreCoach. Le détail du refus reste
+     * loggé en console.
+     *
+     * Tri numero_maillot NULLS LAST (identique C12-f §5).
+     * nom_court PEUT être NULL (dette C12-nom) →
+     * libelleJoueurSuivi() pour afficher (ancre = numéro).
+     *
+     * USAGE C-1 (temps de jeu) : la baseline effectif (qui est
+     * titulaire = entré au coup d'envoi vs remplaçant) que la
+     * chronologie seule ne porte pas. Lecture pure, zéro écriture,
+     * zéro RPC propre (C1-Q3 : RPC déjà livrée C12-l).
+     *
+     * @param {string} evenementUuid UUID de la rencontre
+     * @returns {Promise<Array>} lignes (6 champs), [] si
+     *          erreur/refus/vide
+     */
+    async getCompoReduiteRencontreCoach(evenementUuid) {
+      if (!evenementUuid) {
+        console.error('MOM Hub: getCompoReduiteRencontreCoach() requiert un evenementUuid');
+        return [];
+      }
+      const { data, error } = await client.rpc('get_compo_reduite_rencontre_coach', {
+        p_evenement_uuid: evenementUuid
+      });
+      if (error) {
+        console.error('MOM Hub: getCompoReduiteRencontreCoach()', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
      * Insère une ligne chronologie en Mode Vidéo (coach).
      * Encapsule la RPC SECURITY DEFINER inserer_observable_coach
      * (sql/C12-j). Signature SQL réelle (fait foi) :
@@ -2902,7 +2976,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.15 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.16 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
