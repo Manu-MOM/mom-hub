@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.10 — SUIVI-COACH-1 Objet B accroche (17 mai 2026)
+ * Version : 1.11 — SUIVI-COACH-1 Objet C accroche (18 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -114,6 +114,43 @@
  *          Spec : Conception-SUIVI-COACH-1-ObjetB.md (validé
  *          Manu). Dépend de mode-video.html + mode-video.js +
  *          supabase-client v1.15 (couche données coach).
+ *
+ *   v1.11 : SUIVI-COACH-1 Objet C — ACCROCHE (panneau temps de jeu
+ *          C-1 + lien spectateur C-2). ADDITION PURE, modèle
+ *          SUIVI-COACH-2/v1.10 STRICT : nouvelles fonctions
+ *          uniquement (spectateurBuildUrl, renderSpectateurAcces,
+ *          renderTempsDeJeuMount + handlers spectGenerer/Copier/
+ *          Partager) + appels EN AVAL de renderSuiviRencontreBloc
+ *          (match simple & matchs enfants — A-Q3, hiérarchie
+ *          réutilisée à l'identique) + forEach de binding siblings.
+ *          AUCUNE fonction d'Objet A/B modifiée, AUCUNE branche
+ *          d'état / génération de lien de saisie touchée.
+ *          • C-1 (temps de jeu) : un placeholder est émis EN AVAL
+ *            (gate suiviRevoirActionnable = MÊME seuil « phase aval »
+ *            que Mode Vidéo, non inventé) puis TempsDeJeu.monter()
+ *            est appelé post-render (js/temps-de-jeu.js, panneau
+ *            replié, lecture pure). Non bloquant si TempsDeJeu
+ *            absent (posture v1.9/v1.10).
+ *          • C-2 (lien spectateur) : exposé « dans l'état 3 »
+ *            (C2-Q3, évolution A-Q4) — renderSpectateurAcces rend
+ *            '' sauf si un lien de saisie est actif en session.
+ *            Coach-initié (génération = écriture délibérée, jamais
+ *            d'auto-INSERT). Borné session : aucune RPC de
+ *            relecture spectateur n'existe (seul getLienSaisieActif
+ *            /C12-h, saisie-only) — même posture « borné session »
+ *            que le lien de saisie v1.8 (honnête, non inventé).
+ *            Map isolée SUIVI_SPECT_SESSION (la Map d'Objet A
+ *            n'est NI touchée NI relue pour écrire). URL
+ *            spectateur.html?t=<jeton> calquée sur suiviBuildUrl.
+ *          genererLienEphemere(evtId,'spectateur') : contrat
+ *          DÉJÀ présent (wrapper v1.13, role∈saisie|spectateur ;
+ *          C12-f generer_lien_ephemere sans PI-7 ni relais pour
+ *          'spectateur') — l'évolution « Objet C-2 / SUIVI-UI-6 »
+ *          tracée par v1.8/A-Q4 est ICI réalisée (plus « hors
+ *          cycle » : c'est ce cycle). Rien inventé, contrat activé.
+ *          Spec : Conception-SUIVI-COACH-1-ObjetC.md (validé Manu).
+ *          Dépend de spectateur.html + js/spectateur.js +
+ *          js/temps-de-jeu.js + supabase-client v1.16.
  */
 
 (function () {
@@ -155,6 +192,13 @@
   // En RAM UNIQUEMENT (jamais localStorage — cohérent avec l'invariant
   // I5 du module Suivi). evtId -> { token, role, expire_le, url }
   const SUIVI_LIENS_SESSION = new Map();
+
+  // SUIVI-COACH-1 Objet C accroche (v1.11) — Map ISOLÉE des liens
+  // spectateur (C2-Q3). Distincte de SUIVI_LIENS_SESSION (Objet A) :
+  // jeton/rôle différents, lecture seule. En RAM UNIQUEMENT (jamais
+  // localStorage — invariant I5). Borné session (aucune RPC de
+  // relecture spectateur n'existe). evtId -> { token, expire_le, url }
+  const SUIVI_SPECT_SESSION = new Map();
 
   const state = {
     typesActifs:   new Set(['all']),
@@ -849,6 +893,131 @@
     return h;
   }
 
+  // ============================================================
+  // SUIVI-COACH-1 Objet C — ACCROCHE (ADDITION PURE)
+  // ============================================================
+  // Panneau temps de jeu C-1 + lien spectateur C-2. NOUVELLES
+  // fonctions uniquement, appelées EN AVAL de renderSuiviRencontre-
+  // Bloc : ZÉRO retouche de la logique d'Objet A/B (modèle v1.10).
+  // Spec : Conception-SUIVI-COACH-1-ObjetC.md (validé Manu).
+
+  // URL de l'écran spectateur (lecture seule, fichier distinct
+  // — C2-Q1). Contrat ?t=<jeton> POSÉ dans js/spectateur.js /
+  // suivi-client.js (getToken lit ?t=), réutilisé À L'IDENTIQUE.
+  // Pattern calqué sur suiviBuildUrl — rien inventé.
+  function spectateurBuildUrl(token) {
+    const u = new URL('spectateur.html', window.location.href);
+    u.search = '?t=' + encodeURIComponent(token);
+    return u.toString();
+  }
+
+  // Accès « lien spectateur » pour UNE rencontre. C2-Q3 / évolution
+  // A-Q4 : exposé UNIQUEMENT « dans l'état 3 » (un lien de saisie
+  // est actif en session = le suivi est en place). '' sinon. Lecture
+  // seule de SUIVI_LIENS_SESSION pour décider la visibilité (même
+  // posture que renderModeVideoAcces qui lit rencontre.etat — on ne
+  // modifie ni n'écrit la Map d'Objet A). Borné session (aucune RPC
+  // de relecture spectateur n'existe — honnête, non inventé).
+  function renderSpectateurAcces(rencontre) {
+    const evtId = rencontre.id;
+    if (!SUIVI_LIENS_SESSION.get(evtId)) return '';   // pas état 3
+    const spect = SUIVI_SPECT_SESSION.get(evtId);
+    let h = '<div style="padding:6px 0;border-top:1px solid var(--paper-warm);margin-top:8px;">';
+    if (spect) {
+      h += '<div style="font-family:\'JetBrains Mono\',monospace;font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-mute);margin-bottom:4px;">Lien spectateur (lecture seule — familles, public)</div>';
+      h += '<div style="font-family:\'JetBrains Mono\',monospace;font-size:12px;color:var(--ink);word-break:break-all;background:var(--paper-warm);padding:8px;border-radius:6px;">' + escHtml(spect.url) + '</div>';
+      h += '<div style="font-size:11px;color:var(--ink-mute);margin-top:4px;">Valable jusqu\'au ' + escHtml(formatDateShort(spect.expire_le)) + '</div>';
+      h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">';
+      h += '<button type="button" class="evt-btn" data-action="suivi-spect-copier" data-event-id="' + escHtml(evtId) + '">📋 Copier</button>';
+      h += '<button type="button" class="evt-btn" data-action="suivi-spect-partager" data-event-id="' + escHtml(evtId) + '">📤 Partager</button>';
+      h += '<button type="button" class="evt-btn evt-btn-danger" data-action="suivi-spect-regenerer" data-event-id="' + escHtml(evtId) + '">🔄 Régénérer</button>';
+      h += '</div>';
+      h += '<div style="font-size:11px;color:var(--ink-mute);margin-top:6px;">Lecture seule : ce lien ne permet jamais de saisir. Régénérer en crée un nouveau (les précédents restent valables jusqu\'à leur expiration).</div>';
+    } else {
+      h += '<button type="button" class="evt-btn" data-action="suivi-spect-generer" data-event-id="' + escHtml(evtId) + '">👁 Lien spectateur (lecture seule)</button>';
+      h += '<div style="font-size:11px;color:var(--ink-mute);margin-top:6px;">Lien public à transmettre aux familles : suivi en lecture seule, aucune possibilité de saisie.</div>';
+    }
+    h += '</div>';
+    return h;
+  }
+
+  // Placeholder de montage du panneau temps de jeu C-1. Émis EN
+  // AVAL ; gate = suiviRevoirActionnable (MÊME seuil « phase aval »
+  // que Mode Vidéo — non inventé). Le composant js/temps-de-jeu.js
+  // est monté post-render (bindSuiviActions) ; il porte lui-même sa
+  // logique de 4 états (replié, lecture pure). data-etat transmet
+  // l'état rencontre (connu côté coach via la fiche — C1-Q3).
+  function renderTempsDeJeuMount(rencontre) {
+    if (!suiviRevoirActionnable(rencontre)) return '';
+    return '<div data-tdj-mount data-event-id="' + escHtml(rencontre.id)
+         + '" data-etat="' + escHtml(rencontre.etat || '') + '"></div>';
+  }
+
+  // Génération / régénération d'un lien SPECTATEUR (lecture seule).
+  // Miroir de suiviGenerer mais role='spectateur' : C12-f
+  // generer_lien_ephemere n'applique NI PI-7 NI relais pour
+  // 'spectateur' (saisie-only) → génération inconditionnelle, et
+  // les anciens liens restent valables (lecture seule, inoffensifs).
+  async function spectGenerer(evtId, btn, isRegen) {
+    if (!evtId) return;
+    const labelInitial = isRegen ? '🔄 Régénérer' : '👁 Lien spectateur (lecture seule)';
+    if (btn) { btn.disabled = true; btn.textContent = isRegen ? 'Régénération…' : 'Génération…'; }
+    try {
+      const res = await SupabaseHub.genererLienEphemere(evtId, 'spectateur');
+      if (!res || !res.ok) {
+        const msg = (res && res.error) || 'erreur inconnue';
+        alert('Échec de la génération du lien spectateur : ' + msg);
+        if (btn) { btn.disabled = false; btn.textContent = labelInitial; }
+        return;
+      }
+      const d = res.data;   // { token, role, expire_le }
+      SUIVI_SPECT_SESSION.set(evtId, {
+        token:     d.token,
+        expire_le: d.expire_le,
+        url:       spectateurBuildUrl(d.token)
+      });
+      refreshSuiviSection();
+    } catch (err) {
+      console.error('MOM Hub: spectGenerer()', err);
+      alert('Erreur inattendue : ' + (err && err.message ? err.message : err));
+      if (btn) { btn.disabled = false; btn.textContent = labelInitial; }
+    }
+  }
+
+  async function spectCopier(evtId) {
+    const s = SUIVI_SPECT_SESSION.get(evtId);
+    if (!s) return;
+    try {
+      await navigator.clipboard.writeText(s.url);
+      alert('Lien spectateur copié dans le presse-papiers.');
+    } catch (e) {
+      window.prompt('Copiez le lien spectateur :', s.url);
+    }
+  }
+
+  async function spectPartager(evtId) {
+    const s = SUIVI_SPECT_SESSION.get(evtId);
+    if (!s) return;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Suivi de la rencontre (spectateur)',
+          text:  'Lien spectateur — suivi en lecture seule',
+          url:   s.url
+        });
+      } catch (e) {
+        // Partage annulé : silencieux
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(s.url);
+      alert('Partage non disponible sur cet appareil — lien copié à la place.');
+    } catch (e) {
+      window.prompt('Copiez le lien spectateur :', s.url);
+    }
+  }
+
   // Compo « prête » selon la notion DÉJÀ connue de la fiche.
   // AUCUN seuil inventé : on réutilise statutCompoBadge
   // (prête ⟺ validee+utilisee===total && total>0).
@@ -947,6 +1116,8 @@
             } else {
               html += renderSuiviRencontreBloc(child);
               html += renderModeVideoAcces(child);
+              html += renderSpectateurAcces(child);
+              html += renderTempsDeJeuMount(child);
             }
             html += '</div>';
           });
@@ -956,6 +1127,8 @@
       // Match simple
       html += renderSuiviRencontreBloc(evt);
       html += renderModeVideoAcces(evt);
+      html += renderSpectateurAcces(evt);
+      html += renderTempsDeJeuMount(evt);
     }
 
     html += '</div>';
@@ -1099,6 +1272,45 @@
       btn.addEventListener('click', function () {
         // Ouvre l'écran Mode Vidéo coach (fichier distinct, B-Q1).
         window.location.href = modeVideoBuildUrl(this.getAttribute('data-event-id'));
+      });
+    });
+
+    // SUIVI-COACH-1 Objet C (v1.11) : lien spectateur + montage du
+    // panneau temps de jeu (ADDITION PURE — siblings des bindings
+    // ci-dessus, pattern identique ; les bindings d'Objet A/B ne
+    // sont pas touchés). Câblé sur full render ET refreshSuiviSection
+    // (noeuds remplacés → pas de double-binding).
+    document.querySelectorAll('[data-action="suivi-spect-generer"]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        spectGenerer(this.getAttribute('data-event-id'), this, false);
+      });
+    });
+    document.querySelectorAll('[data-action="suivi-spect-regenerer"]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        spectGenerer(this.getAttribute('data-event-id'), this, true);
+      });
+    });
+    document.querySelectorAll('[data-action="suivi-spect-copier"]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        spectCopier(this.getAttribute('data-event-id'));
+      });
+    });
+    document.querySelectorAll('[data-action="suivi-spect-partager"]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        spectPartager(this.getAttribute('data-event-id'));
+      });
+    });
+    // Montage du panneau temps de jeu C-1 (composant js/temps-de-jeu.js,
+    // panneau replié, lecture pure). Non bloquant si TempsDeJeu absent
+    // (posture v1.9/v1.10 : l'accroche n'empêche jamais la fiche).
+    // Garde data-tdj-done = pas de double-montage sur un même noeud
+    // (refreshSuiviSection remplace tout le noeud → placeholder frais).
+    document.querySelectorAll('[data-tdj-mount]').forEach(el => {
+      if (el.getAttribute('data-tdj-done') === '1') return;
+      if (!window.TempsDeJeu || typeof window.TempsDeJeu.monter !== 'function') return;
+      el.setAttribute('data-tdj-done', '1');
+      window.TempsDeJeu.monter(el, el.getAttribute('data-event-id'), {
+        etat: el.getAttribute('data-etat') || null
       });
     });
   }
