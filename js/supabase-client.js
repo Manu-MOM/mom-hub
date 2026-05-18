@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.16 — mai 2026
+ * Version : 1.17 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -362,6 +362,43 @@
  *          son existence NE lève PAS la dégradation picker d'Objet B
  *          (cela exige de toucher mode-video.js, NON modifié ici —
  *          passation §5 respectée). Ajout pur, mode-video.js intact.
+ *
+ *   v1.17 : Refonte Évènements (Production · Évènements) — mise en
+ *          cohérence AVAL de la migration SQL v1.1→v1.2 (M1/M2/M6),
+ *          NIVEAU 1 SEUL (conséquent, prouvable par diff). Les
+ *          wrappers liaison/adversaires M3/M5 sont VOLONTAIREMENT
+ *          différés à un commit séparé (leur contrat dépend de
+ *          l'UX U1→U4 ; ne pas inventer une signature « parce qu'il
+ *          en faut une » — anti-pattern DS-1). Trois interventions,
+ *          AUCUN wrapper v1.0→v1.16 modifié dans sa logique :
+ *
+ *          (1) createEvenement() : ajout de 'recurrence' à la
+ *              whitelist allowedFields (M2 — la colonne JSONB
+ *              nullable existe désormais en base, migration v1.2
+ *              §5.1 commitée). Sans cet ajout, le champ M2 serait
+ *              filtré silencieusement et donc inopérant. Aucune
+ *              autre clé touchée ; État initial 'creation' inchangé.
+ *
+ *          (2) addMatchToTournoi() : CORRECTION D'UNE RÉGRESSION
+ *              introduite par la migration. Le garde-fou lisait
+ *              parent.type_evenement !== 'tournoi' ; or M1 a remappé
+ *              'tournoi' → 'competition' en base, donc plus AUCUN
+ *              parent ne satisfait l'ancien test → tout ajout de
+ *              match à un tournoi existant échouait. Remplacé par la
+ *              convention M6 (v1.2 §4.4) : un parent valide =
+ *              type_evenement === 'competition' ET
+ *              evenement_parent_id IS NULL (Compétition racine, pas
+ *              une phase-boîte ni un match). type_evenement de
+ *              l'enfant : 'match' → 'competition' (le domaine
+ *              technique 'match' n'existe plus, CHECK v1.2). Défaut
+ *              type_competition hérité : 'tournoi' (TOUJOURS valide —
+ *              présent dans les 10 sous-types) ; conservé tel quel.
+ *
+ *          (3) JSDoc createEvenement / addMatchToTournoi : domaines
+ *              CHECK périmés corrigés (étaient match/entrainement/
+ *              stage/tournoi/journee_championnat et championnat/
+ *              amical/coupe/tournoi → désormais competition/
+ *              entrainement/stage et les 10 sous-types). Doc only.
  */
 
 (function (global) {
@@ -718,23 +755,29 @@
      * pour sécurité) :
      *   - code               (string, requis, UNIQUE en base)
      *   - libelle            (string, requis)
-     *   - type_evenement     (string, requis, CHECK : match/entrainement/
-     *                         stage/tournoi/journee_championnat)
-     *   - type_competition   (string, optionnel, CHECK : championnat/
-     *                         amical/coupe/tournoi)
-     *   - equipe_id          (UUID, requis sauf cas parent stage/tournoi)
+     *   - type_evenement     (string, requis, CHECK : competition/
+     *                         entrainement/stage)
+     *   - type_competition   (string, optionnel ; non vide seulement si
+     *                         type_evenement='competition' ; CHECK : 10
+     *                         sous-types de sous-types-competition.json)
+     *   - equipe_id          (UUID, requis pour entrainement/stage ;
+     *                         libre pour competition — équipes via la
+     *                         liaison M3 evenement_equipes_engagees)
      *   - saison_id          (UUID, requis)
-     *   - format_de_jeu      (string, requis pour match/journee_champ)
+     *   - format_de_jeu      (string, optionnel ; CHECK : XV/13/12/X/9/8/7)
      *   - date_debut         (ISO string, requis)
      *   - date_fin           (ISO string, optionnel)
      *   - site_id            (UUID, optionnel)
      *   - organisateur_principal_id (UUID, requis)
-     *   - evenement_parent_id (UUID, optionnel — pour enfants)
-     *   - phase_libelle      (string, optionnel)
+     *   - evenement_parent_id (UUID, optionnel — série/exception M2 ou
+     *                         hiérarchie Compétition→Phase→Match M6)
+     *   - phase_libelle      (string, optionnel — nom de phase-boîte M6)
      *   - ordre_dans_phase   (integer, optionnel)
      *   - adversaire_nom     (string, optionnel)
      *   - domicile_exterieur (string, optionnel, CHECK : domicile/
      *                         exterieur/neutre)
+     *   - recurrence         (JSONB, optionnel — règle de série M2,
+     *                         structure libre non interprétée par CHECK)
      *   - notes_internes     (string, optionnel)
      *
      * État initial forcé à 'creation' (CHECK valide).
@@ -758,6 +801,7 @@
         'organisateur_principal_id',
         'evenement_parent_id', 'phase_libelle', 'ordre_dans_phase',
         'adversaire_nom', 'domicile_exterieur',
+        'recurrence',                                  // M2 (migration v1.2 §5.1) — colonne JSONB nullable
         'notes_internes'
       ];
       const insertPayload = { etat: 'creation' };
@@ -847,11 +891,15 @@
     },
 
     /**
-     * Ajoute un match enfant à un tournoi existant. Hérite par défaut du
-     * parent : type_competition, saison_id, equipe_id, organisateur_principal_id,
-     * format_de_jeu, site_id. type_evenement forcé à 'match'.
+     * Ajoute un match enfant à une compétition racine existante (cas
+     * tournoi/challenge à matchs). Convention M6 (v1.2 §4.4) : le parent
+     * doit être type_evenement='competition' ET sans evenement_parent_id ;
+     * l'enfant créé est lui aussi 'competition' (le domaine technique
+     * 'match' n'existe plus depuis la migration v1.2 §5.1). Hérite par
+     * défaut du parent : type_competition, saison_id, equipe_id,
+     * organisateur_principal_id, format_de_jeu, site_id.
      *
-     * @param {string} tournoiId UUID du tournoi parent
+     * @param {string} tournoiId UUID de la compétition racine parente
      * @param {Object} payload Champs spécifiques au match
      *   - libelle           (string, requis — ex: "vs Nancy Seichamps")
      *   - date_debut        (ISO string, requis)
@@ -871,7 +919,7 @@
       // 1. Récupère le parent pour hériter
       const { data: parent, error: errParent } = await client
         .from('evenements')
-        .select('id, code, type_evenement, type_competition, saison_id, equipe_id, organisateur_principal_id, format_de_jeu, site_id, domicile_exterieur')
+        .select('id, code, type_evenement, type_competition, saison_id, equipe_id, organisateur_principal_id, format_de_jeu, site_id, domicile_exterieur, evenement_parent_id')
         .eq('id', tournoiId)
         .maybeSingle();
 
@@ -880,13 +928,29 @@
         return { ok: false, error: errParent.message };
       }
       if (!parent) return { ok: false, error: 'Tournoi parent introuvable' };
-      if (parent.type_evenement !== 'tournoi') {
-        return { ok: false, error: "L'évènement parent n'est pas un tournoi (type=" + parent.type_evenement + ")" };
+      // Convention M6 (v1.2 §4.4) : un parent recevant des matchs est une
+      // COMPÉTITION RACINE. Le domaine technique 'tournoi' a été remappé en
+      // 'competition' par la migration v1.2 §5.1 (M1) — l'ancien test
+      // `!== 'tournoi'` rejetait désormais 100 % des parents (régression).
+      // Parent valide = competition ET sans parent (pas une phase-boîte
+      // ni un match enfant).
+      if (parent.type_evenement !== 'competition' || parent.evenement_parent_id !== null) {
+        return {
+          ok: false,
+          error: "L'évènement parent n'est pas une compétition racine (type_evenement="
+                 + parent.type_evenement
+                 + (parent.evenement_parent_id !== null ? ', a un parent' : '') + ')'
+        };
       }
 
       // 2. Construit le payload enfant
+      // Convention M6 (v1.2 §4.4) : un match enfant EST de la famille
+      // 'competition' (le domaine technique 'match' n'existe plus depuis
+      // la migration v1.2 §5.1). Il se distingue d'une phase-boîte par
+      // evenement_parent_id renseigné + adversaire_nom + absence d'enfants
+      // (convention applicative, pas de colonne marqueur — P1/P4).
       const childPayload = {
-        type_evenement:            'match',
+        type_evenement:            'competition',
         evenement_parent_id:       parent.id,
         type_competition:          payload.type_competition || parent.type_competition || 'tournoi',
         saison_id:                 parent.saison_id,
