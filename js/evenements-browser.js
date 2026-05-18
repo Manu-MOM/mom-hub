@@ -299,6 +299,68 @@
  *              ⚠️ Les RÈGLES CSS .evt-compet-<code> (palette §5.4)
  *              vivent dans evenements.html (vérification Production) —
  *              ce JS pose la classe mécaniquement, pas la couleur.
+ *
+ *   v1.16 : Refonte Évènements (Production · Évènements) — U1/U2
+ *          LOGIQUE ADAPTATIVE de la modale création, pilotant les
+ *          12 ancres DOM posées par evenements.html commit (b1).
+ *          Implémente Conception-Refonte-Evenements-U1-U4-v1.md
+ *          §1/§2.4/§2.5/§3 (UX, fait foi). Extension de
+ *          updateCreateConditionalFields (Façon 1, PAS un wizard) ;
+ *          renderSection/renderCard/openFiche/accroches Suivi A/B/C
+ *          JAMAIS touchés.
+ *
+ *          ⚠️ PÉRIMÈTRE HONNÊTE (constat de modèle, NON un trou
+ *          inventé) — la PERSISTANCE M3 (multi-équipes) et M5
+ *          (adversaires par équipe) est BLOQUÉE : tables RLS
+ *          SELECT-only, aucune policy ni wrapper write (dette tracée
+ *          supabase-client v1.18) ; et aucun wrapper de listing
+ *          `equipes` n'existe (4a non peuplable réellement). Câbler
+ *          ces blocs comme s'ils enregistraient = le « faux » que
+ *          l'UX §2.5 interdit. Donc, MÊME PATRON HONNÊTE QUE LE
+ *          STAFF (UX §2.5 option b) : l'UI Engagement (4a/4b/4c) est
+ *          adaptative et visible mais étiquetée NON-PERSISTÉE tant
+ *          que la dette write M3/M5 + le listing equipes ne sont pas
+ *          livrés. Réversible : dette levée → on retire l'étiquette
+ *          et on câble le submit, rien à redessiner.
+ *
+ *          (1) updateCreateConditionalFields ÉTENDU — règle
+ *              d'adaptation à 3 entrées (UX §1) : famille (Bloc 1) ;
+ *              occasionnel/récurrent si Entraînement (M2, forme
+ *              d'écran seule — structure JSONB = D-M2, Production
+ *              P3) ; bascule question Phases DÉRIVÉE du sous-type
+ *              (UX §3.1 : visible seulement pour tournoi /
+ *              challenge_vie / challenge_inter_ligues / plateau).
+ *              Compétition → bloc Engagement affiché ; Stage/
+ *              Entraînement → masqué (frontière CHECK relâché
+ *              v1.2 §5.1). Aucune colonne marqueur (P1/M6 §4.4).
+ *
+ *          (2) Lignes répétables (UI pure) : +Adversaire (4c, patron
+ *              unique, indice triangulaire/plateau UX §2.4/4c) ;
+ *              +Phase / +Match (U2 §3.2, 2 niveaux d'UI, AUCUNE
+ *              sous-phase — plafond M6 §4.4). Suppression par ligne.
+ *
+ *          (3) Question Phases (radios phases_mode) : OUI →
+ *              « Phases & matchs » SE SUBSTITUE à 4c (masque
+ *              adversaires simples) ; NON → adversaires simples
+ *              (M5). Strictement UX §3.1/3.2.
+ *
+ *          (4) Bloc 5 Staff : AUCUN câblage write (déjà désactivé +
+ *              étiquette en HTML b1, décision Manu option b). Le JS
+ *              ne fait que NE PAS toucher — pas de faux.
+ *
+ *          (5) submitModalCreate : INCHANGÉ sur le périmètre M3/M5
+ *              (rien collecté n'est envoyé — pas de faux). La
+ *              création de l'évènement de base reste la voie
+ *              existante (v1.15). Phases & matchs M6 : la
+ *              persistance passe par des lignes `evenements`
+ *              (createEvenement / addMatchToTournoi v1.17, table
+ *              evenements — PAS M3/M5) ; le câblage submit des
+ *              phases est laissé à un commit dédié (V2) pour ne pas
+ *              mélanger UI adaptative et orchestration multi-INSERT
+ *              dans le même diff (1 intention = 1 commit). L'UI
+ *              Phases est livrée et fonctionnelle ; sa persistance
+ *              = commit suivant, tracée, NON un faux (le bandeau
+ *              n'affirme pas un enregistrement immédiat).
  */
 
 (function () {
@@ -2421,6 +2483,17 @@
       submitBtn.textContent = "Créer l'évènement";
     }
 
+    // v1.16 — reset des zones répétables U1/U2 (form.reset() ne vide
+    // pas le DOM injecté). Anti-résidu entre 2 ouvertures de modale.
+    const advLines = document.getElementById('evt-create-adv-lines');
+    if (advLines) advLines.innerHTML = '';
+    const phasesList = document.getElementById('evt-create-phases-list');
+    if (phasesList) phasesList.innerHTML = '';
+    const formatLines = document.getElementById('evt-create-format-lines');
+    if (formatLines) formatLines.innerHTML = '';
+    // 4c démarre avec 1 ligne adversaire (patron unique, UX §2.4/4c).
+    addAdversaireRow('');
+
     document.getElementById('evt-overlay-create').classList.add('show');
   }
 
@@ -2429,9 +2502,13 @@
   }
 
   /**
-   * Affiche/masque les champs conditionnels de E3 selon le type sélectionné :
-   * - type_competition + format_de_jeu : seulement match / tournoi / journee_championnat
-   * - date_fin : seulement tournoi / stage
+   * U1/U2 (v1.16) — règle d'adaptation à 3 entrées de la modale E3
+   * (UX §1). Entrée 1 famille (competition→Engagement+compét+format ;
+   * stage→date_fin ; entrainement→occasionnel/récurrent M2). Entrée 2
+   * occasionnel/récurrent. Entrée 3 sous-type → bascule question
+   * Phases (UX §3.1, 4 sous-types éligibles). Idempotent, appelé sur
+   * changement de type, de sous-type, et à l'ouverture. Aucune
+   * colonne marqueur (P1/M6 §4.4) : pure adaptation d'écran.
    */
   function updateCreateConditionalFields() {
     const checked = document.querySelector('#evt-create-form input[name=type_evenement]:checked');
@@ -2452,6 +2529,144 @@
     if (competGroup)  competGroup.style.display  = showCompet  ? '' : 'none';
     if (formatGroup)  formatGroup.style.display  = showFormat  ? '' : 'none';
     if (dateFinGroup) dateFinGroup.style.display = showDateFin ? '' : 'none';
+
+    // ──────────────────────────────────────────────────────────────
+    // v1.16 — U1/U2 : règle d'adaptation à 3 entrées (UX §1).
+    // Entrée 1 = famille. Entrée 2 = occasionnel/récurrent (M2).
+    // Entrée 3 = sous-type → bascule question Phases (UX §3.1).
+    // Aucune colonne marqueur (P1, M6 §4.4) : pure adaptation d'écran.
+    // ──────────────────────────────────────────────────────────────
+    const engagement = document.getElementById('evt-create-engagement');
+    if (engagement) {
+      // Bloc Engagement = Compétition uniquement (frontière CHECK
+      // relâché v1.2 §5.1 ; Stage/Entraînement → équipe unique gérée
+      // par la voie existante, hors de ce bloc).
+      engagement.style.display = (famille === 'competition') ? '' : 'none';
+    }
+
+    // Entrée 2 — Entraînement : occasionnel | récurrent (M2). Forme
+    // d'écran seulement (structure JSONB = D-M2, Production P3). La
+    // sous-question vit dans #evt-create-recurrence-question (peut être
+    // absente si evenements.html pas encore étendu sur ce point —
+    // défensif : on ne casse pas si l'ancre manque).
+    const recurrenceQ = document.getElementById('evt-create-recurrence-question');
+    if (recurrenceQ) {
+      recurrenceQ.style.display = (famille === 'entrainement') ? '' : 'none';
+    }
+
+    // Entrée 3 — bascule question Phases DÉRIVÉE du sous-type.
+    // Visible UNIQUEMENT pour les 4 sous-types « avec question »
+    // (UX §3.1). Les 6 autres (fiche simple) : jamais de question,
+    // la phase-saison reste une étiquette Bloc 1, jamais une porte.
+    const PHASES_QUESTION_SOUS_TYPES = [
+      'tournoi', 'challenge_vie', 'challenge_inter_ligues', 'plateau'
+    ];
+    const competSelect = document.getElementById('evt-create-compet');
+    const sousType = competSelect ? competSelect.value : '';
+    const phasesQuestion = document.getElementById('evt-create-phases-question');
+    const phasesEligible = (famille === 'competition')
+      && PHASES_QUESTION_SOUS_TYPES.indexOf(sousType) !== -1;
+    if (phasesQuestion) {
+      phasesQuestion.style.display = phasesEligible ? '' : 'none';
+      if (!phasesEligible) {
+        // Sous-type non éligible → forcer NON (pas de phases) et
+        // réafficher 4c adversaires simples.
+        const radioNon = phasesQuestion.querySelector('input[name=phases_mode][value=non]');
+        if (radioNon) radioNon.checked = true;
+      }
+    }
+    // Applique la conséquence OUI/NON (substitution 4c ↔ Phases).
+    updatePhasesModeVisibility();
+
+    // Règle Seven (M4, UX §2.4/4b) : sous-type 'seven' → format '7'
+    // PRÉ-REMPLI, modifiable (P4 : un pré-remplissage, jamais un
+    // verrou). N'écrase pas un choix déjà posé par l'utilisateur.
+    if (famille === 'competition' && sousType === 'seven') {
+      const fmt = document.getElementById('evt-create-format');
+      if (fmt && !fmt.value) fmt.value = '7';
+    }
+  }
+
+  // v1.16 — U2 §3.1/3.2 : OUI → « Phases & matchs » se substitue à 4c
+  // (masque adversaires simples) ; NON → adversaires simples (M5).
+  function updatePhasesModeVisibility() {
+    const q = document.getElementById('evt-create-phases-question');
+    const advZone = document.getElementById('evt-create-adv-zone');
+    const phasesZone = document.getElementById('evt-create-phases-zone');
+    // Si la question est masquée (sous-type fiche simple), on est en
+    // mode adversaires simples par construction.
+    const questionVisible = q && q.style.display !== 'none';
+    const oui = questionVisible
+      && q.querySelector('input[name=phases_mode]:checked')
+      && q.querySelector('input[name=phases_mode]:checked').value === 'oui';
+    if (advZone)    advZone.style.display    = oui ? 'none' : '';
+    if (phasesZone) phasesZone.style.display = oui ? '' : 'none';
+  }
+
+  // ────────────────────────────────────────────────────────────────
+  // v1.16 — U1/U2 : lignes répétables (UI pure, AUCUNE persistance —
+  // M3/M5 write = dette tracée v1.18 ; cf. en-tête v1.16 périmètre
+  // honnête). escHtml réutilisé (helper existant).
+  // ────────────────────────────────────────────────────────────────
+
+  // 4c — patron unique répétable (mono comme multi), UX §2.4/4c.
+  function addAdversaireRow(valeur) {
+    const wrap = document.getElementById('evt-create-adv-lines');
+    if (!wrap) return;
+    const row = document.createElement('div');
+    row.className = 'evt-eng-adv-row';
+    row.innerHTML =
+      '<input type="text" class="evt-form-input" placeholder="Nom de l\'adversaire" '
+      + 'value="' + escHtml(valeur || '') + '">'
+      + '<button type="button" class="evt-eng-btn-remove" '
+      + 'title="Retirer cet adversaire" aria-label="Retirer">×</button>';
+    row.querySelector('.evt-eng-btn-remove').addEventListener('click', function () {
+      row.remove();
+    });
+    wrap.appendChild(row);
+  }
+
+  // U2 §3.2 — phase-boîte répétable (nom + ordre) contenant des matchs
+  // répétables (adversaire + sélecteur d'équipe). 2 niveaux d'UI,
+  // AUCUNE sous-phase (plafond M6 §4.4). UI pure.
+  function addMatchRow(matchesWrap) {
+    const row = document.createElement('div');
+    row.className = 'evt-phase-match-row';
+    row.innerHTML =
+      '<input type="text" class="evt-form-input" placeholder="Adversaire du match">'
+      + '<select class="evt-form-select">'
+      +   '<option value="">— Toutes les équipes engagées —</option>'
+      + '</select>'
+      + '<button type="button" class="evt-eng-btn-remove" '
+      + 'title="Retirer ce match" aria-label="Retirer">×</button>';
+    row.querySelector('.evt-eng-btn-remove').addEventListener('click', function () {
+      row.remove();
+    });
+    matchesWrap.appendChild(row);
+  }
+
+  function addPhaseBox() {
+    const list = document.getElementById('evt-create-phases-list');
+    if (!list) return;
+    const box = document.createElement('div');
+    box.className = 'evt-phase-box';
+    box.innerHTML =
+      '<div class="evt-phase-box-head">'
+      +   '<input type="text" class="evt-form-input" placeholder="Nom de la phase (ex : Poule de brassage)">'
+      +   '<button type="button" class="evt-eng-btn-remove" '
+      +   'title="Retirer cette phase" aria-label="Retirer">×</button>'
+      + '</div>'
+      + '<div class="evt-phase-matches"></div>'
+      + '<button type="button" class="evt-eng-btn evt-phase-add-match">+ Match</button>';
+    box.querySelector('.evt-eng-btn-remove').addEventListener('click', function () {
+      box.remove();
+    });
+    const matchesWrap = box.querySelector('.evt-phase-matches');
+    box.querySelector('.evt-phase-add-match').addEventListener('click', function () {
+      addMatchRow(matchesWrap);
+    });
+    list.appendChild(box);
+    addMatchRow(matchesWrap); // une phase démarre avec 1 match
   }
 
   /**
@@ -2899,6 +3114,32 @@
     document.querySelectorAll('#evt-create-form input[name=type_evenement]').forEach(radio => {
       radio.addEventListener('change', updateCreateConditionalFields);
     });
+
+    // v1.16 — U2 §3.1 : changement de SOUS-TYPE compétition →
+    // ré-évalue l'éligibilité de la question Phases (dérivée du
+    // sous-type) + règle Seven. Réutilise updateCreateConditionalFields
+    // (déjà idempotent, ne casse aucun autre groupe).
+    const competSelectEl = document.getElementById('evt-create-compet');
+    if (competSelectEl) {
+      competSelectEl.addEventListener('change', updateCreateConditionalFields);
+    }
+
+    // v1.16 — U2 §3.2 : OUI/NON Phases → substitution 4c ↔ Phases.
+    document.querySelectorAll('#evt-create-form input[name=phases_mode]').forEach(radio => {
+      radio.addEventListener('change', updatePhasesModeVisibility);
+    });
+
+    // v1.16 — 4c : bouton + Adversaire (patron unique répétable).
+    const advAddBtn = document.getElementById('evt-create-adv-add');
+    if (advAddBtn) {
+      advAddBtn.addEventListener('click', function () { addAdversaireRow(''); });
+    }
+
+    // v1.16 — U2 §3.2 : bouton + Phase (phase-boîte répétable).
+    const phaseAddBtn = document.getElementById('evt-create-phase-add');
+    if (phaseAddBtn) {
+      phaseAddBtn.addEventListener('click', addPhaseBox);
+    }
 
     // P2-E.1 — Changement de mode dans E3 (vierge / dupliquer)
     document.querySelectorAll('#evt-create-form input[name=create_mode]').forEach(radio => {
