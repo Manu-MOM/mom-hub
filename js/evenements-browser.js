@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.11 — SUIVI-COACH-1 Objet C accroche (18 mai 2026)
+ * Version : 1.12 — Bouton « Retour aux compositions » fiche E2 (18 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -151,6 +151,28 @@
  *          Spec : Conception-SUIVI-COACH-1-ObjetC.md (validé Manu).
  *          Dépend de spectateur.html + js/spectateur.js +
  *          js/temps-de-jeu.js + supabase-client v1.16.
+ *
+ *   v1.12 : Bouton de navigation « ← Retour aux compositions » dans le
+ *          pied d'actions de la fiche évènement E2 (evt-fiche-actions).
+ *          PENDANT de symétrie du bouton Compos→Évènements « Retour aux
+ *          évènements » (côté compositions-editor — module Compos, hors
+ *          périmètre de cette conv ; non touché). VERSION SIMPLE :
+ *          navigation pure vers compositions.html, SANS deep-link ciblé
+ *          — réplique EXACTE du pattern déjà déployé du raccourci
+ *          'suivi-aller-compo' (l. ~1265), même commentaire d'honnêteté.
+ *          La version ciblée (?evenement=<uuid>) suppose une convention
+ *          d'URL côté compositions.html NON établie : enabler conv Compos
+ *          (jumeau SUIVI-COACH-deeplink), NON défini ici (zéro couplage
+ *          inventé). ADDITION PURE : 1 bouton dans renderFiche
+ *          (evt-fiche-actions) + 1 forEach de binding dans
+ *          bindFicheActions (sibling strict de edit/notes-from-fiche).
+ *          Aucune fonction existante modifiée ; bouton toujours visible
+ *          (aucune garde d'état inventée — navigation pure, utile aussi
+ *          sur évènement annulé/archivé). data-event-id porté par
+ *          cohérence avec les boutons frères, NON consommé (la version
+ *          simple ne lit aucun id). evenements.html NON touché
+ *          (.evt-btn / .evt-fiche-actions déjà présents). Aucune RPC :
+ *          supabase-client NON touché.
  */
 
 (function () {
@@ -1545,6 +1567,12 @@
     // 8. ACTIONS EN PIED (P2-E.2 : boutons câblés)
     // ────────────────────────────────────────────────
     html += '<div class="evt-fiche-actions">';
+    // v1.12 — Bouton « Retour aux compositions » (pendant de symétrie du
+    // bouton Compos→Évènements « Retour aux évènements »). Toujours
+    // visible : navigation pure, aucune garde d'état inventée (utile
+    // aussi sur un évènement annulé/archivé). data-event-id porté par
+    // cohérence avec les boutons frères, NON consommé en version simple.
+    html += '<button type="button" class="evt-btn" data-action="compos-from-fiche" data-event-id="' + escHtml(evt.id) + '">← Retour aux compositions</button>';
     if (evt.etat !== 'annule' && evt.etat !== 'archive') {
       html += '<button type="button" class="evt-btn" data-action="edit-from-fiche" data-event-id="' + escHtml(evt.id) + '">✏️ Modifier</button>';
       html += '<button type="button" class="evt-btn" data-action="notes-from-fiche" data-event-id="' + escHtml(evt.id) + '">📝 Notes</button>';
@@ -1608,6 +1636,18 @@
       btn.addEventListener('click', function () {
         const id = this.getAttribute('data-event-id');
         if (id) openModalEditNotes(id);
+      });
+    });
+    // v1.12 — Bouton « Retour aux compositions » : sibling strict de
+    // edit/notes-from-fiche. Navigation pure = réplique EXACTE du
+    // pattern déjà déployé 'suivi-aller-compo' ci-dessous (même
+    // commentaire d'honnêteté : pas de deep-link inventé, la convention
+    // d'URL de compositions.html n'est pas connue ; la version ciblée
+    // est un enabler conv Compos, non défini ici — zéro couplage
+    // inventé). data-event-id présent mais NON lu (version simple).
+    document.querySelectorAll('[data-action="compos-from-fiche"]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        window.location.href = 'compositions.html';
       });
     });
     // P2-E.5 : toggle collapsible mobile (logistique, encadrants, notes)
