@@ -6,6 +6,14 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.6 — Phase 4.4 étape 6c-2/6c-3 (18 mai 2026)
+ *   v3.6 : Bouton « Retour aux évènements » dans la bannière, affiché
+ *           une fois la compo de base au moins validée (validee /
+ *           utilisee / archivee). Navigation simple vers evenements.html,
+ *           SANS paramètre : un retour ciblé sur la rencontre relèverait
+ *           d'une convention d'URL côté Évènements (dette
+ *           SUIVI-COACH-deeplink, autre module/conv). Zéro couplage.
+ *
  * Version : 3.5 — Phase 4.4 étape 6c-2/6c-3 (18 mai 2026)
  *   v3.5 : Action de validation de la compo dans la bannière.
  *           - Bouton "Valider la compo" (etat brouillon) / "Repasser en
@@ -255,7 +263,21 @@
       b.addEventListener('click', function () { onUnvalidateCompoClick(base.id); });
       host.appendChild(b);
     }
-    // 'utilisee' / 'archivee' : aucun contrôle (verrou aval, hors périmètre Compos)
+    // 'utilisee' / 'archivee' : pas de bascule d'état (verrou aval, hors périmètre Compos)
+
+    // v3.6 — une fois la compo au moins validée, raccourci de sortie vers
+    // la liste des évènements. Navigation simple, SANS paramètre : un
+    // retour ciblé sur la rencontre (refocus côté Évènements) suppose une
+    // convention d'URL côté evenements.html — autre module, autre conv
+    // (dette SUIVI-COACH-deeplink). Ici : zéro couplage, zéro invention.
+    if (base.etat === 'validee' || base.etat === 'utilisee' || base.etat === 'archivee') {
+      const back = document.createElement('button');
+      back.type = 'button';
+      back.className = 'compo-validate-btn compo-validate-btn--back';
+      back.textContent = 'Retour aux évènements';
+      back.addEventListener('click', function () { window.location.href = 'evenements.html'; });
+      host.appendChild(back);
+    }
   }
 
   function renderEventSelector() {
@@ -1006,7 +1028,7 @@
     bindPopoverOutsideClick();
 
     console.log(
-      '%c🏉 Compositions Editor v3.5 (étape 6c-2 + 6c-3 + validation compo) chargé',
+      '%c🏉 Compositions Editor v3.6 (étape 6c-2 + 6c-3 + validation compo + retour évènements) chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         evenements: State.evenements.length,
