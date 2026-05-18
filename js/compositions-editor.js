@@ -6,6 +6,19 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.7 — Phase 4.4 étape 6c-2/6c-3 (18 mai 2026)
+ *   v3.7 : Fix « 20 slots titulaires au lieu de 15 » (P2 Partie A).
+ *           loadPostes() exclut désormais les lignes
+ *           est_regroupement=true (PIL/2L/3L/CTR/AIL = regroupements
+ *           tactiques, jamais des positions). La table postes contient
+ *           20 lignes (15 réelles + 5 regroupements) ; l'hypothèse
+ *           codée v3.1 « la table n'a que les 15 XV » était périmée.
+ *           Source-safe, aucun arbitrage : le booléen est_regroupement
+ *           est porté par la table (dump vérifié). NB : le compte/liste
+ *           pilotés par le format réel de la rencontre (XV/X/7/13) =
+ *           Partie B, séparée (dépend de l'exposition de format_de_jeu
+ *           par la RPC get_evenements_a_venir — non traitée ici).
+ *
  * Version : 3.6 — Phase 4.4 étape 6c-2/6c-3 (18 mai 2026)
  *   v3.6 : Bouton « Retour aux évènements » dans la bannière, affiché
  *           une fois la compo de base au moins validée (validee /
@@ -983,7 +996,16 @@
   }
   async function loadPostes() {
     const all = await SupabaseHub.getPostes();
-    State.postes = (all || []).slice().sort((a, b) => (a.numero_xv || 99) - (b.numero_xv || 99));
+    // v3.7 — n'expose QUE les vrais postes de terrain. Les lignes
+    // est_regroupement=true (PIL/2L/3L/CTR/AIL) sont des regroupements
+    // tactiques de substitution, jamais des positions de jeu : exclues
+    // du référentiel de slots. Source : dump table postes (20 lignes =
+    // 15 est_regroupement=false + 5 true). Corrige le rendu de 20 slots
+    // titulaires au lieu de 15. Prédicat défensif (!truthy) : seules les
+    // lignes explicitement regroupement sont retirées.
+    State.postes = (all || [])
+      .filter(p => !p.est_regroupement)
+      .sort((a, b) => (a.numero_xv || 99) - (b.numero_xv || 99));
     State.postesById = new Map();
     for (const p of State.postes) State.postesById.set(p.id, p);
     return State.postes;
