@@ -196,6 +196,57 @@
  *          trancher le modèle, explicitement différé hors de cette conv).
  *          Fallback défensif → 'competition' : jamais d'évènement
  *          perdu/masqué. evenements.html & supabase-client NON touchés.
+ *
+ *   v1.14 : Refonte Évènements (Production · Évènements) — U3 SEUL
+ *          (regroupement + tri calendrier). Implémente
+ *          Conception-Refonte-Evenements-U1-U4-v1.md §4 (UX, fait
+ *          foi), aligné sur le type_evenement RÉEL post-migration
+ *          v1.2 §5.1 (commitée). U1/U2/U4 (modale, bascule Phases,
+ *          palette) = commit SÉPARÉ suivant (v1.15). Périmètre
+ *          strict, addition/réalignement prouvés par diff ;
+ *          renderSection / renderCard / openFiche / couche données /
+ *          accroches Suivi A/B/C JAMAIS touchés.
+ *
+ *          (1) RÉPARE une régression de v1.13 : v1.13 FORÇAIT le
+ *              regroupement (toujours groupé, pas de retour chrono).
+ *              L'UX §4 impose « regroupement = vue ACTIVABLE, défaut
+ *              CHRONOLOGIQUE conservé » (ne pas régresser l'usage
+ *              premier « c'est quand le prochain ? », cf. RPC portail).
+ *              → Nouveau flag state.grouperParCategorie (DÉFAUT false
+ *              = chronologique), persisté dans les prefs existantes.
+ *              false → renderSection sur passés puis à venir (= retour
+ *              EXACT au comportement v1.12, regroupement par mois) ;
+ *              true → renderSectionsParCategorie. Bascule injectée en
+ *              tête de #evt-list (zone que le module possède déjà —
+ *              Façon 1, aucune dépendance evenements.html).
+ *
+ *          (2) CATEGORIE_ORDRE inversé : v1.13 = stage→entr→compét.
+ *              UX §4 impose Compétition → Entraînement → Stage
+ *              (P7 : l'enjeu central remonte). Tri chrono conservé
+ *              DANS chaque famille (partitionnement stable inchangé).
+ *
+ *          (3) evtCategorie aligné sur le domaine RÉEL post-migration
+ *              (type_evenement ∈ competition|entrainement|stage,
+ *              CHECK v1.2 §5.1). Le mapping des anciennes valeurs
+ *              techniques (match|tournoi|journee_championnat) devient
+ *              le fallback défensif (ces valeurs n'existent plus en
+ *              base) ; aucun évènement jamais perdu (doctrine v1.13
+ *              conservée).
+ *
+ *          (4) TYPE_LABELS / TYPE_ICONS : ajout de l'entrée
+ *              'competition' (sans cela, evt.type_evenement RÉEL
+ *              ='competition' s'afficherait en chaîne brute).
+ *              Anciennes clés conservées (fallback défensif additif).
+ *
+ *          (5) showCompet réaligné : v1.13 testait les valeurs mortes
+ *              match|tournoi|journee_championnat. UX §4 : le filtre
+ *              COMPÉT. n'a de sens que pour la famille Compétition
+ *              (P1, pas de filtre inopérant) → visible si famille
+ *              'all' ou 'competition'. NB : le JEU de chips (3
+ *              familles / 10 sous-types) vit dans evenements.html
+ *              (autre fichier, NON ici) — ce JS réaligne seulement
+ *              SA logique de lecture/visibilité ; le rebranchement
+ *              des chips = vérification Production sur evenements.html.
  */
 
 (function () {
@@ -250,18 +301,28 @@
     competsActifs: new Set(['all']),
     search:        '',
     showPassed:    true,
+    // U3 (v1.14) : regroupement par 3 familles = vue ACTIVABLE.
+    // Défaut false = CHRONOLOGIQUE (UX §4 — ne pas régresser
+    // l'usage premier « c'est quand le prochain ? »).
+    grouperParCategorie: false,
     expandedTournois: new Set()
   };
 
   const TYPE_LABELS = {
-    match:               'Match',
+    // Domaine RÉEL post-migration v1.2 (CHECK : competition|entrainement|stage)
+    competition:         'Compétition',
     entrainement:        'Entraînement',
     stage:               'Stage',
+    // Anciennes valeurs techniques — fallback défensif (n'existent plus
+    // en base après migration v1.2 §5.1 ; conservées par prudence
+    // d'affichage, jamais de libellé brut).
+    match:               'Match',
     tournoi:             'Tournoi',
     journee_championnat: 'Journée champ.'
   };
 
   const TYPE_ICONS = {
+    competition:         '<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>',
     match:               '<circle cx="12" cy="12" r="10"/><path d="M12 2v20"/><path d="M2 12h20"/>',
     entrainement:        '<polyline points="22 4 12 14.01 9 11.01"/><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>',
     stage:               '<path d="M2 12h6l3-9 4 18 3-9h4"/>',
@@ -277,23 +338,17 @@
   };
 
   // ──────────────────────────────────────────────────────────────
-  // ÉTAPE 1 (refonte Évènements, retour terrain Manu 18/05) —
-  // REGROUPEMENT PAR 3 GRANDES CATÉGORIES. Display-only, ZÉRO schéma,
-  // RÉVERSIBLE (retirer ce bloc + restaurer les 2 lignes renderListe
-  // = retour EXACT v1.12). Mapping validé Manu sur les valeurs
-  // RÉELLEMENT déployées du CHECK SQL type_evenement (match |
-  // entrainement | stage | tournoi | journee_championnat — vérifié
-  // supabase-client v1.16 l.721-722) :
-  //   stage                                 → Stage
-  //   entrainement                          → Entraînement
-  //   match | tournoi | journee_championnat → Compétition
-  // Dégradation honnête : occasionnel/récurrent NON distingués (aucun
-  // champ de récurrence en base — vérifié createEvenement) ; sous-types
-  // compétition (ph.1/ph.2, seven, Challenge…) NON ajoutés (valeurs
-  // absentes du CHECK déployé — les inventer = trancher le modèle,
-  // explicitement différé hors de cette conv). Fallback défensif →
-  // 'competition' : ne JAMAIS perdre/masquer un évènement.
-  const CATEGORIE_ORDRE  = ['stage', 'entrainement', 'competition'];
+  // U3 (refonte Évènements, v1.14) — REGROUPEMENT PAR 3 FAMILLES M1,
+  // ALIGNÉ SUR LE type_evenement RÉEL post-migration v1.2 §5.1
+  // (CHECK : competition | entrainement | stage). Vue ACTIVABLE
+  // (state.grouperParCategorie, défaut chronologique — UX §4),
+  // RÉVERSIBLE. Ordre Compétition → Entraînement → Stage (UX §4,
+  // P7 : l'enjeu central remonte) ; tri chrono conservé DANS chaque
+  // famille (partitionnement stable). Le mapping des anciennes
+  // valeurs techniques (match|tournoi|journee_championnat) est
+  // désormais le fallback défensif (valeurs absentes du CHECK après
+  // migration) : ne JAMAIS perdre/masquer un évènement.
+  const CATEGORIE_ORDRE  = ['competition', 'entrainement', 'stage'];
   const CATEGORIE_LABELS = {
     stage:        'Stage',
     entrainement: 'Entraînement',
@@ -303,8 +358,9 @@
     const t = evt && evt.type_evenement;
     if (t === 'stage') return 'stage';
     if (t === 'entrainement') return 'entrainement';
-    // match | tournoi | journee_championnat → compétition ;
-    // tout autre cas (défensif) → compétition (jamais d'évènement perdu).
+    // 'competition' (valeur RÉELLE post-migration) ET fallback défensif
+    // (anciennes valeurs mortes match|tournoi|journee_championnat, ou
+    // tout cas imprévu) → compétition : jamais d'évènement perdu.
     return 'competition';
   }
 
@@ -415,7 +471,8 @@
       const payload = {
         typesActifs:   Array.from(state.typesActifs),
         competsActifs: Array.from(state.competsActifs),
-        showPassed:    state.showPassed
+        showPassed:    state.showPassed,
+        grouperParCategorie: state.grouperParCategorie
       };
       localStorage.setItem(STORAGE_KEY_PREFS, JSON.stringify(payload));
     } catch (e) {
@@ -610,20 +667,50 @@
     const filteredPasses = state.showPassed ? EVENEMENTS_PASSES.filter(filterRoot) : [];
     const total = filteredAvenir.length + filteredPasses.length;
 
+    // U3 (v1.14) — bascule « Grouper par catégorie ». Injectée en tête
+    // de #evt-list (zone possédée par le module — Façon 1, aucune
+    // dépendance evenements.html). Liée dans bindCardEvents (appelé en
+    // fin de renderListe, là où sont liés les contrôles internes liste).
+    const toggleBar =
+      '<div class="evt-groupbar">' +
+        '<button type="button" class="evt-groupbar-btn' +
+          (state.grouperParCategorie ? ' active' : '') +
+          '" data-action="toggle-grouper" ' +
+          'aria-pressed="' + (state.grouperParCategorie ? 'true' : 'false') + '">' +
+          (state.grouperParCategorie
+            ? 'Grouper par catégorie : activé'
+            : 'Grouper par catégorie') +
+        '</button>' +
+      '</div>';
+
     if (total === 0) {
-      list.innerHTML = '<div class="evt-list-empty">Aucun évènement trouvé.<br><small>Essayez d\'élargir les filtres ou de modifier la recherche.</small></div>';
+      list.innerHTML = toggleBar +
+        '<div class="evt-list-empty">Aucun évènement trouvé.<br><small>Essayez d\'élargir les filtres ou de modifier la recherche.</small></div>';
+      bindCardEvents();
       return;
     }
 
-    // v1.13 — ÉTAPE 1 : regroupement par 3 catégories SOUS le split
-    // passés/à venir (option A). renderSectionsParCategorie réutilise
-    // renderSection telle quelle ; ordre passés→à venir inchangé.
-    let html = '';
-    if (filteredPasses.length > 0) {
-      html += renderSectionsParCategorie(filteredPasses, true, 'passés');
-    }
-    if (filteredAvenir.length > 0) {
-      html += renderSectionsParCategorie(filteredAvenir, false, 'à venir');
+    // U3 (v1.14) — DÉFAUT chronologique (UX §4, répare régression v1.13
+    // qui forçait le regroupement). false → renderSection direct sur
+    // passés puis à venir (= comportement EXACT v1.12, regroupement par
+    // mois interne, tri chrono pur). true → regroupement par les 3
+    // familles (ordre Compétition→Entraînement→Stage), tri chrono
+    // conservé DANS chaque famille. renderSection JAMAIS modifiée.
+    let html = toggleBar;
+    if (state.grouperParCategorie) {
+      if (filteredPasses.length > 0) {
+        html += renderSectionsParCategorie(filteredPasses, true, 'passés');
+      }
+      if (filteredAvenir.length > 0) {
+        html += renderSectionsParCategorie(filteredAvenir, false, 'à venir');
+      }
+    } else {
+      if (filteredPasses.length > 0) {
+        html += renderSection('Passés', filteredPasses, true);
+      }
+      if (filteredAvenir.length > 0) {
+        html += renderSection('À venir', filteredAvenir, false);
+      }
     }
 
     list.innerHTML = html;
@@ -677,6 +764,17 @@
   }
 
   function bindCardEvents() {
+    // U3 (v1.14) — bascule « Grouper par catégorie ». Persistée dans
+    // les prefs existantes (savePrefs étendu), re-render immédiat.
+    const grpBtn = document.querySelector('[data-action="toggle-grouper"]');
+    if (grpBtn) {
+      grpBtn.addEventListener('click', function () {
+        state.grouperParCategorie = !state.grouperParCategorie;
+        savePrefs();
+        renderListe();
+      });
+    }
+
     document.querySelectorAll('.evt-card-chevron[data-action="toggle-tournoi"]').forEach(btn => {
       btn.addEventListener('click', function (e) {
         e.stopPropagation();
@@ -2781,10 +2879,12 @@
     });
     const competRow = document.getElementById('evt-filters-compet');
     if (competRow) {
+      // U3 (v1.14) — le filtre COMPÉT. n'a de sens que pour la famille
+      // Compétition (UX §4, P1 : pas de filtre inopérant). v1.13 testait
+      // les valeurs techniques match|tournoi|journee_championnat,
+      // MORTES après migration v1.2 §5.1 → réaligné sur 'competition'.
       const showCompet = state.typesActifs.has('all')
-                      || state.typesActifs.has('match')
-                      || state.typesActifs.has('tournoi')
-                      || state.typesActifs.has('journee_championnat');
+                      || state.typesActifs.has('competition');
       competRow.style.display = showCompet ? 'flex' : 'none';
     }
     savePrefs();
@@ -2825,6 +2925,7 @@
       if (Array.isArray(prefs.typesActifs))   state.typesActifs   = new Set(prefs.typesActifs);
       if (Array.isArray(prefs.competsActifs)) state.competsActifs = new Set(prefs.competsActifs);
       if (typeof prefs.showPassed === 'boolean') state.showPassed = prefs.showPassed;
+      if (typeof prefs.grouperParCategorie === 'boolean') state.grouperParCategorie = prefs.grouperParCategorie;
       document.querySelectorAll('.evt-chip[data-type]').forEach(c => {
         c.classList.toggle('active', state.typesActifs.has(c.getAttribute('data-type')));
       });
