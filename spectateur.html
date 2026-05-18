@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<!-- Tribune : mobile/desktop, lecture passive. Zoom accessibilité
+     conservé (jamais user-scalable=no). -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<meta name="robots" content="noindex,nofollow">
+<title>Suivi en direct · MOM Hub</title>
+
+<!-- =====================================================================
+     MOM Hub · Objet C-2 — Écran spectateur (lecture seule DISTINCTE)
+     =====================================================================
+     Cycle SUIVI-COACH-1, Objet C. Conception figée
+     Conception-SUIVI-COACH-1-ObjetC.md (C2-Q1/Q2/Q3, VALIDÉ Manu).
+
+     C2-Q1 — FICHIER DISTINCT dédié. RÉUTILISE le *rendu lecture* de
+       suivi.html (bandeau score Zone A, chrono, fil Zone E) : mêmes
+       tokens .suivi-* mappés sur hub.css (recopiés ici à l'identique,
+       suivi.html N'EST PAS modifié — module bénévole intangible),
+       même format de ligne (rendu par spectateur.js, fidèle au rendu
+       réel déployé suivi-app.js v0.14). ZÉRO surface d'écriture, sûr
+       par construction : aucune Zone B (bascule), aucune Zone C
+       (palette), aucune Zone D (sélecteur joueur), aucun ⚙, aucun
+       sas, aucun bouton Période, aucune ligne corrigible, aucune
+       aide-action. role_lien (C12-g) INFORME (« vous suivez en
+       spectateur »), n'active rien.
+     C2-Q2 — score = SUM client de la chronologie lue (jamais la
+       photo evenements) ; fil = récit effectif (annulées masquées
+       côté RPC via p_inclure_annulees=FALSE, corrigées à valeur
+       courante) ; pas de marqueur source_saisie ; 4 états de cycle
+       de vie honnêtes ; payload réduit RGPD inchangé.
+     C2-Q3 — A génère / C-2 OUVRE. Aucune génération/logique de rôle
+       ici : C-2 ne connaît que SON jeton spectateur dans l'URL
+       (?t=...) et la RPC de lecture (C12-d voie jeton, intacte).
+
+     S-5.1 respecté (lien sans droit d'écriture, refresh ~10 s,
+     payload réduit RGPD). S-5.1.a : pas un « mode d'UI fragile »
+     piloté par le rôle — un fichier neuf SANS code d'écriture.
+
+     COQUILLE SEULEMENT (zéro logique). Le routage des 4 états, le
+     calcul du score, le rendu du fil, le polling = js/spectateur.js.
+
+     CONTRAT DOM pour js/spectateur.js (IDs stables) :
+       Écrans (.suivi-screen, un seul sans [hidden]) :
+         #scrLoading  — chargement initial
+         #scrError    — lien invalide/expiré (#errMsg, bouton
+                         #btnReessayer injecté par le JS si réseau)
+         #scrAttente  — match pas commencé (chronologie vide) :
+                         message honnête, AUCUN bouton
+         #scrEnCours  — lecture : en cours OU terminé
+       Dans #scrEnCours :
+         #specEntete  — en-tête rencontre RGPD-safe (C12-g)
+         #specRole    — bandeau « vous suivez en spectateur » (role_lien)
+         #specStatut  — pastille EN DIRECT / TERMINÉ
+         #zaScore     — score (innerHTML : MOM <span class=pts>n</span>
+                         — <span class=pts>m</span> ADV)
+         #zaChrono    — placeholder période/minute (texte)
+         #zeEmpty / #zeList / #zeToggle — fil 2 dernières + « Tout voir »
+         #histoOverlay / #histoList / #histoClose — fil complet (lecture)
+         #specRefresh — bouton « Rafraîchir » (affiché si TERMINÉ)
+     ===================================================================== -->
+
+<!-- Charte commune. La couche .suivi-* ci-dessous est RECOPIÉE à
+     l'identique de suivi.html (réconciliation canonique sur les
+     variables réelles de hub.css), restreinte aux primitives de
+     LECTURE (zéro style d'écriture). suivi.html non touché. -->
+<link rel="stylesheet" href="css/hub.css">
+
+<style>
+/* =====================================================================
+   .suivi-* — sous-ensemble LECTURE recopié de suivi.html (S-1.a).
+   Aucune variable hub.css redéfinie : on ne fait qu'y référer.
+   ===================================================================== */
+:root {
+  --suivi-vert:        var(--vert-prairie);
+  --suivi-vert-fonce:  var(--vert-bouteille);
+  --suivi-vert-clair:  var(--vert-light);
+
+  --suivi-encre:       var(--ink);
+  --suivi-encre-doux:  var(--ink-mute);
+  --suivi-fond:        var(--paper);
+  --suivi-surface:     #fff;
+  --suivi-bord:        var(--line);
+
+  --suivi-danger:      var(--rouge-blesse);
+  --suivi-alerte:      var(--gold);
+
+  --suivi-rayon:       14px;
+  --suivi-gap:         16px;
+  --suivi-max:         480px;
+  --suivi-focus:       0 0 0 4px rgba(45,122,62,.35);
+}
+
+body.suivi-body {
+  font-size: 18px;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  padding:
+    env(safe-area-inset-top)
+    env(safe-area-inset-right)
+    env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+  min-height: 100dvh;
+}
+
+.suivi-app {
+  position: relative;
+  z-index: 2;
+  max-width: var(--suivi-max);
+  margin: 0 auto;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* États d'écran — un seul visible, [hidden] natif (bascule = JS). */
+.suivi-screen {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  padding: 24px 20px;
+}
+.suivi-screen[hidden] { display: none; }
+
+/* Chargement (sobre, sans dramatisation) */
+.suivi-loading {
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: var(--suivi-encre-doux);
+  text-align: center;
+}
+.suivi-loading__pulse {
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  border: 5px solid var(--suivi-vert-clair);
+  border-top-color: var(--suivi-vert);
+  animation: suivi-spin 1s linear infinite;
+}
+@keyframes suivi-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .suivi-loading__pulse { animation: none; }
+}
+
+/* Erreur (lien invalide/expiré/révoqué) — sobre */
+.suivi-error {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 16px;
+}
+.suivi-error__title {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  font-size: 24px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  margin: 0;
+}
+.suivi-error__msg {
+  margin: 0;
+  color: var(--suivi-encre-doux);
+  max-width: 32ch;
+}
+
+/* Attente — match pas commencé (chronologie vide). Honnête, AUCUN
+   bouton : ce n'est NI le tampon bénévole NI un « Coup d'envoi ».
+   (C2-Q2 point 4, miroir lecture de A-Q2.) */
+.suivi-attente {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 14px;
+}
+.suivi-attente__title {
+  font-family: 'Oswald', sans-serif;
+  font-size: 20px; font-weight: 600;
+  letter-spacing: .05em; text-transform: uppercase;
+  margin: 0; color: var(--suivi-encre-doux);
+}
+.suivi-attente__msg {
+  margin: 0; color: var(--suivi-encre-doux);
+  max-width: 32ch; line-height: 1.5;
+}
+
+/* En cours / terminé : colonne de LECTURE calme (le contexte
+   spectateur n'a pas les contraintes pouce/pluie du live ; on ne
+   réutilise donc PAS le plein-écran palette de .suivi-encours).
+   position:relative pour que l'overlay histo (inset:0) le couvre. */
+.suivi-spec {
+  position: relative;
+  padding: 0;
+  gap: 0;
+}
+
+/* En-tête rencontre RGPD-safe (C12-g) + bandeau spectateur. */
+.spec-entete {
+  flex: 0 0 auto;
+  padding: 14px 16px 12px;
+  background: var(--suivi-fond);
+  border-bottom: 1px solid var(--suivi-bord);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.spec-entete__match {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  font-size: 18px;
+  letter-spacing: .02em;
+  color: var(--suivi-encre);
+  margin: 0;
+}
+.spec-entete__meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  letter-spacing: .04em;
+  color: var(--suivi-encre-doux);
+  margin: 0;
+}
+.spec-entete__tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+/* Bandeau « vous suivez en spectateur » : tag LECTURE SEULE existant
+   (.suivi-readonly-tag, recopié) — sémantiquement exact (non tapable,
+   discret). role_lien le confirme (C12-g) ; ne décide rien. */
+.suivi-readonly-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  font-weight: 500;
+  color: var(--suivi-encre-doux);
+  background: var(--suivi-vert-clair);
+  border-radius: 999px;
+  padding: 7px 14px;
+}
+
+/* Pastille d'état EN DIRECT / TERMINÉ (réutilise les tokens). */
+.spec-statut {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 7px 14px;
+  color: #fff;
+  background: var(--suivi-encre-doux);
+}
+.spec-statut[data-etat="direct"] { background: var(--suivi-vert); }
+.spec-statut[data-etat="termine"] { background: var(--suivi-encre-doux); }
+.spec-statut__point {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.spec-statut[data-etat="direct"] .spec-statut__point {
+  animation: spec-pulse 1.6s ease-in-out infinite;
+}
+@keyframes spec-pulse { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) {
+  .spec-statut__point { animation: none; }
+}
+
+/* ---- Zone A — bandeau score + chrono (lecture seule, I1).
+   Recopié de suivi.html SANS les affordances d'écriture/contrôle
+   (pas de bouton Période, pas de ⚙, pas de ?). ---- */
+.suivi-za {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--suivi-vert-fonce);
+  color: #fff;
+}
+.suivi-za__score {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  font-size: 22px;
+  letter-spacing: .02em;
+  white-space: nowrap;
+}
+.suivi-za__score .pts { font-variant-numeric: tabular-nums; }
+.suivi-za__chrono {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  letter-spacing: .06em;
+  opacity: .85;
+  white-space: nowrap;
+}
+.suivi-za__spacer { margin-left: auto; }
+
+/* ---- Zone E — le fil (recopié de suivi.html). Lecture seule :
+   « Tout voir » ouvre l'overlay histo (lecture), rien d'autre. ---- */
+.suivi-ze {
+  flex: 0 0 auto;
+  background: var(--suivi-fond);
+  border-bottom: 1px solid var(--suivi-bord);
+  padding: 10px 16px 14px;
+}
+.suivi-ze__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.suivi-ze__title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--suivi-encre-doux);
+}
+.suivi-ze__toggle {
+  margin-left: auto;
+  appearance: none;
+  border: 1px solid var(--suivi-bord);
+  background: var(--suivi-surface);
+  color: var(--suivi-encre-doux);
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.suivi-ze__toggle:focus-visible { outline: none; box-shadow: var(--suivi-focus); }
+.suivi-ze__list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.suivi-ze__list li { padding: 4px 0; }
+.suivi-ze__empty {
+  margin: 8px 0 0;
+  color: var(--suivi-encre-doux);
+  font-size: 14px;
+}
+
+/* Corps de lecture : le fil complet remplit l'espace restant et
+   défile, sans overlay quand l'historique « Tout voir » est fermé. */
+.spec-corps {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 14px 16px calc(20px + env(safe-area-inset-bottom));
+  background: var(--suivi-surface);
+}
+.spec-corps__hint {
+  margin: 0 0 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--suivi-encre-doux);
+}
+.spec-corps__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.spec-corps__list li {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--suivi-bord);
+}
+.spec-corps__list li:last-child { border-bottom: none; }
+
+/* Pied : rafraîchir manuel (affiché QUE si TERMINÉ — refresh
+   ralenti, S-5.1.b « ménage le réseau »). Bouton neutre recopié. */
+.spec-pied {
+  flex: 0 0 auto;
+  padding: 14px 16px calc(16px + env(safe-area-inset-bottom));
+  display: none;
+}
+.spec-pied[data-on="1"] { display: block; }
+.suivi-btn-neutre {
+  appearance: none;
+  min-height: 56px;
+  width: 100%;
+  border: 2px solid var(--suivi-bord);
+  border-radius: var(--suivi-rayon);
+  background: var(--suivi-surface);
+  color: var(--suivi-encre);
+  font-family: 'Manrope', sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.suivi-btn-neutre:active { background: var(--suivi-fond); }
+.suivi-btn-neutre:focus-visible { outline: none; box-shadow: var(--suivi-focus); }
+
+/* ---- Overlay « fil complet » — lecture seule (recopié de
+   suivi.html SANS la variante corrigible : aucun tap d'écriture).
+   Couvre #scrEnCours (inset:0). ---- */
+.suivi-histo {
+  position: absolute;
+  inset: 0;
+  background: var(--suivi-surface);
+  display: flex;
+  flex-direction: column;
+  z-index: 5;
+}
+.suivi-histo[hidden] { display: none; }
+.suivi-histo__bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--suivi-vert-fonce);
+  color: #fff;
+}
+.suivi-histo__title {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  font-size: 17px;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+}
+.suivi-histo__close {
+  margin-left: auto;
+  appearance: none;
+  border: none;
+  background: rgba(255,255,255,.16);
+  color: #fff;
+  font-family: 'Manrope', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 10px 16px;
+  min-height: 44px;
+  cursor: pointer;
+}
+.suivi-histo__close:active { background: rgba(255,255,255,.28); }
+.suivi-histo__close:focus-visible { outline: none; box-shadow: var(--suivi-focus); }
+.suivi-histo__list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  list-style: none;
+  margin: 0;
+  padding: 8px 0 calc(16px + env(safe-area-inset-bottom));
+}
+.suivi-histo__list li {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--suivi-bord);
+  font-size: 15px;
+  line-height: 1.4;
+}
+.suivi-histo__list li:last-child { border-bottom: none; }
+.suivi-histo__empty {
+  padding: 24px 16px;
+  color: var(--suivi-encre-doux);
+  text-align: center;
+}
+
+/* Accessibilité : masquage visuel sans masquage lecteur d'écran */
+.suivi-sr {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0);
+  white-space: nowrap; border: 0;
+}
+</style>
+</head>
+
+<body class="suivi-body">
+
+  <!-- =================================================================
+       COQUILLE C-2 — structure vide + système visuel recopié.
+       ZÉRO surface d'écriture (sûr par construction). Aucun script de
+       logique : routage des 4 états + score + fil + polling =
+       js/spectateur.js. Pas de topbar Hub : écran SANS login (le
+       jeton spectateur de l'URL est la seule autorisation, lecture).
+       ================================================================= -->
+  <main class="suivi-app" id="suiviApp" aria-live="polite">
+
+    <!-- État A — chargement (visible par défaut) -->
+    <section class="suivi-screen suivi-loading" id="scrLoading" aria-label="Chargement">
+      <div class="suivi-loading__pulse" aria-hidden="true"></div>
+      <p>Ouverture du suivi…</p>
+    </section>
+
+    <!-- État B — lien invalide / expiré / révoqué (#errMsg + bouton
+         Réessayer injecté par le JS UNIQUEMENT sur erreur réseau) -->
+    <section class="suivi-screen suivi-error" id="scrError" hidden aria-label="Lien inutilisable">
+      <h1 class="suivi-error__title">Lien inutilisable</h1>
+      <p class="suivi-error__msg" id="errMsg">
+        Ce lien de suivi n'est plus actif. Demande un nouveau lien au coach.
+      </p>
+    </section>
+
+    <!-- État C — match pas commencé (chronologie vide). Honnête,
+         AUCUN bouton (ni persona ni rôle bénévole). -->
+    <section class="suivi-screen suivi-attente" id="scrAttente" hidden aria-label="Le match n'a pas encore commencé">
+      <p class="suivi-attente__title">En attente du coup d'envoi</p>
+      <p class="suivi-attente__msg">
+        Le match n'a pas encore commencé. Cette page se mettra à jour
+        toute seule dès le coup d'envoi.
+      </p>
+      <span class="suivi-readonly-tag">Vous suivez en spectateur</span>
+    </section>
+
+    <!-- État D — lecture : EN COURS ou TERMINÉ (même rendu, le JS
+         bascule la pastille #specStatut + le pied #specPied). -->
+    <section class="suivi-screen suivi-spec" id="scrEnCours" hidden aria-label="Suivi de la rencontre">
+
+      <!-- En-tête rencontre RGPD-safe (C12-g) + bandeau spectateur
+           (role_lien INFORME, n'active rien) + pastille d'état. -->
+      <header class="spec-entete">
+        <p class="spec-entete__match" id="specEntete">Rencontre</p>
+        <p class="spec-entete__meta" id="specMeta"></p>
+        <div class="spec-entete__tags">
+          <span class="suivi-readonly-tag" id="specRole">Vous suivez en spectateur</span>
+          <span class="spec-statut" id="specStatut" data-etat="direct">
+            <span class="spec-statut__point" aria-hidden="true"></span>
+            <span id="specStatutTxt">En direct</span>
+          </span>
+        </div>
+      </header>
+
+      <!-- ZONE A — bandeau score + chrono (lecture seule, I1 : le
+           score est CALCULÉ côté client, jamais saisi). Chrono =
+           placeholder (le bénévole n'a pas de moteur chrono : on
+           reflète honnêtement période/minute de la dernière ligne). -->
+      <div class="suivi-za" id="zoneA">
+        <span class="suivi-za__score" id="zaScore" aria-live="polite">
+          MOM <span class="pts">0</span> — <span class="pts">0</span> ADV
+        </span>
+        <span class="suivi-za__spacer"></span>
+        <span class="suivi-za__chrono" id="zaChrono">— ·&nbsp;—'</span>
+      </div>
+
+      <!-- ZONE E — fil : 2 dernières lignes + « Tout voir » (ouvre
+           l'overlay lecture seule). Récit effectif (annulées exclues
+           côté RPC). Peuplé par spectateur.js. -->
+      <div class="suivi-ze" id="zoneE">
+        <div class="suivi-ze__head">
+          <span class="suivi-ze__title">Le fil du match</span>
+          <button class="suivi-ze__toggle" id="zeToggle" type="button"
+                  aria-expanded="false" disabled>Tout voir</button>
+        </div>
+        <p class="suivi-ze__empty" id="zeEmpty">Aucune action pour l'instant.</p>
+        <ul class="suivi-ze__list" id="zeList" hidden aria-live="polite"></ul>
+      </div>
+
+      <!-- Corps : le fil complet, défilable, calme (pas de palette à
+           caser : contexte tribune). Peuplé par spectateur.js. -->
+      <div class="spec-corps" id="specCorps">
+        <p class="spec-corps__hint">Déroulé de la rencontre</p>
+        <ul class="spec-corps__list" id="specCorpsList" aria-live="polite"></ul>
+      </div>
+
+      <!-- Pied : rafraîchir manuel — affiché QUE si TERMINÉ (refresh
+           ralenti, S-5.1.b). data-on basculé par spectateur.js. -->
+      <div class="spec-pied" id="specPied" data-on="0">
+        <button class="suivi-btn-neutre" id="specRefresh" type="button">
+          ↻ Rafraîchir
+        </button>
+      </div>
+
+      <!-- Overlay « fil complet » — LECTURE SEULE, par-dessus le
+           corps, jamais une autre page. Aucune ligne corrigible
+           (aucune écriture). Ouvert/fermé par « Tout voir ». -->
+      <div class="suivi-histo" id="histoOverlay" hidden
+           role="dialog" aria-modal="true" aria-label="Fil complet du match">
+        <div class="suivi-histo__bar">
+          <span class="suivi-histo__title">Fil complet</span>
+          <button class="suivi-histo__close" id="histoClose" type="button"
+                  aria-label="Fermer">✕ Fermer</button>
+        </div>
+        <ul class="suivi-histo__list" id="histoList" aria-live="polite"></ul>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- =================================================================
+       DÉPENDANCES — supabase-js (CDN UMD) PUIS suivi-client.js
+       (RÉUTILISÉ tel quel, NON modifié : getToken /
+       getChronologieRencontre voie jeton / libelleJoueur /
+       chargerEtatInitial) PUIS spectateur.js (contrôleur C-2,
+       fichier 2). Écran SANS login : pas de supabase-client.js /
+       SupabaseHub. suivi-client.js crée son client de repli
+       persistSession:false (I5).
+       ================================================================= -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/suivi-client.js"></script>
+  <script src="js/spectateur.js"></script>
+
+</body>
+</html>
