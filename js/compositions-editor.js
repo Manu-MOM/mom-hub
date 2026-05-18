@@ -6,6 +6,19 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.5 — Phase 4.4 étape 6c-2/6c-3 (18 mai 2026)
+ *   v3.5 : Action de validation de la compo dans la bannière.
+ *           - Bouton "Valider la compo" (etat brouillon) / "Repasser en
+ *             brouillon" (etat validee), adossé aux wrappers DÉJÀ déployés
+ *             SupabaseHub.validateCompo / unvalidateCompo (garde-fou
+ *             serveur .eq('etat',...), aucune règle dupliquée côté client)
+ *           - Cible = compo de base (type_compo==='base'), exactement la
+ *             compo que la bannière d'état reflète déjà (renderEventBanner) :
+ *             pill et bouton restent toujours cohérents
+ *           - Pas de gate de complétude (le "X/15" reste informatif) ;
+ *             réversibilité offerte ; AUCUNE mention du Suivi/PI-7 ici
+ *             (doctrine interconnexion : zéro couplage module→module)
+ *
  * Version : 3.4 — Phase 4.4 étape 6c-2/6c-3 (13 mai 2026)
  *   v3.0 : Vue Liste + Popover Picker
  *   v3.1 : Fix mapping colonnes table postes Supabase :
@@ -71,6 +84,7 @@
     eventBannerLabel:  () => document.getElementById('event-label'),
     eventBannerMeta:   () => document.getElementById('event-meta'),
     eventBannerState:  () => document.getElementById('event-state'),
+    compoValidateHost: () => document.getElementById('compo-validate-host'),
     eventSelectorBtn:  () => document.getElementById('event-selector-btn'),
     eventSelectorList: () => document.getElementById('event-selector-list'),
     compoTabs:         () => document.getElementById('compo-tabs'),
@@ -209,6 +223,39 @@
       stateEl.textContent = 'Aucune compo';
       stateEl.className   = 'event-banner__state';
     }
+
+    renderCompoValidation();
+  }
+
+  // Contrôle de validation de la compo (bannière).
+  // Cible = compo de base : c'est la compo que le pill d'état ci-dessus
+  // reflète déjà (compoBase), pill et bouton restent donc cohérents.
+  // Aucune règle métier dupliquée ici : le garde-fou d'état vit côté
+  // serveur dans validateCompo/unvalidateCompo (.eq('etat',...)).
+  function renderCompoValidation() {
+    const host = DOM.compoValidateHost();
+    if (!host) return;
+    host.innerHTML = '';
+
+    const base = State.compos.find(c => c.type_compo === 'base');
+    if (!base) return; // rien à valider tant qu'il n'y a pas de compo de base
+
+    if (base.etat === 'brouillon') {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'compo-validate-btn';
+      b.textContent = 'Valider la compo';
+      b.addEventListener('click', function () { onValidateCompoClick(base.id); });
+      host.appendChild(b);
+    } else if (base.etat === 'validee') {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'compo-validate-btn compo-validate-btn--undo';
+      b.textContent = 'Repasser en brouillon';
+      b.addEventListener('click', function () { onUnvalidateCompoClick(base.id); });
+      host.appendChild(b);
+    }
+    // 'utilisee' / 'archivee' : aucun contrôle (verrou aval, hors périmètre Compos)
   }
 
   function renderEventSelector() {
@@ -854,6 +901,36 @@
     renderEffectifPanel();
   }
 
+  // Validation / dé-validation de la compo de base.
+  // Le garde-fou d'état est porté par le serveur (validateCompo/
+  // unvalidateCompo : .eq('etat',...)), on remonte juste son message.
+  async function onValidateCompoClick(compoId) {
+    if (!compoId) return;
+    const r = await SupabaseHub.validateCompo(compoId);
+    if (!r.ok) { alert('Validation impossible : ' + r.error); return; }
+    await loadComposForCurrentEvent();
+    if (State.selectedCompoId) await loadCompoJoueurs();
+    renderEventBanner();
+    renderCompoTabs();
+    renderFillIndicator();
+    renderEditorArea();
+    renderEffectifPanel();
+  }
+
+  async function onUnvalidateCompoClick(compoId) {
+    if (!compoId) return;
+    if (!window.confirm('Repasser cette compo en brouillon ? Elle ne sera plus considérée comme validée.')) return;
+    const r = await SupabaseHub.unvalidateCompo(compoId);
+    if (!r.ok) { alert('Action impossible : ' + r.error); return; }
+    await loadComposForCurrentEvent();
+    if (State.selectedCompoId) await loadCompoJoueurs();
+    renderEventBanner();
+    renderCompoTabs();
+    renderFillIndicator();
+    renderEditorArea();
+    renderEffectifPanel();
+  }
+
   // ============================================================
   // 9. CHARGEMENTS
   // ============================================================
@@ -929,7 +1006,7 @@
     bindPopoverOutsideClick();
 
     console.log(
-      '%c🏉 Compositions Editor v3.4 (étape 6c-2 + 6c-3) chargé',
+      '%c🏉 Compositions Editor v3.5 (étape 6c-2 + 6c-3 + validation compo) chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         evenements: State.evenements.length,
