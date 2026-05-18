@@ -1144,6 +1144,67 @@
     font-style: italic;
     margin-top: 2px;
   }
+
+  /* ===== U1/U2 (Refonte Évènements) — Engagement / Phases / Staff ===== */
+  .evt-eng-equipes {
+    display: flex; flex-direction: column; gap: 6px;
+    max-height: 180px; overflow-y: auto;
+    border: 1px solid var(--line); border-radius: 6px; padding: 8px;
+  }
+  .evt-eng-equipe-row {
+    display: flex; align-items: center; gap: 8px; font-size: 13px;
+  }
+  .evt-eng-format-line {
+    display: flex; align-items: center; gap: 8px;
+    margin-top: 6px; font-size: 13px;
+  }
+  .evt-eng-format-line .evt-eng-format-team { min-width: 120px; font-weight: 600; }
+  .evt-eng-adv-row {
+    display: flex; align-items: center; gap: 6px; margin-top: 6px;
+  }
+  .evt-eng-adv-row input { flex: 1; }
+  .evt-eng-btn {
+    background: var(--paper-deep); border: 1px solid var(--line);
+    border-radius: 6px; padding: 5px 10px; font-size: 12px;
+    cursor: pointer; color: var(--ink);
+  }
+  .evt-eng-btn:hover { border-color: var(--vert-pelouse); }
+  .evt-eng-btn-remove {
+    background: none; border: none; cursor: pointer;
+    color: var(--ink-mute); font-size: 16px; line-height: 1; padding: 0 4px;
+  }
+  .evt-phase-box {
+    border: 1px solid var(--line); border-radius: 8px;
+    padding: 10px; margin-top: 8px;
+    background: var(--paper-deep);
+  }
+  .evt-phase-box-head {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+  }
+  .evt-phase-box-head input { flex: 1; }
+  .evt-phase-match-row {
+    display: flex; align-items: center; gap: 6px;
+    margin-top: 6px; padding-left: 10px;
+  }
+  .evt-phase-match-row input,
+  .evt-phase-match-row select { flex: 1; min-width: 0; }
+  .evt-bandeau-info {
+    background: rgba(24, 95, 165, 0.08);
+    border: 1px solid rgba(24, 95, 165, 0.25);
+    border-radius: 6px; padding: 8px 10px;
+    font-size: 11px; color: var(--ink); margin-top: 8px;
+  }
+  /* Bloc 5 Staff — désactivé tant que P2-E.4 non livrée (UX §2.5) */
+  .evt-staff-disabled {
+    opacity: 0.55; pointer-events: none; user-select: none;
+  }
+  .evt-staff-pending-label {
+    display: inline-block; margin-top: 4px;
+    background: rgba(133, 79, 11, 0.12);
+    border: 1px solid rgba(133, 79, 11, 0.3);
+    color: #854F0B; border-radius: 6px;
+    padding: 4px 8px; font-size: 11px; font-style: italic;
+  }
   .evt-form-error {
     background: rgba(200, 137, 106, 0.12);
     color: #8b3a1a;
@@ -1475,6 +1536,101 @@
         <div class="evt-form-group">
           <label class="evt-form-label" for="evt-create-adversaire">Adversaire (opt.)</label>
           <input type="text" class="evt-form-input" id="evt-create-adversaire" name="adversaire_nom" placeholder="Ex : Strasbourg AS">
+        </div>
+
+        <!-- ============================================================
+             BLOC 4 — ENGAGEMENT (U1 §2.4) + BASCULE PHASES (U2 §3).
+             Visible uniquement famille Compétition (frontière CHECK
+             relâché v1.2 §5.1 ; Stage/Entraînement → équipe unique via
+             le champ existant, géré JS). Conteneurs/squelettes ; le
+             peuplement (équipes depuis `equipes`, lignes format,
+             adversaires, phases répétables) et l'adaptativité sont
+             pilotés par evenements-browser (commit b2). Aucun id/name
+             inventé : ancrés UX §2.4/§3.2, modèle v1.2 §4.3/4.4.
+        ============================================================ -->
+        <div id="evt-create-engagement" style="display:none;">
+
+          <hr style="border:none;border-top:1px solid var(--line);margin:12px 0;">
+
+          <!-- 4a — Équipes engagées (cases peuplées par le JS depuis
+               `equipes` ; filtrage catégorie/club = vérif Production,
+               UX §2.4/4a). Le NOMBRE coché pilote 4b/4c (M3). -->
+          <div class="evt-form-group">
+            <label class="evt-form-label">Équipes engagées</label>
+            <div class="evt-eng-equipes" id="evt-create-equipes">
+              <div class="evt-form-hint">Chargement des équipes…</div>
+            </div>
+            <div class="evt-form-hint">1 équipe = cas simple · 2+ = engagement multi-équipes (M3)</div>
+          </div>
+
+          <!-- 4b — Format. 1 équipe → sélecteur unique existant
+               (#evt-create-format ci-dessus). 2+ → 1 ligne/équipe
+               (override M4, v1.2 §4.3). Zone alimentée par le JS. -->
+          <div class="evt-form-group" id="evt-create-format-par-equipe" style="display:none;">
+            <label class="evt-form-label">Format par équipe</label>
+            <div id="evt-create-format-lines"></div>
+            <div class="evt-form-hint">Vide = hérite du format de l'évènement (réplique _getFormat SAR×MOM)</div>
+          </div>
+
+          <!-- 4c — Adversaires SANS phases (M5). Patron unique
+               répétable (mono comme multi), indice triangulaire/
+               plateau (UX §2.4/4c, décision Manu : un seul idiome). -->
+          <div class="evt-form-group" id="evt-create-adv-zone">
+            <label class="evt-form-label">Adversaires</label>
+            <div id="evt-create-adv-lines"></div>
+            <button type="button" class="evt-eng-btn" id="evt-create-adv-add">+ Adversaire</button>
+            <div class="evt-form-hint">2 adversaires = triangulaire · 3+ = plateau</div>
+          </div>
+
+          <!-- U2 §3.1 — Question Phases, DÉRIVÉE du sous-type (jamais
+               posée partout). Visible JS seulement si type_competition
+               ∈ {tournoi, challenge_vie, challenge_inter_ligues,
+               plateau}. La formulation ancre sur la JOURNÉE (jamais
+               « phase » au sens saison — UX §3.1). -->
+          <div class="evt-form-group" id="evt-create-phases-question" style="display:none;">
+            <label class="evt-form-label">Journée à plusieurs poules / phases ?</label>
+            <div class="evt-form-radio-group">
+              <label class="evt-form-radio-option"><input type="radio" name="phases_mode" value="non" checked> Non</label>
+              <label class="evt-form-radio-option"><input type="radio" name="phases_mode" value="oui"> Oui</label>
+            </div>
+          </div>
+
+          <!-- U2 §3.2 — Branche OUI : « Phases & matchs » SE SUBSTITUE
+               à 4c. 3 niveaux M6 (Compétition implicite → Phase-boîte
+               → Match), 2 niveaux d'UI, AUCUNE sous-phase (plafond
+               modèle M6 §4.4). Zone répétable pilotée par le JS. -->
+          <div class="evt-form-group" id="evt-create-phases-zone" style="display:none;">
+            <label class="evt-form-label">Phases &amp; matchs</label>
+            <div id="evt-create-phases-list"></div>
+            <button type="button" class="evt-eng-btn" id="evt-create-phase-add">+ Phase</button>
+            <div class="evt-bandeau-info">
+              La compo de base s'applique à tous les matchs. Vous pourrez
+              la modifier par match depuis l'éditeur.
+            </div>
+          </div>
+
+        </div>
+
+        <hr style="border:none;border-top:1px solid var(--line);margin:12px 0;">
+
+        <!-- ============================================================
+             BLOC 5 — STAFF PRÉSENT (U1 §2.5, M8). evenement_encadrants
+             EXISTE déjà (déployée). Décision Manu = option (b) :
+             le bloc FIGURE (sa place est ici) mais DÉSACTIVÉ + étiquette
+             explicite tant que la dette P2-E.4 (policies write + CRUD)
+             n'est pas livrée. Jamais une case qui paraît enregistrer
+             sans le pouvoir. Réversible : P2-E.4 livrée → on retire la
+             classe + l'étiquette, rien à redessiner.
+        ============================================================ -->
+        <div class="evt-form-group">
+          <label class="evt-form-label">Staff présent</label>
+          <div class="evt-eng-equipes evt-staff-disabled" id="evt-create-staff" aria-disabled="true">
+            <div class="evt-form-hint">Cases à cocher du staff (une par membre, rôles affichés)</div>
+          </div>
+          <span class="evt-staff-pending-label">
+            Saisie du staff à venir (dépend de la livraison P2-E.4 :
+            écriture encadrants). Bloc volontairement désactivé.
+          </span>
         </div>
 
       </form>
