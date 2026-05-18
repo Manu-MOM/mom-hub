@@ -165,14 +165,23 @@
     color: var(--paper);
     border-color: var(--vert-prairie);
   }
-  /* Chips compétition : colorées selon type_competition (V1 indicatif, à affiner) */
-  .evt-chip.compet-champ-p1.active { background: #6b3fa0; border-color: #6b3fa0; }
-  .evt-chip.compet-champ-p2.active { background: #2e63a8; border-color: #2e63a8; }
-  .evt-chip.compet-vie.active      { background: #c93a8a; border-color: #c93a8a; }
-  .evt-chip.compet-fed.active      { background: #1f9e9e; border-color: #1f9e9e; }
-  .evt-chip.compet-tournoi.active  { background: #cf6a1a; border-color: #cf6a1a; }
-  .evt-chip.compet-amical.active   { background: #8a5a3a; border-color: #8a5a3a; }
-  .evt-chip.compet-seven.active    { background: #d4a93a; border-color: #d4a93a; }
+  /* U4 palette §5.4 (validée Manu, réversible P3) — classes
+     .evt-compet-<code> DÉRIVÉES des 10 codes de
+     sous-types-competition.json (M7 : une seule source de vérité,
+     le CSS suit le référentiel). L'ancienne nomenclature parallèle
+     (compet-champ-p1/p2/vie/fed/tournoi/amical/seven) est SUPPRIMÉE ;
+     « compet-fed » disparaît au profit de Challenge Inter-Ligues
+     (UX §5.1, verrou non négociable). Accent = couleur active du chip. */
+  .evt-chip.evt-compet-match-championnat.active           { background: #185FA5; border-color: #185FA5; }
+  .evt-chip.evt-compet-championnat-phase-1.active         { background: #185FA5; border-color: #185FA5; }
+  .evt-chip.evt-compet-championnat-phase-2.active         { background: #0C447C; border-color: #0C447C; }
+  .evt-chip.evt-compet-championnat-phases-finales.active  { background: #042C53; border-color: #042C53; }
+  .evt-chip.evt-compet-match-amical.active                { background: #888780; border-color: #888780; }
+  .evt-chip.evt-compet-plateau.active                     { background: #0F6E56; border-color: #0F6E56; }
+  .evt-chip.evt-compet-tournoi.active                     { background: #854F0B; border-color: #854F0B; }
+  .evt-chip.evt-compet-challenge-vie.active               { background: #993C1D; border-color: #993C1D; }
+  .evt-chip.evt-compet-challenge-inter-ligues.active      { background: #534AB7; border-color: #534AB7; }
+  .evt-chip.evt-compet-seven.active                       { background: #993556; border-color: #993556; }
 
   /* ========== ZONE LISTE ========== */
   .evt-list {
@@ -394,14 +403,32 @@
     flex-shrink: 0;
     background: var(--ink-mute);   /* fallback gris si aucune compet */
   }
-  /* Couleurs par type_competition (cohérent .evt-chip.compet-*) */
-  .evt-card.compet-champ-p1  .evt-card-stripe { background: #6b3fa0; }
-  .evt-card.compet-champ-p2  .evt-card-stripe { background: #2e63a8; }
-  .evt-card.compet-vie       .evt-card-stripe { background: #c93a8a; }
-  .evt-card.compet-fed       .evt-card-stripe { background: #1f9e9e; }
-  .evt-card.compet-tournoi   .evt-card-stripe { background: #cf6a1a; }
-  .evt-card.compet-amical    .evt-card-stripe { background: #8a5a3a; }
-  .evt-card.compet-seven     .evt-card-stripe { background: #d4a93a; }
+  /* U4 palette §5.4 — stripe de carte par type_competition. Classe
+     .evt-compet-<code> posée par competClass() (evenements-browser
+     v1.15, dérivée du référentiel). La stripe porte l'ACCENT §5.4 ;
+     le fond clair §5.4 est appliqué à .evt-card.evt-compet-<code>
+     (désambiguïsation toujours doublée du libellé — UX §5.3/5.5). */
+  .evt-card.evt-compet-match-championnat          .evt-card-stripe { background: #185FA5; }
+  .evt-card.evt-compet-championnat-phase-1        .evt-card-stripe { background: #185FA5; }
+  .evt-card.evt-compet-championnat-phase-2        .evt-card-stripe { background: #0C447C; }
+  .evt-card.evt-compet-championnat-phases-finales .evt-card-stripe { background: #042C53; }
+  .evt-card.evt-compet-match-amical               .evt-card-stripe { background: #888780; }
+  .evt-card.evt-compet-plateau                    .evt-card-stripe { background: #0F6E56; }
+  .evt-card.evt-compet-tournoi                    .evt-card-stripe { background: #854F0B; }
+  .evt-card.evt-compet-challenge-vie              .evt-card-stripe { background: #993C1D; }
+  .evt-card.evt-compet-challenge-inter-ligues     .evt-card-stripe { background: #534AB7; }
+  .evt-card.evt-compet-seven                      .evt-card-stripe { background: #993556; }
+  /* Fond clair §5.4 (teinte-mère par grappe ; toujours + libellé) */
+  .evt-card.evt-compet-match-championnat          { background: #E6F1FB; }
+  .evt-card.evt-compet-championnat-phase-1        { background: #B5D4F4; }
+  .evt-card.evt-compet-championnat-phase-2        { background: #85B7EB; }
+  .evt-card.evt-compet-championnat-phases-finales { background: #378ADD; }
+  .evt-card.evt-compet-match-amical               { background: #F1EFE8; }
+  .evt-card.evt-compet-plateau                    { background: #E1F5EE; }
+  .evt-card.evt-compet-tournoi                    { background: #FAEEDA; }
+  .evt-card.evt-compet-challenge-vie              { background: #FAECE7; }
+  .evt-card.evt-compet-challenge-inter-ligues     { background: #EEEDFE; }
+  .evt-card.evt-compet-seven                      { background: #FBEAF0; }
 
   /* Corps de carte */
   .evt-card-body {
@@ -1250,21 +1277,29 @@
       <div class="evt-filters-row">
         <span class="evt-filter-label">Type :</span>
         <span class="evt-chip active" data-type="all">Tous</span>
-        <span class="evt-chip" data-type="match">Match</span>
-        <span class="evt-chip" data-type="tournoi">Tournoi</span>
+        <span class="evt-chip" data-type="competition">Compétition</span>
         <span class="evt-chip" data-type="entrainement">Entraînement</span>
         <span class="evt-chip" data-type="stage">Stage</span>
-        <span class="evt-chip" data-type="journee_championnat">Journée champ.</span>
       </div>
 
-      <!-- FILTRES COMPÉTITION (masqués si pas de match/tournoi actif) -->
+      <!-- FILTRES COMPÉTITION (masqués si famille Compétition non active —
+           evenements-browser v1.14 showCompet). data-compet = code RÉEL
+           du référentiel sous-types-competition.json ; classe
+           evt-compet-<code> dérivée (U4 §5.4). « compet-fed » SUPPRIMÉ
+           (→ Challenge Inter-Ligues, UX §5.1). -->
       <div class="evt-filters-row" id="evt-filters-compet">
         <span class="evt-filter-label">Compét. :</span>
         <span class="evt-chip active" data-compet="all">Toutes</span>
-        <span class="evt-chip compet-champ-p1" data-compet="championnat">Championnat</span>
-        <span class="evt-chip compet-vie"     data-compet="coupe">Coupe</span>
-        <span class="evt-chip compet-tournoi" data-compet="tournoi">Tournoi</span>
-        <span class="evt-chip compet-amical"  data-compet="amical">Amical</span>
+        <span class="evt-chip evt-compet-match-championnat" data-compet="match_championnat">Match de championnat</span>
+        <span class="evt-chip evt-compet-championnat-phase-1" data-compet="championnat_phase_1">Championnat phase 1</span>
+        <span class="evt-chip evt-compet-championnat-phase-2" data-compet="championnat_phase_2">Championnat phase 2</span>
+        <span class="evt-chip evt-compet-championnat-phases-finales" data-compet="championnat_phases_finales">Championnat phases finales</span>
+        <span class="evt-chip evt-compet-match-amical" data-compet="match_amical">Match amical</span>
+        <span class="evt-chip evt-compet-plateau" data-compet="plateau">Plateau</span>
+        <span class="evt-chip evt-compet-tournoi" data-compet="tournoi">Tournoi</span>
+        <span class="evt-chip evt-compet-challenge-vie" data-compet="challenge_vie">Challenge Vié</span>
+        <span class="evt-chip evt-compet-challenge-inter-ligues" data-compet="challenge_inter_ligues">Challenge Inter-Ligues</span>
+        <span class="evt-chip evt-compet-seven" data-compet="seven">Seven</span>
       </div>
 
       <!-- ZONE LISTE (S2.2 peuplera ceci) -->
@@ -1330,15 +1365,17 @@
              le modèle).
         ============================================================ -->
 
-        <!-- BLOC 1 — Type d'évènement -->
+        <!-- BLOC 1 — Type d'évènement (3 familles réelles M1, CHECK
+             v1.2 §5.1 : competition | entrainement | stage). Défaut
+             entrainement conservé (cohérent openModalCreate). Le
+             sous-type de compétition est qualifié au Bloc 4
+             (type_competition), M1 : non vide uniquement si compétition. -->
         <div class="evt-form-group">
           <label class="evt-form-label required">Type d'évènement</label>
           <div class="evt-form-radio-group">
             <label class="evt-form-radio-option"><input type="radio" name="type_evenement" value="entrainement" checked> Entraînement</label>
-            <label class="evt-form-radio-option"><input type="radio" name="type_evenement" value="match"> Match</label>
-            <label class="evt-form-radio-option"><input type="radio" name="type_evenement" value="tournoi"> Tournoi</label>
+            <label class="evt-form-radio-option"><input type="radio" name="type_evenement" value="competition"> Compétition</label>
             <label class="evt-form-radio-option"><input type="radio" name="type_evenement" value="stage"> Stage</label>
-            <label class="evt-form-radio-option"><input type="radio" name="type_evenement" value="journee_championnat"> Journée champ.</label>
           </div>
         </div>
 
@@ -1407,10 +1444,16 @@
           <label class="evt-form-label" for="evt-create-compet">Type de compétition</label>
           <select class="evt-form-select" id="evt-create-compet" name="type_competition">
             <option value="">— Aucune —</option>
-            <option value="championnat">Championnat</option>
-            <option value="amical">Amical</option>
-            <option value="coupe">Coupe</option>
+            <option value="match_championnat">Match de championnat</option>
+            <option value="match_amical">Match amical</option>
+            <option value="plateau">Plateau</option>
             <option value="tournoi">Tournoi</option>
+            <option value="championnat_phase_1">Championnat phase 1</option>
+            <option value="championnat_phase_2">Championnat phase 2</option>
+            <option value="championnat_phases_finales">Championnat phases finales</option>
+            <option value="challenge_vie">Challenge Vié</option>
+            <option value="challenge_inter_ligues">Challenge Inter-Ligues</option>
+            <option value="seven">Seven</option>
           </select>
         </div>
 
@@ -1420,11 +1463,13 @@
             <option value="">— Choisir —</option>
             <option value="XV">XV (15 vs 15)</option>
             <option value="13">XIII</option>
+            <option value="12">XII</option>
             <option value="X">X</option>
+            <option value="9">IX</option>
+            <option value="8">VIII</option>
             <option value="7">VII</option>
-            <option value="5">V</option>
           </select>
-          <div class="evt-form-hint">Requis pour match et journée de championnat</div>
+          <div class="evt-form-hint">Pré-rempli à VII pour un Seven (modifiable)</div>
         </div>
 
         <div class="evt-form-group">
@@ -1505,9 +1550,11 @@
             <option value="">— Hériter du tournoi —</option>
             <option value="XV">XV</option>
             <option value="13">XIII</option>
+            <option value="12">XII</option>
             <option value="X">X</option>
+            <option value="9">IX</option>
+            <option value="8">VIII</option>
             <option value="7">VII</option>
-            <option value="5">V</option>
           </select>
         </div>
 
@@ -1566,10 +1613,16 @@
           <label class="evt-form-label" for="evt-edit-compet">Type de compétition</label>
           <select class="evt-form-select" id="evt-edit-compet" name="type_competition">
             <option value="">— Aucune —</option>
-            <option value="championnat">Championnat</option>
-            <option value="amical">Amical</option>
-            <option value="coupe">Coupe</option>
+            <option value="match_championnat">Match de championnat</option>
+            <option value="match_amical">Match amical</option>
+            <option value="plateau">Plateau</option>
             <option value="tournoi">Tournoi</option>
+            <option value="championnat_phase_1">Championnat phase 1</option>
+            <option value="championnat_phase_2">Championnat phase 2</option>
+            <option value="championnat_phases_finales">Championnat phases finales</option>
+            <option value="challenge_vie">Challenge Vié</option>
+            <option value="challenge_inter_ligues">Challenge Inter-Ligues</option>
+            <option value="seven">Seven</option>
           </select>
         </div>
 
@@ -1579,9 +1632,11 @@
             <option value="">— Choisir —</option>
             <option value="XV">XV (15 vs 15)</option>
             <option value="13">XIII</option>
+            <option value="12">XII</option>
             <option value="X">X</option>
+            <option value="9">IX</option>
+            <option value="8">VIII</option>
             <option value="7">VII</option>
-            <option value="5">V</option>
           </select>
         </div>
 
