@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.12 — Bouton « Retour aux compositions » fiche E2 (18 mai 2026)
+ * Version : 1.13 — Regroupement liste par 3 catégories (display-only) (18 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -173,6 +173,29 @@
  *          simple ne lit aucun id). evenements.html NON touché
  *          (.evt-btn / .evt-fiche-actions déjà présents). Aucune RPC :
  *          supabase-client NON touché.
+ *
+ *   v1.13 : ÉTAPE 1 refonte Évènements (retour terrain Manu 18/05) —
+ *          REGROUPEMENT de la liste par les 3 GRANDES CATÉGORIES
+ *          (Stage / Entraînement / Compétition). DISPLAY-ONLY, ZÉRO
+ *          schéma, RÉVERSIBLE (retirer le bloc constantes + restaurer
+ *          les 2 lignes renderListe = retour exact v1.12). Mapping
+ *          validé Manu sur les valeurs RÉELLEMENT déployées du CHECK
+ *          SQL type_evenement : stage→Stage, entrainement→Entraînement,
+ *          match|tournoi|journee_championnat→Compétition. Hiérarchie :
+ *          catégorie SOUS le split passés/à venir (option A, la plus
+ *          réversible — non l'inverse ; choix signalé à Manu, ajustable
+ *          en boucle). renderSection RÉUTILISÉE TELLE QUELLE (jamais
+ *          modifiée) : addition pure = 1 bloc constantes + 1 fonction
+ *          evtCategorie + 1 fonction renderSectionsParCategorie + 2
+ *          lignes substituées dans renderListe. AUCUNE retouche de
+ *          renderCard / openFiche / filtres / couche données / accroches
+ *          Suivi A/B/C. Dégradation honnête : occasionnel vs récurrent
+ *          NON distingués (aucun champ de récurrence en base) ;
+ *          sous-types compétition (ph.1/ph.2, seven, Challenge…) NON
+ *          ajoutés (valeurs absentes du CHECK déployé — les inventer =
+ *          trancher le modèle, explicitement différé hors de cette conv).
+ *          Fallback défensif → 'competition' : jamais d'évènement
+ *          perdu/masqué. evenements.html & supabase-client NON touchés.
  */
 
 (function () {
@@ -252,6 +275,38 @@
     tournoi:     'compet-tournoi',
     amical:      'compet-amical'
   };
+
+  // ──────────────────────────────────────────────────────────────
+  // ÉTAPE 1 (refonte Évènements, retour terrain Manu 18/05) —
+  // REGROUPEMENT PAR 3 GRANDES CATÉGORIES. Display-only, ZÉRO schéma,
+  // RÉVERSIBLE (retirer ce bloc + restaurer les 2 lignes renderListe
+  // = retour EXACT v1.12). Mapping validé Manu sur les valeurs
+  // RÉELLEMENT déployées du CHECK SQL type_evenement (match |
+  // entrainement | stage | tournoi | journee_championnat — vérifié
+  // supabase-client v1.16 l.721-722) :
+  //   stage                                 → Stage
+  //   entrainement                          → Entraînement
+  //   match | tournoi | journee_championnat → Compétition
+  // Dégradation honnête : occasionnel/récurrent NON distingués (aucun
+  // champ de récurrence en base — vérifié createEvenement) ; sous-types
+  // compétition (ph.1/ph.2, seven, Challenge…) NON ajoutés (valeurs
+  // absentes du CHECK déployé — les inventer = trancher le modèle,
+  // explicitement différé hors de cette conv). Fallback défensif →
+  // 'competition' : ne JAMAIS perdre/masquer un évènement.
+  const CATEGORIE_ORDRE  = ['stage', 'entrainement', 'competition'];
+  const CATEGORIE_LABELS = {
+    stage:        'Stage',
+    entrainement: 'Entraînement',
+    competition:  'Compétition'
+  };
+  function evtCategorie(evt) {
+    const t = evt && evt.type_evenement;
+    if (t === 'stage') return 'stage';
+    if (t === 'entrainement') return 'entrainement';
+    // match | tournoi | journee_championnat → compétition ;
+    // tout autre cas (défensif) → compétition (jamais d'évènement perdu).
+    return 'competition';
+  }
 
   // ============================================================
   // 2. CHARGEMENT DES DONNÉES
@@ -560,16 +615,41 @@
       return;
     }
 
+    // v1.13 — ÉTAPE 1 : regroupement par 3 catégories SOUS le split
+    // passés/à venir (option A). renderSectionsParCategorie réutilise
+    // renderSection telle quelle ; ordre passés→à venir inchangé.
     let html = '';
     if (filteredPasses.length > 0) {
-      html += renderSection('Évènements passés', filteredPasses, true);
+      html += renderSectionsParCategorie(filteredPasses, true, 'passés');
     }
     if (filteredAvenir.length > 0) {
-      html += renderSection('Évènements à venir', filteredAvenir, false);
+      html += renderSectionsParCategorie(filteredAvenir, false, 'à venir');
     }
 
     list.innerHTML = html;
     bindCardEvents();
+  }
+
+  // v1.13 — ÉTAPE 1 : émet une section renderSection() PAR catégorie
+  // présente, dans l'ordre CATEGORIE_ORDRE. renderSection (regroupement
+  // mois + cartes) est RÉUTILISÉE TELLE QUELLE, jamais modifiée
+  // (addition pure). Partitionnement = préserve l'ordre relatif des
+  // évènements → aucun changement de tri chronologique intra-catégorie.
+  // Catégorie vide = non rendue. Le « · N » du titre vient de
+  // renderSection (compte par catégorie).
+  function renderSectionsParCategorie(events, isPasse, suffixe) {
+    const parCat = {};
+    events.forEach(e => {
+      const c = evtCategorie(e);
+      (parCat[c] = parCat[c] || []).push(e);
+    });
+    let html = '';
+    CATEGORIE_ORDRE.forEach(cat => {
+      const lot = parCat[cat];
+      if (!lot || lot.length === 0) return;
+      html += renderSection(CATEGORIE_LABELS[cat] + ' · ' + suffixe, lot, isPasse);
+    });
+    return html;
   }
 
   function renderSection(titre, events, isPasse) {
