@@ -76,6 +76,27 @@
 --   fournir le SQL de l'ALTER `composition_joueurs` (ou confirmer la
 --   colonne) pour trancher. Hors périmètre de ce correctif (qui ne
 --   traite que l'écart de nommage prouvé par le DDL en main).
+--   ✅ RÉSOLU 18/05 : vérifié à la source (information_schema.columns
+--   sur la base déployée) — `composition_joueurs.etat_joueur` EXISTE
+--   bien (type text). `get_compo_reduite_rencontre` testée en base :
+--   renvoie 20 lignes correctement. Aucune correction nécessaire ;
+--   l'inquiétude initiale était infondée (d'où l'importance de ne
+--   PAS l'avoir « corrigée » à l'aveugle).
+--
+-- CORRECTIF 2 — 18/05/2026 (même conv) : APRÈS déploiement du fix
+--   ci-dessus, `generer_lien_ephemere` plantait sur
+--   `column reference "role" is ambiguous` (bug masqué jusque-là par
+--   l'erreur evenement_uuid : l'UPDATE n'était jamais atteint).
+--   CAUSE : `RETURNS TABLE(token, role, expire_le)` crée une variable
+--   PL/pgSQL `role` qui entre en collision avec la colonne
+--   `lien_suivi.role` dans l'UPDATE du relais (référence non
+--   qualifiée). CORRIGÉ : les 3 colonnes de l'UPDATE sont qualifiées
+--   `lien_suivi.evenement_uuid` / `.role` / `.revoque` (qualifier
+--   tout l'UPDATE, pas seulement `role`, prévient le même piège lors
+--   d'un futur changement de signature). Zéro autre changement.
+--   Appliqué + vérifié en base Supabase (lien généré OK en terrain) ;
+--   ce fichier intègre maintenant les DEUX correctifs (dépôt
+--   resynchronisé sur la base).
 -- NON touché : `lien_suivi.evenement_uuid` (colonne réelle de CETTE
 --   table, DDL ci-dessous — cohérente ; le relais l.~195 est correct).
 -- DÉPLOIEMENT : ce fichier est `CREATE OR REPLACE` → ré-exécuter en
@@ -232,9 +253,9 @@ BEGIN
         -- conservée (chronologie_suivi.saisi_par garde l'ancien jeton).
         UPDATE lien_suivi
            SET revoque = TRUE
-         WHERE evenement_uuid = p_evenement_uuid
-           AND role = 'saisie'
-           AND revoque = FALSE;
+         WHERE lien_suivi.evenement_uuid = p_evenement_uuid   -- FIX 2 : colonnes qualifiées (lever l'ambiguïté "role" : RETURNS TABLE(... role ...) crée une variable homonyme de lien_suivi.role)
+           AND lien_suivi.role = 'saisie'
+           AND lien_suivi.revoque = FALSE;
     END IF;
 
     -- Jeton opaque (2 UUID concaténés sans tirets = 64 hex).
