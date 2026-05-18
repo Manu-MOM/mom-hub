@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.17 — mai 2026
+ * Version : 1.18 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -399,6 +399,42 @@
  *              stage/tournoi/journee_championnat et championnat/
  *              amical/coupe/tournoi → désormais competition/
  *              entrainement/stage et les 10 sous-types). Doc only.
+ *
+ *   v1.18 : Refonte Évènements (Production · Évènements) — wrappers
+ *          LECTURE des tables M3/M5 créées par la migration v1.2 §5.1
+ *          (evenement_equipes_engagees, evenement_adversaires).
+ *          Ajout pur : aucun wrapper v1.0→v1.17 modifié.
+ *
+ *          (1) getEquipesEngagees(evenementId) : liste des équipes
+ *              engagées d'une compétition (liaison M3), triée par
+ *              `ordre` NULLS LAST puis date_creation. Inclut le
+ *              format override par équipe (M4). Array, [] sur
+ *              erreur/vide (convention projet, cf.
+ *              getChronologieRencontreCoach).
+ *
+ *          (2) getAdversairesEvenement(evenementId) : adversaires
+ *              d'une compétition SANS phases (M5), résolus via la
+ *              liaison M3 (jointure equipe engagée → adversaires),
+ *              triés par equipe puis `ordre`. Array, [] idem.
+ *              NB frontière M5↔M6 (v1.2 §4.4) : pour les compétitions
+ *              À phases, l'adversaire est porté par evenements.
+ *              adversaire_nom du match (déjà lu par les RPC/wrappers
+ *              événement existants) — CE wrapper ne couvre QUE le
+ *              cas sans phases, par construction.
+ *
+ *          DETTE WRITE M3/M5 (tracée, non livrée ici) : les 2 tables
+ *          ont RLS activé, SELECT authenticated, AUCUNE policy write
+ *          (patron déployé voulu, v1.2 §4.3/4.4 ; identique à
+ *          `evenements` dont les écritures sont service_role-only).
+ *          Des wrappers d'écriture seraient rejetés par RLS à la
+ *          livraison → NON livrés (pas de faux silencieux, cohérent
+ *          UX §2.5). Même nature de dette que P2-E.4
+ *          (evenement_encadrants write) et P4-write (evenements
+ *          write) : à lever ensemble en session RLS write par rôle
+ *          dédiée (préexistante au STATE). La modale U1→U4
+ *          (fichiers browser à venir) câblera la SAISIE ; l'écriture
+ *          effective M3/M5 dépend de cette dette, comme createEvenement
+ *          en dépend déjà aujourd'hui.
  */
 
 (function (global) {
@@ -1116,6 +1152,104 @@
         return { ok: false, error: "L'évènement n'est pas en état 'annule' (déjà actif ou introuvable)" };
       }
       return { ok: true, data: data };
+    },
+
+    // ============================================================
+    // REFONTE ÉVÈNEMENTS — WRAPPERS LECTURE M3/M5 v1.18
+    // ============================================================
+    // Tables créées par la migration v1.2 §5.1 (commitée).
+    // LECTURE seule : RLS SELECT authenticated OK. L'ÉCRITURE M3/M5
+    // est une dette tracée (RLS write par rôle, session dédiée —
+    // cf. changelog v1.18). Convention de retour : Array, [] sur
+    // erreur/vide (identique getChronologieRencontreCoach, PI-5).
+
+    /**
+     * Équipes engagées d'une compétition (liaison M3
+     * evenement_equipes_engagees). Pour le cas multi-équipes ; le cas
+     * mono-équipe reste porté par evenements.equipe_id (v1.2 §4.3, le
+     * "format effectif" se résout côté lecture appelante : override
+     * liaison si présent, sinon evenements.format_de_jeu).
+     *
+     * @param {string} evenementId UUID de la compétition
+     * @returns {Promise<Array>} lignes liaison (id, equipe_id,
+     *   format_de_jeu, ordre, notes) triées ordre NULLS LAST puis
+     *   date_creation ; [] sur erreur/vide.
+     */
+    async getEquipesEngagees(evenementId) {
+      if (!evenementId) {
+        console.error('MOM Hub: getEquipesEngagees() requiert un evenementId');
+        return [];
+      }
+      const { data, error } = await client
+        .from('evenement_equipes_engagees')
+        .select('id, evenement_id, equipe_id, format_de_jeu, ordre, notes, date_creation')
+        .eq('evenement_id', evenementId)
+        .order('ordre', { ascending: true, nullsFirst: false })
+        .order('date_creation', { ascending: true });
+      if (error) {
+        console.error('MOM Hub: getEquipesEngagees()', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * Adversaires d'une compétition SANS phases (M5), résolus via la
+     * liaison M3 (evenement_adversaires.evenement_equipe_id →
+     * evenement_equipes_engagees.id, filtré sur evenement_id).
+     *
+     * Frontière M5↔M6 (v1.2 §4.4) : ce wrapper ne couvre QUE les
+     * compétitions sans phases. Pour les compétitions à phases,
+     * l'adversaire est porté par evenements.adversaire_nom du match
+     * (déjà exposé par les RPC/wrappers événement existants) — par
+     * construction, une telle compétition n'a pas de lignes
+     * evenement_adversaires.
+     *
+     * @param {string} evenementId UUID de la compétition
+     * @returns {Promise<Array>} adversaires aplatis (evenement_equipe_id,
+     *   equipe_id, adversaire_nom, ordre, notes) triés equipe puis
+     *   ordre ; [] sur erreur/vide.
+     */
+    async getAdversairesEvenement(evenementId) {
+      if (!evenementId) {
+        console.error('MOM Hub: getAdversairesEvenement() requiert un evenementId');
+        return [];
+      }
+      // Jointure imbriquée PostgREST : on part de la liaison M3 filtrée
+      // sur l'événement, on ramène les adversaires rattachés.
+      const { data, error } = await client
+        .from('evenement_equipes_engagees')
+        .select('id, equipe_id, ordre, evenement_adversaires ( id, adversaire_nom, ordre, notes, date_creation )')
+        .eq('evenement_id', evenementId)
+        .order('ordre', { ascending: true, nullsFirst: false });
+      if (error) {
+        console.error('MOM Hub: getAdversairesEvenement()', error);
+        return [];
+      }
+      if (!Array.isArray(data)) return [];
+      // Aplatissement : 1 ligne par adversaire, équipe engagée portée.
+      const out = [];
+      data.forEach(eq => {
+        const advs = Array.isArray(eq.evenement_adversaires) ? eq.evenement_adversaires : [];
+        advs
+          .slice()
+          .sort((a, b) => {
+            const ao = a.ordre == null ? Infinity : a.ordre;
+            const bo = b.ordre == null ? Infinity : b.ordre;
+            return ao - bo;
+          })
+          .forEach(adv => {
+            out.push({
+              evenement_equipe_id: eq.id,
+              equipe_id:           eq.equipe_id,
+              adversaire_nom:      adv.adversaire_nom,
+              ordre:               adv.ordre,
+              notes:               adv.notes,
+              date_creation:       adv.date_creation
+            });
+          });
+      });
+      return out;
     },
 
     /**
