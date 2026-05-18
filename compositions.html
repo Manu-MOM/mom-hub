@@ -64,6 +64,20 @@
     .event-banner__state.state-validee   { color: var(--vert-prairie); border-color: var(--vert-prairie); }
     .event-banner__state.state-utilisee  { color: var(--bleu-base);    border-color: var(--bleu-base); }
     .event-banner__state.state-archivee  { color: var(--ink-mute); opacity: 0.6; }
+    .compo-validate { display: inline-flex; align-items: center; }
+    .compo-validate-btn {
+      font-family: 'Oswald', sans-serif; font-size: 13px; font-weight: 600;
+      letter-spacing: 0.06em; text-transform: uppercase;
+      padding: 6px 14px; border-radius: 4px; cursor: pointer;
+      color: #fff; background: var(--vert-prairie); border: 1px solid var(--vert-prairie);
+      transition: filter 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .compo-validate-btn:hover { filter: brightness(1.07); }
+    .compo-validate-btn--undo {
+      color: var(--ink-mute); background: transparent; border-color: var(--line);
+      font-weight: 500;
+    }
+    .compo-validate-btn--undo:hover { filter: none; color: var(--vert-prairie); border-color: var(--vert-prairie); }
 
     /* Sélecteur d'événement */
     .event-selector {
@@ -418,6 +432,7 @@
         <span class="event-banner__meta" id="event-meta"></span>
       </button>
       <span class="event-banner__state" id="event-state"></span>
+      <span class="compo-validate" id="compo-validate-host"></span>
       <ul class="event-selector" id="event-selector-list" role="listbox"></ul>
     </section>
 
