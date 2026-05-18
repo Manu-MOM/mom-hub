@@ -1315,7 +1315,36 @@
       <div id="evt-create-msg"></div>
       <form class="evt-modal-form" id="evt-create-form" onsubmit="return false;">
 
-        <!-- P2-E.1 : Comment commencer ? (Créer vierge / Dupliquer un précédent) -->
+        <!-- ============================================================
+             RÉAGENCEMENT (étape 2 réversible — retour terrain Manu 18/05) :
+             ordre des blocs aligné sur la structure demandée, UNIQUEMENT
+             avec les champs DÉJÀ existants. PURE PERMUTATION : aucun id,
+             name, class, conteneur de groupe ni attribut modifié → aucun
+             JS impacté (le JS accède par id/name, vérifié à la source).
+             Display-only, RÉVERSIBLE. NON inclus ici (= décisions de
+             modèle/UX différées hors de cette conv, cf. Cadrage-Refonte-
+             Evenements-Creation) : bloc « Équipes engagées / format par
+             équipe / adversaires par équipe » (cardinalité 1→N) et bloc
+             « Staff présent ». Le bloc 1 conserve les 5 valeurs réelles
+             du CHECK SQL (NON réduit à 3 catégories — ce serait trancher
+             le modèle).
+        ============================================================ -->
+
+        <!-- BLOC 1 — Type d'évènement -->
+        <div class="evt-form-group">
+          <label class="evt-form-label required">Type d'évènement</label>
+          <div class="evt-form-radio-group">
+            <label class="evt-form-radio-option"><input type="radio" name="type_evenement" value="entrainement" checked> Entraînement</label>
+            <label class="evt-form-radio-option"><input type="radio" name="type_evenement" value="match"> Match</label>
+            <label class="evt-form-radio-option"><input type="radio" name="type_evenement" value="tournoi"> Tournoi</label>
+            <label class="evt-form-radio-option"><input type="radio" name="type_evenement" value="stage"> Stage</label>
+            <label class="evt-form-radio-option"><input type="radio" name="type_evenement" value="journee_championnat"> Journée champ.</label>
+          </div>
+        </div>
+
+        <hr style="border:none;border-top:1px solid var(--line);margin:12px 0;">
+
+        <!-- BLOC 2 — Comment commencer ? (P2-E.1 : Créer vierge / Dupliquer un précédent) -->
         <div class="evt-form-group">
           <label class="evt-form-label">Comment commencer ?</label>
           <div class="evt-form-radio-group">
@@ -1333,17 +1362,7 @@
 
         <hr style="border:none;border-top:1px solid var(--line);margin:12px 0;">
 
-        <div class="evt-form-group">
-          <label class="evt-form-label required">Type d'évènement</label>
-          <div class="evt-form-radio-group">
-            <label class="evt-form-radio-option"><input type="radio" name="type_evenement" value="entrainement" checked> Entraînement</label>
-            <label class="evt-form-radio-option"><input type="radio" name="type_evenement" value="match"> Match</label>
-            <label class="evt-form-radio-option"><input type="radio" name="type_evenement" value="tournoi"> Tournoi</label>
-            <label class="evt-form-radio-option"><input type="radio" name="type_evenement" value="stage"> Stage</label>
-            <label class="evt-form-radio-option"><input type="radio" name="type_evenement" value="journee_championnat"> Journée champ.</label>
-          </div>
-        </div>
-
+        <!-- BLOC 3 — Identité (nom, date, domicile/extérieur, site) -->
         <div class="evt-form-group">
           <label class="evt-form-label required" for="evt-create-libelle">Libellé</label>
           <input type="text" class="evt-form-input" id="evt-create-libelle" name="libelle" placeholder="Ex : Entraînement M14 du mercredi (28/05)" required>
@@ -1378,6 +1397,12 @@
           <div class="evt-form-hint">Laissez vide si le site n'est pas dans la liste MOM (ex : déplacement)</div>
         </div>
 
+        <hr style="border:none;border-top:1px solid var(--line);margin:12px 0;">
+
+        <!-- BLOC 4 — Compétition & adversaire (champs EXISTANTS, singuliers).
+             Le passage multi-équipes / format par équipe / adversaires par
+             équipe (cardinalité 1→N) est une décision de MODÈLE différée
+             hors de cette conv (cf. Cadrage-Refonte-Evenements-Creation). -->
         <div class="evt-form-group" id="evt-create-compet-group">
           <label class="evt-form-label" for="evt-create-compet">Type de compétition</label>
           <select class="evt-form-select" id="evt-create-compet" name="type_competition">
