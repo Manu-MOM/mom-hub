@@ -41,6 +41,46 @@
 -- chrono).
 --
 -- Idempotent.
+--
+-- =====================================================================
+-- CORRECTIF 18/05/2026 (conv `Production · Suivi de rencontre (backend
+-- C12)`, rouverte au seul titre « retouche SQL C12 »).
+-- BUG TERRAIN : « générer le lien de suivi » échouait sur
+--   `column "evenement_uuid" does not exist`.
+-- CAUSE (vérifiée à la source, DDL réellement déployé
+--   `sql/18-compositions.sql`) : la table `compositions` a été
+--   implémentée avec un naming `_id` (`evenement_id`,
+--   `composition_id`, `joueur_id`, `poste_id`) — l'en-tête de
+--   `sql/18` le dit explicitement (« Naming `_id` partout au lieu de
+--   `_uuid` du doc »). Le doc `Modelisation-Evenements-v1.1.md §4.3`
+--   (cité comme « schéma réel » par ce fichier) était resté en
+--   `_uuid` et NE reflétait PAS le déployé. Ce C12-f avait suivi le
+--   doc, pas le DDL → 2 requêtes fausses.
+-- CORRIGÉ (alignement strict sur le DDL déployé, AUCUN autre
+--   changement — signature, logique PI-7, payload, grants, helpers
+--   intacts ; alias de sortie RPC `joueur_uuid`/`poste_uuid`
+--   CONSERVÉS pour ne pas casser le contrat client) :
+--   • PI-7 de `generer_lien_ephemere` : `compositions.evenement_uuid`
+--     → `evenement_id`  (= LE bug terrain).
+--   • `get_compo_reduite_rencontre` : `cj.joueur_uuid`→`joueur_id`,
+--     `cj.poste_uuid`→`poste_id`, `cj.composition_uuid`→
+--     `composition_id`, `c.evenement_uuid`→`c.evenement_id`
+--     (bug latent du même type — plantait dès l'aperçu compo).
+-- NON corrigé, SIGNALÉ (ne rien inventer) : `cj.etat_joueur` est
+--   absent de `sql/18-compositions.sql`. Le commentaire d'origine
+--   dit « colonne livrée Phase 4.3 » → vraisemblablement ajoutée par
+--   un ALTER ultérieur non fourni ici. Laissé TEL QUEL : le corriger
+--   à l'aveugle (suppression/rename) serait une invention. ⚠️ À
+--   VÉRIFIER À LA SOURCE : si `etat_joueur` n'existe pas non plus en
+--   base déployée, `get_compo_reduite_rencontre` plantera encore →
+--   fournir le SQL de l'ALTER `composition_joueurs` (ou confirmer la
+--   colonne) pour trancher. Hors périmètre de ce correctif (qui ne
+--   traite que l'écart de nommage prouvé par le DDL en main).
+-- NON touché : `lien_suivi.evenement_uuid` (colonne réelle de CETTE
+--   table, DDL ci-dessous — cohérente ; le relais l.~195 est correct).
+-- DÉPLOIEMENT : ce fichier est `CREATE OR REPLACE` → ré-exécuter en
+--   base Supabase (sinon le dépôt est juste mais le terrain plante
+--   toujours). 1 fichier = 1 commit.
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
@@ -178,7 +218,7 @@ BEGIN
     IF p_role = 'saisie' THEN
         IF NOT EXISTS (
             SELECT 1 FROM compositions
-            WHERE evenement_uuid = p_evenement_uuid
+            WHERE evenement_id = p_evenement_uuid   -- FIX terrain : colonne réelle = evenement_id (sql/18-compositions.sql ligne 30) ; le doc modél. §4.3 dit evenement_uuid mais le déployé fait foi
               AND cote = 'mom'
               AND etat = 'validee'
               AND est_active = TRUE
@@ -240,15 +280,15 @@ BEGIN
     v_evt := valider_lien_suivi(p_token, NULL);  -- lecture : 2 rôles OK
 
     RETURN QUERY
-    SELECT cj.joueur_uuid,
+    SELECT cj.joueur_id        AS joueur_uuid,     -- FIX : colonne réelle joueur_id (sql/18) ; alias de sortie joueur_uuid conservé = contrat client inchangé
            cj.numero_maillot,
-           cj.poste_uuid,
+           cj.poste_id         AS poste_uuid,      -- FIX : colonne réelle poste_id ; alias de sortie poste_uuid conservé
            cj.role,
-           cj.etat_joueur,
-           chronologie_nom_court_personne(cj.joueur_uuid)
+           cj.etat_joueur,                          -- ⚠️ NON corrigé : absente de sql/18-compositions.sql ; voir NOTE en tête (ALTER Phase 4.3+ à confirmer, non inventé)
+           chronologie_nom_court_personne(cj.joueur_id)
     FROM   composition_joueurs cj
-    JOIN   compositions c ON c.id = cj.composition_uuid
-    WHERE  c.evenement_uuid = v_evt
+    JOIN   compositions c ON c.id = cj.composition_id   -- FIX : FK réelle composition_id (sql/18), pas composition_uuid
+    WHERE  c.evenement_id = v_evt                       -- FIX : colonne réelle evenement_id (sql/18), pas evenement_uuid
       AND  c.cote = 'mom'
       AND  c.etat = 'validee'
       AND  c.est_active = TRUE
