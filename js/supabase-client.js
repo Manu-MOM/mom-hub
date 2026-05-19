@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.18 — mai 2026
+ * Version : 1.19 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -435,6 +435,50 @@
  *          (fichiers browser à venir) câblera la SAISIE ; l'écriture
  *          effective M3/M5 dépend de cette dette, comme createEvenement
  *          en dépend déjà aujourd'hui.
+ *
+ *   v1.19 : Session RLS write par rôle (Production) — wrappers ÉCRITURE
+ *          M3/M5. Lève la DETTE WRITE M3/M5 tracée en v1.18 (la RLS
+ *          write est désormais posée : sql/41-rls-write-evenements-
+ *          filles, INSERT/UPDATE/DELETE = has_role admin|coach,
+ *          calquée sur le patron evenements déployé). Ajout pur :
+ *          aucun wrapper v1.0→v1.18 modifié dans sa logique.
+ *
+ *          (1) addEquipeEngagee(evenementId, payload) : INSERT M3
+ *              (evenement_equipes_engagees). Whitelist : equipe_id
+ *              (requis), format_de_jeu, ordre, notes. Patron write
+ *              identique createEvenement (insert→select→maybeSingle,
+ *              { ok, data? | error }).
+ *
+ *          (2) removeEquipeEngagee(liaisonId) : DELETE M3 par id de
+ *              liaison (décocher une équipe, UX §2.4/4a). Le ON DELETE
+ *              CASCADE de sql/40 supprime automatiquement les
+ *              adversaires M5 rattachés (zéro orphelin, pas de delete
+ *              applicatif en cascade à écrire).
+ *
+ *          (3) addAdversaire(evenementEquipeId, payload) : INSERT M5
+ *              (evenement_adversaires). Whitelist : adversaire_nom
+ *              (requis), ordre, notes. NB asymétrie M3↔M5 : la table
+ *              M5 n'a NI cree_par NI updated_at/trigger (sql/40
+ *              §M5) — payload volontairement plus court que M3,
+ *              ce n'est pas un oubli.
+ *
+ *          (4) removeAdversaire(adversaireId) : DELETE M5 par id.
+ *
+ *          cree_par NON renseigné (homogène createEvenement déployé :
+ *          pas de mapping auth→personnes en base, l'autorisation est
+ *          portée par la RLS has_role, le client ne s'auto-identifie
+ *          pas comme personne — décision technique consignée).
+ *          Convention de retour { ok, data? , error? } = patron WRITE
+ *          du fichier (createEvenement / updateLogistique), PAS le
+ *          patron lecture []/Array des wrappers v1.18.
+ *
+ *          NON livré ici, volontairement (anti-DS-1, pas de code sans
+ *          appelant) : aucun wrapper update* M3/M5 (aucune UX U1→U4
+ *          livrée ne modifie une ligne de liaison existante ; la
+ *          policy UPDATE existe en base mais resterait sans appelant).
+ *          Staff P2-E.4 (evenement_encadrants write) : MÊME nature,
+ *          traité dans une étape séparée (Bloc 5 désactivé option b,
+ *          câblage distinct du Bloc 4a — une étape = un livrable).
  */
 
 (function (global) {
@@ -1250,6 +1294,203 @@
           });
       });
       return out;
+    },
+
+    // ============================================================
+    // SESSION RLS WRITE PAR RÔLE — WRAPPERS ÉCRITURE M3/M5 v1.19
+    // ============================================================
+    // RLS write posée : sql/41-rls-write-evenements-filles
+    // (INSERT/UPDATE/DELETE = has_role admin|coach, patron evenements
+    // déployé). Convention de retour : { ok, data? , error? } =
+    // patron WRITE (createEvenement), PAS le patron lecture [] ci-dessus.
+    // cree_par NON renseigné (homogène createEvenement ; pas de mapping
+    // auth→personnes en base — décision technique consignée changelog).
+
+    /**
+     * Engage une équipe sur une compétition (INSERT liaison M3
+     * evenement_equipes_engagees). Lève la dette write M3 (RLS posée
+     * sql/41). Patron write identique createEvenement.
+     *
+     * @param {string} evenementId UUID de la compétition
+     * @param {Object} payload { equipe_id (requis), format_de_jeu?,
+     *   ordre?, notes? }. format_de_jeu = override M4 par équipe
+     *   (domaine CHECK sql/40 : XV|13|12|X|9|8|7) ; laissé au SQL.
+     * @returns {Promise<{ok: boolean, data?: Object, error?: string}>}
+     */
+    async addEquipeEngagee(evenementId, payload) {
+      if (!evenementId) {
+        return { ok: false, error: 'evenementId requis' };
+      }
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+        return { ok: false, error: 'Payload manquant ou invalide' };
+      }
+      if (!payload.equipe_id) {
+        return { ok: false, error: 'Champ requis manquant : equipe_id' };
+      }
+      const allowedFields = ['format_de_jeu', 'ordre', 'notes'];
+      const insertPayload = {
+        evenement_id: evenementId,
+        equipe_id:    payload.equipe_id
+      };
+      allowedFields.forEach(f => {
+        if (payload[f] !== undefined) insertPayload[f] = payload[f];
+      });
+
+      const { data, error } = await client
+        .from('evenement_equipes_engagees')
+        .insert(insertPayload)
+        .select()
+        .maybeSingle();
+
+      if (error) {
+        console.error('MOM Hub: addEquipeEngagee()', error);
+        return { ok: false, error: error.message || 'Erreur INSERT evenement_equipes_engagees' };
+      }
+      return { ok: true, data: data };
+    },
+
+    /**
+     * Retire une équipe engagée (DELETE liaison M3 par id). Cas
+     * "décocher une équipe" du Bloc 4a (UX §2.4/4a). Le ON DELETE
+     * CASCADE de sql/40 supprime automatiquement les adversaires M5
+     * rattachés à cette liaison — aucun delete applicatif en cascade.
+     *
+     * @param {string} liaisonId UUID de la ligne evenement_equipes_engagees
+     * @returns {Promise<{ok: boolean, error?: string}>}
+     */
+    async removeEquipeEngagee(liaisonId) {
+      if (!liaisonId) {
+        return { ok: false, error: 'liaisonId requis' };
+      }
+      const { error } = await client
+        .from('evenement_equipes_engagees')
+        .delete()
+        .eq('id', liaisonId);
+
+      if (error) {
+        console.error('MOM Hub: removeEquipeEngagee()', error);
+        return { ok: false, error: error.message || 'Erreur DELETE evenement_equipes_engagees' };
+      }
+      return { ok: true };
+    },
+
+    /**
+     * Ajoute un adversaire à une équipe engagée (INSERT M5
+     * evenement_adversaires), cas compétition SANS phases
+     * (frontière M5↔M6, v1.2 §4.4). Lève la dette write M5.
+     *
+     * NB asymétrie M3↔M5 (sql/40 §M5) : evenement_adversaires n'a NI
+     * cree_par NI updated_at/trigger → payload volontairement plus
+     * court que addEquipeEngagee, ce n'est pas un oubli.
+     *
+     * @param {string} evenementEquipeId UUID de la liaison M3
+     *   (evenement_equipes_engagees.id) à laquelle rattacher l'adversaire
+     * @param {Object} payload { adversaire_nom (requis), ordre?, notes? }
+     * @returns {Promise<{ok: boolean, data?: Object, error?: string}>}
+     */
+    async addAdversaire(evenementEquipeId, payload) {
+      if (!evenementEquipeId) {
+        return { ok: false, error: 'evenementEquipeId requis' };
+      }
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+        return { ok: false, error: 'Payload manquant ou invalide' };
+      }
+      if (!payload.adversaire_nom) {
+        return { ok: false, error: 'Champ requis manquant : adversaire_nom' };
+      }
+      const allowedFields = ['ordre', 'notes'];
+      const insertPayload = {
+        evenement_equipe_id: evenementEquipeId,
+        adversaire_nom:      payload.adversaire_nom
+      };
+      allowedFields.forEach(f => {
+        if (payload[f] !== undefined) insertPayload[f] = payload[f];
+      });
+
+      const { data, error } = await client
+        .from('evenement_adversaires')
+        .insert(insertPayload)
+        .select()
+        .maybeSingle();
+
+      if (error) {
+        console.error('MOM Hub: addAdversaire()', error);
+        return { ok: false, error: error.message || 'Erreur INSERT evenement_adversaires' };
+      }
+      return { ok: true, data: data };
+    },
+
+    /**
+     * Retire un adversaire (DELETE M5 par id).
+     *
+     * @param {string} adversaireId UUID de la ligne evenement_adversaires
+     * @returns {Promise<{ok: boolean, error?: string}>}
+     */
+    async removeAdversaire(adversaireId) {
+      if (!adversaireId) {
+        return { ok: false, error: 'adversaireId requis' };
+      }
+      const { error } = await client
+        .from('evenement_adversaires')
+        .delete()
+        .eq('id', adversaireId);
+
+      if (error) {
+        console.error('MOM Hub: removeAdversaire()', error);
+        return { ok: false, error: error.message || 'Erreur DELETE evenement_adversaires' };
+      }
+      return { ok: true };
+    },
+
+    /**
+     * Liste les équipes d'une catégorie pour peupler le Bloc 4a
+     * (cases à cocher Engagement, UX §2.4/4a). Lève la dette
+     * REFONTE-EVT-listing-equipes (listing absent, module M14
+     * mono-équipe hardcodé).
+     *
+     * Filtrage tranché avec Manu (décisions métier consignées) :
+     *   - périmètre = équipes de la CATÉGORIE passée en paramètre
+     *     (Q1 = option a : catégorie explicite, pas dérivée — le
+     *     wrapper ne fait aucune hypothèse sur l'état du formulaire ;
+     *     la source de categorieId côté UI = gate du câblage, traité
+     *     à l'étape submitModalCreate, PAS présumé ici) ;
+     *   - SAISON ACTIVE uniquement (Q2) — via ententes.saison_id →
+     *     saisons.est_active = true ;
+     *   - equipes.statut = 'active' uniquement.
+     *
+     * Chaîne de jointure RÉELLE (sql/01 lu à la source, NON devinée) :
+     *   equipes.entente_id → ententes.id (NOT NULL) ;
+     *   ententes.categorie_id (NOT NULL) ; ententes.saison_id
+     *   (NOT NULL) → saisons.est_active. ententes a
+     *   UNIQUE(saison_id, categorie_id) : au plus 1 entente par
+     *   couple → pas de doublon d'équipe par construction.
+     *
+     * Convention de retour : Array, [] sur erreur/vide (patron
+     * LECTURE liste v1.18 / PI-5 — c'est un wrapper de lecture).
+     *
+     * @param {string} categorieId UUID de la catégorie
+     * @returns {Promise<Array>} équipes (id, code, nom_officiel,
+     *   libelle_court, format_jeu_code, numero_equipe) triées
+     *   numero_equipe puis nom_officiel ; [] sur erreur/vide.
+     */
+    async listEquipes(categorieId) {
+      if (!categorieId) {
+        console.error('MOM Hub: listEquipes() requiert un categorieId');
+        return [];
+      }
+      const { data, error } = await client
+        .from('equipes')
+        .select('id, code, nom_officiel, libelle_court, format_jeu_code, numero_equipe, ententes!inner ( categorie_id, saisons!inner ( est_active ) )')
+        .eq('statut', 'active')
+        .eq('ententes.categorie_id', categorieId)
+        .eq('ententes.saisons.est_active', true)
+        .order('numero_equipe', { ascending: true, nullsFirst: false })
+        .order('nom_officiel', { ascending: true });
+      if (error) {
+        console.error('MOM Hub: listEquipes()', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
     },
 
     /**
