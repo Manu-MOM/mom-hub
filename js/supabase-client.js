@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.21 — mai 2026
+ * Version : 1.22 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -507,6 +507,30 @@
  *          champs inchangés) ; aucun autre wrapper modifié ; aucun
  *          nouveau SQL ni RPC. Requis par evenements-browser v1.20
  *          (édition engagement depuis la fiche : retrait adversaire).
+ *   v1.22 : Collectif & compo 3 niveaux (Production) — couche données
+ *          N1/N2/N3. 9 wrappers ADDITIFS, patrons STRICTEMENT calqués
+ *          sur les wrappers M3/M5 (addEquipeEngagee/removeEquipeEngagee)
+ *          et compo (updateJoueurCompo/getCompoComplete) déployés —
+ *          rien réinventé (PI-5). Modèle Modelisation-Collectif-Compo-
+ *          3-Niveaux-v1.md v1.1 fait foi ; DDL sql/44 collectif_membre
+ *          / sql/45 equipe_engagee_membre / sql/46 compositions.
+ *          evenement_equipe_id (exécutés+vérifiés en base 19/05).
+ *          N1 : listCollectifMembres, addCollectifMembre,
+ *               updateCollectifMembre, listEntentes.
+ *          N2 : listGroupeEngage, addGroupeMembre, removeGroupeMembre.
+ *          N3 : getCompoForEvenementEquipe, setCompoEvenementEquipe.
+ *          PAS de removeCollectifMembre (UA-4 sortie = date_fin datée,
+ *          jamais DELETE — aucun appelant, anti-DS-1, précédent sql/43).
+ *          Strictement ADDITIF : 9 méthodes + version + ce changelog ;
+ *          AUCUNE méthode existante touchée ; aucun nouveau SQL/RPC ;
+ *          autorisation = RLS par rôle (patron sql/43), aucun mapping
+ *          auth→personnes (IDENT-SYS hors périmètre). Bascule de saison
+ *          (UA-5/A-3) NON incluse ici — couloir U-admin (sous-décision
+ *          mécanisme à trancher). Incohérence préexistante NON touchée
+ *          (tracée, non absorbée) : le console.log de boot affiche
+ *          encore « v1.16 chargé » (≠ header) — antérieure à cette
+ *          passe, à reprendre en passe dédiée pour ne pas élargir le
+ *          périmètre (précédent STATE pt 5 arbo suivi-app).
  */
 
 (function (global) {
@@ -3439,6 +3463,328 @@
         return { ok: false, error: error.message || 'Erreur corriger_observable_coach' };
       }
       return { ok: true };
+    },
+
+    // ----------------------------------------------------------
+    // COLLECTIF & COMPO 3 NIVEAUX — N1 / N2 / N3 (v1.22)
+    //   Modèle Modelisation-Collectif-Compo-3-Niveaux-v1.md v1.1
+    //   (fait foi). DDL : sql/44 collectif_membre / sql/45
+    //   equipe_engagee_membre / sql/46 compositions.evenement_equipe_id
+    //   (exécutés + vérifiés en base 19/05). Patrons d'écriture/lecture
+    //   STRICTEMENT calqués sur les wrappers M3/M5 (addEquipeEngagee /
+    //   removeEquipeEngagee) et compo (updateJoueurCompo /
+    //   getCompoComplete) déployés — rien réinventé (PI-5). RLS par
+    //   rôle (patron sql/43, has_role admin|coach) ; AUCUN mapping
+    //   auth→personnes (IDENT-SYS hors périmètre). Embeds personnes
+    //   = colonnes d'identité de getCompoComplete (non inventées).
+    // ----------------------------------------------------------
+
+    /**
+     * N1 — Vivier d'un collectif : membres d'une entente (catégorie ×
+     * saison, modèle §2.1). Colonne gauche U-N2 (vivier) + liste
+     * U-admin. Embed personnes minimal calqué getCompoComplete.
+     * Tri/recherche fine = côté UX (UN2-1) ; ici tri stable
+     * top-level (role, date_debut) — pas d'hypothèse sur l'ordre
+     * d'un embed PostgREST.
+     *
+     * @param {string} ententeId UUID ententes (porte catégorie+saison)
+     * @param {Object} [options] { role?: 'joueur'|'staff',
+     *   actifsSeuls?: boolean (date_fin IS NULL) }
+     * @returns {Promise<Array>} [] si erreur (pattern getVivierCompo)
+     */
+    async listCollectifMembres(ententeId, options) {
+      if (!ententeId) {
+        console.error('MOM Hub: listCollectifMembres() requiert un ententeId');
+        return [];
+      }
+      const opt = (options && typeof options === 'object') ? options : {};
+      let q = client
+        .from('collectif_membre')
+        .select(`
+          id, personne_id, entente_id, role, statut,
+          date_debut, date_fin,
+          personnes ( id, nom, prenom )
+        `)
+        .eq('entente_id', ententeId);
+      if (opt.role === 'joueur' || opt.role === 'staff') {
+        q = q.eq('role', opt.role);
+      }
+      if (opt.actifsSeuls === true) {
+        q = q.is('date_fin', null);
+      }
+      const { data, error } = await q
+        .order('role', { ascending: true })
+        .order('date_debut', { ascending: true });
+      if (error) {
+        console.error('MOM Hub: listCollectifMembres()', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * N1 — Ajoute un membre au collectif (U-admin, INSERT
+     * collectif_membre ; RLS admin|coach, l'UX gate admin UA-1).
+     * date_debut défaut = aujourd'hui si absent (miroir intention
+     * equipe_joueurs DEFAULT CURRENT_DATE ; la table N1 n'a pas de
+     * default par design modèle §2.1, le wrapper fournit la même
+     * valeur saine que le patron cité). PAS de removeCollectifMembre :
+     * UA-4 « sortie = ligne datée, jamais supprimée » → date_fin via
+     * updateCollectifMembre, on ne DELETE pas (aucun appelant UX,
+     * anti-DS-1 — précédent sql/43). Pattern addEquipeEngagee.
+     *
+     * @param {Object} payload { personne_id (req), entente_id (req),
+     *   role (req: 'joueur'|'staff'), statut?, date_debut?, date_fin? }
+     * @returns {Promise<{ok:boolean, data?:Object, error?:string}>}
+     */
+    async addCollectifMembre(payload) {
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+        return { ok: false, error: 'Payload manquant ou invalide' };
+      }
+      if (!payload.personne_id || !payload.entente_id || !payload.role) {
+        return { ok: false, error: 'Champs requis manquants : personne_id, entente_id, role' };
+      }
+      const insertPayload = {
+        personne_id: payload.personne_id,
+        entente_id:  payload.entente_id,
+        role:        payload.role,
+        date_debut:  payload.date_debut || new Date().toISOString().slice(0, 10)
+      };
+      ['statut', 'date_fin'].forEach(f => {
+        if (payload[f] !== undefined) insertPayload[f] = payload[f];
+      });
+      const { data, error } = await client
+        .from('collectif_membre')
+        .insert(insertPayload)
+        .select()
+        .maybeSingle();
+      if (error) {
+        console.error('MOM Hub: addCollectifMembre()', error);
+        return { ok: false, error: error.message || 'Erreur INSERT collectif_membre' };
+      }
+      return { ok: true, data: data };
+    },
+
+    /**
+     * N1 — Met à jour un membre (U-admin). Patch limité à statut
+     * (qualifie la pioche, N1-5) et date_fin (sortie datée, UA-4 —
+     * la sortie N'EST PAS un DELETE). role/personne/entente/date_debut
+     * NON modifiables (identité de la ligne ; un changement = nouvelle
+     * ligne, scénarios §2.3). Pattern updateJoueurCompo.
+     *
+     * @param {string} id UUID collectif_membre
+     * @param {Object} patch { statut?, date_fin? }
+     * @returns {Promise<{ok:boolean, data?:Object, error?:string}>}
+     */
+    async updateCollectifMembre(id, patch) {
+      if (!id) return { ok: false, error: 'id requis' };
+      if (!patch || typeof patch !== 'object') {
+        return { ok: false, error: 'patch (objet) requis' };
+      }
+      const allowedKeys = ['statut', 'date_fin'];
+      const cleanPatch = {};
+      for (const k of allowedKeys) {
+        if (Object.prototype.hasOwnProperty.call(patch, k)) {
+          cleanPatch[k] = patch[k];
+        }
+      }
+      if (Object.keys(cleanPatch).length === 0) {
+        return { ok: false, error: 'Aucun champ modifiable dans patch (statut, date_fin)' };
+      }
+      const { data, error } = await client
+        .from('collectif_membre')
+        .update(cleanPatch)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) {
+        console.error('MOM Hub: updateCollectifMembre()', error);
+        return { ok: false, error: error.message };
+      }
+      return { ok: true, data };
+    },
+
+    /**
+     * N1/admin — Liste les ententes pour le sélecteur U-admin (UA-2 :
+     * catégorie × saison ; saisons passées CONSULTABLES, jamais
+     * réécrites → AUCUN filtre est_active ici, contrairement à
+     * listEquipes). LECTURE seule : la CRÉATION d'entente = chantier
+     * ADMIN-(ii), hors périmètre (A-4/UA-6). Lecture directe
+     * .from('ententes') = même chemin authentifié prouvé déployé +
+     * recetté terrain que listEquipes (ententes!inner y fonctionne).
+     *
+     * @param {Object} [options] { saisonId?, categorieId? }
+     * @returns {Promise<Array>} [] si erreur
+     */
+    async listEntentes(options) {
+      const opt = (options && typeof options === 'object') ? options : {};
+      let q = client
+        .from('ententes')
+        .select(`
+          id, code, libelle_court, libelle_moyen,
+          saison_id, categorie_id,
+          saisons ( id, code ),
+          categories ( id, code )
+        `);
+      if (opt.saisonId)    q = q.eq('saison_id', opt.saisonId);
+      if (opt.categorieId) q = q.eq('categorie_id', opt.categorieId);
+      const { data, error } = await q.order('code', { ascending: true });
+      if (error) {
+        console.error('MOM Hub: listEntentes()', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * N2 — Groupe de base convoqué d'une équipe engagée (modèle §3.1).
+     * Colonne droite U-N2 + source de pioche U-N3. Le rôle joueur|
+     * staff est LU via collectif_membre.role (N2-6, zéro champ neuf) ;
+     * l'UX compte joueurs/staff séparément. Embed 2 niveaux calqué
+     * listEquipes (ententes!inner ( saisons!inner )) — pattern prouvé.
+     *
+     * @param {string} evenementEquipeId UUID evenement_equipes_engagees
+     * @returns {Promise<Array>} [] si erreur
+     */
+    async listGroupeEngage(evenementEquipeId) {
+      if (!evenementEquipeId) {
+        console.error('MOM Hub: listGroupeEngage() requiert un evenementEquipeId');
+        return [];
+      }
+      const { data, error } = await client
+        .from('equipe_engagee_membre')
+        .select(`
+          id, evenement_equipe_id, collectif_membre_id,
+          collectif_membre (
+            id, role, statut, date_debut, date_fin, personne_id,
+            personnes ( id, nom, prenom )
+          )
+        `)
+        .eq('evenement_equipe_id', evenementEquipeId);
+      if (error) {
+        console.error('MOM Hub: listGroupeEngage()', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * N2 — Convoque un membre du collectif dans une équipe engagée
+     * (U-N2 « → ajoute »). INSERT equipe_engagee_membre. Le vrai
+     * doublon (même membre 2× même équipe) est empêché par l'UNIQUE
+     * sql/45 (erreur remontée telle quelle) ; le cumul inter-équipes
+     * A&B reste autorisé (N3-5). Pattern addEquipeEngagee.
+     *
+     * @param {string} evenementEquipeId UUID evenement_equipes_engagees
+     * @param {string} collectifMembreId UUID collectif_membre
+     * @returns {Promise<{ok:boolean, data?:Object, error?:string}>}
+     */
+    async addGroupeMembre(evenementEquipeId, collectifMembreId) {
+      if (!evenementEquipeId) return { ok: false, error: 'evenementEquipeId requis' };
+      if (!collectifMembreId) return { ok: false, error: 'collectifMembreId requis' };
+      const { data, error } = await client
+        .from('equipe_engagee_membre')
+        .insert({
+          evenement_equipe_id: evenementEquipeId,
+          collectif_membre_id: collectifMembreId
+        })
+        .select()
+        .maybeSingle();
+      if (error) {
+        console.error('MOM Hub: addGroupeMembre()', error);
+        return { ok: false, error: error.message || 'Erreur INSERT equipe_engagee_membre' };
+      }
+      return { ok: true, data: data };
+    },
+
+    /**
+     * N2 — Retire un membre du groupe convoqué (U-N2 « × retire »).
+     * DELETE par id. N2-4 : liste vivante NON versionnée → le retrait
+     * est l'opération normale (≠ N1 où la sortie est datée). Pattern
+     * removeEquipeEngagee.
+     *
+     * @param {string} id UUID equipe_engagee_membre
+     * @returns {Promise<{ok:boolean, error?:string}>}
+     */
+    async removeGroupeMembre(id) {
+      if (!id) return { ok: false, error: 'id requis' };
+      const { error } = await client
+        .from('equipe_engagee_membre')
+        .delete()
+        .eq('id', id);
+      if (error) {
+        console.error('MOM Hub: removeGroupeMembre()', error);
+        return { ok: false, error: error.message || 'Erreur DELETE equipe_engagee_membre' };
+      }
+      return { ok: true };
+    },
+
+    /**
+     * N3 — Compo(s) rattachée(s) à une équipe engagée (feuille de
+     * match, modèle N3-1). Lecture du nouveau lien additif
+     * compositions.evenement_equipe_id (sql/46). Sert U-N3 à retrouver
+     * la feuille de l'équipe engagée. NULL = mono-équipe (non renvoyé
+     * ici, lu par evenement_id via le chemin existant — rétro-compat).
+     * Tri est_active puis version (la plus récente d'abord).
+     *
+     * @param {string} evenementEquipeId UUID evenement_equipes_engagees
+     * @returns {Promise<Array>} [] si erreur
+     */
+    async getCompoForEvenementEquipe(evenementEquipeId) {
+      if (!evenementEquipeId) {
+        console.error('MOM Hub: getCompoForEvenementEquipe() requiert un evenementEquipeId');
+        return [];
+      }
+      const { data, error } = await client
+        .from('compositions')
+        .select(`
+          id, evenement_id, evenement_equipe_id, cote, etat,
+          version, est_active, notes_compo, created_at, updated_at
+        `)
+        .eq('evenement_equipe_id', evenementEquipeId)
+        .eq('cote', 'mom')
+        .order('est_active', { ascending: false })
+        .order('version', { ascending: false });
+      if (error) {
+        console.error('MOM Hub: getCompoForEvenementEquipe()', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * N3 — Rattache (ou détache) une compo existante à une équipe
+     * engagée : UPDATE compositions.evenement_equipe_id (sql/46,
+     * colonne additive). null = retour mono-équipe (rétro-compat
+     * stricte, N3-1). NE crée PAS de compo (createCompo déployé NON
+     * touché — Façon 1, éditeur étendu pas dupliqué) ; emprunte le
+     * chemin write compositions déjà utilisé par updateCompoNotes
+     * (prouvé fonctionnel déployé). Pattern updateJoueurCompo.
+     *
+     * @param {string} compoId UUID compositions
+     * @param {string|null} evenementEquipeId UUID equipe engagée, ou
+     *   null pour détacher (mono-équipe)
+     * @returns {Promise<{ok:boolean, data?:Object, error?:string}>}
+     */
+    async setCompoEvenementEquipe(compoId, evenementEquipeId) {
+      if (!compoId) return { ok: false, error: 'compoId requis' };
+      if (evenementEquipeId !== null && evenementEquipeId !== undefined &&
+          typeof evenementEquipeId !== 'string') {
+        return { ok: false, error: 'evenementEquipeId doit être un UUID ou null' };
+      }
+      const { data, error } = await client
+        .from('compositions')
+        .update({
+          evenement_equipe_id: (evenementEquipeId === undefined ? null : evenementEquipeId)
+        })
+        .eq('id', compoId)
+        .select()
+        .single();
+      if (error) {
+        console.error('MOM Hub: setCompoEvenementEquipe()', error);
+        return { ok: false, error: error.message };
+      }
+      return { ok: true, data };
     },
 
     /**
