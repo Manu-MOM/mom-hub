@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.21 — Niveau 0 « Équipes & compositions » (accroche Collectif/compo 3 niveaux) (19 mai 2026)
+ * Version : 1.22 — Niveau 0 : activation accès « Groupe de base » (U-N2) (19 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -552,6 +552,22 @@
  *          diff vs original vérifié md5 ; node --check OK. Aucune
  *          ancre evenements.html requise (fiche JS-construite),
  *          aucune classe CSS neuve (réutilise evt-fiche-*) — DS-1.
+ *
+ *   v1.22 : Collectif & compo 3 niveaux (Production) — étape (b) :
+ *          ACTIVATION du bouton « Groupe de base » du Niveau 0
+ *          (v1.21). Le bouton passe de dégradé honnête
+ *          (disabled+« bientôt ») à ACTIF → navigation
+ *          groupe-base.html?evenement_equipe=<id> (écran U-N2,
+ *          doc UX §2). Handler additif dans bindFicheActions
+ *          calqué EXACTEMENT sur compos-from-fiche (navigation
+ *          pure). Le bouton « Feuille de match » reste dégradé
+ *          (activé étape c U-N3). Diff = version + changelog +
+ *          1 ligne bouton (disabled→actif, MA section v1.21) +
+ *          1 bloc handler additif. renderCard/renderSection/
+ *          openFiche/renderFiche (autres sections)/handlers
+ *          bindFicheActions existants : byte-identiques (prouvé
+ *          md5). node --check OK. Convention ?evenement_equipe
+ *          = SD-1(a) assumée Manu (tracée clôture).
  */
 
 (function () {
@@ -2201,7 +2217,7 @@
             html += '<div class="evt-fiche-list-meta">Format : ' + escHtml(eq.format_de_jeu) + '</div>';
           }
           html += '<div class="evt-fiche-list-meta" style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;">';
-          html += '<button type="button" class="evt-btn" data-action="ouvrir-groupe-base" data-evenement-equipe-id="' + escHtml(eq.id) + '" data-event-id="' + escHtml(evt.id) + '" disabled title="Disponible à la livraison de l’écran Groupe de base (étape suivante du chantier Collectif)" style="font-size:11px;opacity:0.55;cursor:not-allowed;">👥 Groupe de base <span style="color:var(--ink-mute);">(bientôt)</span></button>';
+          html += '<button type="button" class="evt-btn" data-action="ouvrir-groupe-base" data-evenement-equipe-id="' + escHtml(eq.id) + '" data-event-id="' + escHtml(evt.id) + '" title="Ouvrir le groupe de base de cette équipe engagée" style="font-size:11px;">👥 Groupe de base</button>';
           html += '<button type="button" class="evt-btn" data-action="ouvrir-feuille-equipe" data-evenement-equipe-id="' + escHtml(eq.id) + '" data-event-id="' + escHtml(evt.id) + '" disabled title="Disponible à la livraison de la feuille de match par équipe engagée (étape suivante du chantier Collectif)" style="font-size:11px;opacity:0.55;cursor:not-allowed;">📋 Feuille de match <span style="color:var(--ink-mute);">(bientôt)</span></button>';
           html += '</div>';
           html += '</div>';
@@ -2347,6 +2363,16 @@
     document.querySelectorAll('[data-action="compos-from-fiche"]').forEach(btn => {
       btn.addEventListener('click', function () {
         window.location.href = 'compositions.html';
+      });
+    });
+    // Collectif & compo 3 niveaux (v1.22) — accès U-N2 « Groupe de
+    // base » (Niveau 0). Navigation pure calquée compos-from-fiche.
+    document.querySelectorAll('[data-action="ouvrir-groupe-base"]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        const evtEqId = this.getAttribute('data-evenement-equipe-id');
+        if (evtEqId) {
+          window.location.href = 'groupe-base.html?evenement_equipe=' + encodeURIComponent(evtEqId);
+        }
       });
     });
     // P2-E.5 : toggle collapsible mobile (logistique, encadrants, notes)
