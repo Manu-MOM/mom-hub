@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.20 — Read-back + édition fiche : équipes engagées / adversaires M3/M5 (19 mai 2026)
+ * Version : 1.21 — Niveau 0 « Équipes & compositions » (accroche Collectif/compo 3 niveaux) (19 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -528,6 +528,30 @@
  *          vérifié md5 ; node --check OK). Aucune ancre
  *          evenements.html requise (fiche JS-construite) — DS-1
  *          tenu (patrons réutilisés, rien fabriqué en aveugle).
+ *
+ *   v1.21 : Collectif & compo 3 niveaux (Production) — Niveau 0
+ *          (doc UX §1). NOUVELLE section fiche « 🧩 Équipes &
+ *          compositions » (compétition + ≥1 équipe engagée) :
+ *          par équipe nom + format (M3, lecture) + 2 accès
+ *          (Groupe de base U-N2 / Feuille U-N3). Réutilise les
+ *          données DÉJÀ attachées par openFiche
+ *          (evt._equipesEngagees / _equipeNames) : ZÉRO nouvel
+ *          appel, ZÉRO RPC/SQL, ZÉRO openFiche modifié. Boutons
+ *          honnêtement DÉGRADÉS (disabled + « bientôt ») tant que
+ *          U-N2 (étape b) / U-N3 (étape c) non livrés — patron
+ *          projet « jamais de trou silencieux » (mode-video v0.1).
+ *          Convention d'URL ?evenement_equipe=<id> = SD-1 (a)
+ *          ASSUMÉE par Manu (lève partiellement SUIVI-COACH-
+ *          deeplink — écart de gouvernance tracé, à acter clôture).
+ *          INVARIANT v1.19+v1.20+v1.21 : renderCard/renderSection/
+ *          accroches Suivi A/B/C/couche données/logique existante
+ *          de openFiche & bindFicheActions & des sections existantes
+ *          de renderFiche NON touchés ; renderFiche reçoit UNE
+ *          section additive de plus à son point d'extension prévu
+ *          (idem 5bis v1.19/v1.20) — addition pure prouvée par
+ *          diff vs original vérifié md5 ; node --check OK. Aucune
+ *          ancre evenements.html requise (fiche JS-construite),
+ *          aucune classe CSS neuve (réutilise evt-fiche-*) — DS-1.
  */
 
 (function () {
@@ -2143,6 +2167,51 @@
       }
       html += '</div>';
       html += '</div>';
+    }
+
+    // ────────────────────────────────────────────────
+    // 5ter. ÉQUIPES & COMPOSITIONS (Niveau 0 — Collectif &
+    //    compo 3 niveaux, doc UX §1). Compétition + ≥1 équipe
+    //    engagée. Par équipe : nom + format (M3, lecture) + 2 accès
+    //    (Groupe de base U-N2 / Feuille U-N3). Réutilise les données
+    //    DÉJÀ attachées par openFiche (evt._equipesEngagees /
+    //    _equipeNames) — ZÉRO nouvel appel, ZÉRO openFiche touché.
+    //    Boutons honnêtement DÉGRADÉS (disabled + « bientôt ») tant
+    //    que U-N2 (étape b) / U-N3 (étape c) non livrés — patron
+    //    projet « jamais de trou silencieux ». data-evenement-equipe-id
+    //    = eq.id (evenement_equipes_engagees.id) = param U-N2/U-N3.
+    //    Convention ?evenement_equipe=<id> = SD-1 (a) assumée Manu.
+    // ────────────────────────────────────────────────
+    if (evt.type_evenement === 'competition') {
+      const eqEngN0 = Array.isArray(evt._equipesEngagees) ? evt._equipesEngagees : [];
+      if (eqEngN0.length > 0) {
+        const eqNamesN0 = (evt._equipeNames && typeof evt._equipeNames === 'object')
+          ? evt._equipeNames : {};
+        html += '<div class="evt-fiche-section evt-fiche-collapsible">';
+        html += '<div class="evt-fiche-section-title">🧩 Équipes &amp; compositions <span class="evt-fiche-chevron">▶</span></div>';
+        html += '<div class="evt-fiche-section-body">';
+        html += '<ul class="evt-fiche-list">';
+        eqEngN0.forEach(function (eq) {
+          const nomEq = eqNamesN0[eq.equipe_id] || eq.equipe_id || '(équipe inconnue)';
+          html += '<li class="evt-fiche-list-item">';
+          html += '<span class="evt-fiche-list-puce">•</span>';
+          html += '<div class="evt-fiche-list-content">';
+          html += '<div class="evt-fiche-list-name">' + escHtml(nomEq) + '</div>';
+          if (eq.format_de_jeu) {
+            html += '<div class="evt-fiche-list-meta">Format : ' + escHtml(eq.format_de_jeu) + '</div>';
+          }
+          html += '<div class="evt-fiche-list-meta" style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;">';
+          html += '<button type="button" class="evt-btn" data-action="ouvrir-groupe-base" data-evenement-equipe-id="' + escHtml(eq.id) + '" data-event-id="' + escHtml(evt.id) + '" disabled title="Disponible à la livraison de l’écran Groupe de base (étape suivante du chantier Collectif)" style="font-size:11px;opacity:0.55;cursor:not-allowed;">👥 Groupe de base <span style="color:var(--ink-mute);">(bientôt)</span></button>';
+          html += '<button type="button" class="evt-btn" data-action="ouvrir-feuille-equipe" data-evenement-equipe-id="' + escHtml(eq.id) + '" data-event-id="' + escHtml(evt.id) + '" disabled title="Disponible à la livraison de la feuille de match par équipe engagée (étape suivante du chantier Collectif)" style="font-size:11px;opacity:0.55;cursor:not-allowed;">📋 Feuille de match <span style="color:var(--ink-mute);">(bientôt)</span></button>';
+          html += '</div>';
+          html += '</div>';
+          html += '</li>';
+        });
+        html += '</ul>';
+        html += '<div class="evt-fiche-empty" style="margin-top:6px;font-size:11px;">Accès Groupe de base (U-N2) et Feuille de match (U-N3) — activés aux étapes suivantes du chantier Collectif &amp; compo 3 niveaux.</div>';
+        html += '</div>';
+        html += '</div>';
+      }
     }
 
     // ────────────────────────────────────────────────
