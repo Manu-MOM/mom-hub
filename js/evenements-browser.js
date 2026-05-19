@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.19 — Read-back fiche : équipes engagées + adversaires M3/M5 (19 mai 2026)
+ * Version : 1.20 — Read-back + édition fiche : équipes engagées / adversaires M3/M5 (19 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -492,53 +492,42 @@
  *              voie v1.17 inchangée) → compositions.evenement_id et
  *              accroches A/B/C non régressées par construction.
  *
- *   v1.19 : Session RLS write par rôle (Production) — READ-BACK fiche
- *          des équipes engagées + adversaires (M3/M5). Constat à la
- *          source 19/05 : la création persiste bien M3/M5 (sql/43 +
- *          câblage v1.18 prouvés par lecture base) MAIS la fiche ne
- *          les affichait NULLE PART — la RPC fiche
- *          (getEvenementWithEncadrants) ne porte que `encadrants`,
- *          et getEquipesEngagees/getAdversairesEvenement (déployés
- *          v1.18 supabase-client) n'étaient JAMAIS appelés (0 appel).
- *          L'engagement saisi était donc écrit mais invisible.
- *          ADDITION PURE, aucune fonction existante modifiée :
+ *   v1.19 : Session RLS write — READ-BACK fiche des équipes engagées
+ *          + adversaires (M3/M5). Constat source 19/05 : la création
+ *          persiste bien M3/M5 (sql/43 + câblage v1.18 prouvés par
+ *          lecture base) MAIS la fiche ne les affichait NULLE PART
+ *          (RPC fiche = `encadrants` seul ; getEquipesEngagees/
+ *          getAdversairesEvenement déployés v1.18 JAMAIS appelés).
+ *          Engagement écrit mais invisible. ADDITION : openFiche
+ *          attache evt._equipesEngagees/_adversaires/_equipeNames
+ *          (2 await NON BLOQUANTS, posture relecture lien Suivi) ;
+ *          renderFiche rend une section calquée sur Encadrants.
  *
- *          (1) openFiche : après le fetch evt, 2 await NON BLOQUANTS
- *              getEquipesEngagees(evt.id) + getAdversairesEvenement
- *              (evt.id), attachés sur evt._equipesEngagees /
- *              evt._adversaires. Posture identique à la relecture
- *              lien Suivi (SUIVI-COACH-2) : tout échec → fiche
- *              rendue sans le read-back (jamais d'échec d'ouverture).
- *              Compétitions uniquement (M3/M5 n'existent que là ;
- *              cohérent avec le gating création Bloc 4a).
+ *   v1.20 : Session RLS write — ÉDITION de l'engagement depuis la
+ *          fiche (lève EVT-ENGAGEMENT-UI partie édition). Sur la
+ *          section v1.19, gardé etat ∉ {annule,archive} (idem
+ *          logistique) : engager une équipe (picker = listEquipes
+ *          du club, équipes non déjà engagées), retirer une équipe
+ *          (CASCADE M5 par FK sql/40, confirm), ajouter un
+ *          adversaire (input par équipe), retirer un adversaire
+ *          (via id exposé par supabase-client v1.21). Handlers
+ *          STRICTEMENT calqués sur reactivate-from-fiche (bouton
+ *          désactivé → await wrapper déployé → alert si échec →
+ *          succès closeFiche/reloadEvents/openFiche). openFiche
+ *          v1.19 étendu : liste club chargée pour TOUTE compétition
+ *          (plus seulement si déjà engagée) → evt._equipesClub,
+ *          pour que l'ajout d'une 1re équipe marche. Wrappers tous
+ *          DÉJÀ déployés (v1.19 add/removeEquipeEngagee/addAdversaire,
+ *          v1.21 removeAdversaire) ; AUCUN nouveau SQL/RPC ; lecture
+ *          des noms = listing, repli honnête UUID (jamais un faux).
  *
- *          (2) Résolution des noms d'équipe : getEquipesEngagees ne
- *              renvoie que equipe_id (UUID). Le nom est résolu via
- *              le LISTING déjà déployé (getCategorieEquipe(M14) +
- *              listEquipes, v1.20 — MÊME source que le Bloc 4a),
- *              attaché sur evt._equipeNames (map id→libellé). AUCUN
- *              nom inventé ; repli honnête sur l'UUID si la
- *              résolution échoue (dégradation explicite, jamais un
- *              faux). Backend/wrappers inchangés (zéro nouveau SQL).
- *
- *          (3) renderFiche : nouvelle section « Équipes engagées »
- *              (bloc 5bis, entre Logistique et Encadrants), calquée
- *              TRAIT POUR TRAIT sur le bloc Encadrants (mêmes classes
- *              CSS déjà prouvées au rendu, même état vide honnête,
- *              même collapsible P2-E.5). Adversaires M5 rendus sous
- *              chaque équipe (groupés par evenement_equipe_id).
- *              Aucune ancre evenements.html requise (fiche
- *              JS-construite) → DS-1 tenu (patron réutilisé, rien
- *              fabriqué en aveugle).
- *
- *          (4) INVARIANT : renderCard / renderSection / accroches
- *              Suivi A/B/C / couche données / la logique existante
- *              de openFiche & renderFiche — NON touchés (addition
- *              pure prouvée par diff). Lecture seule (zéro write) ;
- *              compositions.evenement_id intact. L'édition de
- *              l'engagement post-création (ajout/retrait depuis la
- *              fiche) = livrable (ii) SÉPARÉ (1 intention = 1 commit),
- *              dette EVT-ENGAGEMENT-UI partie édition, NON ici.
+ *          INVARIANT v1.19+v1.20 : renderCard/renderSection/
+ *          accroches Suivi A/B/C/couche données/logique existante
+ *          de openFiche & renderFiche & bindFicheActions NON
+ *          touchés (addition pure prouvée par diff vs original
+ *          vérifié md5 ; node --check OK). Aucune ancre
+ *          evenements.html requise (fiche JS-construite) — DS-1
+ *          tenu (patrons réutilisés, rien fabriqué en aveugle).
  */
 
 (function () {
@@ -1329,24 +1318,24 @@
       }
 
       // ────────────────────────────────────────────────
-      // v1.19 — READ-BACK ENGAGEMENT (M3/M5) sur la fiche.
+      // v1.19/v1.20 — READ-BACK + ÉDITION ENGAGEMENT (M3/M5).
       // La RPC fiche (getEvenementWithEncadrants) ne porte PAS les
-      // équipes engagées / adversaires (payload `encadrants` seul) :
-      // c'est pourquoi l'engagement saisi à la création n'était
-      // jamais visible. On le récupère ICI via les wrappers LECTURE
-      // déployés (supabase-client v1.18 getEquipesEngagees /
-      // getAdversairesEvenement) et on résout les noms d'équipe via
-      // le LISTING déjà déployé (v1.20 getCategorieEquipe/listEquipes
-      // — même source que le Bloc 4a, aucun nom inventé). Le tout est
-      // attaché à evt pour que renderFiche (sync) le rende.
-      // STRICTEMENT NON BLOQUANT (même posture que la relecture lien
-      // Suivi ci-dessus) : tout échec → fiche rendue sans le
-      // read-back (état honnête géré par tableaux/map vides).
+      // équipes engagées/adversaires (payload `encadrants` seul) :
+      // l'engagement saisi à la création était écrit mais invisible.
+      // On le récupère ICI via les wrappers LECTURE déployés
+      // (getEquipesEngagees/getAdversairesEvenement) ; noms d'équipe
+      // ET liste engageable résolus via le LISTING déployé
+      // (getCategorieEquipe/listEquipes — même source que le Bloc
+      // 4a, aucun nom inventé). Attaché à evt pour renderFiche
+      // (sync). STRICTEMENT NON BLOQUANT (même posture que la
+      // relecture lien Suivi ci-dessus) : tout échec → fiche rendue
+      // sans le read-back (état honnête, tableaux/map vides).
       // Compétitions uniquement (M3/M5 n'existent que là ; cohérent
-      // avec le gating création Bloc 4a).
+      // gating création Bloc 4a).
       evt._equipesEngagees = [];
       evt._adversaires     = [];
       evt._equipeNames     = {};
+      evt._equipesClub     = [];
       if (evt.type_evenement === 'competition' && window.SupabaseHub) {
         try {
           if (typeof SupabaseHub.getEquipesEngagees === 'function') {
@@ -1357,16 +1346,18 @@
             const _advs = await SupabaseHub.getAdversairesEvenement(evt.id);
             evt._adversaires = Array.isArray(_advs) ? _advs : [];
           }
-          // Résolution UUID → libellé via le listing du club (même
-          // chaîne que le Bloc 4a création). Échec/silence = repli
-          // honnête sur l'UUID côté renderFiche (jamais un faux).
-          if (evt._equipesEngagees.length > 0
-              && typeof SupabaseHub.getCategorieEquipe === 'function'
+          // Liste du club (catégorie) : sert aux noms ET au picker
+          // « + Engager ». Chargée pour TOUTE compétition (v1.20,
+          // plus seulement si déjà engagée) afin que l'ajout d'une
+          // 1re équipe fonctionne. Échec/silence = repli honnête
+          // sur l'UUID côté renderFiche (jamais un faux).
+          if (typeof SupabaseHub.getCategorieEquipe === 'function'
               && typeof SupabaseHub.listEquipes === 'function') {
             const _cat = await SupabaseHub.getCategorieEquipe(M14_TEAM_UUID);
             if (_cat && _cat.ok && _cat.data && _cat.data.categorie_id) {
               const _liste = await SupabaseHub.listEquipes(_cat.data.categorie_id);
-              (Array.isArray(_liste) ? _liste : []).forEach(function (e) {
+              evt._equipesClub = Array.isArray(_liste) ? _liste : [];
+              evt._equipesClub.forEach(function (e) {
                 if (e && e.id) {
                   evt._equipeNames[e.id] =
                     e.libelle_court || e.nom_officiel || e.code || e.id;
@@ -1375,9 +1366,8 @@
             }
           }
         } catch (e) {
-          // Non bloquant : on log, la fiche est rendue sans le
-          // read-back complet (tableaux/map vides → état honnête).
-          console.error('MOM Hub: openFiche() read-back engagement', e);
+          // Non bloquant : log, fiche rendue sans read-back complet.
+          console.error('MOM Hub: openFiche() engagement (read-back/édition)', e);
         }
       }
 
@@ -2065,20 +2055,26 @@
     }
 
     // ────────────────────────────────────────────────
-    // 5bis. ÉQUIPES ENGAGÉES + ADVERSAIRES (M3/M5) — v1.19
-    //    Read-back de l'engagement saisi à la création (Bloc 4a/4c).
-    //    Compétitions uniquement. Données attachées par openFiche
-    //    (wrappers LECTURE déployés v1.18) ; noms d'équipe résolus
-    //    via le listing (v1.20), repli honnête sur l'UUID — aucun
-    //    nom inventé, jamais un faux. Calqué sur le bloc Encadrants
-    //    (mêmes classes CSS, même état vide, même collapsible
-    //    P2-E.5). Lecture seule : zéro write, addition pure.
+    // 5bis. ÉQUIPES ENGAGÉES + ADVERSAIRES (M3/M5)
+    //    v1.19 read-back · v1.20 édition (engager/retirer
+    //    équipe, ajouter/retirer adversaire). Compétitions
+    //    uniquement. Données attachées par openFiche (wrappers
+    //    LECTURE déployés) ; écritures via wrappers déployés
+    //    (add/removeEquipeEngagee, add/removeAdversaire). Noms via
+    //    listing, repli honnête UUID. Calqué sur le bloc Encadrants
+    //    (classes/collapsible P2-E.5) + patron data-action +
+    //    bindFicheActions (refresh = reactivate-from-fiche).
+    //    Édition gardée etat ∉ {annule,archive} (idem logistique).
     // ────────────────────────────────────────────────
     if (evt.type_evenement === 'competition') {
       const eqEng  = Array.isArray(evt._equipesEngagees) ? evt._equipesEngagees : [];
       const advAll = Array.isArray(evt._adversaires) ? evt._adversaires : [];
       const eqNames = (evt._equipeNames && typeof evt._equipeNames === 'object')
         ? evt._equipeNames : {};
+      const clubEq = Array.isArray(evt._equipesClub) ? evt._equipesClub : [];
+      const engEditable = (evt.etat !== 'annule' && evt.etat !== 'archive');
+      const engagedIds = {};
+      eqEng.forEach(function (eq) { engagedIds[eq.equipe_id] = true; });
       html += '<div class="evt-fiche-section evt-fiche-collapsible">';
       html += '<div class="evt-fiche-section-title">🏉 Équipes engagées <span class="evt-fiche-chevron">▶</span></div>';
       html += '<div class="evt-fiche-section-body">';
@@ -2091,7 +2087,11 @@
           html += '<li class="evt-fiche-list-item">';
           html += '<span class="evt-fiche-list-puce">•</span>';
           html += '<div class="evt-fiche-list-content">';
-          html += '<div class="evt-fiche-list-name">' + escHtml(nomEq) + '</div>';
+          html += '<div class="evt-fiche-list-name">' + escHtml(nomEq);
+          if (engEditable) {
+            html += ' <button type="button" class="evt-btn" data-action="retirer-equipe-from-fiche" data-liaison-id="' + escHtml(eq.id) + '" data-event-id="' + escHtml(evt.id) + '" style="font-size:10px;color:var(--ink-mute);">✕ retirer</button>';
+          }
+          html += '</div>';
           if (eq.format_de_jeu) {
             html += '<div class="evt-fiche-list-meta">Format : ' + escHtml(eq.format_de_jeu) + '</div>';
           }
@@ -2099,9 +2099,19 @@
             .filter(function (a) { return a.evenement_equipe_id === eq.id; })
             .forEach(function (a) {
               if (a.adversaire_nom) {
-                html += '<div class="evt-fiche-list-meta">vs ' + escHtml(a.adversaire_nom) + '</div>';
+                html += '<div class="evt-fiche-list-meta">vs ' + escHtml(a.adversaire_nom);
+                if (engEditable && a.id) {
+                  html += ' <button type="button" class="evt-btn" data-action="retirer-adversaire-from-fiche" data-adv-id="' + escHtml(a.id) + '" data-event-id="' + escHtml(evt.id) + '" style="font-size:10px;color:var(--ink-mute);">✕</button>';
+                }
+                html += '</div>';
               }
             });
+          if (engEditable) {
+            html += '<div class="evt-fiche-list-meta" style="margin-top:4px;">';
+            html += '<input type="text" class="evt-form-input" data-adv-input-for="' + escHtml(eq.id) + '" placeholder="Ajouter un adversaire…" style="font-size:12px;max-width:200px;">';
+            html += ' <button type="button" class="evt-btn" data-action="ajouter-adversaire-from-fiche" data-liaison-id="' + escHtml(eq.id) + '" data-event-id="' + escHtml(evt.id) + '" style="font-size:11px;">+ adversaire</button>';
+            html += '</div>';
+          }
           if (eq.notes) {
             html += '<div class="evt-fiche-list-meta">📝 ' + escHtml(eq.notes) + '</div>';
           }
@@ -2109,6 +2119,27 @@
           html += '</li>';
         });
         html += '</ul>';
+      }
+      if (engEditable) {
+        const dispo = clubEq.filter(function (e) { return e && e.id && !engagedIds[e.id]; });
+        html += '<div style="margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">';
+        if (dispo.length === 0) {
+          html += '<span class="evt-fiche-empty" style="margin:0;">'
+            + (clubEq.length === 0
+                ? 'Liste des équipes indisponible (chargement / hors-ligne).'
+                : 'Toutes les équipes du club sont déjà engagées.')
+            + '</span>';
+        } else {
+          html += '<select class="evt-form-select" data-eng-picker="' + escHtml(evt.id) + '" style="font-size:12px;max-width:220px;">';
+          html += '<option value="">— Engager une équipe… —</option>';
+          dispo.forEach(function (e) {
+            const lib = e.libelle_court || e.nom_officiel || e.code || e.id;
+            html += '<option value="' + escHtml(e.id) + '">' + escHtml(lib) + '</option>';
+          });
+          html += '</select>';
+          html += ' <button type="button" class="evt-btn" data-action="engager-equipe-from-fiche" data-event-id="' + escHtml(evt.id) + '" style="font-size:11px;">+ Engager</button>';
+        }
+        html += '</div>';
       }
       html += '</div>';
       html += '</div>';
@@ -2260,6 +2291,124 @@
       btn.addEventListener('click', function () {
         const id = this.getAttribute('data-event-id');
         if (id) openModalLogistique(id);
+      });
+    });
+    // v1.20 — Édition de l'engagement depuis la fiche (M3/M5).
+    // Patron STRICTEMENT calqué sur reactivate-from-fiche ci-dessus :
+    // bouton désactivé → await wrapper DÉPLOYÉ → alert si échec →
+    // succès closeFiche(); await reloadEvents(); openFiche(id) (la
+    // fiche rerend, openFiche relit M3/M5). Wrappers déjà déployés
+    // (add/removeEquipeEngagee/addAdversaire v1.19, removeAdversaire
+    // v1.21). Aucune logique inventée, aucun nouveau SQL.
+    document.querySelectorAll('[data-action="engager-equipe-from-fiche"]').forEach(btn => {
+      btn.addEventListener('click', async function () {
+        const evtId = this.getAttribute('data-event-id');
+        if (!evtId) return;
+        const sel = document.querySelector('[data-eng-picker="' + evtId + '"]');
+        const equipeId = sel ? sel.value : '';
+        if (!equipeId) { alert('Sélectionne une équipe à engager.'); return; }
+        this.disabled = true;
+        const _t = this.textContent;
+        this.textContent = 'Engagement…';
+        try {
+          const res = await SupabaseHub.addEquipeEngagee(evtId, { equipe_id: equipeId });
+          if (!res || !res.ok) {
+            alert('Échec : ' + ((res && res.error) || 'erreur inconnue'));
+            this.disabled = false;
+            this.textContent = _t;
+            return;
+          }
+          closeFiche();
+          await reloadEvents();
+          openFiche(evtId);
+        } catch (err) {
+          console.error('engager-equipe-from-fiche', err);
+          alert('Erreur inattendue : ' + (err.message || err));
+          this.disabled = false;
+          this.textContent = _t;
+        }
+      });
+    });
+    document.querySelectorAll('[data-action="retirer-equipe-from-fiche"]').forEach(btn => {
+      btn.addEventListener('click', async function () {
+        const evtId = this.getAttribute('data-event-id');
+        const liaisonId = this.getAttribute('data-liaison-id');
+        if (!evtId || !liaisonId) return;
+        if (!confirm('Retirer cette équipe engagée ? Ses adversaires saisis seront aussi supprimés (cascade FK).')) return;
+        this.disabled = true;
+        const _t = this.textContent;
+        this.textContent = '…';
+        try {
+          const res = await SupabaseHub.removeEquipeEngagee(liaisonId);
+          if (!res || !res.ok) {
+            alert('Échec : ' + ((res && res.error) || 'erreur inconnue'));
+            this.disabled = false;
+            this.textContent = _t;
+            return;
+          }
+          closeFiche();
+          await reloadEvents();
+          openFiche(evtId);
+        } catch (err) {
+          console.error('retirer-equipe-from-fiche', err);
+          alert('Erreur inattendue : ' + (err.message || err));
+          this.disabled = false;
+          this.textContent = _t;
+        }
+      });
+    });
+    document.querySelectorAll('[data-action="ajouter-adversaire-from-fiche"]').forEach(btn => {
+      btn.addEventListener('click', async function () {
+        const evtId = this.getAttribute('data-event-id');
+        const liaisonId = this.getAttribute('data-liaison-id');
+        if (!evtId || !liaisonId) return;
+        const inp = document.querySelector('[data-adv-input-for="' + liaisonId + '"]');
+        const nom = inp ? inp.value.trim() : '';
+        if (!nom) { alert('Saisis le nom de l\'adversaire.'); return; }
+        this.disabled = true;
+        const _t = this.textContent;
+        this.textContent = '…';
+        try {
+          const res = await SupabaseHub.addAdversaire(liaisonId, { adversaire_nom: nom });
+          if (!res || !res.ok) {
+            alert('Échec : ' + ((res && res.error) || 'erreur inconnue'));
+            this.disabled = false;
+            this.textContent = _t;
+            return;
+          }
+          closeFiche();
+          await reloadEvents();
+          openFiche(evtId);
+        } catch (err) {
+          console.error('ajouter-adversaire-from-fiche', err);
+          alert('Erreur inattendue : ' + (err.message || err));
+          this.disabled = false;
+          this.textContent = _t;
+        }
+      });
+    });
+    document.querySelectorAll('[data-action="retirer-adversaire-from-fiche"]').forEach(btn => {
+      btn.addEventListener('click', async function () {
+        const evtId = this.getAttribute('data-event-id');
+        const advId = this.getAttribute('data-adv-id');
+        if (!evtId || !advId) return;
+        if (!confirm('Retirer cet adversaire ?')) return;
+        this.disabled = true;
+        try {
+          const res = await SupabaseHub.removeAdversaire(advId);
+          if (!res || !res.ok) {
+            alert('Échec : ' + ((res && res.error) || 'erreur inconnue'));
+            this.disabled = false;
+            return;
+          }
+          closeFiche();
+          await reloadEvents();
+          openFiche(evtId);
+        } catch (err) {
+          console.error('retirer-adversaire-from-fiche', err);
+          alert('Erreur inattendue : ' + (err.message || err));
+          this.disabled = false;
+        }
       });
     });
     // SUIVI-COACH-1 Objet A : actions de la section Suivi
