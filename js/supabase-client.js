@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.22 — mai 2026
+ * Version : 1.23 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -531,6 +531,22 @@
  *          encore « v1.16 chargé » (≠ header) — antérieure à cette
  *          passe, à reprendre en passe dédiée pour ne pas élargir le
  *          périmètre (précédent STATE pt 5 arbo suivi-app).
+ *   v1.23 : Collectif & compo 3 niveaux (Production) — U-N2 entrée.
+ *          1 wrapper ADDITIF getEvenementEquipeContext(evtEqId) :
+ *          résolveur du point d'entrée de l'écran Groupe de base
+ *          (doc UX §2 UN2-1). 1 requête imbriquée
+ *          evenement_equipes_engagees → evenements (titre/date,
+ *          « Plateau · date ») + equipes → ententes (entente_id =
+ *          source N1 du vivier, « Collectif · saison » ; via
+ *          equipes.entente_id NOT NULL, sql/01 — PAS de devinette
+ *          de saison). Patron getCategorieEquipe (embed prouvé
+ *          déployé+recetté) ; maybeSingle. Évite une résolution
+ *          multi-sauts client fragile (anti-hypothèse). Strictement
+ *          ADDITIF : 1 méthode + version + changelog ; AUCUNE
+ *          méthode existante touchée ; aucun nouveau SQL/RPC ;
+ *          aucune colonne inventée (toutes vérifiées sql/01/sql/42
+ *          ou usage déployé). console.log boot v1.16 toujours NON
+ *          touché (incohérence préexistante tracée, non absorbée).
  */
 
 (function (global) {
@@ -3785,6 +3801,76 @@
         return { ok: false, error: error.message };
       }
       return { ok: true, data };
+    },
+
+    /**
+     * U-N2 entrée — résout le contexte d'une équipe engagée pour
+     * l'écran Groupe de base (doc UX §2 UN2-1, 3 dimensions :
+     * « Plateau · date » = evenements ; « Groupe — Équipe » =
+     * equipes ; « Collectif · saison » = ententes via N1). UNE
+     * requête imbriquée (PI-5) ; entente_id résolu par
+     * equipes.entente_id (NOT NULL, sql/01) — aucune devinette de
+     * saison. Patron getCategorieEquipe (embed equipes→ententes
+     * prouvé déployé+recetté). Toutes colonnes vérifiées source
+     * (sql/01/sql/42) ou usage déployé — rien inventé (DS-1).
+     *
+     * @param {string} evenementEquipeId UUID evenement_equipes_engagees
+     * @returns {Promise<{ok:boolean, data?:{evenement_equipe:Object,
+     *   evenement:Object, equipe:Object, entente:Object},
+     *   error?:string}>}
+     */
+    async getEvenementEquipeContext(evenementEquipeId) {
+      if (!evenementEquipeId) {
+        return { ok: false, error: 'evenementEquipeId requis' };
+      }
+      const { data, error } = await client
+        .from('evenement_equipes_engagees')
+        .select(`
+          id, evenement_id, equipe_id, format_de_jeu, notes,
+          evenements ( id, code, libelle, date_debut, type_evenement ),
+          equipes (
+            id, code, libelle_court, nom_officiel, entente_id,
+            ententes ( id, code, libelle_court, libelle_moyen,
+                        categorie_id, saison_id )
+          )
+        `)
+        .eq('id', evenementEquipeId)
+        .maybeSingle();
+      if (error) {
+        console.error('MOM Hub: getEvenementEquipeContext()', error);
+        return { ok: false, error: error.message || 'Erreur lecture contexte équipe engagée' };
+      }
+      if (!data) {
+        return { ok: false, error: 'Équipe engagée introuvable' };
+      }
+      const eq   = data;
+      const evt  = eq.evenements || null;
+      const team = eq.equipes || null;
+      const ent  = (team && team.ententes) ? team.ententes : null;
+      if (!ent || !ent.id) {
+        return { ok: false, error: "Entente introuvable pour cette équipe engagée (chaîne équipe→entente)" };
+      }
+      return {
+        ok: true,
+        data: {
+          evenement_equipe: {
+            id:            eq.id,
+            evenement_id:  eq.evenement_id,
+            equipe_id:     eq.equipe_id,
+            format_de_jeu: eq.format_de_jeu,
+            notes:         eq.notes
+          },
+          evenement: evt,
+          equipe: team ? {
+            id:            team.id,
+            code:          team.code,
+            libelle_court: team.libelle_court,
+            nom_officiel:  team.nom_officiel,
+            entente_id:    team.entente_id
+          } : null,
+          entente: ent
+        }
+      };
     },
 
     /**
