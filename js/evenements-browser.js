@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.13 — Regroupement liste par 3 catégories (display-only) (18 mai 2026)
+ * Version : 1.18 — Câblage write Bloc 4a/4c (M3/M5) — Session RLS write (19 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -417,6 +417,80 @@
  *              compétition pour voir/compléter). submitModalCreate :
  *              addition pure, branche Phases gardée par phases_mode
  *              = 'oui' ET sous-type éligible (UX §3.1).
+ *
+ *   v1.18 : Session RLS write par rôle (Production) — CÂBLAGE WRITE du
+ *          Bloc 4a/4c (Engagement M3/M5). Lève la dette 1
+ *          (REFONTE-EVT-write-M3/M5 + listing equipes) côté UI : la
+ *          RLS write est posée (sql/41), les wrappers existent
+ *          (supabase-client v1.19 add/removeEquipeEngagee /
+ *          add/removeAdversaire ; v1.20 getCategorieEquipe +
+ *          listEquipes). v1.16 disait « rien collecté n'est envoyé
+ *          (pas de faux) » : ce faux est maintenant levé, le Bloc 4a
+ *          collecte ET persiste réellement.
+ *
+ *          PÉRIMÈTRE (décisions Manu consignées) :
+ *          - categorieId dérivé de M14_TEAM_UUID (option A : module
+ *            M14-mono-équipe, comme tout le reste du fichier). Le
+ *            multi-catégorie/multi-coach = dette de fond séparée
+ *            « liaison auth→équipe→saison » (tracée passation, PAS
+ *            traitée ici — chantier de modélisation amont).
+ *          - Câblage write M3/M5 UNIQUEMENT en mode adversaires
+ *            simples (phases_mode ≠ 'oui'). La branche Phases=OUI
+ *            persiste déjà via `evenements` M6 (v1.17,
+ *            persisterPhasesEtMatchs) — PAS M3/M5 (frontière modèle
+ *            v1.2 §4.4 M5↔M6). Câbler M3/M5 sur Phases = doublon
+ *            d'une persistance déjà faite → exclu (anti-DS-1).
+ *          - Staff Bloc 5 (dette 2, P2-E.4) : NON câblé ici. Bloqué
+ *            sur source de lecture staff non vérifiée (RPC
+ *            get_joueurs_equipe non lue) → dette tracée, pas une
+ *            invention. Étape séparée.
+ *
+ *          (1) CTX_CATEGORIE_ID : résolu une fois au chargement du
+ *              contexte modal (loadModalContext), via
+ *              SupabaseHub.getCategorieEquipe(M14_TEAM_UUID). Même
+ *              esprit que CTX_SAISON_ID/CTX_ORGANISATEUR_ID (lecture
+ *              ciblée, variable de contexte). Défensif : si échec,
+ *              le Bloc 4a affiche une erreur honnête, ne bloque pas
+ *              la création de l'évènement de base.
+ *
+ *          (2) peuplerEquipesEngagees() : remplit #evt-create-equipes
+ *              (cases à cocher) via SupabaseHub.listEquipes(
+ *              CTX_CATEGORIE_ID). Appelé quand le bloc Engagement
+ *              devient visible (hook updateCreateConditionalFields,
+ *              addition — la logique conditionnelle existante n'est
+ *              pas modifiée, seulement complétée). État honnête :
+ *              « Chargement… » → cases, ou message d'erreur, ou
+ *              « aucune équipe » (jamais une case fantôme).
+ *
+ *          (3) submitModalCreate ÉTENDU en addition pure : après
+ *              création réussie de la compétition (createdId présent)
+ *              ET si famille=competition ET phases_mode≠'oui', on
+ *              persiste l'engagement : pour chaque équipe cochée →
+ *              addEquipeEngagee(createdId,…) ; pour chaque adversaire
+ *              saisi → addAdversaire(liaisonId,…) rattaché à la
+ *              PREMIÈRE équipe engagée (cas simple/triangulaire UX
+ *              §2.4/4c ; le multi-équipe×adversaire fin reste porté
+ *              par l'UX existante, pas sur-spécifié ici). La voie
+ *              création de base (v1.15) et la branche Phases (v1.17)
+ *              sont INCHANGÉES (gardées par leurs conditions
+ *              existantes).
+ *
+ *          (4) STRATÉGIE D'ÉCHEC = création progressive, MÊME doctrine
+ *              que v1.17 persisterPhasesEtMatchs (décision Manu) :
+ *              pas de transaction client (API REST), on n'invente pas
+ *              un faux « tout ou rien ». Échec en cours
+ *              d'engagement → on N'ANNULE PAS, on garde ce qui est
+ *              créé, on rend compte exactement (combien d'équipes /
+ *              adversaires enregistrés, où ça s'est arrêté). La
+ *              compétition est créée ; l'utilisateur complète depuis
+ *              la fiche. Cohérent P4 « le Hub avertit, ne bloque pas ».
+ *
+ *          (5) INVARIANT SUIVI : aucune fonction Suivi/render/openFiche
+ *              touchée (addition pure, prouvé par diff signatures).
+ *              M3/M5 sont des tables de liaison ; aucun match n'est
+ *              créé/modifié ici (les matchs = lignes `evenements`,
+ *              voie v1.17 inchangée) → compositions.evenement_id et
+ *              accroches A/B/C non régressées par construction.
  */
 
 (function () {
@@ -444,6 +518,7 @@
   // (pas de hardcode anti-doctrine — récupération via API)
   let CTX_SAISON_ID       = null;
   let CTX_ORGANISATEUR_ID = null;
+  let CTX_CATEGORIE_ID    = null;  // v1.18 — catégorie M14 (dérivée de M14_TEAM_UUID), pour listEquipes Bloc 4a
   let SITES               = [];   // [{id, libelle_court, libelle}]
 
   // S2.4.b — Contexte courant des modales (event sélectionné pour E4, tournoi pour E5)
@@ -2410,6 +2485,22 @@
         }
       }
 
+      // v1.18 — Catégorie M14 (dérivée de M14_TEAM_UUID) pour peupler
+      // le Bloc 4a via listEquipes. Module M14-mono-équipe (décision
+      // périmètre option A). Défensif : un échec ici N'EMPÊCHE PAS la
+      // création de l'évènement de base ; seul le Bloc 4a affichera
+      // une erreur honnête (jamais une case fantôme).
+      if (window.SupabaseHub && typeof SupabaseHub.getCategorieEquipe === 'function') {
+        const catRes = await SupabaseHub.getCategorieEquipe(M14_TEAM_UUID);
+        if (catRes && catRes.ok && catRes.data) {
+          CTX_CATEGORIE_ID = catRes.data.categorie_id;
+          console.log('Modal context : categorie=', CTX_CATEGORIE_ID);
+        } else {
+          console.warn('loadModalContext() résolution catégorie M14',
+            catRes && catRes.error);
+        }
+      }
+
       // 2. Sites actifs pour le dropdown
       if (window.SupabaseHub && typeof SupabaseHub.listSitesActifs === 'function') {
         const sites = await SupabaseHub.listSitesActifs();
@@ -2598,6 +2689,12 @@
       // relâché v1.2 §5.1 ; Stage/Entraînement → équipe unique gérée
       // par la voie existante, hors de ce bloc).
       engagement.style.display = (famille === 'competition') ? '' : 'none';
+      // v1.18 — addition : quand le bloc devient visible, peupler 4a
+      // (cases équipes). Idempotent : peuplerEquipesEngagees ne
+      // recharge pas si déjà peuplé pour la même catégorie.
+      if (famille === 'competition') {
+        peuplerEquipesEngagees();
+      }
     }
 
     // Entrée 2 — Entraînement : occasionnel | récurrent (M2). Forme
@@ -2657,6 +2754,63 @@
       && q.querySelector('input[name=phases_mode]:checked').value === 'oui';
     if (advZone)    advZone.style.display    = oui ? 'none' : '';
     if (phasesZone) phasesZone.style.display = oui ? '' : 'none';
+  }
+
+  // ────────────────────────────────────────────────────────────────
+  // v1.18 — Bloc 4a : peuplement RÉEL des équipes engageables
+  // (listEquipes via la catégorie M14). État honnête : chargement →
+  // cases, erreur, ou « aucune équipe ». Jamais de case fantôme.
+  // ────────────────────────────────────────────────────────────────
+  let _eq4aLoadedForCat = null;  // idempotence : catégorie déjà peuplée
+
+  async function peuplerEquipesEngagees() {
+    const wrap = document.getElementById('evt-create-equipes');
+    if (!wrap) return;
+
+    // Idempotent : déjà peuplé pour cette catégorie → ne pas recharger
+    // (évite un re-fetch à chaque changement de sous-type/format).
+    if (_eq4aLoadedForCat && _eq4aLoadedForCat === CTX_CATEGORIE_ID
+        && wrap.querySelector('input[type=checkbox]')) {
+      return;
+    }
+
+    if (!CTX_CATEGORIE_ID) {
+      wrap.innerHTML = '<div class="evt-form-error">Catégorie non '
+        + 'résolue : impossible de lister les équipes engageables. '
+        + 'L\'évènement reste créable ; complétez l\'engagement '
+        + 'depuis la fiche.</div>';
+      return;
+    }
+
+    wrap.innerHTML = '<div class="evt-form-hint">Chargement des équipes…</div>';
+
+    let equipes = [];
+    try {
+      equipes = await SupabaseHub.listEquipes(CTX_CATEGORIE_ID);
+    } catch (e) {
+      console.error('peuplerEquipesEngagees()', e);
+      equipes = [];
+    }
+
+    if (!Array.isArray(equipes) || equipes.length === 0) {
+      wrap.innerHTML = '<div class="evt-form-hint">Aucune équipe '
+        + 'active dans cette catégorie pour la saison en cours.</div>';
+      _eq4aLoadedForCat = CTX_CATEGORIE_ID;
+      return;
+    }
+
+    // Cases à cocher : 1 par équipe. value = equipe_id (consommé au
+    // submit). Libellé = nom officiel (+ libellé court si présent).
+    const html = equipes.map(function (eq) {
+      const label = escHtml(
+        eq.nom_officiel || eq.libelle_court || eq.code || eq.id);
+      return '<label class="evt-eng-equipe-row">'
+        + '<input type="checkbox" class="evt-eng-equipe-cb" '
+        + 'value="' + escHtml(eq.id) + '"> '
+        + label + '</label>';
+    }).join('');
+    wrap.innerHTML = html;
+    _eq4aLoadedForCat = CTX_CATEGORIE_ID;
   }
 
   // ────────────────────────────────────────────────────────────────
@@ -2989,8 +3143,83 @@
         }
       }
 
+      // v1.18 — Persistance ENGAGEMENT M3/M5 (dette 1). Addition pure,
+      // gardée par : famille competition + pas duplication + créé +
+      // mode adversaires simples (phases_mode ≠ oui — la branche
+      // Phases=OUI persiste via `evenements` M6, v1.17, PAS M3/M5 ;
+      // frontière modèle v1.2 §4.4). Doctrine création progressive
+      // IDENTIQUE persisterPhasesEtMatchs : on n'annule rien, on rend
+      // compte exactement (P4 « le Hub avertit, ne bloque pas »).
+      let engReport = '';
+      if (familleEvt === 'competition' && createdId && !isDuplication
+          && !phasesOui) {
+        const cbList = Array.prototype.slice.call(
+          document.querySelectorAll('#evt-create-equipes .evt-eng-equipe-cb:checked'));
+        const advInputs = Array.prototype.slice.call(
+          document.querySelectorAll('#evt-create-adv-lines .evt-eng-adv-row input[type=text]'));
+        const advNoms = advInputs
+          .map(function (i) { return (i.value || '').trim(); })
+          .filter(function (v) { return v.length > 0; });
+
+        if (cbList.length > 0) {
+          let equipesOk = 0;
+          let advOk = 0;
+          let stopInfo = '';
+          let premiereLiaisonId = null;
+
+          for (let i = 0; i < cbList.length && !stopInfo; i++) {
+            const eqId = cbList[i].value;
+            const r = await SupabaseHub.addEquipeEngagee(createdId, {
+              equipe_id: eqId,
+              ordre:     i + 1
+            });
+            if (r && r.ok) {
+              equipesOk++;
+              if (!premiereLiaisonId && r.data && r.data.id) {
+                premiereLiaisonId = r.data.id;  // cible des adversaires (cas simple/triangulaire UX §2.4/4c)
+              }
+            } else {
+              stopInfo = 'l\'engagement de l\'équipe ' + (i + 1)
+                + ' (' + escHtml((r && r.error) || 'erreur inconnue') + ')';
+            }
+          }
+
+          // Adversaires (M5) rattachés à la 1re équipe engagée — cas
+          // simple/triangulaire (UX §2.4/4c, idiome unique). Le
+          // multi-équipe×adversaire fin n'est PAS sur-spécifié ici
+          // (anti-DS-1 : pas d'UX inventée).
+          if (!stopInfo && premiereLiaisonId && advNoms.length > 0) {
+            for (let j = 0; j < advNoms.length && !stopInfo; j++) {
+              const ra = await SupabaseHub.addAdversaire(premiereLiaisonId, {
+                adversaire_nom: advNoms[j],
+                ordre:          j + 1
+              });
+              if (ra && ra.ok) {
+                advOk++;
+              } else {
+                stopInfo = 'l\'adversaire « ' + escHtml(advNoms[j]) + ' » ('
+                  + escHtml((ra && ra.error) || 'erreur inconnue') + ')';
+              }
+            }
+          }
+
+          if (stopInfo) {
+            engReport = '<div class="evt-form-error">Engagement partiel : '
+              + equipesOk + ' équipe(s) et ' + advOk + ' adversaire(s) '
+              + 'enregistrés, puis arrêt sur ' + stopInfo
+              + '.<br><small>Ce qui est créé est conservé. Complétez le '
+              + 'reste depuis la fiche de la compétition.</small></div>';
+          } else {
+            engReport = '<div class="evt-form-success">'
+              + equipesOk + ' équipe(s) engagée(s)'
+              + (advOk > 0 ? ' et ' + advOk + ' adversaire(s)' : '')
+              + ' enregistrée(s).</div>';
+          }
+        }
+      }
+
       msg.innerHTML = '<div class="evt-form-success">✅ Évènement '
-        + (isDuplication ? 'dupliqué' : 'créé') + '.</div>' + phaseReport;
+        + (isDuplication ? 'dupliqué' : 'créé') + '.</div>' + phaseReport + engReport;
       const modalBody = document.querySelector('#evt-overlay-create .evt-modal-body');
       if (modalBody) modalBody.scrollTop = 0;
       setTimeout(async () => {
