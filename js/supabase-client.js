@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.23 — mai 2026
+ * Version : 1.24 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -547,6 +547,25 @@
  *          aucune colonne inventée (toutes vérifiées sql/01/sql/42
  *          ou usage déployé). console.log boot v1.16 toujours NON
  *          touché (incohérence préexistante tracée, non absorbée).
+ *   v1.24 : Collectif & compo 3 niveaux (Production) — U-admin (i).
+ *          1 wrapper ADDITIF listJoueursCategorieEntente(ententeId) :
+ *          pioche de l'écran U-admin (doc UX §4). « Joueurs de la
+ *          catégorie » = personnes affectées (equipe_joueurs ACTIVE,
+ *          date_sortie IS NULL) à une equipe dont entente_id =
+ *          l'entente. Chemin VÉRIFIÉ à la source sql/01
+ *          (ententes.categorie_id ← equipes.entente_id ←
+ *          equipe_joueurs). ÉCART ASSUMÉ Manu (tracé clôture) :
+ *          equipe_joueurs sert UNIQUEMENT à peupler la liste de
+ *          pioche UI (candidats à l'instant T) — le STOCKAGE N1
+ *          reste autonome (addCollectifMembre n'écrit JAMAIS
+ *          equipe_joueurs ; modèle N1-2 « pas adossé » tenu au
+ *          sens structurel). Patron embed listEquipes/getCompo
+ *          Complete (prouvé déployé). Strictement ADDITIF : 1
+ *          méthode + version + changelog ; AUCUNE méthode existante
+ *          touchée ; aucun SQL/RPC neuf ; colonnes vérifiées sql/01
+ *          (equipe_joueurs.date_sortie/personne_id/equipe_id ;
+ *          equipes.entente_id ; personnes.nom/prenom). console.log
+ *          boot v1.16 toujours NON touché (tracé, non absorbé).
  */
 
 (function (global) {
@@ -3871,6 +3890,58 @@
           entente: ent
         }
       };
+    },
+
+    /**
+     * U-admin pioche — « les joueurs de la catégorie » (doc UX §4) :
+     * personnes affectées (equipe_joueurs ACTIVE, date_sortie IS
+     * NULL) à une equipe dont entente_id = l'entente sélectionnée.
+     * Chemin VÉRIFIÉ source sql/01 : ententes.categorie_id ←
+     * equipes.entente_id ← equipe_joueurs(personne_id). ÉCART
+     * ASSUMÉ (tracé clôture) : equipe_joueurs sert UNIQUEMENT à la
+     * pioche UI ; le stockage N1 reste autonome. Dédoublonne par
+     * personne (un joueur sur 2 équipes de l'entente = 1 entrée).
+     * Patron embed listEquipes (equipes!inner) prouvé déployé.
+     *
+     * @param {string} ententeId UUID ententes
+     * @returns {Promise<Array>} [{personne_id, nom, prenom}] trié
+     *   nom/prenom ; [] si erreur (dégradation honnête, pattern
+     *   getVivierCompo).
+     */
+    async listJoueursCategorieEntente(ententeId) {
+      if (!ententeId) {
+        console.error('MOM Hub: listJoueursCategorieEntente() requiert un ententeId');
+        return [];
+      }
+      const { data, error } = await client
+        .from('equipe_joueurs')
+        .select(`
+          personne_id, date_sortie,
+          equipes!inner ( id, entente_id ),
+          personnes ( id, nom, prenom )
+        `)
+        .eq('equipes.entente_id', ententeId)
+        .is('date_sortie', null);
+      if (error) {
+        console.error('MOM Hub: listJoueursCategorieEntente()', error);
+        return [];
+      }
+      if (!Array.isArray(data)) return [];
+      const seen = new Set();
+      const out = [];
+      data.forEach(function (row) {
+        const pid = row && row.personne_id;
+        if (!pid || seen.has(pid)) return;
+        seen.add(pid);
+        const p = row.personnes || {};
+        out.push({ personne_id: pid, nom: p.nom || '', prenom: p.prenom || '' });
+      });
+      out.sort(function (a, b) {
+        const an = (a.nom + ' ' + a.prenom).toLowerCase();
+        const bn = (b.nom + ' ' + b.prenom).toLowerCase();
+        return an < bn ? -1 : (an > bn ? 1 : 0);
+      });
+      return out;
     },
 
     /**
