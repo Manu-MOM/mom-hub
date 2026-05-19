@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.25 — mai 2026
+ * Version : 1.26 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -587,6 +587,27 @@
  *          personnes, prouvé OK 62 terrain) et
  *          getEvenementEquipeContext (embeds 1-FK) INTACTS.
  *          node --check OK. console.log boot v1.16 NON touché.
+ *   v1.26 : FIX noms via RPC (Production — prouvé terrain : SQL
+ *          direct OK mais embed personnes = '' partout). CAUSE
+ *          RACINE (constat source) : `personnes` RLS active + 0
+ *          policy ⇒ embed PostgREST `personnes(...)` renvoie NULL
+ *          (verrou RGPD délibéré). FIX : sql/47 câble C12-nom
+ *          (chronologie_nom_court_personne) ET ajoute la RPC en
+ *          lot get_noms_personnes(uuid[]) gardée has_role(admin|
+ *          coach). Côté client : helper privé _resolveNoms(uuids)
+ *          (1 appel RPC → Map) ; listCollectifMembres /
+ *          listGroupeEngage / listJoueursCategorieEntente
+ *          retirent l'embed personnes MORT et injectent les noms
+ *          via le helper. Structures de sortie INCHANGÉES (les
+ *          appelants groupe-base.js/u-admin.js lisent .personnes
+ *          .nom et .nom — formes préservées à l'identique). Décision
+ *          Manu (option 2, tracée clôture) : absorption résolution
+ *          dette transverse C12-nom + arbitrage RGPD « Prénom NOM »
+ *          (Manu informé chemin jeton public, assumé). Modif
+ *          bornée : version+changelog + 1 helper + 3 wrappers
+ *          (embed retiré, helper injecté) ; aucune autre méthode,
+ *          aucune signature publique touchée ; node --check OK.
+ *          console.log boot v1.16 toujours NON touché.
  */
 
 (function (global) {
@@ -3548,6 +3569,45 @@
      *   actifsSeuls?: boolean (date_fin IS NULL) }
      * @returns {Promise<Array>} [] si erreur (pattern getVivierCompo)
      */
+    /**
+     * Helper privé (v1.26) — résout nom/prenom pour une liste
+     * d'UUID personnes via la RPC gardée get_noms_personnes
+     * (sql/47). Existe parce que `personnes` est RLS-verrouillée
+     * (RGPD délibéré) : l'embed PostgREST renvoie NULL. Centralise
+     * la résolution (1 seul appel RPC, dédoublonné) pour les 3
+     * wrappers Collectif — P1, une seule vérité.
+     *
+     * @param {Array<string>} uuids UUID personnes (doublons/NULL tolérés)
+     * @returns {Promise<Map<string,{nom:string,prenom:string}>>}
+     *   Map vide si aucun uuid / erreur (dégradation honnête : les
+     *   appelants retombent sur nom/prenom '' comme avant le fix).
+     */
+    async _resolveNoms(uuids) {
+      const uniq = [];
+      const seen = new Set();
+      (Array.isArray(uuids) ? uuids : []).forEach(function (u) {
+        if (u && !seen.has(u)) { seen.add(u); uniq.push(u); }
+      });
+      const map = new Map();
+      if (uniq.length === 0) return map;
+      const { data, error } = await client.rpc('get_noms_personnes', {
+        p_personne_uuids: uniq
+      });
+      if (error) {
+        console.error('MOM Hub: _resolveNoms() / get_noms_personnes', error);
+        return map;   // Map vide → appelants dégradent honnêtement
+      }
+      (Array.isArray(data) ? data : []).forEach(function (row) {
+        if (row && row.personne_id) {
+          map.set(row.personne_id, {
+            nom:    row.nom || '',
+            prenom: row.prenom || ''
+          });
+        }
+      });
+      return map;
+    },
+
     async listCollectifMembres(ententeId, options) {
       if (!ententeId) {
         console.error('MOM Hub: listCollectifMembres() requiert un ententeId');
@@ -3558,8 +3618,7 @@
         .from('collectif_membre')
         .select(`
           id, personne_id, entente_id, role, statut,
-          date_debut, date_fin,
-          personnes!collectif_membre_personne_id_fkey ( id, nom, prenom )
+          date_debut, date_fin
         `)
         .eq('entente_id', ententeId);
       if (opt.role === 'joueur' || opt.role === 'staff') {
@@ -3575,7 +3634,20 @@
         console.error('MOM Hub: listCollectifMembres()', error);
         return [];
       }
-      return Array.isArray(data) ? data : [];
+      if (!Array.isArray(data)) return [];
+      // RLS personnes verrouillée (RGPD) → noms via RPC gardée
+      // (sql/47), pas par embed. Structure de sortie INCHANGÉE :
+      // on réinjecte `.personnes {id,nom,prenom}` comme avant.
+      const noms = await SupabaseHub._resolveNoms(
+        data.map(function (r) { return r.personne_id; })
+      );
+      data.forEach(function (r) {
+        const n = noms.get(r.personne_id);
+        r.personnes = n
+          ? { id: r.personne_id, nom: n.nom, prenom: n.prenom }
+          : { id: r.personne_id, nom: '', prenom: '' };
+      });
+      return data;
     },
 
     /**
@@ -3712,8 +3784,7 @@
         .select(`
           id, evenement_equipe_id, collectif_membre_id,
           collectif_membre (
-            id, role, statut, date_debut, date_fin, personne_id,
-            personnes!collectif_membre_personne_id_fkey ( id, nom, prenom )
+            id, role, statut, date_debut, date_fin, personne_id
           )
         `)
         .eq('evenement_equipe_id', evenementEquipeId);
@@ -3721,7 +3792,26 @@
         console.error('MOM Hub: listGroupeEngage()', error);
         return [];
       }
-      return Array.isArray(data) ? data : [];
+      if (!Array.isArray(data)) return [];
+      // RLS personnes verrouillée → noms via RPC gardée (sql/47).
+      // Structure INCHANGÉE : .collectif_membre.personnes {id,nom,prenom}
+      const ids = [];
+      data.forEach(function (r) {
+        if (r.collectif_membre && r.collectif_membre.personne_id) {
+          ids.push(r.collectif_membre.personne_id);
+        }
+      });
+      const noms = await SupabaseHub._resolveNoms(ids);
+      data.forEach(function (r) {
+        const cm = r.collectif_membre;
+        if (cm) {
+          const n = noms.get(cm.personne_id);
+          cm.personnes = n
+            ? { id: cm.personne_id, nom: n.nom, prenom: n.prenom }
+            : { id: cm.personne_id, nom: '', prenom: '' };
+        }
+      });
+      return data;
     },
 
     /**
@@ -3938,8 +4028,7 @@
         .from('equipe_joueurs')
         .select(`
           personne_id, date_sortie,
-          equipes!inner ( id, entente_id ),
-          personnes ( id, nom, prenom )
+          equipes!inner ( id, entente_id )
         `)
         .eq('equipes.entente_id', ententeId)
         .is('date_sortie', null);
@@ -3948,14 +4037,18 @@
         return [];
       }
       if (!Array.isArray(data)) return [];
+      // RLS personnes verrouillée → noms via RPC gardée (sql/47).
+      // Sortie INCHANGÉE : [{personne_id, nom, prenom}] trié nom/prenom.
       const seen = new Set();
-      const out = [];
+      const ids = [];
       data.forEach(function (row) {
         const pid = row && row.personne_id;
-        if (!pid || seen.has(pid)) return;
-        seen.add(pid);
-        const p = row.personnes || {};
-        out.push({ personne_id: pid, nom: p.nom || '', prenom: p.prenom || '' });
+        if (pid && !seen.has(pid)) { seen.add(pid); ids.push(pid); }
+      });
+      const noms = await SupabaseHub._resolveNoms(ids);
+      const out = ids.map(function (pid) {
+        const n = noms.get(pid);
+        return { personne_id: pid, nom: (n && n.nom) || '', prenom: (n && n.prenom) || '' };
       });
       out.sort(function (a, b) {
         const an = (a.nom + ' ' + a.prenom).toLowerCase();
