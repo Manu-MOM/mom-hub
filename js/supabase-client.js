@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.20 — mai 2026
+ * Version : 1.21 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -495,6 +495,18 @@
  *          Convention de retour : { ok, data? , error? } — c'est une
  *          lecture ciblée à résultat unique (pattern maybeSingle,
  *          comme le fallback contexte modal evenements-browser).
+ *
+ *   v1.21 : Session RLS write par rôle (Production) — getAdversaires
+ *          Evenement expose désormais `id` (id de la ligne
+ *          evenement_adversaires) dans l'objet aplati. Le SELECT le
+ *          récupérait DÉJÀ (`evenement_adversaires ( id, … )`) ; il
+ *          était simplement non recopié dans out.push → un appelant
+ *          ne pouvait pas cibler un adversaire pour removeAdversaire.
+ *          Strictement ADDITIF : 1 clé ajoutée en tête de l'objet,
+ *          AUCUNE clé existante touchée (ordre/contenu des autres
+ *          champs inchangés) ; aucun autre wrapper modifié ; aucun
+ *          nouveau SQL ni RPC. Requis par evenements-browser v1.20
+ *          (édition engagement depuis la fiche : retrait adversaire).
  */
 
 (function (global) {
@@ -1300,6 +1312,7 @@
           })
           .forEach(adv => {
             out.push({
+              id:                  adv.id,
               evenement_equipe_id: eq.id,
               equipe_id:           eq.equipe_id,
               adversaire_nom:      adv.adversaire_nom,
