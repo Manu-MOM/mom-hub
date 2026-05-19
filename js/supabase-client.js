@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.19 — mai 2026
+ * Version : 1.20 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -479,6 +479,22 @@
  *          Staff P2-E.4 (evenement_encadrants write) : MÊME nature,
  *          traité dans une étape séparée (Bloc 5 désactivé option b,
  *          câblage distinct du Bloc 4a — une étape = un livrable).
+ *
+ *   v1.20 : Session RLS write par rôle (Production) — 1 wrapper LECTURE
+ *          getCategorieEquipe(equipeId). Résout la catégorie d'une
+ *          équipe via la chaîne RÉELLE equipes.entente_id →
+ *          ententes.categorie_id (sql/01 lu à la source, NON devinée ;
+ *          entente_id + categorie_id sont NOT NULL → résolution sûre).
+ *          Sert à alimenter listEquipes(categorieId) pour le Bloc 4a
+ *          dans le module M14-mono-équipe (categorieId dérivé de
+ *          M14_TEAM_UUID côté browser — décision périmètre Manu
+ *          "option A" : M14 en dur, comme tout le module ; le
+ *          multi-catégorie/multi-coach est la dette de fond
+ *          "liaison auth→équipe→saison", chantier séparé tracé).
+ *          Ajout pur : aucun wrapper v1.0→v1.19 modifié.
+ *          Convention de retour : { ok, data? , error? } — c'est une
+ *          lecture ciblée à résultat unique (pattern maybeSingle,
+ *          comme le fallback contexte modal evenements-browser).
  */
 
 (function (global) {
@@ -1491,6 +1507,46 @@
         return [];
       }
       return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * Résout la catégorie d'une équipe (equipes.entente_id →
+     * ententes.categorie_id). Sert à dériver le categorieId attendu
+     * par listEquipes() à partir d'une équipe connue (cas Bloc 4a :
+     * M14_TEAM_UUID → sa catégorie → équipes engageables).
+     *
+     * Chaîne RÉELLE (sql/01 lu à la source) : equipes.entente_id
+     * (NOT NULL) → ententes.id ; ententes.categorie_id (NOT NULL).
+     * Les 2 FK étant NOT NULL, une équipe existante a TOUJOURS une
+     * catégorie résoluble (pas de cas null légitime). Lecture ciblée
+     * à résultat unique : pattern maybeSingle (idem fallback contexte
+     * modal evenements-browser l.~2397, NON inventé).
+     *
+     * @param {string} equipeId UUID de l'équipe
+     * @returns {Promise<{ok: boolean, data?: {categorie_id: string},
+     *   error?: string}>}
+     */
+    async getCategorieEquipe(equipeId) {
+      if (!equipeId) {
+        return { ok: false, error: 'equipeId requis' };
+      }
+      const { data, error } = await client
+        .from('equipes')
+        .select('ententes!inner ( categorie_id )')
+        .eq('id', equipeId)
+        .maybeSingle();
+
+      if (error) {
+        console.error('MOM Hub: getCategorieEquipe()', error);
+        return { ok: false, error: error.message || 'Erreur lecture catégorie équipe' };
+      }
+      const catId = data && data.ententes && data.ententes.categorie_id
+        ? data.ententes.categorie_id
+        : null;
+      if (!catId) {
+        return { ok: false, error: 'Catégorie introuvable pour cette équipe' };
+      }
+      return { ok: true, data: { categorie_id: catId } };
     },
 
     /**
