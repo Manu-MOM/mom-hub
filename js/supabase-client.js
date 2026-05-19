@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.24 — mai 2026
+ * Version : 1.25 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -566,6 +566,27 @@
  *          (equipe_joueurs.date_sortie/personne_id/equipe_id ;
  *          equipes.entente_id ; personnes.nom/prenom). console.log
  *          boot v1.16 toujours NON touché (tracé, non absorbé).
+ *   v1.25 : FIX PGRST201 (Production, prouvé terrain — la base
+ *          fait foi). collectif_membre a 2 FK vers personnes
+ *          (collectif_membre_personne_id_fkey ET
+ *          collectif_membre_cree_par_fkey, vérifiées pg_constraint
+ *          à la source) -> l'embed `personnes ( … )` était AMBIGU
+ *          (PostgREST refuse : « Could not embed because more than
+ *          one relationship was found »). listCollectifMembres
+ *          plantait (renvoyait [] -> vivier U-N2 vide, pioche
+ *          U-admin vide) ; listGroupeEngage portait la même
+ *          ambiguïté LATENTE (sous-embed personnes via
+ *          collectif_membre). FIX MINIMAL : embed désambiguïsé par
+ *          le nom EXACT de la FK voulue
+ *          (personnes!collectif_membre_personne_id_fkey) — vérifié
+ *          source pg_constraint, NON deviné. STRICTEMENT 2 lignes
+ *          d'embed modifiées (listCollectifMembres + sous-embed
+ *          listGroupeEngage) + version + changelog. AUCUNE autre
+ *          ligne, AUCUNE signature, AUCUN wrapper supplémentaire
+ *          touché. listJoueursCategorieEntente (1 seule FK
+ *          personnes, prouvé OK 62 terrain) et
+ *          getEvenementEquipeContext (embeds 1-FK) INTACTS.
+ *          node --check OK. console.log boot v1.16 NON touché.
  */
 
 (function (global) {
@@ -3538,7 +3559,7 @@
         .select(`
           id, personne_id, entente_id, role, statut,
           date_debut, date_fin,
-          personnes ( id, nom, prenom )
+          personnes!collectif_membre_personne_id_fkey ( id, nom, prenom )
         `)
         .eq('entente_id', ententeId);
       if (opt.role === 'joueur' || opt.role === 'staff') {
@@ -3692,7 +3713,7 @@
           id, evenement_equipe_id, collectif_membre_id,
           collectif_membre (
             id, role, statut, date_debut, date_fin, personne_id,
-            personnes ( id, nom, prenom )
+            personnes!collectif_membre_personne_id_fkey ( id, nom, prenom )
           )
         `)
         .eq('evenement_equipe_id', evenementEquipeId);
