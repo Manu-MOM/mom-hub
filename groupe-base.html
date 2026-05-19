@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Groupe de base · MOM Hub</title>
+  <link rel="icon" type="image/png" href="assets/logo-m2m.png">
+  <meta name="description" content="Groupe de base d'une équipe engagée — MOM Hub." />
+
+  <link rel="stylesheet" href="css/hub.css">
+
+  <style>
+    /* Spécifique U-N2 — réutilise au maximum les tokens hub.css.
+       Calqué sur l'idiome 2 colonnes de compositions.html. */
+    body.auth-pending { visibility: hidden; }
+
+    .gb-layout { max-width: 1180px; margin: 0 auto; padding: 24px 24px 48px; position: relative; z-index: 2; }
+
+    .gb-head { margin-bottom: 16px; }
+    .gb-head h2 { margin: 0 0 4px; font-size: 22px; }
+    .gb-head .gb-sub { font-size: 13px; color: var(--ink-mute); }
+    .gb-head .gb-sub + .gb-sub { margin-top: 2px; }
+
+    .gb-error {
+      display: none; margin: 16px 0; padding: 14px 16px;
+      border: 1px solid var(--rouge-blesse, #c0392b); border-radius: 8px;
+      background: var(--paper-warm, #faf6ef); color: var(--ink, #222); font-size: 14px;
+    }
+
+    .gb-note {
+      font-size: 12px; color: var(--ink-mute); margin: 6px 0 14px;
+      font-style: italic;
+    }
+
+    .gb-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+    @media (max-width: 880px) { .gb-grid { grid-template-columns: 1fr; } }
+
+    .gb-col { border: 1px solid var(--paper-warm, #ece6da); border-radius: 10px; background: #fff; }
+    .gb-col__head {
+      padding: 12px 14px; border-bottom: 1px solid var(--paper-warm, #ece6da);
+      display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    }
+    .gb-col__title { font-size: 14px; font-weight: 700; }
+    .gb-col__count {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      background: var(--paper-warm, #f1ece1); padding: 2px 8px; border-radius: 999px;
+    }
+    .gb-col__body { padding: 10px 12px; }
+
+    .gb-filters { display: flex; gap: 8px; flex-wrap: wrap; padding: 10px 14px;
+      border-bottom: 1px solid var(--paper-warm, #ece6da); }
+    .gb-filters input, .gb-filters select {
+      font-size: 13px; padding: 6px 8px; border: 1px solid var(--paper-warm, #d9d2c4);
+      border-radius: 6px; background: #fff; color: var(--ink, #222);
+    }
+    .gb-filters input { flex: 1; min-width: 120px; }
+
+    .gb-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 2px; }
+    .gb-item {
+      display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+      border-radius: 6px;
+    }
+    .gb-item:hover { background: var(--paper-warm, #faf6ef); }
+    .gb-item--in   { opacity: 0.5; }
+    .gb-item--warn { background: rgba(214, 137, 16, 0.10); }
+    .gb-item-main { flex: 1; min-width: 0; line-height: 1.3; }
+    .gb-item-name { font-size: 13px; color: var(--ink, #222); }
+    .gb-item-sub  { font-size: 11px; color: var(--ink-mute); margin-top: 1px;
+      display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+    .gb-role { font-size: 10px; padding: 1px 6px; border-radius: 999px; }
+    .gb-role--joueur { background: rgba(45, 125, 70, 0.12); color: #2d7d46; }
+    .gb-role--staff  { background: rgba(20, 110, 180, 0.12); color: #146eb4; }
+
+    .gb-statut { font-size: 10px; padding: 1px 6px; border-radius: 999px;
+      background: var(--paper-warm, #f1ece1); color: var(--ink-mute); }
+    .gb-warn-tag { font-size: 10px; color: #b86f0c; }
+
+    .gb-btn {
+      border: 1px solid var(--paper-warm, #d9d2c4); background: #fff;
+      border-radius: 6px; padding: 4px 9px; font-size: 13px; cursor: pointer; color: var(--ink, #222);
+    }
+    .gb-btn:hover { background: var(--paper-warm, #f1ece1); }
+    .gb-add { font-weight: 700; }
+    .gb-rm  { color: var(--ink-mute); }
+    .gb-check { font-size: 14px; color: #2d7d46; padding: 0 9px; }
+
+    .gb-grp-section { margin-bottom: 16px; }
+    .gb-grp-section:last-child { margin-bottom: 0; }
+    .gb-grp-section__title {
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--ink-mute); margin: 0 0 6px; display: flex; gap: 8px; align-items: center;
+    }
+    .gb-grp-section--staff .gb-grp-section__title { color: #146eb4; }
+
+    .gb-empty { font-size: 12px; color: var(--ink-mute); font-style: italic; padding: 8px 10px; list-style: none; }
+
+    .gb-banner {
+      margin-top: 16px; padding: 10px 14px; border-radius: 8px;
+      background: var(--paper-warm, #faf6ef); border: 1px solid var(--paper-warm, #ece6da);
+      font-size: 13px; color: var(--ink, #222);
+    }
+  </style>
+</head>
+<body class="auth-pending">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo"><img src="assets/logo-m2m.png" alt="MOM Rugby"></div>
+      <div class="brand-text">
+        <h1>MOM Hub</h1>
+        <p>Mutzig Ovalie Molsheim</p>
+      </div>
+    </div>
+
+    <div class="season-pill">SAISON 2025 / 2026</div>
+
+    <nav class="main-nav">
+      <a href="./">Tableau de bord</a>
+      <a href="evenements.html">Évènements</a>
+      <a class="active">Groupe de base</a>
+      <a href="compositions.html">Compositions</a>
+    </nav>
+
+    <div class="icon-row">
+      <button class="icon-btn" title="Recherche" aria-label="Recherche">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      </button>
+    </div>
+
+    <div class="user-profile">
+      <div class="avatar">EJ</div>
+      <div class="user-info">
+        <div class="user-name">Emmanuel Jung</div>
+        <div class="user-role">Référent M14</div>
+      </div>
+      <a href="evenements.html" class="user-action" title="Retour aux évènements" aria-label="Retour aux évènements">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/></svg>
+      </a>
+      <button type="button" class="user-action" id="btn-signout" title="Se déconnecter" aria-label="Se déconnecter">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="gb-layout">
+
+    <div class="gb-head">
+      <h2 id="gb-title">Groupe de base…</h2>
+      <div class="gb-sub" id="gb-sub-plateau">Chargement…</div>
+      <div class="gb-sub" id="gb-sub-collectif"></div>
+    </div>
+
+    <div class="gb-error" id="gb-error"></div>
+
+    <div id="gb-panel">
+
+      <!-- UN2-4 : liste vivante, aucune validation -->
+      <div class="gb-note">Liste vivante — aucune validation ici. Le versionnement de la feuille de match se fait au niveau suivant (Compositions).</div>
+
+      <div class="gb-grid">
+
+        <!-- Colonne gauche : vivier (collectif N1) -->
+        <section class="gb-col" aria-label="Vivier du collectif">
+          <div class="gb-col__head">
+            <span class="gb-col__title">Vivier — collectif</span>
+            <span class="gb-col__count"><span id="gb-vivier-count">0</span> affiché·s</span>
+          </div>
+          <div class="gb-filters">
+            <input type="text" id="gb-search" placeholder="Rechercher un nom…" aria-label="Rechercher un nom">
+            <select id="gb-role-filter" aria-label="Filtrer par rôle">
+              <option value="tous">Tous</option>
+              <option value="joueur">Joueurs</option>
+              <option value="staff">Staff</option>
+            </select>
+            <select id="gb-statut-filter" aria-label="Filtrer par statut">
+              <option value="tous">Tout statut</option>
+              <option value="regulier">Régulier</option>
+              <option value="renfort_temporaire">Renfort</option>
+              <option value="en_transition">Transition</option>
+            </select>
+          </div>
+          <div class="gb-col__body">
+            <ul class="gb-list" id="gb-vivier-list">
+              <li class="gb-empty">Chargement du vivier…</li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- Colonne droite : groupe convoqué (N2) -->
+        <section class="gb-col" aria-label="Groupe convoqué">
+          <div class="gb-col__head">
+            <span class="gb-col__title">Groupe convoqué — cette équipe engagée</span>
+          </div>
+          <div class="gb-col__body">
+
+            <div class="gb-grp-section">
+              <div class="gb-grp-section__title">
+                Joueurs · <span class="gb-col__count"><span id="gb-cnt-joueurs">0</span></span>
+              </div>
+              <ul class="gb-list" id="gb-grp-joueurs">
+                <li class="gb-empty">Aucun joueur convoqué.</li>
+              </ul>
+            </div>
+
+            <div class="gb-grp-section gb-grp-section--staff">
+              <div class="gb-grp-section__title">
+                Staff de l’équipe · <span class="gb-col__count"><span id="gb-cnt-staff">0</span></span>
+              </div>
+              <ul class="gb-list" id="gb-grp-staff">
+                <li class="gb-empty">Aucun staff convoqué.</li>
+              </ul>
+            </div>
+
+          </div>
+        </section>
+
+      </div>
+
+      <!-- UN2-7 : bandeau bas N2→N3 + N2-6 -->
+      <div class="gb-banner" id="gb-banner">La feuille de match piochera les joueurs convoqués ; le staff est convoqué, non aligné.</div>
+
+    </div>
+
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/groupe-base.js"></script>
+
+  <script>
+    (async function () {
+      'use strict';
+      const session = await SupabaseHub.getSession();
+      if (!session) { window.location.replace('login.html'); return; }
+      const roles = await SupabaseHub.getMyRoles();
+      const isAdminOrCoach = roles.indexOf('admin') !== -1 || roles.indexOf('coach') !== -1;
+      if (!isAdminOrCoach) { window.location.replace('./'); return; }
+
+      document.body.classList.remove('auth-pending');
+      document.body.classList.add('auth-resolved');
+      if (roles.indexOf('admin') !== -1) document.body.classList.add('auth-admin');
+
+      const signoutBtn = document.getElementById('btn-signout');
+      if (signoutBtn) {
+        signoutBtn.addEventListener('click', async function () {
+          signoutBtn.disabled = true;
+          await SupabaseHub.signOut();
+        });
+      }
+
+      SupabaseHub.onAuthChange(function (event) {
+        if (event === 'SIGNED_OUT') window.location.replace('login.html');
+      });
+
+      await window.GroupeBase.init();
+    })();
+  </script>
+</body>
+</html>
