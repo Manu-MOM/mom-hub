@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Administration du collectif · MOM Hub</title>
+  <link rel="icon" type="image/png" href="assets/logo-m2m.png">
+  <meta name="description" content="Administration du collectif par saison — MOM Hub (mode admin)." />
+
+  <link rel="stylesheet" href="css/hub.css">
+
+  <style>
+    body.auth-pending { visibility: hidden; }
+
+    .ua-layout { max-width: 1080px; margin: 0 auto; padding: 24px 24px 48px; position: relative; z-index: 2; }
+
+    .ua-badge {
+      display: inline-block; padding: 6px 14px; border-radius: 999px;
+      background: var(--paper-warm, #f1ece1); color: var(--ink, #222);
+      font-size: 13px; margin-bottom: 14px;
+    }
+
+    .ua-head h2 { margin: 0 0 4px; font-size: 22px; }
+    .ua-entente-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 14px 0 6px; }
+    .ua-entente-row select {
+      font-size: 14px; padding: 7px 10px; border: 1px solid var(--paper-warm, #d9d2c4);
+      border-radius: 6px; background: #fff; color: var(--ink, #222); min-width: 280px;
+    }
+    .ua-entente-meta { font-size: 12px; color: var(--ink-mute); font-style: italic; margin-bottom: 14px; }
+
+    .ua-error {
+      display: none; margin: 14px 0; padding: 14px 16px;
+      border: 1px solid var(--rouge-blesse, #c0392b); border-radius: 8px;
+      background: var(--paper-warm, #faf6ef); color: var(--ink, #222); font-size: 14px;
+    }
+
+    .ua-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+    @media (max-width: 880px) { .ua-grid { grid-template-columns: 1fr; } }
+
+    .ua-col { border: 1px solid var(--paper-warm, #ece6da); border-radius: 10px; background: #fff; }
+    .ua-col__head {
+      padding: 12px 14px; border-bottom: 1px solid var(--paper-warm, #ece6da);
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    }
+    .ua-col__title { font-size: 14px; font-weight: 700; }
+    .ua-col__title--staff { color: #146eb4; }
+    .ua-col__count {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      background: var(--paper-warm, #f1ece1); padding: 2px 8px; border-radius: 999px;
+    }
+    .ua-col__body { padding: 10px 12px; }
+    .ua-add-row {
+      display: flex; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--paper-warm, #ece6da);
+      flex-wrap: wrap; align-items: center;
+    }
+    .ua-add-row select, .ua-add-row input {
+      font-size: 13px; padding: 6px 8px; border: 1px solid var(--paper-warm, #d9d2c4);
+      border-radius: 6px; background: #fff; color: var(--ink, #222); flex: 1; min-width: 140px;
+    }
+
+    .ua-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 2px; }
+    .ua-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; }
+    .ua-item:hover { background: var(--paper-warm, #faf6ef); }
+    .ua-item--out { opacity: 0.55; }
+    .ua-item-main { flex: 1; min-width: 0; line-height: 1.35; }
+    .ua-item-name { font-size: 13px; color: var(--ink, #222); }
+    .ua-item-dates { font-size: 11px; color: var(--ink-mute); margin-top: 1px; }
+
+    .ua-chip { font-size: 10px; padding: 1px 6px; border-radius: 999px;
+      background: var(--paper-warm, #f1ece1); color: var(--ink-mute); }
+
+    .ua-btn {
+      border: 1px solid var(--paper-warm, #d9d2c4); background: #fff;
+      border-radius: 6px; padding: 5px 10px; font-size: 12px; cursor: pointer; color: var(--ink, #222);
+    }
+    .ua-btn:hover:not(:disabled) { background: var(--paper-warm, #f1ece1); }
+    .ua-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .ua-out { color: var(--ink-mute); }
+
+    .ua-empty { font-size: 12px; color: var(--ink-mute); font-style: italic; padding: 8px 10px; list-style: none; }
+
+    .ua-bascule {
+      margin-top: 22px; padding: 14px 16px; border-radius: 8px;
+      background: var(--paper-warm, #faf6ef); border: 1px dashed var(--paper-warm, #d9d2c4);
+      font-size: 13px; color: var(--ink, #222);
+    }
+    .ua-bascule h3 { margin: 0 0 6px; font-size: 13px; }
+    .ua-bascule p { margin: 4px 0; color: var(--ink-mute); }
+  </style>
+</head>
+<body class="auth-pending">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo"><img src="assets/logo-m2m.png" alt="MOM Rugby"></div>
+      <div class="brand-text">
+        <h1>MOM Hub</h1>
+        <p>Mutzig Ovalie Molsheim</p>
+      </div>
+    </div>
+
+    <div class="season-pill">SAISON 2025 / 2026</div>
+
+    <nav class="main-nav">
+      <a href="./">Tableau de bord</a>
+      <a href="evenements.html">Évènements</a>
+      <a class="active">Collectif (admin)</a>
+      <a href="compositions.html">Compositions</a>
+    </nav>
+
+    <div class="icon-row">
+      <button class="icon-btn" title="Recherche" aria-label="Recherche">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      </button>
+    </div>
+
+    <div class="user-profile">
+      <div class="avatar">EJ</div>
+      <div class="user-info">
+        <div class="user-name">Emmanuel Jung</div>
+        <div class="user-role">Référent M14</div>
+      </div>
+      <a href="./" class="user-action" title="Retour au portail" aria-label="Retour au portail">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/></svg>
+      </a>
+      <button type="button" class="user-action" id="btn-signout" title="Se déconnecter" aria-label="Se déconnecter">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="ua-layout">
+
+    <div class="ua-badge" id="ua-badge">🔒 …</div>
+
+    <div class="ua-head">
+      <h2>Administration du collectif</h2>
+    </div>
+
+    <div class="ua-entente-row">
+      <label for="ua-entente" style="font-size:13px;color:var(--ink-mute);">Catégorie / saison :</label>
+      <select id="ua-entente" aria-label="Choisir la catégorie et la saison">
+        <option value="">Chargement…</option>
+      </select>
+    </div>
+    <div class="ua-entente-meta" id="ua-entente-meta"></div>
+
+    <div class="ua-error" id="ua-error"></div>
+
+    <div id="ua-panel" style="display:none;">
+
+      <div class="ua-grid">
+
+        <!-- Bloc Joueurs -->
+        <section class="ua-col" aria-label="Joueurs du collectif">
+          <div class="ua-col__head">
+            <span class="ua-col__title">Joueurs</span>
+            <span class="ua-col__count"><span id="ua-cnt-joueurs">0</span></span>
+          </div>
+          <div class="ua-add-row">
+            <select id="ua-pioche" aria-label="Choisir un joueur à enrôler">
+              <option value="">— Choisir un joueur… —</option>
+            </select>
+            <button type="button" class="ua-btn" id="ua-add-joueur" disabled>+ Enrôler</button>
+          </div>
+          <div class="ua-col__body">
+            <ul class="ua-list" id="ua-joueurs">
+              <li class="ua-empty">Sélectionnez une catégorie / saison.</li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- Bloc Staff -->
+        <section class="ua-col" aria-label="Staff du collectif">
+          <div class="ua-col__head">
+            <span class="ua-col__title ua-col__title--staff">Staff</span>
+            <span class="ua-col__count"><span id="ua-cnt-staff">0</span></span>
+          </div>
+          <div class="ua-add-row" id="ua-add-staff-wrap">
+            <input type="text" id="ua-staff-nom" placeholder="Staff — sélection dédiée à venir" disabled aria-label="Staff (à venir)">
+            <button type="button" class="ua-btn" id="ua-add-staff" title="Le staff fera l’objet d’une sélection dédiée (non spécifiée à ce stade)">+ Staff</button>
+          </div>
+          <div class="ua-col__body">
+            <ul class="ua-list" id="ua-staff">
+              <li class="ua-empty">Sélectionnez une catégorie / saison.</li>
+            </ul>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- UA-5 : bascule de saison — bloc informatif honnête, NON câblé -->
+      <div class="ua-bascule">
+        <h3>↻ Bascule de saison</h3>
+        <p>La reconduction (copie de l’ossature du collectif vers la saison suivante, l’admin élaguant ensuite le delta — la saison passée restant intacte) sera proposée ici.</p>
+        <p><em>Mécanisme non encore arbitré — bouton volontairement absent tant que la décision n’est pas prise (aucun geste destructeur improvisé). La saison cible se crée en amont, hors de cet écran (administration transverse).</em></p>
+      </div>
+
+    </div>
+
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/u-admin.js"></script>
+
+  <script>
+    (async function () {
+      'use strict';
+      const session = await SupabaseHub.getSession();
+      if (!session) { window.location.replace('login.html'); return; }
+      const roles = await SupabaseHub.getMyRoles();
+      const isAdmin = roles.indexOf('admin') !== -1;
+      // U-admin = mode admin (i) STRICT (UA-1). Un coach non-admin
+      // est renvoyé : pas d'accès, pas de demi-mesure (le modèle
+      // réserve l'administration du collectif à has_role('admin')).
+      if (!isAdmin) { window.location.replace('./'); return; }
+
+      document.body.classList.remove('auth-pending');
+      document.body.classList.add('auth-resolved');
+      document.body.classList.add('auth-admin');
+
+      const signoutBtn = document.getElementById('btn-signout');
+      if (signoutBtn) {
+        signoutBtn.addEventListener('click', async function () {
+          signoutBtn.disabled = true;
+          await SupabaseHub.signOut();
+        });
+      }
+
+      SupabaseHub.onAuthChange(function (event) {
+        if (event === 'SIGNED_OUT') window.location.replace('login.html');
+      });
+
+      await window.UAdmin.init({ isAdmin: true });
+    })();
+  </script>
+</body>
+</html>
