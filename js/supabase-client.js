@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.28 — mai 2026
+ * Version : 1.29 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -675,6 +675,27 @@
  *          transparente pour les appelants existants).
  *          node --check OK. console.log boot v1.16 toujours
  *          NON touché.
+ *   v1.29 : HYGIÈNE — bump console.log boot (conv `Production ·
+ *          Hygiène — console.log boots + nettoyage données test`,
+ *          pt 17). Le console.log de boot affichait encore
+ *          « v1.16 chargé » depuis la passe Suivi A (mai 2026)
+ *          alors que les bumps v1.17 → v1.28 (12 maillons, dont
+ *          la chaîne Refonte Évènements + Session RLS write +
+ *          Collectif & compo 3 niveaux + étape c U-N3) avaient
+ *          tous laissé la ligne intacte, hors périmètre récurrent
+ *          (incohérence préexistante tracée pt 13/15/16). S2
+ *          option a actée pt 17 : libellé version-only durable,
+ *          le changelog header raconte l'histoire, le console.log
+ *          dit juste l'identité chargée.
+ *
+ *          Modif bornée : version header v1.28 → v1.29 + 1 entrée
+ *          changelog (celle-ci) + 1 chaîne de caractères dans le
+ *          console.log boot (`v1.16 chargé` → `v1.29 chargé`).
+ *          Aucune méthode touchée. Aucune signature publique
+ *          touchée. Aucun call-site touché. 3 hunks ciblés, diff
+ *          prouvé minimal. Provenance md5 chaîne maillon par
+ *          maillon : v1.28 fad1439c → v1.29 (recollé par Manu
+ *          après écriture). node --check OK.
  */
 
 (function (global) {
@@ -4198,7 +4219,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.16 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.29 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
