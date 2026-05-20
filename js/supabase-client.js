@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.27 — mai 2026
+ * Version : 1.28 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -630,6 +630,51 @@
  *          touchée ; node --check OK. console.log boot v1.16
  *          toujours NON touché (incohérence préexistante pt 13,
  *          hors périmètre).
+ *   v1.28 : FIX projection getCompoForEvenementEquipe (bug
+ *          pré-existant v1.26, masqué jusqu'ici car le wrapper
+ *          n'avait pas d'appelant avant compositions-editor v3.8).
+ *          Détecté à la recette terrain Manu 20/05 (essai 2 puis
+ *          essai 3) : 1 seul clic sur le CTA « Créer la compo de
+ *          base » créait bien la base en DB, mais l'éditeur
+ *          réaffichait le CTA après reload car State.compos
+ *          restait []. Le coach cliquait à nouveau, l'INSERT
+ *          était refusé par sql/50 (idx_compositions_active_base
+ *          _per_event_equipe_cote a fait son travail honnête,
+ *          P4) → alert 409 affichée. CAUSE RACINE tranchée par
+ *          le fait (sondes console : state.compos=[] puis KEYS
+ *          retournées par getCompoForEvenementEquipe = 10 champs
+ *          SANS type_compo). La projection .select() du wrapper
+ *          omettait `type_compo` ET `compo_base_origine_id` →
+ *          loadComposForCurrentEvent U-N3 cherchait
+ *          .find(c => c.type_compo === 'base') sur un champ
+ *          undefined → base=null → State.compos=[] → CTA
+ *          réaffiché en boucle.
+ *
+ *          FIX : 2 champs ajoutés à la projection
+ *          (type_compo + compo_base_origine_id). Discipline :
+ *          on ne corrige que ce qui est cassé (P1 + pt 15 anti-
+ *          débordement). Pas d'autres champs ajoutés sans usage
+ *          réel pour les justifier.
+ *
+ *          Note traçage anti-hypothèse honnête : v3.9 (livrée
+ *          au tour précédent) ajoutait une garde anti-concurrence
+ *          dans onCreateBaseClick motivée par une hypothèse
+ *          double-clic UX. Le fait l'a inversée — c'était UN
+ *          SEUL clic à chaque fois (recette Manu : « 1 seul
+ *          clic »). La garde v3.9 reste DÉFENSIVE UTILE (un
+ *          vrai double-clic pourrait théoriquement survenir),
+ *          mais elle ne fixait pas ce bug-ci. v1.28 fixe la
+ *          cause racine réelle. Discipline pt 15 : inverser
+ *          une hypothèse par le fait est un signal de BON
+ *          fonctionnement de la méthode, pas un échec.
+ *
+ *          Modif bornée : version + changelog + 1 ligne
+ *          projection .select() (2 champs ajoutés). Aucune
+ *          autre méthode, aucune signature publique touchée ;
+ *          aucun call-site touché (la projection enrichie est
+ *          transparente pour les appelants existants).
+ *          node --check OK. console.log boot v1.16 toujours
+ *          NON touché.
  */
 
 (function (global) {
@@ -3935,7 +3980,8 @@
       const { data, error } = await client
         .from('compositions')
         .select(`
-          id, evenement_id, evenement_equipe_id, cote, etat,
+          id, evenement_id, evenement_equipe_id, type_compo,
+          compo_base_origine_id, cote, etat,
           version, est_active, notes_compo, created_at, updated_at
         `)
         .eq('evenement_equipe_id', evenementEquipeId)
