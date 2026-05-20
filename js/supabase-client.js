@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.26 — mai 2026
+ * Version : 1.27 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -608,6 +608,28 @@
  *          (embed retiré, helper injecté) ; aucune autre méthode,
  *          aucune signature publique touchée ; node --check OK.
  *          console.log boot v1.16 toujours NON touché.
+ *   v1.27 : Étape (c) U-N3 — extension additive createCompo pour
+ *          accepter `evenement_equipe_id` optionnel (sql/46
+ *          additif, colonne UUID NULL). NULL = comportement
+ *          legacy mono-équipe strictement inchangé (rétro-compat
+ *          prouvée). Renseigné = compo rattachée à l'équipe
+ *          engagée (modèle Collectif v1.1 §4 N3-1, option A
+ *          actée 20/05 conv (c)). Garde de cohérence ajoutée :
+ *          `evenement_equipe_id` REFUSÉ avec `type_compo='match'`
+ *          (pendant exact du pattern existant pour
+ *          `compo_base_origine_id` + `type_compo='base'`) — les
+ *          matchs dérivent leur équipe engagée via `compo_base_
+ *          origine_id` (Q1a actée). `duplicateCompoFromBase`
+ *          NON touché (matchs ne portent rien — modèle pur).
+ *          2 call-sites existants prouvés rétro-compat (ne
+ *          passent pas le nouveau paramètre) : duplicateCompoFrom
+ *          Base l. 1874 (interne) et compositions-editor.js l.
+ *          833 (mode legacy v3.7). Modif bornée : version +
+ *          changelog + 1 wrapper (1 garde + 1 ligne payload) ;
+ *          aucune autre méthode, aucune signature publique
+ *          touchée ; node --check OK. console.log boot v1.16
+ *          toujours NON touché (incohérence préexistante pt 13,
+ *          hors périmètre).
  */
 
 (function (global) {
@@ -1816,6 +1838,23 @@
 
     /**
      * Crée une nouvelle composition vierge (sans joueurs).
+     *
+     * v1.27 — extension additive `evenement_equipe_id` optionnel
+     * (modèle Collectif v1.1 §4 N3-1, sql/46) : NULL/absent =
+     * comportement legacy mono-équipe (rétro-compat stricte) ;
+     * renseigné = compo rattachée à l'équipe engagée. Réservé
+     * `type_compo='base'` (option A actée Q1a : les matchs ne
+     * portent pas `evenement_equipe_id`, leur équipe engagée se
+     * déduit via `compo_base_origine_id`).
+     *
+     * @param {Object} params
+     * @param {string} params.evenement_id          UUID requis
+     * @param {('base'|'match')} params.type_compo  requis
+     * @param {string} [params.evenement_equipe_id] UUID optionnel
+     *   (v1.27, base seule)
+     * @param {string} [params.compo_base_origine_id] UUID optionnel
+     *   (match seul)
+     * @returns {Promise<{ok:boolean, data?:Object, error?:string}>}
      */
     async createCompo(params) {
       if (!params || !params.evenement_id || !params.type_compo) {
@@ -1826,6 +1865,13 @@
       }
       if (params.compo_base_origine_id && params.type_compo !== 'match') {
         return { ok: false, error: "compo_base_origine_id incompatible avec type_compo='base'" };
+      }
+      // v1.27 — garde de cohérence option A (Q1a actée) : les matchs
+      // dérivent leur équipe engagée via compo_base_origine_id ; ils ne
+      // portent JAMAIS evenement_equipe_id directement. Symétrique de la
+      // garde compo_base_origine_id ci-dessus.
+      if (params.evenement_equipe_id && params.type_compo !== 'base') {
+        return { ok: false, error: "evenement_equipe_id incompatible avec type_compo='match'" };
       }
 
       const payload = {
@@ -1838,6 +1884,11 @@
       };
       if (params.compo_base_origine_id) {
         payload.compo_base_origine_id = params.compo_base_origine_id;
+      }
+      // v1.27 — additif : si absent, colonne reste NULL en base
+      // (DEFAULT NULL posé par sql/46), comportement legacy strict
+      if (params.evenement_equipe_id) {
+        payload.evenement_equipe_id = params.evenement_equipe_id;
       }
 
       const { data, error } = await client
