@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.22 — Niveau 0 : activation accès « Groupe de base » (U-N2) (19 mai 2026)
+ * Version : 1.23 — Niveau 0 : activation accès « Feuille de match » (U-N3) (20 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -568,6 +568,28 @@
  *          bindFicheActions existants : byte-identiques (prouvé
  *          md5). node --check OK. Convention ?evenement_equipe
  *          = SD-1(a) assumée Manu (tracée clôture).
+ *   v1.23 : Étape (c) U-N3 — activation accès « Feuille de match »
+ *          (Niveau 0). Symétrique exact de l'activation v1.22 du
+ *          bouton « Groupe de base ». Le bouton « Feuille de
+ *          match » émis par v1.22 (data-action="ouvrir-feuille-
+ *          equipe" + data-evenement-equipe-id, actuellement
+ *          disabled+« bientôt ») passe à ACTIF → navigation
+ *          compositions.html?evenement_equipe=<id> (éditeur
+ *          étendu Façon 1, doc UX §3, compositions-editor v3.8
+ *          + supabase-client v1.27 + sql/50 déployés en amont).
+ *          Handler additif dans bindFicheActions calqué BYTE-
+ *          IDENTIQUE sur ouvrir-groupe-base v1.22 (navigation
+ *          pure, zéro logique métier). Diff = version + changelog
+ *          + 1 ligne bouton (disabled→actif, retrait « bientôt »
+ *          du libellé) + 1 bloc handler additif. renderCard /
+ *          renderSection / openFiche / renderFiche (autres
+ *          sections) / handlers bindFicheActions existants
+ *          (incl. ouvrir-groupe-base) : byte-identiques (preuve
+ *          md5). node --check OK. Convention ?evenement_equipe
+ *          = SD-1(a) (déjà assumée v1.22, ré-utilisée).
+ *          Cycle Collectif & compo 3 niveaux LIVRÉ DE BOUT EN
+ *          BOUT côté UI une fois v1.23 déployée (étapes
+ *          a/b/c/d/e du chantier).
  */
 
 (function () {
@@ -2218,7 +2240,7 @@
           }
           html += '<div class="evt-fiche-list-meta" style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;">';
           html += '<button type="button" class="evt-btn" data-action="ouvrir-groupe-base" data-evenement-equipe-id="' + escHtml(eq.id) + '" data-event-id="' + escHtml(evt.id) + '" title="Ouvrir le groupe de base de cette équipe engagée" style="font-size:11px;">👥 Groupe de base</button>';
-          html += '<button type="button" class="evt-btn" data-action="ouvrir-feuille-equipe" data-evenement-equipe-id="' + escHtml(eq.id) + '" data-event-id="' + escHtml(evt.id) + '" disabled title="Disponible à la livraison de la feuille de match par équipe engagée (étape suivante du chantier Collectif)" style="font-size:11px;opacity:0.55;cursor:not-allowed;">📋 Feuille de match <span style="color:var(--ink-mute);">(bientôt)</span></button>';
+          html += '<button type="button" class="evt-btn" data-action="ouvrir-feuille-equipe" data-evenement-equipe-id="' + escHtml(eq.id) + '" data-event-id="' + escHtml(evt.id) + '" title="Ouvrir la feuille de match de cette équipe engagée" style="font-size:11px;">📋 Feuille de match</button>';
           html += '</div>';
           html += '</div>';
           html += '</li>';
@@ -2372,6 +2394,20 @@
         const evtEqId = this.getAttribute('data-evenement-equipe-id');
         if (evtEqId) {
           window.location.href = 'groupe-base.html?evenement_equipe=' + encodeURIComponent(evtEqId);
+        }
+      });
+    });
+    // Collectif & compo 3 niveaux (v1.23) — accès U-N3 « Feuille de
+    // match » (Niveau 0). Navigation pure, miroir BYTE-IDENTIQUE de
+    // ouvrir-groupe-base ci-dessus, seule différence = la cible
+    // (compositions.html au lieu de groupe-base.html). Zéro logique
+    // métier, zéro couplage module→module : l'URL ?evenement_equipe
+    // est lue par compositions-editor v3.8 qui bascule en mode U-N3.
+    document.querySelectorAll('[data-action="ouvrir-feuille-equipe"]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        const evtEqId = this.getAttribute('data-evenement-equipe-id');
+        if (evtEqId) {
+          window.location.href = 'compositions.html?evenement_equipe=' + encodeURIComponent(evtEqId);
         }
       });
     });
