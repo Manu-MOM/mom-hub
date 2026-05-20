@@ -6,6 +6,32 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.10 — Hygiène console.log boot (20 mai 2026)
+ *   v3.10 : HYGIÈNE — bump console.log boot (conv `Production ·
+ *           Hygiène — console.log boots + nettoyage données test`,
+ *           pt 17). Le console.log de boot affichait encore
+ *           « v3.6 (étape 6c-2 + 6c-3 + validation compo + retour
+ *           évènements) chargé » alors que les bumps v3.7 → v3.9
+ *           (3 maillons) avaient tous laissé la ligne intacte, hors
+ *           périmètre récurrent (incohérence préexistante tracée
+ *           pt 13/15/16). S2bis option a actée pt 17 : libellé
+ *           version-only durable + diag object 2ᵉ argument
+ *           PRÉSERVÉ byte-identique (sa valeur opérationnelle a
+ *           été prouvée à la recette terrain pt 16 — boot éditeur
+ *           U-N3 `{evenements:1, vivier:15, postes:15, compos:1,
+ *           compoJoueurs:0}` était la 2ᵉ des 3 confirmations
+ *           chiffrées tranchant la cause racine).
+ *
+ *           Modif bornée : version header v3.9 → v3.10 + 1 entrée
+ *           changelog (celle-ci) + 1 chaîne de caractères dans le
+ *           console.log boot (1er arg seul changé, 2ᵉ arg style +
+ *           3ᵉ arg diag object byte-identiques). Aucune autre
+ *           fonction touchée. Aucun comportement legacy/U-N3
+ *           modifié. 2 hunks ciblés (1 addition pure changelog +
+ *           1 ligne console.log), diff prouvé minimal.
+ *           Provenance md5 : v3.9 2d6a19b1 → v3.10 (recollé par
+ *           Manu après écriture). node --check OK.
+ *
  * Version : 3.9 — Étape (c) U-N3 garde anti-concurrence (20 mai 2026)
  *   v3.9 : FIX double-clic CTA « Créer la compo de base » détecté à
  *           la recette terrain Manu 20/05. Symptôme : 2 clics rapides
@@ -1444,7 +1470,7 @@
     bindPopoverOutsideClick();
 
     console.log(
-      '%c🏉 Compositions Editor v3.6 (étape 6c-2 + 6c-3 + validation compo + retour évènements) chargé',
+      '%c🏉 Compositions Editor v3.10 chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         evenements: State.evenements.length,
