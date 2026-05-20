@@ -6,6 +6,58 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.8 — Étape (c) U-N3 (20 mai 2026)
+ *   v3.8 : Extension Façon 1 « éditeur étendu pas dupliqué » — bascule
+ *           par paramètre d'URL ?evenement_equipe=<uuid> (SD-1 actée
+ *           20/05). Param absent = comportement legacy STRICTEMENT
+ *           inchangé (mode mono-équipe M14 hard-codé), preuve par diff
+ *           vs md5 18733c08 : tous les chemins legacy tombent dans
+ *           l'else du dispatch et restent byte-identiques. Param
+ *           présent = mode U-N3 :
+ *           - UN3-1 pioche = groupe N2 de l'équipe engagée
+ *             (listGroupeEngage déployé v1.22+)
+ *           - création base = geste explicite via CTA existant
+ *             (btn-create-base réutilisé), createCompo passe
+ *             evenement_equipe_id (v1.27 prête, addition pure
+ *             rétro-compat)
+ *           - UN3-3/4/5 repli hors-groupe : toggle persistant dans
+ *             le panneau effectif (calque pattern existant
+ *             effectif-filter-sar) → pioche élargie via
+ *             listJoueursCategorieEntente, joueurs hors-groupe
+ *             marqués `_horsGroupe=true` en mémoire, placés avec
+ *             `est_depannage_hors_categorie=true` (champ EXISTANT
+ *             sql/18, exposé non inventé). UI : visuel orange.
+ *             Jamais bloquant (P4).
+ *           - UN3-6 frontière joueur/staff tenue : pioche N2 filtre
+ *             role='joueur' (le staff convoqué ne joue pas)
+ *           - A1 sélecteur d'évènement masqué en mode U-N3
+ *             (l'évènement est fixé par l'URL ; retour à la fiche
+ *             pour changer)
+ *           - B1 onglets matchs filtrés par equipe engagée
+ *             (compos rattachées via evenement_equipe_id pour la
+ *             base, puis matchs dérivés via compo_base_origine_id
+ *             === base.id — option A pure Q1a)
+ *           - bannière enrichie : libellé court de l'équipe affiché
+ *             à côté du libellé évènement (3 dimensions évènement /
+ *             équipe / état de compo)
+ *           Décisions actées 20/05 conv (c) : Q1a option A pure
+ *           (matchs ne portent pas evenement_equipe_id, dérivent via
+ *           compo_base_origine_id) ; Q2a N matchs actifs simultanés
+ *           multi-équipes ; Q3b sql/50 deux index unique partiels
+ *           (NULLS NOT DISTINCT bases / par base matchs) ; Q4a
+ *           création base via CTA existant (jamais à la volée).
+ *           Modèle Collectif v1.1 §3-4 + UX §3 FAIT FOI, non rouverts.
+ *           Hors périmètre intentionnel : NB_TITULAIRES_XV=15 reste
+ *           hard-codé (Partie B format adaptatif XV/X/7/13 = chantier
+ *           distinct tracé v3.7) ; console.log boot v3.6 NON touché
+ *           (incohérence préexistante v3.6 ≠ header v3.7, hors
+ *           périmètre, pendant à console.log v1.16 supabase-client).
+ *           Wrappers v1.27 utilisés : createCompo étendu,
+ *           listGroupeEngage, getCompoForEvenementEquipe,
+ *           getEvenementEquipeContext, listJoueursCategorieEntente
+ *           (tous déjà déployés). Aucune nouvelle RPC ; aucune
+ *           mutation modèle ; addition pure prouvée par diff.
+ *
  * Version : 3.7 — Phase 4.4 étape 6c-2/6c-3 (18 mai 2026)
  *   v3.7 : Fix « 20 slots titulaires au lieu de 15 » (P2 Partie A).
  *           loadPostes() exclut désormais les lignes
@@ -93,7 +145,18 @@
     postes: [],
     postesById: new Map(),
     compoJoueurs: [],
-    popover: null
+    popover: null,
+    // ────────────────────────────────────────────────────────
+    // v3.8 — état U-N3 (mode « éditeur étendu pas dupliqué »).
+    // Tous les champs sont à valeur neutre (null/false/Set vide)
+    // en mode legacy mono-équipe → les chemins legacy testent ce
+    // flag en première ligne et tombent dans l'else byte-identique
+    // au v3.7. Preuve de rétro-compat stricte par diff.
+    // ────────────────────────────────────────────────────────
+    evenementEquipeId: null,            // UUID si ?evenement_equipe=… (URL)
+    evenementEquipeContext: null,       // résultat getEvenementEquipeContext
+    includeHorsGroupe: false,           // toggle UN3-3 (repli hors-groupe)
+    groupeIds: new Set()                // cache personne_id du groupe N2
   };
 
   // ============================================================
@@ -232,7 +295,19 @@
       return;
     }
     DOM.eventBannerType().textContent  = libelleTypeEvenement(evt.type_evenement);
-    DOM.eventBannerLabel().textContent = libelleEvenement(evt) + ' · ' + formatDateLong(evt.date_debut);
+    // v3.8 — en mode U-N3, le libellé court de l'équipe engagée
+    // s'ajoute discrètement après la date pour clarifier qu'on édite
+    // la feuille d'UNE équipe précise (3 dimensions évènement / équipe
+    // / état). En legacy : libellé strictement inchangé (preuve diff).
+    let labelText = libelleEvenement(evt) + ' · ' + formatDateLong(evt.date_debut);
+    if (State.evenementEquipeId && State.evenementEquipeContext &&
+        State.evenementEquipeContext.equipe) {
+      const eqLabel = State.evenementEquipeContext.equipe.libelle_court ||
+                      State.evenementEquipeContext.equipe.nom_officiel ||
+                      State.evenementEquipeContext.equipe.code || '';
+      if (eqLabel) labelText += ' — ' + eqLabel;
+    }
+    DOM.eventBannerLabel().textContent = labelText;
     DOM.eventBannerMeta().textContent  = evt.site_libelle_court || '';
 
     const compoBase = State.compos.find(c => c.type_compo === 'base');
@@ -513,6 +588,77 @@
     const bodyEl  = DOM.effectifBody();
     if (!bodyEl) return;
 
+    // ────────────────────────────────────────────────────────
+    // v3.8 — Dispatch mode U-N3 vs legacy. En legacy, le bloc else
+    // est byte-identique au code v3.7 (preuve par diff). En U-N3,
+    // mapping différent (Joueurs du groupe / Hors groupe), toggle
+    // UN3-3 et visuel orange UN3-4.
+    // ────────────────────────────────────────────────────────
+    if (State.evenementEquipeId) {
+      let vivier = State.vivier;
+      if (titleEl) titleEl.textContent = 'Effectif (' + vivier.length + ')';
+
+      if (vivier.length === 0) {
+        bodyEl.innerHTML =
+          renderToggleHorsGroupeUN3() +
+          '<div class="effectif-panel__placeholder"><em>Aucun joueur dans le groupe de base.</em></div>';
+        bindToggleHorsGroupeUN3();
+        return;
+      }
+
+      const placedIds = joueursDejaPlaces();
+      const sectionGroupe = { label: 'Joueurs du groupe', items: [] };
+      const sectionHors   = { label: 'Hors groupe (dépannage)', items: [] };
+      for (const j of vivier) {
+        if (j._horsGroupe) sectionHors.items.push(j); else sectionGroupe.items.push(j);
+      }
+      sectionGroupe.items.sort(compareJoueurs);
+      sectionHors.items.sort(compareJoueurs);
+
+      let html = renderToggleHorsGroupeUN3();
+      const sections = [sectionGroupe];
+      if (sectionHors.items.length > 0) sections.push(sectionHors);
+      for (const g of sections) {
+        if (g.items.length === 0) continue;
+        const isHors = (g === sectionHors);
+        html += '<div class="effectif-group">';
+        html +=   '<h3 class="effectif-group__title">' + escapeHtml(g.label) +
+                  ' <span class="effectif-group__count">(' + g.items.length + ')</span></h3>';
+        html +=   '<ul class="effectif-list">';
+        for (const j of g.items) {
+          const isPlaced = placedIds.has(j.joueur_id);
+          const tagHtml = isHors
+            ? '<span class="effectif-item__tag effectif-item__tag--renfort" title="Joueur hors du groupe de base (dépannage)">hors groupe</span>'
+            : '';
+          html += '<li class="effectif-item' + (isPlaced ? ' effectif-item--placed' : '') + (isHors ? ' effectif-item--hors-groupe' : '') + '" data-joueur-id="' + escapeHtml(j.joueur_id) + '" title="' + escapeHtml((j.prenom || '') + ' ' + (j.nom || '')) + (isPlaced ? ' — déjà dans la compo' : (isHors ? ' — hors du groupe de base (dépannage)' : '')) + '">';
+          html +=   '<span class="effectif-item__avatar">' + escapeHtml(initiales(j.prenom, j.nom)) + '</span>';
+          html +=   '<span class="effectif-item__name">';
+          html +=     '<span class="effectif-item__nom">' + escapeHtml(j.nom || '?') + '</span>';
+          html +=     '<span class="effectif-item__prenom">' + escapeHtml(j.prenom || '') + '</span>';
+          html +=   '</span>';
+          html +=   tagHtml;
+          html += '</li>';
+        }
+        html +=   '</ul>';
+        html += '</div>';
+      }
+      bodyEl.innerHTML = html;
+      bindToggleHorsGroupeUN3();
+
+      document.querySelectorAll('.effectif-item').forEach(function (item) {
+        if (item.classList.contains('effectif-item--placed')) return;
+        item.addEventListener('click', function (e) {
+          e.stopPropagation();
+          const joueurId = item.dataset.joueurId;
+          if (joueurId) openPickerForJoueur(joueurId);
+        });
+      });
+      return;
+    }
+
+    // ────────────────────────────────────────────────────────
+    // Mode legacy — code v3.7 BYTE-IDENTIQUE (preuve par diff).
+    // ────────────────────────────────────────────────────────
     let vivier = State.vivier;
     if (State.filtreHideSAR) vivier = vivier.filter(j => !j.est_partenaire_entente);
     if (titleEl) titleEl.textContent = 'Effectif (' + vivier.length + ')';
@@ -567,6 +713,30 @@
     });
   }
 
+  // v3.8 — Toggle UN3-3 : « Piocher hors du groupe de base ».
+  // Calque exact du pattern existant pour effectif-filter-sar (CSS
+  // classes effectif-panel__filter réutilisées). Rendu inline dans
+  // le panneau effectif (pas de modif HTML compositions.html).
+  // Annonce de la conséquence dans le label : « élargit la pioche
+  // au-delà du groupe » → satisfait UX §3 UN3-3.
+  function renderToggleHorsGroupeUN3() {
+    return (
+      '<label class="effectif-panel__filter" style="margin-bottom:8px;">' +
+        '<input type="checkbox" id="un3-toggle-hors-groupe"' +
+          (State.includeHorsGroupe ? ' checked' : '') + '>' +
+        ' Piocher hors du groupe de base ' +
+        '<span style="color: var(--ink-mute); font-size: 11px;">' +
+          '(dépannage — élargit la pioche au-delà du groupe)' +
+        '</span>' +
+      '</label>'
+    );
+  }
+
+  function bindToggleHorsGroupeUN3() {
+    const t = document.getElementById('un3-toggle-hors-groupe');
+    if (t) t.addEventListener('change', function (e) { toggleIncludeHorsGroupe(e.target.checked); });
+  }
+
   // ============================================================
   // 7. POPOVER PICKER
   // ============================================================
@@ -601,6 +771,10 @@
 
   // v3.4 : helper extrait pour pouvoir rafraîchir uniquement la liste
   // sans détruire l'input search (évite l'effet "à l'envers")
+  // v3.8 : en mode U-N3, le marquage warning bascule de « hors
+  // catégorie M14 » (legacy, comparaison categorie_id) à « hors
+  // groupe » (U-N3, lecture du flag _horsGroupe). Le mode legacy
+  // reste byte-identique (branche else).
   function popoverListItemsSlotVide() {
     const pv = State.popover;
     const search = (pv.search || '').toLowerCase();
@@ -615,18 +789,35 @@
       html += '<li class="popover__empty">Aucun joueur disponible.</li>';
     } else {
       for (const j of candidates) {
-        const horsCat = j.categorie_id !== M14_CATEGORIE_ID;
-        const etq = etiquetteJoueur(j);
-        const tagHtml = etq ? '<span class="effectif-item__tag effectif-item__tag--' + etq.kind + '">' + etq.label + '</span>' : '';
-        html += '<li class="popover__item' + (horsCat ? ' popover__item--warning' : '') + '" data-joueur-id="' + escapeHtml(j.joueur_id) + '">';
-        html +=   '<span class="effectif-item__avatar">' + escapeHtml(initiales(j.prenom, j.nom)) + '</span>';
-        html +=   '<span class="effectif-item__name">';
-        html +=     '<span class="effectif-item__nom">' + escapeHtml(j.nom || '?') + '</span>';
-        html +=     '<span class="effectif-item__prenom">' + escapeHtml(j.prenom || '') + '</span>';
-        html +=   '</span>';
-        html +=   tagHtml;
-        if (horsCat) html += '<span class="popover__warning" title="Hors catégorie M14 (dépannage)">⚠</span>';
-        html += '</li>';
+        if (State.evenementEquipeId) {
+          // U-N3 : warning = hors du groupe de base (dépannage)
+          const horsGroupe = !!j._horsGroupe;
+          html += '<li class="popover__item' + (horsGroupe ? ' popover__item--warning' : '') + '" data-joueur-id="' + escapeHtml(j.joueur_id) + '">';
+          html +=   '<span class="effectif-item__avatar">' + escapeHtml(initiales(j.prenom, j.nom)) + '</span>';
+          html +=   '<span class="effectif-item__name">';
+          html +=     '<span class="effectif-item__nom">' + escapeHtml(j.nom || '?') + '</span>';
+          html +=     '<span class="effectif-item__prenom">' + escapeHtml(j.prenom || '') + '</span>';
+          html +=   '</span>';
+          if (horsGroupe) {
+            html += '<span class="effectif-item__tag effectif-item__tag--renfort" title="Joueur hors du groupe de base">hors groupe</span>';
+            html += '<span class="popover__warning" title="Hors du groupe de base (dépannage)">⚠</span>';
+          }
+          html += '</li>';
+        } else {
+          // Legacy : warning = hors catégorie M14 (byte-identique v3.7)
+          const horsCat = j.categorie_id !== M14_CATEGORIE_ID;
+          const etq = etiquetteJoueur(j);
+          const tagHtml = etq ? '<span class="effectif-item__tag effectif-item__tag--' + etq.kind + '">' + etq.label + '</span>' : '';
+          html += '<li class="popover__item' + (horsCat ? ' popover__item--warning' : '') + '" data-joueur-id="' + escapeHtml(j.joueur_id) + '">';
+          html +=   '<span class="effectif-item__avatar">' + escapeHtml(initiales(j.prenom, j.nom)) + '</span>';
+          html +=   '<span class="effectif-item__name">';
+          html +=     '<span class="effectif-item__nom">' + escapeHtml(j.nom || '?') + '</span>';
+          html +=     '<span class="effectif-item__prenom">' + escapeHtml(j.prenom || '') + '</span>';
+          html +=   '</span>';
+          html +=   tagHtml;
+          if (horsCat) html += '<span class="popover__warning" title="Hors catégorie M14 (dépannage)">⚠</span>';
+          html += '</li>';
+        }
       }
     }
     return html;
@@ -825,12 +1016,32 @@
     renderEffectifPanel();
   }
 
+  // v3.8 — Toggle UN3-3 : élargit la pioche au hors-groupe. Recharge
+  // le vivier (chemin loadVivier U-N3 lit listJoueursCategorieEntente
+  // si State.includeHorsGroupe, sinon listGroupeEngage seul). Le
+  // refresh complet effectif + slots est nécessaire car la pioche
+  // disponible change.
+  async function toggleIncludeHorsGroupe(checked) {
+    State.includeHorsGroupe = !!checked;
+    await loadVivier();
+    renderEffectifPanel();
+  }
+
   async function onCreateBaseClick() {
     if (!State.selectedEvenementId) return;
     const btn = document.getElementById('btn-create-base');
     if (btn) { btn.disabled = true; btn.textContent = 'Création en cours…'; }
 
-    const r = await SupabaseHub.createCompo({ evenement_id: State.selectedEvenementId, type_compo: 'base' });
+    // v3.8 — en mode U-N3, on propage evenement_equipe_id à la
+    // base créée (Q4a actée : geste explicite via CTA existant +
+    // option A Q1a : seule la base porte le lien équipe engagée).
+    // createCompo v1.27 accepte le paramètre additif (rétro-compat
+    // stricte : absent = comportement legacy, NULL en base).
+    const params = { evenement_id: State.selectedEvenementId, type_compo: 'base' };
+    if (State.evenementEquipeId) {
+      params.evenement_equipe_id = State.evenementEquipeId;
+    }
+    const r = await SupabaseHub.createCompo(params);
     if (!r.ok) {
       alert('Erreur création compo de base : ' + r.error);
       if (btn) { btn.disabled = false; btn.textContent = 'Créer la compo de base'; }
@@ -852,7 +1063,13 @@
     const joueur = getJoueurVivier(joueurId);
     if (!joueur) return;
 
-    const horsCat = joueur.categorie_id !== M14_CATEGORIE_ID;
+    // v3.8 — en mode U-N3, est_depannage_hors_categorie reflète
+    // « hors du groupe de base » (UN3-4, expose le champ EXISTANT
+    // sql/18, non inventé). En legacy, comportement v3.7 préservé
+    // (comparaison categorie_id).
+    const horsCat = State.evenementEquipeId
+      ? !!joueur._horsGroupe
+      : (joueur.categorie_id !== M14_CATEGORIE_ID);
     const params = {
       composition_id: State.selectedCompoId,
       joueur_id: joueurId,
@@ -890,7 +1107,10 @@
     const joueur = getJoueurVivier(pv.joueurId);
     if (!joueur) return;
 
-    const horsCat = joueur.categorie_id !== M14_CATEGORIE_ID;
+    // v3.8 — idem onPickJoueurPourSlot ci-dessus : bascule par mode.
+    const horsCat = State.evenementEquipeId
+      ? !!joueur._horsGroupe
+      : (joueur.categorie_id !== M14_CATEGORIE_ID);
     const params = {
       composition_id: State.selectedCompoId,
       joueur_id: pv.joueurId,
@@ -971,11 +1191,62 @@
   // ============================================================
 
   async function loadEvenements() {
+    // v3.8 — En mode U-N3, l'évènement est fixé par l'URL et résolu
+    // via getEvenementEquipeContext (1 seul evt, pas un listing).
+    // En legacy : byte-identique v3.7 (listing 60 jours pour M14).
+    if (State.evenementEquipeId) {
+      const ctx = await SupabaseHub.getEvenementEquipeContext(State.evenementEquipeId);
+      if (!ctx || !ctx.ok) {
+        console.error('MOM Hub: loadEvenements() U-N3 — contexte introuvable', ctx && ctx.error);
+        State.evenements = [];
+        State.evenementEquipeContext = null;
+        return State.evenements;
+      }
+      State.evenementEquipeContext = ctx.data;
+      const evt = ctx.data.evenement || null;
+      State.evenements = evt ? [{
+        id: evt.id,
+        code: evt.code,
+        libelle: evt.libelle,
+        date_debut: evt.date_debut,
+        type_evenement: evt.type_evenement
+      }] : [];
+      return State.evenements;
+    }
     State.evenements = await SupabaseHub.getEvenementsAVenir(M14_TEAM_UUID, 60);
     return State.evenements;
   }
   async function loadComposForCurrentEvent() {
     if (!State.selectedEvenementId) { State.compos = []; return; }
+    // v3.8 — En mode U-N3 : compos rattachées à l'équipe engagée
+    // courante. Lecture en 2 temps cohérente Q1a (matchs ne portent
+    // pas evenement_equipe_id, dérivent via compo_base_origine_id) :
+    //   1) getCompoForEvenementEquipe → base de cette équipe engagée
+    //   2) listCompositionsByEquipe → matchs filtrés par
+    //      compo_base_origine_id === base.id
+    // En legacy : code v3.7 byte-identique (listCompositionsByEquipe
+    // sur M14_TEAM_UUID, filtre par evenement_id).
+    if (State.evenementEquipeId) {
+      const liesAEquipe = await SupabaseHub.getCompoForEvenementEquipe(State.evenementEquipeId);
+      // base = type_compo='base' (peut être 0 ou 1 ; sql/50 garantit
+      // au plus 1 active par (evt, equipe engagée, cote))
+      const base = (liesAEquipe || []).find(c => c.type_compo === 'base') || null;
+      if (!base) {
+        State.compos = [];
+        State.selectedCompoId = null;
+        return;
+      }
+      // matchs dérivés de cette base : remontée par compo_base_origine_id
+      const all = await SupabaseHub.listCompositionsByEquipe(M14_TEAM_UUID);
+      const matchsDeLaBase = (all || []).filter(
+        c => c.type_compo === 'match' &&
+             c.compo_base_origine_id === base.id &&
+             c.evenement_id === State.selectedEvenementId
+      );
+      State.compos = [base].concat(matchsDeLaBase);
+      State.selectedCompoId = base.id;
+      return;
+    }
     const all = await SupabaseHub.listCompositionsByEquipe(M14_TEAM_UUID);
     State.compos = all.filter(c => c.evenement_id === State.selectedEvenementId);
     const compoBase = State.compos.find(c => c.type_compo === 'base');
@@ -989,6 +1260,61 @@
     State.compoJoueurs = complet ? complet.joueurs : [];
   }
   async function loadVivier() {
+    // v3.8 — En mode U-N3, la pioche = groupe N2 de l'équipe engagée
+    // (UN3-1), avec filtre role='joueur' (UN3-6, le staff ne joue
+    // pas). Toggle UN3-3 : si State.includeHorsGroupe, on élargit
+    // via listJoueursCategorieEntente (pioche élargie au collectif
+    // de la catégorie), avec marquage _horsGroupe sur les joueurs
+    // qui ne sont PAS dans le groupe N2. Normalisation vers la forme
+    // legacy {joueur_id, nom, prenom, categorie_id, ...} pour rester
+    // compatible avec les helpers de rendu existants (getJoueurVivier,
+    // renderSlotPoste etc. — qui lisent .joueur_id et .nom/.prenom).
+    // En legacy : code v3.7 byte-identique (getVivierCompo M14).
+    if (State.evenementEquipeId) {
+      const ctx = State.evenementEquipeContext;
+      const ententeId = ctx && ctx.entente ? ctx.entente.id : null;
+      const categorieId = ctx && ctx.entente ? ctx.entente.categorie_id : null;
+
+      // Pioche N2 (groupe convoqué)
+      const groupe = await SupabaseHub.listGroupeEngage(State.evenementEquipeId);
+      const groupeJoueurs = (groupe || []).filter(
+        m => m.collectif_membre && m.collectif_membre.role === 'joueur'
+      );
+      State.groupeIds = new Set();
+      const vivier = groupeJoueurs.map(function (m) {
+        const cm = m.collectif_membre;
+        const personnes = cm.personnes || {};
+        State.groupeIds.add(cm.personne_id);
+        return {
+          joueur_id: cm.personne_id,
+          nom: personnes.nom || '',
+          prenom: personnes.prenom || '',
+          categorie_id: categorieId,
+          _horsGroupe: false
+        };
+      });
+
+      // Pioche élargie si toggle UN3-3 actif
+      if (State.includeHorsGroupe && ententeId) {
+        const elargi = await SupabaseHub.listJoueursCategorieEntente(ententeId);
+        for (const j of (elargi || [])) {
+          if (!State.groupeIds.has(j.personne_id)) {
+            vivier.push({
+              joueur_id: j.personne_id,
+              nom: j.nom || '',
+              prenom: j.prenom || '',
+              categorie_id: categorieId,
+              _horsGroupe: true
+            });
+          }
+        }
+      }
+
+      State.vivier = vivier;
+      State.vivierById = new Map();
+      for (const j of State.vivier) State.vivierById.set(j.joueur_id, j);
+      return State.vivier;
+    }
     State.vivier = await SupabaseHub.getVivierCompo(M14_TEAM_UUID);
     State.vivierById = new Map();
     for (const j of State.vivier) State.vivierById.set(j.joueur_id, j);
@@ -1016,6 +1342,15 @@
   // ============================================================
 
   async function init() {
+    // v3.8 — Lecture URL ?evenement_equipe=<uuid> au boot (SD-1
+    // actée 20/05). Param absent = mode legacy (M14 hard-codé,
+    // chemins v3.7 byte-identiques). Param présent = mode U-N3.
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const raw = params.get('evenement_equipe');
+      if (raw && raw.trim()) State.evenementEquipeId = raw.trim();
+    } catch (_) { /* SSR ou contexte sans window — laisser null */ }
+
     await Promise.all([ loadEvenements(), loadVivier(), loadPostes() ]);
 
     if (State.evenements.length > 0) {
@@ -1032,8 +1367,16 @@
     renderEffectifPanel();
     renderPopover();
 
+    // v3.8 — A1 : en mode U-N3, l'évènement est fixé par l'URL ;
+    // le sélecteur d'évènements n'a pas de sens (retour à la fiche
+    // évènement pour changer). On masque le bouton et on coupe son
+    // handler. En legacy : comportement v3.7 byte-identique.
     const selBtn = DOM.eventSelectorBtn();
-    if (selBtn) selBtn.addEventListener('click', function (e) { e.stopPropagation(); toggleEventSelector(); });
+    if (State.evenementEquipeId) {
+      if (selBtn) selBtn.style.display = 'none';
+    } else {
+      if (selBtn) selBtn.addEventListener('click', function (e) { e.stopPropagation(); toggleEventSelector(); });
+    }
 
     const filterEl = DOM.effectifFilter();
     if (filterEl) filterEl.addEventListener('change', function (e) { toggleFiltreSAR(e.target.checked); });
