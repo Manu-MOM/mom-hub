@@ -6,6 +6,33 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.9 — Étape (c) U-N3 garde anti-concurrence (20 mai 2026)
+ *   v3.9 : FIX double-clic CTA « Créer la compo de base » détecté à
+ *           la recette terrain Manu 20/05. Symptôme : 2 clics rapides
+ *           déclenchent 2 INSERT concurrents → 2ᵉ refusé par sql/50
+ *           (index unique partiel idx_compositions_active_base_per_
+ *           event_equipe_cote) → alert remontée à l'écran (« duplicate
+ *           key value violates unique constraint »). État base sain
+ *           (l'index a fait son travail, P4 honnête) ; UX dégradée
+ *           (friction sur le terrain). Cause racine : la garde
+ *           btn.disabled=true v3.7 ne protège pas si (a) deux clics
+ *           sont émis avant que le DOM ait propagé l'état, ou (b) le
+ *           bouton est re-rendu entre les deux. Le fait a tranché —
+ *           recette Manu : « 1 peut-être 2 clics... pas sûr et
+ *           certain » + sonde base = 1 ligne créée + 1 erreur =
+ *           hypothèse double-clic confirmée par la cohérence des
+ *           faits. FIX : garde State.isCreatingBase + try/finally
+ *           (patron anti-double-submit propre) — si la fonction est
+ *           ré-entrée concurremment, le 2ᵉ appel retourne
+ *           instantanément. Compatible legacy ET U-N3 (la garde est
+ *           au niveau du flux, pas du mode). Aucun retry automatique
+ *           (anti-mutation silencieuse) : le clic unique correctement
+ *           garde-foué suffit. Modif bornée : version + changelog +
+ *           1 champ State + refonte onCreateBaseClick (try/finally).
+ *           Aucune autre fonction touchée ; aucun comportement
+ *           legacy modifié hors flux protégé. node --check OK.
+ *           Chaîne md5 v3.7 18733c08 → v3.8 63a62d73 → v3.9.
+ *
  * Version : 3.8 — Étape (c) U-N3 (20 mai 2026)
  *   v3.8 : Extension Façon 1 « éditeur étendu pas dupliqué » — bascule
  *           par paramètre d'URL ?evenement_equipe=<uuid> (SD-1 actée
@@ -156,7 +183,15 @@
     evenementEquipeId: null,            // UUID si ?evenement_equipe=… (URL)
     evenementEquipeContext: null,       // résultat getEvenementEquipeContext
     includeHorsGroupe: false,           // toggle UN3-3 (repli hors-groupe)
-    groupeIds: new Set()                // cache personne_id du groupe N2
+    groupeIds: new Set(),               // cache personne_id du groupe N2
+    // ────────────────────────────────────────────────────────
+    // v3.9 — Garde anti-concurrence pour onCreateBaseClick.
+    // false par défaut, basculé true pendant la création, restauré
+    // par try/finally. Empêche un 2ᵉ clic rapide de déclencher un
+    // INSERT concurrent (cf. fix recette terrain 20/05). Mode legacy
+    // ET U-N3 protégés (le bug guettait aussi en legacy).
+    // ────────────────────────────────────────────────────────
+    isCreatingBase: false
   };
 
   // ============================================================
@@ -1029,32 +1064,48 @@
 
   async function onCreateBaseClick() {
     if (!State.selectedEvenementId) return;
+    // v3.9 — Garde anti-concurrence : si la fonction est déjà en
+    // cours d'exécution (double-clic, re-render concurrent), on
+    // sort immédiatement. Plus robuste que btn.disabled seul (qui
+    // peut être contourné par 2 clics avant propagation DOM ou par
+    // un re-render du bouton entre les deux clics).
+    if (State.isCreatingBase) return;
+    State.isCreatingBase = true;
+
     const btn = document.getElementById('btn-create-base');
     if (btn) { btn.disabled = true; btn.textContent = 'Création en cours…'; }
 
-    // v3.8 — en mode U-N3, on propage evenement_equipe_id à la
-    // base créée (Q4a actée : geste explicite via CTA existant +
-    // option A Q1a : seule la base porte le lien équipe engagée).
-    // createCompo v1.27 accepte le paramètre additif (rétro-compat
-    // stricte : absent = comportement legacy, NULL en base).
-    const params = { evenement_id: State.selectedEvenementId, type_compo: 'base' };
-    if (State.evenementEquipeId) {
-      params.evenement_equipe_id = State.evenementEquipeId;
+    try {
+      // v3.8 — en mode U-N3, on propage evenement_equipe_id à la
+      // base créée (Q4a actée : geste explicite via CTA existant +
+      // option A Q1a : seule la base porte le lien équipe engagée).
+      // createCompo v1.27 accepte le paramètre additif (rétro-compat
+      // stricte : absent = comportement legacy, NULL en base).
+      const params = { evenement_id: State.selectedEvenementId, type_compo: 'base' };
+      if (State.evenementEquipeId) {
+        params.evenement_equipe_id = State.evenementEquipeId;
+      }
+      const r = await SupabaseHub.createCompo(params);
+      if (!r.ok) {
+        alert('Erreur création compo de base : ' + r.error);
+        if (btn) { btn.disabled = false; btn.textContent = 'Créer la compo de base'; }
+        return;
+      }
+      await loadComposForCurrentEvent();
+      State.selectedCompoId = r.data.id;
+      await loadCompoJoueurs();
+      renderEventBanner();
+      renderCompoTabs();
+      renderFillIndicator();
+      renderEditorArea();
+      renderEffectifPanel();
+    } finally {
+      // v3.9 — Garde toujours relâchée, même en cas d'erreur ou
+      // exception. Indispensable pour permettre une nouvelle
+      // tentative si la 1ʳᵉ a échoué pour une raison légitime
+      // (réseau, conflit base, etc.).
+      State.isCreatingBase = false;
     }
-    const r = await SupabaseHub.createCompo(params);
-    if (!r.ok) {
-      alert('Erreur création compo de base : ' + r.error);
-      if (btn) { btn.disabled = false; btn.textContent = 'Créer la compo de base'; }
-      return;
-    }
-    await loadComposForCurrentEvent();
-    State.selectedCompoId = r.data.id;
-    await loadCompoJoueurs();
-    renderEventBanner();
-    renderCompoTabs();
-    renderFillIndicator();
-    renderEditorArea();
-    renderEffectifPanel();
   }
 
   async function onPickJoueurPourSlot(joueurId) {
