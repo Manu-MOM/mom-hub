@@ -1312,55 +1312,81 @@
           <div class="evt-header-sub" id="evt-header-sub">Chargement…</div>
         </div>
         <div class="evt-header-kpis">
-          <div class="evt-kpi">
+          <button type="button" class="evt-kpi"
+                  data-action="filter-set" data-filter-value="avenir"
+                  title="Filtrer pour n'afficher que les évènements à venir"
+                  style="border:none; background:inherit; cursor:pointer; padding:inherit;">
             <div class="evt-kpi-num" id="kpi-avenir">…</div>
             <div class="evt-kpi-lbl">À venir</div>
-          </div>
-          <div class="evt-kpi">
+          </button>
+          <button type="button" class="evt-kpi"
+                  data-action="filter-set" data-filter-value="passes"
+                  title="Filtrer pour n'afficher que les évènements passés"
+                  style="border:none; background:inherit; cursor:pointer; padding:inherit;">
             <div class="evt-kpi-num" id="kpi-passes">…</div>
             <div class="evt-kpi-lbl">Passés</div>
-          </div>
+          </button>
         </div>
       </div>
 
-      <!-- BARRE DE RECHERCHE -->
-      <div class="evt-search-row">
+      <!-- BARRE DE RECHERCHE + CTA PRIMAIRE (§3.4 H-6 — F3 résolu :
+           CTA repérable près du titre EN PLUS du FAB conservé). -->
+      <div class="evt-search-row" style="display:flex; gap:8px; align-items:center;">
         <input
           type="text"
           class="evt-search"
           id="evt-search"
           placeholder="🔍 Rechercher un événement…"
           autocomplete="off"
+          style="flex:1;"
         >
+        <button type="button" class="evt-btn evt-btn-primary"
+                id="evt-btn-create-top" data-action="open-create"
+                title="Créer un nouvel évènement">
+          + Nouvel évènement
+        </button>
       </div>
 
-      <!-- FILTRES TYPE -->
-      <div class="evt-filters-row">
+      <!-- FILTRES TYPE (§3.4 H-1 — 1 ligne 4 pills + bouton admin H-5
+           "Grouper par catégorie" visible uniquement si has_role admin,
+           révélé par JS L3 après auth check. F22 résolu : élimine
+           bruit cognitif coach mono-catégorie M14.) -->
+      <div class="evt-filters-row" id="evt-filters-type">
         <span class="evt-filter-label">Type :</span>
         <span class="evt-chip active" data-type="all">Tous</span>
-        <span class="evt-chip" data-type="competition">Compétition</span>
         <span class="evt-chip" data-type="entrainement">Entraînement</span>
+        <span class="evt-chip" data-type="competition">Compétition</span>
         <span class="evt-chip" data-type="stage">Stage</span>
+        <button type="button" class="evt-btn evt-btn-admin-only"
+                id="evt-btn-grouper-categorie" data-action="toggle-grouper-categorie"
+                style="display:none; margin-left:auto; font-size:0.85em;"
+                title="Visible en mode admin général uniquement">
+          Grouper par catégorie
+        </button>
       </div>
 
-      <!-- FILTRES COMPÉTITION (masqués si famille Compétition non active —
-           evenements-browser v1.14 showCompet). data-compet = code RÉEL
+      <!-- DROPDOWN SOUS-TYPE COMPÉTITION (§3.4 H-2 — visible uniquement
+           si filtre TYPE='competition' actif, géré JS L3 ; codes RÉELS
            du référentiel sous-types-competition.json ; classe
-           evt-compet-<code> dérivée (U4 §5.4). « compet-fed » SUPPRIMÉ
-           (→ Challenge Inter-Ligues, UX §5.1). -->
-      <div class="evt-filters-row" id="evt-filters-compet">
-        <span class="evt-filter-label">Compét. :</span>
-        <span class="evt-chip active" data-compet="all">Toutes</span>
-        <span class="evt-chip evt-compet-match-championnat" data-compet="match_championnat">Match de championnat</span>
-        <span class="evt-chip evt-compet-championnat-phase-1" data-compet="championnat_phase_1">Championnat phase 1</span>
-        <span class="evt-chip evt-compet-championnat-phase-2" data-compet="championnat_phase_2">Championnat phase 2</span>
-        <span class="evt-chip evt-compet-championnat-phases-finales" data-compet="championnat_phases_finales">Championnat phases finales</span>
-        <span class="evt-chip evt-compet-match-amical" data-compet="match_amical">Match amical</span>
-        <span class="evt-chip evt-compet-plateau" data-compet="plateau">Plateau</span>
-        <span class="evt-chip evt-compet-tournoi" data-compet="tournoi">Tournoi</span>
-        <span class="evt-chip evt-compet-challenge-vie" data-compet="challenge_vie">Challenge Vié</span>
-        <span class="evt-chip evt-compet-challenge-inter-ligues" data-compet="challenge_inter_ligues">Challenge Inter-Ligues</span>
-        <span class="evt-chip evt-compet-seven" data-compet="seven">Seven</span>
+           evt-compet-<code> dérivée U4 §5.4. F1.b résolu : passe de
+           11 pills saturées à 1 dropdown conditionnel. « compet-fed »
+           SUPPRIMÉ → Challenge Inter-Ligues, UX §5.1.) -->
+      <div class="evt-filters-row" id="evt-filters-soustype" style="display:none;">
+        <label class="evt-filter-label" for="evt-soustype-select">Sous-type :</label>
+        <select class="evt-form-select" id="evt-soustype-select"
+                style="max-width:280px; flex:0 1 auto;">
+          <option value="all" selected>Tous sous-types</option>
+          <option value="match_championnat">Match de championnat</option>
+          <option value="championnat_phase_1">Championnat phase 1</option>
+          <option value="championnat_phase_2">Championnat phase 2</option>
+          <option value="championnat_phases_finales">Championnat phases finales</option>
+          <option value="match_amical">Match amical</option>
+          <option value="plateau">Plateau</option>
+          <option value="tournoi">Tournoi</option>
+          <option value="challenge_vie">Challenge Vié</option>
+          <option value="challenge_inter_ligues">Challenge Inter-Ligues</option>
+          <option value="seven">Seven</option>
+        </select>
       </div>
 
       <!-- ZONE LISTE (S2.2 peuplera ceci) -->
@@ -1403,34 +1429,31 @@
 
 <!-- ============ MODALES (squelettes vides, contenu S2.4) ============ -->
 
-<!-- E3 — Modale Création -->
+<!-- E3 — Modale Création (REFONTE pt 19 — doc UX §3.1 FAIT FOI
+     Conception-UX-Parcours-Evt-Compo-v1.md md5 4c8652d9).
+     5 modes adaptatifs (A1 Entraînement / A2 Stage / A3 Compétition
+     simple / A4 Plateau-multi-équipes priorité 1 / A5 Tournoi à
+     phases obligatoires) pilotés par la combo radios type_evenement
+     × select type_competition. Sections affichées/masquées par JS L3.
+     Voie « rapide » modale = 1 clic Créer = 1 transaction atomique
+     RPC creer_evenement_complet (sql/52). Voie « lente » fiche
+     post-création (R4 §3.1.6) intacte via modales E4/E5/E6. -->
 <div class="evt-overlay" id="evt-overlay-create" role="dialog" aria-modal="true" aria-labelledby="evt-create-title">
   <div class="evt-modal">
     <div class="evt-modal-title" id="evt-create-title">Nouvel évènement</div>
+    <!-- Bandeau mode (UX §3.1 spec comportementale : "Adaptation visible
+         par bandeau mode + sections conditionnelles, pas seulement par
+         champs grisés" - décision P3). Texte injecté par JS L3. -->
+    <div id="evt-create-mode-bandeau" class="evt-bandeau-info"
+         style="margin:0 16px 8px 16px; display:none;"></div>
     <div class="evt-modal-body">
       <div id="evt-create-msg"></div>
       <form class="evt-modal-form" id="evt-create-form" onsubmit="return false;">
 
-        <!-- ============================================================
-             RÉAGENCEMENT (étape 2 réversible — retour terrain Manu 18/05) :
-             ordre des blocs aligné sur la structure demandée, UNIQUEMENT
-             avec les champs DÉJÀ existants. PURE PERMUTATION : aucun id,
-             name, class, conteneur de groupe ni attribut modifié → aucun
-             JS impacté (le JS accède par id/name, vérifié à la source).
-             Display-only, RÉVERSIBLE. NON inclus ici (= décisions de
-             modèle/UX différées hors de cette conv, cf. Cadrage-Refonte-
-             Evenements-Creation) : bloc « Équipes engagées / format par
-             équipe / adversaires par équipe » (cardinalité 1→N) et bloc
-             « Staff présent ». Le bloc 1 conserve les 5 valeurs réelles
-             du CHECK SQL (NON réduit à 3 catégories — ce serait trancher
-             le modèle).
-        ============================================================ -->
-
-        <!-- BLOC 1 — Type d'évènement (3 familles réelles M1, CHECK
-             v1.2 §5.1 : competition | entrainement | stage). Défaut
-             entrainement conservé (cohérent openModalCreate). Le
-             sous-type de compétition est qualifié au Bloc 4
-             (type_competition), M1 : non vide uniquement si compétition. -->
+        <!-- ====================================================
+             BLOC 1 — Type d'évènement (3 familles M1, CHECK v1.2
+             evenements_type_check : competition|entrainement|stage)
+             ==================================================== -->
         <div class="evt-form-group">
           <label class="evt-form-label required">Type d'évènement</label>
           <div class="evt-form-radio-group">
@@ -1440,30 +1463,58 @@
           </div>
         </div>
 
-        <hr style="border:none;border-top:1px solid var(--line);margin:12px 0;">
-
-        <!-- BLOC 2 — Comment commencer ? (P2-E.1 : Créer vierge / Dupliquer un précédent) -->
+        <!-- ====================================================
+             BLOC 2 — Comment commencer ? (P2-E.1, A8 acquis
+             différentiel MOM Hub absent SAR×MOM, doc UX §1.4).
+             Conservé byte-identique vs v1.23.
+             ==================================================== -->
         <div class="evt-form-group">
           <label class="evt-form-label">Comment commencer ?</label>
           <div class="evt-form-radio-group">
             <label class="evt-form-radio-option"><input type="radio" name="create_mode" value="vierge" checked> Créer vierge</label>
-            <label class="evt-form-radio-option"><input type="radio" name="create_mode" value="dupliquer"> ↩ Dupliquer un événement précédent</label>
+            <label class="evt-form-radio-option"><input type="radio" name="create_mode" value="dupliquer"> ↩ Dupliquer un évènement précédent</label>
           </div>
         </div>
         <div class="evt-form-group evt-create-dup-group" id="evt-create-dup-group" style="display:none;">
-          <label class="evt-form-label" for="evt-create-dup-source">Événement source</label>
+          <label class="evt-form-label" for="evt-create-dup-source">Évènement source</label>
           <select class="evt-form-select" id="evt-create-dup-source">
-            <option value="">— Sélectionner l'événement à dupliquer —</option>
+            <option value="">— Sélectionner l'évènement à dupliquer —</option>
           </select>
-          <div class="evt-form-hint">Les champs seront pré-remplis depuis cet événement. Vous pourrez les modifier avant de valider.</div>
+          <div class="evt-form-hint">Les champs seront pré-remplis depuis cet évènement. Vous pourrez les modifier avant de valider.</div>
         </div>
 
         <hr style="border:none;border-top:1px solid var(--line);margin:12px 0;">
 
-        <!-- BLOC 3 — Identité (nom, date, domicile/extérieur, site) -->
+        <!-- ====================================================
+             BLOC 3 — Sous-type compétition (visible uniquement si
+             type_evenement=competition, déterminera A3/A4/A5).
+             Aligné CHECK evenements_competition_check (10 sous-types).
+             ==================================================== -->
+        <div class="evt-form-group" id="evt-create-compet-group" style="display:none;">
+          <label class="evt-form-label required" for="evt-create-compet">Sous-type</label>
+          <select class="evt-form-select" id="evt-create-compet" name="type_competition">
+            <option value="">— Choisir —</option>
+            <option value="match_championnat">Match de championnat</option>
+            <option value="championnat_phase_1">Championnat phase 1</option>
+            <option value="championnat_phase_2">Championnat phase 2</option>
+            <option value="championnat_phases_finales">Championnat phases finales</option>
+            <option value="match_amical">Match amical</option>
+            <option value="plateau">Plateau</option>
+            <option value="tournoi">Tournoi</option>
+            <option value="challenge_vie">Challenge Vié</option>
+            <option value="challenge_inter_ligues">Challenge Inter-Ligues</option>
+            <option value="seven">Seven</option>
+          </select>
+        </div>
+
+        <!-- ====================================================
+             BLOC 4 — Identité (libellé, date début, date fin opt,
+             multi-jours toggle pour A4/A5 plateau/tournoi)
+             ==================================================== -->
         <div class="evt-form-group">
           <label class="evt-form-label required" for="evt-create-libelle">Libellé</label>
-          <input type="text" class="evt-form-input" id="evt-create-libelle" name="libelle" placeholder="Ex : Entraînement M14 du mercredi (28/05)" required>
+          <input type="text" class="evt-form-input" id="evt-create-libelle" name="libelle"
+                 placeholder="Ex : Entraînement M14 du mercredi (28/05)" required>
         </div>
 
         <div class="evt-form-group-row">
@@ -1477,8 +1528,32 @@
           </div>
         </div>
 
+        <!-- Multi-jours toggle (modes A4/A5 — D5 §3.1.6 doc UX,
+             F14 tournoi 2 jours + dates propres par phase) -->
+        <div class="evt-form-group" id="evt-create-multijours-toggle-group" style="display:none;">
+          <label class="evt-form-radio-option">
+            <input type="checkbox" id="evt-create-multijours-toggle" name="multijours">
+            Sur plusieurs jours (active la date de fin)
+          </label>
+        </div>
+
+        <!-- ====================================================
+             BLOC 5 — Lieu + déduction domicile/extérieur (R1 §3.1.6
+             doc UX : LIEU unique avec déduction modifiable, F5 résolu)
+             ==================================================== -->
         <div class="evt-form-group">
-          <label class="evt-form-label" for="evt-create-domicile">Domicile / Extérieur</label>
+          <label class="evt-form-label" for="evt-create-site">Lieu</label>
+          <select class="evt-form-select" id="evt-create-site" name="site_id">
+            <option value="">— Choisir un site —</option>
+          </select>
+          <div class="evt-form-hint" id="evt-create-domicile-deduction">
+            <!-- Déduction domicile/extérieur affichée ici par JS L3
+                 (R1 §3.1.6 : domicile/exterieur/neutre selon le site) -->
+          </div>
+        </div>
+
+        <div class="evt-form-group">
+          <label class="evt-form-label" for="evt-create-domicile">Domicile / Extérieur (déduit, modifiable)</label>
           <select class="evt-form-select" id="evt-create-domicile" name="domicile_exterieur">
             <option value="">— Non renseigné —</option>
             <option value="domicile">Domicile</option>
@@ -1487,125 +1562,165 @@
           </select>
         </div>
 
-        <div class="evt-form-group">
-          <label class="evt-form-label" for="evt-create-site">Site</label>
-          <select class="evt-form-select" id="evt-create-site" name="site_id">
-            <option value="">— Choisir un site —</option>
-          </select>
-          <div class="evt-form-hint">Laissez vide si le site n'est pas dans la liste MOM (ex : déplacement)</div>
+        <!-- ====================================================
+             BLOC 6 — Horaires détaillés (modes A3/A4/A5, masqué A1/A2)
+             D7 §3.1.6 doc UX, F17 résolu UI. Persistance DIFFÉRÉE :
+             dette modèle MODELE-EVT-HORAIRES-RDV 🟠 ouverte, ces
+             champs NE SONT PAS envoyés à creer_evenement_complet
+             (sql/52) — bandeau jaune honnête, JS L3 les ignore au
+             submit. Saisis pour mémoire utilisateur uniquement.
+             ==================================================== -->
+        <div class="evt-form-group" id="evt-create-horaires-detailles-zone" style="display:none;">
+          <div class="evt-bandeau-info"
+               id="evt-create-horaires-bandeau"
+               style="background:#fff8e1; border-left:4px solid #ffc107; padding:8px 12px; margin-bottom:8px;">
+            ⚠ Horaires détaillés (RDV / fin prévue / lieu RDV) saisis pour mémoire — persistance différée, dette modèle <code>MODELE-EVT-HORAIRES-RDV</code> en cours.
+          </div>
+          <div class="evt-form-group-row">
+            <div class="evt-form-group">
+              <label class="evt-form-label" for="evt-create-debut-match">Début match</label>
+              <input type="time" class="evt-form-input" id="evt-create-debut-match" name="debut_match">
+            </div>
+            <div class="evt-form-group">
+              <label class="evt-form-label" for="evt-create-fin-prevue">Fin prévue</label>
+              <input type="time" class="evt-form-input" id="evt-create-fin-prevue" name="fin_prevue">
+            </div>
+          </div>
+          <div class="evt-form-group-row">
+            <div class="evt-form-group">
+              <label class="evt-form-label" for="evt-create-rdv-heure">Heure RDV</label>
+              <input type="time" class="evt-form-input" id="evt-create-rdv-heure" name="rdv_heure">
+            </div>
+            <div class="evt-form-group">
+              <label class="evt-form-label" for="evt-create-rdv-lieu">Lieu RDV</label>
+              <input type="text" class="evt-form-input" id="evt-create-rdv-lieu" name="rdv_lieu"
+                     placeholder="Ex : Brenckle parking">
+            </div>
+          </div>
         </div>
 
-        <hr style="border:none;border-top:1px solid var(--line);margin:12px 0;">
-
-        <!-- BLOC 4 — Compétition & adversaire (champs EXISTANTS, singuliers).
-             Le passage multi-équipes / format par équipe / adversaires par
-             équipe (cardinalité 1→N) est une décision de MODÈLE différée
-             hors de cette conv (cf. Cadrage-Refonte-Evenements-Creation). -->
-        <div class="evt-form-group" id="evt-create-compet-group">
-          <label class="evt-form-label" for="evt-create-compet">Type de compétition</label>
-          <select class="evt-form-select" id="evt-create-compet" name="type_competition">
-            <option value="">— Aucune —</option>
-            <option value="match_championnat">Match de championnat</option>
-            <option value="match_amical">Match amical</option>
-            <option value="plateau">Plateau</option>
-            <option value="tournoi">Tournoi</option>
-            <option value="championnat_phase_1">Championnat phase 1</option>
-            <option value="championnat_phase_2">Championnat phase 2</option>
-            <option value="championnat_phases_finales">Championnat phases finales</option>
-            <option value="challenge_vie">Challenge Vié</option>
-            <option value="challenge_inter_ligues">Challenge Inter-Ligues</option>
-            <option value="seven">Seven</option>
-          </select>
+        <!-- ====================================================
+             BLOC 7 — Série récurrente (mode A1 uniquement)
+             D6 §3.1.6 doc UX, F15 résolu. Stocké en JSONB
+             evenements.recurrence (whitelist v1.17 wrapper).
+             ==================================================== -->
+        <div class="evt-form-group" id="evt-create-recurrence-zone" style="display:none;">
+          <label class="evt-form-radio-option">
+            <input type="checkbox" id="evt-create-recurrence-toggle" name="recurrence_toggle">
+            Série récurrente (entraînements réguliers)
+          </label>
+          <div id="evt-create-recurrence-details" style="display:none; margin-top:8px; padding:8px; background:#f8f9fa; border-radius:4px;">
+            <div class="evt-form-group-row">
+              <div class="evt-form-group">
+                <label class="evt-form-label" for="evt-create-recurrence-frequence">Fréquence</label>
+                <select class="evt-form-select" id="evt-create-recurrence-frequence" name="recurrence_frequence">
+                  <option value="hebdomadaire" selected>Hebdomadaire</option>
+                  <option value="bimensuelle">Bimensuelle</option>
+                </select>
+              </div>
+              <div class="evt-form-group">
+                <label class="evt-form-label" for="evt-create-recurrence-fin">Jusqu'au</label>
+                <input type="date" class="evt-form-input" id="evt-create-recurrence-fin" name="recurrence_fin">
+              </div>
+            </div>
+            <div class="evt-form-hint" id="evt-create-recurrence-staff-hint">
+              💡 Staff par défaut de la série. Vous confirmerez la présence séance par séance depuis la liste des entraînements (dette <code>UX-EVT-SERIES-STAFF-PAR-SEANCE</code>).
+            </div>
+          </div>
         </div>
 
-        <div class="evt-form-group" id="evt-create-format-group">
-          <label class="evt-form-label" for="evt-create-format">Format de jeu</label>
-          <select class="evt-form-select" id="evt-create-format" name="format_de_jeu">
-            <option value="">— Choisir —</option>
-            <option value="XV">XV (15 vs 15)</option>
-            <option value="13">XIII</option>
-            <option value="12">XII</option>
-            <option value="X">X</option>
-            <option value="9">IX</option>
-            <option value="8">VIII</option>
-            <option value="7">VII</option>
-          </select>
-          <div class="evt-form-hint">Pré-rempli à VII pour un Seven (modifiable)</div>
-        </div>
-
-        <div class="evt-form-group">
-          <label class="evt-form-label" for="evt-create-adversaire">Adversaire (opt.)</label>
-          <input type="text" class="evt-form-input" id="evt-create-adversaire" name="adversaire_nom" placeholder="Ex : Strasbourg AS">
-        </div>
-
-        <!-- ============================================================
-             BLOC 4 — ENGAGEMENT (U1 §2.4) + BASCULE PHASES (U2 §3).
-             Visible uniquement famille Compétition (frontière CHECK
-             relâché v1.2 §5.1 ; Stage/Entraînement → équipe unique via
-             le champ existant, géré JS). Conteneurs/squelettes ; le
-             peuplement (équipes depuis `equipes`, lignes format,
-             adversaires, phases répétables) et l'adaptativité sont
-             pilotés par evenements-browser (commit b2). Aucun id/name
-             inventé : ancrés UX §2.4/§3.2, modèle v1.2 §4.3/4.4.
-        ============================================================ -->
+        <!-- ====================================================
+             BLOC 8 — ENGAGEMENT (Équipes engagées + Formats +
+             Adversaires + Phases). Visible modes A3/A4/A5.
+             Conserve les ancres DOM v1.20 (evt-create-engagement,
+             evt-create-equipes, evt-create-format-par-equipe,
+             evt-create-phases-question, evt-create-phases-zone)
+             pour minimiser l'impact JS L3. Ajoute zones
+             adversaire-mono (A3) et adv-par-equipe (A4/A5) +
+             phases-par-equipe-list (F19 arborescence).
+             ==================================================== -->
         <div id="evt-create-engagement" style="display:none;">
 
           <hr style="border:none;border-top:1px solid var(--line);margin:12px 0;">
 
-          <!-- 4a — Équipes engagées (cases peuplées par le JS depuis
-               `equipes` ; filtrage catégorie/club = vérif Production,
-               UX §2.4/4a). Le NOMBRE coché pilote 4b/4c (M3). -->
+          <!-- 8a — Équipes engagées (D2 §3.1.6, F7+F9+F11 résolus).
+               Cases peuplées par JS L3 via listEquipes catégorie+
+               saison active + statut='active' (patron v1.20 attesté
+               pt 14). Libellés génériques "Équipe 1/2/3" provisoires
+               jusqu'à livraison ADMIN-(ii), Q-A10 acté. -->
           <div class="evt-form-group">
-            <label class="evt-form-label">Équipes engagées</label>
+            <label class="evt-form-label required">Équipes engagées</label>
             <div class="evt-eng-equipes" id="evt-create-equipes">
               <div class="evt-form-hint">Chargement des équipes…</div>
             </div>
-            <div class="evt-form-hint">1 équipe = cas simple · 2+ = engagement multi-équipes (M3)</div>
+            <div class="evt-form-hint">1 équipe = match simple (A3) · 2+ = engagement multi-équipes plateau (A4) ou tournoi (A5).</div>
           </div>
 
-          <!-- 4b — Format. 1 équipe → sélecteur unique existant
-               (#evt-create-format ci-dessus). 2+ → 1 ligne/équipe
-               (override M4, v1.2 §4.3). Zone alimentée par le JS. -->
+          <!-- 8b — Format par équipe (mode A4/A5 multi-équipes,
+               override M4 §4.3) ou format global (mode A3) -->
           <div class="evt-form-group" id="evt-create-format-par-equipe" style="display:none;">
             <label class="evt-form-label">Format par équipe</label>
             <div id="evt-create-format-lines"></div>
-            <div class="evt-form-hint">Vide = hérite du format de l'évènement (réplique _getFormat SAR×MOM)</div>
+            <div class="evt-form-hint">Format spécifique à chaque équipe engagée (override M4).</div>
           </div>
 
-          <!-- 4c — Adversaires SANS phases (M5). Patron unique
-               répétable (mono comme multi), indice triangulaire/
-               plateau (UX §2.4/4c, décision Manu : un seul idiome). -->
-          <div class="evt-form-group" id="evt-create-adv-zone">
-            <label class="evt-form-label">Adversaires</label>
-            <div id="evt-create-adv-lines"></div>
-            <button type="button" class="evt-eng-btn" id="evt-create-adv-add">+ Adversaire</button>
-            <div class="evt-form-hint">2 adversaires = triangulaire · 3+ = plateau</div>
+          <div class="evt-form-group" id="evt-create-format-group" style="display:none;">
+            <label class="evt-form-label" for="evt-create-format">Format de jeu</label>
+            <select class="evt-form-select" id="evt-create-format" name="format_de_jeu">
+              <option value="">— Choisir —</option>
+              <option value="XV">XV (15 vs 15)</option>
+              <option value="13">XIII</option>
+              <option value="12">XII</option>
+              <option value="X">X</option>
+              <option value="9">IX</option>
+              <option value="8">VIII</option>
+              <option value="7">VII</option>
+            </select>
+            <div class="evt-form-hint">Pré-rempli à VII pour un Seven (modifiable).</div>
           </div>
 
-          <!-- U2 §3.1 — Question Phases, DÉRIVÉE du sous-type (jamais
-               posée partout). Visible JS seulement si type_competition
-               ∈ {tournoi, challenge_vie, challenge_inter_ligues,
-               plateau}. La formulation ancre sur la JOURNÉE (jamais
-               « phase » au sens saison — UX §3.1). -->
+          <!-- 8c — Adversaire mono (mode A3 : 1 équipe + 1 adversaire
+               singulier, D3 §3.1.6 frontière M5). Conserve ancre
+               evt-create-adversaire v1.23. -->
+          <div class="evt-form-group" id="evt-create-adversaire-mono-group" style="display:none;">
+            <label class="evt-form-label" for="evt-create-adversaire">Adversaire</label>
+            <input type="text" class="evt-form-input" id="evt-create-adversaire" name="adversaire_nom"
+                   placeholder="Ex : Strasbourg AS">
+            <div class="evt-form-hint">1 équipe cochée → 1 adversaire (cas match simple).</div>
+          </div>
+
+          <!-- 8d — Adversaires par équipe (modes A4/A5 multi-équipes
+               ou plateau sans phases). 1 ligne par équipe cochée,
+               peuplée par JS L3. F12 résolu. -->
+          <div class="evt-form-group" id="evt-create-adv-par-equipe-zone" style="display:none;">
+            <label class="evt-form-label">Adversaires par équipe</label>
+            <div id="evt-create-adv-par-equipe-lines"></div>
+            <div class="evt-form-hint">Saisissez les adversaires de chaque équipe engagée. Vide = à compléter plus tard depuis la fiche évènement.</div>
+          </div>
+
+          <!-- 8e — Structure de phases (modes A4/A5, F18+F19 résolus
+               D4 §3.1.6 arborescence par équipe option I). Question
+               dérivée du sous-type (UX §3.1.4 plateau / §3.1.5 tournoi
+               où phases sont par défaut). -->
           <div class="evt-form-group" id="evt-create-phases-question" style="display:none;">
-            <label class="evt-form-label">Journée à plusieurs poules / phases ?</label>
+            <label class="evt-form-label">Structure de phases</label>
             <div class="evt-form-radio-group">
-              <label class="evt-form-radio-option"><input type="radio" name="phases_mode" value="non" checked> Non</label>
-              <label class="evt-form-radio-option"><input type="radio" name="phases_mode" value="oui"> Oui</label>
+              <label class="evt-form-radio-option"><input type="radio" name="phases_mode" value="non" checked> Pas de phases (matchs libres)</label>
+              <label class="evt-form-radio-option"><input type="radio" name="phases_mode" value="oui"> Avec phases</label>
             </div>
           </div>
 
-          <!-- U2 §3.2 — Branche OUI : « Phases & matchs » SE SUBSTITUE
-               à 4c. 3 niveaux M6 (Compétition implicite → Phase-boîte
-               → Match), 2 niveaux d'UI, AUCUNE sous-phase (plafond
-               modèle M6 §4.4). Zone répétable pilotée par le JS. -->
+          <!-- 8f — Phases par équipe (F19 arborescence). Visible si
+               phases_mode='oui'. Conteneur peuplé par JS L3 avec un
+               sous-conteneur par équipe cochée, chacun ayant ses
+               propres phases + matchs. -->
           <div class="evt-form-group" id="evt-create-phases-zone" style="display:none;">
-            <label class="evt-form-label">Phases &amp; matchs</label>
-            <div id="evt-create-phases-list"></div>
-            <button type="button" class="evt-eng-btn" id="evt-create-phase-add">+ Phase</button>
+            <label class="evt-form-label">Phases &amp; matchs (par équipe — F19)</label>
+            <div id="evt-create-phases-par-equipe-list">
+              <div class="evt-form-hint">L'arborescence par équipe sera construite ici dynamiquement.</div>
+            </div>
             <div class="evt-bandeau-info">
-              La compo de base s'applique à tous les matchs. Vous pourrez
-              la modifier par match depuis l'éditeur.
+              💡 Chaque équipe engagée a ses propres phases et matchs (F19 doc UX §3.1.4 option I). Plus de sélecteur d'équipe par match — l'équipe est portée par le conteneur parent.
             </div>
           </div>
 
@@ -1613,24 +1728,40 @@
 
         <hr style="border:none;border-top:1px solid var(--line);margin:12px 0;">
 
-        <!-- ============================================================
-             BLOC 5 — STAFF PRÉSENT (U1 §2.5, M8). evenement_encadrants
-             EXISTE déjà (déployée). Décision Manu = option (b) :
-             le bloc FIGURE (sa place est ici) mais DÉSACTIVÉ + étiquette
-             explicite tant que la dette P2-E.4 (policies write + CRUD)
-             n'est pas livrée. Jamais une case qui paraît enregistrer
-             sans le pouvoir. Réversible : P2-E.4 livrée → on retire la
-             classe + l'étiquette, rien à redessiner.
-        ============================================================ -->
+        <!-- ====================================================
+             BLOC 9 — ENCADREMENT M8 (tous modes A1→A5).
+             E-1 ACTÉ : cette refonte UX absorbe le câblage staff
+             modale différé P2-E.4 (M8 RLS write fonctionnelle pt 14
+             prouvée). D8+Q-A19 Option B + Q-A20 (iii) §3.1.6 doc UX.
+             Bloc ACTIF (plus de classe evt-staff-disabled), lecture
+             dynamique collectif N1 role='staff' par JS L3.
+             ==================================================== -->
         <div class="evt-form-group">
-          <label class="evt-form-label">Staff présent</label>
-          <div class="evt-eng-equipes evt-staff-disabled" id="evt-create-staff" aria-disabled="true">
-            <div class="evt-form-hint">Cases à cocher du staff (une par membre, rôles affichés)</div>
+          <label class="evt-form-label">Encadrement</label>
+          <div class="evt-eng-equipes" id="evt-create-staff">
+            <div class="evt-form-hint">Chargement de la liste d'encadrement…</div>
           </div>
-          <span class="evt-staff-pending-label">
-            Saisie du staff à venir (dépend de la livraison P2-E.4 :
-            écriture encadrants). Bloc volontairement désactivé.
-          </span>
+          <div class="evt-form-hint">Cochez les coachs / encadrants présents (table <code>evenement_encadrants</code> M8).</div>
+        </div>
+
+        <!-- ====================================================
+             BLOC 10 — AFFECTATION par équipe N2 (mode A4 plateau
+             multi-équipes uniquement). D10 §3.1.6 doc UX : dropdown
+             par équipe propose uniquement les coachs déjà cochés
+             en M8 (cohérence intra-modale, N2 sous-ensemble M8).
+             Cohérent E-1 + Q-A20 (iii). Liste construite par JS L3.
+             ==================================================== -->
+        <div class="evt-form-group" id="evt-create-affectations-n2-zone" style="display:none;">
+          <label class="evt-form-label">Affectation par équipe (optionnel)</label>
+          <div id="evt-create-affectations-n2-lines">
+            <div class="evt-form-hint">L'affectation par équipe sera construite ici dynamiquement.</div>
+          </div>
+          <div class="evt-form-hint">Vide = staff évènement global, pas d'affectation N2 explicite.</div>
+        </div>
+
+        <!-- Hint final (UX §3.1.4) -->
+        <div class="evt-bandeau-info" id="evt-create-hint-final" style="margin-top:12px;">
+          💡 Vous pourrez ajuster équipes, phases, matchs et compositions depuis la fiche évènement (voie « lente » R4 §3.1.6 intacte).
         </div>
 
       </form>
