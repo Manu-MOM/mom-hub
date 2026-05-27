@@ -1062,6 +1062,316 @@
   }
 
   /* =====================================================
+   * ========== L3b — Refonte renderFiche §3.2-3.3 (v3) ==
+   * =====================================================
+   * Conv `Production · Refonte UX Évt→Compo · L3b refonte renderFiche
+   * §3.2-3.3` close pt 20 (27/05/2026). Doc UX FAIT FOI
+   * Conception-UX-Parcours-Evt-Compo-v1.md md5 4c8652d9.
+   *
+   * Styles pour les ~35 classes neuves de renderFiche v1.25 md5 3c841387 :
+   *   (1) Header navigation (collision résolue par sélecteur descendant)
+   *   (3) Bannière Niveau 1 — 5 cellules essentielles auto-adaptatives §3.2
+   *   (4) Bannière Niveau 2 — 5 secondaires dépliables chevron §3.2
+   *   (6) Grille FONCTIONNALITÉS — 8 grands boutons statuts honnêtes §3.3
+   *
+   * Tokens projet only (--ink/--paper-*/--line/--vert-prairie/--clay).
+   * Préfixage .evt-* strict tenu. Auto-fit grid responsive natif.
+   * ===================================================== */
+
+  /* --- (1) Header navigation : override collision avec sticky overlay ---
+   * `.evt-fiche-header` existe déjà ligne 760 pour le bandeau sticky du
+   * panel overlay (code + titre + ✕). Sélecteur descendant restrictif
+   * cible UNIQUEMENT le nouveau bloc nav rendu dans le body par
+   * renderFiche v1.25, sans toucher au sticky. */
+  .evt-fiche-body > .evt-fiche-header {
+    padding: 0;
+    border-bottom: none;
+    background: transparent;
+    position: static;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+  .evt-fiche-back,
+  .evt-fiche-back-parent {
+    align-self: flex-start;
+    font-size: 12px;
+    padding: 6px 10px;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.02em;
+  }
+  .evt-fiche-back-parent {
+    color: var(--ink-mute);
+    font-size: 11px;
+  }
+
+  /* --- (3) Bannière Niveau 1 : 5 cellules essentielles auto-adaptatives §3.2
+   * HORAIRES · LIEU+domicile · ÉQUIPES ENGAGÉES+formats · ADVERSAIRES
+   * + 5ᵉ cellule conditionnelle SCORE (Q2 acté). Grid auto-fit gère
+   * gracieusement 1 à 5 cellules selon données peuplées. */
+  .evt-fiche-banniere-n1 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 10px;
+    padding: 12px 0;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    margin: 14px 0 4px 0;
+  }
+  .evt-fiche-n1-cellule {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 8px 10px;
+    border-radius: 4px;
+    background: var(--paper-warm);
+  }
+  .evt-fiche-n1-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+  }
+  .evt-fiche-n1-value {
+    font-family: 'Oswald', sans-serif;
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--ink);
+    line-height: 1.15;
+  }
+  .evt-fiche-n1-sub {
+    font-size: 11px;
+    color: var(--ink-soft);
+    line-height: 1.3;
+    margin-top: 2px;
+  }
+  .evt-fiche-n1-score {
+    background: rgba(45, 125, 70, 0.08);
+    border: 1px solid rgba(45, 125, 70, 0.2);
+  }
+  .evt-fiche-n1-score-val {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--vert-prairie);
+  }
+
+  /* --- (4) Bannière Niveau 2 : 5 secondaires dépliables chevron §3.2
+   * STRUCTURE PHASES · RENDEZ-VOUS · STATUT COMPOSITIONS · ENCADREMENT ·
+   * NOTES. Toggle hidden + chevron pivotant via .is-open (handler
+   * data-action="toggle-niveau-2" bindFicheActions v1.25). */
+  .evt-fiche-banniere-n2-toggle {
+    display: flex;
+    justify-content: center;
+    margin: 6px 0;
+  }
+  .evt-fiche-toggle-btn {
+    font-size: 11px;
+    padding: 6px 12px;
+    color: var(--ink-mute);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .evt-fiche-chevron-n2 {
+    display: inline-block;
+    transition: transform 0.2s ease;
+    font-size: 10px;
+  }
+  .evt-fiche-chevron-n2.is-open {
+    transform: rotate(90deg);
+  }
+  .evt-fiche-banniere-n2 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 8px;
+    padding: 10px;
+    background: var(--paper);
+    border: 1px dashed var(--line);
+    border-radius: 4px;
+    margin-bottom: 14px;
+  }
+  .evt-fiche-banniere-n2[hidden] {
+    display: none;
+  }
+  .evt-fiche-n2-cellule {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px;
+    background: var(--paper-warm);
+    border-radius: 3px;
+  }
+  .evt-fiche-n2-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+  }
+  .evt-fiche-n2-value {
+    font-size: 13px;
+    color: var(--ink);
+    line-height: 1.3;
+  }
+  .evt-fiche-n2-empty {
+    color: var(--ink-mute);
+    font-style: italic;
+    font-size: 12px;
+  }
+  .evt-fiche-n2-dette {
+    border-left: 2px solid var(--clay, #c8896a);
+  }
+  .evt-fiche-n2-footnote {
+    font-size: 10px;
+    color: var(--ink-mute);
+    font-style: italic;
+    margin-top: 2px;
+  }
+  .evt-fiche-n2-footnote code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    padding: 1px 4px;
+    background: var(--paper-deep);
+    border-radius: 2px;
+    color: var(--ink);
+  }
+  .evt-fiche-n2-link {
+    align-self: flex-start;
+    margin-top: 3px;
+    font-size: 11px;
+    padding: 3px 8px;
+  }
+  .evt-fiche-n2-notes {
+    grid-column: 1 / -1;
+  }
+  .evt-fiche-n2-prose {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+
+  /* --- (6) Grille FONCTIONNALITÉS DE L'ÉVÈNEMENT : 8 grands boutons §3.3
+   * Q-A28 statuts honnêtes (Disponible / En cours / À venir). Q4=C
+   * adaptation multi-équipes : expansion in-situ via .evt-fiche-fonction-
+   * expand. Handler `expand-fonction` bindFicheActions v1.25. */
+  .evt-fiche-grille-fonctions {
+    margin: 16px 0;
+  }
+  .evt-fiche-grille-titre {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--line);
+  }
+  .evt-fiche-grille-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+  }
+  .evt-fiche-fonction {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 10px;
+    background: var(--paper-warm);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    min-height: 105px;
+  }
+  .evt-fiche-fonction-disponible {
+    background: var(--paper);
+    border-color: rgba(45, 125, 70, 0.25);
+  }
+  .evt-fiche-fonction-en-cours {
+    opacity: 0.75;
+    background: rgba(212, 169, 58, 0.05);
+    border-color: rgba(212, 169, 58, 0.25);
+  }
+  .evt-fiche-fonction-a-venir {
+    opacity: 0.55;
+  }
+  .evt-fiche-fonction-badge {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    font-size: 8px !important;
+    padding: 2px 5px !important;
+  }
+  .evt-fiche-fonction-titre {
+    font-family: 'Oswald', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink);
+    line-height: 1.15;
+  }
+  .evt-fiche-fonction-soustitre {
+    font-size: 11px;
+    color: var(--ink-soft);
+    line-height: 1.3;
+    margin-bottom: 6px;
+  }
+  .evt-fiche-fonction-cta {
+    align-self: flex-start;
+    font-size: 11px;
+    padding: 5px 10px;
+    margin-top: auto;
+  }
+  .evt-fiche-fonction-cta[disabled] {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+  .evt-fiche-fonction-expand {
+    margin-top: 8px;
+    padding: 6px;
+    background: var(--paper-deep);
+    border-radius: 3px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .evt-fiche-fonction-expand[hidden] {
+    display: none;
+  }
+  .evt-fiche-fonction-expand-item {
+    text-align: left;
+    font-size: 11px;
+    padding: 5px 8px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+  }
+  .evt-fiche-fonction-expand-item:hover {
+    background: var(--paper-warm);
+  }
+
+  /* --- Mobile : serrer bannière N1 et grille fonctionnalités --- */
+  @media (max-width: 768px) {
+    .evt-fiche-banniere-n1 {
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 6px;
+    }
+    .evt-fiche-banniere-n2 {
+      grid-template-columns: 1fr;
+    }
+    .evt-fiche-grille-list {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    .evt-fiche-fonction {
+      min-height: 95px;
+      padding: 10px 8px;
+    }
+    .evt-fiche-fonction-titre {
+      font-size: 13px;
+    }
+  }
+
+  /* =====================================================
    * ========== S2.4 — FORMULAIRES MODALES ==============
    * ===================================================== */
 
