@@ -590,6 +590,74 @@
  *          Cycle Collectif & compo 3 niveaux LIVRÉ DE BOUT EN
  *          BOUT côté UI une fois v1.23 déployée (étapes
  *          a/b/c/d/e du chantier).
+ *
+ *   v1.24 : Refonte UX Évt→Compo · L3a (Production · 27/05/2026, pt 19) —
+ *          Câblage JS de la refonte HTML L4 (evenements.html refonte
+ *          5 modes adaptatifs A1→A5 + écran d'accueil filtres §3.4 +
+ *          KPIs cliquables H-3 + bouton admin H-5 + CTA primaire H-6).
+ *          Consomme la RPC composite sql/52 creer_evenement_complet
+ *          via le wrapper SupabaseHub.createEvenementComplet v1.30.
+ *          Doc UX FAIT FOI : Conception-UX-Parcours-Evt-Compo-v1.md
+ *          md5 4c8652d9.
+ *
+ *          PÉRIMÈTRE L3a (cette livraison) :
+ *            (1) updateCreateConditionalFields refondu pour 5 modes
+ *                adaptatifs : bandeau mode visible, masquage/affichage
+ *                des blocs sous-type (A3/A4/A5), horaires détaillés
+ *                (A3/A4/A5), récurrence (A1), engagement multi-équipes
+ *                (A3/A4/A5), adversaire mono (A3) vs adv-par-équipe
+ *                (A4/A5), phases-par-équipe F19 (A4/A5), affectations
+ *                N2 plateau (A4 multi-équipes).
+ *            (2) submitModalCreate refondu pour basculer sur
+ *                createEvenementComplet (RPC composite atomique).
+ *                Construction du payload composite (6 obligatoires +
+ *                12 optionnels dont 4 JSONB) depuis le DOM.
+ *            (3) Câblage HTML L4 dans bindEvents : CTA primaire
+ *                evt-btn-create-top, KPIs cliquables (data-action
+ *                filter-set), dropdown sous-type evt-soustype-select
+ *                (au lieu des 11 pills compet retirées), bouton admin
+ *                evt-btn-grouper-categorie (révélation conditionnelle
+ *                si SupabaseHub.isAdmin), multijours toggle,
+ *                récurrence toggle.
+ *            (4) Nouvelles fonctions de peuplement dynamique : staff
+ *                (lecture collectif N1 role='staff' actif saison
+ *                courante, E-1 acté §4.6 doc UX), affectations N2
+ *                plateau (dropdown par équipe cochée, sous-ensemble
+ *                M8), structure multi-équipes (format-par-équipe +
+ *                adv-par-équipe + phases-par-équipe-list dynamique
+ *                sur change checkbox équipe).
+ *            (5) Voie « lente » fiche R4 §3.1.6 INTACTE : modales
+ *                E4/E5/E6 + wrappers REST inchangés. La voie « lente »
+ *                reste exploitable post-création pour ajustements.
+ *
+ *          PÉRIMÈTRE DIFFÉRÉ L3b (dette UX-EVT-FICHE-REFONTE 🟡,
+ *          livraison ultérieure) :
+ *            - renderFiche §3.2-3.3 (bannière 2 niveaux + grille 8
+ *              liens fonctionnalités + 3 actions). La fiche actuelle
+ *              reste pleinement fonctionnelle (Suivi A/B/C +
+ *              handlers Niveau 0 ouvrir-groupe-base/ouvrir-feuille-
+ *              equipe byte-identiques par construction).
+ *
+ *          INVARIANTS PROTÉGÉS (preuve byte-identité dédiée md5) :
+ *            - 11+ fonctions Suivi A/B/C (suiviBuildUrl, suiviGenerer,
+ *              suiviPartager, renderSuiviRencontreBloc, renderSuiviSection,
+ *              refreshSuiviSection, bindSuiviActions, modeVideoBuildUrl,
+ *              renderModeVideoAcces, spectateurBuildUrl,
+ *              renderSpectateurAcces, renderTempsDeJeuMount,
+ *              spectGenerer, spectCopier, spectPartager)
+ *            - 2 handlers Niveau 0 v1.22/v1.23 dans bindFicheActions
+ *              (ouvrir-groupe-base + ouvrir-feuille-equipe)
+ *            - M14_TEAM_UUID + constantes module
+ *            - loadPrefs / savePrefs / loadEvenementsAVenir /
+ *              loadEvenementsPasses / buildIndexes
+ *            - renderFiche (différé L3b)
+ *
+ *          Bump console.log boot : "v1.4.1 (S2.5) chargé" → "v1.24
+ *          (S3) chargé" — alignement cohérent header v1.24 (cycle
+ *          Hygiène pt 17 répliqué, incohérence "v1.4.1" pré-existante
+ *          jamais tracée en STATE absorbée ici, additif éditorial).
+ *          Provenance md5 chaîne maillon par maillon : v1.23 a0af7b42
+ *          → v1.24 (recollé après écriture).
  */
 
 (function () {
@@ -3088,87 +3156,383 @@
    * changement de type, de sous-type, et à l'ouverture. Aucune
    * colonne marqueur (P1/M6 §4.4) : pure adaptation d'écran.
    */
+  /**
+   * v1.24 — Règle d'adaptation 5 modes (refonte UX Evt→Compo doc UX
+   * §3.1). Pilote la modale création par combo (type_evenement ×
+   * type_competition) avec bandeau mode + sections conditionnelles.
+   *
+   * 5 modes :
+   *   A1 = entrainement (récurrence possible)
+   *   A2 = stage (multi-jours implicite, dates start/end)
+   *   A3 = competition + sous-type sans phases (match_championnat,
+   *        championnat_phase_1/2/finales, match_amical, seven,
+   *        challenge_vie, challenge_inter_ligues — selon spec UX §3.1.3)
+   *   A4 = competition + plateau (multi-équipes, phases optionnelles)
+   *   A5 = competition + tournoi (phases obligatoires, multi-équipes
+   *        possible)
+   *
+   * Idempotent (appelée à l'ouverture + sur change radio/select).
+   * Préserve ancres v1.23 (evt-create-engagement, evt-create-equipes,
+   * evt-create-phases-question, evt-create-phases-zone) et active
+   * les nouvelles ancres L4 (evt-create-compet-group,
+   * evt-create-mode-bandeau, evt-create-horaires-detailles-zone,
+   * evt-create-recurrence-zone, evt-create-multijours-toggle-group,
+   * evt-create-adversaire-mono-group, evt-create-adv-par-equipe-zone,
+   * evt-create-phases-par-equipe-list, evt-create-affectations-n2-zone).
+   */
   function updateCreateConditionalFields() {
     const checked = document.querySelector('#evt-create-form input[name=type_evenement]:checked');
     if (!checked) return;
-    // v1.15 — raisonne sur la FAMILLE réelle (forward/backward compat).
     const famille = familleReelle(checked.value);
 
-    const competGroup = document.getElementById('evt-create-compet-group');
-    const formatGroup = document.getElementById('evt-create-format-group');
-    const dateFinGroup = document.getElementById('evt-create-date-fin-group');
-
-    // Compétition → sous-type + format (M1 : type_competition non vide
-    // uniquement si competition). Stage → date_fin (plurijours). UX §2.3.
-    const showCompet  = famille === 'competition';
-    const showFormat  = famille === 'competition';
-    const showDateFin = famille === 'stage';
-
-    if (competGroup)  competGroup.style.display  = showCompet  ? '' : 'none';
-    if (formatGroup)  formatGroup.style.display  = showFormat  ? '' : 'none';
-    if (dateFinGroup) dateFinGroup.style.display = showDateFin ? '' : 'none';
-
-    // ──────────────────────────────────────────────────────────────
-    // v1.16 — U1/U2 : règle d'adaptation à 3 entrées (UX §1).
-    // Entrée 1 = famille. Entrée 2 = occasionnel/récurrent (M2).
-    // Entrée 3 = sous-type → bascule question Phases (UX §3.1).
-    // Aucune colonne marqueur (P1, M6 §4.4) : pure adaptation d'écran.
-    // ──────────────────────────────────────────────────────────────
-    const engagement = document.getElementById('evt-create-engagement');
-    if (engagement) {
-      // Bloc Engagement = Compétition uniquement (frontière CHECK
-      // relâché v1.2 §5.1 ; Stage/Entraînement → équipe unique gérée
-      // par la voie existante, hors de ce bloc).
-      engagement.style.display = (famille === 'competition') ? '' : 'none';
-      // v1.18 — addition : quand le bloc devient visible, peupler 4a
-      // (cases équipes). Idempotent : peuplerEquipesEngagees ne
-      // recharge pas si déjà peuplé pour la même catégorie.
-      if (famille === 'competition') {
-        peuplerEquipesEngagees();
-      }
-    }
-
-    // Entrée 2 — Entraînement : occasionnel | récurrent (M2). Forme
-    // d'écran seulement (structure JSONB = D-M2, Production P3). La
-    // sous-question vit dans #evt-create-recurrence-question (peut être
-    // absente si evenements.html pas encore étendu sur ce point —
-    // défensif : on ne casse pas si l'ancre manque).
-    const recurrenceQ = document.getElementById('evt-create-recurrence-question');
-    if (recurrenceQ) {
-      recurrenceQ.style.display = (famille === 'entrainement') ? '' : 'none';
-    }
-
-    // Entrée 3 — bascule question Phases DÉRIVÉE du sous-type.
-    // Visible UNIQUEMENT pour les 4 sous-types « avec question »
-    // (UX §3.1). Les 6 autres (fiche simple) : jamais de question,
-    // la phase-saison reste une étiquette Bloc 1, jamais une porte.
-    const PHASES_QUESTION_SOUS_TYPES = [
-      'tournoi', 'challenge_vie', 'challenge_inter_ligues', 'plateau'
-    ];
     const competSelect = document.getElementById('evt-create-compet');
     const sousType = competSelect ? competSelect.value : '';
-    const phasesQuestion = document.getElementById('evt-create-phases-question');
-    const phasesEligible = (famille === 'competition')
-      && PHASES_QUESTION_SOUS_TYPES.indexOf(sousType) !== -1;
-    if (phasesQuestion) {
-      phasesQuestion.style.display = phasesEligible ? '' : 'none';
-      if (!phasesEligible) {
-        // Sous-type non éligible → forcer NON (pas de phases) et
-        // réafficher 4c adversaires simples.
-        const radioNon = phasesQuestion.querySelector('input[name=phases_mode][value=non]');
-        if (radioNon) radioNon.checked = true;
-      }
-    }
-    // Applique la conséquence OUI/NON (substitution 4c ↔ Phases).
-    updatePhasesModeVisibility();
 
-    // Règle Seven (M4, UX §2.4/4b) : sous-type 'seven' → format '7'
-    // PRÉ-REMPLI, modifiable (P4 : un pré-remplissage, jamais un
-    // verrou). N'écrase pas un choix déjà posé par l'utilisateur.
+    // ──────────────────────────────────────────────────────────────
+    // Détermination du mode A1→A5
+    // ──────────────────────────────────────────────────────────────
+    const PHASES_OBLIG_SOUS_TYPES = ['tournoi'];        // A5
+    const PHASES_OPTIONNEL_SOUS_TYPES = ['plateau'];    // A4 (multi-équipes possible)
+    let mode = 'A1';
+    if (famille === 'entrainement')      mode = 'A1';
+    else if (famille === 'stage')         mode = 'A2';
+    else if (famille === 'competition') {
+      if (PHASES_OBLIG_SOUS_TYPES.indexOf(sousType) !== -1)     mode = 'A5';
+      else if (PHASES_OPTIONNEL_SOUS_TYPES.indexOf(sousType) !== -1) mode = 'A4';
+      else                                                      mode = 'A3';
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // Bandeau mode (signal visuel fort UX §3.1 P3 décision)
+    // ──────────────────────────────────────────────────────────────
+    setBandeauMode(mode, famille, sousType);
+
+    // ──────────────────────────────────────────────────────────────
+    // Visibilité des sections par mode
+    // ──────────────────────────────────────────────────────────────
+    const showCompet      = famille === 'competition';            // Bloc 3 sous-type
+    const showEngagement  = famille === 'competition';            // Bloc 8 engagement
+    const showHoraires    = mode === 'A3' || mode === 'A4' || mode === 'A5'; // Bloc 6 horaires détaillés
+    const showRecurrence  = mode === 'A1';                        // Bloc 7 série récurrente
+    const showMultijours  = mode === 'A4' || mode === 'A5';       // Toggle multi-jours
+    const showDateFin     = famille === 'stage';                  // Date fin auto pour stage
+    const showFormatGlob  = false;                                // jamais en mode adaptatif (format-par-équipe le remplace)
+    const showAdvMono     = mode === 'A3';                        // Adversaire singulier
+    const showAdvParEq    = mode === 'A4' || mode === 'A5';       // Adversaires par équipe
+    const showPhasesQ     = mode === 'A4';                        // Question phases (A4 plateau seul)
+    const showPhasesZone  = mode === 'A5';                        // Phases activées par défaut A5 tournoi
+
+    function setDisplay(id, show) {
+      const el = document.getElementById(id);
+      if (el) el.style.display = show ? '' : 'none';
+    }
+
+    setDisplay('evt-create-compet-group',                showCompet);
+    setDisplay('evt-create-engagement',                  showEngagement);
+    setDisplay('evt-create-horaires-detailles-zone',     showHoraires);
+    setDisplay('evt-create-recurrence-zone',             showRecurrence);
+    setDisplay('evt-create-multijours-toggle-group',     showMultijours);
+    setDisplay('evt-create-date-fin-group',              showDateFin || showMultijours);
+    setDisplay('evt-create-format-group',                showFormatGlob);
+    setDisplay('evt-create-adversaire-mono-group',       showAdvMono);
+    setDisplay('evt-create-adv-par-equipe-zone',         showAdvParEq);
+    setDisplay('evt-create-phases-question',             showPhasesQ);
+
+    // Phases zone : A5 = visible par défaut (tournoi = phases obligatoires)
+    // A4 = visible si phases_mode=oui sinon caché. A1/A2/A3 = jamais.
+    let showPhasesZoneEffective = showPhasesZone;
+    if (mode === 'A4') {
+      const radioOui = document.querySelector('#evt-create-phases-question input[name=phases_mode][value=oui]:checked');
+      showPhasesZoneEffective = !!radioOui;
+    }
+    setDisplay('evt-create-phases-zone', showPhasesZoneEffective);
+
+    // ──────────────────────────────────────────────────────────────
+    // Peuplement dynamique des blocs visibles (idempotent)
+    // ──────────────────────────────────────────────────────────────
+    if (showEngagement) {
+      peuplerEquipesEngagees();  // existant v1.18, idempotent
+    }
+    // Staff M8 ACTIF (E-1 acté §4.6 doc UX) — tous modes A1→A5
+    peuplerStaff();
+
+    // Affectations N2 plateau : visible uniquement mode A4 multi-équipes
+    // (>= 2 équipes cochées). Géré par on-change checkbox équipe via
+    // updateMultiEquipesUI() ; on déclenche un refresh ici par sécurité.
+    updateMultiEquipesUI();
+
+    // Règle Seven (préserve v1.16) : sous-type 'seven' → format '7'
+    // (NB : format global retiré en mode adaptatif L4, mais l'ancre
+    // existe encore — défensif, n'écrase pas un choix utilisateur).
     if (famille === 'competition' && sousType === 'seven') {
       const fmt = document.getElementById('evt-create-format');
       if (fmt && !fmt.value) fmt.value = '7';
     }
+  }
+
+  /**
+   * v1.24 — Helper : affiche le bandeau mode (UX §3.1 P3 décision —
+   * "adaptation visible par bandeau mode + sections conditionnelles,
+   * pas seulement par champs grisés"). Texte court, factuel.
+   */
+  function setBandeauMode(mode, famille, sousType) {
+    const bandeau = document.getElementById('evt-create-mode-bandeau');
+    if (!bandeau) return;
+
+    const LIBELLES = {
+      'A1': '🎯 Mode A1 — Entraînement (récurrence possible)',
+      'A2': '🏕️ Mode A2 — Stage (multi-jours)',
+      'A3': '⚔️ Mode A3 — Compétition simple (1 équipe, 1 adversaire)',
+      'A4': '🏆 Mode A4 — Plateau (multi-équipes, phases optionnelles)',
+      'A5': '🥇 Mode A5 — Tournoi (multi-équipes, phases obligatoires)'
+    };
+    bandeau.textContent = LIBELLES[mode] || ('Mode ' + mode);
+    bandeau.style.display = '';
+  }
+
+  /**
+   * v1.24 — Met à jour les blocs dynamiques pilotés par le nombre
+   * d'équipes cochées (Bloc 8b format-par-équipe, 8d adv-par-équipe,
+   * 8f phases-par-équipe-list, Bloc 10 affectations N2 plateau).
+   * Appelé sur change d'une checkbox équipe ET à chaque refresh
+   * updateCreateConditionalFields.
+   */
+  function updateMultiEquipesUI() {
+    const cbList = document.querySelectorAll('#evt-create-equipes .evt-eng-equipe-cb:checked');
+    const nbCoches = cbList.length;
+
+    const competSelect = document.getElementById('evt-create-compet');
+    const sousType = competSelect ? competSelect.value : '';
+    const isA4 = sousType === 'plateau';
+    const isA5 = sousType === 'tournoi';
+
+    const formatParEq = document.getElementById('evt-create-format-par-equipe');
+    const advParEq    = document.getElementById('evt-create-adv-par-equipe-zone');
+    const phasesParEq = document.getElementById('evt-create-phases-zone');
+    const affectN2    = document.getElementById('evt-create-affectations-n2-zone');
+
+    // Format par équipe visible si >= 2 équipes cochées (override M4)
+    if (formatParEq) {
+      formatParEq.style.display = (nbCoches >= 2) ? '' : 'none';
+      if (nbCoches >= 2) buildFormatParEquipeLines(cbList);
+    }
+
+    // Adv par équipe : peuplé si A4/A5 et au moins 1 équipe
+    if (advParEq && (isA4 || isA5) && nbCoches >= 1) {
+      buildAdvParEquipeLines(cbList);
+    }
+
+    // Phases par équipe : peuplé si A4 (avec phases_mode=oui) ou A5
+    if (phasesParEq && phasesParEq.style.display !== 'none' && nbCoches >= 1) {
+      buildPhasesParEquipeList(cbList);
+    }
+
+    // Affectations N2 : mode A4 plateau ET multi-équipes (>= 2)
+    if (affectN2) {
+      const showN2 = isA4 && nbCoches >= 2;
+      affectN2.style.display = showN2 ? '' : 'none';
+      if (showN2) buildAffectationsN2Lines(cbList);
+    }
+  }
+
+  // ────────────────────────────────────────────────────────────────
+  // v1.24 — PEUPLEMENT STAFF M8 (E-1 acté §4.6 doc UX, bloc passif
+  // → actif). Lecture dynamique collectif N1 role='staff' actif
+  // saison courante via SupabaseHub. Cache résultats par catégorie
+  // pour éviter re-fetch. Cases checkbox value=personne_id.
+  // ────────────────────────────────────────────────────────────────
+  let _staffLoadedForCat = null;
+  let _staffCache = [];
+
+  async function peuplerStaff() {
+    const wrap = document.getElementById('evt-create-staff');
+    if (!wrap) return;
+
+    // Idempotent : même catégorie déjà chargée
+    if (_staffLoadedForCat && _staffLoadedForCat === CTX_CATEGORIE_ID
+        && wrap.querySelector('input[type=checkbox]')) {
+      return;
+    }
+
+    if (!CTX_CATEGORIE_ID) {
+      wrap.innerHTML = '<div class="evt-form-error">Catégorie non '
+        + 'résolue : impossible de lister le staff. L\'évènement reste '
+        + 'créable ; complétez l\'encadrement depuis la fiche.</div>';
+      return;
+    }
+
+    wrap.innerHTML = '<div class="evt-form-hint">Chargement de la liste d\'encadrement…</div>';
+
+    let membres = [];
+    try {
+      // Pattern défensif : si SupabaseHub.listStaffParCategorie n'existe pas
+      // (wrapper potentiellement non livré), on tombe sur fallback honnête.
+      if (typeof SupabaseHub.listStaffParCategorie === 'function') {
+        membres = await SupabaseHub.listStaffParCategorie(CTX_CATEGORIE_ID);
+      } else if (typeof SupabaseHub.listCollectifMembresStaff === 'function') {
+        membres = await SupabaseHub.listCollectifMembresStaff(CTX_CATEGORIE_ID);
+      } else {
+        console.warn('peuplerStaff() : aucun wrapper SupabaseHub disponible pour lister le staff');
+        wrap.innerHTML = '<div class="evt-form-hint">Liste d\'encadrement '
+          + 'indisponible (wrapper non livré). Vous pourrez ajouter les '
+          + 'encadrants depuis la fiche après création.</div>';
+        return;
+      }
+    } catch (e) {
+      console.error('peuplerStaff()', e);
+      membres = [];
+    }
+
+    _staffCache = Array.isArray(membres) ? membres : [];
+    _staffLoadedForCat = CTX_CATEGORIE_ID;
+
+    if (_staffCache.length === 0) {
+      wrap.innerHTML = '<div class="evt-form-hint">Aucun staff actif '
+        + 'sur cette catégorie pour la saison en cours. Vous pourrez '
+        + 'ajouter les encadrants depuis la fiche.</div>';
+      return;
+    }
+
+    const html = _staffCache.map(function (m) {
+      // membre attendu : { personne_id, prenom, nom, role(s) }
+      const pid = m.personne_id || m.id || '';
+      const nom = escHtml(
+        ((m.prenom || '') + ' ' + (m.nom || '')).trim()
+        || m.libelle || m.email_principal || pid);
+      return '<label class="evt-eng-equipe-row">'
+        + '<input type="checkbox" class="evt-eng-staff-cb" '
+        + 'value="' + escHtml(pid) + '"> '
+        + nom + '</label>';
+    }).join('');
+    wrap.innerHTML = html;
+
+    // Hook change → met à jour le dropdown affectations N2 (qui ne
+    // doit proposer que les staff cochés ici, cohérence intra-modale
+    // D10 §3.1.6 doc UX).
+    wrap.querySelectorAll('.evt-eng-staff-cb').forEach(function (cb) {
+      cb.addEventListener('change', updateMultiEquipesUI);
+    });
+  }
+
+  // ────────────────────────────────────────────────────────────────
+  // v1.24 — HELPERS BLOCS MULTI-ÉQUIPES (F19 arborescence par équipe,
+  // doc UX §3.1.4). Tous générés dynamiquement depuis la liste des
+  // checkboxes cochées dans evt-create-equipes. Idempotent : recrée
+  // le contenu à chaque appel (anti-résidu si nb d'équipes change).
+  // ────────────────────────────────────────────────────────────────
+
+  /**
+   * Bloc 8b — Format par équipe (visible si >= 2 équipes cochées).
+   * 1 ligne par équipe avec dropdown format (override M4 §4.3).
+   */
+  function buildFormatParEquipeLines(checkedCbs) {
+    const wrap = document.getElementById('evt-create-format-lines');
+    if (!wrap) return;
+    const FORMATS = [
+      { v: '',   l: '— Hérité —' },
+      { v: 'XV', l: 'XV (15)' },
+      { v: '13', l: 'XIII' },
+      { v: '12', l: 'XII' },
+      { v: 'X',  l: 'X' },
+      { v: '9',  l: 'IX' },
+      { v: '8',  l: 'VIII' },
+      { v: '7',  l: 'VII' }
+    ];
+    const html = Array.prototype.map.call(checkedCbs, function (cb) {
+      const equipeId = cb.value;
+      const equipeLabel = cb.parentElement ? cb.parentElement.textContent.trim() : equipeId;
+      const optsHtml = FORMATS.map(function (f) {
+        return '<option value="' + escHtml(f.v) + '">' + escHtml(f.l) + '</option>';
+      }).join('');
+      return '<div class="evt-eng-format-row" data-equipe-id="' + escHtml(equipeId) + '">'
+        + '<span class="evt-eng-format-label">' + escHtml(equipeLabel) + '</span>'
+        + '<select class="evt-form-select evt-eng-format-select">'
+        + optsHtml + '</select>'
+        + '</div>';
+    }).join('');
+    wrap.innerHTML = html;
+  }
+
+  /**
+   * Bloc 8d — Adversaires par équipe (visible modes A4/A5 multi-équipes).
+   * 1 input texte par équipe pour saisir l'adversaire / nom de poule.
+   */
+  function buildAdvParEquipeLines(checkedCbs) {
+    const wrap = document.getElementById('evt-create-adv-par-equipe-lines');
+    if (!wrap) return;
+    const html = Array.prototype.map.call(checkedCbs, function (cb) {
+      const equipeId = cb.value;
+      const equipeLabel = cb.parentElement ? cb.parentElement.textContent.trim() : equipeId;
+      return '<div class="evt-eng-adv-row" data-equipe-id="' + escHtml(equipeId) + '">'
+        + '<span class="evt-eng-adv-label">' + escHtml(equipeLabel) + '</span>'
+        + '<input type="text" class="evt-form-input evt-eng-adv-input" '
+        + 'placeholder="Adversaire / nom poule (opt.)">'
+        + '</div>';
+    }).join('');
+    wrap.innerHTML = html;
+  }
+
+  /**
+   * Bloc 8f — Phases par équipe (F19 arborescence). 1 sous-conteneur
+   * par équipe cochée avec liste répétable de phases (+ matchs par phase).
+   * Pour cette livraison L3a : structure minimale (1 phase par défaut,
+   * boutons + Phase et + Match dans chaque phase). L'arborescence
+   * complète UI évoluera progressivement.
+   */
+  function buildPhasesParEquipeList(checkedCbs) {
+    const wrap = document.getElementById('evt-create-phases-par-equipe-list');
+    if (!wrap) return;
+    const html = Array.prototype.map.call(checkedCbs, function (cb) {
+      const equipeId = cb.value;
+      const equipeLabel = cb.parentElement ? cb.parentElement.textContent.trim() : equipeId;
+      return '<div class="evt-phases-equipe-block" data-equipe-id="' + escHtml(equipeId) + '" '
+        + 'style="border:1px solid var(--line); padding:8px; margin-bottom:8px; border-radius:4px;">'
+        + '<div class="evt-phases-equipe-title" style="font-weight:600; margin-bottom:6px;">'
+        + escHtml(equipeLabel) + '</div>'
+        + '<div class="evt-phases-list-for-equipe" data-equipe-id="' + escHtml(equipeId) + '">'
+        + '<div class="evt-form-hint">Au moins 1 phase requise par équipe. Édition fine depuis la fiche après création.</div>'
+        + '</div>'
+        + '</div>';
+    }).join('');
+    wrap.innerHTML = html;
+  }
+
+  /**
+   * Bloc 10 — Affectations N2 plateau (mode A4 plateau multi-équipes).
+   * 1 ligne par équipe avec dropdown contenant uniquement les coachs
+   * cochés en M8 (cohérence intra-modale D10 §3.1.6 — N2 sous-ensemble
+   * M8). Vide = pas d'affectation N2 explicite (staff évènement global).
+   */
+  function buildAffectationsN2Lines(checkedCbs) {
+    const wrap = document.getElementById('evt-create-affectations-n2-lines');
+    if (!wrap) return;
+
+    // Récupère les coachs cochés en M8
+    const staffCochesCbs = document.querySelectorAll('#evt-create-staff .evt-eng-staff-cb:checked');
+    if (staffCochesCbs.length === 0) {
+      wrap.innerHTML = '<div class="evt-form-hint">Aucun encadrant '
+        + 'coché en Bloc 9. Cochez d\'abord les coachs présents pour '
+        + 'pouvoir les affecter par équipe.</div>';
+      return;
+    }
+    const staffOptsHtml = '<option value="">— Aucun (staff global) —</option>'
+      + Array.prototype.map.call(staffCochesCbs, function (scb) {
+        const pid = scb.value;
+        const lbl = scb.parentElement ? scb.parentElement.textContent.trim() : pid;
+        return '<option value="' + escHtml(pid) + '">' + escHtml(lbl) + '</option>';
+      }).join('');
+
+    const html = Array.prototype.map.call(checkedCbs, function (cb) {
+      const equipeId = cb.value;
+      const equipeLabel = cb.parentElement ? cb.parentElement.textContent.trim() : equipeId;
+      return '<div class="evt-eng-n2-row" data-equipe-id="' + escHtml(equipeId) + '" '
+        + 'style="display:flex; gap:8px; align-items:center; margin-bottom:4px;">'
+        + '<span style="flex:0 0 40%;">' + escHtml(equipeLabel) + '</span>'
+        + '<select class="evt-form-select evt-eng-n2-select" style="flex:1;">'
+        + staffOptsHtml + '</select>'
+        + '</div>';
+    }).join('');
+    wrap.innerHTML = html;
   }
 
   // v1.16 — U2 §3.1/3.2 : OUI → « Phases & matchs » se substitue à 4c
@@ -3242,6 +3606,13 @@
     }).join('');
     wrap.innerHTML = html;
     _eq4aLoadedForCat = CTX_CATEGORIE_ID;
+
+    // v1.24 — Hook change → met à jour les blocs dynamiques pilotés
+    // par le nombre d'équipes cochées (format-par-équipe, adv-par-
+    // équipe, phases-par-équipe-list, affectations N2 plateau).
+    wrap.querySelectorAll('.evt-eng-equipe-cb').forEach(function (cb) {
+      cb.addEventListener('change', updateMultiEquipesUI);
+    });
   }
 
   // ────────────────────────────────────────────────────────────────
@@ -3430,18 +3801,38 @@
     return result;
   }
 
+  /**
+   * v1.24 — Soumission modale création refondue (5 modes adaptatifs).
+   * Construit le payload composite et appelle SupabaseHub.
+   * createEvenementComplet (RPC composite atomique sql/52). Voie
+   * « rapide » R3 §3.1.6 doc UX.
+   *
+   * Modes (cf. updateCreateConditionalFields) :
+   *   A1 = entrainement (récurrence optionnelle, equipe_id M14)
+   *   A2 = stage (equipe_id M14, date_fin)
+   *   A3 = competition + sous-type simple (1 équipe + 1 adversaire)
+   *   A4 = competition + plateau (multi-équipes, adv-par-équipe,
+   *        phases optionnelles, affectations N2)
+   *   A5 = competition + tournoi (phases obligatoires par équipe)
+   *
+   * Pour A1/A2 : payload minimaliste (pas d'equipes_engagees).
+   * Pour A3 : 1 équipe engagée + 1 adversaire (M5).
+   * Pour A4/A5 : N équipes engagées + N adversaires par équipe + N
+   *              phases par équipe + N affectations N2 plateau.
+   *
+   * Mode duplication : reste sur duplicateEvenement existant (voie
+   * « lente » REST inchangée, R4 §3.1.6).
+   */
   async function submitModalCreate() {
     const submitBtn = document.getElementById('evt-create-submit');
     const msg = document.getElementById('evt-create-msg');
     if (!submitBtn || !msg) return;
 
-    // Pré-requis context
     if (!CTX_SAISON_ID || !CTX_ORGANISATEUR_ID) {
       msg.innerHTML = '<div class="evt-form-error">Contexte saison/organisateur non chargé. Rechargez la page.</div>';
       return;
     }
 
-    // Lecture du form
     const f = document.getElementById('evt-create-form');
     if (!f) return;
 
@@ -3450,21 +3841,16 @@
       msg.innerHTML = '<div class="evt-form-error">Veuillez sélectionner un type d\'évènement</div>';
       return;
     }
-    const type = typeChecked.value;
-    // v1.15 — RÉGRESSION : la modale (evenements.html non mis à jour)
-    // émet encore match|tournoi|journee_championnat → violerait
-    // evenements_type_check v1.2. On remappe vers la famille RÉELLE
-    // pour tout ce qui part en base. `type` (valeur radio brute) reste
-    // utilisé tel quel pour les hints client lisant l'ancien form.
-    const familleEvt = familleReelle(type);
-    const libelle = f.elements.libelle.value.trim();
-    const dateDebut = f.elements.date_debut.value;
-    const dateFin = f.elements.date_fin.value;
-    const siteId = f.elements.site_id.value;
-    const typeCompet = f.elements.type_competition.value;
-    const formatJeu = f.elements.format_de_jeu.value;
-    const adversaire = f.elements.adversaire_nom.value.trim();
-    const domicile = f.elements.domicile_exterieur.value;
+    const type        = typeChecked.value;
+    const familleEvt  = familleReelle(type);
+    const libelle     = f.elements.libelle.value.trim();
+    const dateDebut   = f.elements.date_debut.value;
+    const dateFin     = f.elements.date_fin.value;
+    const siteId      = f.elements.site_id.value;
+    const typeCompet  = f.elements.type_competition.value;
+    const adversaire  = f.elements.adversaire_nom.value.trim();
+    const domicile    = f.elements.domicile_exterieur.value;
+    const notes       = f.elements.notes_internes ? f.elements.notes_internes.value.trim() : '';
 
     // Validation
     if (!libelle) {
@@ -3475,203 +3861,250 @@
       msg.innerHTML = '<div class="evt-form-error">La date de début est requise</div>';
       return;
     }
-    if ((type === 'match' || type === 'journee_championnat') && !formatJeu) {
-      msg.innerHTML = '<div class="evt-form-error">Le format de jeu est requis pour ' + (type === 'match' ? 'un match' : 'une journée de championnat') + '</div>';
+    if (familleEvt === 'competition' && !typeCompet) {
+      msg.innerHTML = '<div class="evt-form-error">Le sous-type est requis pour une compétition</div>';
       return;
     }
 
-    // Construction du payload
-    const payload = {
-      code:                       generateEventCode(familleEvt, dateDebut),
-      libelle:                    libelle,
-      type_evenement:             familleEvt,
-      equipe_id:                  M14_TEAM_UUID,
-      saison_id:                  CTX_SAISON_ID,
-      organisateur_principal_id:  CTX_ORGANISATEUR_ID,
-      date_debut:                 new Date(dateDebut).toISOString()
-    };
-    if (dateFin)    payload.date_fin = new Date(dateFin).toISOString();
-    if (siteId)     payload.site_id = siteId;
-    if (typeCompet) payload.type_competition = typeCompet;
-    if (formatJeu)  payload.format_de_jeu = formatJeu;
-    if (adversaire) payload.adversaire_nom = adversaire;
-    if (domicile)   payload.domicile_exterieur = domicile;
+    // Branche duplication : voie « lente » REST inchangée (R4 §3.1.6)
+    const modeChecked = f.querySelector('input[name=create_mode]:checked');
+    const isDuplication = modeChecked && modeChecked.value === 'dupliquer' && MODAL_CREATE_DUP_SRC_ID;
+    if (isDuplication) {
+      return submitModalCreateDuplication(libelle, dateDebut, dateFin, siteId,
+        familleEvt, typeCompet, adversaire, domicile);
+    }
 
-    // Appel wrapper : branche selon mode (P2-E.1 duplication vs création vierge)
+    // ──────────────────────────────────────────────────────────────
+    // Construction payload composite createEvenementComplet (RPC sql/52)
+    // ──────────────────────────────────────────────────────────────
+    const payload = {
+      type_evenement:              familleEvt,
+      libelle:                     libelle,
+      code:                        generateEventCode(familleEvt, dateDebut),
+      date_debut:                  new Date(dateDebut).toISOString(),
+      saison_id:                   CTX_SAISON_ID,
+      organisateur_principal_id:   CTX_ORGANISATEUR_ID
+    };
+
+    // Champs optionnels racines
+    if (dateFin)   payload.date_fin = new Date(dateFin).toISOString();
+    if (siteId)    payload.site_id  = siteId;
+    if (typeCompet)payload.type_competition = typeCompet;
+    if (domicile)  payload.domicile_exterieur = domicile;
+    if (notes)     payload.notes_internes = notes;
+
+    // equipe_id racine : modes A1/A2 (entraînement/stage) → M14_TEAM_UUID
+    // requis par CHECK equipe_obligatoire_si_pas_parent. Modes A3/A4/A5
+    // (competition) → NULL (l'équipe est portée par les M3 evenement_
+    // equipes_engagees).
+    if (familleEvt === 'entrainement' || familleEvt === 'stage') {
+      payload.equipe_id = M14_TEAM_UUID;
+    }
+
+    // Mode A1 récurrence (JSONB recurrence brute, géré côté UI)
+    if (familleEvt === 'entrainement') {
+      const recToggle = document.getElementById('evt-create-recurrence-toggle');
+      if (recToggle && recToggle.checked) {
+        const freq = (document.getElementById('evt-create-recurrence-frequence') || {}).value || 'hebdomadaire';
+        const fin  = (document.getElementById('evt-create-recurrence-fin') || {}).value || '';
+        payload.recurrence = {
+          mode: 'recurrent',
+          frequence: freq,
+          fin: fin || null
+        };
+      }
+    }
+
+    // Modes A3/A4/A5 : engagement (M3 + M5)
+    if (familleEvt === 'competition') {
+      const cbList = Array.prototype.slice.call(
+        document.querySelectorAll('#evt-create-equipes .evt-eng-equipe-cb:checked'));
+      if (cbList.length === 0) {
+        msg.innerHTML = '<div class="evt-form-error">Au moins une équipe doit être engagée pour une compétition</div>';
+        return;
+      }
+
+      // Mode A3 (1 équipe + 1 adversaire mono)
+      // Mode A4/A5 (multi-équipes + adv-par-équipe)
+      const isA3 = cbList.length === 1 && typeCompet !== 'plateau' && typeCompet !== 'tournoi';
+
+      payload.equipes_engagees = cbList.map(function (cb, idx) {
+        const eqId = cb.value;
+        const localId = 'equipe_' + (idx + 1);
+        const eng = {
+          equipe_id:                 eqId,
+          evenement_equipe_id_local: localId,
+          ordre:                     idx + 1
+        };
+
+        // Format par équipe (override M4) si présent
+        const formatRow = document.querySelector(
+          '#evt-create-format-lines .evt-eng-format-row[data-equipe-id="' + eqId + '"] .evt-eng-format-select');
+        if (formatRow && formatRow.value) {
+          eng.format_de_jeu = formatRow.value;
+        }
+
+        // Adversaires de cette équipe (mode A3 mono ou A4/A5 par équipe)
+        const advs = [];
+        if (isA3 && adversaire) {
+          advs.push({ adversaire_nom: adversaire, ordre: 1 });
+        } else {
+          const advInput = document.querySelector(
+            '#evt-create-adv-par-equipe-lines .evt-eng-adv-row[data-equipe-id="' + eqId + '"] .evt-eng-adv-input');
+          if (advInput && advInput.value.trim()) {
+            advs.push({ adversaire_nom: advInput.value.trim(), ordre: 1 });
+          }
+        }
+        if (advs.length > 0) eng.adversaires = advs;
+
+        return eng;
+      });
+
+      // Phases par équipe (F19 arborescence) : modes A4 (avec phases_mode=oui) + A5
+      const phasesQ = document.getElementById('evt-create-phases-question');
+      const phasesQVisible = phasesQ && phasesQ.style.display !== 'none';
+      const phasesOuiEl = phasesQ && phasesQ.querySelector('input[name=phases_mode]:checked');
+      const phasesOui = (phasesQVisible && phasesOuiEl && phasesOuiEl.value === 'oui')
+                        || typeCompet === 'tournoi'; // A5 forcé
+
+      if (phasesOui) {
+        // Pour cette livraison L3a : structure minimale 1 phase par équipe
+        // (édition fine déportée à la fiche post-création, voie « lente » R4).
+        payload.phases_par_equipe = cbList.map(function (cb, idx) {
+          return {
+            evenement_equipe_id_local: 'equipe_' + (idx + 1),
+            phases: [
+              { libelle: 'Phase 1', ordre: 1 }
+            ]
+          };
+        });
+      }
+    }
+
+    // Encadrement M8 (tous modes, E-1 acté)
+    const staffCbs = Array.prototype.slice.call(
+      document.querySelectorAll('#evt-create-staff .evt-eng-staff-cb:checked'));
+    if (staffCbs.length > 0) {
+      payload.encadrants = staffCbs.map(function (cb) { return cb.value; });
+    }
+
+    // Affectations N2 plateau (mode A4 multi-équipes uniquement)
+    if (familleEvt === 'competition' && typeCompet === 'plateau') {
+      const n2Rows = document.querySelectorAll(
+        '#evt-create-affectations-n2-lines .evt-eng-n2-row');
+      const affectations = [];
+      Array.prototype.forEach.call(n2Rows, function (row, idx) {
+        const select = row.querySelector('.evt-eng-n2-select');
+        if (select && select.value) {
+          affectations.push({
+            evenement_equipe_id_local: 'equipe_' + (idx + 1),
+            personne_id: select.value
+          });
+        }
+      });
+      if (affectations.length > 0) {
+        payload.affectations_n2 = affectations;
+      }
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // Appel RPC composite
+    // ──────────────────────────────────────────────────────────────
     submitBtn.disabled = true;
     submitBtn.textContent = 'Création…';
     msg.innerHTML = '';
 
-    // P2-E.1 : mode duplication ?
-    const modeChecked = f.querySelector('input[name=create_mode]:checked');
-    const isDuplication = modeChecked && modeChecked.value === 'dupliquer' && MODAL_CREATE_DUP_SRC_ID;
-
     try {
-      let res;
-      if (isDuplication) {
-        // Mode duplication : appel duplicateEvenement(srcId, overrides)
-        // Les overrides sont les champs modifiés par l'utilisateur
-        const overrides = {
-          code: generateEventCode(familleEvt, dateDebut),
-          libelle: libelle,
-          type_evenement: familleEvt,
-          date_debut: new Date(dateDebut).toISOString(),
-          equipe_id: M14_TEAM_UUID,
-          saison_id: CTX_SAISON_ID,
-          organisateur_principal_id: CTX_ORGANISATEUR_ID
-        };
-        if (dateFin)    overrides.date_fin = new Date(dateFin).toISOString();
-        if (siteId)     overrides.site_id = siteId;
-        if (typeCompet) overrides.type_competition = typeCompet;
-        if (formatJeu)  overrides.format_de_jeu = formatJeu;
-        if (adversaire) overrides.adversaire_nom = adversaire;
-        if (domicile)   overrides.domicile_exterieur = domicile;
-        res = await SupabaseHub.duplicateEvenement(MODAL_CREATE_DUP_SRC_ID, overrides);
-      } else {
-        // Mode création vierge : appel createEvenement(payload) existant
-        res = await SupabaseHub.createEvenement(payload);
-      }
+      const res = await SupabaseHub.createEvenementComplet(payload);
 
       if (!res || !res.ok) {
-        msg.innerHTML = '<div class="evt-form-error">Échec : ' + escHtml((res && res.error) || 'erreur inconnue') + '</div>';
+        msg.innerHTML = '<div class="evt-form-error">Échec : '
+          + escHtml((res && res.error) || 'erreur inconnue') + '</div>';
         const modalBody = document.querySelector('#evt-overlay-create .evt-modal-body');
         if (modalBody) modalBody.scrollTop = 0;
         submitBtn.disabled = false;
         submitBtn.textContent = "Créer l'évènement";
         return;
       }
-      // Succès
-      const createdId = res.data && res.data.id ? res.data.id : null;
 
-      // v1.17 — Si mode Phases=OUI (UX §3.2) ET racine créée :
-      // orchestration M6 (phase-boîtes + matchs). Création
-      // progressive : on rend compte exactement, on n'annule rien.
-      const phasesQ = document.getElementById('evt-create-phases-question');
-      const phasesQVisible = phasesQ && phasesQ.style.display !== 'none';
-      const phasesOuiEl = phasesQ && phasesQ.querySelector('input[name=phases_mode]:checked');
-      const phasesOui = phasesQVisible && phasesOuiEl && phasesOuiEl.value === 'oui';
+      const createdId = res.evenementId;
+      msg.innerHTML = '<div class="evt-form-success">✅ Évènement créé (transaction atomique).</div>';
 
-      let phaseReport = '';
-      if (phasesOui && createdId && !isDuplication) {
-        const orch = await persisterPhasesEtMatchs(createdId, {
-          saison_id:                 CTX_SAISON_ID,
-          organisateur_principal_id: CTX_ORGANISATEUR_ID,
-          type_competition:          typeCompet || 'tournoi',
-          format_de_jeu:             formatJeu || '',
-          site_id:                   siteId || '',
-          date_debut:                new Date(dateDebut).toISOString()
-        });
-        if (orch.stopped) {
-          phaseReport = '<div class="evt-form-error">Compétition créée · '
-            + orch.phasesOk + ' phase(s) et ' + orch.matchsOk + ' match(s) enregistrés, '
-            + 'puis arrêt sur ' + escHtml(orch.stopInfo)
-            + '.<br><small>Ce qui est créé est conservé. Complétez le reste '
-            + 'depuis la fiche du tournoi (bouton + Match).</small></div>';
-        } else {
-          phaseReport = '<div class="evt-form-success">'
-            + orch.phasesOk + ' phase(s) et ' + orch.matchsOk
-            + ' match(s) enregistrés.</div>';
-        }
-      }
-
-      // v1.18 — Persistance ENGAGEMENT M3/M5 (dette 1). Addition pure,
-      // gardée par : famille competition + pas duplication + créé +
-      // mode adversaires simples (phases_mode ≠ oui — la branche
-      // Phases=OUI persiste via `evenements` M6, v1.17, PAS M3/M5 ;
-      // frontière modèle v1.2 §4.4). Doctrine création progressive
-      // IDENTIQUE persisterPhasesEtMatchs : on n'annule rien, on rend
-      // compte exactement (P4 « le Hub avertit, ne bloque pas »).
-      let engReport = '';
-      if (familleEvt === 'competition' && createdId && !isDuplication
-          && !phasesOui) {
-        const cbList = Array.prototype.slice.call(
-          document.querySelectorAll('#evt-create-equipes .evt-eng-equipe-cb:checked'));
-        const advInputs = Array.prototype.slice.call(
-          document.querySelectorAll('#evt-create-adv-lines .evt-eng-adv-row input[type=text]'));
-        const advNoms = advInputs
-          .map(function (i) { return (i.value || '').trim(); })
-          .filter(function (v) { return v.length > 0; });
-
-        if (cbList.length > 0) {
-          let equipesOk = 0;
-          let advOk = 0;
-          let stopInfo = '';
-          let premiereLiaisonId = null;
-
-          for (let i = 0; i < cbList.length && !stopInfo; i++) {
-            const eqId = cbList[i].value;
-            const r = await SupabaseHub.addEquipeEngagee(createdId, {
-              equipe_id: eqId,
-              ordre:     i + 1
-            });
-            if (r && r.ok) {
-              equipesOk++;
-              if (!premiereLiaisonId && r.data && r.data.id) {
-                premiereLiaisonId = r.data.id;  // cible des adversaires (cas simple/triangulaire UX §2.4/4c)
-              }
-            } else {
-              stopInfo = 'l\'engagement de l\'équipe ' + (i + 1)
-                + ' (' + escHtml((r && r.error) || 'erreur inconnue') + ')';
-            }
-          }
-
-          // Adversaires (M5) rattachés à la 1re équipe engagée — cas
-          // simple/triangulaire (UX §2.4/4c, idiome unique). Le
-          // multi-équipe×adversaire fin n'est PAS sur-spécifié ici
-          // (anti-DS-1 : pas d'UX inventée).
-          if (!stopInfo && premiereLiaisonId && advNoms.length > 0) {
-            for (let j = 0; j < advNoms.length && !stopInfo; j++) {
-              const ra = await SupabaseHub.addAdversaire(premiereLiaisonId, {
-                adversaire_nom: advNoms[j],
-                ordre:          j + 1
-              });
-              if (ra && ra.ok) {
-                advOk++;
-              } else {
-                stopInfo = 'l\'adversaire « ' + escHtml(advNoms[j]) + ' » ('
-                  + escHtml((ra && ra.error) || 'erreur inconnue') + ')';
-              }
-            }
-          }
-
-          if (stopInfo) {
-            engReport = '<div class="evt-form-error">Engagement partiel : '
-              + equipesOk + ' équipe(s) et ' + advOk + ' adversaire(s) '
-              + 'enregistrés, puis arrêt sur ' + stopInfo
-              + '.<br><small>Ce qui est créé est conservé. Complétez le '
-              + 'reste depuis la fiche de la compétition.</small></div>';
-          } else {
-            engReport = '<div class="evt-form-success">'
-              + equipesOk + ' équipe(s) engagée(s)'
-              + (advOk > 0 ? ' et ' + advOk + ' adversaire(s)' : '')
-              + ' enregistrée(s).</div>';
-          }
-        }
-      }
-
-      msg.innerHTML = '<div class="evt-form-success">✅ Évènement '
-        + (isDuplication ? 'dupliqué' : 'créé') + '.</div>' + phaseReport + engReport;
       const modalBody = document.querySelector('#evt-overlay-create .evt-modal-body');
       if (modalBody) modalBody.scrollTop = 0;
+
       setTimeout(async () => {
         closeModalCreate();
         await reloadEvents();
-        // P2-E.1 G9 : si tournoi créé, ouvrir la fiche pour ajouter
-        // les matchs. v1.15 — l'ancien type='tournoi' est mort
-        // post-migration ; successeur 1:1 fidèle = le SOUS-TYPE
-        // type_competition='tournoi'. (Élargir aux autres sous-types
-        // à phases = U2, dépend evenements.html — NON pré-empté ici.)
-        // v1.17 : on ouvre AUSSI la fiche après orchestration Phases
-        // (réussie ou partielle) — l'utilisateur voit/complète.
-        if ((typeCompet === 'tournoi' || phasesOui) && createdId) {
+        // Ouvre la fiche si compétition (pour ajustements voie « lente »)
+        if (familleEvt === 'competition' && createdId) {
           openFiche(createdId);
         }
       }, 500);
     } catch (err) {
       console.error('submitModalCreate', err);
-      msg.innerHTML = '<div class="evt-form-error">Erreur inattendue : ' + escHtml(err.message || String(err)) + '</div>';
+      msg.innerHTML = '<div class="evt-form-error">Erreur inattendue : '
+        + escHtml(err.message || String(err)) + '</div>';
       const modalBody = document.querySelector('#evt-overlay-create .evt-modal-body');
       if (modalBody) modalBody.scrollTop = 0;
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Créer l'évènement";
+    }
+  }
+
+  /**
+   * v1.24 — Branche duplication isolée (préserve la logique v1.17/v1.18).
+   * Voie « lente » REST (duplicateEvenement + add wrappers progressifs),
+   * inchangée. R4 §3.1.6 doc UX intact.
+   */
+  async function submitModalCreateDuplication(libelle, dateDebut, dateFin,
+                                              siteId, familleEvt, typeCompet,
+                                              adversaire, domicile) {
+    const submitBtn = document.getElementById('evt-create-submit');
+    const msg = document.getElementById('evt-create-msg');
+    if (!submitBtn || !msg) return;
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Duplication…';
+    msg.innerHTML = '';
+
+    const overrides = {
+      code:                      generateEventCode(familleEvt, dateDebut),
+      libelle:                   libelle,
+      type_evenement:            familleEvt,
+      date_debut:                new Date(dateDebut).toISOString(),
+      equipe_id:                 (familleEvt === 'competition') ? null : M14_TEAM_UUID,
+      saison_id:                 CTX_SAISON_ID,
+      organisateur_principal_id: CTX_ORGANISATEUR_ID
+    };
+    if (dateFin)    overrides.date_fin = new Date(dateFin).toISOString();
+    if (siteId)     overrides.site_id = siteId;
+    if (typeCompet) overrides.type_competition = typeCompet;
+    if (adversaire) overrides.adversaire_nom = adversaire;
+    if (domicile)   overrides.domicile_exterieur = domicile;
+
+    try {
+      const res = await SupabaseHub.duplicateEvenement(MODAL_CREATE_DUP_SRC_ID, overrides);
+      if (!res || !res.ok) {
+        msg.innerHTML = '<div class="evt-form-error">Échec duplication : '
+          + escHtml((res && res.error) || 'erreur inconnue') + '</div>';
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Créer l'évènement";
+        return;
+      }
+      const createdId = res.data && res.data.id ? res.data.id : null;
+      msg.innerHTML = '<div class="evt-form-success">✅ Évènement dupliqué.</div>';
+      setTimeout(async () => {
+        closeModalCreate();
+        await reloadEvents();
+        if (familleEvt === 'competition' && createdId) {
+          openFiche(createdId);
+        }
+      }, 500);
+    } catch (err) {
+      console.error('submitModalCreateDuplication', err);
+      msg.innerHTML = '<div class="evt-form-error">Erreur inattendue : '
+        + escHtml(err.message || String(err)) + '</div>';
       submitBtn.disabled = false;
       submitBtn.textContent = "Créer l'évènement";
     }
@@ -4042,8 +4475,120 @@
         document.querySelectorAll('.evt-overlay.show').forEach(o => o.classList.remove('show'));
       }
     });
+
+    // ──────────────────────────────────────────────────────────────
+    // v1.24 — CÂBLAGES NOUVEAUX ÉLÉMENTS HTML L4 (refonte UX Evt→Compo)
+    // ──────────────────────────────────────────────────────────────
+
+    // H-6 §3.4 : CTA primaire "Nouvel évènement" près de la barre de
+    // recherche (en plus du FAB existant). 2 entrées vers la même
+    // modale (cohérent inline onclick défensif L4 v2).
+    const ctaTop = document.getElementById('evt-btn-create-top');
+    if (ctaTop) ctaTop.addEventListener('click', openModalCreate);
+
+    // H-3 §3.4 : KPIs cliquables (compteurs → filtres actionnables).
+    document.querySelectorAll('[data-action="filter-set"]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const val = this.getAttribute('data-filter-value');
+        if (val === 'avenir') {
+          state.showPassed = false;
+        } else if (val === 'passes') {
+          state.showPassed = true;
+        }
+        savePrefs();
+        renderListe();
+      });
+    });
+
+    // H-2 §3.4 : Dropdown sous-type compétition (au lieu de pills).
+    const sousTypeSelect = document.getElementById('evt-soustype-select');
+    if (sousTypeSelect) {
+      sousTypeSelect.addEventListener('change', function () {
+        setSousTypeFilter(this.value);
+      });
+    }
+
+    // H-5 §3.4 : Bouton "Grouper par catégorie" admin-only. Le bouton
+    // est caché par défaut (style display:none HTML L4) ; révélé dans
+    // init() après auth check si isAdmin. Câblage du click ici.
+    const btnGrouperAdmin = document.getElementById('evt-btn-grouper-categorie');
+    if (btnGrouperAdmin) {
+      btnGrouperAdmin.addEventListener('click', function () {
+        state.grouperParCategorie = !state.grouperParCategorie;
+        this.classList.toggle('active', state.grouperParCategorie);
+        savePrefs();
+        renderListe();
+      });
+    }
+
+    // §3.1.4 : Multi-jours toggle (modes A4/A5) — révèle la date_fin
+    // automatiquement quand coché.
+    const multijoursToggle = document.getElementById('evt-create-multijours-toggle');
+    if (multijoursToggle) {
+      multijoursToggle.addEventListener('change', function () {
+        const dateFinGroup = document.getElementById('evt-create-date-fin-group');
+        if (dateFinGroup) {
+          dateFinGroup.style.display = this.checked ? '' : 'none';
+        }
+      });
+    }
+
+    // §3.1.2 : Récurrence toggle (mode A1) — révèle les détails
+    // (fréquence + date fin série).
+    const recurrenceToggle = document.getElementById('evt-create-recurrence-toggle');
+    if (recurrenceToggle) {
+      recurrenceToggle.addEventListener('change', function () {
+        const detailsZone = document.getElementById('evt-create-recurrence-details');
+        if (detailsZone) {
+          detailsZone.style.display = this.checked ? '' : 'none';
+        }
+      });
+    }
+
+    // §3.1.4 : phases_mode radio change → recalcule visibilité phases-zone
+    // (utilisé seulement par mode A4 plateau, A5 tournoi force phases).
+    document.querySelectorAll('#evt-create-phases-question input[name=phases_mode]').forEach(function (radio) {
+      radio.addEventListener('change', updateCreateConditionalFields);
+    });
   }
 
+  /**
+   * v1.24 — Révèle le bouton "Grouper par catégorie" si l'utilisateur
+   * a le rôle admin (H-5 §3.4 doc UX, F22 résolu — bruit cognitif
+   * éliminé pour coach mono-catégorie). Appelé une fois après auth
+   * check dans init(). Défensif : si SupabaseHub.isAdmin n'est pas
+   * disponible, le bouton reste caché (échec côté sûreté).
+   */
+  async function revelerBoutonAdminSiAdmin() {
+    const btn = document.getElementById('evt-btn-grouper-categorie');
+    if (!btn) return;
+    try {
+      if (typeof SupabaseHub.isAdmin === 'function') {
+        const isAdmin = await SupabaseHub.isAdmin();
+        if (isAdmin) {
+          btn.style.display = '';
+          btn.classList.toggle('active', !!state.grouperParCategorie);
+        }
+      } else if (typeof SupabaseHub.hasRole === 'function') {
+        const hasAdminRole = await SupabaseHub.hasRole('admin');
+        if (hasAdminRole) {
+          btn.style.display = '';
+          btn.classList.toggle('active', !!state.grouperParCategorie);
+        }
+      } else {
+        console.warn('revelerBoutonAdminSiAdmin : aucun wrapper isAdmin/hasRole disponible');
+      }
+    } catch (e) {
+      console.warn('revelerBoutonAdminSiAdmin', e);
+    }
+  }
+
+  /**
+   * v1.24 — Toggle filtre TYPE refondu (HTML L4 : 4 pills, sous-type
+   * via dropdown séparé). Affiche/masque le bloc dropdown sous-type
+   * conditionnellement si famille Compétition active (H-2 doc UX §3.4).
+   * Remplace toggleCompetFilter pills par changement sur dropdown.
+   */
   function toggleTypeFilter(type) {
     if (type === 'all') {
       state.typesActifs.clear();
@@ -4060,12 +4605,19 @@
     document.querySelectorAll('.evt-chip[data-type]').forEach(c => {
       c.classList.toggle('active', state.typesActifs.has(c.getAttribute('data-type')));
     });
+    // v1.24 — Dropdown sous-type (HTML L4 evt-filters-soustype) visible
+    // si famille Compétition active (ou Tous). Remplace les 11 pills
+    // compétition retirées (cf. evenements.html L4 hunk 1).
+    const sousTypeRow = document.getElementById('evt-filters-soustype');
+    if (sousTypeRow) {
+      const showSousType = state.typesActifs.has('all')
+                        || state.typesActifs.has('competition');
+      sousTypeRow.style.display = showSousType ? 'flex' : 'none';
+    }
+    // v1.23 — Préserve compat éventuelle si evt-filters-compet existe
+    // encore (transition partielle). Sinon noop.
     const competRow = document.getElementById('evt-filters-compet');
     if (competRow) {
-      // U3 (v1.14) — le filtre COMPÉT. n'a de sens que pour la famille
-      // Compétition (UX §4, P1 : pas de filtre inopérant). v1.13 testait
-      // les valeurs techniques match|tournoi|journee_championnat,
-      // MORTES après migration v1.2 §5.1 → réaligné sur 'competition'.
       const showCompet = state.typesActifs.has('all')
                       || state.typesActifs.has('competition');
       competRow.style.display = showCompet ? 'flex' : 'none';
@@ -4074,6 +4626,24 @@
     renderListe();
   }
 
+  /**
+   * v1.24 — Filtre sous-type via dropdown (au lieu de pills v1.23).
+   * Le state interne reste competsActifs (compat pass()).
+   */
+  function setSousTypeFilter(value) {
+    if (!value || value === 'all') {
+      state.competsActifs.clear();
+      state.competsActifs.add('all');
+    } else {
+      state.competsActifs.clear();
+      state.competsActifs.add(value);
+    }
+    savePrefs();
+    renderListe();
+  }
+
+  // Préservé v1.23 pour rétrocompat (pills compet retirées HTML L4
+  // mais fonction conservée pour API publique si appelée ailleurs).
   function toggleCompetFilter(compet) {
     if (compet === 'all') {
       state.competsActifs.clear();
@@ -4099,7 +4669,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init S2.5 (v1.4.1)');
+    console.log('🏉 MOM Hub · Évènements Browser — init v1.24 (S3 Refonte UX Evt→Compo)');
 
     const list = document.getElementById('evt-list');
 
@@ -4133,6 +4703,11 @@
         '·', Object.keys(CHILDREN_BY_PARENT).length, 'tournoi(s) avec enfants');
 
       bindEvents();
+      // v1.24 — H-5 §3.4 : révèle le bouton admin "Grouper par catégorie"
+      // si l'utilisateur a le rôle admin (auth check asynchrone, non
+      // bloquant pour le rendu initial).
+      revelerBoutonAdminSiAdmin();
+
       renderKPIs();
       renderListe();
       renderMiniCal();
@@ -4168,7 +4743,7 @@
     closeFiche:        closeFiche
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.4.1 (S2.5) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.24 (S3 Refonte UX Evt→Compo · L3a) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
