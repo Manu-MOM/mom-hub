@@ -73,6 +73,31 @@
 --      scalar subquery (par sécurité, élimine définitivement le
 --      pattern problématique du script).
 --
+-- D-Q8 cree_par OMIS dans les INSERT (alignement strict pattern
+--      projet). Acté 27/05 suite à 3e incident à l'exécution
+--      smoke test :
+--        ERROR 23503 : insert or update on table "evenements"
+--        violates foreign key constraint "evenements_cree_par_fkey"
+--        Key (cree_par)=(<auth.uid()>) is not present in table
+--        "personnes".
+--      Cause racine : auth.uid() retourne l'UUID Supabase Auth de
+--      l'appelant, mais la FK cree_par pointe vers personnes.id.
+--      Le mapping auth.uid() → personne_id n'existe pas (dette
+--      LIAISON-IDENT-FOND / IDENT-SYS tracée STATE pt 14/15,
+--      « mapping auth→personnes inexistant »). Faute discipline
+--      anti-DS-1 du v3 (variable inventée vs comportement déployé).
+--      Cadrage source pattern projet : createEvenement v1.17 +
+--      addEquipeEngagee v1.19 + addAdversaire v1.19 + addMatchTo
+--      Tournoi v1.17 = TOUS laissent cree_par à NULL (whitelist
+--      sans ce champ). Le RPC v4 s'aligne strictement : cree_par
+--      OMIS dans les 5 INSERT (racine + M3 + phase + match + M8),
+--      la variable v_caller_uid est supprimée du DECLARE, l'init
+--      v_caller_uid := auth.uid() retirée. Anti-régression
+--      invisible vs le pattern déployé. La traçabilité créateur
+--      reste DETTE OUVERTE (LIAISON-IDENT-FOND / IDENT-SYS) à
+--      instruire séparément, non absorbée ici (« une conv = un
+--      sujet »).
+--
 -- ────────────────────────────────────────────────────────────
 -- OBSERVATIONS SCHÉMA ACTÉES
 -- ────────────────────────────────────────────────────────────
@@ -265,7 +290,6 @@ DECLARE
   v_local_id              TEXT;
   v_local_to_uuid         JSONB := '{}'::jsonb;  -- mapping local_id → uuid réel M3
   v_personne_id           UUID;
-  v_caller_uid            UUID;
   v_equipe_id_for_phase   UUID;       -- récupéré du mapping enrichi (4)
   v_m3_entry              JSONB;
   v_phase_ordre           INTEGER;
@@ -286,8 +310,6 @@ BEGIN
   IF NOT (has_role('admin') OR has_role('coach')) THEN
     RAISE EXCEPTION 'access denied: admin or coach role required (creer_evenement_complet)';
   END IF;
-
-  v_caller_uid := auth.uid();
 
   -- ────────────────────────────────────────────────────────
   -- (1) VALIDATION MINIMUMS
@@ -310,21 +332,23 @@ BEGIN
 
   -- ────────────────────────────────────────────────────────
   -- (2) INSERT racine evenements
+  --     cree_par OMIS : pattern projet aligné (createEvenement
+  --     v1.17 ne le renseigne pas non plus). FK personnes.id
+  --     non résolvable depuis auth.uid() — dette LIAISON-IDENT-
+  --     FOND / IDENT-SYS tracée STATE pt 14/15, non absorbée ici.
   -- ────────────────────────────────────────────────────────
   INSERT INTO public.evenements (
     code, libelle, type_evenement, type_competition,
     equipe_id, saison_id, format_de_jeu,
     date_debut, date_fin, site_id,
     organisateur_principal_id,
-    domicile_exterieur, recurrence, notes_internes,
-    cree_par
+    domicile_exterieur, recurrence, notes_internes
   ) VALUES (
     p_code, p_libelle, p_type_evenement, p_type_competition,
     p_equipe_id, p_saison_id, p_format_de_jeu,
     p_date_debut, p_date_fin, p_site_id,
     p_organisateur_principal_id,
-    p_domicile_exterieur, p_recurrence, p_notes_internes,
-    v_caller_uid
+    p_domicile_exterieur, p_recurrence, p_notes_internes
   ) RETURNING id INTO v_evenement_id;
 
   IF v_evenement_id IS NULL THEN
@@ -342,14 +366,13 @@ BEGIN
 
     FOR v_engagement IN SELECT * FROM jsonb_array_elements(p_equipes_engagees) LOOP
       INSERT INTO public.evenement_equipes_engagees (
-        evenement_id, equipe_id, format_de_jeu, ordre, notes, cree_par
+        evenement_id, equipe_id, format_de_jeu, ordre, notes
       ) VALUES (
         v_evenement_id,
         (v_engagement->>'equipe_id')::uuid,
         v_engagement->>'format_de_jeu',
         NULLIF(v_engagement->>'ordre', '')::integer,
-        v_engagement->>'notes',
-        v_caller_uid
+        v_engagement->>'notes'
       ) RETURNING id INTO v_evenement_equipe_id;
 
       v_n_m3_insere := v_n_m3_insere + 1;
@@ -419,8 +442,7 @@ BEGIN
           equipe_id, saison_id,
           date_debut,
           organisateur_principal_id,
-          evenement_parent_id, phase_libelle, ordre_dans_phase,
-          cree_par
+          evenement_parent_id, phase_libelle, ordre_dans_phase
         ) VALUES (
           v_phase_code,
           v_phase->>'libelle',
@@ -432,8 +454,7 @@ BEGIN
           p_organisateur_principal_id,
           v_evenement_id,
           v_phase->>'libelle',
-          NULLIF(v_phase->>'ordre', '')::integer,
-          v_caller_uid
+          NULLIF(v_phase->>'ordre', '')::integer
         ) RETURNING id INTO v_phase_id;
 
         -- Matchs dans cette phase
@@ -449,8 +470,7 @@ BEGIN
               date_debut,
               organisateur_principal_id,
               evenement_parent_id, phase_libelle, ordre_dans_phase,
-              adversaire_nom,
-              cree_par
+              adversaire_nom
             ) VALUES (
               v_match_code,
               v_match->>'libelle',
@@ -464,8 +484,7 @@ BEGIN
               v_phase_id,
               v_phase->>'libelle',
               NULLIF(v_match->>'ordre', '')::integer,
-              v_match->>'adversaire_nom',
-              v_caller_uid
+              v_match->>'adversaire_nom'
             );
           END LOOP;
         END IF;
@@ -483,12 +502,11 @@ BEGIN
 
     FOREACH v_personne_id IN ARRAY p_encadrants LOOP
       INSERT INTO public.evenement_encadrants (
-        evenement_id, personne_id, roles_encadrement, cree_par
+        evenement_id, personne_id, roles_encadrement
       ) VALUES (
         v_evenement_id,
         v_personne_id,
-        ARRAY['coach']::text[],
-        v_caller_uid
+        ARRAY['coach']::text[]
       );
       v_n_m8_insere := v_n_m8_insere + 1;
     END LOOP;
