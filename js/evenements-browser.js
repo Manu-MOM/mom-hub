@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.25 — Refonte UX Évt→Compo · L3b · renderFiche §3.2-3.3 (27 mai 2026)
+ * Version : 1.26 — UX-EVT-DOUBLON-GROUPER-BOUTON · retrait groupbar interne (27 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -792,6 +792,98 @@
  *          Provenance md5 chaîne maillon par maillon : v1.24 9a8a06d8
  *          → v1.25 (recollé après écriture, audit md5 byte-identité
  *          12/12 fonctions Suivi A/B/C joint à la livraison).
+ *
+ *   v1.26 : UX-EVT-DOUBLON-GROUPER-BOUTON · retrait groupbar interne
+ *          (Production · 27/05/2026, pt 20 suite 2) — Lève la dette
+ *          cosmétique `UX-EVT-DOUBLON-GROUPER-BOUTON` 🟢 ouverte pt 19
+ *          (observée terrain recette pt 19 : 2 boutons « Grouper par
+ *          catégorie » visibles simultanément).
+ *
+ *          DIAGNOSTIC (cartographie source v1.25) :
+ *            - Bouton OFFICIEL H-5 §3.4 doc UX FAIT FOI = bouton header
+ *              `<button id="evt-btn-grouper-categorie">` dans
+ *              `evenements.html` v3, caché display:none par défaut,
+ *              révélé conditionnellement par `revelerBoutonAdminSiAdmin`
+ *              v1.24 → ADMIN UNIQUEMENT (cohérent §3.4 H-5 admin-only
+ *              strict). Câblage handler dans `bindEvents` ligne 4801-
+ *              4809 : `state.grouperParCategorie = !` + `savePrefs()`
+ *              + `renderListe()`.
+ *            - Bouton LEGACY (doublon à retirer) = bloc `evt-groupbar`
+ *              rendu dynamiquement par `renderListe` (lignes 1241-
+ *              1255 v1.25) en tête de #evt-list. Handler câblé dans
+ *              `bindCardEvents` ligne 1340-1347 sur le sélecteur
+ *              `[data-action="toggle-grouper"]`. Reliquat de l'ère
+ *              U3 v1.14 (bascule « Grouper par catégorie » antérieure
+ *              à la doctrine UX §3.4 H-5 admin-only). VISIBLE PAR TOUS
+ *              les utilisateurs (coach inclus) → CONTRADICTION avec
+ *              doc UX §3.4 H-5 admin-only strict.
+ *
+ *          BONUS INATTENDU (correctif de gouvernance UX) : le retrait
+ *          du bouton interne ne se contente pas de lever le doublon
+ *          cosmétique, il CORRIGE aussi une régression silencieuse —
+ *          un coach non-admin voyait jusqu'à présent la groupbar
+ *          interne et pouvait activer le groupement par catégorie
+ *          alors que doc UX §3.4 H-5 réserve cette fonction à l'admin
+ *          strict. La gouvernance UX est désormais alignée doc.
+ *
+ *          PÉRIMÈTRE v1.26 (8 hunks ciblés diff prouvé minimal) :
+ *            (1) Bump version en-tête v1.25 → v1.26.
+ *            (2) Bloc changelog v1.26 ajouté en-tête (addition pure).
+ *            (3) Retrait bloc `const toggleBar = '<div class="evt-
+ *                groupbar">...</div>';` (lignes 1241-1255 v1.25, 15
+ *                lignes) + commentaire « U3 (v1.14) — bascule "Grouper
+ *                par catégorie" » associé.
+ *            (4) Adapt usage `list.innerHTML = toggleBar + '<div...'`
+ *                → `list.innerHTML = '<div...'` (branche total === 0).
+ *            (5) Adapt usage `let html = toggleBar;` → `let html = '';`
+ *                (branche total > 0).
+ *            (6) Retrait handler `[data-action="toggle-grouper"]`
+ *                dans `bindCardEvents` (lignes 1338-1347 v1.25, 10
+ *                lignes) + commentaire « U3 (v1.14) » associé. Mort
+ *                code après retrait (3).
+ *            (7) Bump console.log boot init v1.25 (L3b) → v1.26.
+ *            (8) Bump console.log boot final v1.25 (L3b) → v1.26.
+ *
+ *          Total : ~25 lignes retirées net, ~70 lignes ajoutées
+ *          (changelog v1.26 dense + ce bloc). `evenements.html` v3
+ *          NON TOUCHÉ (pas de CSS `.evt-groupbar` dans le `<style>`
+ *          v3 → aucun CSS mort à nettoyer, périmètre strict JS).
+ *
+ *          INVARIANTS PROTÉGÉS (preuve byte-identité dédiée md5 post-
+ *          écriture) :
+ *            - 12 fonctions Suivi A/B/C (zone touchée = renderListe +
+ *              bindCardEvents, hors fonctions Suivi)
+ *            - `renderFiche` v1.25 byte-identique md5 (zone L3b
+ *              §3.2-3.3 fiche évènement non touchée)
+ *            - `bindFicheActions` v1.25 byte-identique md5 (zone L3b
+ *              fiche évènement non touchée)
+ *            - Handlers Niveau 0 `ouvrir-groupe-base` + `ouvrir-
+ *              feuille-equipe` byte-identiques (dans bindFicheActions
+ *              non touchée)
+ *            - Helper `renderFonctionCellule` v1.25 byte-identique
+ *              (zone L3b non touchée)
+ *            - Bouton OFFICIEL H-5 admin-only `revelerBoutonAdmin
+ *              SiAdmin` v1.24 + son handler dans bindEvents ligne
+ *              4801-4809 byte-identiques (préservés strictement).
+ *
+ *          ÉCART GOUVERNANCE NEUF E-6 ASSUMÉ (à acter STATE pt 20
+ *          sous-bloc « suite 2 », pattern option 2 pt 11/15/16/17/19/
+ *          20) : cycle pt 20 = strict sujet `renderFiche` §3.2-3.3
+ *          fiche évènement (livraison principale v1.25 + passe CSS
+ *          L3b suite v3) ; `UX-EVT-DOUBLON-GROUPER-BOUTON` touche
+ *          l'écran d'accueil §3.4 = périmètre différent. Absorption
+ *          assumée pour cohérence fichier (continuité `evenements-
+ *          browser.js`, recette terrain pt 20 absorbe naturellement
+ *          v1.25 + v3 + v1.26).
+ *
+ *          Bump console.log boot : "v1.25 (S3 Refonte UX Evt→Compo ·
+ *          L3b)" → "v1.26 (S3 · UX-EVT-DOUBLON-GROUPER-BOUTON levée)".
+ *          S2a strict version-only pattern pt 17.
+ *
+ *          Provenance md5 chaîne maillon par maillon : v1.24 9a8a06d8
+ *          → v1.25 3c841387 → v1.26 (recollé après écriture, audit
+ *          md5 byte-identité 12/12 Suivi A/B/C + renderFiche +
+ *          bindFicheActions joint à la livraison).
  */
 
 (function () {
@@ -1238,24 +1330,16 @@
     const filteredPasses = state.showPassed ? EVENEMENTS_PASSES.filter(filterRoot) : [];
     const total = filteredAvenir.length + filteredPasses.length;
 
-    // U3 (v1.14) — bascule « Grouper par catégorie ». Injectée en tête
-    // de #evt-list (zone possédée par le module — Façon 1, aucune
-    // dépendance evenements.html). Liée dans bindCardEvents (appelé en
-    // fin de renderListe, là où sont liés les contrôles internes liste).
-    const toggleBar =
-      '<div class="evt-groupbar">' +
-        '<button type="button" class="evt-groupbar-btn' +
-          (state.grouperParCategorie ? ' active' : '') +
-          '" data-action="toggle-grouper" ' +
-          'aria-pressed="' + (state.grouperParCategorie ? 'true' : 'false') + '">' +
-          (state.grouperParCategorie
-            ? 'Grouper par catégorie : activé'
-            : 'Grouper par catégorie') +
-        '</button>' +
-      '</div>';
+    // v1.26 — Retrait du bloc legacy U3 v1.14 `evt-groupbar` (doublon
+    // de H-5 §3.4 doc UX FAIT FOI). Le bouton OFFICIEL admin-only est
+    // dans evenements.html v3 `<button id="evt-btn-grouper-categorie">`
+    // révélé conditionnellement par `revelerBoutonAdminSiAdmin` v1.24,
+    // câblé dans bindEvents (ligne ~4801). Lève dette `UX-EVT-DOUBLON-
+    // GROUPER-BOUTON` 🟢 + bonus correctif gouvernance (coach non-admin
+    // ne voit plus le toggle, cohérent H-5 admin-only strict).
 
     if (total === 0) {
-      list.innerHTML = toggleBar +
+      list.innerHTML =
         '<div class="evt-list-empty">Aucun évènement trouvé.<br><small>Essayez d\'élargir les filtres ou de modifier la recherche.</small></div>';
       bindCardEvents();
       return;
@@ -1267,7 +1351,7 @@
     // mois interne, tri chrono pur). true → regroupement par les 3
     // familles (ordre Compétition→Entraînement→Stage), tri chrono
     // conservé DANS chaque famille. renderSection JAMAIS modifiée.
-    let html = toggleBar;
+    let html = '';
     if (state.grouperParCategorie) {
       if (filteredPasses.length > 0) {
         html += renderSectionsParCategorie(filteredPasses, true, 'passés');
@@ -1335,16 +1419,11 @@
   }
 
   function bindCardEvents() {
-    // U3 (v1.14) — bascule « Grouper par catégorie ». Persistée dans
-    // les prefs existantes (savePrefs étendu), re-render immédiat.
-    const grpBtn = document.querySelector('[data-action="toggle-grouper"]');
-    if (grpBtn) {
-      grpBtn.addEventListener('click', function () {
-        state.grouperParCategorie = !state.grouperParCategorie;
-        savePrefs();
-        renderListe();
-      });
-    }
+    // v1.26 — Retrait du handler legacy `[data-action="toggle-grouper"]`
+    // U3 v1.14 (mort code suite à retrait du bouton interne, voir
+    // commentaire renderListe v1.26 ci-dessus). Le bouton OFFICIEL
+    // H-5 §3.4 admin-only est câblé directement dans bindEvents (ligne
+    // ~4801, byte-identique v1.24+), pas ici.
 
     document.querySelectorAll('.evt-card-chevron[data-action="toggle-tournoi"]').forEach(btn => {
       btn.addEventListener('click', function (e) {
@@ -4956,7 +5035,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init v1.25 (S3 Refonte UX Evt→Compo · L3b)');
+    console.log('🏉 MOM Hub · Évènements Browser — init v1.26 (S3 · UX-EVT-DOUBLON-GROUPER-BOUTON levée)');
 
     const list = document.getElementById('evt-list');
 
@@ -5030,7 +5109,7 @@
     closeFiche:        closeFiche
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.25 (S3 Refonte UX Evt→Compo · L3b) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.26 (S3 · UX-EVT-DOUBLON-GROUPER-BOUTON levée) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
