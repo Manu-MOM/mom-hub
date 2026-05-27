@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.29 — mai 2026
+ * Version : 1.30 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -696,6 +696,46 @@
  *          prouvé minimal. Provenance md5 chaîne maillon par
  *          maillon : v1.28 fad1439c → v1.29 (recollé par Manu
  *          après écriture). node --check OK.
+ *
+ *   v1.30 : Refonte UX Évt→Compo (Production · 27/05/2026, pt 19) —
+ *          1 NOUVEAU WRAPPER additif consommant la RPC composite
+ *          sql/52 creer_evenement_complet (SECURITY DEFINER,
+ *          transaction atomique côté serveur, 18 paramètres). Voie
+ *          « rapide » de la modale création refondue 5 modes
+ *          adaptatifs (doc UX FAIT FOI §3.1, R3 §3.1.6).
+ *
+ *          (1) createEvenementComplet(payload) : invocation RPC
+ *              avec mapping payload JS → paramètres SQL (préfixe
+ *              p_), validation minima côté client cohérente avec
+ *              la garde RPC serveur (6 champs requis :
+ *              type_evenement, libelle, code, date_debut, saison_id,
+ *              organisateur_principal_id). Retour { ok, evenementId,
+ *              error? } homogène avec les autres wrappers Évènements.
+ *
+ *          Différence avec createEvenement (v1.17) :
+ *            - createEvenement       = INSERT racine REST seul,
+ *                                      voie « lente » fiche pour
+ *                                      ajout progressif M3/M5/M6/
+ *                                      M8/N2 (wrappers REST séparés,
+ *                                      R4 §3.1.6 — INTACT).
+ *            - createEvenementComplet = transaction unique RPC
+ *                                       côté serveur, tout-ou-rien
+ *                                       atomique D-Q1, voie
+ *                                       « rapide » modale.
+ *
+ *          ADDITION PURE prouvée par diff vs original v1.29
+ *          vérifié md5 5ce8cb87 : seules 4 zones touchées —
+ *          (a) version header 1.29 → 1.30 (1 ligne),
+ *          (b) entrée changelog (ce bloc, addition pure),
+ *          (c) ajout fonction createEvenementComplet juste après
+ *              createEvenement (1 bloc additif autonome),
+ *          (d) console.log boot v1.29 chargé → v1.30 chargé
+ *              (1 ligne).
+ *          Wrappers v1.0 → v1.29 byte-identiques (preuve par diff).
+ *          Aucune signature publique modifiée. Aucun call-site
+ *          modifié. Provenance md5 chaîne maillon par maillon :
+ *          v1.29 5ce8cb87 → v1.30 (recollé après écriture).
+ *          node --check OK.
  */
 
 (function (global) {
@@ -1117,6 +1157,117 @@
         return { ok: false, error: error.message || 'Erreur INSERT evenements' };
       }
       return { ok: true, data: data };
+    },
+
+    /**
+     * Crée un évènement complet en UNE transaction atomique côté
+     * serveur, via la RPC composite sql/52 creer_evenement_complet
+     * (SECURITY DEFINER, garde has_role admin|coach). Voie « rapide »
+     * de la modale création refondue 5 modes adaptatifs (doc UX
+     * FAIT FOI Conception-UX-Parcours-Evt-Compo-v1.md §3.1, R3
+     * §3.1.6). Livré v1.30, 27/05/2026.
+     *
+     * Différence avec createEvenement (v1.17) :
+     *   - createEvenement       = INSERT racine REST seul, voie
+     *                             « lente » fiche pour ajout
+     *                             progressif M3/M5/M6/M8/N2 via
+     *                             wrappers REST séparés (R4 §3.1.6
+     *                             INTACT).
+     *   - createEvenementComplet = transaction unique RPC côté
+     *                              serveur, tout-ou-rien atomique
+     *                              D-Q1, voie « rapide » modale.
+     *                              Crée en 1 appel : evenements
+     *                              racine + N M3 + N M5 par M3 +
+     *                              N phases-boîtes M6 + N matchs +
+     *                              N M8 + N N2 staff.
+     *
+     * Validation client-side ALIGNÉE sur la garde serveur (anti-
+     * faux silencieux, message métier explicite avant round-trip
+     * réseau). Mapping payload JS → paramètres SQL via préfixe p_
+     * conforme signature RPC (18 paramètres, 6 obligatoires + 12
+     * optionnels).
+     *
+     * @param {Object} payload
+     *   OBLIGATOIRES :
+     *     - type_evenement              ('entrainement'|'competition'|'stage')
+     *     - libelle                     (string)
+     *     - code                        (string, unique côté UI)
+     *     - date_debut                  (ISO 8601 string)
+     *     - saison_id                   (UUID)
+     *     - organisateur_principal_id   (UUID, FK personnes)
+     *   OPTIONNELS (NULL OK côté table) :
+     *     - type_competition            (string, NULL si pas compétition)
+     *     - format_de_jeu               (string, format global racine A3)
+     *     - date_fin                    (ISO 8601, stage/multi-jours)
+     *     - site_id                     (UUID)
+     *     - domicile_exterieur          ('domicile'|'exterieur'|'neutre')
+     *     - equipe_id                   (UUID, entraînement/stage uniquement)
+     *     - recurrence                  (JSONB M2 série récurrente A1)
+     *     - notes_internes              (string)
+     *   COMPOSITES JSONB (cf. doc d'en-tête sql/52) :
+     *     - equipes_engagees            (Array d'objets, A3/A4/A5)
+     *     - phases_par_equipe           (Array d'objets, A4/A5 avec phases)
+     *     - encadrants                  (Array UUID personnes, tous modes)
+     *     - affectations_n2             (Array d'objets, A4/A5 multi-équipes)
+     *
+     * @returns {Promise<{ok: boolean, evenementId?: string, error?: string}>}
+     *   - ok=true + evenementId=UUID si succès
+     *   - ok=false + error=string si validation client ou RPC échoue
+     */
+    async createEvenementComplet(payload) {
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+        return { ok: false, error: 'Payload manquant ou invalide' };
+      }
+      // Validation minima alignée garde RPC serveur (sql/52 étape 1)
+      const required = [
+        'type_evenement', 'libelle', 'code',
+        'date_debut', 'saison_id', 'organisateur_principal_id'
+      ];
+      const missing = required.filter(f => !payload[f]);
+      if (missing.length > 0) {
+        return {
+          ok: false,
+          error: 'Champs requis manquants : ' + missing.join(', ')
+        };
+      }
+
+      // Mapping payload JS → paramètres SQL (préfixe p_, signature
+      // RPC 18 paramètres dans l'ordre exact du CREATE FUNCTION
+      // sql/52). Champs absents du payload → null explicite (Supabase
+      // JS supporte les paramètres nommés avec valeurs null pour
+      // déclencher les DEFAULT côté SQL).
+      const rpcParams = {
+        p_type_evenement:            payload.type_evenement,
+        p_libelle:                   payload.libelle,
+        p_code:                      payload.code,
+        p_date_debut:                payload.date_debut,
+        p_saison_id:                 payload.saison_id,
+        p_organisateur_principal_id: payload.organisateur_principal_id,
+        p_type_competition:          payload.type_competition          ?? null,
+        p_format_de_jeu:             payload.format_de_jeu             ?? null,
+        p_date_fin:                  payload.date_fin                  ?? null,
+        p_site_id:                   payload.site_id                   ?? null,
+        p_domicile_exterieur:        payload.domicile_exterieur        ?? null,
+        p_equipe_id:                 payload.equipe_id                 ?? null,
+        p_recurrence:                payload.recurrence                ?? null,
+        p_notes_internes:            payload.notes_internes            ?? null,
+        p_equipes_engagees:          payload.equipes_engagees          ?? null,
+        p_phases_par_equipe:         payload.phases_par_equipe         ?? null,
+        p_encadrants:                payload.encadrants                ?? null,
+        p_affectations_n2:           payload.affectations_n2           ?? null
+      };
+
+      const { data, error } = await client.rpc('creer_evenement_complet', rpcParams);
+
+      if (error) {
+        console.error('MOM Hub: createEvenementComplet()', error);
+        return {
+          ok: false,
+          error: error.message || 'Erreur RPC creer_evenement_complet'
+        };
+      }
+      // RPC retourne directement l'UUID évènement parent (RETURNS UUID)
+      return { ok: true, evenementId: data };
     },
 
     /**
@@ -4219,7 +4370,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.29 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.30 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
