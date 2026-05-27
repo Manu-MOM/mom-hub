@@ -1342,6 +1342,7 @@
         >
         <button type="button" class="evt-btn evt-btn-primary"
                 id="evt-btn-create-top" data-action="open-create"
+                onclick="if (window.EvenementsBrowser && window.EvenementsBrowser.openModalCreate) { window.EvenementsBrowser.openModalCreate(); }"
                 title="Créer un nouvel évènement">
           + Nouvel évènement
         </button>
