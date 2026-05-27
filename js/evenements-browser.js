@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.23 — Niveau 0 : activation accès « Feuille de match » (U-N3) (20 mai 2026)
+ * Version : 1.25 — Refonte UX Évt→Compo · L3b · renderFiche §3.2-3.3 (27 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -658,6 +658,140 @@
  *          jamais tracée en STATE absorbée ici, additif éditorial).
  *          Provenance md5 chaîne maillon par maillon : v1.23 a0af7b42
  *          → v1.24 (recollé après écriture).
+ *
+ *   v1.25 : Refonte UX Évt→Compo · L3b · renderFiche §3.2-3.3 (Production
+ *          · 27/05/2026, pt 20) — Refonte intégrale de la fiche évènement
+ *          conformément au doc UX FAIT FOI Conception-UX-Parcours-Evt-
+ *          Compo-v1.md md5 4c8652d9, §3.2 bannière 2 niveaux + §3.3 grille
+ *          8 liens fonctionnalités + 3 actions. Lève la dette UX-EVT-
+ *          FICHE-REFONTE 🟡 ouverte pt 19. Doctrine F-1 : fiche évènement
+ *          = centre névralgique, tout part de l'évènement créé.
+ *
+ *          STRUCTURE renderFiche v1.25 (9 blocs séquentiels) :
+ *            (1) Header navigation : bouton « ← Retour au calendrier »
+ *                F-4 + bouton contextuel « ↩ Retour à [parent] » si
+ *                evenement_parent_id (préserve navigation enfant→tournoi
+ *                parent du bloc v1.24 #4, remplace par bouton header).
+ *            (2) Identité compacte : date+type+libellé+pills (etat,
+ *                type_competition, domicile_exterieur). Bloc densifié
+ *                (la ligne « secondaire » dispersée v1.24 partie en
+ *                Niveau 1).
+ *            (3) Bannière Niveau 1 : 5 cellules auto-adaptatives
+ *                essentielles (HORAIRES, LIEU+domicile, ÉQUIPES
+ *                ENGAGÉES+formats, ADVERSAIRES synthèse, SCORE
+ *                conditionnel Q2 acté). Grille CSS auto-fit, gère
+ *                gracieusement 1 à 5 cellules selon données peuplées
+ *                (entraînement → 2 cellules HORAIRES+LIEU, compétition
+ *                multi-équipes → 4-5 cellules).
+ *            (4) Bannière Niveau 2 : 5 secondaires dépliables via
+ *                chevron (STRUCTURE PHASES + lien « voir le détail » →
+ *                #evt-phases-detail, RENDEZ-VOUS dégradation honnête
+ *                MODELE-EVT-HORAIRES-RDV 🟠, STATUT COMPOSITIONS,
+ *                ENCADREMENT résumé inline « Prénom N. », NOTES texte
+ *                libre absorbé depuis ancien bloc #10 v1.24).
+ *            (5) Bloc Suivi de rencontre : INVARIANT byte-identique
+ *                via renderSuiviSection(evt). Wrapper id="evt-suivi-
+ *                rencontre" addition pure pour ancre scroll depuis
+ *                grille 8 liens. Aucune modification du contenu.
+ *            (6) Grille FONCTIONNALITÉS DE L'ÉVÈNEMENT : 8 grands
+ *                boutons avec icône + titre + sous-titre + badge
+ *                statut honnête (Disponible ✅ / En cours ⏳ / À venir
+ *                🔜). Q4=C adaptation multi-équipes pour Compositions/
+ *                Groupes : 1 équipe → ouverture directe (handler
+ *                Niveau 0 INVARIANT) ; N équipes → expansion in-situ
+ *                avec liste équipes inline (handler expand-fonction
+ *                neuf, réutilise data-evenement-equipe-id +
+ *                ouvrir-groupe-base/ouvrir-feuille-equipe byte-
+ *                identiques). Lien Suivi (#2) = ancre scroll vers le
+ *                bloc (5). Lien Encadrement (#4) = expansion in-situ
+ *                avec liste M8 détaillée (édition unifiée via Modifier).
+ *                Liens #5-8 désactivés avec badges honnêtes.
+ *            (7) Sous-section #evt-phases-detail : préserve byte-
+ *                identique l'ancien bloc Phases du tournoi v1.24 #3
+ *                (regroupement par phase + matchs avec heure/libellé/
+ *                adversaire/badge). Valeur opérationnelle conservée,
+ *                scrolled depuis lien « voir le détail » Niveau 2.
+ *            (8) Bloc Logistique déplacement : préservé fonctionnel
+ *                byte-identique (P2-E.3 formulaire structuré + collapsible
+ *                + handler logistique-from-fiche). Position : entre
+ *                grille 8 liens et Actions. Affiché si
+ *                logistique_deplacement peuplé OU type='deplacement'.
+ *            (9) Actions §3.3 doc UX strict : « ✏️ Modifier » + « 📋
+ *                Dupliquer » + « 🗑 Supprimer » (3 boutons). Suivi
+ *                convention soft-delete projet : « Supprimer » = handler
+ *                cancel-from-fiche INVARIANT (etat='annule', scénario 5
+ *                modèle v1.1 « passé immuable »). Cas etat='annule' →
+ *                « ↩ Réactiver » (handler reactivate-from-fiche INVARIANT).
+ *
+ *          HELPER NEUF renderFonctionCellule(opts) : génère 1 cellule
+ *          de la grille (6) avec statut adaptatif Disponible/En cours/À
+ *          venir. Q4=C : Compositions/Groupes/Encadrement adaptatifs
+ *          selon nombre d'équipes engagées. Action 'expand-fonction'
+ *          neuve pour toggle expansion in-situ.
+ *
+ *          INVARIANTS BYTE-IDENTIQUES (preuve md5 individuel) :
+ *            - 12 fonctions Suivi A/B/C : renderSuiviRencontreBloc,
+ *              renderSuiviSection, refreshSuiviSection, bindSuiviActions,
+ *              suiviBuildUrl, suiviGenerer, suiviPartager,
+ *              modeVideoBuildUrl, renderModeVideoAcces, spectateurBuildUrl,
+ *              renderSpectateurAcces, renderTempsDeJeuMount
+ *            - Helpers utilitaires : escHtml, formatDateShort,
+ *              formatHeureOnly, statutCompoBadge, TYPE_LABELS,
+ *              EVENTS_BY_ID, CHILDREN_BY_PARENT, openFiche, closeFiche
+ *            - Handlers Niveau 0 réutilisés (réutilisation byte-
+ *              identique du data-action via la grille adaptative
+ *              Q4=C) : ouvrir-groupe-base, ouvrir-feuille-equipe
+ *            - Handlers actions préservés : edit-from-fiche, cancel-
+ *              from-fiche, reactivate-from-fiche, logistique-from-fiche
+ *            - Modale Création L4 v2 (openModalCreate, MODAL_CREATE_DUP
+ *              _SRC_ID, populateDupSourceDropdown, prefillFormFromSource)
+ *              réutilisée pour Modifier + Dupliquer via handlers.
+ *
+ *          HANDLERS NEUFS bindFicheActions v1.25 :
+ *            - retour-calendrier (closeFiche())
+ *            - retour-parent (closeFiche + openFiche(parent_id))
+ *            - toggle-niveau-2 (toggle hidden + aria-expanded + chevron)
+ *            - duplicate-from-fiche (closeFiche + openModalCreate +
+ *              bascule radio create_mode=dupliquer + présélection source)
+ *            - voir-suivi (scrollIntoView #evt-suivi-rencontre)
+ *            - voir-phases-detail (scrollIntoView #evt-phases-detail)
+ *            - expand-fonction (toggle hidden + aria-expanded de la
+ *              section expand-{sectionId})
+ *
+ *          HANDLERS RETIRÉS bindFicheActions v1.25 (écart gouvernance
+ *          E-5 §gouvernance, tracé en STATE pt 20) :
+ *            - compos-from-fiche (Q5=A : « Retour au calendrier » F-4
+ *              remplace ; navigation Évt↔Compos retravaillée en conv
+ *              UX-PARCOURS-NAV suivante)
+ *            - notes-from-fiche (Q3=B : Notes absorbées Niveau 2,
+ *              édition unifiée via Modifier)
+ *            - engager-equipe-from-fiche (Q3=B édition inline retirée)
+ *            - retirer-equipe-from-fiche (Q3=B édition inline retirée)
+ *            - ajouter-adversaire-from-fiche (Q3=B édition inline retirée)
+ *            - retirer-adversaire-from-fiche (Q3=B édition inline retirée)
+ *
+ *          ÉCART GOUVERNANCE NEUF E-5 (à acter STATE pt 20, pattern
+ *          option 2 pt 11/15/16/17/19) : Q3=B retire l'édition inline
+ *          M3/M5 (engager/retirer équipe, +/− adversaire) au profit du
+ *          parcours strict « Modifier rouvre la modale L4 v2 unique »
+ *          (centre névralgique F-1). Régression fonctionnelle ponctuelle
+ *          assumée : ajouter 1 adversaire = ouverture modale entière.
+ *          Cohérent doctrine P1 simplicité + parcours unifié. Tracé
+ *          changelog + STATE pt 20.
+ *
+ *          DETTE COSMÉTIQUE NON ABSORBÉE : UX-EVT-DOUBLON-GROUPER-BOUTON
+ *          🟢 (ouverte pt 19, sur écran d'accueil §3.4) reste ouverte —
+ *          sujet strict §3.2-3.3 ici, doublon est hors périmètre de la
+ *          fiche évènement.
+ *
+ *          Bump console.log boot : "v1.24 (S3 Refonte UX Evt→Compo)" →
+ *          "v1.25 (S3 Refonte UX Evt→Compo · L3b)" + "v1.24 (S3 Refonte
+ *          UX Evt→Compo · L3a) chargé" → "v1.25 (S3 Refonte UX Evt→Compo
+ *          · L3b) chargé". S2a strict version-only pattern pt 17.
+ *
+ *          Provenance md5 chaîne maillon par maillon : v1.24 9a8a06d8
+ *          → v1.25 (recollé après écriture, audit md5 byte-identité
+ *          12/12 fonctions Suivi A/B/C joint à la livraison).
  */
 
 (function () {
@@ -2012,41 +2146,68 @@
    *   Identité → Phases (si tournoi) → Logistique (conditionnelle) →
    *   Encadrants → Notes → Score (si rempli) → Actions
    */
+  // ============================================================
+  // v1.25 — renderFiche refondu (L3b · dette UX-EVT-FICHE-REFONTE)
+  // ============================================================
+  // Refonte intégrale §3.2-3.3 doc UX FAIT FOI md5 4c8652d9.
+  // Doctrine F-1 : fiche évènement = centre névralgique, tout part de
+  // l'évènement créé. 9 blocs séquentiels (voir bloc changelog v1.25
+  // en-tête fichier pour la spec complète).
+  //
+  // INVARIANTS BYTE-IDENTIQUES : renderSuiviSection, helpers utilitaires,
+  // handlers Niveau 0 ouvrir-groupe-base/ouvrir-feuille-equipe (réutilisés
+  // dans expansion in-situ multi-équipes Q4=C). RETIRÉS Q3=B + Q5=A
+  // (écart gouvernance E-5) : édition inline M3/M5, bouton Retour aux
+  // compositions, bouton Notes séparé.
+  // ============================================================
   function renderFiche(evt) {
     let html = '';
 
+    const isCompetition = evt.type_evenement === 'competition';
+    const isTournoi     = evt.type_evenement === 'tournoi';
+    const isMatch       = evt.type_evenement === 'match';
+    const eqEng  = Array.isArray(evt._equipesEngagees) ? evt._equipesEngagees : [];
+    const advAll = Array.isArray(evt._adversaires) ? evt._adversaires : [];
+    const eqNames = (evt._equipeNames && typeof evt._equipeNames === 'object')
+      ? evt._equipeNames : {};
+    const encadrants = Array.isArray(evt.encadrants) ? evt.encadrants : [];
+    const enfants = isTournoi ? (CHILDREN_BY_PARENT[evt.id] || []) : [];
+    const hasLogistique = evt.logistique_deplacement
+      && typeof evt.logistique_deplacement === 'object'
+      && Object.keys(evt.logistique_deplacement).length > 0;
+    const showLogistique = hasLogistique || evt.type_evenement === 'deplacement';
+    const editableEtat = (evt.etat !== 'annule' && evt.etat !== 'archive');
+    const hasScore = (evt.score_mom !== null && evt.score_mom !== undefined
+                      && evt.score_adverse !== null && evt.score_adverse !== undefined);
+
     // ────────────────────────────────────────────────
-    // 1. BANDEAU IDENTITÉ
+    // (1) HEADER NAVIGATION : retour calendrier F-4 + retour parent contextuel
+    // ────────────────────────────────────────────────
+    html += '<div class="evt-fiche-header">';
+    html += '<button type="button" class="evt-btn evt-fiche-back" data-action="retour-calendrier">← Retour au calendrier</button>';
+    if (evt.evenement_parent_id) {
+      const parent = EVENTS_BY_ID[evt.evenement_parent_id];
+      if (parent) {
+        const parentLib = parent.libelle || parent.code || '(tournoi parent)';
+        html += '<button type="button" class="evt-btn evt-fiche-back-parent" data-action="retour-parent" data-parent-id="' + escHtml(evt.evenement_parent_id) + '">↩ Retour à ' + escHtml(parentLib) + '</button>';
+      }
+    }
+    html += '</div>';
+
+    // ────────────────────────────────────────────────
+    // (2) IDENTITÉ COMPACTE
     // ────────────────────────────────────────────────
     const dateLib = formatDateShort(evt.date_debut);
     const typeLbl = TYPE_LABELS[evt.type_evenement] || evt.type_evenement;
-    const badge   = statutCompoBadge(evt.compo_status_summary);
     const etatPillCls = 'evt-fiche-pill-etat-' + (evt.etat || 'creation');
-
-    let secondaire = '';
-    if (evt.site_libelle_court) secondaire = escHtml(evt.site_libelle_court);
-    if (evt.adversaire_nom) {
-      secondaire += (secondaire ? ' · ' : '') + 'vs ' + escHtml(evt.adversaire_nom);
-    }
-    if (evt.type_competition) {
-      secondaire += (secondaire ? ' · ' : '') + escHtml(evt.type_competition);
-    }
-    if (evt.format_de_jeu) {
-      secondaire += (secondaire ? ' · ' : '') + escHtml(evt.format_de_jeu);
-    }
 
     html += '<div class="evt-fiche-identite">';
     html += '<div class="evt-fiche-identite-meta">' + escHtml(dateLib) + ' · ' + escHtml(typeLbl) + '</div>';
     html += '<div class="evt-fiche-identite-libelle">' + escHtml(evt.libelle || '(sans libellé)') + '</div>';
-    if (secondaire) {
-      html += '<div class="evt-fiche-identite-secondaire">' + secondaire + '</div>';
-    }
     html += '<div class="evt-fiche-identite-row">';
     html += '<span class="evt-fiche-pill ' + etatPillCls + '">État : ' + escHtml(evt.etat || 'creation') + '</span>';
-    if (evt.compo_status_summary && evt.compo_status_summary.total > 0) {
-      html += '<span class="evt-fiche-pill">' + escHtml(badge.libelle) + '</span>';
-    } else if (evt.type_evenement === 'match' || evt.type_evenement === 'tournoi') {
-      html += '<span class="evt-fiche-pill">0 compo · à faire</span>';
+    if (evt.type_competition) {
+      html += '<span class="evt-fiche-pill">' + escHtml(evt.type_competition) + '</span>';
     }
     if (evt.domicile_exterieur) {
       html += '<span class="evt-fiche-pill">' + escHtml(evt.domicile_exterieur) + '</span>';
@@ -2055,96 +2216,318 @@
     html += '</div>';
 
     // ────────────────────────────────────────────────
-    // 2. SCORE (si match joué)
+    // (3) BANNIÈRE NIVEAU 1 — 5 cellules auto-adaptatives essentielles §3.2
+    //     HORAIRES · LIEU+domicile · ÉQUIPES ENGAGÉES+formats · ADVERSAIRES
+    //     + 5ᵉ cellule conditionnelle SCORE (Q2 acté) si match avec score.
+    //     CSS grid auto-fit : 1-5 cellules selon données peuplées.
     // ────────────────────────────────────────────────
-    if (evt.score_mom !== null && evt.score_mom !== undefined && evt.score_adverse !== null && evt.score_adverse !== undefined) {
-      html += '<div class="evt-fiche-section">';
-      html += '<div class="evt-fiche-section-title">🏆 Score</div>';
-      html += '<div class="evt-fiche-score">';
-      html += '<span class="evt-fiche-score-num">' + escHtml(String(evt.score_mom)) + '</span>';
-      html += '<span class="evt-fiche-score-vs">—</span>';
-      html += '<span class="evt-fiche-score-num">' + escHtml(String(evt.score_adverse)) + '</span>';
-      html += '</div>';
+    html += '<div class="evt-fiche-banniere-n1">';
+
+    // HORAIRES (toujours visible si date_debut)
+    if (evt.date_debut) {
+      let horairesCellule = escHtml(formatHeureOnly(evt.date_debut));
+      if (evt.date_fin) {
+        horairesCellule += ' → ' + escHtml(formatHeureOnly(evt.date_fin));
+      }
+      html += '<div class="evt-fiche-n1-cellule">';
+      html += '<div class="evt-fiche-n1-label">Horaires</div>';
+      html += '<div class="evt-fiche-n1-value">' + horairesCellule + '</div>';
       html += '</div>';
     }
 
-    // ────────────────────────────────────────────────
-    // SUIVI DE LA RENCONTRE (SUIVI-COACH-1 Objet A)
-    //   Section dédiée — match|tournoi, etat ∉ {annule,archive}.
-    //   Rendu vide ('') si non applicable (P7 : ne se manifeste que
-    //   quand pertinente).
-    // ────────────────────────────────────────────────
-    html += renderSuiviSection(evt);
-
-    // ────────────────────────────────────────────────
-    // 3. PHASES (si tournoi avec enfants — repris depuis CHILDREN_BY_PARENT)
-    // ────────────────────────────────────────────────
-    if (evt.type_evenement === 'tournoi') {
-      const enfants = CHILDREN_BY_PARENT[evt.id] || [];
-      html += '<div class="evt-fiche-section">';
-      html += '<div class="evt-fiche-section-title">📋 Phases du tournoi</div>';
-      if (enfants.length === 0) {
-        html += '<div class="evt-fiche-empty">Aucun match interne créé pour ce tournoi.</div>';
-      } else {
-        // Regroupement par phase_libelle
-        const phases = [];
-        const byPhase = {};
-        enfants.forEach(c => {
-          const p = c.phase_libelle || '(sans phase)';
-          if (!byPhase[p]) { byPhase[p] = []; phases.push(p); }
-          byPhase[p].push(c);
-        });
-        phases.forEach(phaseName => {
-          html += '<div class="evt-fiche-phase-titre">📍 ' + escHtml(phaseName) + '</div>';
-          byPhase[phaseName].forEach(child => {
-            const heure = formatHeureOnly(child.date_debut);
-            const childBadge = statutCompoBadge(child.compo_status_summary);
-            const childLibStartsVs = (child.libelle || '').toLowerCase().indexOf('vs ') === 0;
-            const advBlock = childLibStartsVs
-              ? ''
-              : (child.adversaire_nom
-                  ? ' · vs ' + escHtml(child.adversaire_nom)
-                  : ' · <em style="color:var(--ink-mute)">(adv. à déterminer)</em>');
-            const isChildAnnule = child.etat === 'annule';
-            html += '<div class="evt-fiche-phase-row">';
-            html += '<span class="evt-fiche-phase-heure">' + escHtml(heure) + '</span>';
-            html += '<span style="flex:1;">' + escHtml(child.libelle || '') + advBlock + '</span>';
-            if (isChildAnnule) {
-              html += '<span class="evt-card-badge evt-badge-annule evt-badge-sm">Annulé</span>';
-            } else {
-              html += '<span class="evt-card-badge evt-badge-' + childBadge.cls + ' evt-badge-sm">' + escHtml(childBadge.libelle) + '</span>';
-            }
-            html += '</div>';
-          });
-        });
+    // LIEU + sous-ligne domicile/extérieur
+    if (evt.site_libelle_court) {
+      html += '<div class="evt-fiche-n1-cellule">';
+      html += '<div class="evt-fiche-n1-label">Lieu</div>';
+      html += '<div class="evt-fiche-n1-value">' + escHtml(evt.site_libelle_court) + '</div>';
+      if (evt.domicile_exterieur) {
+        html += '<div class="evt-fiche-n1-sub">🏠 ' + escHtml(evt.domicile_exterieur) + '</div>';
       }
       html += '</div>';
     }
 
-    // ────────────────────────────────────────────────
-    // 4. PARENT (si match enfant de tournoi)
-    // ────────────────────────────────────────────────
-    if (evt.evenement_parent_id) {
-      const parent = EVENTS_BY_ID[evt.evenement_parent_id];
-      if (parent) {
-        html += '<div class="evt-fiche-section">';
-        html += '<div class="evt-fiche-section-title">🏟️ Rattaché à</div>';
-        html += '<div class="evt-fiche-text">' + escHtml(parent.libelle || parent.code || '(tournoi parent)');
-        if (evt.phase_libelle) {
-          html += ' <span style="color:var(--ink-mute);">— ' + escHtml(evt.phase_libelle) + '</span>';
-        }
-        html += '</div>';
+    // ÉQUIPES ENGAGÉES (compétition + données chargées)
+    if (isCompetition && eqEng.length > 0) {
+      const formatsList = eqEng
+        .map(function (eq) {
+          const nomEq = eqNames[eq.equipe_id] || '(équipe)';
+          return eq.format_de_jeu
+            ? escHtml(nomEq) + ' : ' + escHtml(eq.format_de_jeu)
+            : escHtml(nomEq);
+        })
+        .join(' · ');
+      const plurNb = eqEng.length > 1 ? 's' : '';
+      html += '<div class="evt-fiche-n1-cellule">';
+      html += '<div class="evt-fiche-n1-label">Équipes engagées</div>';
+      html += '<div class="evt-fiche-n1-value">' + eqEng.length + ' équipe' + plurNb + ' engagée' + plurNb + '</div>';
+      html += '<div class="evt-fiche-n1-sub">' + formatsList + '</div>';
+      html += '</div>';
+    }
+
+    // ADVERSAIRES (synthèse compétition)
+    if (isCompetition && advAll.length > 0) {
+      const advNoms = advAll
+        .map(function (a) { return a.adversaire_nom; })
+        .filter(function (n) { return n; });
+      if (advNoms.length > 0) {
+        html += '<div class="evt-fiche-n1-cellule">';
+        html += '<div class="evt-fiche-n1-label">Adversaires</div>';
+        html += '<div class="evt-fiche-n1-value">' + advNoms.map(escHtml).join(', ') + '</div>';
         html += '</div>';
       }
     }
+    // Repli adversaire simple (cas non-compétition mais champ direct)
+    else if (!isCompetition && evt.adversaire_nom) {
+      html += '<div class="evt-fiche-n1-cellule">';
+      html += '<div class="evt-fiche-n1-label">Adversaire</div>';
+      html += '<div class="evt-fiche-n1-value">' + escHtml(evt.adversaire_nom) + '</div>';
+      html += '</div>';
+    }
+
+    // SCORE (5ᵉ cellule conditionnelle, Q2 acté)
+    if (hasScore) {
+      html += '<div class="evt-fiche-n1-cellule evt-fiche-n1-score">';
+      html += '<div class="evt-fiche-n1-label">Score</div>';
+      html += '<div class="evt-fiche-n1-value evt-fiche-n1-score-val">' + escHtml(String(evt.score_mom)) + ' — ' + escHtml(String(evt.score_adverse)) + '</div>';
+      html += '</div>';
+    }
+
+    html += '</div>';
 
     // ────────────────────────────────────────────────
-    // 5. LOGISTIQUE DÉPLACEMENT (conditionnelle, cf. doc §5.3 Q6)
-    //    P2-E.3 : formulaire structuré (remplace JSON brut)
-    //    P2-E.5 : collapsible mobile
+    // (4) BANNIÈRE NIVEAU 2 — 5 secondaires dépliables §3.2
+    //     STRUCTURE PHASES · RENDEZ-VOUS · STATUT COMPOSITIONS ·
+    //     ENCADREMENT · NOTES. Chevron pivotant via toggle-niveau-2.
     // ────────────────────────────────────────────────
-    const hasLogistique = evt.logistique_deplacement && typeof evt.logistique_deplacement === 'object' && Object.keys(evt.logistique_deplacement).length > 0;
-    const showLogistique = hasLogistique || evt.type_evenement === 'deplacement';
+    html += '<div class="evt-fiche-banniere-n2-toggle">';
+    html += '<button type="button" class="evt-btn evt-fiche-toggle-btn" data-action="toggle-niveau-2" aria-expanded="false">Afficher les détails <span class="evt-fiche-chevron-n2">▶</span></button>';
+    html += '</div>';
+    html += '<div class="evt-fiche-banniere-n2" id="evt-fiche-n2-body" hidden>';
+
+    // STRUCTURE PHASES (si tournoi avec enfants)
+    if (isTournoi && enfants.length > 0) {
+      const phasesSet = {};
+      enfants.forEach(function (c) {
+        const p = c.phase_libelle || '(sans phase)';
+        phasesSet[p] = true;
+      });
+      const nbPhases = Object.keys(phasesSet).length;
+      const nbMatchs = enfants.length;
+      const plurPh = nbPhases > 1 ? 's' : '';
+      const plurMa = nbMatchs > 1 ? 's' : '';
+      html += '<div class="evt-fiche-n2-cellule">';
+      html += '<div class="evt-fiche-n2-label">Structure phases</div>';
+      html += '<div class="evt-fiche-n2-value">' + nbPhases + ' phase' + plurPh + ' · ' + nbMatchs + ' match' + plurMa + ' prévu' + plurMa + '</div>';
+      html += '<button type="button" class="evt-btn evt-fiche-n2-link" data-action="voir-phases-detail">voir le détail →</button>';
+      html += '</div>';
+    }
+
+    // RENDEZ-VOUS (dette MODELE-EVT-HORAIRES-RDV 🟠 — dégradation honnête)
+    html += '<div class="evt-fiche-n2-cellule evt-fiche-n2-dette">';
+    html += '<div class="evt-fiche-n2-label">Rendez-vous</div>';
+    html += '<div class="evt-fiche-n2-value evt-fiche-n2-empty">— non saisi</div>';
+    html += '<div class="evt-fiche-n2-footnote">Dette modèle <code>MODELE-EVT-HORAIRES-RDV</code> 🟠</div>';
+    html += '</div>';
+
+    // STATUT COMPOSITIONS
+    const compoSummary = evt.compo_status_summary;
+    if (compoSummary && compoSummary.total > 0) {
+      const badge = statutCompoBadge(compoSummary);
+      html += '<div class="evt-fiche-n2-cellule">';
+      html += '<div class="evt-fiche-n2-label">Statut compositions</div>';
+      html += '<div class="evt-fiche-n2-value">' + escHtml(badge.libelle) + '</div>';
+      html += '<span class="evt-card-badge evt-badge-' + badge.cls + ' evt-badge-sm">' + escHtml(badge.libelle) + '</span>';
+      html += '</div>';
+    } else if (isCompetition || isMatch || isTournoi) {
+      html += '<div class="evt-fiche-n2-cellule">';
+      html += '<div class="evt-fiche-n2-label">Statut compositions</div>';
+      html += '<div class="evt-fiche-n2-value evt-fiche-n2-empty">0 compo · à faire</div>';
+      html += '</div>';
+    }
+
+    // ENCADREMENT (résumé inline « Prénom N. »)
+    if (encadrants.length > 0) {
+      const noms = encadrants.map(function (enc) {
+        const prenom = enc.prenom || '';
+        const nom = enc.nom || '';
+        if (prenom && nom) return prenom + ' ' + nom.charAt(0) + '.';
+        return prenom || nom || '(sans nom)';
+      });
+      html += '<div class="evt-fiche-n2-cellule">';
+      html += '<div class="evt-fiche-n2-label">Encadrement</div>';
+      html += '<div class="evt-fiche-n2-value">' + noms.map(escHtml).join(', ') + '</div>';
+      html += '</div>';
+    } else {
+      html += '<div class="evt-fiche-n2-cellule">';
+      html += '<div class="evt-fiche-n2-label">Encadrement</div>';
+      html += '<div class="evt-fiche-n2-value evt-fiche-n2-empty">— aucun encadrant rattaché</div>';
+      html += '</div>';
+    }
+
+    // NOTES (champ notes_internes existant, absorbé Niveau 2)
+    if (evt.notes_internes) {
+      html += '<div class="evt-fiche-n2-cellule evt-fiche-n2-notes">';
+      html += '<div class="evt-fiche-n2-label">Notes</div>';
+      html += '<div class="evt-fiche-n2-value evt-fiche-n2-prose">' + escHtml(evt.notes_internes) + '</div>';
+      html += '</div>';
+    } else {
+      html += '<div class="evt-fiche-n2-cellule evt-fiche-n2-dette">';
+      html += '<div class="evt-fiche-n2-label">Notes</div>';
+      html += '<div class="evt-fiche-n2-value evt-fiche-n2-empty">— aucune note</div>';
+      html += '<div class="evt-fiche-n2-footnote">Dette modèle <code>MODELE-EVT-NOTES</code> 🟡 (champ structuré à clarifier)</div>';
+      html += '</div>';
+    }
+
+    html += '</div>';  // /banniere-n2
+
+    // ────────────────────────────────────────────────
+    // (5) BLOC SUIVI DE RENCONTRE — INVARIANT byte-identique
+    //     renderSuiviSection préservée 100%. Wrapper id="evt-suivi-
+    //     rencontre" = addition pure pour ancre depuis lien #2 grille.
+    // ────────────────────────────────────────────────
+    const suiviHtml = renderSuiviSection(evt);
+    if (suiviHtml) {
+      html += '<div id="evt-suivi-rencontre">' + suiviHtml + '</div>';
+    }
+
+    // ────────────────────────────────────────────────
+    // (6) GRILLE FONCTIONNALITÉS DE L'ÉVÈNEMENT — 8 grands boutons §3.3
+    //     Statuts honnêtes Q-A28. Q4=C : Compositions/Groupes adaptatifs
+    //     selon nombre d'équipes engagées (1→direct INVARIANT, N→expand).
+    // ────────────────────────────────────────────────
+    html += '<div class="evt-fiche-grille-fonctions">';
+    html += '<div class="evt-fiche-grille-titre">Fonctionnalités de l\'évènement</div>';
+    html += '<div class="evt-fiche-grille-list">';
+
+    // Fonction #1 — Compositions (Feuilles de match par équipe)
+    html += renderFonctionCellule({
+      titre: '📋 Compositions',
+      sousTitre: 'Feuilles de match par équipe',
+      statut: eqEng.length > 0 ? 'disponible' : 'a-venir',
+      action: 'ouvrir-feuille-equipe',
+      multiEquipes: eqEng,
+      eqNames: eqNames,
+      evt: evt,
+      sectionId: 'compositions'
+    });
+
+    // Fonction #2 — Suivi (ancre interne vers bloc 5)
+    const suiviDispo = !!suiviHtml;
+    html += renderFonctionCellule({
+      titre: '⏱ Suivi',
+      sousTitre: 'Saisie observables match',
+      statut: suiviDispo ? 'disponible' : 'a-venir',
+      action: 'voir-suivi',
+      evt: evt,
+      hintIndisponible: suiviDispo ? null : 'hors période ou type d\'évènement'
+    });
+
+    // Fonction #3 — Groupes de base (Pioche dans le vivier)
+    html += renderFonctionCellule({
+      titre: '👥 Groupes de base',
+      sousTitre: 'Pioche dans le vivier',
+      statut: eqEng.length > 0 ? 'disponible' : 'a-venir',
+      action: 'ouvrir-groupe-base',
+      multiEquipes: eqEng,
+      eqNames: eqNames,
+      evt: evt,
+      sectionId: 'groupes'
+    });
+
+    // Fonction #4 — Encadrement (Staff et affectations)
+    html += renderFonctionCellule({
+      titre: '🧑‍🏫 Encadrement',
+      sousTitre: 'Staff et affectations',
+      statut: encadrants.length > 0 ? 'disponible' : 'a-venir',
+      action: 'expand-fonction',
+      evt: evt,
+      sectionId: 'encadrement',
+      encadrants: encadrants
+    });
+
+    // Fonction #5 — Vue terrain (en cours, dette UX-EVT-VUE-TERRAIN)
+    html += renderFonctionCellule({
+      titre: '🏟 Vue terrain',
+      sousTitre: 'Placement des joueurs',
+      statut: 'en-cours',
+      evt: evt
+    });
+
+    // Fonction #6 — Vue réseaux sociaux (à venir)
+    html += renderFonctionCellule({
+      titre: '📲 Vue réseaux sociaux',
+      sousTitre: 'Composition partageable',
+      statut: 'a-venir',
+      evt: evt
+    });
+
+    // Fonction #7 — Rapports (à venir)
+    html += renderFonctionCellule({
+      titre: '📝 Rapports',
+      sousTitre: 'Compte-rendu de match',
+      statut: 'a-venir',
+      evt: evt
+    });
+
+    // Fonction #8 — Statistiques (à venir)
+    html += renderFonctionCellule({
+      titre: '📊 Statistiques',
+      sousTitre: 'Synthèse chiffrée',
+      statut: 'a-venir',
+      evt: evt
+    });
+
+    html += '</div>';  // /grille-list
+    html += '</div>';  // /grille-fonctions
+
+    // ────────────────────────────────────────────────
+    // (7) SOUS-SECTION #evt-phases-detail (si tournoi avec enfants)
+    //     Préserve la valeur opérationnelle de l'ancien bloc « Phases du
+    //     tournoi » v1.24. Scrollée depuis lien « voir le détail » N2.
+    //     Regroupement par phase identique v1.24 (structure préservée).
+    // ────────────────────────────────────────────────
+    if (isTournoi && enfants.length > 0) {
+      const phases = [];
+      const byPhase = {};
+      enfants.forEach(function (c) {
+        const p = c.phase_libelle || '(sans phase)';
+        if (!byPhase[p]) { byPhase[p] = []; phases.push(p); }
+        byPhase[p].push(c);
+      });
+      html += '<div class="evt-fiche-section" id="evt-phases-detail">';
+      html += '<div class="evt-fiche-section-title">📋 Phases du tournoi (détail)</div>';
+      phases.forEach(function (phaseName) {
+        html += '<div class="evt-fiche-phase-titre">📍 ' + escHtml(phaseName) + '</div>';
+        byPhase[phaseName].forEach(function (child) {
+          const heure = formatHeureOnly(child.date_debut);
+          const childBadge = statutCompoBadge(child.compo_status_summary);
+          const childLibStartsVs = (child.libelle || '').toLowerCase().indexOf('vs ') === 0;
+          const advBlock = childLibStartsVs
+            ? ''
+            : (child.adversaire_nom
+                ? ' · vs ' + escHtml(child.adversaire_nom)
+                : ' · <em style="color:var(--ink-mute)">(adv. à déterminer)</em>');
+          const isChildAnnule = child.etat === 'annule';
+          html += '<div class="evt-fiche-phase-row">';
+          html += '<span class="evt-fiche-phase-heure">' + escHtml(heure) + '</span>';
+          html += '<span style="flex:1;">' + escHtml(child.libelle || '') + advBlock + '</span>';
+          if (isChildAnnule) {
+            html += '<span class="evt-card-badge evt-badge-annule evt-badge-sm">Annulé</span>';
+          } else {
+            html += '<span class="evt-card-badge evt-badge-' + childBadge.cls + ' evt-badge-sm">' + escHtml(childBadge.libelle) + '</span>';
+          }
+          html += '</div>';
+        });
+      });
+      html += '</div>';
+    }
+
+    // ────────────────────────────────────────────────
+    // (8) BLOC LOGISTIQUE DÉPLACEMENT — préservé fonctionnel P2-E.3
+    //     Handler logistique-from-fiche INVARIANT byte-identique.
+    //     Position entre grille 8 liens et Actions (au lieu de bloc #5
+    //     comme v1.24 — pas de changement comportemental).
+    // ────────────────────────────────────────────────
     if (showLogistique) {
       html += '<div class="evt-fiche-section evt-fiche-collapsible">';
       html += '<div class="evt-fiche-section-title">🚐 Logistique déplacement <span class="evt-fiche-chevron">▶</span></div>';
@@ -2158,12 +2541,12 @@
           ['Hébergement', lg.hebergement],
           ['Conducteurs', lg.conducteurs],
           ['Notes logistique', lg.notes_logistique]
-        ].filter(([, v]) => v);
+        ].filter(function (kv) { return kv[1]; });
         if (logRows.length > 0) {
-          logRows.forEach(([k, v]) => {
+          logRows.forEach(function (kv) {
             html += '<div style="display:flex;gap:8px;padding:4px 0;font-size:13px;border-bottom:1px solid var(--paper-warm);">';
-            html += '<div style="min-width:110px;font-family:\'JetBrains Mono\',monospace;font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-mute);padding-top:3px;">' + escHtml(k) + '</div>';
-            html += '<div style="flex:1;color:var(--ink);">' + escHtml(v) + '</div>';
+            html += '<div style="min-width:110px;font-family:\'JetBrains Mono\',monospace;font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-mute);padding-top:3px;">' + escHtml(kv[0]) + '</div>';
+            html += '<div style="flex:1;color:var(--ink);">' + escHtml(kv[1]) + '</div>';
             html += '</div>';
           });
         } else {
@@ -2172,239 +2555,157 @@
       } else {
         html += '<div class="evt-fiche-empty">Aucune logistique renseignée.</div>';
       }
-      if (evt.etat !== 'annule' && evt.etat !== 'archive') {
+      if (editableEtat) {
         html += '<div style="margin-top:8px;"><button type="button" class="evt-btn" data-action="logistique-from-fiche" data-event-id="' + escHtml(evt.id) + '" style="font-size:11px;">✏️ ' + (hasLogistique ? 'Modifier' : '+ Ajouter logistique') + '</button></div>';
       }
       html += '</div>';
       html += '</div>';
-    } else if (evt.etat !== 'annule' && evt.etat !== 'archive') {
-      // Pas de section logistique mais bouton discret pour en ajouter une
+    } else if (editableEtat && evt.type_evenement === 'deplacement') {
       html += '<div class="evt-fiche-section">';
       html += '<button type="button" class="evt-btn" data-action="logistique-from-fiche" data-event-id="' + escHtml(evt.id) + '" style="font-size:11px;color:var(--ink-mute);">+ Ajouter logistique de déplacement</button>';
       html += '</div>';
     }
 
     // ────────────────────────────────────────────────
-    // 5bis. ÉQUIPES ENGAGÉES + ADVERSAIRES (M3/M5)
-    //    v1.19 read-back · v1.20 édition (engager/retirer
-    //    équipe, ajouter/retirer adversaire). Compétitions
-    //    uniquement. Données attachées par openFiche (wrappers
-    //    LECTURE déployés) ; écritures via wrappers déployés
-    //    (add/removeEquipeEngagee, add/removeAdversaire). Noms via
-    //    listing, repli honnête UUID. Calqué sur le bloc Encadrants
-    //    (classes/collapsible P2-E.5) + patron data-action +
-    //    bindFicheActions (refresh = reactivate-from-fiche).
-    //    Édition gardée etat ∉ {annule,archive} (idem logistique).
-    // ────────────────────────────────────────────────
-    if (evt.type_evenement === 'competition') {
-      const eqEng  = Array.isArray(evt._equipesEngagees) ? evt._equipesEngagees : [];
-      const advAll = Array.isArray(evt._adversaires) ? evt._adversaires : [];
-      const eqNames = (evt._equipeNames && typeof evt._equipeNames === 'object')
-        ? evt._equipeNames : {};
-      const clubEq = Array.isArray(evt._equipesClub) ? evt._equipesClub : [];
-      const engEditable = (evt.etat !== 'annule' && evt.etat !== 'archive');
-      const engagedIds = {};
-      eqEng.forEach(function (eq) { engagedIds[eq.equipe_id] = true; });
-      html += '<div class="evt-fiche-section evt-fiche-collapsible">';
-      html += '<div class="evt-fiche-section-title">🏉 Équipes engagées <span class="evt-fiche-chevron">▶</span></div>';
-      html += '<div class="evt-fiche-section-body">';
-      if (eqEng.length === 0) {
-        html += '<div class="evt-fiche-empty">Aucune équipe engagée pour cette compétition.</div>';
-      } else {
-        html += '<ul class="evt-fiche-list">';
-        eqEng.forEach(function (eq) {
-          const nomEq = eqNames[eq.equipe_id] || eq.equipe_id || '(équipe inconnue)';
-          html += '<li class="evt-fiche-list-item">';
-          html += '<span class="evt-fiche-list-puce">•</span>';
-          html += '<div class="evt-fiche-list-content">';
-          html += '<div class="evt-fiche-list-name">' + escHtml(nomEq);
-          if (engEditable) {
-            html += ' <button type="button" class="evt-btn" data-action="retirer-equipe-from-fiche" data-liaison-id="' + escHtml(eq.id) + '" data-event-id="' + escHtml(evt.id) + '" style="font-size:10px;color:var(--ink-mute);">✕ retirer</button>';
-          }
-          html += '</div>';
-          if (eq.format_de_jeu) {
-            html += '<div class="evt-fiche-list-meta">Format : ' + escHtml(eq.format_de_jeu) + '</div>';
-          }
-          advAll
-            .filter(function (a) { return a.evenement_equipe_id === eq.id; })
-            .forEach(function (a) {
-              if (a.adversaire_nom) {
-                html += '<div class="evt-fiche-list-meta">vs ' + escHtml(a.adversaire_nom);
-                if (engEditable && a.id) {
-                  html += ' <button type="button" class="evt-btn" data-action="retirer-adversaire-from-fiche" data-adv-id="' + escHtml(a.id) + '" data-event-id="' + escHtml(evt.id) + '" style="font-size:10px;color:var(--ink-mute);">✕</button>';
-                }
-                html += '</div>';
-              }
-            });
-          if (engEditable) {
-            html += '<div class="evt-fiche-list-meta" style="margin-top:4px;">';
-            html += '<input type="text" class="evt-form-input" data-adv-input-for="' + escHtml(eq.id) + '" placeholder="Ajouter un adversaire…" style="font-size:12px;max-width:200px;">';
-            html += ' <button type="button" class="evt-btn" data-action="ajouter-adversaire-from-fiche" data-liaison-id="' + escHtml(eq.id) + '" data-event-id="' + escHtml(evt.id) + '" style="font-size:11px;">+ adversaire</button>';
-            html += '</div>';
-          }
-          if (eq.notes) {
-            html += '<div class="evt-fiche-list-meta">📝 ' + escHtml(eq.notes) + '</div>';
-          }
-          html += '</div>';
-          html += '</li>';
-        });
-        html += '</ul>';
-      }
-      if (engEditable) {
-        const dispo = clubEq.filter(function (e) { return e && e.id && !engagedIds[e.id]; });
-        html += '<div style="margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">';
-        if (dispo.length === 0) {
-          html += '<span class="evt-fiche-empty" style="margin:0;">'
-            + (clubEq.length === 0
-                ? 'Liste des équipes indisponible (chargement / hors-ligne).'
-                : 'Toutes les équipes du club sont déjà engagées.')
-            + '</span>';
-        } else {
-          html += '<select class="evt-form-select" data-eng-picker="' + escHtml(evt.id) + '" style="font-size:12px;max-width:220px;">';
-          html += '<option value="">— Engager une équipe… —</option>';
-          dispo.forEach(function (e) {
-            const lib = e.libelle_court || e.nom_officiel || e.code || e.id;
-            html += '<option value="' + escHtml(e.id) + '">' + escHtml(lib) + '</option>';
-          });
-          html += '</select>';
-          html += ' <button type="button" class="evt-btn" data-action="engager-equipe-from-fiche" data-event-id="' + escHtml(evt.id) + '" style="font-size:11px;">+ Engager</button>';
-        }
-        html += '</div>';
-      }
-      html += '</div>';
-      html += '</div>';
-    }
-
-    // ────────────────────────────────────────────────
-    // 5ter. ÉQUIPES & COMPOSITIONS (Niveau 0 — Collectif &
-    //    compo 3 niveaux, doc UX §1). Compétition + ≥1 équipe
-    //    engagée. Par équipe : nom + format (M3, lecture) + 2 accès
-    //    (Groupe de base U-N2 / Feuille U-N3). Réutilise les données
-    //    DÉJÀ attachées par openFiche (evt._equipesEngagees /
-    //    _equipeNames) — ZÉRO nouvel appel, ZÉRO openFiche touché.
-    //    Boutons honnêtement DÉGRADÉS (disabled + « bientôt ») tant
-    //    que U-N2 (étape b) / U-N3 (étape c) non livrés — patron
-    //    projet « jamais de trou silencieux ». data-evenement-equipe-id
-    //    = eq.id (evenement_equipes_engagees.id) = param U-N2/U-N3.
-    //    Convention ?evenement_equipe=<id> = SD-1 (a) assumée Manu.
-    // ────────────────────────────────────────────────
-    if (evt.type_evenement === 'competition') {
-      const eqEngN0 = Array.isArray(evt._equipesEngagees) ? evt._equipesEngagees : [];
-      if (eqEngN0.length > 0) {
-        const eqNamesN0 = (evt._equipeNames && typeof evt._equipeNames === 'object')
-          ? evt._equipeNames : {};
-        html += '<div class="evt-fiche-section evt-fiche-collapsible">';
-        html += '<div class="evt-fiche-section-title">🧩 Équipes &amp; compositions <span class="evt-fiche-chevron">▶</span></div>';
-        html += '<div class="evt-fiche-section-body">';
-        html += '<ul class="evt-fiche-list">';
-        eqEngN0.forEach(function (eq) {
-          const nomEq = eqNamesN0[eq.equipe_id] || eq.equipe_id || '(équipe inconnue)';
-          html += '<li class="evt-fiche-list-item">';
-          html += '<span class="evt-fiche-list-puce">•</span>';
-          html += '<div class="evt-fiche-list-content">';
-          html += '<div class="evt-fiche-list-name">' + escHtml(nomEq) + '</div>';
-          if (eq.format_de_jeu) {
-            html += '<div class="evt-fiche-list-meta">Format : ' + escHtml(eq.format_de_jeu) + '</div>';
-          }
-          html += '<div class="evt-fiche-list-meta" style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;">';
-          html += '<button type="button" class="evt-btn" data-action="ouvrir-groupe-base" data-evenement-equipe-id="' + escHtml(eq.id) + '" data-event-id="' + escHtml(evt.id) + '" title="Ouvrir le groupe de base de cette équipe engagée" style="font-size:11px;">👥 Groupe de base</button>';
-          html += '<button type="button" class="evt-btn" data-action="ouvrir-feuille-equipe" data-evenement-equipe-id="' + escHtml(eq.id) + '" data-event-id="' + escHtml(evt.id) + '" title="Ouvrir la feuille de match de cette équipe engagée" style="font-size:11px;">📋 Feuille de match</button>';
-          html += '</div>';
-          html += '</div>';
-          html += '</li>';
-        });
-        html += '</ul>';
-        html += '<div class="evt-fiche-empty" style="margin-top:6px;font-size:11px;">Accès Groupe de base (U-N2) et Feuille de match (U-N3) — activés aux étapes suivantes du chantier Collectif &amp; compo 3 niveaux.</div>';
-        html += '</div>';
-        html += '</div>';
-      }
-    }
-
-    // ────────────────────────────────────────────────
-    // 6. ENCADRANTS (array JSONB depuis la RPC)
-    //    P2-E.5 : collapsible mobile
-    // ────────────────────────────────────────────────
-    html += '<div class="evt-fiche-section evt-fiche-collapsible">';
-    html += '<div class="evt-fiche-section-title">👥 Encadrants <span class="evt-fiche-chevron">▶</span></div>';
-    html += '<div class="evt-fiche-section-body">';
-    const encadrants = Array.isArray(evt.encadrants) ? evt.encadrants : [];
-    if (encadrants.length === 0) {
-      html += '<div class="evt-fiche-empty">Aucun encadrant rattaché à cet évènement.</div>';
-    } else {
-      html += '<ul class="evt-fiche-list">';
-      encadrants.forEach(enc => {
-        const nomComplet = [enc.prenom, enc.nom].filter(Boolean).join(' ') || '(sans nom)';
-        const roles = Array.isArray(enc.roles_encadrement)
-          ? enc.roles_encadrement.join(', ')
-          : '';
-        html += '<li class="evt-fiche-list-item">';
-        html += '<span class="evt-fiche-list-puce">•</span>';
-        html += '<div class="evt-fiche-list-content">';
-        html += '<div class="evt-fiche-list-name">' + escHtml(nomComplet) + '</div>';
-        if (roles) {
-          html += '<div class="evt-fiche-list-meta">' + escHtml(roles) + '</div>';
-        }
-        if (enc.notes) {
-          html += '<div class="evt-fiche-list-meta">📝 ' + escHtml(enc.notes) + '</div>';
-        }
-        html += '</div>';
-        html += '</li>';
-      });
-      html += '</ul>';
-    }
-    html += '</div>';
-    html += '</div>';
-
-    // ────────────────────────────────────────────────
-    // 7. NOTES INTERNES
-    //    P2-E.5 : collapsible mobile
-    // ────────────────────────────────────────────────
-    if (evt.notes_internes) {
-      html += '<div class="evt-fiche-section evt-fiche-collapsible">';
-      html += '<div class="evt-fiche-section-title">📝 Notes internes <span class="evt-fiche-chevron">▶</span></div>';
-      html += '<div class="evt-fiche-section-body">';
-      html += '<div class="evt-fiche-text">' + escHtml(evt.notes_internes) + '</div>';
-      html += '</div>';
-      html += '</div>';
-    }
-
-    // ────────────────────────────────────────────────
-    // 8. ACTIONS EN PIED (P2-E.2 : boutons câblés)
+    // (9) ACTIONS §3.3 doc UX — Modifier / Dupliquer / Supprimer
+    //     OU Réactiver si etat='annule'. Convention soft-delete projet
+    //     préservée : « Supprimer » = handler cancel-from-fiche INVARIANT
+    //     (etat='annule', scénario 5 modèle v1.1 « passé immuable »).
     // ────────────────────────────────────────────────
     html += '<div class="evt-fiche-actions">';
-    // v1.12 — Bouton « Retour aux compositions » (pendant de symétrie du
-    // bouton Compos→Évènements « Retour aux évènements »). Toujours
-    // visible : navigation pure, aucune garde d'état inventée (utile
-    // aussi sur un évènement annulé/archivé). data-event-id porté par
-    // cohérence avec les boutons frères, NON consommé en version simple.
-    html += '<button type="button" class="evt-btn" data-action="compos-from-fiche" data-event-id="' + escHtml(evt.id) + '">← Retour aux compositions</button>';
-    if (evt.etat !== 'annule' && evt.etat !== 'archive') {
-      html += '<button type="button" class="evt-btn" data-action="edit-from-fiche" data-event-id="' + escHtml(evt.id) + '">✏️ Modifier</button>';
-      html += '<button type="button" class="evt-btn" data-action="notes-from-fiche" data-event-id="' + escHtml(evt.id) + '">📝 Notes</button>';
-    }
-    if (evt.etat === 'annule') {
+    if (editableEtat) {
+      html += '<button type="button" class="evt-btn evt-btn-primary" data-action="edit-from-fiche" data-event-id="' + escHtml(evt.id) + '">✏️ Modifier</button>';
+      html += '<button type="button" class="evt-btn" data-action="duplicate-from-fiche" data-event-id="' + escHtml(evt.id) + '">📋 Dupliquer</button>';
       html += '<div class="evt-fiche-actions-spacer"></div>';
+      html += '<button type="button" class="evt-btn evt-btn-danger" data-action="cancel-from-fiche" data-event-id="' + escHtml(evt.id) + '">🗑 Supprimer</button>';
+    } else if (evt.etat === 'annule') {
       html += '<button type="button" class="evt-btn evt-btn-primary" data-action="reactivate-from-fiche" data-event-id="' + escHtml(evt.id) + '">↩ Réactiver l\'évènement</button>';
-    } else if (evt.etat !== 'archive') {
-      html += '<div class="evt-fiche-actions-spacer"></div>';
-      html += '<button type="button" class="evt-btn evt-btn-danger" data-action="cancel-from-fiche" data-event-id="' + escHtml(evt.id) + '">🗑 Annuler l\'évènement</button>';
     }
     html += '</div>';
 
     return html;
   }
 
+  // ============================================================
+  // v1.25 — Helper renderFonctionCellule (grille 8 liens §3.3)
+  // ============================================================
+  // Génère 1 cellule de la grille FONCTIONNALITÉS. Statut ∈ {disponible,
+  // en-cours, a-venir}. Pour disponible : Compositions/Groupes adaptatifs
+  // selon nombre d'équipes (Q4=C : 1→direct via handler INVARIANT, N→
+  // expansion in-situ via expand-fonction qui réutilise les handlers
+  // Niveau 0 byte-identiques pour chaque équipe). Encadrement : expansion
+  // in-situ de la liste M8 détaillée (édition unifiée via Modifier).
+  // Suivi : scroll ancre interne vers bloc (5) renderSuiviSection.
+  // ============================================================
+  function renderFonctionCellule(opts) {
+    const statut = opts.statut || 'a-venir';
+    const evtId  = (opts.evt && opts.evt.id) || '';
+    const multi  = Array.isArray(opts.multiEquipes) ? opts.multiEquipes : null;
+    const eqN    = (opts.eqNames && typeof opts.eqNames === 'object') ? opts.eqNames : {};
+
+    let html = '<div class="evt-fiche-fonction evt-fiche-fonction-' + escHtml(statut) + '" data-fonction-section="' + escHtml(opts.sectionId || '') + '">';
+
+    // Badge statut honnête (sauf disponible)
+    let badgeLib = '';
+    if (statut === 'en-cours') badgeLib = 'en cours';
+    else if (statut === 'a-venir') badgeLib = 'à venir';
+    if (badgeLib) {
+      html += '<span class="evt-card-badge evt-badge-sm evt-fiche-fonction-badge">' + escHtml(badgeLib) + '</span>';
+    }
+
+    html += '<div class="evt-fiche-fonction-titre">' + opts.titre + '</div>';
+    html += '<div class="evt-fiche-fonction-soustitre">' + escHtml(opts.sousTitre) + '</div>';
+
+    // Statut disponible → mécanisme adaptatif
+    if (statut === 'disponible') {
+      // Compositions/Groupes multi-équipes adaptatif (Q4=C)
+      if (multi && (opts.action === 'ouvrir-feuille-equipe' || opts.action === 'ouvrir-groupe-base')) {
+        if (multi.length === 1) {
+          // 1 équipe → bouton direct (handler Niveau 0 INVARIANT)
+          const eq = multi[0];
+          html += '<button type="button" class="evt-btn evt-fiche-fonction-cta" data-action="' + escHtml(opts.action) + '" data-evenement-equipe-id="' + escHtml(eq.id) + '" data-event-id="' + escHtml(evtId) + '">Ouvrir →</button>';
+        } else {
+          // N équipes → expansion in-situ (handlers Niveau 0 réutilisés)
+          html += '<button type="button" class="evt-btn evt-fiche-fonction-cta" data-action="expand-fonction" data-fonction-target="' + escHtml(opts.sectionId) + '" aria-expanded="false">Choisir l\'équipe ▼</button>';
+          html += '<div class="evt-fiche-fonction-expand" id="evt-fiche-expand-' + escHtml(opts.sectionId) + '" hidden>';
+          multi.forEach(function (eq) {
+            const nomEq = eqN[eq.equipe_id] || eq.equipe_id || '(équipe)';
+            const formatStr = eq.format_de_jeu ? ' · ' + escHtml(eq.format_de_jeu) : '';
+            html += '<button type="button" class="evt-btn evt-fiche-fonction-expand-item" data-action="' + escHtml(opts.action) + '" data-evenement-equipe-id="' + escHtml(eq.id) + '" data-event-id="' + escHtml(evtId) + '">→ ' + escHtml(nomEq) + formatStr + '</button>';
+          });
+          html += '</div>';
+        }
+      }
+      // Suivi : ancre interne scroll
+      else if (opts.action === 'voir-suivi') {
+        html += '<button type="button" class="evt-btn evt-fiche-fonction-cta" data-action="voir-suivi" data-event-id="' + escHtml(evtId) + '">Voir ci-dessous ↓</button>';
+      }
+      // Encadrement : expansion in-situ (liste détaillée M8)
+      else if (opts.sectionId === 'encadrement') {
+        const enc = Array.isArray(opts.encadrants) ? opts.encadrants : [];
+        html += '<button type="button" class="evt-btn evt-fiche-fonction-cta" data-action="expand-fonction" data-fonction-target="encadrement" aria-expanded="false">Voir le détail ▼</button>';
+        html += '<div class="evt-fiche-fonction-expand" id="evt-fiche-expand-encadrement" hidden>';
+        if (enc.length === 0) {
+          html += '<div class="evt-fiche-empty">Aucun encadrant.</div>';
+        } else {
+          html += '<ul class="evt-fiche-list">';
+          enc.forEach(function (e) {
+            const nomComplet = [e.prenom, e.nom].filter(Boolean).join(' ') || '(sans nom)';
+            const roles = Array.isArray(e.roles_encadrement) ? e.roles_encadrement.join(', ') : '';
+            html += '<li class="evt-fiche-list-item">';
+            html += '<span class="evt-fiche-list-puce">•</span>';
+            html += '<div class="evt-fiche-list-content">';
+            html += '<div class="evt-fiche-list-name">' + escHtml(nomComplet) + '</div>';
+            if (roles) html += '<div class="evt-fiche-list-meta">' + escHtml(roles) + '</div>';
+            if (e.notes) html += '<div class="evt-fiche-list-meta">📝 ' + escHtml(e.notes) + '</div>';
+            html += '</div>';
+            html += '</li>';
+          });
+          html += '</ul>';
+        }
+        html += '<div class="evt-fiche-empty" style="font-size:11px;margin-top:6px;">Édition via « ✏️ Modifier » (rouvre la modale).</div>';
+        html += '</div>';
+      }
+    }
+    // Statut en-cours ou à-venir : grand bouton désactivé honnête
+    else {
+      const hint = opts.hintIndisponible;
+      html += '<button type="button" class="evt-btn evt-fiche-fonction-cta" disabled' + (hint ? ' title="' + escHtml(hint) + '"' : '') + '>—</button>';
+    }
+
+    html += '</div>';
+    return html;
+  }
+
   /**
-   * Câble les actions internes de la fiche détaillée (boutons Annuler /
-   * Réactiver). Appelé après chaque renderFiche pour rebrancher les listeners.
+   * Câble les actions internes de la fiche détaillée v1.25 (refonte
+   * §3.3 doc UX FAIT FOI md5 4c8652d9). 12 handlers délégués :
+   *   - 6 PRÉSERVÉS BYTE-IDENTIQUES v1.24 : cancel-from-fiche,
+   *     reactivate-from-fiche, edit-from-fiche, logistique-from-fiche,
+   *     ouvrir-groupe-base (Niveau 0), ouvrir-feuille-equipe (Niveau 0)
+   *   - 6 NEUFS v1.25 : retour-calendrier, retour-parent,
+   *     toggle-niveau-2, duplicate-from-fiche, voir-suivi,
+   *     voir-phases-detail, expand-fonction
+   *   - 6 RETIRÉS v1.24 (écart gouvernance E-5 acté STATE pt 20) :
+   *     compos-from-fiche, notes-from-fiche, engager-equipe-from-fiche,
+   *     retirer-equipe-from-fiche, ajouter-adversaire-from-fiche,
+   *     retirer-adversaire-from-fiche
+   * Appelé après chaque renderFiche pour rebrancher les listeners.
+   * Toggle collapsible mobile (logistique) préservé byte-identique.
+   * SUIVI-COACH-1 Objet A : bindSuiviActions() appelée en fin (INVARIANT).
    */
   function bindFicheActions() {
+    // ── PRÉSERVÉ v1.24 : Annuler évènement (renommé « Supprimer » dans
+    //    le label UI v1.25, handler INVARIANT cancel-from-fiche, convention
+    //    soft-delete projet préservée → openModalCancel).
     document.querySelectorAll('[data-action="cancel-from-fiche"]').forEach(btn => {
       btn.addEventListener('click', function () {
         const id = this.getAttribute('data-event-id');
         if (id) openModalCancel(id);
       });
     });
+    // ── PRÉSERVÉ v1.24 : Réactiver évènement (handler INVARIANT
+    //    reactivate-from-fiche, byte-identique v1.24).
     document.querySelectorAll('[data-action="reactivate-from-fiche"]').forEach(btn => {
       btn.addEventListener('click', async function () {
         const id = this.getAttribute('data-event-id');
@@ -2430,33 +2731,130 @@
         }
       });
     });
-    // P2-E.2 : boutons édition identité + notes
+    // ── PRÉSERVÉ v1.24 (P2-E.2) : édition identité via modale L4 v2.
+    //    Q3=B : édition unifiée — toutes les modifs M3/M5/M6/M8 passent
+    //    désormais par ce handler (centre névralgique F-1 §3.3 doc UX).
     document.querySelectorAll('[data-action="edit-from-fiche"]').forEach(btn => {
       btn.addEventListener('click', function () {
         const id = this.getAttribute('data-event-id');
         if (id) openModalEdit(id);
       });
     });
-    document.querySelectorAll('[data-action="notes-from-fiche"]').forEach(btn => {
+    // ── NEUF v1.25 (§3.3 ACTIONS) : Dupliquer = rouvre modale création
+    //    en mode Dupliquer avec présélection source = evt courant. Réutilise
+    //    le mécanisme existant openModalCreate() + radio create_mode + DOM
+    //    select evt-create-dup-source (P2-E.1 v1.5). closeFiche() avant
+    //    pour éviter le double-overlay (la modale create est un overlay
+    //    séparé, mais on ferme la fiche par cohérence ergonomique :
+    //    l'utilisateur veut créer un nouvel évènement copié, pas continuer
+    //    sur la fiche source).
+    document.querySelectorAll('[data-action="duplicate-from-fiche"]').forEach(btn => {
       btn.addEventListener('click', function () {
-        const id = this.getAttribute('data-event-id');
-        if (id) openModalEditNotes(id);
+        const srcId = this.getAttribute('data-event-id');
+        if (!srcId) return;
+        closeFiche();
+        openModalCreate();
+        // Bascule mode dupliquer (radio + déclenchement change pour
+        // afficher dupGroup via le handler v1.24 bindEvents existant).
+        const radioDup = document.querySelector('#evt-create-form input[name=create_mode][value=dupliquer]');
+        if (radioDup) {
+          radioDup.checked = true;
+          radioDup.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        // Présélection de la source (déclenche prefillFormFromSource via
+        // le handler change v1.24 bindEvents existant).
+        const dupSel = document.getElementById('evt-create-dup-source');
+        if (dupSel) {
+          dupSel.value = srcId;
+          dupSel.dispatchEvent(new Event('change', { bubbles: true }));
+        }
       });
     });
-    // v1.12 — Bouton « Retour aux compositions » : sibling strict de
-    // edit/notes-from-fiche. Navigation pure = réplique EXACTE du
-    // pattern déjà déployé 'suivi-aller-compo' ci-dessous (même
-    // commentaire d'honnêteté : pas de deep-link inventé, la convention
-    // d'URL de compositions.html n'est pas connue ; la version ciblée
-    // est un enabler conv Compos, non défini ici — zéro couplage
-    // inventé). data-event-id présent mais NON lu (version simple).
-    document.querySelectorAll('[data-action="compos-from-fiche"]').forEach(btn => {
+    // ── NEUF v1.25 (§3.2 F-4) : Retour au calendrier = ferme l'overlay
+    //    fiche, retour à la liste évènements. Remplace l'ancien
+    //    « Retour aux compositions » (Q5=A acté).
+    document.querySelectorAll('[data-action="retour-calendrier"]').forEach(btn => {
       btn.addEventListener('click', function () {
-        window.location.href = 'compositions.html';
+        closeFiche();
       });
     });
-    // Collectif & compo 3 niveaux (v1.22) — accès U-N2 « Groupe de
-    // base » (Niveau 0). Navigation pure calquée compos-from-fiche.
+    // ── NEUF v1.25 (§3.2) : Retour parent contextuel = navigation
+    //    enfant→tournoi parent. Préserve la valeur de l'ancien bloc
+    //    « Rattaché à » v1.24 (sous forme de bouton header).
+    document.querySelectorAll('[data-action="retour-parent"]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        const parentId = this.getAttribute('data-parent-id');
+        if (!parentId) return;
+        closeFiche();
+        openFiche(parentId);
+      });
+    });
+    // ── NEUF v1.25 (§3.2 chevron) : Toggle Niveau 2 dépliable.
+    //    Bascule attribut hidden + aria-expanded + classe chevron pour
+    //    rotation visuelle (CSS .evt-fiche-chevron-n2.is-open).
+    document.querySelectorAll('[data-action="toggle-niveau-2"]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        const body = document.getElementById('evt-fiche-n2-body');
+        if (!body) return;
+        const isOpen = !body.hasAttribute('hidden');
+        if (isOpen) {
+          body.setAttribute('hidden', '');
+          this.setAttribute('aria-expanded', 'false');
+        } else {
+          body.removeAttribute('hidden');
+          this.setAttribute('aria-expanded', 'true');
+        }
+        const chev = this.querySelector('.evt-fiche-chevron-n2');
+        if (chev) chev.classList.toggle('is-open', !isOpen);
+      });
+    });
+    // ── NEUF v1.25 (§3.3 lien #2) : Ancre interne vers bloc Suivi de
+    //    rencontre (id="evt-suivi-rencontre" wrappant
+    //    renderSuiviSection INVARIANT).
+    document.querySelectorAll('[data-action="voir-suivi"]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        const target = document.getElementById('evt-suivi-rencontre');
+        if (target && target.scrollIntoView) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    });
+    // ── NEUF v1.25 (§3.2 N2 lien) : Ancre interne vers sous-section
+    //    Phases du tournoi détail (id="evt-phases-detail").
+    document.querySelectorAll('[data-action="voir-phases-detail"]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        const target = document.getElementById('evt-phases-detail');
+        if (target && target.scrollIntoView) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    });
+    // ── NEUF v1.25 (§3.3 Q4=C) : Expansion in-situ d'une cellule de la
+    //    grille 8 liens (Compositions/Groupes multi-équipes, Encadrement).
+    //    Bascule attribut hidden + aria-expanded du conteneur
+    //    #evt-fiche-expand-{target}. Réutilise les handlers Niveau 0
+    //    INVARIANTS ouvrir-groupe-base/ouvrir-feuille-equipe pour chaque
+    //    item-équipe de l'expansion (cf. renderFonctionCellule).
+    document.querySelectorAll('[data-action="expand-fonction"]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        const targetId = this.getAttribute('data-fonction-target');
+        if (!targetId) return;
+        const panel = document.getElementById('evt-fiche-expand-' + targetId);
+        if (!panel) return;
+        const isOpen = !panel.hasAttribute('hidden');
+        if (isOpen) {
+          panel.setAttribute('hidden', '');
+          this.setAttribute('aria-expanded', 'false');
+        } else {
+          panel.removeAttribute('hidden');
+          this.setAttribute('aria-expanded', 'true');
+        }
+      });
+    });
+    // ── PRÉSERVÉ v1.22 BYTE-IDENTIQUE : accès U-N2 « Groupe de base ».
+    //    Réutilisé byte-identique dans la grille 8 liens v1.25
+    //    (Compositions cellule + Groupes cellule, cf. renderFonctionCellule
+    //    Q4=C). Navigation pure ?evenement_equipe=<id> = SD-1 (a).
     document.querySelectorAll('[data-action="ouvrir-groupe-base"]').forEach(btn => {
       btn.addEventListener('click', function () {
         const evtEqId = this.getAttribute('data-evenement-equipe-id');
@@ -2465,12 +2863,10 @@
         }
       });
     });
-    // Collectif & compo 3 niveaux (v1.23) — accès U-N3 « Feuille de
-    // match » (Niveau 0). Navigation pure, miroir BYTE-IDENTIQUE de
-    // ouvrir-groupe-base ci-dessus, seule différence = la cible
-    // (compositions.html au lieu de groupe-base.html). Zéro logique
-    // métier, zéro couplage module→module : l'URL ?evenement_equipe
-    // est lue par compositions-editor v3.8 qui bascule en mode U-N3.
+    // ── PRÉSERVÉ v1.23 BYTE-IDENTIQUE : accès U-N3 « Feuille de match ».
+    //    Miroir byte-identique de ouvrir-groupe-base (seule diff = cible
+    //    compositions.html). Réutilisé v1.25 dans la grille 8 liens
+    //    (Compositions cellule, cf. renderFonctionCellule Q4=C).
     document.querySelectorAll('[data-action="ouvrir-feuille-equipe"]').forEach(btn => {
       btn.addEventListener('click', function () {
         const evtEqId = this.getAttribute('data-evenement-equipe-id');
@@ -2479,138 +2875,29 @@
         }
       });
     });
-    // P2-E.5 : toggle collapsible mobile (logistique, encadrants, notes)
+    // ── PRÉSERVÉ v1.24 (P2-E.5) : toggle collapsible mobile pour le
+    //    bloc Logistique déplacement v1.25 (#8). Les autres collapsibles
+    //    v1.24 (Équipes engagées, Équipes & compositions Niveau 0,
+    //    Encadrants, Notes internes) ont été absorbés dans la bannière
+    //    2 niveaux + grille 8 liens v1.25, seul Logistique reste
+    //    collapsible séparé.
     document.querySelectorAll('.evt-fiche-collapsible .evt-fiche-section-title').forEach(title => {
       title.addEventListener('click', function () {
         this.closest('.evt-fiche-collapsible').classList.toggle('is-open');
       });
     });
-    // P2-E.3 : bouton édition logistique
+    // ── PRÉSERVÉ v1.24 (P2-E.3) : bouton édition logistique (handler
+    //    logistique-from-fiche INVARIANT). Bloc Logistique v1.25 utilise
+    //    le même handler byte-identique.
     document.querySelectorAll('[data-action="logistique-from-fiche"]').forEach(btn => {
       btn.addEventListener('click', function () {
         const id = this.getAttribute('data-event-id');
         if (id) openModalLogistique(id);
       });
     });
-    // v1.20 — Édition de l'engagement depuis la fiche (M3/M5).
-    // Patron STRICTEMENT calqué sur reactivate-from-fiche ci-dessus :
-    // bouton désactivé → await wrapper DÉPLOYÉ → alert si échec →
-    // succès closeFiche(); await reloadEvents(); openFiche(id) (la
-    // fiche rerend, openFiche relit M3/M5). Wrappers déjà déployés
-    // (add/removeEquipeEngagee/addAdversaire v1.19, removeAdversaire
-    // v1.21). Aucune logique inventée, aucun nouveau SQL.
-    document.querySelectorAll('[data-action="engager-equipe-from-fiche"]').forEach(btn => {
-      btn.addEventListener('click', async function () {
-        const evtId = this.getAttribute('data-event-id');
-        if (!evtId) return;
-        const sel = document.querySelector('[data-eng-picker="' + evtId + '"]');
-        const equipeId = sel ? sel.value : '';
-        if (!equipeId) { alert('Sélectionne une équipe à engager.'); return; }
-        this.disabled = true;
-        const _t = this.textContent;
-        this.textContent = 'Engagement…';
-        try {
-          const res = await SupabaseHub.addEquipeEngagee(evtId, { equipe_id: equipeId });
-          if (!res || !res.ok) {
-            alert('Échec : ' + ((res && res.error) || 'erreur inconnue'));
-            this.disabled = false;
-            this.textContent = _t;
-            return;
-          }
-          closeFiche();
-          await reloadEvents();
-          openFiche(evtId);
-        } catch (err) {
-          console.error('engager-equipe-from-fiche', err);
-          alert('Erreur inattendue : ' + (err.message || err));
-          this.disabled = false;
-          this.textContent = _t;
-        }
-      });
-    });
-    document.querySelectorAll('[data-action="retirer-equipe-from-fiche"]').forEach(btn => {
-      btn.addEventListener('click', async function () {
-        const evtId = this.getAttribute('data-event-id');
-        const liaisonId = this.getAttribute('data-liaison-id');
-        if (!evtId || !liaisonId) return;
-        if (!confirm('Retirer cette équipe engagée ? Ses adversaires saisis seront aussi supprimés (cascade FK).')) return;
-        this.disabled = true;
-        const _t = this.textContent;
-        this.textContent = '…';
-        try {
-          const res = await SupabaseHub.removeEquipeEngagee(liaisonId);
-          if (!res || !res.ok) {
-            alert('Échec : ' + ((res && res.error) || 'erreur inconnue'));
-            this.disabled = false;
-            this.textContent = _t;
-            return;
-          }
-          closeFiche();
-          await reloadEvents();
-          openFiche(evtId);
-        } catch (err) {
-          console.error('retirer-equipe-from-fiche', err);
-          alert('Erreur inattendue : ' + (err.message || err));
-          this.disabled = false;
-          this.textContent = _t;
-        }
-      });
-    });
-    document.querySelectorAll('[data-action="ajouter-adversaire-from-fiche"]').forEach(btn => {
-      btn.addEventListener('click', async function () {
-        const evtId = this.getAttribute('data-event-id');
-        const liaisonId = this.getAttribute('data-liaison-id');
-        if (!evtId || !liaisonId) return;
-        const inp = document.querySelector('[data-adv-input-for="' + liaisonId + '"]');
-        const nom = inp ? inp.value.trim() : '';
-        if (!nom) { alert('Saisis le nom de l\'adversaire.'); return; }
-        this.disabled = true;
-        const _t = this.textContent;
-        this.textContent = '…';
-        try {
-          const res = await SupabaseHub.addAdversaire(liaisonId, { adversaire_nom: nom });
-          if (!res || !res.ok) {
-            alert('Échec : ' + ((res && res.error) || 'erreur inconnue'));
-            this.disabled = false;
-            this.textContent = _t;
-            return;
-          }
-          closeFiche();
-          await reloadEvents();
-          openFiche(evtId);
-        } catch (err) {
-          console.error('ajouter-adversaire-from-fiche', err);
-          alert('Erreur inattendue : ' + (err.message || err));
-          this.disabled = false;
-          this.textContent = _t;
-        }
-      });
-    });
-    document.querySelectorAll('[data-action="retirer-adversaire-from-fiche"]').forEach(btn => {
-      btn.addEventListener('click', async function () {
-        const evtId = this.getAttribute('data-event-id');
-        const advId = this.getAttribute('data-adv-id');
-        if (!evtId || !advId) return;
-        if (!confirm('Retirer cet adversaire ?')) return;
-        this.disabled = true;
-        try {
-          const res = await SupabaseHub.removeAdversaire(advId);
-          if (!res || !res.ok) {
-            alert('Échec : ' + ((res && res.error) || 'erreur inconnue'));
-            this.disabled = false;
-            return;
-          }
-          closeFiche();
-          await reloadEvents();
-          openFiche(evtId);
-        } catch (err) {
-          console.error('retirer-adversaire-from-fiche', err);
-          alert('Erreur inattendue : ' + (err.message || err));
-          this.disabled = false;
-        }
-      });
-    });
-    // SUIVI-COACH-1 Objet A : actions de la section Suivi
+    // ── PRÉSERVÉ v1.8+ : SUIVI-COACH-1 Objet A actions de la section
+    //    Suivi (bloc 5 renderFiche v1.25 — INVARIANT byte-identique
+    //    renderSuiviSection md5 aa631ebe...).
     bindSuiviActions();
   }
 
@@ -4669,7 +4956,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init v1.24 (S3 Refonte UX Evt→Compo)');
+    console.log('🏉 MOM Hub · Évènements Browser — init v1.25 (S3 Refonte UX Evt→Compo · L3b)');
 
     const list = document.getElementById('evt-list');
 
@@ -4743,7 +5030,7 @@
     closeFiche:        closeFiche
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.24 (S3 Refonte UX Evt→Compo · L3a) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.25 (S3 Refonte UX Evt→Compo · L3b) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
