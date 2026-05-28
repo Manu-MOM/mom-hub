@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.33 — mai 2026
+ * Version : 1.34 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -880,6 +880,37 @@
  *          Wrappers v1.0 → v1.32 byte-identiques (preuve par diff).
  *          Aucune signature publique modifiée. Aucun call-site modifié.
  *          Provenance md5 : v1.32 c1c5b41b → v1.33 (recollé après
+ *          écriture). node --check OK.
+ *   v1.34 : Production · Écran de gestion du staff (collectif N1). 1
+ *          wrapper ADDITIF listStaffDisponibles() alimentant la pioche
+ *          staff de u-admin (option A : déroulante des personnes staff).
+ *          Calque _resolveNoms / listJoueursCategorieEntente : RPC
+ *          SECURITY DEFINER gardée (sql/56 list_staff_disponibles),
+ *          PAS de SELECT client — `personnes` a 0 policy RLS (acté
+ *          v1.33), seul chemin de lecture = RPC. Sortie INCHANGÉE et
+ *          alignée sur listJoueursCategorieEntente : [{personne_id, nom,
+ *          prenom}] trié, [] si erreur (dégradation honnête). Filtre
+ *          staff = categorie_personne ILIKE '%staff%' LU À LA SOURCE
+ *          (sonde GROUP BY 28/05 : staff+parent_et_staff+joueur_et_
+ *          parent_et_staff = 46 ; aucune colonne devinée — personnes n'a
+ *          PAS de colonne `role`, le filtre vit dans categorie_personne).
+ *          Côté écriture : RIEN de neuf — addCollectifMembre accepte déjà
+ *          role:'staff' (v1.24) et la RLS write collectif_membre admin|
+ *          coach passe (patron addEquipeEngagee prouvé déployé), donc
+ *          aucune RPC d'écriture ni SECURITY DEFINER write requise pour
+ *          le staff. listCollectifMembres({role:'staff'}) existe déjà.
+ *
+ *          ADDITION PURE prouvée par diff vs original v1.33 vérifié
+ *          md5 fa6603c2 : 4 zones touchées —
+ *          (a) version header 1.33 → 1.34 (1 ligne),
+ *          (b) entrée changelog (ce bloc, addition pure),
+ *          (c) 1 méthode listStaffDisponibles insérée en fin d'objet
+ *              APRÈS appliquerBascule (virgule ajoutée à sa fermeture,
+ *              dernier membre de l'objet ; aucun voisin muté),
+ *          (d) console.log boot v1.33 → v1.34 chargé (1 ligne).
+ *          Wrappers v1.0 → v1.33 byte-identiques (preuve par diff).
+ *          Aucune signature publique modifiée. Aucun call-site modifié.
+ *          Provenance md5 : v1.33 fa6603c2 → v1.34 (recollé après
  *          écriture). node --check OK.
  */
 
@@ -5112,6 +5143,60 @@
         return { ok: false, error: error.message || 'Erreur application bascule' };
       }
       return { ok: true, data: data };
+    },
+
+    // ============================================================
+    // PRODUCTION · STAFF DU COLLECTIF N1  (v1.34)
+    //   Pioche staff de u-admin (option A). Côté écriture, RIEN de
+    //   neuf : addCollectifMembre(role:'staff') + listCollectifMembres
+    //   ({role:'staff'}) existent depuis v1.24. Seul manque = la SOURCE
+    //   de pioche, ici résolue par RPC (personnes RLS-verrouillée).
+    // ============================================================
+
+    /**
+     * U-admin pioche STAFF (option A) — les personnes staff du club,
+     * pour rattachement manuel à l'entente sélectionnée. Calque exact
+     * de listJoueursCategorieEntente côté SORTIE, mais la SOURCE diffère :
+     * il n'existe AUCUNE table d'affectation staff par catégorie
+     * (sonde 3a : pas de equipe_staff ; evenement_encadrants est au
+     * niveau évènement, pas saison) — donc pas de filtre par entente,
+     * l'admin choisit qui rattacher (Q1 acté : un staff peut encadrer
+     * plusieurs catégories ; le rattachement est un geste explicite).
+     *
+     * `personnes` ayant 0 policy RLS (acté v1.33), le SELECT client
+     * est impossible -> lecture via RPC SECURITY DEFINER gardée
+     * (sql/56 list_staff_disponibles), patron get_noms_personnes /
+     * apercu_bascule. Filtre serveur = categorie_personne ILIKE
+     * '%staff%' (LU à la source, 46 personnes ; cf. sql/56). Payload
+     * RGPD minimal {personne_id, nom, prenom}, jamais les colonnes
+     * sensibles de personnes.
+     *
+     * Doublons attendus (IDENT-DOUBLONS, non résolu ici) : BELKIS /
+     * HELM / VOEGELI ont une fiche staff distincte -> 1 ligne staff
+     * chacune ; RULFO = 1 fiche double-rôle -> 1 ligne. Relève
+     * d'IDENT-SYS, hors périmètre.
+     *
+     * @returns {Promise<Array>} [{personne_id, nom, prenom}] trié
+     *   nom/prenom ; [] si erreur (dégradation honnête, miroir
+     *   listJoueursCategorieEntente).
+     */
+    async listStaffDisponibles() {
+      const { data, error } = await client.rpc('list_staff_disponibles');
+      if (error) {
+        console.error('MOM Hub: listStaffDisponibles()', error);
+        return [];
+      }
+      if (!Array.isArray(data)) return [];
+      // Sortie alignée sur listJoueursCategorieEntente : objets plats
+      // {personne_id, nom, prenom}. La RPC trie déjà (nom, prenom) ;
+      // on normalise les NULL éventuels sans réordonner.
+      return data.map(function (r) {
+        return {
+          personne_id: r.personne_id,
+          nom:    r.nom || '',
+          prenom: r.prenom || ''
+        };
+      });
     }
 
   };
@@ -5122,7 +5207,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.33 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.34 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
