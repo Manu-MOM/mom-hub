@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Administration des sites · MOM Hub</title>
+  <link rel="icon" type="image/png" href="assets/logo-m2m.png">
+  <meta name="description" content="Administration transverse des sites (lieux d'entraînement et de match) — MOM Hub (mode admin)." />
+
+  <link rel="stylesheet" href="css/hub.css">
+
+  <style>
+    /* ADMIN-(ii) · (4) Sites — doc FAIT FOI Conception-UX-ADMIN-ii-v1.md
+       §3.2. Habillage calqué sur admin-equipes.html (mêmes tokens
+       css/hub.css), namespace `as-`. Structure : liste plate (pas
+       d'arborescence) + modale unique création/édition. */
+
+    body.auth-pending { visibility: hidden; }
+
+    .as-layout { max-width: 1080px; margin: 0 auto; padding: 24px 24px 48px; position: relative; z-index: 2; }
+
+    .as-badge {
+      display: inline-block; padding: 6px 14px; border-radius: 999px;
+      background: var(--paper-warm, #f1ece1); color: var(--ink, #222);
+      font-size: 13px; margin-bottom: 14px;
+    }
+
+    .as-head h2 { margin: 0 0 4px; font-size: 22px; }
+    .as-head p { margin: 0; font-size: 13px; color: var(--ink-mute); }
+
+    .as-toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 16px 0 6px; }
+    .as-count { font-size: 12px; color: var(--ink-mute); margin-left: auto; }
+
+    .as-error {
+      display: none; margin: 14px 0; padding: 14px 16px;
+      border: 1px solid var(--rouge-blesse, #c0392b); border-radius: 8px;
+      background: var(--paper-warm, #faf6ef); color: var(--ink, #222); font-size: 14px;
+    }
+
+    /* Liste plate des sites (α : pas de regroupement domicile/extérieur,
+       club_principal_id NULL sur toutes les données réelles). */
+    .as-list { list-style: none; padding: 0; margin: 10px 0 0; display: flex; flex-direction: column; gap: 6px; }
+    .as-item {
+      display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+      border: 1px solid var(--paper-warm, #ece6da); border-radius: 10px; background: #fff;
+      cursor: pointer; transition: background 0.12s ease, border-color 0.12s ease;
+    }
+    .as-item:hover { background: var(--paper-warm, #faf6ef); border-color: var(--vert-essai, #2D7D46); }
+    .as-item--inactive { opacity: 0.5; }
+    .as-item-main { flex: 1; min-width: 0; line-height: 1.35; }
+    .as-item-nom { display: block; font-size: 15px; font-weight: 600; color: var(--ink, #222); }
+    .as-item-meta { display: block; font-size: 12px; color: var(--ink-mute); margin-top: 2px; }
+    .as-type-badge {
+      font-size: 10px; padding: 2px 9px; border-radius: 999px; text-transform: uppercase;
+      letter-spacing: 0.4px; background: var(--feedback-success-bg, #e7f3ec);
+      color: var(--feedback-success-fg, #2D7D46); white-space: nowrap;
+    }
+    .as-inactive-badge {
+      font-size: 10px; padding: 2px 9px; border-radius: 999px; text-transform: uppercase;
+      letter-spacing: 0.4px; background: var(--paper-warm, #f1ece1); color: var(--ink-mute); white-space: nowrap;
+    }
+    .as-empty { font-size: 13px; color: var(--ink-mute); font-style: italic; padding: 24px 4px; }
+
+    .as-btn {
+      border: 1px solid var(--paper-warm, #d9d2c4); background: #fff;
+      border-radius: 6px; padding: 8px 14px; font-size: 13px; cursor: pointer; color: var(--ink, #222);
+    }
+    .as-btn:hover:not(:disabled) { background: var(--paper-warm, #f1ece1); }
+    .as-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .as-btn--primary { background: var(--vert-essai, #2D7D46); color: #fff; border-color: var(--vert-essai, #2D7D46); }
+    .as-btn--primary:hover:not(:disabled) { filter: brightness(0.95); background: var(--vert-essai, #2D7D46); }
+    .as-btn--danger { color: var(--rouge-blesse, #c0392b); border-color: var(--rouge-blesse, #c0392b); }
+
+    /* Modale (même patron que admin-equipes) */
+    .as-modal { display: none; position: fixed; inset: 0; z-index: 50;
+      background: rgba(20, 18, 14, 0.45); padding: 24px; overflow-y: auto; }
+    .as-modal.is-open { display: block; }
+    .as-modal-card {
+      max-width: 600px; margin: 24px auto; background: #fff; border-radius: 12px;
+      border: 1px solid var(--paper-warm, #ece6da); box-shadow: 0 18px 50px rgba(0,0,0,0.25);
+    }
+    .as-modal-head {
+      padding: 16px 20px; border-bottom: 1px solid var(--paper-warm, #ece6da);
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    }
+    .as-modal-title { font-size: 16px; font-weight: 700; margin: 0; }
+    .as-modal-body { padding: 16px 20px; }
+    .as-modal-foot {
+      padding: 14px 20px; border-top: 1px solid var(--paper-warm, #ece6da);
+      display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .as-modal-foot__right { display: flex; gap: 10px; margin-left: auto; }
+
+    .as-field { margin-bottom: 12px; }
+    .as-field > label { display: block; font-size: 12px; color: var(--ink-mute); margin-bottom: 4px; }
+    .as-field input[type="text"], .as-field input[type="number"], .as-field select, .as-field textarea {
+      width: 100%; box-sizing: border-box; font-size: 14px; padding: 8px 10px;
+      border: 1px solid var(--paper-warm, #d9d2c4); border-radius: 6px;
+      background: #fff; color: var(--ink, #222); font-family: inherit;
+    }
+    .as-field textarea { min-height: 60px; resize: vertical; }
+    .as-field-hint { font-size: 11px; color: var(--ink-mute); margin-top: 3px; }
+    .as-field-row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .as-field-row > .as-field { flex: 1; min-width: 140px; }
+
+    details.as-complements { margin-top: 6px; border-top: 1px dashed var(--paper-warm, #d9d2c4); padding-top: 10px; }
+    details.as-complements > summary { cursor: pointer; font-size: 13px; color: #146eb4; margin-bottom: 10px; }
+
+    .as-modal-error {
+      display: none; margin-bottom: 12px; padding: 10px 12px;
+      border: 1px solid var(--rouge-blesse, #c0392b); border-radius: 6px;
+      background: var(--paper-warm, #faf6ef); color: var(--ink, #222); font-size: 13px;
+    }
+  </style>
+</head>
+<body class="auth-pending">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo"><img src="assets/logo-m2m.png" alt="MOM Rugby"></div>
+      <div class="brand-text">
+        <h1>MOM Hub</h1>
+        <p>Mutzig Ovalie Molsheim</p>
+      </div>
+    </div>
+
+    <div class="season-pill">SAISON 2025 / 2026</div>
+
+    <nav class="main-nav">
+      <a href="./">Tableau de bord</a>
+      <a href="evenements.html">Évènements</a>
+      <a href="u-admin.html">Collectif (admin)</a>
+      <a href="compositions.html">Compositions</a>
+    </nav>
+
+    <div class="icon-row">
+      <button class="icon-btn" title="Recherche" aria-label="Recherche">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      </button>
+    </div>
+
+    <div class="user-profile">
+      <div class="avatar">EJ</div>
+      <div class="user-info">
+        <div class="user-name">Emmanuel Jung</div>
+        <div class="user-role">Référent M14</div>
+      </div>
+      <a href="./" class="user-action" title="Retour au portail" aria-label="Retour au portail">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/></svg>
+      </a>
+      <button type="button" class="user-action" id="btn-signout" title="Se déconnecter" aria-label="Se déconnecter">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="as-layout">
+
+    <div class="as-badge" id="as-badge">🔒 …</div>
+
+    <div class="as-head">
+      <h2>Administration des sites</h2>
+      <p>Lieux d'entraînement et de match, au service de la fiche évènement. Liste plate, triée par nom.</p>
+    </div>
+
+    <div class="as-toolbar">
+      <button type="button" class="as-btn as-btn--primary" id="as-new">+ Nouveau site</button>
+      <span class="as-count" id="as-count"></span>
+    </div>
+
+    <div class="as-error" id="as-error"></div>
+
+    <!-- Liste plate (rendue par admin-sites.js) -->
+    <ul class="as-list" id="as-list" style="display:none;"></ul>
+
+  </main>
+
+  <!-- ============================================================ -->
+  <!-- MODALE SITE (création / édition) · doc §3.2                 -->
+  <!-- 3 essentiels (nom, ville, type) + Compléments dépliables   -->
+  <!-- ============================================================ -->
+  <div class="as-modal" id="as-modal-site" role="dialog" aria-modal="true" aria-labelledby="as-site-modal-title">
+    <div class="as-modal-card">
+      <div class="as-modal-head">
+        <h3 class="as-modal-title" id="as-site-modal-title">Nouveau site</h3>
+        <button type="button" class="as-btn" id="as-site-close" aria-label="Fermer">✕</button>
+      </div>
+      <div class="as-modal-body">
+
+        <div class="as-modal-error" id="as-site-error"></div>
+
+        <!-- Essentiels -->
+        <div class="as-field">
+          <label for="as-site-nom">Nom du site</label>
+          <input type="text" id="as-site-nom" autocomplete="off" placeholder="Ex. Stade municipal de Mutzig">
+        </div>
+
+        <div class="as-field-row">
+          <div class="as-field">
+            <label for="as-site-ville">Ville</label>
+            <input type="text" id="as-site-ville" autocomplete="off">
+          </div>
+          <div class="as-field">
+            <label for="as-site-type">Type</label>
+            <input type="text" id="as-site-type" list="as-site-type-list" autocomplete="off" placeholder="stade">
+            <datalist id="as-site-type-list">
+              <option value="stade"></option>
+              <option value="gymnase"></option>
+              <option value="terrain"></option>
+              <option value="complexe sportif"></option>
+              <option value="salle"></option>
+              <option value="autre"></option>
+            </datalist>
+            <div class="as-field-hint">Texte libre ; « stade » par défaut si vide.</div>
+          </div>
+        </div>
+
+        <!-- Compléments dépliables -->
+        <details class="as-complements" id="as-site-complements">
+          <summary>Compléments</summary>
+
+          <div class="as-field">
+            <label for="as-site-libelle-court">Nom court</label>
+            <input type="text" id="as-site-libelle-court" autocomplete="off">
+          </div>
+
+          <div class="as-field">
+            <label for="as-site-adresse">Adresse</label>
+            <input type="text" id="as-site-adresse" autocomplete="off">
+          </div>
+
+          <div class="as-field-row">
+            <div class="as-field">
+              <label for="as-site-cp">Code postal</label>
+              <input type="text" id="as-site-cp" autocomplete="off">
+            </div>
+            <div class="as-field">
+              <label for="as-site-capacite">Capacité estimée</label>
+              <input type="number" id="as-site-capacite" min="0" step="1">
+            </div>
+          </div>
+
+          <div class="as-field">
+            <label for="as-site-gps">GPS <span class="as-field-hint">(latitude, longitude — facultatif)</span></label>
+            <input type="text" id="as-site-gps" autocomplete="off" placeholder="48.5421, 7.4567">
+            <div class="as-field-hint">Un seul champ : colle « lat, lng » (ex. depuis Google Maps).</div>
+          </div>
+
+          <div class="as-field">
+            <label for="as-site-notes">Notes</label>
+            <textarea id="as-site-notes"></textarea>
+          </div>
+        </details>
+
+      </div>
+      <div class="as-modal-foot">
+        <button type="button" class="as-btn as-btn--danger" id="as-site-statut-toggle" style="display:none;">Désactiver</button>
+        <div class="as-modal-foot__right">
+          <button type="button" class="as-btn" id="as-site-cancel">Annuler</button>
+          <button type="button" class="as-btn as-btn--primary" id="as-site-save">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/admin-sites.js"></script>
+
+  <script>
+    (async function () {
+      'use strict';
+      // Garde d'accès calquée sur admin-equipes.html : ADMIN-(ii) = mode
+      // admin STRICT (doc §3.2 D2 « admin seul v1 »). La RLS base est
+      // has_role('admin') SEUL sur sites (INSERT/UPDATE/DELETE,
+      // pg_policies 28/05) — aligné, aucun chemin d'écriture site
+      // ouvert à un non-admin, ni côté UI ni côté base.
+      const session = await SupabaseHub.getSession();
+      if (!session) { window.location.replace('login.html'); return; }
+      const roles = await SupabaseHub.getMyRoles();
+      const isAdmin = roles.indexOf('admin') !== -1;
+      if (!isAdmin) { window.location.replace('./'); return; }
+
+      document.body.classList.remove('auth-pending');
+      document.body.classList.add('auth-resolved');
+      document.body.classList.add('auth-admin');
+
+      const signoutBtn = document.getElementById('btn-signout');
+      if (signoutBtn) {
+        signoutBtn.addEventListener('click', async function () {
+          signoutBtn.disabled = true;
+          await SupabaseHub.signOut();
+        });
+      }
+
+      SupabaseHub.onAuthChange(function (event) {
+        if (event === 'SIGNED_OUT') window.location.replace('login.html');
+      });
+
+      await window.AdminSites.init({ isAdmin: true });
+    })();
+  </script>
+</body>
+</html>
