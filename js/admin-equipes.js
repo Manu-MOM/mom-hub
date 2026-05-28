@@ -20,7 +20,14 @@
  *    non-admins (cf. admin-equipes.html). La RLS base est admin|coach
  *    sur equipes (filet permissif dormant, supabase-client v1.31).
  *
- * Version : 1.0 — 28/05/2026 (Production ADMIN-(ii), pt 21).
+ * Version : 1.1 — 28/05/2026 (Production ADMIN-(ii), pt 21).
+ *   v1.0 : écran (1) Équipes (grille pôle→catégorie, modales équipe + entente).
+ *   v1.1 : correctif recette terrain — (a) l'édition de cadre charge le cadre
+ *          COMPLET via getEntenteCadre (la grille listEntentes ne projette pas
+ *          régime/club/partenaires/convention → modale vide sinon) ; (b) badge
+ *          carte « cadre » honnête (plus de « — » trompeur, le régime s'affiche
+ *          dans la modale). type_equipe 'entente'/'mono' VALIDÉ terrain
+ *          (base = 'entente'), code auto sans collision — aucun réalignement.
  */
 (function (global) {
   'use strict';
@@ -165,8 +172,10 @@
     // ligne cadre (entente) — §3.3
     let cadre;
     if (ent) {
-      const regime = ent.regime_actuel ? esc(ent.regime_actuel) : '—';
-      cadre = '<span class="ae-badge-entente">' + regime + '</span>' +
+      // listEntentes (grille) ne projette pas regime_actuel → on n'affiche
+      // PAS de régime ici (pas de « — » trompeur) ; le régime réel est dans
+      // la modale (chargée via getEntenteCadre). Badge = présence du cadre.
+      cadre = '<span class="ae-badge-entente">cadre</span>' +
         '<span>' + esc(ent.libelle_court || ent.libelle_moyen || ent.code || 'entente') + '</span>' +
         '<button type="button" class="ae-cat__cadre-link" data-action="open-cadre" data-cat="' + esc(cat.id) +
         '"' + (editable ? '' : ' disabled') + '>Cadre de la catégorie</button>';
@@ -488,19 +497,32 @@
     $('ae-ent-club-add').firstChild && ($('ae-ent-club-add').selectedIndex = 0);
   }
 
-  function openCadre(catId) {
+  async function openCadre(catId) {
     const cat = findCat(catId);
     const saison = getSelectedSaison();
-    const ent = State.ententesByCat.get(catId);
     if (!cat || !saison) return;
+    const partial = State.ententesByCat.get(catId);   // depuis la grille (projection réduite listEntentes)
+    const hasCadre = !!partial;
+    setEntError('');
+
+    // La grille (listEntentes) ne projette PAS régime/club/partenaires/
+    // convention. Pour une ÉDITION fidèle on charge le cadre complet via
+    // getEntenteCadre (wrapper v1.31 dédié) — sinon la modale s'ouvrirait
+    // avec ces champs vides alors que la base les a.
+    let ent = partial || null;
+    if (hasCadre) {
+      const r = await Hub.getEntenteCadre(catId, saison.id);
+      if (r && r.ok && r.data) ent = r.data;
+      else setEntError('Cadre partiellement chargé — certains champs peuvent manquer.');
+    }
+
     State.entCtx = {
-      mode: ent ? 'edit' : 'create',
-      cat: cat, saison: saison, entente: ent || null,
+      mode: hasCadre ? 'edit' : 'create',
+      cat: cat, saison: saison, entente: hasCadre ? ent : null,
       partenaires: (ent && Array.isArray(ent.clubs_partenaires_ids)) ? ent.clubs_partenaires_ids.slice() : []
     };
 
-    setEntError('');
-    $('ae-ent-modal-title').textContent = ent ? 'Cadre de la catégorie' : 'Créer le cadre — ' + (cat.libelle_court || cat.code);
+    $('ae-ent-modal-title').textContent = hasCadre ? 'Cadre de la catégorie' : 'Créer le cadre — ' + (cat.libelle_court || cat.code);
     $('ae-ent-ctx-categorie').textContent = cat.libelle_court || cat.code;
     $('ae-ent-ctx-saison').textContent = saisonLabel(saison);
 
@@ -687,6 +709,6 @@
 
   global.AdminEquipes = { init: init };
 
-  console.log('%c🏉 MOM Hub · admin-equipes.js v1.0 chargé', 'color: #2D7D46; font-weight: bold;');
+  console.log('%c🏉 MOM Hub · admin-equipes.js v1.1 chargé', 'color: #2D7D46; font-weight: bold;');
 
 })(typeof window !== 'undefined' ? window : globalThis);
