@@ -1,0 +1,41 @@
+{
+  "_meta": {
+    "type": "schema",
+    "name": "saison",
+    "version": "2.0",
+    "statut": "amorçage / documentation — source de vérité = table SQL `saisons`, ne plus éditer à la main (gouvernance pt 26, option C)",
+    "description": "Schéma de l'entité Saison du MOM Hub. Pivot temporel : les données vivantes du club (effectifs, équipes, présences, observations) sont rattachées à une saison. Ce schéma DÉCRIT la table SQL `saisons` qui fait foi — il ne la précède plus.",
+    "_changelog": [
+      "1.0 (2026-05-10) - Création initiale, alignée sur la doctrine doc 07 (entité 1). Modèle théorique riche, jamais implémenté tel quel.",
+      "2.0 (2026-05-28) - Réconciliation SCHEMA-SAISON-DRIFT (option A) : schéma dégradé au réel de la table `saisons`. Retrait des champs sur-promis sans colonne en base (libelle_court/long, annee_debut/fin, statut texte, reference_ffr, competitions_engagees, calendrier_scolaire) et de l'enum `statut` (incohérence archived/archivee supprimée par retrait). L'état d'une saison est un booléen `est_active`, pas un triptyque. Source de vérité = SQL."
+    ]
+  },
+  "_documentation": {
+    "philosophie": "Le pivot temporel du Core. Une seule saison active à un instant T (`est_active = true`). Les autres saisons (futures en préparation comme passées archivées) sont `est_active = false` — la base ne distingue pas ces deux cas, seul le couple de dates les situe dans le temps.",
+    "format_libelle": "Standard FFR : 'Saison 2025/2026' (slash). NB : des données historiques en base utilisent encore le tiret ('2025-2026') — incohérence de données tracée hors schéma.",
+    "source_de_verite": "Table SQL `public.saisons` (8 colonnes). Écrite par l'écran ADMIN-(ii) `admin-saisons` via les RPC SECURITY DEFINER de `sql/53` v3 (creer_saison / activer_saison / apercu_bascule / appliquer_bascule). Lue par `listSaisons` (`supabase-client.js`)."
+  },
+  "fields": {
+    "_section_A_identite": "──── A · IDENTITÉ ────",
+    "id": "uuid (PK, défaut uuid_generate_v4()). NOT NULL.",
+    "code": "text. Millésime, ex: '2025/2026'. NOT NULL. Sert de base à la dérivation de l'année par la bascule.",
+    "libelle": "text. Libellé affiché, ex: 'Saison 2025/2026'. NOT NULL. (UN seul libellé — pas de court/long.)",
+
+    "_section_B_bornes_temporelles": "──── B · BORNES TEMPORELLES ────",
+    "date_debut": "date. Début de saison (typiquement 1er juillet). NOT NULL.",
+    "date_fin": "date. Fin de saison (typiquement 30 juin). NOT NULL.",
+
+    "_section_C_etat": "──── C · ÉTAT ────",
+    "est_active": "boolean. NOT NULL, défaut false. true = saison active à l'instant T (une seule). Toute autre saison (future ou archivée) = false.",
+
+    "_section_D_audit": "──── D · AUDIT ────",
+    "created_at": "timestamptz. NOT NULL, défaut now().",
+    "updated_at": "timestamptz. NOT NULL, défaut now()."
+  },
+  "regles_metier": {
+    "regle_1": "Une seule saison avec `est_active = true` à un instant T.",
+    "regle_2": "Une saison future (rentrée suivante) est représentée par `est_active = false` jusqu'à son activation — la base ne porte pas d'état 'en préparation' distinct.",
+    "regle_3": "L'activation et la bascule des catégories par millésime sont deux gestes indépendants (cf. sql/53 v3).",
+    "regle_4": "Format de libellé conforme FFR avec slash : 'Saison AAAA/AAAA' (cible ; des données historiques au tiret subsistent)."
+  }
+}
