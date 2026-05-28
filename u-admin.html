@@ -177,8 +177,10 @@
             <span class="ua-col__count"><span id="ua-cnt-staff">0</span></span>
           </div>
           <div class="ua-add-row" id="ua-add-staff-wrap">
-            <input type="text" id="ua-staff-nom" placeholder="Staff — sélection dédiée à venir" disabled aria-label="Staff (à venir)">
-            <button type="button" class="ua-btn" id="ua-add-staff" title="Le staff fera l’objet d’une sélection dédiée (non spécifiée à ce stade)">+ Staff</button>
+            <select id="ua-pioche-staff" aria-label="Choisir un staff à enrôler">
+              <option value="">— Choisir un staff… —</option>
+            </select>
+            <button type="button" class="ua-btn" id="ua-add-staff" disabled>+ Enrôler</button>
           </div>
           <div class="ua-col__body">
             <ul class="ua-list" id="ua-staff">
