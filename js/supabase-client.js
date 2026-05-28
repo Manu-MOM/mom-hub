@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.31 — mai 2026
+ * Version : 1.32 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -790,6 +790,53 @@
  *          Wrappers v1.0 → v1.30 byte-identiques (preuve par diff).
  *          Aucune signature publique modifiée. Aucun call-site
  *          modifié. Provenance md5 : v1.30 b545c588 → v1.31 (recollé
+ *          après écriture). node --check OK.
+ *   v1.32 : ADMIN-(ii) sous-chantier (4) Sites — écran admin sites.
+ *          Doc FAIT FOI Conception-UX-ADMIN-ii-v1.md §3.2. 4 wrappers
+ *          ADDITIFS Sites, miroir du couple equipes :
+ *            - listSites(options) : TOUS les sites (actifs + inactifs),
+ *              projection riche (grille admin) — vs listSitesActifs()
+ *              active-only INTACT (alimente le dropdown évènement).
+ *            - createSite(payload) : requis libelle ; `code` AUTO-
+ *              dérivé du libellé si absent (slug majuscule + suffixe
+ *              base36 court anti-collision — `code` est NOT NULL SANS
+ *              défaut DB, vérifié information_schema 28/05, donc c'est
+ *              au client de le fournir ; décision technique déléguée
+ *              tracée). `pays` non envoyé (défaut DB 'France') ;
+ *              `club_principal_id` non exposé (NULL inutilisé, doc) ;
+ *              `actif` non envoyé (défaut DB true), toggle via
+ *              setSiteActif. Whitelist = colonnes réelles `sites`.
+ *            - updateSite(siteId, patch) : PATCH partiel ; whitelist
+ *              SANS `code` (identifiant stable, non édité) NI `actif`
+ *              (chemin dédié setSiteActif, jamais deux écritures du
+ *              booléen).
+ *            - setSiteActif(siteId, actif) : bascule du BOOLÉEN `actif`
+ *              (≠ setEquipeStatut qui écrit un statut TEXTE — `sites`
+ *              n'a pas de colonne statut ; vérifié information_schema).
+ *              Pas de DELETE dur (une policy DELETE admin existe en
+ *              base mais doctrine = bascule actif, on ne l'expose pas).
+ *
+ *          Schéma + RLS `sites` LUS À LA SOURCE (information_schema +
+ *          pg_policies, 28/05, anti-fabrication pt 14 ; la base fait
+ *          foi, pas sql/01) : 19 colonnes ; write = has_role('admin')
+ *          SEUL sur INSERT/UPDATE/DELETE (≠ equipes admin|coach) →
+ *          aligne la garde UI admin-strict d'admin-sites.html. Aucune
+ *          colonne devinée. NB : evenements-browser.js v1.26 lit DÉJÀ
+ *          les sites via listSitesActifs (pas de constante en dur à
+ *          remplacer, contrairement au libellé de la passation —
+ *          vérifié à la source) → NON touché par ce chantier.
+ *
+ *          ADDITION PURE prouvée par diff vs original v1.31 vérifié
+ *          md5 fb1fa7f5 : 4 zones touchées —
+ *          (a) version header 1.31 → 1.32 (1 ligne),
+ *          (b) entrée changelog (ce bloc, addition pure),
+ *          (c) 1 section contiguë de 4 méthodes Sites insérée APRÈS
+ *              listSitesActifs (virgule déjà terminale, aucun membre
+ *              voisin muté),
+ *          (d) console.log boot v1.31 → v1.32 chargé (1 ligne).
+ *          Wrappers v1.0 → v1.31 byte-identiques (preuve par diff).
+ *          Aucune signature publique modifiée. Aucun call-site
+ *          modifié. Provenance md5 : v1.31 fb1fa7f5 → v1.32 (recollé
  *          après écriture). node --check OK.
  */
 
@@ -2615,6 +2662,158 @@
         return [];
       }
       return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * ADMIN-(ii) (4) — Liste TOUS les sites (actifs + inactifs), pour
+     * la grille d'administration. Miroir admin de listSitesActifs()
+     * (qui, lui, reste active-only et alimente le dropdown évènement).
+     * Projection riche (toutes les colonnes éditables de la modale).
+     * LECTURE seule ; RLS SELECT = tout authentifié (pg_policies 28/05).
+     *
+     * @param {object} [options]
+     * @param {number} [options.limit=500]
+     * @returns {Promise<Array>} Sites triés par libellé, [] si erreur
+     */
+    async listSites(options) {
+      const opts = options || {};
+      const limit = opts.limit || 500;
+      const { data, error } = await client
+        .from('sites')
+        .select('id, code, libelle, libelle_court, adresse, code_postal, ' +
+                'ville, pays, latitude, longitude, type_site, ' +
+                'capacite_estimee, notes, actif')
+        .order('libelle', { ascending: true })
+        .limit(limit);
+      if (error) {
+        console.error('MOM Hub: listSites()', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * ÉCRITURE — Crée un site (doc §3.2 ; écran admin sites, Voie A).
+     * RLS write = has_role('admin') SEUL (pg_policies 28/05). Requis
+     * (NOT NULL sans défaut, information_schema 28/05) : `libelle` +
+     * `code`. `code` n'ayant PAS de défaut DB, il est AUTO-dérivé du
+     * libellé ici s'il n'est pas fourni (slug majuscule + suffixe
+     * base36 court anti-collision ; code invisible en UI — value du
+     * dropdown évènement = id). `pays` (défaut 'France'), `actif`
+     * (défaut true) et `id/created_at/...` (défauts DB) NON envoyés.
+     * `club_principal_id` non exposé (NULL inutilisé, doc). Whitelist
+     * = colonnes réelles `sites`.
+     *
+     * @param {Object} payload  { libelle (requis), ville?, type_site?, ... }
+     * @returns {Promise<{ok:boolean, data?:Object, error?:string}>}
+     */
+    async createSite(payload) {
+      if (!payload || typeof payload !== 'object') {
+        return { ok: false, error: 'Payload manquant ou invalide' };
+      }
+      const libelle = (payload.libelle == null ? '' : String(payload.libelle)).trim();
+      if (!libelle) {
+        return { ok: false, error: 'Champ requis manquant : libelle (nom du site)' };
+      }
+      // `code` auto si absent : slug majuscule sans accents (≤ 24) +
+      // suffixe base36 court (Date.now) pour limiter les collisions.
+      let code = (payload.code == null ? '' : String(payload.code)).trim();
+      if (!code) {
+        const slug = libelle
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+          .toUpperCase().slice(0, 24);
+        const suffix = Date.now().toString(36).slice(-4).toUpperCase();
+        code = (slug || 'SITE') + '-' + suffix;
+      }
+      const allowedFields = [
+        'libelle', 'libelle_court', 'adresse', 'code_postal', 'ville',
+        'type_site', 'latitude', 'longitude', 'capacite_estimee', 'notes'
+      ];
+      const insertPayload = { code: code };
+      allowedFields.forEach(function (f) {
+        if (payload[f] !== undefined) insertPayload[f] = payload[f];
+      });
+      const { data, error } = await client
+        .from('sites')
+        .insert(insertPayload)
+        .select()
+        .maybeSingle();
+      if (error) {
+        console.error('MOM Hub: createSite()', error);
+        return { ok: false, error: error.message || 'Erreur INSERT sites' };
+      }
+      return { ok: true, data: data };
+    },
+
+    /**
+     * ÉCRITURE — Met à jour un site (édition par clic, doc §3.2).
+     * PATCH partiel : seuls les champs fournis sont écrits. Whitelist
+     * SANS `code` (identifiant stable, non édité) NI `actif` (chemin
+     * dédié setSiteActif). id/created_at/updated_at/cree_par exclus.
+     * RLS write = has_role('admin') SEUL.
+     *
+     * @param {string} siteId  UUID sites.id
+     * @param {Object} patch   sous-ensemble des colonnes site
+     * @returns {Promise<{ok:boolean, data?:Object, error?:string}>}
+     */
+    async updateSite(siteId, patch) {
+      if (!siteId) return { ok: false, error: 'siteId manquant' };
+      if (!patch || typeof patch !== 'object') {
+        return { ok: false, error: 'patch manquant ou invalide' };
+      }
+      const allowedFields = [
+        'libelle', 'libelle_court', 'adresse', 'code_postal', 'ville',
+        'type_site', 'latitude', 'longitude', 'capacite_estimee', 'notes'
+      ];
+      const updatePayload = {};
+      allowedFields.forEach(function (f) {
+        if (patch[f] !== undefined) updatePayload[f] = patch[f];
+      });
+      if (Object.keys(updatePayload).length === 0) {
+        return { ok: false, error: 'Aucun champ à mettre à jour' };
+      }
+      const { data, error } = await client
+        .from('sites')
+        .update(updatePayload)
+        .eq('id', siteId)
+        .select()
+        .maybeSingle();
+      if (error) {
+        console.error('MOM Hub: updateSite()', error);
+        return { ok: false, error: error.message || 'Erreur UPDATE sites' };
+      }
+      return { ok: true, data: data };
+    },
+
+    /**
+     * ÉCRITURE — Active / désactive un site (doc §3.2 : jamais de
+     * suppression dure, on bascule le BOOLÉEN `actif` pour préserver
+     * l'historique évènements ; listSitesActifs() ne renvoie que
+     * actif=true). ≠ setEquipeStatut (statut TEXTE) : `sites` n'a pas
+     * de colonne statut (vérifié information_schema 28/05).
+     * RLS write = has_role('admin') SEUL.
+     *
+     * @param {string} siteId  UUID
+     * @param {boolean} actif  nouvel état (true = actif, false = inactif)
+     * @returns {Promise<{ok:boolean, data?:Object, error?:string}>}
+     */
+    async setSiteActif(siteId, actif) {
+      if (!siteId) return { ok: false, error: 'siteId manquant' };
+      if (typeof actif !== 'boolean') {
+        return { ok: false, error: 'actif requis (booléen)' };
+      }
+      const { data, error } = await client
+        .from('sites')
+        .update({ actif: actif })
+        .eq('id', siteId)
+        .select()
+        .maybeSingle();
+      if (error) {
+        console.error('MOM Hub: setSiteActif()', error);
+        return { ok: false, error: error.message || 'Erreur UPDATE actif site' };
+      }
+      return { ok: true, data: data };
     },
 
     /**
@@ -4775,7 +4974,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.31 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.32 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
