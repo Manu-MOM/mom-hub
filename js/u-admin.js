@@ -14,7 +14,27 @@
  * SAISON uniquement. PAS de création saison/entente, PAS de
  * sites/référentiels (= chantier ADMIN-(ii), NON absorbé ici).
  *
- * Version : 1.0 — étape (e) chantier Collectif & compo 3 niveaux.
+ * Version : 1.1 — Production · Écran de gestion du staff (collectif N1).
+ *   v1.1 : ACTIVATION du bloc Staff, resté bridé en v1.0 faute de
+ *          source staff structurée. La source est désormais résolue :
+ *          pioche staff = SupabaseHub.listStaffDisponibles() (v1.34,
+ *          RPC SECURITY DEFINER sql/56, personnes RLS-verrouillée).
+ *          Le bloc Staff devient le MIROIR exact du bloc Joueurs :
+ *          déroulante (option A) + bouton Enrôler ; enrôlement =
+ *          addCollectifMembre(role:'staff') [DÉJÀ dispo v1.24, rien
+ *          de neuf côté écriture] ; sortie = date_fin datée jamais
+ *          DELETE (updateCollectifMembre, UA-4 inchangé) ; exclusion
+ *          des staff déjà actifs (date_fin NULL) comme pour les joueurs.
+ *          onAddStaff() n'est plus un alert() honnête mais l'action
+ *          réelle calquée sur onAddJoueur(). La pioche staff n'est PAS
+ *          filtrée par entente (sonde 3a : aucune table d'affectation
+ *          staff par catégorie ; Q1 acté = un staff peut encadrer
+ *          plusieurs catégories, rattachement = geste explicite admin).
+ *          Doublons attendus (BELKIS/HELM/VOEGELI 2 fiches) : relèvent
+ *          d'IDENT-SYS, non résolus ici. Reste INCHANGÉ de v1.0 : tout
+ *          le bloc Joueurs, le sélecteur entente, la bascule de saison
+ *          (toujours bloc informatif NON câblé, décision ouverte).
+ *          Zéro localStorage. Dégradation honnête sur chaque erreur.
  *   v1.0 : badge admin + cadenas has_role('admin') (UA-1) ;
  *          sélecteur entente = catégorie×saison, saisons passées
  *          consultables (UA-2, listEntentes sans filtre actif) ;
@@ -46,6 +66,7 @@
     ententeId: null,
     membres:  [],     // listCollectifMembres(ententeId)
     pioche:   [],     // listJoueursCategorieEntente(ententeId)
+    piocheStaff: [],  // listStaffDisponibles() — non filtré par entente
     busy:     false
   };
 
@@ -61,7 +82,8 @@
     cntStaff:     () => document.getElementById('ua-cnt-staff'),
     piocheSel:    () => document.getElementById('ua-pioche'),
     addJoueurBtn: () => document.getElementById('ua-add-joueur'),
-    staffNom:     () => document.getElementById('ua-staff-nom'),
+    piocheStaffSel: () => document.getElementById('ua-pioche-staff'),
+    addStaffBtn:    () => document.getElementById('ua-add-staff'),
     addStaffWrap: () => document.getElementById('ua-add-staff-wrap')
   };
 
@@ -128,6 +150,15 @@
 
   async function loadPioche() {
     State.pioche = await SupabaseHub.listJoueursCategorieEntente(State.ententeId) || [];
+  }
+
+  async function loadPiocheStaff() {
+    // Source NON filtrée par entente (sonde 3a : pas de table
+    // d'affectation staff par catégorie). Liste club-wide des staff,
+    // l'admin rattache explicitement (Q1). Indépendant de l'entente
+    // -> chargeable une fois, mais on suit le même cycle que la pioche
+    // joueurs par simplicité (P1, une seule logique de rafraîchissement).
+    State.piocheStaff = await SupabaseHub.listStaffDisponibles() || [];
   }
 
   // ----------------------------------------------------------
@@ -202,9 +233,35 @@
     DOM.addJoueurBtn().disabled = false;
   }
 
+  function renderPiocheStaff() {
+    const sel = DOM.piocheStaffSel();
+    if (!sel) return;
+    // Exclut les personnes DÉJÀ membres staff actifs (date_fin NULL),
+    // miroir exact de renderPioche côté joueurs.
+    const dejaActifs = new Set(
+      State.membres
+        .filter(m => m.role === 'staff' && !m.date_fin)
+        .map(m => m.personne_id)
+    );
+    const dispo = State.piocheStaff.filter(p => !dejaActifs.has(p.personne_id));
+    if (dispo.length === 0) {
+      sel.innerHTML = '<option value="">(aucun staff disponible — tous déjà dans le collectif)</option>';
+      DOM.addStaffBtn().disabled = true;
+      return;
+    }
+    let html = '<option value="">— Choisir un staff à enrôler… —</option>';
+    dispo.forEach(function (p) {
+      const lib = [p.prenom, p.nom].filter(Boolean).join(' ') || '(sans nom)';
+      html += '<option value="' + escapeHtml(p.personne_id) + '">' + escapeHtml(lib) + '</option>';
+    });
+    sel.innerHTML = html;
+    DOM.addStaffBtn().disabled = false;
+  }
+
   function renderAll() {
     renderMembres();
     renderPioche();
+    renderPiocheStaff();
   }
 
   // ----------------------------------------------------------
@@ -219,7 +276,7 @@
     }
     DOM.panel().style.display = '';
     renderEntenteMeta();
-    await Promise.all([ loadMembres(), loadPioche() ]);
+    await Promise.all([ loadMembres(), loadPioche(), loadPiocheStaff() ]);
     renderAll();
   }
 
@@ -248,18 +305,31 @@
 
   async function onAddStaff() {
     if (State.busy) return;
-    // Le modèle ne définit PAS de source structurée pour le staff
-    // (≠ joueurs via equipe_joueurs). Saisie nom libre = honnête,
-    // PAS de pioche inventée. personne_id : le staff doit exister
-    // dans `personnes` — on NE crée PAS de personne ici (hors
-    // périmètre, anti-DS-1). Si pas de personne_id résolu, on
-    // refuse explicitement plutôt que d'inventer une identité.
-    alert(
-      'Ajout staff : le staff fera l’objet d’une sélection dédiée ' +
-      '(non spécifiée par le modèle à ce stade). Cet écran n’invente ' +
-      'pas de source staff — à traiter dans une étape ultérieure ' +
-      'dédiée. Aucune action effectuée.'
-    );
+    const pid = DOM.piocheStaffSel().value;
+    if (!pid) return;
+    State.busy = true;
+    DOM.addStaffBtn().disabled = true;
+    // Miroir exact d'onAddJoueur, role='staff'. Écriture via
+    // addCollectifMembre (v1.24, role:'staff' supporté ; RLS write
+    // collectif_membre admin|coach OK — patron addEquipeEngagee). On
+    // n'invente AUCUNE personne : pid provient de la pioche staff
+    // (personnes existantes, RPC sql/56). statut 'regulier' par défaut
+    // comme les joueurs (qualification fine = hors périmètre v1).
+    const r = await SupabaseHub.addCollectifMembre({
+      personne_id: pid,
+      entente_id:  State.ententeId,
+      role:        'staff',
+      statut:      'regulier',
+      date_debut:  today()
+    });
+    State.busy = false;
+    if (!r || !r.ok) {
+      alert('Enrôlement staff impossible : ' + ((r && r.error) || 'erreur inconnue'));
+      DOM.addStaffBtn().disabled = false;
+      return;
+    }
+    await loadMembres();
+    renderAll();
   }
 
   async function onMarkOut(membreId) {
