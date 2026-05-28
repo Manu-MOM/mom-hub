@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.32 — mai 2026
+ * Version : 1.33 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -838,6 +838,49 @@
  *          Aucune signature publique modifiée. Aucun call-site
  *          modifié. Provenance md5 : v1.31 fb1fa7f5 → v1.32 (recollé
  *          après écriture). node --check OK.
+ *
+ *   v1.33 : ADMIN-(ii) sous-chantier (2) Saisons + bascule millésime.
+ *          Doc FAIT FOI Conception-UX-ADMIN-ii-v1.md §3.4. 4 wrappers
+ *          ADDITIFS appelant les RPC SECURITY DEFINER de sql/53 (md5
+ *          304c37f6, gardées has_role('admin')) — saisons ET personnes
+ *          ont une RLS write FERMÉE au client (sondes 28/05 : saisons =
+ *          1 seule policy SELECT publique, aucune write ; personnes = 0
+ *          policy), donc le bulk client est IMPOSSIBLE (écrirait dans le
+ *          vide, leçon REFONTE-EVT-write-M3/M5) → TOUT passe par RPC :
+ *            - createSaison(payload) : RPC creer_saison ; requis code /
+ *              libelle / date_debut / date_fin ; est_active=false
+ *              (activation = geste séparé). CHECK(date_fin>date_debut) +
+ *              UNIQUE(code) appliqués par la base (fail-loud).
+ *            - setSaisonActive(saisonId) : RPC activer_saison ; désactive
+ *              l'active courante PUIS active la cible, atomique (respecte
+ *              idx_saisons_une_seule_active, index unique partiel mono-
+ *              active lu à la source 28/05).
+ *            - apercuBascule(saisonId) : RPC apercu_bascule, LECTURE
+ *              SEULE ; calcul serveur (personnes JAMAIS exposée, 0 policy
+ *              SELECT), payload RGPD minimal {personne_id, nom_court,
+ *              cat_avant, cat_apres, groupe, motif} ; 3 groupes
+ *              a_basculer / inchange / a_verifier.
+ *            - appliquerBascule(saisonId) : RPC appliquer_bascule,
+ *              ÉCRITURE DE MASSE ; RECALCUL serveur (ne fait pas confiance
+ *              au client) + UPDATE personnes.categorie_id + INSERT
+ *              bascule_log, transaction fail-loud ; derrière garde-fou UI.
+ *          listSaisons() (lecture, bandeau D4) existe depuis v1.31, NON
+ *          touchée. Règle figée + scope PROUVÉS par exécution réelle
+ *          (28/05 : 207 dans le scope = 77 a_basculer / 65 inchange /
+ *          65 a_verifier ; séniors/loisir age_max NULL exclus, D6=A).
+ *
+ *          ADDITION PURE prouvée par diff vs original v1.32 vérifié
+ *          md5 c1c5b41b : 4 zones touchées —
+ *          (a) version header 1.32 → 1.33 (1 ligne),
+ *          (b) entrée changelog (ce bloc, addition pure),
+ *          (c) 1 section contiguë de 4 méthodes Saisons insérée APRÈS
+ *              updateEntente (virgule ajoutée à sa fermeture, dernier
+ *              membre de l'objet ; aucun voisin muté),
+ *          (d) console.log boot v1.32 → v1.33 chargé (1 ligne).
+ *          Wrappers v1.0 → v1.32 byte-identiques (preuve par diff).
+ *          Aucune signature publique modifiée. Aucun call-site modifié.
+ *          Provenance md5 : v1.32 c1c5b41b → v1.33 (recollé après
+ *          écriture). node --check OK.
  */
 
 (function (global) {
@@ -4964,6 +5007,111 @@
         return { ok: false, error: error.message || 'Erreur UPDATE ententes' };
       }
       return { ok: true, data: data };
+    },
+
+    // ============================================================
+    // ADMIN-(ii) · (2) SAISONS + bascule millésime  (v1.33)
+    //   Doc FAIT FOI Conception-UX-ADMIN-ii-v1.md (md5 ca043a48) §3.4.
+    //   4 wrappers ADDITIFS appelant les RPC SECURITY DEFINER de sql/53
+    //   (has_role('admin')). saisons ET personnes ont une RLS write
+    //   FERMÉE au client (sondes 28/05) → aucune écriture directe
+    //   possible : TOUT passe par RPC. listSaisons() (lecture, bandeau
+    //   D4) existe depuis v1.31 et n'est PAS touchée ici.
+    // ============================================================
+
+    /**
+     * ÉCRITURE — Crée une saison (2a). RPC creer_saison (SECURITY
+     * DEFINER, has_role('admin')) : saisons n'a aucune policy write
+     * (RLS deny côté client). Requis : code, libelle, date_debut,
+     * date_fin (dates ISO 'YYYY-MM-DD'). est_active=false à la création
+     * (activation = geste séparé, cf. setSaisonActive). La base applique
+     * CHECK(date_fin>date_debut) + UNIQUE(code) (fail-loud).
+     *
+     * @param {Object} payload {code, libelle, date_debut, date_fin}
+     * @returns {Promise<{ok:boolean, data?:string, error?:string}>} data=uuid
+     */
+    async createSaison(payload) {
+      if (!payload || typeof payload !== 'object') {
+        return { ok: false, error: 'Payload manquant ou invalide' };
+      }
+      const code = (payload.code == null ? '' : String(payload.code)).trim();
+      const libelle = (payload.libelle == null ? '' : String(payload.libelle)).trim();
+      const dd = (payload.date_debut == null ? '' : String(payload.date_debut)).trim();
+      const df = (payload.date_fin == null ? '' : String(payload.date_fin)).trim();
+      if (!code || !libelle || !dd || !df) {
+        return { ok: false, error: 'Champs requis : code, libelle, date_debut, date_fin' };
+      }
+      const { data, error } = await client.rpc('creer_saison', {
+        p_code: code, p_libelle: libelle, p_date_debut: dd, p_date_fin: df
+      });
+      if (error) {
+        console.error('MOM Hub: createSaison()', error);
+        return { ok: false, error: error.message || 'Erreur création saison' };
+      }
+      return { ok: true, data: data };   // data = uuid de la saison créée
+    },
+
+    /**
+     * ÉCRITURE — Active une saison (2a). RPC activer_saison : désactive
+     * l'active courante PUIS active la cible, dans la même transaction
+     * (respecte l'index unique partiel idx_saisons_une_seule_active qui
+     * interdit deux est_active=true). Indépendant de la bascule.
+     *
+     * @param {string} saisonId UUID saisons.id
+     * @returns {Promise<{ok:boolean, data?:Object, error?:string}>}
+     */
+    async setSaisonActive(saisonId) {
+      if (!saisonId) return { ok: false, error: 'saisonId manquant' };
+      const { data, error } = await client.rpc('activer_saison', { p_id: saisonId });
+      if (error) {
+        console.error('MOM Hub: setSaisonActive()', error);
+        return { ok: false, error: error.message || 'Erreur activation saison' };
+      }
+      return { ok: true, data: data };
+    },
+
+    /**
+     * LECTURE — Aperçu de la bascule par millésime (2b), STRICTEMENT
+     * LECTURE SEULE (rien n'est écrit). RPC apercu_bascule : le calcul
+     * (règle figée) est fait côté serveur car personnes a 0 policy SELECT
+     * (verrou RGPD) → jamais exposée ; seul le payload réduit sort. Une
+     * ligne par personne du scope : {personne_id, nom_court, cat_avant,
+     * cat_apres, groupe, motif}. groupe ∈ {a_basculer, inchange,
+     * a_verifier}.
+     *
+     * @param {string} saisonId UUID de la saison CIBLE (N+1)
+     * @returns {Promise<{ok:boolean, data?:Array, error?:string}>}
+     */
+    async apercuBascule(saisonId) {
+      if (!saisonId) return { ok: false, error: 'saisonId manquant' };
+      const { data, error } = await client.rpc('apercu_bascule', { p_saison_id: saisonId });
+      if (error) {
+        console.error('MOM Hub: apercuBascule()', error);
+        return { ok: false, error: error.message || 'Erreur aperçu bascule' };
+      }
+      return { ok: true, data: Array.isArray(data) ? data : [] };
+    },
+
+    /**
+     * ÉCRITURE DE MASSE — Applique la bascule (2b). RPC appliquer_bascule :
+     * RECALCULE serveur le groupe « à basculer » (ne fait PAS confiance à
+     * une liste client → garantit « lecture seule jusqu'à Appliquer »),
+     * UPDATE personnes.categorie_id + INSERT bascule_log dans une seule
+     * transaction, fail-loud (nb modifiées = nb attendues sinon ROLLBACK).
+     * À n'appeler que derrière une confirmation explicite (garde-fou UI).
+     *
+     * @param {string} saisonId UUID de la saison CIBLE
+     * @returns {Promise<{ok:boolean, data?:Object, error?:string}>}
+     *          data = {ok, nb_basculees, log_id, message?}
+     */
+    async appliquerBascule(saisonId) {
+      if (!saisonId) return { ok: false, error: 'saisonId manquant' };
+      const { data, error } = await client.rpc('appliquer_bascule', { p_saison_id: saisonId });
+      if (error) {
+        console.error('MOM Hub: appliquerBascule()', error);
+        return { ok: false, error: error.message || 'Erreur application bascule' };
+      }
+      return { ok: true, data: data };
     }
 
   };
@@ -4974,7 +5122,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.32 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.33 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
