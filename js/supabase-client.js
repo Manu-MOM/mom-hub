@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.30 — mai 2026
+ * Version : 1.31 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -736,6 +736,53 @@
  *          modifié. Provenance md5 chaîne maillon par maillon :
  *          v1.29 5ce8cb87 → v1.30 (recollé après écriture).
  *          node --check OK.
+ *   v1.31 : ADMIN-(ii) sous-chantier (1) Équipes par catégorie +
+ *          (3) Ententes intégré (Production · 28/05/2026, pt 21).
+ *          7 NOUVEAUX WRAPPERS additifs, colonnes TOUTES confirmées
+ *          à la source (information_schema 28/05, aucune inventée —
+ *          doc FAIT FOI Conception-UX-ADMIN-ii-v1.md md5 ca043a48) :
+ *            LECTURE (2)
+ *            - getPolesAvecCategories() : grille pôle → catégories
+ *              actives du club. Mapping = poles.categories_rattachees
+ *              (TEXT[] de codes catégorie) confirmé source → lève le
+ *              candidat de la dette IMPL-CAT-ACTIVES-MAPPING ; M5
+ *              exclue par construction (absente des tableaux).
+ *              Jointure côté client par categories.code.
+ *            - getEntenteCadre(categorieId, saisonId) : le cadre
+ *              UNIQUE(saison_id, categorie_id) (≤ 1). data=null =
+ *              cas F15/F18 « catégorie sans cadre ».
+ *            ÉCRITURE equipes (3)
+ *            - createEquipe(payload)  : requis code / nom_officiel /
+ *              entente_id (déduit du contexte, NON saisi).
+ *            - updateEquipe(equipeId, patch) : PATCH partiel.
+ *            - setEquipeStatut(equipeId, statut) : active/inactive,
+ *              jamais de suppression dure (préserve l'historique evts).
+ *            ÉCRITURE ententes (2)
+ *            - createEntente(payload)  : cas rare F15/F18.
+ *            - updateEntente(ententeId, patch) : régime / clubs /
+ *              convention ; ancre saison_id × categorie_id IMMUABLE.
+ *
+ *          ⚠️ Chemin write « admin seul v1 » (doc §3.1 D2) : SUPPOSE
+ *          une policy RLS write has_role('admin') sur equipes ET
+ *          ententes. À CONFIRMER (pg_policies) AVANT recette terrain
+ *          — leçon REFONTE-EVT-write-M3/M5 : RLS write absente =
+ *          écriture silencieuse dans le vide (faux involontaire).
+ *          Si absente, RLS DDL (patron sql/43) à livrer en commit
+ *          séparé. Les wrappers eux sont corrects quel que soit
+ *          l'état RLS (la base tranche).
+ *
+ *          ADDITION PURE prouvée par diff vs original v1.30 vérifié
+ *          md5 b545c588 : 4 zones touchées —
+ *          (a) version header 1.30 → 1.31 (1 ligne),
+ *          (b) entrée changelog (ce bloc, addition pure),
+ *          (c) 1 section contiguë de 7 méthodes en fin d'objet
+ *              (virgule ajoutée après consoliderScoreRencontreCoach,
+ *              dernier membre devenu non-terminal),
+ *          (d) console.log boot v1.30 → v1.31 chargé (1 ligne).
+ *          Wrappers v1.0 → v1.30 byte-identiques (preuve par diff).
+ *          Aucune signature publique modifiée. Aucun call-site
+ *          modifié. Provenance md5 : v1.30 b545c588 → v1.31 (recollé
+ *          après écriture). node --check OK.
  */
 
 (function (global) {
@@ -4360,6 +4407,300 @@
       }
       const r = Array.isArray(data) ? (data[0] || null) : data;
       return { ok: true, data: r };
+    },
+
+    // ============================================================
+    // ADMIN-(ii) · ESPACE ADMINISTRATION TRANSVERSE  (v1.31)
+    //   Sous-chantier (1) Équipes par catégorie + (3) Ententes
+    //   intégré. Doc FAIT FOI Conception-UX-ADMIN-ii-v1.md
+    //   (md5 ca043a48) §3.1 / §3.3. Toutes les colonnes sont
+    //   confirmées à la source (information_schema, 28/05/2026) —
+    //   aucune inventée. Chemin write = « admin seul v1 » (RLS
+    //   has_role('admin') à confirmer pg_policies, cf. changelog).
+    // ============================================================
+
+    /**
+     * LECTURE — Grille pôles → catégories actives du club (doc
+     * §3.1 D2bis « par pôle → catégorie verrouillée »). Structure
+     * d'entrée de l'écran admin équipes.
+     *
+     * Mapping pôle↔catégorie = poles.categories_rattachees (TEXT[]
+     * de CODES catégorie), confirmé à la source — lève le candidat
+     * de la dette IMPL-CAT-ACTIVES-MAPPING : une catégorie est
+     * « active au club » ssi son code figure dans le tableau d'un
+     * pôle. M5 exclue par construction (absente des tableaux).
+     * Jointure faite côté client par categories.code.
+     *
+     * @returns {Promise<{ok:boolean, data?:Array, error?:string}>}
+     *   data = pôles (ordre getPoles), chacun
+     *   { ...pole, categories: [...] } triées par ordre_tri.
+     */
+    async getPolesAvecCategories() {
+      const [polesRes, catsRes] = await Promise.all([
+        client.from('poles').select('*').order('uuid_legacy'),
+        client.from('categories').select('*').order('ordre_tri', { ascending: true })
+      ]);
+      if (polesRes.error) {
+        console.error('MOM Hub: getPolesAvecCategories() poles', polesRes.error);
+        return { ok: false, error: polesRes.error.message || 'Erreur lecture poles' };
+      }
+      if (catsRes.error) {
+        console.error('MOM Hub: getPolesAvecCategories() categories', catsRes.error);
+        return { ok: false, error: catsRes.error.message || 'Erreur lecture categories' };
+      }
+      const cats = Array.isArray(catsRes.data) ? catsRes.data : [];
+      const byCode = new Map(cats.map(c => [c.code, c]));
+      const data = (Array.isArray(polesRes.data) ? polesRes.data : []).map(p => {
+        const codes = Array.isArray(p.categories_rattachees) ? p.categories_rattachees : [];
+        const categories = codes
+          .map(code => byCode.get(code))
+          .filter(Boolean)
+          .sort((a, b) => (a.ordre_tri || 0) - (b.ordre_tri || 0));
+        return Object.assign({}, p, { categories: categories });
+      });
+      return { ok: true, data: data };
+    },
+
+    /**
+     * LECTURE — Le cadre « entente » d'une catégorie × saison
+     * (doc §3.3). UNIQUE(saison_id, categorie_id) ⇒ au plus 1.
+     * Sert (a) à déduire equipes.entente_id à la création d'une
+     * équipe (champ verrouillé, contexte), (b) à détecter le cas
+     * F15/F18 « catégorie sans cadre » (data=null → modale entente
+     * en mode création avant toute équipe).
+     *
+     * @param {string} categorieId UUID categories.id
+     * @param {string} saisonId    UUID saisons.id
+     * @returns {Promise<{ok:boolean, data?:Object|null, error?:string}>}
+     */
+    async getEntenteCadre(categorieId, saisonId) {
+      if (!categorieId || !saisonId) {
+        return { ok: false, error: 'categorieId et saisonId requis' };
+      }
+      const { data, error } = await client
+        .from('ententes')
+        .select('id, code, slug, libelle_court, libelle_moyen, libelle_long, saison_id, categorie_id, club_principal_id, clubs_partenaires_ids, regime_actuel, date_mise_en_place, convention_ffr_url, date_signature_convention, date_fin_validite_convention, identifiant_sporteasy, competitions_engagees, notes')
+        .eq('categorie_id', categorieId)
+        .eq('saison_id', saisonId)
+        .maybeSingle();
+      if (error) {
+        console.error('MOM Hub: getEntenteCadre()', error);
+        return { ok: false, error: error.message || 'Erreur lecture entente cadre' };
+      }
+      return { ok: true, data: data || null };
+    },
+
+    /**
+     * ÉCRITURE — Crée une équipe (doc §3.1 modale création). v1
+     * « admin seul » (RLS has_role('admin') à confirmer). entente_id
+     * est DÉDUIT du contexte catégorie × saison (getEntenteCadre),
+     * jamais saisi. Requis (NOT NULL sans défaut, schéma réel) :
+     * code, nom_officiel, entente_id. Le reste est optionnel
+     * (défauts base) ; whitelist = colonnes réelles equipes
+     * (information_schema 28/05).
+     *
+     * @param {Object} payload
+     * @returns {Promise<{ok:boolean, data?:Object, error?:string}>}
+     */
+    async createEquipe(payload) {
+      if (!payload || typeof payload !== 'object') {
+        return { ok: false, error: 'Payload manquant ou invalide' };
+      }
+      if (!payload.code || !payload.nom_officiel || !payload.entente_id) {
+        return { ok: false, error: 'Champs requis manquants : code, nom_officiel, entente_id' };
+      }
+      const allowedFields = [
+        'code', 'nom_officiel', 'alias', 'entente_id', 'numero_equipe',
+        'libelle_court', 'libelle_moyen', 'libelle_long',
+        'type_equipe', 'club_referent_id', 'mixte', 'mixte_detail',
+        'format_jeu_code', 'format_jeu_libelle',
+        'championnat_nom', 'championnat_ligue',
+        'championnat_code_ffr', 'championnat_code_scorenco',
+        'sites_utilises', 'site_principal_id', 'sites_note',
+        'statut', 'coach_principal_id', 'coachs_adjoints_ids',
+        'manager_id', 'jeux_maillots',
+        'effectif_theorique', 'effectif_minimum_operationnel', 'notes'
+      ];
+      const insertPayload = {};
+      allowedFields.forEach(f => {
+        if (payload[f] !== undefined) insertPayload[f] = payload[f];
+      });
+      const { data, error } = await client
+        .from('equipes')
+        .insert(insertPayload)
+        .select()
+        .maybeSingle();
+      if (error) {
+        console.error('MOM Hub: createEquipe()', error);
+        return { ok: false, error: error.message || 'Erreur INSERT equipes' };
+      }
+      return { ok: true, data: data };
+    },
+
+    /**
+     * ÉCRITURE — Met à jour une équipe (édition par clic sur carte,
+     * doc §3.1 cycle de vie). PATCH partiel : seuls les champs
+     * fournis sont écrits. Whitelist = colonnes réelles equipes
+     * (entente_id reste éditable = re-rattachement possible) ;
+     * id / created_at / updated_at exclus.
+     *
+     * @param {string} equipeId UUID equipes.id
+     * @param {Object} patch    sous-ensemble des colonnes équipe
+     * @returns {Promise<{ok:boolean, data?:Object, error?:string}>}
+     */
+    async updateEquipe(equipeId, patch) {
+      if (!equipeId) return { ok: false, error: 'equipeId manquant' };
+      if (!patch || typeof patch !== 'object') {
+        return { ok: false, error: 'patch manquant ou invalide' };
+      }
+      const allowedFields = [
+        'code', 'nom_officiel', 'alias', 'entente_id', 'numero_equipe',
+        'libelle_court', 'libelle_moyen', 'libelle_long',
+        'type_equipe', 'club_referent_id', 'mixte', 'mixte_detail',
+        'format_jeu_code', 'format_jeu_libelle',
+        'championnat_nom', 'championnat_ligue',
+        'championnat_code_ffr', 'championnat_code_scorenco',
+        'sites_utilises', 'site_principal_id', 'sites_note',
+        'statut', 'coach_principal_id', 'coachs_adjoints_ids',
+        'manager_id', 'jeux_maillots',
+        'effectif_theorique', 'effectif_minimum_operationnel', 'notes'
+      ];
+      const updatePayload = {};
+      allowedFields.forEach(f => {
+        if (patch[f] !== undefined) updatePayload[f] = patch[f];
+      });
+      if (Object.keys(updatePayload).length === 0) {
+        return { ok: false, error: 'Aucun champ à mettre à jour' };
+      }
+      const { data, error } = await client
+        .from('equipes')
+        .update(updatePayload)
+        .eq('id', equipeId)
+        .select()
+        .maybeSingle();
+      if (error) {
+        console.error('MOM Hub: updateEquipe()', error);
+        return { ok: false, error: error.message || 'Erreur UPDATE equipes' };
+      }
+      return { ok: true, data: data };
+    },
+
+    /**
+     * ÉCRITURE — Active / désactive une équipe (doc §3.1 : jamais
+     * de suppression dure, on bascule statut pour préserver
+     * l'historique évènements ; listEquipes() ne renvoie que
+     * statut='active'). Valeurs conventionnelles doc : 'active' /
+     * 'inactive' (décision déléguée tracée — si la base emploie un
+     * autre littéral de désactivation, ajuster sans casse). Le
+     * statut est passé explicitement, non figé ici.
+     *
+     * @param {string} equipeId UUID
+     * @param {string} statut   nouveau statut (chaîne non vide)
+     * @returns {Promise<{ok:boolean, data?:Object, error?:string}>}
+     */
+    async setEquipeStatut(equipeId, statut) {
+      if (!equipeId) return { ok: false, error: 'equipeId manquant' };
+      if (!statut || typeof statut !== 'string') {
+        return { ok: false, error: 'statut requis (chaîne non vide)' };
+      }
+      const { data, error } = await client
+        .from('equipes')
+        .update({ statut: statut })
+        .eq('id', equipeId)
+        .select()
+        .maybeSingle();
+      if (error) {
+        console.error('MOM Hub: setEquipeStatut()', error);
+        return { ok: false, error: error.message || 'Erreur UPDATE statut equipe' };
+      }
+      return { ok: true, data: data };
+    },
+
+    /**
+     * ÉCRITURE — Crée le cadre entente d'une catégorie × saison
+     * (doc §3.3, cas ultra-rare F15/F18 « catégorie sans cadre »).
+     * UNIQUE(saison_id, categorie_id) garantit l'unicité côté base.
+     * Requis (NOT NULL sans défaut, schéma réel) : code, saison_id,
+     * categorie_id, club_principal_id, regime_actuel.
+     *
+     * @param {Object} payload
+     * @returns {Promise<{ok:boolean, data?:Object, error?:string}>}
+     */
+    async createEntente(payload) {
+      if (!payload || typeof payload !== 'object') {
+        return { ok: false, error: 'Payload manquant ou invalide' };
+      }
+      if (!payload.code || !payload.saison_id || !payload.categorie_id
+          || !payload.club_principal_id || !payload.regime_actuel) {
+        return { ok: false, error: 'Champs requis manquants : code, saison_id, categorie_id, club_principal_id, regime_actuel' };
+      }
+      const allowedFields = [
+        'code', 'slug', 'libelle_court', 'libelle_moyen', 'libelle_long',
+        'saison_id', 'categorie_id', 'club_principal_id',
+        'clubs_partenaires_ids', 'regime_actuel', 'date_mise_en_place',
+        'convention_ffr_url', 'date_signature_convention',
+        'date_fin_validite_convention', 'identifiant_sporteasy',
+        'competitions_engagees', 'notes'
+      ];
+      const insertPayload = {};
+      allowedFields.forEach(f => {
+        if (payload[f] !== undefined) insertPayload[f] = payload[f];
+      });
+      const { data, error } = await client
+        .from('ententes')
+        .insert(insertPayload)
+        .select()
+        .maybeSingle();
+      if (error) {
+        console.error('MOM Hub: createEntente()', error);
+        return { ok: false, error: error.message || 'Erreur INSERT ententes' };
+      }
+      return { ok: true, data: data };
+    },
+
+    /**
+     * ÉCRITURE — Édite le cadre entente (doc §3.3, geste rare :
+     * corriger un régime, ajouter des clubs partenaires, renseigner
+     * la convention FFR). L'ancre d'identité saison_id × categorie_id
+     * est IMMUABLE dans ce chemin (décision déléguée tracée :
+     * changer le couple = re-clé, hors usage « éditer le cadre ») —
+     * exclue de la whitelist, comme id / created_at / updated_at.
+     * PATCH partiel.
+     *
+     * @param {string} ententeId UUID ententes.id
+     * @param {Object} patch
+     * @returns {Promise<{ok:boolean, data?:Object, error?:string}>}
+     */
+    async updateEntente(ententeId, patch) {
+      if (!ententeId) return { ok: false, error: 'ententeId manquant' };
+      if (!patch || typeof patch !== 'object') {
+        return { ok: false, error: 'patch manquant ou invalide' };
+      }
+      const allowedFields = [
+        'code', 'slug', 'libelle_court', 'libelle_moyen', 'libelle_long',
+        'club_principal_id', 'clubs_partenaires_ids', 'regime_actuel',
+        'date_mise_en_place', 'convention_ffr_url',
+        'date_signature_convention', 'date_fin_validite_convention',
+        'identifiant_sporteasy', 'competitions_engagees', 'notes'
+      ];
+      const updatePayload = {};
+      allowedFields.forEach(f => {
+        if (patch[f] !== undefined) updatePayload[f] = patch[f];
+      });
+      if (Object.keys(updatePayload).length === 0) {
+        return { ok: false, error: 'Aucun champ à mettre à jour' };
+      }
+      const { data, error } = await client
+        .from('ententes')
+        .update(updatePayload)
+        .eq('id', ententeId)
+        .select()
+        .maybeSingle();
+      if (error) {
+        console.error('MOM Hub: updateEntente()', error);
+        return { ok: false, error: error.message || 'Erreur UPDATE ententes' };
+      }
+      return { ok: true, data: data };
     }
 
   };
@@ -4370,7 +4711,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.30 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.31 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
