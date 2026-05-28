@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Administration des équipes · MOM Hub</title>
+  <link rel="icon" type="image/png" href="assets/logo-m2m.png">
+  <meta name="description" content="Administration transverse des équipes par pôle → catégorie, par saison — MOM Hub (mode admin)." />
+
+  <link rel="stylesheet" href="css/hub.css">
+
+  <style>
+    /* ADMIN-(ii) · (1) Équipes par catégorie — doc FAIT FOI
+       Conception-UX-ADMIN-ii-v1.md §3.1 / §3.3. Habillage calqué
+       sur u-admin.html (mêmes tokens css/hub.css), namespace `ae-`. */
+
+    body.auth-pending { visibility: hidden; }
+
+    .ae-layout { max-width: 1080px; margin: 0 auto; padding: 24px 24px 48px; position: relative; z-index: 2; }
+
+    .ae-badge {
+      display: inline-block; padding: 6px 14px; border-radius: 999px;
+      background: var(--paper-warm, #f1ece1); color: var(--ink, #222);
+      font-size: 13px; margin-bottom: 14px;
+    }
+
+    .ae-head h2 { margin: 0 0 4px; font-size: 22px; }
+    .ae-head p { margin: 0; font-size: 13px; color: var(--ink-mute); }
+
+    /* Bandeau saison (D4) */
+    .ae-saison-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 16px 0 4px; }
+    .ae-saison-row label { font-size: 13px; color: var(--ink-mute); }
+    .ae-saison-row select {
+      font-size: 14px; padding: 7px 10px; border: 1px solid var(--paper-warm, #d9d2c4);
+      border-radius: 6px; background: #fff; color: var(--ink, #222); min-width: 220px;
+    }
+    .ae-saison-meta { font-size: 12px; color: var(--ink-mute); font-style: italic; margin-bottom: 16px; }
+    .ae-saison-meta .ae-ro { color: var(--rouge-blesse, #c0392b); font-style: normal; }
+
+    .ae-error {
+      display: none; margin: 14px 0; padding: 14px 16px;
+      border: 1px solid var(--rouge-blesse, #c0392b); border-radius: 8px;
+      background: var(--paper-warm, #faf6ef); color: var(--ink, #222); font-size: 14px;
+    }
+
+    /* Pôles → catégories (D2bis / D3) */
+    .ae-pole { margin-bottom: 26px; }
+    .ae-pole__head { display: flex; align-items: baseline; gap: 10px; margin: 0 0 10px; }
+    .ae-pole__title { font-size: 16px; font-weight: 700; color: var(--ink, #222); }
+    .ae-pole__sub { font-size: 12px; color: var(--ink-mute); }
+
+    .ae-cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+
+    .ae-cat {
+      border: 1px solid var(--paper-warm, #ece6da); border-radius: 10px; background: #fff;
+      display: flex; flex-direction: column;
+    }
+    .ae-cat__head {
+      padding: 11px 13px; border-bottom: 1px solid var(--paper-warm, #ece6da);
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    }
+    .ae-cat__name { font-size: 14px; font-weight: 700; }
+    .ae-cat__cadre {
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+      padding: 8px 13px; border-bottom: 1px solid var(--paper-warm, #ece6da);
+      font-size: 12px; color: var(--ink-mute);
+    }
+    .ae-cat__cadre-link {
+      background: none; border: none; padding: 0; cursor: pointer;
+      color: #146eb4; font-size: 12px; text-decoration: underline;
+    }
+    .ae-badge-entente {
+      font-size: 10px; padding: 1px 7px; border-radius: 999px;
+      background: var(--paper-warm, #f1ece1); color: var(--ink-mute);
+    }
+    .ae-badge-entente--absent { color: var(--rouge-blesse, #c0392b); }
+
+    .ae-cat__body { padding: 8px 11px; flex: 1; }
+    .ae-eq-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 2px; }
+    .ae-eq-item { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-radius: 6px; cursor: pointer; }
+    .ae-eq-item:hover { background: var(--paper-warm, #faf6ef); }
+    .ae-eq-item--inactive { opacity: 0.5; }
+    .ae-eq-main { flex: 1; min-width: 0; line-height: 1.3; }
+    .ae-eq-nom { font-size: 13px; color: var(--ink, #222); }
+    .ae-eq-meta { font-size: 11px; color: var(--ink-mute); margin-top: 1px; }
+    .ae-eq-num {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      background: var(--paper-warm, #f1ece1); padding: 1px 7px; border-radius: 999px; color: var(--ink-mute);
+    }
+    .ae-empty { font-size: 12px; color: var(--ink-mute); font-style: italic; padding: 7px 9px; list-style: none; }
+
+    .ae-cat__foot { padding: 9px 13px; border-top: 1px solid var(--paper-warm, #ece6da); }
+
+    .ae-btn {
+      border: 1px solid var(--paper-warm, #d9d2c4); background: #fff;
+      border-radius: 6px; padding: 6px 12px; font-size: 12px; cursor: pointer; color: var(--ink, #222);
+    }
+    .ae-btn:hover:not(:disabled) { background: var(--paper-warm, #f1ece1); }
+    .ae-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .ae-btn--primary { background: var(--vert-essai, #2D7D46); color: #fff; border-color: var(--vert-essai, #2D7D46); }
+    .ae-btn--primary:hover:not(:disabled) { filter: brightness(0.95); background: var(--vert-essai, #2D7D46); }
+    .ae-btn--danger { color: var(--rouge-blesse, #c0392b); border-color: var(--rouge-blesse, #c0392b); }
+    .ae-btn--add { width: 100%; }
+
+    /* Modales */
+    .ae-modal { display: none; position: fixed; inset: 0; z-index: 50;
+      background: rgba(20, 18, 14, 0.45); padding: 24px; overflow-y: auto; }
+    .ae-modal.is-open { display: block; }
+    .ae-modal-card {
+      max-width: 600px; margin: 24px auto; background: #fff; border-radius: 12px;
+      border: 1px solid var(--paper-warm, #ece6da); box-shadow: 0 18px 50px rgba(0,0,0,0.25);
+    }
+    .ae-modal-head {
+      padding: 16px 20px; border-bottom: 1px solid var(--paper-warm, #ece6da);
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    }
+    .ae-modal-title { font-size: 16px; font-weight: 700; margin: 0; }
+    .ae-modal-body { padding: 16px 20px; }
+    .ae-modal-foot {
+      padding: 14px 20px; border-top: 1px solid var(--paper-warm, #ece6da);
+      display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .ae-modal-foot__right { display: flex; gap: 10px; margin-left: auto; }
+
+    .ae-ctx {
+      background: var(--paper-warm, #faf6ef); border-radius: 8px; padding: 10px 12px;
+      font-size: 12px; color: var(--ink-mute); margin-bottom: 14px; line-height: 1.5;
+    }
+    .ae-ctx strong { color: var(--ink, #222); }
+
+    .ae-field { margin-bottom: 12px; }
+    .ae-field > label { display: block; font-size: 12px; color: var(--ink-mute); margin-bottom: 4px; }
+    .ae-field input[type="text"], .ae-field input[type="number"], .ae-field input[type="url"],
+    .ae-field input[type="date"], .ae-field select, .ae-field textarea {
+      width: 100%; box-sizing: border-box; font-size: 14px; padding: 8px 10px;
+      border: 1px solid var(--paper-warm, #d9d2c4); border-radius: 6px;
+      background: #fff; color: var(--ink, #222); font-family: inherit;
+    }
+    .ae-field textarea { min-height: 60px; resize: vertical; }
+    .ae-field-hint { font-size: 11px; color: var(--ink-mute); margin-top: 3px; }
+    .ae-field-row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .ae-field-row > .ae-field { flex: 1; min-width: 140px; }
+
+    .ae-radio-row { display: flex; gap: 16px; flex-wrap: wrap; }
+    .ae-radio-row label { display: flex; align-items: center; gap: 5px; font-size: 13px; color: var(--ink, #222); }
+
+    .ae-mixite-info { font-size: 12px; color: var(--ink-mute); }
+
+    details.ae-complements { margin-top: 6px; border-top: 1px dashed var(--paper-warm, #d9d2c4); padding-top: 10px; }
+    details.ae-complements > summary { cursor: pointer; font-size: 13px; color: #146eb4; margin-bottom: 10px; }
+
+    /* Chips clubs partenaires */
+    .ae-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+    .ae-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px;
+      padding: 3px 9px; border-radius: 999px; background: var(--paper-warm, #f1ece1); color: var(--ink, #222); }
+    .ae-chip button { background: none; border: none; cursor: pointer; color: var(--ink-mute); font-size: 13px; line-height: 1; padding: 0; }
+
+    .ae-modal-error {
+      display: none; margin-bottom: 12px; padding: 10px 12px;
+      border: 1px solid var(--rouge-blesse, #c0392b); border-radius: 6px;
+      background: var(--paper-warm, #faf6ef); color: var(--ink, #222); font-size: 13px;
+    }
+  </style>
+</head>
+<body class="auth-pending">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo"><img src="assets/logo-m2m.png" alt="MOM Rugby"></div>
+      <div class="brand-text">
+        <h1>MOM Hub</h1>
+        <p>Mutzig Ovalie Molsheim</p>
+      </div>
+    </div>
+
+    <div class="season-pill" id="ae-season-pill">SAISON …</div>
+
+    <nav class="main-nav">
+      <a href="./">Tableau de bord</a>
+      <a href="evenements.html">Évènements</a>
+      <a href="u-admin.html">Collectif (admin)</a>
+      <a href="compositions.html">Compositions</a>
+    </nav>
+
+    <div class="icon-row">
+      <button class="icon-btn" title="Recherche" aria-label="Recherche">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      </button>
+    </div>
+
+    <div class="user-profile">
+      <div class="avatar">EJ</div>
+      <div class="user-info">
+        <div class="user-name">Emmanuel Jung</div>
+        <div class="user-role">Référent M14</div>
+      </div>
+      <a href="./" class="user-action" title="Retour au portail" aria-label="Retour au portail">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/></svg>
+      </a>
+      <button type="button" class="user-action" id="btn-signout" title="Se déconnecter" aria-label="Se déconnecter">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="ae-layout">
+
+    <div class="ae-badge" id="ae-badge">🔒 …</div>
+
+    <div class="ae-head">
+      <h2>Administration des équipes</h2>
+      <p>Par pôle → catégorie, par saison. On entre toujours par une catégorie (« pas de mélange »).</p>
+    </div>
+
+    <!-- Bandeau saison (doc §3.1 D4) -->
+    <div class="ae-saison-row">
+      <label for="ae-saison">Saison :</label>
+      <select id="ae-saison" aria-label="Choisir la saison">
+        <option value="">Chargement…</option>
+      </select>
+    </div>
+    <div class="ae-saison-meta" id="ae-saison-meta"></div>
+
+    <div class="ae-error" id="ae-error"></div>
+
+    <!-- Grille pôles → catégories (rendue par admin-equipes.js) -->
+    <div id="ae-poles" style="display:none;"></div>
+
+  </main>
+
+  <!-- ============================================================ -->
+  <!-- MODALE ÉQUIPE (création / édition) · doc §3.1 D5             -->
+  <!-- ============================================================ -->
+  <div class="ae-modal" id="ae-modal-equipe" role="dialog" aria-modal="true" aria-labelledby="ae-eq-modal-title">
+    <div class="ae-modal-card">
+      <div class="ae-modal-head">
+        <h3 class="ae-modal-title" id="ae-eq-modal-title">Nouvelle équipe</h3>
+        <button type="button" class="ae-btn" id="ae-eq-close" aria-label="Fermer">✕</button>
+      </div>
+      <div class="ae-modal-body">
+
+        <div class="ae-modal-error" id="ae-eq-error"></div>
+
+        <!-- Contexte verrouillé : catégorie, saison, entente déduite -->
+        <div class="ae-ctx" id="ae-eq-ctx">
+          Catégorie <strong id="ae-eq-ctx-categorie">—</strong> ·
+          saison <strong id="ae-eq-ctx-saison">—</strong><br>
+          Cadre (entente) <strong id="ae-eq-ctx-entente">—</strong>
+        </div>
+
+        <!-- Essentiels -->
+        <div class="ae-field">
+          <label for="ae-eq-nom">Nom officiel <span title="auto-dérivé, modifiable">✎</span></label>
+          <input type="text" id="ae-eq-nom" autocomplete="off">
+          <div class="ae-field-hint">Pré-rempli automatiquement ; modifiable.</div>
+        </div>
+
+        <div class="ae-field-row">
+          <div class="ae-field">
+            <label for="ae-eq-numero">N° d'équipe</label>
+            <input type="number" id="ae-eq-numero" min="1" step="1">
+          </div>
+          <div class="ae-field">
+            <label for="ae-eq-format">Format de jeu</label>
+            <select id="ae-eq-format">
+              <option value="">— Format… —</option>
+            </select>
+            <div class="ae-field-hint">Filtré sur les formats autorisés de la catégorie.</div>
+          </div>
+        </div>
+
+        <div class="ae-field">
+          <label for="ae-eq-championnat">Championnat</label>
+          <input type="text" id="ae-eq-championnat" list="ae-eq-championnat-list" autocomplete="off">
+          <datalist id="ae-eq-championnat-list"></datalist>
+        </div>
+
+        <div class="ae-field">
+          <label>Type d'équipe</label>
+          <div class="ae-radio-row">
+            <label><input type="radio" name="ae-eq-type" id="ae-eq-type-entente" value="entente"> Entente</label>
+            <label><input type="radio" name="ae-eq-type" id="ae-eq-type-mono" value="mono"> Mono-club</label>
+          </div>
+          <div class="ae-mixite-info" id="ae-eq-mixite-info"></div>
+        </div>
+
+        <!-- Compléments dépliables -->
+        <details class="ae-complements" id="ae-eq-complements">
+          <summary>Compléments</summary>
+
+          <div class="ae-field-row">
+            <div class="ae-field">
+              <label for="ae-eq-libelle-court">Libellé court</label>
+              <input type="text" id="ae-eq-libelle-court" autocomplete="off">
+            </div>
+            <div class="ae-field">
+              <label for="ae-eq-libelle-moyen">Libellé moyen</label>
+              <input type="text" id="ae-eq-libelle-moyen" autocomplete="off">
+            </div>
+          </div>
+          <div class="ae-field">
+            <label for="ae-eq-libelle-long">Libellé long</label>
+            <input type="text" id="ae-eq-libelle-long" autocomplete="off">
+          </div>
+
+          <div class="ae-field">
+            <label for="ae-eq-alias">Alias <span class="ae-field-hint">(séparés par des virgules)</span></label>
+            <input type="text" id="ae-eq-alias" autocomplete="off">
+          </div>
+
+          <div class="ae-field-row">
+            <div class="ae-field">
+              <label for="ae-eq-effectif-theorique">Effectif théorique</label>
+              <input type="number" id="ae-eq-effectif-theorique" min="0" step="1">
+            </div>
+            <div class="ae-field">
+              <label for="ae-eq-effectif-min">Effectif min. opérationnel</label>
+              <input type="number" id="ae-eq-effectif-min" min="0" step="1">
+            </div>
+          </div>
+
+          <div class="ae-field">
+            <label for="ae-eq-site">Site principal</label>
+            <select id="ae-eq-site">
+              <option value="">— Aucun (accepté en v1) —</option>
+            </select>
+          </div>
+
+          <div class="ae-field-row">
+            <div class="ae-field">
+              <label for="ae-eq-code-ffr">Code championnat FFR</label>
+              <input type="text" id="ae-eq-code-ffr" autocomplete="off">
+            </div>
+            <div class="ae-field">
+              <label for="ae-eq-code-scorenco">Code Scorenco</label>
+              <input type="text" id="ae-eq-code-scorenco" autocomplete="off">
+            </div>
+          </div>
+
+          <div class="ae-field">
+            <label for="ae-eq-notes">Notes</label>
+            <textarea id="ae-eq-notes"></textarea>
+          </div>
+
+          <div class="ae-field-hint">
+            Jeux de maillots (<code>jeux_maillots</code>) : éditeur dédié différé hors v1
+            (préservé tel quel en édition, non écrasé).
+          </div>
+        </details>
+
+      </div>
+      <div class="ae-modal-foot">
+        <button type="button" class="ae-btn ae-btn--danger" id="ae-eq-statut-toggle" style="display:none;">Désactiver</button>
+        <div class="ae-modal-foot__right">
+          <button type="button" class="ae-btn" id="ae-eq-cancel">Annuler</button>
+          <button type="button" class="ae-btn ae-btn--primary" id="ae-eq-save">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- MODALE ENTENTE (cadre de la catégorie) · doc §3.3           -->
+  <!-- ============================================================ -->
+  <div class="ae-modal" id="ae-modal-entente" role="dialog" aria-modal="true" aria-labelledby="ae-ent-modal-title">
+    <div class="ae-modal-card">
+      <div class="ae-modal-head">
+        <h3 class="ae-modal-title" id="ae-ent-modal-title">Cadre de la catégorie</h3>
+        <button type="button" class="ae-btn" id="ae-ent-close" aria-label="Fermer">✕</button>
+      </div>
+      <div class="ae-modal-body">
+
+        <div class="ae-modal-error" id="ae-ent-error"></div>
+
+        <div class="ae-ctx" id="ae-ent-ctx">
+          Cadre administratif de <strong id="ae-ent-ctx-categorie">—</strong> ·
+          saison <strong id="ae-ent-ctx-saison">—</strong>
+        </div>
+
+        <!-- code : visible en création seulement (cas F15/F18) -->
+        <div class="ae-field" id="ae-ent-code-wrap" style="display:none;">
+          <label for="ae-ent-code">Code de l'entente</label>
+          <input type="text" id="ae-ent-code" autocomplete="off">
+          <div class="ae-field-hint">Requis pour créer un cadre (cas rare : catégorie sans entente).</div>
+        </div>
+
+        <div class="ae-field">
+          <label>Régime</label>
+          <div class="ae-radio-row">
+            <label><input type="radio" name="ae-ent-regime" value="Solo"> Solo</label>
+            <label><input type="radio" name="ae-ent-regime" value="Permanente"> Permanente</label>
+            <label><input type="radio" name="ae-ent-regime" value="Occasionnelle"> Occasionnelle</label>
+          </div>
+        </div>
+
+        <div class="ae-field">
+          <label for="ae-ent-club-principal">Club principal</label>
+          <select id="ae-ent-club-principal">
+            <option value="">— Choisir un club… —</option>
+          </select>
+        </div>
+
+        <div class="ae-field">
+          <label>Clubs partenaires</label>
+          <div class="ae-chips" id="ae-ent-clubs-chips"></div>
+          <div class="ae-field-row" style="align-items:flex-end;">
+            <div class="ae-field" style="margin-bottom:0;">
+              <select id="ae-ent-club-add">
+                <option value="">— Ajouter un club partenaire… —</option>
+              </select>
+            </div>
+            <button type="button" class="ae-btn" id="ae-ent-club-add-btn">+ Ajouter</button>
+          </div>
+        </div>
+
+        <div class="ae-field-row">
+          <div class="ae-field">
+            <label for="ae-ent-libelle-court">Libellé court</label>
+            <input type="text" id="ae-ent-libelle-court" autocomplete="off">
+          </div>
+          <div class="ae-field">
+            <label for="ae-ent-libelle-moyen">Libellé moyen</label>
+            <input type="text" id="ae-ent-libelle-moyen" autocomplete="off">
+          </div>
+        </div>
+
+        <details class="ae-complements" id="ae-ent-convention">
+          <summary>Convention FFR</summary>
+          <div class="ae-field">
+            <label for="ae-ent-conv-url">URL de la convention</label>
+            <input type="url" id="ae-ent-conv-url" autocomplete="off">
+          </div>
+          <div class="ae-field-row">
+            <div class="ae-field">
+              <label for="ae-ent-conv-date-sig">Date de signature</label>
+              <input type="date" id="ae-ent-conv-date-sig">
+            </div>
+            <div class="ae-field">
+              <label for="ae-ent-conv-date-fin">Fin de validité</label>
+              <input type="date" id="ae-ent-conv-date-fin">
+            </div>
+          </div>
+          <div class="ae-field">
+            <label for="ae-ent-sporteasy">Identifiant Sporteasy</label>
+            <input type="text" id="ae-ent-sporteasy" autocomplete="off">
+          </div>
+          <div class="ae-field">
+            <label for="ae-ent-notes">Notes</label>
+            <textarea id="ae-ent-notes"></textarea>
+          </div>
+        </details>
+
+      </div>
+      <div class="ae-modal-foot">
+        <div class="ae-modal-foot__right">
+          <button type="button" class="ae-btn" id="ae-ent-cancel">Annuler</button>
+          <button type="button" class="ae-btn ae-btn--primary" id="ae-ent-save">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/admin-equipes.js"></script>
+
+  <script>
+    (async function () {
+      'use strict';
+      // Garde d'accès calquée sur u-admin.html : ADMIN-(ii) = mode
+      // admin STRICT (doc §3.1 D2 « admin seul v1 »). La RLS base est
+      // admin|coach sur equipes, mais l'UI se garde sur has_role('admin')
+      // — aucun chemin d'écriture équipe ouvert à un coach (filet RLS
+      // permissif laissé dormant, cf. supabase-client.js v1.31).
+      const session = await SupabaseHub.getSession();
+      if (!session) { window.location.replace('login.html'); return; }
+      const roles = await SupabaseHub.getMyRoles();
+      const isAdmin = roles.indexOf('admin') !== -1;
+      if (!isAdmin) { window.location.replace('./'); return; }
+
+      document.body.classList.remove('auth-pending');
+      document.body.classList.add('auth-resolved');
+      document.body.classList.add('auth-admin');
+
+      const signoutBtn = document.getElementById('btn-signout');
+      if (signoutBtn) {
+        signoutBtn.addEventListener('click', async function () {
+          signoutBtn.disabled = true;
+          await SupabaseHub.signOut();
+        });
+      }
+
+      SupabaseHub.onAuthChange(function (event) {
+        if (event === 'SIGNED_OUT') window.location.replace('login.html');
+      });
+
+      await window.AdminEquipes.init({ isAdmin: true });
+    })();
+  </script>
+</body>
+</html>
