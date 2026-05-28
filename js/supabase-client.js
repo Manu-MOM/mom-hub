@@ -738,10 +738,10 @@
  *          node --check OK.
  *   v1.31 : ADMIN-(ii) sous-chantier (1) Équipes par catégorie +
  *          (3) Ententes intégré (Production · 28/05/2026, pt 21).
- *          7 NOUVEAUX WRAPPERS additifs, colonnes TOUTES confirmées
+ *          9 NOUVEAUX WRAPPERS additifs, colonnes TOUTES confirmées
  *          à la source (information_schema 28/05, aucune inventée —
  *          doc FAIT FOI Conception-UX-ADMIN-ii-v1.md md5 ca043a48) :
- *            LECTURE (2)
+ *            LECTURE (4)
  *            - getPolesAvecCategories() : grille pôle → catégories
  *              actives du club. Mapping = poles.categories_rattachees
  *              (TEXT[] de codes catégorie) confirmé source → lève le
@@ -751,6 +751,14 @@
  *            - getEntenteCadre(categorieId, saisonId) : le cadre
  *              UNIQUE(saison_id, categorie_id) (≤ 1). data=null =
  *              cas F15/F18 « catégorie sans cadre ».
+ *            - listEquipesByEntentes(ententeIds) : équipes de N
+ *              ententes en 1 appel (.in), tous statuts/toute saison
+ *              (grille admin) — vs listEquipes() active-only.
+ *            - listSaisons() : bandeau saison (D4). Colonnes réelles
+ *              id/code/libelle/date_debut/date_fin/est_active (PAS
+ *              de `statut` : JSON saison divergent). Classement
+ *              passé / active / futur dérivé côté écran. Sans filtre
+ *              est_active (passées consultables, lecture seule UI).
  *            ÉCRITURE equipes (3)
  *            - createEquipe(payload)  : requis code / nom_officiel /
  *              entente_id (déduit du contexte, NON saisi).
@@ -775,7 +783,7 @@
  *          md5 b545c588 : 4 zones touchées —
  *          (a) version header 1.30 → 1.31 (1 ligne),
  *          (b) entrée changelog (ce bloc, addition pure),
- *          (c) 1 section contiguë de 7 méthodes en fin d'objet
+ *          (c) 1 section contiguë de 9 méthodes en fin d'objet
  *              (virgule ajoutée après consoliderScoreRencontreCoach,
  *              dernier membre devenu non-terminal),
  *          (d) console.log boot v1.30 → v1.31 chargé (1 ligne).
@@ -4488,6 +4496,62 @@
         return { ok: false, error: error.message || 'Erreur lecture entente cadre' };
       }
       return { ok: true, data: data || null };
+    },
+
+    /**
+     * LECTURE — Liste les saisons pour le bandeau ADMIN-(ii) (doc
+     * §3.1 D4). Colonnes confirmées à la source (information_schema
+     * 28/05) : id, code, libelle, date_debut, date_fin, est_active.
+     * Le modèle réel n'a PAS de colonne `statut` (le JSON saison
+     * diverge — gouvernance SQL↔JSON) : le classement passé / active
+     * / futur se dérive de date_debut/date_fin + est_active côté
+     * écran. Tri date_debut décroissant (plus récentes d'abord).
+     * AUCUN filtre est_active : les saisons passées sont
+     * CONSULTABLES (lecture seule côté UI, jamais réécrites).
+     *
+     * @returns {Promise<{ok:boolean, data?:Array, error?:string}>}
+     */
+    async listSaisons() {
+      const { data, error } = await client
+        .from('saisons')
+        .select('id, code, libelle, date_debut, date_fin, est_active')
+        .order('date_debut', { ascending: false });
+      if (error) {
+        console.error('MOM Hub: listSaisons()', error);
+        return { ok: false, error: error.message || 'Erreur lecture saisons' };
+      }
+      return { ok: true, data: Array.isArray(data) ? data : [] };
+    },
+
+    /**
+     * LECTURE — Équipes rattachées à un ENSEMBLE d'ententes, en un
+     * seul appel (.in entente_id). Sert la grille ADMIN-(ii) : on
+     * résout d'abord les ententes de la saison choisie
+     * (listEntentes({saisonId})) puis on charge toutes leurs équipes
+     * d'un coup, groupées côté écran par entente_id → catégorie.
+     * Contrairement à listEquipes() (active-season-only +
+     * statut='active'), renvoie TOUS les statuts — l'admin voit aussi
+     * les équipes désactivées (grisées) — et toute saison (aucun
+     * filtre est_active). select('*') = prérempli pour la modale
+     * d'édition sans second fetch.
+     *
+     * @param {string[]} ententeIds liste d'UUID ententes.id
+     * @returns {Promise<{ok:boolean, data?:Array, error?:string}>}
+     */
+    async listEquipesByEntentes(ententeIds) {
+      if (!Array.isArray(ententeIds) || ententeIds.length === 0) {
+        return { ok: true, data: [] };
+      }
+      const { data, error } = await client
+        .from('equipes')
+        .select('*')
+        .in('entente_id', ententeIds)
+        .order('numero_equipe', { ascending: true, nullsFirst: false });
+      if (error) {
+        console.error('MOM Hub: listEquipesByEntentes()', error);
+        return { ok: false, error: error.message || 'Erreur lecture equipes' };
+      }
+      return { ok: true, data: Array.isArray(data) ? data : [] };
     },
 
     /**
