@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Administration des saisons · MOM Hub</title>
+  <link rel="icon" type="image/png" href="assets/logo-m2m.png">
+  <meta name="description" content="Administration transverse des saisons (millésime) et bascule des catégories — MOM Hub (mode admin)." />
+
+  <link rel="stylesheet" href="css/hub.css">
+
+  <style>
+    /* ADMIN-(ii) · (2) Saisons + bascule millésime — doc FAIT FOI
+       Conception-UX-ADMIN-ii-v1.md §3.4. Habillage calqué sur
+       admin-sites.html (mêmes tokens css/hub.css), namespace `asn-`.
+       Deux zones : (2a) liste saisons + création/activation ;
+       (2b) écran bascule = aperçu 3 groupes LECTURE SEULE + Appliquer. */
+
+    body.auth-pending { visibility: hidden; }
+
+    .asn-layout { max-width: 1080px; margin: 0 auto; padding: 24px 24px 48px; position: relative; z-index: 2; }
+
+    .asn-badge {
+      display: inline-block; padding: 6px 14px; border-radius: 999px;
+      background: var(--paper-warm, #f1ece1); color: var(--ink, #222);
+      font-size: 13px; margin-bottom: 14px;
+    }
+
+    .asn-head h2 { margin: 0 0 4px; font-size: 22px; }
+    .asn-head p { margin: 0; font-size: 13px; color: var(--ink-mute); }
+
+    .asn-error {
+      display: none; margin: 14px 0; padding: 14px 16px;
+      border: 1px solid var(--rouge-blesse, #c0392b); border-radius: 8px;
+      background: var(--paper-warm, #faf6ef); color: var(--ink, #222); font-size: 14px;
+    }
+
+    /* Sections */
+    .asn-section { margin-top: 30px; }
+    .asn-section-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+    .asn-section-head h3 { margin: 0; font-size: 18px; }
+    .asn-section-head p { margin: 0; font-size: 13px; color: var(--ink-mute); }
+    .asn-section-sep { border: none; border-top: 1px solid var(--paper-warm, #ece6da); margin: 26px 0 0; }
+
+    .asn-toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 14px 0 6px; }
+    .asn-count { font-size: 12px; color: var(--ink-mute); margin-left: auto; }
+
+    /* ----- (2a) Liste des saisons ----- */
+    .asn-list { list-style: none; padding: 0; margin: 10px 0 0; display: flex; flex-direction: column; gap: 6px; }
+    .asn-item {
+      display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+      border: 1px solid var(--paper-warm, #ece6da); border-radius: 10px; background: #fff;
+    }
+    .asn-item--active { border-color: var(--vert-essai, #2D7D46); background: var(--feedback-success-bg, #f3faf5); }
+    .asn-item-main { flex: 1; min-width: 0; line-height: 1.35; }
+    .asn-item-nom { display: block; font-size: 15px; font-weight: 600; color: var(--ink, #222); }
+    .asn-item-meta { display: block; font-size: 12px; color: var(--ink-mute); margin-top: 2px; }
+    .asn-statut-badge {
+      font-size: 10px; padding: 2px 9px; border-radius: 999px; text-transform: uppercase;
+      letter-spacing: 0.4px; white-space: nowrap; background: var(--paper-warm, #f1ece1); color: var(--ink-mute);
+    }
+    .asn-statut-badge--active { background: var(--feedback-success-bg, #e7f3ec); color: var(--feedback-success-fg, #2D7D46); }
+    .asn-statut-badge--avenir { background: #eef4fb; color: #146eb4; }
+    .asn-empty { font-size: 13px; color: var(--ink-mute); font-style: italic; padding: 18px 4px; }
+
+    /* ----- (2b) Bascule ----- */
+    .asn-bascule-controls { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-top: 12px; }
+    .asn-bascule-controls .asn-field { margin-bottom: 0; min-width: 240px; }
+    .asn-hint-block {
+      margin-top: 10px; padding: 10px 12px; border-radius: 8px; font-size: 12.5px;
+      background: var(--paper-warm, #f7f3ea); color: var(--ink-mute); line-height: 1.5;
+    }
+
+    .asn-apercu { display: none; margin-top: 18px; }
+    .asn-apercu.is-shown { display: block; }
+    .asn-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+    .asn-group-card {
+      border: 1px solid var(--paper-warm, #ece6da); border-radius: 10px; padding: 14px 16px; background: #fff;
+    }
+    .asn-group-card--basculer { border-left: 4px solid var(--vert-essai, #2D7D46); }
+    .asn-group-card--inchange { border-left: 4px solid var(--line, #d9d2c4); }
+    .asn-group-card--verifier { border-left: 4px solid var(--clay, #c98a3a); }
+    .asn-group-n { font-family: 'Oswald', sans-serif; font-size: 30px; line-height: 1; color: var(--ink, #222); }
+    .asn-group-label { font-size: 12px; color: var(--ink-mute); margin-top: 4px; }
+
+    .asn-tables { margin-top: 18px; }
+    .asn-table-wrap { margin-top: 14px; }
+    .asn-table-title { font-size: 14px; font-weight: 600; margin: 0 0 6px; }
+    .asn-table-scroll { max-height: 320px; overflow-y: auto; border: 1px solid var(--paper-warm, #ece6da); border-radius: 8px; }
+    table.asn-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    table.asn-table th, table.asn-table td { text-align: left; padding: 7px 12px; border-bottom: 1px solid var(--paper-warm, #f1ece1); }
+    table.asn-table th { position: sticky; top: 0; background: var(--paper-warm, #f7f3ea); color: var(--ink-mute); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; }
+    table.asn-table tr:last-child td { border-bottom: none; }
+    .asn-arrow { color: var(--vert-essai, #2D7D46); font-weight: 700; }
+    .asn-motif { color: var(--clay, #b9772b); }
+
+    .asn-apply-row { margin-top: 20px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .asn-result {
+      display: none; margin-top: 14px; padding: 12px 14px; border-radius: 8px; font-size: 13.5px;
+      border: 1px solid var(--vert-essai, #2D7D46); background: var(--feedback-success-bg, #f3faf5); color: var(--ink, #222);
+    }
+    .asn-result.is-shown { display: block; }
+
+    /* Boutons (calqués admin-sites) */
+    .asn-btn {
+      border: 1px solid var(--paper-warm, #d9d2c4); background: #fff;
+      border-radius: 6px; padding: 8px 14px; font-size: 13px; cursor: pointer; color: var(--ink, #222);
+    }
+    .asn-btn:hover:not(:disabled) { background: var(--paper-warm, #f1ece1); }
+    .asn-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .asn-btn--primary { background: var(--vert-essai, #2D7D46); color: #fff; border-color: var(--vert-essai, #2D7D46); }
+    .asn-btn--primary:hover:not(:disabled) { filter: brightness(0.95); }
+    .asn-btn--warn { background: var(--clay, #c98a3a); color: #fff; border-color: var(--clay, #c98a3a); }
+    .asn-btn--warn:hover:not(:disabled) { filter: brightness(0.95); }
+    .asn-btn--ghost { background: transparent; }
+
+    /* Modales (patron admin-sites) */
+    .asn-modal { display: none; position: fixed; inset: 0; z-index: 50; background: rgba(20, 18, 14, 0.45); padding: 24px; overflow-y: auto; }
+    .asn-modal.is-open { display: block; }
+    .asn-modal-card { max-width: 560px; margin: 24px auto; background: #fff; border-radius: 12px; border: 1px solid var(--paper-warm, #ece6da); box-shadow: 0 18px 50px rgba(0,0,0,0.25); }
+    .asn-modal-head { padding: 16px 20px; border-bottom: 1px solid var(--paper-warm, #ece6da); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .asn-modal-title { font-size: 16px; font-weight: 700; margin: 0; }
+    .asn-modal-body { padding: 16px 20px; }
+    .asn-modal-foot { padding: 14px 20px; border-top: 1px solid var(--paper-warm, #ece6da); display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+
+    .asn-field { margin-bottom: 12px; }
+    .asn-field > label { display: block; font-size: 12px; color: var(--ink-mute); margin-bottom: 4px; }
+    .asn-field input[type="text"], .asn-field input[type="date"], .asn-field select {
+      width: 100%; box-sizing: border-box; font-size: 14px; padding: 8px 10px;
+      border: 1px solid var(--paper-warm, #d9d2c4); border-radius: 6px; background: #fff; color: var(--ink, #222); font-family: inherit;
+    }
+    .asn-field-hint { font-size: 11px; color: var(--ink-mute); margin-top: 3px; }
+    .asn-field-row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .asn-field-row > .asn-field { flex: 1; min-width: 140px; }
+
+    .asn-modal-error { display: none; margin-bottom: 12px; padding: 10px 12px; border: 1px solid var(--rouge-blesse, #c0392b); border-radius: 6px; background: var(--paper-warm, #faf6ef); color: var(--ink, #222); font-size: 13px; }
+    .asn-confirm-text { font-size: 14px; line-height: 1.55; color: var(--ink, #222); }
+    .asn-confirm-strong { font-weight: 700; }
+  </style>
+</head>
+<body class="auth-pending">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo"><img src="assets/logo-m2m.png" alt="MOM Rugby"></div>
+      <div class="brand-text">
+        <h1>MOM Hub</h1>
+        <p>Mutzig Ovalie Molsheim</p>
+      </div>
+    </div>
+
+    <div class="season-pill" id="asn-season-pill">SAISON 2025 / 2026</div>
+
+    <nav class="main-nav">
+      <a href="./">Tableau de bord</a>
+      <a href="evenements.html">Évènements</a>
+      <a href="u-admin.html">Collectif (admin)</a>
+      <a href="compositions.html">Compositions</a>
+    </nav>
+
+    <div class="icon-row">
+      <button class="icon-btn" title="Recherche" aria-label="Recherche">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      </button>
+    </div>
+
+    <div class="user-profile">
+      <div class="avatar">EJ</div>
+      <div class="user-info">
+        <div class="user-name">Emmanuel Jung</div>
+        <div class="user-role">Administrateur</div>
+      </div>
+      <a href="./" class="user-action" title="Retour au portail" aria-label="Retour au portail">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/></svg>
+      </a>
+      <button type="button" class="user-action" id="btn-signout" title="Se déconnecter" aria-label="Se déconnecter">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="asn-layout">
+
+    <div class="asn-badge" id="asn-badge">🔒 …</div>
+
+    <div class="asn-head">
+      <h2>Administration des saisons</h2>
+      <p>Création et activation des millésimes, et bascule des catégories d'une saison à l'autre.</p>
+    </div>
+
+    <div class="asn-error" id="asn-error"></div>
+
+    <!-- ====================================================== -->
+    <!-- (2a) SAISONS — liste + création + activation           -->
+    <!-- ====================================================== -->
+    <section class="asn-section" aria-labelledby="asn-s1-title">
+      <div class="asn-section-head">
+        <h3 id="asn-s1-title">Saisons</h3>
+        <p>La saison active porte la pastille ✦. Une seule saison active à la fois.</p>
+      </div>
+
+      <div class="asn-toolbar">
+        <button type="button" class="asn-btn asn-btn--primary" id="asn-new">+ Nouvelle saison</button>
+        <span class="asn-count" id="asn-count"></span>
+      </div>
+
+      <ul class="asn-list" id="asn-list"></ul>
+      <div class="asn-empty" id="asn-empty" style="display:none;">Aucune saison enregistrée.</div>
+    </section>
+
+    <hr class="asn-section-sep">
+
+    <!-- ====================================================== -->
+    <!-- (2b) BASCULE des catégories par millésime              -->
+    <!-- ====================================================== -->
+    <section class="asn-section" aria-labelledby="asn-s2-title">
+      <div class="asn-section-head">
+        <h3 id="asn-s2-title">Bascule des catégories par millésime</h3>
+        <p>Fait monter les joueurs d'une catégorie d'âge à la suivante pour la saison choisie.</p>
+      </div>
+
+      <div class="asn-bascule-controls">
+        <div class="asn-field">
+          <label for="asn-cible">Saison cible</label>
+          <select id="asn-cible"></select>
+        </div>
+        <button type="button" class="asn-btn asn-btn--primary" id="asn-apercu-btn">Calculer l'aperçu</button>
+      </div>
+
+      <div class="asn-hint-block">
+        L'aperçu est <strong>en lecture seule</strong> : rien n'est modifié tant que vous n'avez pas cliqué « Appliquer ».
+        Les joueurs sont répartis en trois groupes — <strong>à basculer</strong> (montée d'une catégorie),
+        <strong>inchangés</strong> (déjà à la bonne catégorie), et <strong>à vérifier</strong> (cas que l'outil
+        ne bascule jamais tout seul : sexe ou date de naissance manquants, F15 intégrée, surclassement, hors grille).
+        Les séniors et le loisir ne sont pas concernés.
+      </div>
+
+      <div class="asn-apercu" id="asn-apercu">
+        <div class="asn-groups">
+          <div class="asn-group-card asn-group-card--basculer">
+            <div class="asn-group-n" id="asn-n-basculer">0</div>
+            <div class="asn-group-label">à basculer</div>
+          </div>
+          <div class="asn-group-card asn-group-card--inchange">
+            <div class="asn-group-n" id="asn-n-inchange">0</div>
+            <div class="asn-group-label">inchangés</div>
+          </div>
+          <div class="asn-group-card asn-group-card--verifier">
+            <div class="asn-group-n" id="asn-n-verifier">0</div>
+            <div class="asn-group-label">à vérifier</div>
+          </div>
+        </div>
+
+        <div class="asn-tables" id="asn-tables"></div>
+
+        <div class="asn-apply-row">
+          <button type="button" class="asn-btn asn-btn--warn" id="asn-appliquer-btn" disabled>Appliquer la bascule</button>
+          <span class="asn-field-hint" id="asn-apply-hint"></span>
+        </div>
+
+        <div class="asn-result" id="asn-result"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ============================================================ -->
+  <!-- MODALE création de saison (2a) · 4 requis                    -->
+  <!-- ============================================================ -->
+  <div class="asn-modal" id="asn-modal-saison" role="dialog" aria-modal="true" aria-labelledby="asn-saison-modal-title">
+    <div class="asn-modal-card">
+      <div class="asn-modal-head">
+        <h3 class="asn-modal-title" id="asn-saison-modal-title">Nouvelle saison</h3>
+        <button type="button" class="asn-btn" id="asn-saison-close" aria-label="Fermer">✕</button>
+      </div>
+      <div class="asn-modal-body">
+        <div class="asn-modal-error" id="asn-saison-error"></div>
+
+        <div class="asn-field-row">
+          <div class="asn-field">
+            <label for="asn-saison-code">Code</label>
+            <input type="text" id="asn-saison-code" autocomplete="off" placeholder="2026-2027">
+            <div class="asn-field-hint">Identifiant unique (ex. 2026-2027).</div>
+          </div>
+          <div class="asn-field">
+            <label for="asn-saison-libelle">Libellé</label>
+            <input type="text" id="asn-saison-libelle" autocomplete="off" placeholder="Saison 2026/2027">
+          </div>
+        </div>
+
+        <div class="asn-field-row">
+          <div class="asn-field">
+            <label for="asn-saison-debut">Date de début</label>
+            <input type="date" id="asn-saison-debut">
+          </div>
+          <div class="asn-field">
+            <label for="asn-saison-fin">Date de fin</label>
+            <input type="date" id="asn-saison-fin">
+          </div>
+        </div>
+
+        <div class="asn-field-hint">La saison est créée <strong>inactive</strong> ; l'activation se fait ensuite via le bouton « Activer » de la liste.</div>
+      </div>
+      <div class="asn-modal-foot">
+        <button type="button" class="asn-btn" id="asn-saison-cancel">Annuler</button>
+        <button type="button" class="asn-btn asn-btn--primary" id="asn-saison-save">Créer la saison</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- MODALE confirmation bascule (garde-fou, 2b)                  -->
+  <!-- ============================================================ -->
+  <div class="asn-modal" id="asn-modal-confirm" role="dialog" aria-modal="true" aria-labelledby="asn-confirm-title">
+    <div class="asn-modal-card">
+      <div class="asn-modal-head">
+        <h3 class="asn-modal-title" id="asn-confirm-title">Confirmer la bascule</h3>
+        <button type="button" class="asn-btn" id="asn-confirm-close" aria-label="Fermer">✕</button>
+      </div>
+      <div class="asn-modal-body">
+        <p class="asn-confirm-text" id="asn-confirm-text"></p>
+        <p class="asn-confirm-text" style="margin-top:10px;color:var(--ink-mute);font-size:12.5px;">
+          La catégorie de ces joueurs sera mise à jour. L'opération est tracée (journal de bascule) et réversible
+          côté base si nécessaire. Les groupes « inchangés » et « à vérifier » ne sont pas touchés.
+        </p>
+      </div>
+      <div class="asn-modal-foot">
+        <button type="button" class="asn-btn" id="asn-confirm-cancel">Annuler</button>
+        <button type="button" class="asn-btn asn-btn--warn" id="asn-confirm-ok">Oui, appliquer</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/admin-saisons.js"></script>
+
+  <script>
+    (async function () {
+      'use strict';
+      // Garde d'accès calquée sur admin-sites.html : ADMIN-(ii) = mode admin
+      // STRICT (doc §3.4). Les RPC de sql/53 sont gardées has_role('admin') ;
+      // la garde UI aligne le front sur cette RLS (aucun écran admin pour un
+      // non-admin, aucun chemin d'écriture saison/bascule ouvert ailleurs).
+      const session = await SupabaseHub.getSession();
+      if (!session) { window.location.replace('login.html'); return; }
+      const roles = await SupabaseHub.getMyRoles();
+      const isAdmin = roles.indexOf('admin') !== -1;
+      if (!isAdmin) { window.location.replace('./'); return; }
+
+      document.body.classList.remove('auth-pending');
+      document.body.classList.add('auth-resolved');
+      document.body.classList.add('auth-admin');
+
+      const signoutBtn = document.getElementById('btn-signout');
+      if (signoutBtn) {
+        signoutBtn.addEventListener('click', async function () {
+          signoutBtn.disabled = true;
+          await SupabaseHub.signOut();
+        });
+      }
+
+      SupabaseHub.onAuthChange(function (event) {
+        if (event === 'SIGNED_OUT') window.location.replace('login.html');
+      });
+
+      await window.AdminSaisons.init({ isAdmin: true });
+    })();
+  </script>
+</body>
+</html>
