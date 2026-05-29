@@ -1,0 +1,20 @@
+{
+  "_meta": {
+    "id": "fonctions-staff",
+    "version": "1.0",
+    "type": "referentiel_suggere",
+    "gouvernance": "JSON fait foi (STATE pt 26) — référentiel documentaire sans logique.",
+    "usage": "Valeurs proposées en UI (datalist/suggestions) pour le champ fonction_staff.fonction. NON contraignant : le champ base reste text libre (Conception-IDENT-SYS-v1 §2.5). Toute fonction hors liste reste saisissable à la main.",
+    "maj": "2026-05-29"
+  },
+  "fonctions": [
+    "Référent de catégorie",
+    "Entraîneur principal",
+    "Entraîneur adjoint",
+    "Logisticien",
+    "Manager",
+    "Responsable arbitrage",
+    "Délégué sportif",
+    "Soigneur"
+  ]
+}
