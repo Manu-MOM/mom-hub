@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.29 — Format par équipe dès 1 équipe + pré-sélection format réel (30 mai 2026)
+ * Version : 1.30 — Format intégré dans la ligne d'équipe (côte à côte) (30 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -1008,6 +1008,37 @@
  *          byte-identiques ; buildFormatParEquipeLines + peuplerEquipes-
  *          Engagees modifiés (tracés). Provenance md5 : v1.28 (eb4d7c79)
  *          → v1.29 (recollé après écriture, joint).
+ *
+ *   v1.30 : Format par équipe INTÉGRÉ dans la ligne d'équipe (côte à côte,
+ *          décision Manu : « équipes engagées et format par équipe sur la
+ *          même ligne »). Supprime la répétition du nom d'équipe (avant :
+ *          nom dans la case + nom au-dessus du dropdown séparé).
+ *
+ *          peuplerEquipesEngagees construit désormais, par équipe, une
+ *          .evt-eng-equipe-line = [case + libellé] + [<select> format
+ *          MASQUÉ par défaut, RÉVÉLÉ (inline-flex) quand la case est
+ *          cochée]. Décisions Manu : format visible seulement si coché ;
+ *          dès 1 équipe. Le select réutilise les classes EXACTES de
+ *          l'ancien bloc (.evt-eng-format-row[data-equipe-id]
+ *          .evt-eng-format-select) → submitModalCreate lit le format
+ *          depuis #evt-create-equipes (fallback ancien conteneur), avec
+ *          pré-sélection du format réel (data-format) + garde honnête.
+ *
+ *          Le bloc séparé #evt-create-format-par-equipe est NEUTRALISÉ
+ *          (gardé masqué dans updateMultiEquipesUI, plus peuplé).
+ *          buildFormatParEquipeLines conservée mais n'est plus appelée
+ *          (morte de fait, laissée intacte — non régressée).
+ *
+ *          Layout via style inline minimal sur .evt-eng-equipe-line
+ *          (flex/align/gap/wrap) + .evt-eng-format-inline → evenements.html
+ *          NON touché (classes neuves, pas de CSS à ajouter).
+ *
+ *          ZÉRO SQL, RPC inchangée, evenements.html + supabase-client.js
+ *          NON touchés. Invariants (12 Suivi A/B/C + Niveau 0 + renderFiche
+ *          + renderFonctionCellule + buildPhasesParEquipeList) byte-
+ *          identiques ; seule peuplerEquipesEngagees modifiée (+ submit
+ *          format-read adapté). Provenance md5 : v1.29 (6503f169) → v1.30
+ *          (recollé après écriture, joint).
  */
 
 (function () {
@@ -3816,11 +3847,14 @@
     const phasesParEq = document.getElementById('evt-create-phases-zone');
     const affectN2    = document.getElementById('evt-create-affectations-n2-zone');
 
-    // Format par équipe visible dès 1 équipe cochée (v1.29 : était >= 2 ;
-    // utile pour 1 équipe engagée dans un format spécifique, ex. Seven).
+    // v1.30 — Le format par équipe est désormais INTÉGRÉ dans la ligne
+    // de chaque équipe (peuplerEquipesEngagees, select révélé à la coche).
+    // Le bloc séparé #evt-create-format-par-equipe est NEUTRALISÉ (gardé
+    // masqué, plus peuplé). buildFormatParEquipeLines conservée mais
+    // n'est plus appelée (laissée intacte pour ne pas régresser un
+    // appelant éventuel ; morte de fait).
     if (formatParEq) {
-      formatParEq.style.display = (nbCoches >= 1) ? '' : 'none';
-      if (nbCoches >= 1) buildFormatParEquipeLines(cbList);
+      formatParEq.style.display = 'none';
     }
 
     // Adv par équipe : peuplé si la zone est VISIBLE (A4 plateau seul,
@@ -4289,30 +4323,65 @@
       return;
     }
 
-    // Cases à cocher : 1 par équipe. value = equipe_id (consommé au
-    // submit). Libellé = nom officiel (+ libellé court si présent).
-    // v1.29 — data-format = format_jeu_code projeté par listEquipes
-    // (source supabase-client v1.34 L2028) → pré-sélection du format réel
-    // par équipe dans buildFormatParEquipeLines (dégradation honnête si la
-    // valeur ne matche aucune option du dropdown).
+    // v1.30 — FORMAT INTÉGRÉ dans la ligne d'équipe (décision Manu :
+    // « format par équipe sur la même ligne que la case »). Le bloc
+    // séparé #evt-create-format-par-equipe est neutralisé (cf.
+    // updateMultiEquipesUI). Sur chaque ligne : case à cocher + libellé,
+    // puis un <select> format MASQUÉ par défaut, RÉVÉLÉ quand la case est
+    // cochée. Classes/attributs IDENTIQUES à l'ancien bloc
+    // (.evt-eng-format-row[data-equipe-id] .evt-eng-format-select) pour
+    // que submitModalCreate lise le format SANS modification.
+    // Pré-sélection du format réel (data-format = format_jeu_code,
+    // listEquipes v1.34 L2028) avec garde de dégradation honnête.
+    const FORMATS = [
+      { v: '',   l: '— Hérité —' },
+      { v: 'XV', l: 'XV (15)' },
+      { v: '13', l: 'XIII' },
+      { v: '12', l: 'XII' },
+      { v: 'X',  l: 'X' },
+      { v: '9',  l: 'IX' },
+      { v: '8',  l: 'VIII' },
+      { v: '7',  l: 'VII' }
+    ];
     const html = equipes.map(function (eq) {
       const label = escHtml(
         eq.nom_officiel || eq.libelle_court || eq.code || eq.id);
-      const fmt = eq.format_jeu_code ? escHtml(eq.format_jeu_code) : '';
-      return '<label class="evt-eng-equipe-row">'
-        + '<input type="checkbox" class="evt-eng-equipe-cb" '
-        + 'value="' + escHtml(eq.id) + '" '
-        + 'data-format="' + fmt + '"> '
-        + label + '</label>';
+      const fmtReel = eq.format_jeu_code ? String(eq.format_jeu_code) : '';
+      const matchFmt = FORMATS.some(function (f) { return f.v && f.v === fmtReel; });
+      const optsHtml = FORMATS.map(function (f) {
+        const sel = (matchFmt && f.v === fmtReel) ? ' selected' : '';
+        return '<option value="' + escHtml(f.v) + '"' + sel + '>' + escHtml(f.l) + '</option>';
+      }).join('');
+      return '<div class="evt-eng-equipe-line" '
+        + 'style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">'
+        + '<label class="evt-eng-equipe-row">'
+          + '<input type="checkbox" class="evt-eng-equipe-cb" '
+          + 'value="' + escHtml(eq.id) + '" '
+          + 'data-format="' + escHtml(fmtReel) + '"> '
+          + label
+        + '</label>'
+        + '<span class="evt-eng-format-row evt-eng-format-inline" '
+          + 'data-equipe-id="' + escHtml(eq.id) + '" '
+          + 'style="display:none; align-items:center; gap:6px; margin-left:auto;">'
+          + '<select class="evt-form-select evt-eng-format-select" '
+          + 'style="min-width:130px;" title="Format de jeu de cette équipe">'
+          + optsHtml + '</select>'
+        + '</span>'
+      + '</div>';
     }).join('');
     wrap.innerHTML = html;
     _eq4aLoadedForCat = CTX_CATEGORIE_ID;
 
-    // v1.24 — Hook change → met à jour les blocs dynamiques pilotés
-    // par le nombre d'équipes cochées (format-par-équipe, adv-par-
-    // équipe, phases-par-équipe-list, affectations N2 plateau).
+    // Hook change : (1) révèle/masque le select format de CETTE ligne
+    // (visible seulement si cochée, décision Manu) ; (2) met à jour les
+    // blocs dynamiques (adv/phases/N2) via updateMultiEquipesUI.
     wrap.querySelectorAll('.evt-eng-equipe-cb').forEach(function (cb) {
-      cb.addEventListener('change', updateMultiEquipesUI);
+      cb.addEventListener('change', function () {
+        const line = cb.closest('.evt-eng-equipe-line');
+        const fmtRow = line ? line.querySelector('.evt-eng-format-inline') : null;
+        if (fmtRow) fmtRow.style.display = cb.checked ? 'inline-flex' : 'none';
+        updateMultiEquipesUI();
+      });
     });
   }
 
@@ -4642,8 +4711,14 @@
           ordre:                     idx + 1
         };
 
-        // Format par équipe (override M4) si présent
+        // Format par équipe (override M4) si présent. v1.30 — le select
+        // vit désormais dans la ligne d'équipe (#evt-create-equipes) ;
+        // fallback sur l'ancien conteneur #evt-create-format-lines au cas
+        // où (robustesse). Mêmes classes .evt-eng-format-row[data-equipe-id]
+        // .evt-eng-format-select dans les deux cas.
         const formatRow = document.querySelector(
+          '#evt-create-equipes .evt-eng-format-row[data-equipe-id="' + eqId + '"] .evt-eng-format-select')
+          || document.querySelector(
           '#evt-create-format-lines .evt-eng-format-row[data-equipe-id="' + eqId + '"] .evt-eng-format-select');
         if (formatRow && formatRow.value) {
           eng.format_de_jeu = formatRow.value;
@@ -5438,7 +5513,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init v1.29 (S3 · format par équipe dès 1 + format réel pré-sélectionné)');
+    console.log('🏉 MOM Hub · Évènements Browser — init v1.30 (S3 · format intégré dans la ligne equipe)');
 
     const list = document.getElementById('evt-list');
 
@@ -5512,7 +5587,7 @@
     closeFiche:        closeFiche
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.29 (S3 · format par équipe dès 1 + format réel pré-sélectionné) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.30 (S3 · format intégré dans la ligne equipe) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
