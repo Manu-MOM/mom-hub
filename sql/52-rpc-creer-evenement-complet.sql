@@ -98,6 +98,29 @@
 --      instruire séparément, non absorbée ici (« une conv = un
 --      sujet »).
 --
+-- v5 (30 mai 2026) FIX collision evenements_code_key — tournoi
+--    multi-équipes. Symptôme terrain : « duplicate key value
+--    violates unique constraint "evenements_code_key" » à la
+--    création d'un Challenge Vié / tournoi à 2+ équipes engagées
+--    ayant chacune une phase. Diagnostic par le fait : aucune
+--    ligne du jour en base (essais antérieurs n'avaient rien créé,
+--    transaction atomique) → collision INTERNE à un seul appel.
+--    Cause racine : v_phase_ordre est réinitialisé à 0 pour CHAQUE
+--    équipe (boucle FOR v_phase_block ci-dessous), et le code de
+--    phase valait p_code || '-PH' || v_phase_ordre. Deux équipes
+--    ayant chacune une phase produisaient donc le MÊME code
+--    p_code-PH1 dans la même transaction → violation d'unicité.
+--    Resté invisible jusqu'au 1er test multi-équipes réel d'un
+--    tournoi (2e équipe M14 créée seulement pt 22). Fix (1 ligne) :
+--    inclure v_local_id (evenement_equipe_id_local, unique par
+--    équipe par construction du payload) dans le code de phase →
+--    p_code-<eqN>-PH<ordre>. Les matchs en héritent automatiquement
+--    (v_match_code := v_phase_code || '-M' || ...) → unicité
+--    garantie sur tout l'arbre racine/phases/matchs. Aucune
+--    régression mono-équipe (code cosmétiquement plus long, format
+--    de `code` non contraint ailleurs). SEULE la ligne de calcul
+--    v_phase_code change ; reste de la RPC byte-identique au v4.
+--
 -- ────────────────────────────────────────────────────────────
 -- OBSERVATIONS SCHÉMA ACTÉES
 -- ────────────────────────────────────────────────────────────
@@ -435,7 +458,14 @@ BEGIN
       v_phase_ordre := 0;
       FOR v_phase IN SELECT * FROM jsonb_array_elements(v_phase_block->'phases') LOOP
         v_phase_ordre := v_phase_ordre + 1;
-        v_phase_code := p_code || '-PH' || v_phase_ordre::text;
+        -- v5 (fix collision evenements_code_key tournoi multi-équipes) :
+        -- v_phase_ordre est remis à 0 pour CHAQUE équipe (boucle
+        -- FOR v_phase_block), donc deux équipes ayant chacune une phase
+        -- produisaient le même code p_code-PH1 dans la même transaction →
+        -- duplicate key. On inclut v_local_id (evenement_equipe_id_local,
+        -- unique par équipe) dans le code de phase. Les matchs en héritent
+        -- (v_match_code dérive de v_phase_code) → unicité sur tout l'arbre.
+        v_phase_code := p_code || '-' || v_local_id || '-PH' || v_phase_ordre::text;
 
         INSERT INTO public.evenements (
           code, libelle, type_evenement, type_competition,
