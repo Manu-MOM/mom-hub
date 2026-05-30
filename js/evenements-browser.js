@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.28 — Phases : 4 sous-types (tournoi/Vié/inter-ligues/Seven) + anti-doublon adv (30 mai 2026)
+ * Version : 1.29 — Format par équipe dès 1 équipe + pré-sélection format réel (30 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -983,6 +983,31 @@
  *          (12 Suivi A/B/C + Niveau 0 + renderFiche + renderFonctionCellule
  *          + helpers voisins) byte-identiques. Provenance md5 : v1.27
  *          (3ccbf834) → v1.28 (recollé après écriture, joint).
+ *
+ *   v1.29 : Format par équipe — affichage dès 1 équipe + pré-sélection du
+ *          format réel (corrections terrain v1.28, décisions Manu).
+ *
+ *          (A) Bloc FORMAT PAR ÉQUIPE visible dès 1 équipe cochée (était
+ *          >= 2). Utile pour une équipe engagée dans un format spécifique
+ *          (ex. Seven à VII alors que l'équipe joue normalement à XV).
+ *
+ *          (B) Dropdown format PRÉ-SÉLECTIONNÉ sur le format réel de chaque
+ *          équipe. listEquipes (supabase-client v1.34 L2028) projette déjà
+ *          `format_jeu_code` → stocké en data-format sur la checkbox équipe
+ *          (peuplerEquipesEngagees), lu par buildFormatParEquipeLines qui
+ *          ajoute `selected` sur l'option correspondante. GARDE de
+ *          dégradation honnête : si la valeur ne matche aucune option du
+ *          dropdown (CHECK base XV/13/12/X/9/8/7), reste sur « — Hérité — »
+ *          (jamais d'erreur). Le mapping exact des valeurs format_jeu_code
+ *          ↔ options reste à confirmer terrain (colonnes distinctes
+ *          equipes.format_jeu_code vs override evenement format_de_jeu).
+ *
+ *          ZÉRO SQL, RPC inchangée, evenements.html NON touché, wrapper
+ *          listEquipes NON touché (le champ était déjà projeté). Invariants
+ *          (12 Suivi A/B/C + Niveau 0 + renderFiche + renderFonctionCellule)
+ *          byte-identiques ; buildFormatParEquipeLines + peuplerEquipes-
+ *          Engagees modifiés (tracés). Provenance md5 : v1.28 (eb4d7c79)
+ *          → v1.29 (recollé après écriture, joint).
  */
 
 (function () {
@@ -3791,10 +3816,11 @@
     const phasesParEq = document.getElementById('evt-create-phases-zone');
     const affectN2    = document.getElementById('evt-create-affectations-n2-zone');
 
-    // Format par équipe visible si >= 2 équipes cochées (override M4)
+    // Format par équipe visible dès 1 équipe cochée (v1.29 : était >= 2 ;
+    // utile pour 1 équipe engagée dans un format spécifique, ex. Seven).
     if (formatParEq) {
-      formatParEq.style.display = (nbCoches >= 2) ? '' : 'none';
-      if (nbCoches >= 2) buildFormatParEquipeLines(cbList);
+      formatParEq.style.display = (nbCoches >= 1) ? '' : 'none';
+      if (nbCoches >= 1) buildFormatParEquipeLines(cbList);
     }
 
     // Adv par équipe : peuplé si la zone est VISIBLE (A4 plateau seul,
@@ -3904,8 +3930,9 @@
   // ────────────────────────────────────────────────────────────────
 
   /**
-   * Bloc 8b — Format par équipe (visible si >= 2 équipes cochées).
-   * 1 ligne par équipe avec dropdown format (override M4 §4.3).
+   * Bloc 8b — Format par équipe (visible dès 1 équipe cochée, v1.29).
+   * 1 ligne par équipe avec dropdown format (override M4 §4.3),
+   * pré-rempli sur le format réel de l'équipe (data-format).
    */
   function buildFormatParEquipeLines(checkedCbs) {
     const wrap = document.getElementById('evt-create-format-lines');
@@ -3923,8 +3950,15 @@
     const html = Array.prototype.map.call(checkedCbs, function (cb) {
       const equipeId = cb.value;
       const equipeLabel = cb.parentElement ? cb.parentElement.textContent.trim() : equipeId;
+      // v1.29 — format réel de l'équipe (data-format = format_jeu_code
+      // projeté par listEquipes). Pré-sélectionne l'option correspondante
+      // si elle existe dans FORMATS (CHECK base XV/13/12/X/9/8/7) ; sinon
+      // reste sur « — Hérité — » (garde dégradation honnête, jamais d'erreur).
+      const fmtReel = cb.getAttribute('data-format') || '';
+      const matchFmt = FORMATS.some(function (f) { return f.v && f.v === fmtReel; });
       const optsHtml = FORMATS.map(function (f) {
-        return '<option value="' + escHtml(f.v) + '">' + escHtml(f.l) + '</option>';
+        const sel = (matchFmt && f.v === fmtReel) ? ' selected' : '';
+        return '<option value="' + escHtml(f.v) + '"' + sel + '>' + escHtml(f.l) + '</option>';
       }).join('');
       return '<div class="evt-eng-format-row" data-equipe-id="' + escHtml(equipeId) + '">'
         + '<span class="evt-eng-format-label">' + escHtml(equipeLabel) + '</span>'
@@ -4257,12 +4291,18 @@
 
     // Cases à cocher : 1 par équipe. value = equipe_id (consommé au
     // submit). Libellé = nom officiel (+ libellé court si présent).
+    // v1.29 — data-format = format_jeu_code projeté par listEquipes
+    // (source supabase-client v1.34 L2028) → pré-sélection du format réel
+    // par équipe dans buildFormatParEquipeLines (dégradation honnête si la
+    // valeur ne matche aucune option du dropdown).
     const html = equipes.map(function (eq) {
       const label = escHtml(
         eq.nom_officiel || eq.libelle_court || eq.code || eq.id);
+      const fmt = eq.format_jeu_code ? escHtml(eq.format_jeu_code) : '';
       return '<label class="evt-eng-equipe-row">'
         + '<input type="checkbox" class="evt-eng-equipe-cb" '
-        + 'value="' + escHtml(eq.id) + '"> '
+        + 'value="' + escHtml(eq.id) + '" '
+        + 'data-format="' + fmt + '"> '
         + label + '</label>';
     }).join('');
     wrap.innerHTML = html;
@@ -5398,7 +5438,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init v1.28 (S3 · phases 4 sous-types + anti-doublon adv)');
+    console.log('🏉 MOM Hub · Évènements Browser — init v1.29 (S3 · format par équipe dès 1 + format réel pré-sélectionné)');
 
     const list = document.getElementById('evt-list');
 
@@ -5472,7 +5512,7 @@
     closeFiche:        closeFiche
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.28 (S3 · phases 4 sous-types + anti-doublon adv) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.29 (S3 · format par équipe dès 1 + format réel pré-sélectionné) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
