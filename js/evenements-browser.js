@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.31 — Fix création tournoi : libelle de match NOT NULL (30 mai 2026)
+ * Version : 1.32 — Fix collision code evenements (entropie HHMMSS + rand6) (30 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -1062,6 +1062,35 @@
  *          NON touchés. Invariants byte-identiques (le bloc matchs vit
  *          dans submitModalCreate, hors fonctions invariantes). Provenance
  *          md5 : v1.30 (092b496a) → v1.31 (recollé après écriture, joint).
+ *
+ *   v1.32 : FIX collision `duplicate key value violates unique constraint
+ *          "evenements_code_key"` à la création tournoi (bug terrain
+ *          « essai 5 », Challenge Vié). Diagnostic à la source (sql/52
+ *          md5 2778691e lue) : la RPC GÉNÈRE elle-même les codes enfants
+ *          à partir du code racine — v_phase_code := p_code||'-PH'||ordre,
+ *          v_match_code := v_phase_code||'-M'||ordre (L438/L465). Le code
+ *          racine p_code (= generateEventCode côté client, confirmé : INSERT
+ *          racine `code = p_code` L347, et voie duplication génère un code
+ *          client par ligne) est donc le PRÉFIXE de tout l'arbre. Or
+ *          l'ancien format gardait un préfixe CONSTANT pour tous les essais
+ *          d'un même jour/type (EVT-AAAA-MM-JJ-TYPE-M14-<rand4>) → seuls
+ *          4 chars distinguaient → collision sur essais répétés (racine ou
+ *          enfant). Fournir un `code` par phase/match au payload aurait été
+ *          inutile : la RPC ne le lit pas (H2 écartée par lecture).
+ *
+ *          Fix (generateEventCode, côté client — le projet génère p_code
+ *          côté client) : entropie renforcée — segment HHMMSS issu de
+ *          l'INSTANT DE GÉNÉRATION (now, pas de dateDebut sinon deux essais
+ *          même date pré-remplie collisionneraient) + rand 4→6 chars.
+ *          Nouveau format EVT-AAAA-MM-JJ-HHMMSS-TYPE-M14-<rand6>. Deux
+ *          créations à des secondes différentes sont forcément distinctes ;
+ *          rand6 couvre la même seconde. Couvre racine ET enfants (préfixe
+ *          commun). Aucun site d'appel modifié (4 appels inchangés).
+ *
+ *          ZÉRO SQL, RPC sql/52 NON modifiée (lue seulement), evenements.html
+ *          + supabase-client.js NON touchés. Invariants byte-identiques
+ *          (generateEventCode hors fonctions invariantes). Provenance md5 :
+ *          v1.31 (bdff2789) → v1.32 (recollé après écriture, joint).
  */
 
 (function () {
@@ -4491,8 +4520,27 @@
                     : type === 'match' ? 'MATCH'
                     : type === 'journee_championnat' ? 'JCHAMP'
                     : 'EVT');
-    const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
-    return 'EVT-' + y + '-' + m + '-' + day + '-' + typeShort + '-M14-' + rand;
+    // v1.32 — Entropie renforcée contre la collision `evenements_code_key`.
+    // La RPC sql/52 dérive les codes enfants du code racine
+    // (v_phase_code := p_code || '-PH'..., v_match_code := ...-M...), donc
+    // un tournoi crée racine + N phases + N matchs tous préfixés par CE
+    // code. Or l'ancien format (jour + 4 chars) gardait un préfixe
+    // CONSTANT pour tous les essais d'un même jour/type → seuls 4 chars
+    // distinguaient → collision en recette (essais répétés). Fix : on
+    // horodate à la SECONDE et on porte le rand à 6 chars.
+    // IMPORTANT : HHMMSS vient de l'INSTANT DE GÉNÉRATION (now), PAS de
+    // dateDebut — sinon deux essais avec la même date d'évènement
+    // pré-remplie produiraient le même HHMMSS. La date métier (dateDebut)
+    // ne sert qu'au segment AAAA-MM-JJ (lisibilité). Deux créations à des
+    // secondes différentes sont donc forcément distinctes ; le rand 6
+    // couvre la même seconde. Couvre racine ET enfants (préfixe commun).
+    const now = new Date();
+    const HH = String(now.getHours()).padStart(2, '0');
+    const MM = String(now.getMinutes()).padStart(2, '0');
+    const SS = String(now.getSeconds()).padStart(2, '0');
+    const rand = Math.random().toString(36).substring(2, 8).toUpperCase();
+    return 'EVT-' + y + '-' + m + '-' + day + '-' + HH + MM + SS
+         + '-' + typeShort + '-M14-' + rand;
   }
 
   // ────────────────────────────────────────────────────────────────
@@ -5546,7 +5594,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init v1.31 (S3 · fix libelle match)');
+    console.log('🏉 MOM Hub · Évènements Browser — init v1.32 (S3 · fix collision code)');
 
     const list = document.getElementById('evt-list');
 
@@ -5620,7 +5668,7 @@
     closeFiche:        closeFiche
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.31 (S3 · fix libelle match) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.32 (S3 · fix collision code) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
