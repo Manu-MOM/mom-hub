@@ -1,6 +1,23 @@
 -- =====================================================================
 -- MOM HUB · VAGUE 1 · CRÉATION DES TABLES
 -- =====================================================================
+--
+--   ╔════════════════════════════════════════════════════════════════╗
+--   ║                                                                  ║
+--   ║   ⛔  NE PAS EXÉCUTER CE FICHIER SUR LA BASE.  ⛔                 ║
+--   ║                                                                  ║
+--   ║   C'est un FICHIER DE RÉFÉRENCE / DOCUMENTATION, pas une          ║
+--   ║   migration. Les tables existent déjà : le relancer renvoie      ║
+--   ║   « relation "poles" already exists » et ne fait rien d'utile.   ║
+--   ║                                                                  ║
+--   ║   LA BASE SUPABASE FAIT FOI (gouvernance pt 26, Option C).        ║
+--   ║   Ce fichier est un MIROIR documentaire de l'état réel des        ║
+--   ║   9 tables de la Vague 1. Si un écart base↔fichier réapparaît,    ║
+--   ║   on corrige CE FICHIER, jamais la base.                          ║
+--   ║                                                                  ║
+--   ╚════════════════════════════════════════════════════════════════╝
+--
+-- =====================================================================
 -- Auteur : Manu (avec assistance Claude)
 -- Date   : 2026-05-10 (créé) · 2026-05-30 (resync miroir base, pt 35)
 -- Version: 2.0
