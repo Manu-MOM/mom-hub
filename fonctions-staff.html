@@ -3,283 +3,262 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MOM Hub · Fonctions staff</title>
+<title>Fonctions staff · MOM Hub</title>
 <!--
   MOM Hub · Chantier B « Identité & rôles staff » (Conception-IDENT-SYS-v1 §2.7)
   Écran de gestion des fonctions staff par catégorie.
-  Branché sur : list_categories() (sql/62), list_staff_disponibles() (pt 28),
-  list_fonctions_staff / definir_ / cloturer_ / supprimer_fonction_staff (sql/61).
-  Datalist alimentée par 01 - Référentiels/fonctions-staff.json.
-  Canal : Supabase JS (supabase.rpc) — calque u-admin. Écritures gardées admin
-  côté RPC (has_role('admin')) ; l'UI n'a pas à re-vérifier le rôle.
 
-  À RENSEIGNER : SUPABASE_URL / SUPABASE_ANON_KEY (mêmes valeurs que u-admin).
+  ARCHITECTURE (calque u-admin, vérifié à la source 30/05) :
+    - charge supabase.min.js (CDN) puis js/supabase-client.js (SupabaseHub,
+      clés réelles + client configuré) — PAS de client recréé localement.
+    - garde d'auth admin standard : getSession()->login.html, getMyRoles()->./
+    - tous les appels passent par SupabaseHub.client.rpc(...).
+  RPC consommées : list_categories (sql/62), list_staff_disponibles (sql/56),
+    list_fonctions_staff / definir_ / cloturer_ / supprimer_fonction_staff (sql/61).
+  Datalist alimentee par data/fonctions-staff.json (referentiel suggere).
 -->
+<link rel="stylesheet" href="css/hub.css">
 <style>
-  :root {
-    --bg: #f6f5f1; --card: #fff; --ink: #1c2b27; --muted: #6b7a74;
-    --line: #e3e0d8; --accent: #1b6b4c; --accent-soft: #e8f1ec;
-    --danger: #a23b2d; --warn: #b8772a; --radius: 10px;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; background: var(--bg); color: var(--ink);
-    font: 15px/1.5 ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
-    padding: 24px;
-  }
-  .wrap { max-width: 880px; margin: 0 auto; }
-  h1 { font-size: 20px; margin: 0 0 4px; }
-  .sub { color: var(--muted); margin: 0 0 20px; font-size: 13px; }
-  .card {
-    background: var(--card); border: 1px solid var(--line);
-    border-radius: var(--radius); padding: 18px; margin-bottom: 16px;
-  }
-  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
-  select, input {
-    width: 100%; padding: 9px 11px; border: 1px solid var(--line);
-    border-radius: 8px; font: inherit; background: #fff; color: var(--ink);
-  }
-  select:focus, input:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
-  .row { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
-  .row-3 { display: grid; gap: 12px; grid-template-columns: 1.4fr 1.4fr 1fr auto; align-items: end; }
-  button {
-    padding: 9px 16px; border: 0; border-radius: 8px; font: inherit;
-    font-weight: 600; cursor: pointer; background: var(--accent); color: #fff;
-  }
-  button:hover { filter: brightness(1.06); }
-  button.ghost { background: transparent; color: var(--accent); border: 1px solid var(--line); }
-  button.link { background: transparent; color: var(--muted); font-weight: 500; padding: 4px 8px; }
-  button.link.danger { color: var(--danger); }
-  button:disabled { opacity: .5; cursor: default; }
-  table { width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 14px; }
-  th { text-align: left; color: var(--muted); font-weight: 600; font-size: 12px;
-       text-transform: uppercase; letter-spacing: .03em; padding: 6px 8px; border-bottom: 1px solid var(--line); }
-  td { padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
-  tr.ended td { color: var(--muted); }
-  .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 12px; font-weight: 600; }
-  .badge.active { background: var(--accent-soft); color: var(--accent); }
-  .badge.ended { background: #f0ede6; color: var(--muted); }
-  .toolbar { display: flex; align-items: center; gap: 12px; margin: 14px 0 6px; }
-  .toolbar .spacer { flex: 1; }
-  .toggle { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
-  .toggle input { width: auto; }
-  .msg { padding: 10px 14px; border-radius: 8px; font-size: 14px; margin-bottom: 14px; display: none; }
-  .msg.ok { background: var(--accent-soft); color: var(--accent); display: block; }
-  .msg.err { background: #f7e6e2; color: var(--danger); display: block; }
-  .empty { color: var(--muted); padding: 18px 8px; text-align: center; font-size: 14px; }
-  .hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  body.auth-pending { visibility: hidden; }
+  .fs-wrap { max-width: 880px; margin: 0 auto; padding: 24px 24px 48px; }
+  .fs-wrap h1 { font-size: 20px; margin: 0 0 4px; }
+  .fs-sub { color: var(--ink-mute, #6b7a74); margin: 0 0 20px; font-size: 13px; }
+  .fs-card { background: #fff; border: 1px solid var(--paper-warm, #e3e0d8);
+             border-radius: 10px; padding: 18px; margin-bottom: 16px; }
+  .fs-card label { display: block; font-size: 13px; color: var(--ink-mute, #6b7a74); margin-bottom: 4px; }
+  .fs-card select, .fs-card input {
+    width: 100%; padding: 9px 11px; border: 1px solid var(--paper-warm, #d9d2c4);
+    border-radius: 8px; font: inherit; background: #fff; color: var(--ink, #222); }
+  .fs-row3 { display: grid; gap: 12px; grid-template-columns: 1.4fr 1.4fr 1fr auto; align-items: end; }
+  @media (max-width: 720px) { .fs-row3 { grid-template-columns: 1fr; } }
+  .fs-btn { padding: 9px 16px; border: 0; border-radius: 8px; font: inherit; font-weight: 600;
+            cursor: pointer; background: var(--vert-mom, #1b6b4c); color: #fff; }
+  .fs-btn:disabled { opacity: .5; cursor: default; }
+  .fs-link { background: transparent; border: 0; font: inherit; cursor: pointer;
+             color: var(--ink-mute, #6b7a74); padding: 4px 8px; }
+  .fs-link.danger { color: var(--rouge-blesse, #c0392b); }
+  table.fs-tbl { width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 14px; }
+  table.fs-tbl th { text-align: left; color: var(--ink-mute, #6b7a74); font-weight: 600; font-size: 12px;
+                    text-transform: uppercase; letter-spacing: .03em; padding: 6px 8px;
+                    border-bottom: 1px solid var(--paper-warm, #e3e0d8); }
+  table.fs-tbl td { padding: 9px 8px; border-bottom: 1px solid var(--paper-warm, #e3e0d8); }
+  tr.fs-ended td { color: var(--ink-mute, #6b7a74); }
+  .fs-badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+  .fs-badge.active { background: #e8f1ec; color: var(--vert-mom, #1b6b4c); }
+  .fs-badge.ended { background: #f0ede6; color: var(--ink-mute, #6b7a74); }
+  .fs-msg { padding: 10px 14px; border-radius: 8px; font-size: 14px; margin-bottom: 14px; display: none; }
+  .fs-msg.ok { background: #e8f1ec; color: var(--vert-mom, #1b6b4c); display: block; }
+  .fs-msg.err { background: #f7e6e2; color: var(--rouge-blesse, #c0392b); display: block; }
+  .fs-empty { color: var(--ink-mute, #6b7a74); padding: 18px 8px; text-align: center; font-size: 14px; }
+  .fs-hint { font-size: 12px; color: var(--ink-mute, #6b7a74); margin-top: 4px; }
+  .fs-toolbar { display: flex; align-items: center; gap: 12px; margin: 14px 0 6px; }
+  .fs-toolbar .sp { flex: 1; }
+  .fs-toggle { font-size: 13px; color: var(--ink-mute, #6b7a74); display: flex; align-items: center; gap: 6px; }
+  .fs-toggle input { width: auto; }
 </style>
 </head>
-<body>
-<div class="wrap">
+<body class="auth-pending">
+<div class="fs-wrap">
+  <p><a href="./">&larr; Retour au portail</a></p>
   <h1>Fonctions staff</h1>
-  <p class="sub">Qui occupe quelle fonction dans le staff d'une catégorie. Multi-catégories, fonction libre, historisable.</p>
+  <p class="fs-sub">Qui occupe quelle fonction dans le staff d'une categorie. Multi-categories, fonction libre, historisable.</p>
 
-  <div id="msg" class="msg"></div>
+  <div id="fsMsg" class="fs-msg"></div>
 
-  <!-- Sélecteur de catégorie -->
-  <div class="card">
-    <label for="cat">Catégorie</label>
-    <select id="cat"><option value="">— choisir une catégorie —</option></select>
+  <div class="fs-card">
+    <label for="fsCat">Categorie</label>
+    <select id="fsCat"><option value="">&mdash; choisir une categorie &mdash;</option></select>
   </div>
 
-  <!-- Ajout d'une fonction -->
-  <div class="card" id="addCard" style="display:none">
-    <div class="row-3">
+  <div class="fs-card" id="fsAddCard" style="display:none">
+    <div class="fs-row3">
       <div>
-        <label for="staff">Personne (staff disponible)</label>
-        <select id="staff"><option value="">— choisir —</option></select>
+        <label for="fsStaff">Personne (staff)</label>
+        <select id="fsStaff"><option value="">&mdash; choisir &mdash;</option></select>
       </div>
       <div>
-        <label for="fonction">Fonction</label>
-        <input id="fonction" list="fonctionsList" placeholder="ex. Logisticien" autocomplete="off">
-        <datalist id="fonctionsList"></datalist>
+        <label for="fsFonction">Fonction</label>
+        <input id="fsFonction" list="fsFonctionsList" placeholder="ex. Referent de categorie" autocomplete="off">
+        <datalist id="fsFonctionsList"></datalist>
       </div>
       <div>
-        <label for="debut">Début</label>
-        <input id="debut" type="date">
+        <label for="fsDebut">Debut</label>
+        <input id="fsDebut" type="date">
       </div>
-      <div>
-        <button id="addBtn">Ajouter</button>
-      </div>
+      <div><button id="fsAddBtn" class="fs-btn">Ajouter</button></div>
     </div>
-    <p class="hint">Réouvrir la même fonction pour la même personne clôt automatiquement la précédente (historisation).</p>
+    <p class="fs-hint">Reouvrir la meme fonction pour la meme personne clot automatiquement la precedente (historisation).</p>
   </div>
 
-  <!-- Liste -->
-  <div class="card" id="listCard" style="display:none">
-    <div class="toolbar">
-      <strong id="listTitle">Staff de la catégorie</strong>
-      <div class="spacer"></div>
-      <label class="toggle"><input type="checkbox" id="histChk"> Afficher l'historique</label>
+  <div class="fs-card" id="fsListCard" style="display:none">
+    <div class="fs-toolbar">
+      <strong id="fsListTitle">Staff de la categorie</strong>
+      <div class="sp"></div>
+      <label class="fs-toggle"><input type="checkbox" id="fsHistChk"> Afficher l'historique</label>
     </div>
-    <table>
-      <thead><tr><th>Personne</th><th>Fonction</th><th>Début</th><th>Statut</th><th></th></tr></thead>
-      <tbody id="rows"></tbody>
+    <table class="fs-tbl">
+      <thead><tr><th>Personne</th><th>Fonction</th><th>Debut</th><th>Statut</th><th></th></tr></thead>
+      <tbody id="fsRows"></tbody>
     </table>
-    <div id="empty" class="empty" style="display:none">Aucune fonction staff pour cette catégorie.</div>
+    <div id="fsEmpty" class="fs-empty" style="display:none">Aucune fonction staff pour cette categorie.</div>
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/supabase-client.js"></script>
 <script>
-// ---- Config (mêmes valeurs que u-admin) -----------------------------------
-const SUPABASE_URL = "SUPABASE_URL";
-const SUPABASE_ANON_KEY = "SUPABASE_ANON_KEY";
-const REF_FONCTIONS_URL = "fonctions-staff.json"; // ou chemin Drive/CDN du référentiel
+(async function () {
+  'use strict';
 
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  // --- Garde d'auth admin (motif u-admin) ---
+  const session = await SupabaseHub.getSession();
+  if (!session) { window.location.replace('login.html'); return; }
+  const roles = await SupabaseHub.getMyRoles();
+  if (roles.indexOf('admin') === -1) { window.location.replace('./'); return; }
+  document.body.classList.remove('auth-pending');
 
-// ---- Helpers --------------------------------------------------------------
-const $ = (id) => document.getElementById(id);
-const staffNames = new Map(); // personne_id -> "Prénom Nom"
-let currentCat = "";
+  const client = SupabaseHub.client;
+  const $ = (id) => document.getElementById(id);
+  const staffNames = new Map();
+  let currentCat = '';
 
-function flash(text, kind) {
-  const m = $("msg");
-  m.textContent = text; m.className = "msg " + kind;
-  if (kind === "ok") setTimeout(() => { m.className = "msg"; }, 3500);
-}
-
-async function rpc(name, params) {
-  const { data, error } = await sb.rpc(name, params || {});
-  if (error) throw error;
-  return data;
-}
-
-// ---- Chargements ----------------------------------------------------------
-async function loadCategories() {
-  const cats = await rpc("list_categories");
-  const sel = $("cat");
-  cats.forEach(c => {
-    const o = document.createElement("option");
-    o.value = c.id;
-    o.textContent = c.libelle_court || c.libelle_long || c.code;
-    sel.appendChild(o);
-  });
-}
-
-async function loadStaff() {
-  const staff = await rpc("list_staff_disponibles");
-  const sel = $("staff");
-  staff.forEach(s => {
-    const label = [s.prenom, s.nom].filter(Boolean).join(" ").trim() || s.personne_id;
-    staffNames.set(s.personne_id, label);
-    const o = document.createElement("option");
-    o.value = s.personne_id; o.textContent = label;
-    sel.appendChild(o);
-  });
-}
-
-async function loadFonctionsRef() {
-  try {
-    const res = await fetch(REF_FONCTIONS_URL);
-    if (!res.ok) return;
-    const json = await res.json();
-    const dl = $("fonctionsList");
-    (json.fonctions || []).forEach(f => {
-      const o = document.createElement("option"); o.value = f; dl.appendChild(o);
-    });
-  } catch (_) { /* datalist optionnelle : champ reste libre */ }
-}
-
-function nameFor(id) { return staffNames.get(id) || id; }
-
-async function renderList() {
-  if (!currentCat) return;
-  const withHist = $("histChk").checked;
-  const rows = await rpc("list_fonctions_staff", {
-    p_categorie_id: currentCat, p_inclure_historique: withHist
-  });
-  const tbody = $("rows"); tbody.innerHTML = "";
-  $("empty").style.display = rows.length ? "none" : "block";
-
-  rows.forEach(r => {
-    const ended = !!r.date_fin;
-    const tr = document.createElement("tr");
-    if (ended) tr.className = "ended";
-    tr.innerHTML = `
-      <td>${escapeHtml(nameFor(r.personne_id))}</td>
-      <td>${escapeHtml(r.fonction)}</td>
-      <td>${r.date_debut || ""}</td>
-      <td>${ended
-        ? `<span class="badge ended">clos ${r.date_fin}</span>`
-        : `<span class="badge active">en cours</span>`}</td>
-      <td style="text-align:right"></td>`;
-    const actions = tr.lastElementChild;
-    if (!ended) {
-      const bClose = document.createElement("button");
-      bClose.className = "link"; bClose.textContent = "Clôturer";
-      bClose.onclick = () => closeFn(r.id);
-      actions.appendChild(bClose);
-    }
-    const bDel = document.createElement("button");
-    bDel.className = "link danger"; bDel.textContent = "Supprimer";
-    bDel.onclick = () => delFn(r.id);
-    actions.appendChild(bDel);
-    tbody.appendChild(tr);
-  });
-}
-
-function escapeHtml(s) {
-  return String(s ?? "").replace(/[&<>"']/g, c =>
-    ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c]));
-}
-
-// ---- Actions --------------------------------------------------------------
-async function addFn() {
-  const personne = $("staff").value;
-  const fonction = $("fonction").value.trim();
-  const debut = $("debut").value || null;
-  if (!personne) return flash("Choisis une personne.", "err");
-  if (!fonction) return flash("Saisis une fonction.", "err");
-  $("addBtn").disabled = true;
-  try {
-    const params = { p_personne_id: personne, p_categorie_id: currentCat, p_fonction: fonction };
-    if (debut) params.p_date_debut = debut;
-    await rpc("definir_fonction_staff", params);
-    $("fonction").value = ""; $("staff").value = "";
-    flash("Fonction ajoutée.", "ok");
-    await renderList();
-  } catch (e) { flash(errMsg(e), "err"); }
-  finally { $("addBtn").disabled = false; }
-}
-
-async function closeFn(id) {
-  try { await rpc("cloturer_fonction_staff", { p_id: id }); flash("Fonction clôturée.", "ok"); await renderList(); }
-  catch (e) { flash(errMsg(e), "err"); }
-}
-
-async function delFn(id) {
-  if (!confirm("Supprimer définitivement cette ligne ? (pour une fin normale, utilise plutôt Clôturer)")) return;
-  try { await rpc("supprimer_fonction_staff", { p_id: id }); flash("Ligne supprimée.", "ok"); await renderList(); }
-  catch (e) { flash(errMsg(e), "err"); }
-}
-
-function errMsg(e) {
-  const m = (e && (e.message || e.error_description || e.hint)) || "Erreur inconnue.";
-  if (/admin/i.test(m)) return "Action réservée à l'administrateur.";
-  return m;
-}
-
-// ---- Wiring ---------------------------------------------------------------
-$("cat").addEventListener("change", async (e) => {
-  currentCat = e.target.value;
-  const on = !!currentCat;
-  $("addCard").style.display = on ? "block" : "none";
-  $("listCard").style.display = on ? "block" : "none";
-  if (on) {
-    $("listTitle").textContent = "Staff · " + e.target.selectedOptions[0].textContent;
-    await renderList();
+  function flash(text, kind) {
+    const m = $('fsMsg');
+    m.textContent = text; m.className = 'fs-msg ' + kind;
+    if (kind === 'ok') setTimeout(() => { m.className = 'fs-msg'; }, 3500);
   }
-});
-$("histChk").addEventListener("change", renderList);
-$("addBtn").addEventListener("click", addFn);
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+      ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  }
+  function nameFor(id) { return staffNames.get(id) || id; }
+  function errMsg(e) {
+    const m = (e && (e.message || e.error_description || e.hint)) || 'Erreur inconnue.';
+    return /admin/i.test(m) ? "Action reservee a l'administrateur." : m;
+  }
+  async function rpc(name, params) {
+    const { data, error } = await client.rpc(name, params || {});
+    if (error) throw error;
+    return data;
+  }
 
-(async function init() {
+  async function loadCategories() {
+    const cats = await rpc('list_categories');
+    const sel = $('fsCat');
+    (cats || []).forEach(c => {
+      const o = document.createElement('option');
+      o.value = c.id;
+      o.textContent = c.libelle_court || c.libelle_long || c.code;
+      sel.appendChild(o);
+    });
+  }
+  async function loadStaff() {
+    const staff = await rpc('list_staff_disponibles');
+    const sel = $('fsStaff');
+    (staff || []).forEach(s => {
+      const label = [s.prenom, s.nom].filter(Boolean).join(' ').trim() || s.personne_id;
+      staffNames.set(s.personne_id, label);
+      const o = document.createElement('option');
+      o.value = s.personne_id; o.textContent = label;
+      sel.appendChild(o);
+    });
+  }
+  async function loadFonctionsRef() {
+    try {
+      const res = await fetch('data/fonctions-staff.json');
+      if (!res.ok) return;
+      const json = await res.json();
+      const dl = $('fsFonctionsList');
+      (json.fonctions || []).forEach(f => {
+        const o = document.createElement('option'); o.value = f; dl.appendChild(o);
+      });
+    } catch (_) { /* datalist optionnelle, champ reste libre */ }
+  }
+
+  async function renderList() {
+    if (!currentCat) return;
+    const rows = await rpc('list_fonctions_staff', {
+      p_categorie_id: currentCat,
+      p_inclure_historique: $('fsHistChk').checked
+    });
+    const tbody = $('fsRows'); tbody.innerHTML = '';
+    $('fsEmpty').style.display = (rows && rows.length) ? 'none' : 'block';
+    (rows || []).forEach(r => {
+      const ended = !!r.date_fin;
+      const tr = document.createElement('tr');
+      if (ended) tr.className = 'fs-ended';
+      tr.innerHTML =
+        '<td>' + escapeHtml(nameFor(r.personne_id)) + '</td>' +
+        '<td>' + escapeHtml(r.fonction) + '</td>' +
+        '<td>' + (r.date_debut || '') + '</td>' +
+        '<td>' + (ended
+          ? '<span class="fs-badge ended">clos ' + r.date_fin + '</span>'
+          : '<span class="fs-badge active">en cours</span>') + '</td>' +
+        '<td style="text-align:right"></td>';
+      const actions = tr.lastElementChild;
+      if (!ended) {
+        const b = document.createElement('button');
+        b.className = 'fs-link'; b.textContent = 'Cloturer';
+        b.onclick = () => closeFn(r.id);
+        actions.appendChild(b);
+      }
+      const d = document.createElement('button');
+      d.className = 'fs-link danger'; d.textContent = 'Supprimer';
+      d.onclick = () => delFn(r.id);
+      actions.appendChild(d);
+      tbody.appendChild(tr);
+    });
+  }
+
+  async function addFn() {
+    const personne = $('fsStaff').value;
+    const fonction = $('fsFonction').value.trim();
+    const debut = $('fsDebut').value || null;
+    if (!personne) return flash('Choisis une personne.', 'err');
+    if (!fonction) return flash('Saisis une fonction.', 'err');
+    $('fsAddBtn').disabled = true;
+    try {
+      const params = { p_personne_id: personne, p_categorie_id: currentCat, p_fonction: fonction };
+      if (debut) params.p_date_debut = debut;
+      await rpc('definir_fonction_staff', params);
+      $('fsFonction').value = ''; $('fsStaff').value = '';
+      flash('Fonction ajoutee.', 'ok');
+      await renderList();
+    } catch (e) { flash(errMsg(e), 'err'); }
+    finally { $('fsAddBtn').disabled = false; }
+  }
+  async function closeFn(id) {
+    try { await rpc('cloturer_fonction_staff', { p_id: id }); flash('Fonction cloturee.', 'ok'); await renderList(); }
+    catch (e) { flash(errMsg(e), 'err'); }
+  }
+  async function delFn(id) {
+    if (!confirm('Supprimer definitivement cette ligne ? (pour une fin normale, utilise Cloturer)')) return;
+    try { await rpc('supprimer_fonction_staff', { p_id: id }); flash('Ligne supprimee.', 'ok'); await renderList(); }
+    catch (e) { flash(errMsg(e), 'err'); }
+  }
+
+  $('fsCat').addEventListener('change', async (e) => {
+    currentCat = e.target.value;
+    const on = !!currentCat;
+    $('fsAddCard').style.display = on ? 'block' : 'none';
+    $('fsListCard').style.display = on ? 'block' : 'none';
+    if (on) {
+      $('fsListTitle').textContent = 'Staff - ' + e.target.selectedOptions[0].textContent;
+      await renderList();
+    }
+  });
+  $('fsHistChk').addEventListener('change', renderList);
+  $('fsAddBtn').addEventListener('click', addFn);
+
   try {
     await Promise.all([loadCategories(), loadStaff(), loadFonctionsRef()]);
-  } catch (e) { flash("Chargement impossible : " + errMsg(e), "err"); }
+  } catch (e) {
+    flash('Chargement impossible : ' + errMsg(e), 'err');
+  }
+
+  SupabaseHub.onAuthChange(function (event) {
+    if (event === 'SIGNED_OUT') window.location.replace('login.html');
+  });
 })();
 </script>
 </body>
