@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.30 — Format intégré dans la ligne d'équipe (côte à côte) (30 mai 2026)
+ * Version : 1.31 — Fix création tournoi : libelle de match NOT NULL (30 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -1039,6 +1039,29 @@
  *          identiques ; seule peuplerEquipesEngagees modifiée (+ submit
  *          format-read adapté). Provenance md5 : v1.29 (6503f169) → v1.30
  *          (recollé après écriture, joint).
+ *
+ *   v1.31 : FIX création tournoi (bug terrain « essai 4 ») —
+ *          `null value in column "libelle" of relation "evenements"
+ *          violates not-null constraint`. Cause (diagnostic par le fait,
+ *          pas supposé) : la RPC sql/52 crée chaque MATCH comme une ligne
+ *          `evenements` (M6) où `libelle` est NOT NULL ; l'éditeur de
+ *          phases v1.27 n'envoyait QUE { ordre, adversaire_nom? } pour
+ *          les matchs — jamais de `libelle` → NULL → violation. La phase
+ *          avait déjà un fallback client (« Phase N ») donc passait ; le
+ *          match était le seul trou. Le libellé racine (« essai 4 ») et
+ *          les phases n'étaient pas en cause.
+ *
+ *          Correctif minimal (submitModalCreate, bloc matchs) : chaque
+ *          match porte désormais toujours un `libelle` dérivé —
+ *          « vs <adversaire> » si un adversaire est saisi, sinon
+ *          « Match N ». Aligné sur le pattern de la voie duplication
+ *          (submitModalCreateDuplication : phaseLibelle + ' — vs ' + adv).
+ *          1 seul bloc touché ; aucune autre logique modifiée.
+ *
+ *          ZÉRO SQL, RPC inchangée, evenements.html + supabase-client.js
+ *          NON touchés. Invariants byte-identiques (le bloc matchs vit
+ *          dans submitModalCreate, hors fonctions invariantes). Provenance
+ *          md5 : v1.30 (092b496a) → v1.31 (recollé après écriture, joint).
  */
 
 (function () {
@@ -4797,7 +4820,17 @@
             matchRows.forEach(function (row, mIdx) {
               const advInput = row.querySelector('.evt-match-adversaire');
               const adv = advInput ? advInput.value.trim() : '';
-              const m = { ordre: mIdx + 1 };
+              // v1.31 fix — chaque match devient une ligne `evenements`
+              // (M6) côté RPC : `libelle` y est NOT NULL. On dérive donc
+              // toujours un libellé (jamais NULL) : « vs <adv> » si un
+              // adversaire est saisi, sinon « Match N ». Aligné sur la voie
+              // duplication (submitModalCreateDuplication : phaseLibelle +
+              // ' — vs ' + adv). Sans ça : null value column "libelle"
+              // violates not-null constraint (bug terrain essai 4).
+              const m = {
+                ordre:   mIdx + 1,
+                libelle: adv ? ('vs ' + adv) : ('Match ' + (mIdx + 1))
+              };
               if (adv) m.adversaire_nom = adv;
               matchs.push(m);
             });
@@ -5513,7 +5546,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init v1.30 (S3 · format intégré dans la ligne equipe)');
+    console.log('🏉 MOM Hub · Évènements Browser — init v1.31 (S3 · fix libelle match)');
 
     const list = document.getElementById('evt-list');
 
@@ -5587,7 +5620,7 @@
     closeFiche:        closeFiche
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.30 (S3 · format intégré dans la ligne equipe) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.31 (S3 · fix libelle match) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
