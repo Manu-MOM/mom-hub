@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.26 — UX-EVT-DOUBLON-GROUPER-BOUTON · retrait groupbar interne (27 mai 2026)
+ * Version : 1.27 — Éditeur de phases à la création (tournoi multi-phases) (30 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -884,6 +884,68 @@
  *          → v1.25 3c841387 → v1.26 (recollé après écriture, audit
  *          md5 byte-identité 12/12 Suivi A/B/C + renderFiche +
  *          bindFicheActions joint à la livraison).
+ *
+ *   v1.27 : Éditeur de phases à la CRÉATION (tournoi multi-phases /
+ *          multi-équipes). Implémente le doc FAIT FOI
+ *          `Conception-Refonte-UX-Creation-Evt-MultiPhases-v1.md`
+ *          (md5 c5f9998a, §3 décisions D1→D9). Constat de la conception
+ *          (vérifié à la source) : le backend (RPC sql/52
+ *          `creer_evenement_complet`, md5 2778691e) sait DÉJÀ tout faire
+ *          — il consomme intégralement p_phases_par_equipe. La friction
+ *          était PUREMENT UI : buildPhasesParEquipeList n'affichait aucun
+ *          champ (texte de consigne) et submitModalCreate envoyait une
+ *          phase fantôme codée en dur `phases:[{libelle:'Phase 1',
+ *          ordre:1}]`. Cette version branche l'éditeur réel sur le
+ *          backend prêt.
+ *
+ *          ZÉRO SQL, AUCUNE modification de la RPC. evenements.html v3
+ *          (md5 d8b2aa2e) NON TOUCHÉ : tout le CSS nécessaire existait
+ *          DÉJÀ (.evt-phase-box / .evt-phase-box-head / .evt-phase-match-
+ *          row / .evt-eng-btn / .evt-eng-btn-remove + .evt-fiche-
+ *          collapsible/.evt-fiche-chevron/.is-open pour le repli) — pièce
+ *          d'UI jamais construite, branchée sur un design déjà stylé.
+ *          Correction de périmètre signalée : la passation prévoyait une
+ *          passe CSS ; lecture source → inutile (parité avec le pt 23
+ *          sur la constante SITES).
+ *
+ *          Chantiers (1 seul fichier touché) :
+ *            (1) buildPhasesParEquipeList REFONDU en éditeur réel : 1
+ *                carte repliable par équipe cochée (D8), phases nommées
+ *                + date optionnelle illimitées (D2 + D-PROD-2), matchs
+ *                illimités par phase (D4), adversaires en emplacements
+ *                « adv N » ajustables (D5). Départ VIDE (D-PROD-1 : 0
+ *                phase, le coach clique « + Phase »). PRÉSERVATION à la
+ *                re-coche : ne reconstruit que les cartes des équipes
+ *                nouvellement cochées, retire les décochées, conserve les
+ *                phases déjà saisies des autres (état porté par le DOM).
+ *            (2) Helpers neufs : _phaseBoxHtml / _matchRowHtml /
+ *                _refreshPhasesResume / _renumberDefaultAdversaires +
+ *                bindPhasesEditor (délégation d'événements posée 1× dans
+ *                bindEvents, idempotente via flag _phasesEditorBound).
+ *            (3) submitModalCreate : bloc phases REFONDU — lecture réelle
+ *                de l'éditeur → JSONB p_phases_par_equipe complet (mapping
+ *                §4 doc FAIT FOI) + VALIDATION CLIENT « ≥ 1 phase par
+ *                équipe » (message honnête, plus de phase fantôme).
+ *
+ *          Format par équipe (D7) DÉJÀ livré v1.24 (buildFormatParEquipe-
+ *          Lines + lecture payload) → conservé byte-identique, non rouvert.
+ *
+ *          Invariants prouvés byte-identiques (baseline md5 par extraction
+ *          avant/après écriture) : 12 fonctions Suivi A/B/C + handlers
+ *          Niveau 0 (ouvrir-groupe-base / ouvrir-feuille-equipe via
+ *          bindFicheActions) + renderFiche + renderFonctionCellule +
+ *          helpers voisins (buildFormatParEquipeLines /
+ *          buildAdvParEquipeLines / buildAffectationsN2Lines /
+ *          peuplerStaff / peuplerEquipesEngagees / updatePhasesMode-
+ *          Visibility). bindEvents NON byte-identique par construction
+ *          (ajout de l'appel bindPhasesEditor, tracé).
+ *
+ *          Bump console.log boot init + final : "v1.26 (S3 · UX-EVT-
+ *          DOUBLON-GROUPER-BOUTON levée)" → "v1.27 (S3 · éditeur de
+ *          phases à la création)".
+ *
+ *          Provenance md5 : v1.26 2c7f9a50 → v1.27 (recollé après
+ *          écriture, joint à la livraison).
  */
 
 (function () {
@@ -3839,28 +3901,207 @@
   }
 
   /**
-   * Bloc 8f — Phases par équipe (F19 arborescence). 1 sous-conteneur
-   * par équipe cochée avec liste répétable de phases (+ matchs par phase).
-   * Pour cette livraison L3a : structure minimale (1 phase par défaut,
-   * boutons + Phase et + Match dans chaque phase). L'arborescence
-   * complète UI évoluera progressivement.
+   * Bloc 8f — Phases par équipe (F19 arborescence) — ÉDITEUR RÉEL v1.27.
+   *
+   * Refonte du texte de consigne (v1.26) en éditeur de phases opérant
+   * dans l'écran, conforme au doc FAIT FOI
+   * `Conception-Refonte-UX-Creation-Evt-MultiPhases-v1.md` §3 (D1→D9) :
+   *   - 1 carte repliable par équipe cochée (D8, repli via .is-open,
+   *     classes .evt-fiche-collapsible/.evt-fiche-chevron réutilisées) ;
+   *   - phases nommées librement + date optionnelle, illimitées (D2 + D-PROD-2,
+   *     bouton « + Phase ») ;
+   *   - matchs illimités par phase (D4, bouton « + Match ») ;
+   *   - adversaires en emplacements ajustables « adv N » texte libre (D5).
+   *
+   * Départ VIDE (D-PROD-1) : 0 phase à l'ouverture, le coach clique
+   * « + Phase ». La validation « ≥ 1 phase par équipe » est faite côté
+   * client dans submitModalCreate (plus de phase fantôme codée en dur).
+   *
+   * PRÉSERVATION À LA RE-COCHE : updateMultiEquipesUI rappelle cette
+   * fonction à chaque changement de coche d'équipe. On ne reconstruit
+   * QUE les cartes des équipes nouvellement cochées et on retire celles
+   * des équipes décochées — les phases déjà saisies des autres équipes
+   * sont conservées (état porté par le DOM, pas par un objet JS séparé).
+   *
+   * Mécanique : add/remove phase, add/remove match, repli = délégation
+   * d'événements posée une seule fois dans bindEvents (bindPhasesEditor).
    */
   function buildPhasesParEquipeList(checkedCbs) {
     const wrap = document.getElementById('evt-create-phases-par-equipe-list');
     if (!wrap) return;
-    const html = Array.prototype.map.call(checkedCbs, function (cb) {
-      const equipeId = cb.value;
-      const equipeLabel = cb.parentElement ? cb.parentElement.textContent.trim() : equipeId;
-      return '<div class="evt-phases-equipe-block" data-equipe-id="' + escHtml(equipeId) + '" '
-        + 'style="border:1px solid var(--line); padding:8px; margin-bottom:8px; border-radius:4px;">'
-        + '<div class="evt-phases-equipe-title" style="font-weight:600; margin-bottom:6px;">'
-        + escHtml(equipeLabel) + '</div>'
-        + '<div class="evt-phases-list-for-equipe" data-equipe-id="' + escHtml(equipeId) + '">'
-        + '<div class="evt-form-hint">Au moins 1 phase requise par équipe. Édition fine depuis la fiche après création.</div>'
+
+    // Index des équipes désormais cochées (id -> label)
+    const wanted = {};
+    Array.prototype.forEach.call(checkedCbs, function (cb) {
+      const eqId = cb.value;
+      const eqLabel = cb.parentElement ? cb.parentElement.textContent.trim() : eqId;
+      wanted[eqId] = eqLabel;
+    });
+
+    // 1) Retire les cartes des équipes décochées (préserve les autres)
+    Array.prototype.forEach.call(
+      wrap.querySelectorAll('.evt-phases-equipe-block'),
+      function (block) {
+        const eqId = block.getAttribute('data-equipe-id');
+        if (!Object.prototype.hasOwnProperty.call(wanted, eqId)) {
+          block.remove();
+        }
+      });
+
+    // 2) Ajoute une carte vide pour chaque équipe nouvellement cochée
+    Object.keys(wanted).forEach(function (eqId) {
+      if (wrap.querySelector('.evt-phases-equipe-block[data-equipe-id="' + eqId + '"]')) {
+        return; // déjà présente : on ne touche pas à ses phases saisies
+      }
+      const block = document.createElement('div');
+      block.className = 'evt-phases-equipe-block evt-fiche-collapsible is-open';
+      block.setAttribute('data-equipe-id', eqId);
+      block.innerHTML =
+          '<div class="evt-phases-equipe-head evt-fiche-section-title" '
+            + 'data-action="toggle-phases-equipe" style="display:flex; align-items:center; '
+            + 'gap:8px; cursor:pointer; font-weight:600; margin-bottom:6px;">'
+          + '<span class="evt-fiche-chevron">▸</span>'
+          + '<span class="evt-phases-equipe-title">' + escHtml(wanted[eqId]) + '</span>'
+          + '<span class="evt-phases-equipe-resume evt-form-hint" style="margin-left:auto;"></span>'
         + '</div>'
+        + '<div class="evt-fiche-section-body">'
+          + '<div class="evt-phases-list-for-equipe"></div>'
+          + '<button type="button" class="evt-eng-btn" data-action="add-phase" '
+            + 'style="margin-top:6px;">+ Phase</button>'
         + '</div>';
-    }).join('');
-    wrap.innerHTML = html;
+      wrap.appendChild(block);
+      _refreshPhasesResume(block);
+    });
+  }
+
+  /**
+   * Fragment HTML d'une carte phase (D2 nom + D-PROD-2 date optionnelle,
+   * D4 liste de matchs + bouton « + Match »). Aucune phase/match
+   * pré-amorcé (D-PROD-1) : le coach ajoute via les boutons.
+   */
+  function _phaseBoxHtml() {
+    return '<div class="evt-phase-box">'
+      + '<div class="evt-phase-box-head">'
+        + '<input type="text" class="evt-form-input evt-phase-libelle" '
+          + 'placeholder="Nom de la phase (ex. Poule de brassage)">'
+        + '<input type="date" class="evt-form-input evt-phase-date" '
+          + 'style="flex:0 0 150px;" title="Date de la phase (optionnel)">'
+        + '<button type="button" class="evt-eng-btn-remove" '
+          + 'data-action="remove-phase" title="Supprimer cette phase">✕</button>'
+      + '</div>'
+      + '<div class="evt-phase-matchs-list"></div>'
+      + '<button type="button" class="evt-eng-btn" data-action="add-match" '
+        + 'style="margin-top:6px;">+ Match</button>'
+    + '</div>';
+  }
+
+  /**
+   * Fragment HTML d'une ligne match (D5 adversaire = emplacement
+   * ajustable texte libre « adv N » pré-rempli, modifiable ensuite).
+   * @param {number} n - numéro d'ordre pour l'emplacement par défaut.
+   */
+  function _matchRowHtml(n) {
+    return '<div class="evt-phase-match-row">'
+      + '<input type="text" class="evt-form-input evt-match-adversaire" '
+        + 'value="adv ' + n + '" placeholder="Adversaire (ajustable)">'
+      + '<button type="button" class="evt-eng-btn-remove" '
+        + 'data-action="remove-match" title="Supprimer ce match">✕</button>'
+    + '</div>';
+  }
+
+  /**
+   * Met à jour le résumé compact « N phases · M matchs » de l'en-tête
+   * d'une carte équipe (D8 : lisibilité à N équipes, carte repliée).
+   */
+  function _refreshPhasesResume(block) {
+    if (!block) return;
+    const resume = block.querySelector('.evt-phases-equipe-resume');
+    if (!resume) return;
+    const nbPhases = block.querySelectorAll('.evt-phase-box').length;
+    const nbMatchs = block.querySelectorAll('.evt-phase-match-row').length;
+    if (nbPhases === 0) {
+      resume.textContent = 'aucune phase';
+    } else {
+      resume.textContent = nbPhases + ' phase' + (nbPhases > 1 ? 's' : '')
+        + ' · ' + nbMatchs + ' match' + (nbMatchs > 1 ? 's' : '');
+    }
+  }
+
+  /**
+   * Renumérote les emplacements adversaires par défaut « adv N » d'une
+   * phase après ajout/suppression — uniquement les inputs encore sur
+   * leur valeur par défaut (ne touche pas un nom saisi par le coach, D5).
+   */
+  function _renumberDefaultAdversaires(matchsList) {
+    if (!matchsList) return;
+    let n = 0;
+    Array.prototype.forEach.call(
+      matchsList.querySelectorAll('.evt-match-adversaire'),
+      function (inp) {
+        n += 1;
+        if (/^adv \d+$/.test(inp.value.trim())) {
+          inp.value = 'adv ' + n;
+        }
+      });
+  }
+
+  /**
+   * Délégation d'événements de l'éditeur de phases (posée 1× via
+   * bindEvents). Gère add/remove phase, add/remove match, repli carte
+   * équipe. Tout repose sur les data-action des fragments ci-dessus.
+   */
+  function bindPhasesEditor() {
+    const wrap = document.getElementById('evt-create-phases-par-equipe-list');
+    if (!wrap || wrap._phasesEditorBound) return;
+    wrap._phasesEditorBound = true;
+
+    wrap.addEventListener('click', function (e) {
+      const actEl = e.target.closest ? e.target.closest('[data-action]') : null;
+      if (!actEl || !wrap.contains(actEl)) return;
+      const action = actEl.getAttribute('data-action');
+      const block = actEl.closest('.evt-phases-equipe-block');
+
+      if (action === 'toggle-phases-equipe') {
+        if (block) block.classList.toggle('is-open');
+        return;
+      }
+      if (action === 'add-phase') {
+        const list = block && block.querySelector('.evt-phases-list-for-equipe');
+        if (list) {
+          const tmp = document.createElement('div');
+          tmp.innerHTML = _phaseBoxHtml();
+          list.appendChild(tmp.firstChild);
+          _refreshPhasesResume(block);
+        }
+        return;
+      }
+      if (action === 'remove-phase') {
+        const box = actEl.closest('.evt-phase-box');
+        if (box) box.remove();
+        _refreshPhasesResume(block);
+        return;
+      }
+      if (action === 'add-match') {
+        const box = actEl.closest('.evt-phase-box');
+        const list = box && box.querySelector('.evt-phase-matchs-list');
+        if (list) {
+          const n = list.querySelectorAll('.evt-phase-match-row').length + 1;
+          const tmp = document.createElement('div');
+          tmp.innerHTML = _matchRowHtml(n);
+          list.appendChild(tmp.firstChild);
+          _refreshPhasesResume(block);
+        }
+        return;
+      }
+      if (action === 'remove-match') {
+        const row = actEl.closest('.evt-phase-match-row');
+        const list = row && row.parentElement;
+        if (row) row.remove();
+        _renumberDefaultAdversaires(list);
+        _refreshPhasesResume(block);
+        return;
+      }
+    });
   }
 
   /**
@@ -4334,16 +4575,76 @@
                         || typeCompet === 'tournoi'; // A5 forcé
 
       if (phasesOui) {
-        // Pour cette livraison L3a : structure minimale 1 phase par équipe
-        // (édition fine déportée à la fiche post-création, voie « lente » R4).
-        payload.phases_par_equipe = cbList.map(function (cb, idx) {
-          return {
-            evenement_equipe_id_local: 'equipe_' + (idx + 1),
-            phases: [
-              { libelle: 'Phase 1', ordre: 1 }
-            ]
-          };
+        // v1.27 — Lecture RÉELLE de l'éditeur de phases (plus de phase
+        // fantôme « Phase 1 » codée en dur). Pour chaque équipe cochée,
+        // on lit sa carte .evt-phases-equipe-block : ses phases (libellé
+        // + date optionnelle) et, pour chacune, ses matchs (emplacement
+        // adversaire texte libre « adv N » ajustable, D5).
+        // Mapping → contrat RPC p_phases_par_equipe (doc FAIT FOI §4) :
+        //   { evenement_equipe_id_local, phases:[ { libelle, date_debut?,
+        //     ordre, matchs:[ { libelle?, adversaire_nom?, ordre } ] } ] }
+        const editorWrap = document.getElementById('evt-create-phases-par-equipe-list');
+        const phasesPayload = [];
+        let phaseValidationError = null;
+
+        cbList.forEach(function (cb, idx) {
+          const eqId = cb.value;
+          const localId = 'equipe_' + (idx + 1);
+          const eqLabel = cb.parentElement ? cb.parentElement.textContent.trim() : eqId;
+          const block = editorWrap
+            ? editorWrap.querySelector('.evt-phases-equipe-block[data-equipe-id="' + eqId + '"]')
+            : null;
+          const phaseBoxes = block
+            ? Array.prototype.slice.call(block.querySelectorAll('.evt-phase-box'))
+            : [];
+
+          if (phaseBoxes.length === 0) {
+            // D-PROD-1 : départ vide → validation client honnête (≥ 1 phase
+            // par équipe exigée par la RPC en mode phases). On signale, on
+            // n'invente pas de phase fantôme.
+            if (!phaseValidationError) {
+              phaseValidationError = 'Au moins une phase est requise pour l\'équipe « '
+                + eqLabel + ' ». Cliquez « + Phase » dans le bloc « Phases & matchs ».';
+            }
+            return;
+          }
+
+          const phases = phaseBoxes.map(function (box, pIdx) {
+            const libInput  = box.querySelector('.evt-phase-libelle');
+            const dateInput = box.querySelector('.evt-phase-date');
+            const lib = (libInput && libInput.value.trim()) || ('Phase ' + (pIdx + 1));
+            const phase = { libelle: lib, ordre: pIdx + 1 };
+            if (dateInput && dateInput.value) {
+              phase.date_debut = new Date(dateInput.value).toISOString();
+            }
+            const matchRows = Array.prototype.slice.call(
+              box.querySelectorAll('.evt-phase-match-row'));
+            const matchs = [];
+            matchRows.forEach(function (row, mIdx) {
+              const advInput = row.querySelector('.evt-match-adversaire');
+              const adv = advInput ? advInput.value.trim() : '';
+              const m = { ordre: mIdx + 1 };
+              if (adv) m.adversaire_nom = adv;
+              matchs.push(m);
+            });
+            if (matchs.length > 0) phase.matchs = matchs;
+            return phase;
+          });
+
+          phasesPayload.push({
+            evenement_equipe_id_local: localId,
+            phases: phases
+          });
         });
+
+        if (phaseValidationError) {
+          msg.innerHTML = '<div class="evt-form-error">' + escHtml(phaseValidationError) + '</div>';
+          const modalBody = document.querySelector('#evt-overlay-create .evt-modal-body');
+          if (modalBody) modalBody.scrollTop = 0;
+          return;
+        }
+
+        payload.phases_par_equipe = phasesPayload;
       }
     }
 
@@ -4748,6 +5049,9 @@
     // S2.4.b — Submit des 3 modales + P2-E.2 modales E6/E7
     const btnCreateSubmit = document.getElementById('evt-create-submit');
     if (btnCreateSubmit) btnCreateSubmit.addEventListener('click', submitModalCreate);
+    // v1.27 — délégation d'événements de l'éditeur de phases (posée 1×,
+    // idempotente via flag _phasesEditorBound sur le conteneur).
+    bindPhasesEditor();
     const btnCancelSubmit = document.getElementById('evt-cancel-submit');
     if (btnCancelSubmit) btnCancelSubmit.addEventListener('click', submitModalCancel);
     const btnAddMatchSubmit = document.getElementById('evt-addmatch-submit');
@@ -5035,7 +5339,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init v1.26 (S3 · UX-EVT-DOUBLON-GROUPER-BOUTON levée)');
+    console.log('🏉 MOM Hub · Évènements Browser — init v1.27 (S3 · éditeur de phases à la création)');
 
     const list = document.getElementById('evt-list');
 
@@ -5109,7 +5413,7 @@
     closeFiche:        closeFiche
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.26 (S3 · UX-EVT-DOUBLON-GROUPER-BOUTON levée) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.27 (S3 · éditeur de phases à la création) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
