@@ -2,8 +2,22 @@
 -- MOM HUB · VAGUE 1 · CRÉATION DES TABLES
 -- =====================================================================
 -- Auteur : Manu (avec assistance Claude)
--- Date   : 2026-05-10
--- Version: 1.0
+-- Date   : 2026-05-10 (créé) · 2026-05-30 (resync miroir base, pt 35)
+-- Version: 2.0
+--
+-- ⚠️  FICHIER DE RÉFÉRENCE / DOCUMENTATION — PAS UNE MIGRATION À REJOUER.
+--     La base Supabase fait foi (gouvernance pt 26, Option C : SQL/la base
+--     fait foi pour tout référentiel avec table opérationnelle). Ce fichier
+--     est un MIROIR DOCUMENTAIRE de l'état réel des 9 tables de la Vague 1,
+--     régénéré le 2026-05-30 par sonde directe (information_schema.columns +
+--     pg_constraint + pg_indexes, lecture seule). Si un écart base↔fichier
+--     réapparaît, c'est CE FICHIER qu'on corrige, jamais la base.
+--
+--     Périmètre : les 9 tables fondamentales de la Vague 1 UNIQUEMENT. Les
+--     ~18 autres tables de la base (compositions, présences, séances,
+--     évènements, auth_personne, fonction_staff, etc.) sont créées par des
+--     fichiers de vagues ultérieures (sql/10, sql/18, sql/40, sql/44→68…)
+--     et ne relèvent pas de ce fichier.
 --
 -- Crée les 9 tables fondamentales du MOM Hub dans Supabase :
 --   1. poles           (5 lignes)
@@ -11,15 +25,17 @@
 --   3. clubs           (4 lignes)
 --   4. saisons         (1-2 lignes)
 --   5. postes          (~20 lignes)
---   6. ententes        (5-10 lignes)
+--   6. ententes        (5-11 lignes)
 --   7. equipes         (~11 lignes)
---   8. equipe_joueurs  (~250 lignes)
---   9. personnes       (~297 lignes)
+--   8. personnes       (~300 lignes)
+--   9. equipe_joueurs  (~250 lignes)
 --
--- Sécurité : RLS activé sur toutes les tables (policies définies à
---            l'étape 6).
+-- Sécurité : RLS activé sur toutes les tables (policies détaillées à
+--            l'étape 6 ; ce fichier ne pose que les policies de lecture
+--            publique des référentiels).
 --
 -- À exécuter dans Supabase > SQL Editor > New query > coller > Run.
+-- (Pour mémoire seulement — la base existe déjà.)
 -- =====================================================================
 
 
@@ -58,10 +74,14 @@ CREATE TABLE poles (
   libelle_long                TEXT NOT NULL,
   libelle_court               TEXT NOT NULL,
   categories_rattachees       TEXT[] NOT NULL DEFAULT '{}',
-  responsable_principal_id    UUID,  -- FK vers personnes (ajoutée plus tard)
-  co_responsable_id           UUID,  -- FK vers personnes (ajoutée plus tard)
+  responsable_principal_id    UUID,  -- FK vers personnes (ajoutée plus bas)
+  co_responsable_id           UUID,  -- FK vers personnes (ajoutée plus bas)
   created_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  -- Colonnes ajoutées après la Vague 1 (resync 2026-05-30) :
+  uuid_legacy                 TEXT UNIQUE,
+  responsable_principal_nom   TEXT
 );
 
 CREATE TRIGGER set_updated_at
@@ -71,6 +91,7 @@ CREATE TRIGGER set_updated_at
 COMMENT ON TABLE poles IS 'Pôles organisationnels du MOM (EDR, Jeunes, Jeunes F, Seniors, Loisirs)';
 COMMENT ON COLUMN poles.code IS 'Code lisible humain, ex: POLE-EDR';
 COMMENT ON COLUMN poles.categories_rattachees IS 'Liste de codes catégories rattachées, ex: {M6, M8, M10, M12, M14}';
+COMMENT ON COLUMN poles.uuid_legacy IS 'UUID lisible historique pour compatibilité avec les JSON Drive';
 
 
 -- =====================================================================
@@ -79,17 +100,29 @@ COMMENT ON COLUMN poles.categories_rattachees IS 'Liste de codes catégories rat
 -- Les 14 catégories d'âge (M5 à RLSP)
 
 CREATE TABLE categories (
-  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  code            TEXT NOT NULL UNIQUE,
-  code_ffr        TEXT,
-  libelle         TEXT NOT NULL,
-  age_min         INTEGER,
-  age_max         INTEGER,
-  genre           TEXT CHECK (genre IN ('M', 'F', 'mixte')),
-  pole_id         UUID REFERENCES poles(id) ON DELETE SET NULL,
-  ordre_tri       INTEGER NOT NULL DEFAULT 0,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  code                TEXT NOT NULL UNIQUE,
+  code_ffr            TEXT,
+  libelle_court       TEXT NOT NULL,
+  age_min             INTEGER,
+  age_max             INTEGER,
+  genre               TEXT CHECK (genre IN ('M', 'F', 'mixte')),
+  pole_id             UUID REFERENCES poles(id) ON DELETE SET NULL,
+  ordre_tri           INTEGER NOT NULL DEFAULT 0,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  -- Colonnes ajoutées après la Vague 1 (resync 2026-05-30) :
+  uuid_legacy         TEXT UNIQUE,
+  libelle_long        TEXT,
+  type_categorie      TEXT,
+  type_licence_ffr    TEXT,
+  age_minimum_h       INTEGER,
+  age_minimum_f       INTEGER,
+  formats_autorises   TEXT[] NOT NULL DEFAULT '{}',
+  passeports_requis   TEXT[] NOT NULL DEFAULT '{}',
+  mixite_autorisee    BOOLEAN NOT NULL DEFAULT FALSE,
+  notes               TEXT
 );
 
 CREATE TRIGGER set_updated_at
@@ -102,6 +135,8 @@ CREATE INDEX idx_categories_ordre_tri ON categories(ordre_tri);
 COMMENT ON TABLE categories IS 'Catégories d''âge (M5, M6, M8, ..., SR-M, SR-F, RLO, RLSP)';
 COMMENT ON COLUMN categories.code IS 'Code interne, ex: M14';
 COMMENT ON COLUMN categories.code_ffr IS 'Code FFR officiel (peut différer de code)';
+COMMENT ON COLUMN categories.libelle_court IS 'Libellé court (ex-colonne ''libelle'' renommée après la Vague 1)';
+COMMENT ON COLUMN categories.uuid_legacy IS 'UUID lisible historique pour compatibilité avec les JSON Drive';
 
 
 -- =====================================================================
@@ -110,27 +145,47 @@ COMMENT ON COLUMN categories.code_ffr IS 'Code FFR officiel (peut différer de c
 -- Les clubs (MOM, SAR, ASCS, et autres partenaires futurs)
 
 CREATE TABLE clubs (
-  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  code            TEXT NOT NULL UNIQUE,
-  nom_court       TEXT NOT NULL,
-  nom_long        TEXT NOT NULL,
-  numero_ffr      TEXT,
-  ville           TEXT,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id                                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  code                              TEXT NOT NULL UNIQUE,
+  nom_court                         TEXT NOT NULL,
+  nom_long                          TEXT NOT NULL,
+  numero_ffr                        TEXT,
+  ville                             TEXT,
+  created_at                        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at                        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  -- Colonnes ajoutées après la Vague 1 (resync 2026-05-30) :
+  uuid_legacy                       TEXT UNIQUE,
+  adresse                           TEXT,
+  couleurs_officielles              TEXT[] NOT NULL DEFAULT '{}',
+  couleur_affiliation_distinctive   TEXT,
+  comite_departemental              TEXT,
+  ligue_regionale                   TEXT,
+  annee_creation                    INTEGER,
+  annee_creation_association_mere   INTEGER,
+  niveau_competition                TEXT,
+  club_central                      BOOLEAN NOT NULL DEFAULT FALSE,
+  type_partenariat                  TEXT,
+  licencies_dernier_recense         INTEGER,
+  sites_principaux_codes            TEXT[] NOT NULL DEFAULT '{}',
+  notes                             TEXT
 );
 
 CREATE TRIGGER set_updated_at
   BEFORE UPDATE ON clubs
   FOR EACH ROW EXECUTE FUNCTION trigger_set_updated_at();
 
-COMMENT ON TABLE clubs IS 'Clubs (MOM = club principal, autres = partenaires d''entente)';
+COMMENT ON TABLE clubs IS 'Clubs (MOM = club central, autres = partenaires d''entente)';
+COMMENT ON COLUMN clubs.club_central IS 'TRUE pour le club central (MOM)';
+COMMENT ON COLUMN clubs.uuid_legacy IS 'UUID lisible historique pour compatibilité avec les JSON Drive';
 
 
 -- =====================================================================
 -- TABLE 4 : saisons
 -- =====================================================================
 -- Les saisons sportives (1 par an, généralement de juillet à juin)
+-- NB : table volontairement pauvre — l'état d'une saison est porté par le
+--      seul booléen est_active (réconciliation SCHEMA-SAISON-DRIFT, pt 27).
 
 CREATE TABLE saisons (
   id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -155,7 +210,7 @@ CREATE UNIQUE INDEX idx_saisons_une_seule_active
   WHERE est_active = TRUE;
 
 COMMENT ON TABLE saisons IS 'Saisons sportives (1 par an, contrainte 1 seule active)';
-COMMENT ON COLUMN saisons.code IS 'Format AAAA-AAAA, ex: 2025-2026';
+COMMENT ON COLUMN saisons.code IS 'Format AAAA/AAAA (slash FFR), ex: 2025/2026';
 
 
 -- =====================================================================
@@ -176,7 +231,13 @@ CREATE TABLE postes (
   codes_x             TEXT[],
   codes_7             TEXT[],
   created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  -- Colonnes ajoutées après la Vague 1 (resync 2026-05-30) :
+  uuid_legacy         TEXT UNIQUE,
+  formats_applicables TEXT[] NOT NULL DEFAULT '{}',
+  description         TEXT,
+  postes_inclus_codes TEXT[] NOT NULL DEFAULT '{}'
 );
 
 CREATE TRIGGER set_updated_at
@@ -188,6 +249,7 @@ CREATE INDEX idx_postes_numero_xv ON postes(numero_xv);
 COMMENT ON TABLE postes IS 'Postes rugby (15 XV + 5 regroupements)';
 COMMENT ON COLUMN postes.code IS 'Code court, ex: PG, TG, OUV';
 COMMENT ON COLUMN postes.numero_xv IS 'Numéro 1-15 pour postes XV, NULL pour regroupements';
+COMMENT ON COLUMN postes.uuid_legacy IS 'UUID lisible historique pour compatibilité avec les JSON Drive';
 
 
 -- =====================================================================
@@ -262,9 +324,9 @@ CREATE TABLE equipes (
   site_principal_id               UUID,
   sites_note                      TEXT,
   statut                          TEXT NOT NULL DEFAULT 'active' CHECK (statut IN ('active', 'inactive')),
-  coach_principal_id              UUID,  -- FK vers personnes (ajoutée plus tard)
+  coach_principal_id              UUID,  -- FK vers personnes (ajoutée plus bas)
   coachs_adjoints_ids             UUID[] NOT NULL DEFAULT '{}',
-  manager_id                      UUID,  -- FK vers personnes (ajoutée plus tard)
+  manager_id                      UUID,  -- FK vers personnes (ajoutée plus bas)
   jeux_maillots                   JSONB NOT NULL DEFAULT '[]'::jsonb,
   effectif_theorique              INTEGER,
   effectif_minimum_operationnel   INTEGER,
@@ -285,16 +347,18 @@ COMMENT ON COLUMN equipes.format_jeu_code IS 'XV, 13, X, 7, 5 — modifiable au 
 
 
 -- =====================================================================
--- TABLE 9 : personnes  (créée AVANT equipe_joueurs car celle-ci la référence)
+-- TABLE 8 : personnes  (créée AVANT equipe_joueurs car celle-ci la référence)
 -- =====================================================================
 -- La table centrale : tous les individus en relation avec le club
--- 297 lignes au démarrage
+-- ~300 lignes
 
 CREATE TABLE personnes (
   id                                            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   uuid_legacy                                   TEXT UNIQUE,
   categorie_personne                            TEXT NOT NULL CHECK (categorie_personne IN (
-    'joueur', 'parent', 'parent_et_staff', 'staff', 'contact-externe', 'dirigeant'
+    'joueur', 'parent', 'parent_et_staff', 'joueur_et_parent',
+    'joueur_et_staff', 'joueur_et_parent_et_staff', 'staff',
+    'contact-externe', 'dirigeant'
   )),
 
   -- BLOC 1 · IDENTITÉ
@@ -322,8 +386,9 @@ CREATE TABLE personnes (
   personne_a_prevenir_urgence                   JSONB,
 
   -- BLOC 5 · AFFILIATION FFR (résumé)
-  type_personne                                 TEXT CHECK (type_personne IN (
+  type_personne                                 TEXT CHECK (type_personne IS NULL OR type_personne IN (
     'licencie_competition', 'licencie_dirigeant', 'licencie_educateur',
+    'licencie_soigneur', 'licencie_arbitre', 'licencie_externe_partenaire',
     'non_licencie', 'non_licencie_au_mom'
   )),
   numero_licence_ffr                            TEXT,
@@ -364,8 +429,22 @@ CREATE TABLE personnes (
   tag_verifier                                  BOOLEAN NOT NULL DEFAULT FALSE,
 
   created_at                                    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at                                    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at                                    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  -- BLOC PROFIL SPORTIF — colonnes ajoutées après la Vague 1 (resync 2026-05-30)
+  indisponibilite                               TEXT,
+  blessure_resume                               TEXT,
+  suspension_jusqu_au                           DATE,
+  postes_uuids                                  UUID[] NOT NULL DEFAULT '{}'::uuid[],
+  aptitudes_uuids                               UUID[] NOT NULL DEFAULT '{}'::uuid[],
+  taille_cm                                     SMALLINT CHECK (taille_cm IS NULL OR (taille_cm >= 50 AND taille_cm <= 250)),
+  poids_g                                       INTEGER CHECK (poids_g IS NULL OR (poids_g >= 5000 AND poids_g <= 250000)),
+  notes_coach                                   TEXT
 );
+-- NB resync : en base, postes_uuids / aptitudes_uuids sont déclarées
+--   data_type=ARRAY / udt_name=_text (text[]) MAIS portent un DEFAULT
+--   '{}'::uuid[]. Incohérence type/défaut RÉELLE en base, reproduite ici
+--   telle quelle (ce fichier documente le réel, ne le corrige pas).
 
 CREATE TRIGGER set_updated_at
   BEFORE UPDATE ON personnes
@@ -381,13 +460,19 @@ CREATE INDEX idx_personnes_date_naissance ON personnes(date_naissance);
 CREATE INDEX idx_personnes_uuid_legacy ON personnes(uuid_legacy) WHERE uuid_legacy IS NOT NULL;
 CREATE INDEX idx_personnes_tag_verifier ON personnes(tag_verifier) WHERE tag_verifier = TRUE;
 
+-- Index UNIQUE total sur la licence FFR — ajouté après la Vague 1 (resync 2026-05-30).
+-- Coexiste avec l'index partiel non-unique idx_personnes_numero_licence_ffr ci-dessus.
+CREATE UNIQUE INDEX personnes_numero_licence_ffr_unique_idx ON personnes(numero_licence_ffr);
+
 COMMENT ON TABLE personnes IS 'Entité centrale : tous les individus en relation avec le club';
 COMMENT ON COLUMN personnes.uuid_legacy IS 'UUID lisible historique (ex: personne-A3F2B1) pour compatibilité avec les JSON Drive';
 COMMENT ON COLUMN personnes.f15_integree IS 'TRUE si fille F15 jouant en mixité M14';
+COMMENT ON COLUMN personnes.poids_g IS 'Poids en grammes (CHECK 5000-250000)';
+COMMENT ON COLUMN personnes.taille_cm IS 'Taille en centimètres (CHECK 50-250)';
 
 
 -- =====================================================================
--- TABLE 8 : equipe_joueurs
+-- TABLE 9 : equipe_joueurs
 -- =====================================================================
 -- Table de liaison : joueurs d'attache d'une équipe sur une saison
 
@@ -499,22 +584,52 @@ CREATE POLICY "Lecture publique des postes"
 -- AUCUNE policy n'est définie ici. Conséquence : seule la clé
 -- service_role peut y accéder (utilisée pour les migrations).
 -- Les policies user-facing seront définies à l'étape 6.
+-- NB resync : les policies réelles en base sur ces tables (write admin/
+--   bureau/referent, RPC SECURITY DEFINER, etc.) ont été posées par des
+--   vagues ultérieures (sql/04, sql/41/43, sql/63→68…) hors périmètre
+--   de ce fichier Vague 1.
 
 
 -- =====================================================================
 -- FIN DU SCRIPT
 -- =====================================================================
 -- À ce stade, tu as :
---   ✅ 9 tables créées
+--   ✅ 9 tables créées (état réel base au 2026-05-30)
 --   ✅ Toutes les contraintes (PK, FK, CHECK, UNIQUE) en place
---   ✅ Index pour performance
+--   ✅ Index pour performance (dont l'unique total licence FFR)
 --   ✅ Triggers updated_at automatiques
 --   ✅ RLS activé sur toutes les tables
 --   ✅ Lecture publique autorisée sur les 5 référentiels publics
---   ✅ Tables sensibles isolées (ententes, equipes, personnes)
+--   ✅ Tables sensibles isolées (ententes, equipes, equipe_joueurs, personnes)
 --
--- Prochaines étapes :
+-- Resync 2026-05-30 (pt 35, MODELE-DOCTRINE-SQL01-DRIFT) — écarts capturés
+-- vs v1.0 (base fait foi, miroir strict) :
+--   • categories  : libelle → libelle_court ; +10 col (uuid_legacy,
+--                   libelle_long, type_categorie, type_licence_ffr,
+--                   age_minimum_h/f, formats_autorises, passeports_requis,
+--                   mixite_autorisee, notes) ; +UNIQUE(uuid_legacy)
+--   • clubs       : +14 col (uuid_legacy, adresse, couleurs_officielles,
+--                   couleur_affiliation_distinctive, comite_departemental,
+--                   ligue_regionale, annee_creation,
+--                   annee_creation_association_mere, niveau_competition,
+--                   club_central, type_partenariat,
+--                   licencies_dernier_recense, sites_principaux_codes,
+--                   notes) ; +UNIQUE(uuid_legacy)
+--   • poles       : +2 col (uuid_legacy, responsable_principal_nom) ;
+--                   +UNIQUE(uuid_legacy)
+--   • postes      : +4 col (uuid_legacy, formats_applicables, description,
+--                   postes_inclus_codes) ; +UNIQUE(uuid_legacy)
+--   • personnes   : +8 col profil sportif (indisponibilite, blessure_resume,
+--                   suspension_jusqu_au, postes_uuids, aptitudes_uuids,
+--                   taille_cm, poids_g, notes_coach) ; CHECK
+--                   categorie_personne élargi (9 valeurs) ; CHECK
+--                   type_personne élargi (8 valeurs + NULL explicite) ;
+--                   +CHECK taille_cm/poids_g ; +UNIQUE total licence FFR
+--   • equipes     : aligné (type_equipe CHECK 'entente'/'mono_club' confirmé)
+--   • ententes    : aligné · saisons : aligné · equipe_joueurs : aligné
+--
+-- Prochaines étapes (vagues ultérieures, hors ce fichier) :
 --   ÉTAPE 6 : policies RLS détaillées (qui voit quoi)
---   ÉTAPE 7 : migration des 5 référentiels publics
---   ÉTAPE 8 : migration des 297 fiches Personne
+--   ÉTAPE 7 : migration des référentiels publics
+--   ÉTAPE 8 : migration des fiches Personne
 -- =====================================================================
