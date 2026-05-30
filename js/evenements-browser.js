@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.27 — Éditeur de phases à la création (tournoi multi-phases) (30 mai 2026)
+ * Version : 1.28 — Phases : 4 sous-types (tournoi/Vié/inter-ligues/Seven) + anti-doublon adv (30 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -946,6 +946,43 @@
  *
  *          Provenance md5 : v1.26 2c7f9a50 → v1.27 (recollé après
  *          écriture, joint à la livraison).
+ *
+ *   v1.28 : Phases — couverture étendue + anti-doublon adversaires
+ *          (corrections terrain post-v1.27, décisions Manu).
+ *
+ *          (A) PHASES POUR 4 SOUS-TYPES (pas seulement « tournoi ») :
+ *          le multi-phases sert tournoi + Challenge Vié + Challenge
+ *          Inter-Ligues + Seven (cohérent doc FAIT FOI §3.4, couverture
+ *          Vié/Seven/coupe). Constante module UNIQUE PHASES_SOUS_TYPES,
+ *          source de vérité partagée par updateCreateConditionalFields
+ *          (calcul du mode A5) et submitModalCreate (lecture phases vs
+ *          adversaires + exclusion A3). Avant : 'tournoi' en dur à 4
+ *          endroits → Vié/inter-ligues/Seven ne déclenchaient rien.
+ *
+ *          (B) FRONTIÈRE NETTE plateau/tournoi (décision Manu) :
+ *          A4 plateau = matchs simples (adversaires par équipe), JAMAIS
+ *          de phases ; A5 (les 4 sous-types) = éditeur de phases, JAMAIS
+ *          d'adversaires par équipe. La question « Avec phases ? » en A4
+ *          est RETIRÉE (showPhasesQ=false) — un plateau n'a pas de phases.
+ *          Supprime le doublon adversaires/phases (UX-2b) par
+ *          construction : le bloc adv-par-équipe et l'éditeur de phases
+ *          sont désormais mutuellement exclusifs (gouvernés par le mode).
+ *
+ *          Détails : showAdvParEq = A4 seul ; showPhasesZone = A5 seul ;
+ *          peuplement adv/phases gouverné par le display réel des zones ;
+ *          submit ne lit le bloc adv que hors PHASES_SOUS_TYPES ; isA3
+ *          exclut plateau ET les 4 sous-types à phases ; isA5 mort retiré
+ *          de updateMultiEquipesUI (l'affichage suit le display réel).
+ *
+ *          Recette terrain v1.27 OK (captures Manu : 2 équipes M14,
+ *          formats XV/X hétérogènes, éditeur de phases fonctionnel,
+ *          résumé live, repli) — v1.28 corrige le périmètre des
+ *          sous-types + le doublon adv constaté en recette.
+ *
+ *          ZÉRO SQL, RPC inchangée, evenements.html NON touché. Invariants
+ *          (12 Suivi A/B/C + Niveau 0 + renderFiche + renderFonctionCellule
+ *          + helpers voisins) byte-identiques. Provenance md5 : v1.27
+ *          (3ccbf834) → v1.28 (recollé après écriture, joint).
  */
 
 (function () {
@@ -956,6 +993,13 @@
   // ============================================================
 
   const M14_TEAM_UUID = 'bfb83b83-83ef-4dde-b526-48ff87313044';
+
+  // v1.28 — Sous-types de compétition à PHASES (éditeur de phases, mode
+  // A5). Source de vérité UNIQUE partagée par updateCreateConditionalFields
+  // (calcul du mode) et submitModalCreate (lecture phases vs adversaires).
+  // Décision Manu : multi-phases = tournoi + Challenge Vié + Inter-Ligues
+  // + Seven. Cohérent doc FAIT FOI §3.4 (universalité par nommage libre).
+  const PHASES_SOUS_TYPES = ['tournoi', 'challenge_vie', 'challenge_inter_ligues', 'seven'];
 
   const FENETRE_JOURS_AVENIR  = 90;
   const FENETRE_JOURS_PASSES  = 30;
@@ -3619,8 +3663,11 @@
     // ──────────────────────────────────────────────────────────────
     // Détermination du mode A1→A5
     // ──────────────────────────────────────────────────────────────
-    const PHASES_OBLIG_SOUS_TYPES = ['tournoi'];        // A5
-    const PHASES_OPTIONNEL_SOUS_TYPES = ['plateau'];    // A4 (multi-équipes possible)
+    // v1.28 — Sous-types à PHASES (A5) = constante module PHASES_SOUS_TYPES
+    // (source de vérité unique : tournoi + Vié + Inter-Ligues + Seven).
+    // A4 plateau = matchs simples (adversaires par équipe), JAMAIS de phases.
+    const PHASES_OBLIG_SOUS_TYPES = PHASES_SOUS_TYPES;  // A5
+    const PHASES_OPTIONNEL_SOUS_TYPES = ['plateau'];    // A4 (multi-équipes, matchs simples)
     let mode = 'A1';
     if (famille === 'entrainement')      mode = 'A1';
     else if (famille === 'stage')         mode = 'A2';
@@ -3646,9 +3693,15 @@
     const showDateFin     = famille === 'stage';                  // Date fin auto pour stage
     const showFormatGlob  = false;                                // jamais en mode adaptatif (format-par-équipe le remplace)
     const showAdvMono     = mode === 'A3';                        // Adversaire singulier
-    const showAdvParEq    = mode === 'A4' || mode === 'A5';       // Adversaires par équipe
-    const showPhasesQ     = mode === 'A4';                        // Question phases (A4 plateau seul)
-    const showPhasesZone  = mode === 'A5';                        // Phases activées par défaut A5 tournoi
+    // v1.28 — Frontière nette plateau/tournoi (décision Manu) :
+    //   A4 plateau = matchs simples → adversaires par équipe, JAMAIS de phases.
+    //   A5 tournoi = éditeur de phases → JAMAIS d'adversaires par équipe.
+    // La question « Avec phases ? » (A4) est RETIRÉE : un plateau n'a pas
+    // de phases. Supprime le doublon adversaires/phases (UX-2b) par
+    // construction, sans garde conditionnelle.
+    const showAdvParEq    = mode === 'A4';                        // Adversaires par équipe (plateau seul)
+    const showPhasesQ     = false;                                // Question phases retirée (plateau ≠ phases)
+    const showPhasesZone  = mode === 'A5';                        // Phases : tournoi seul
 
     function setDisplay(id, show) {
       const el = document.getElementById(id);
@@ -3666,13 +3719,9 @@
     setDisplay('evt-create-adv-par-equipe-zone',         showAdvParEq);
     setDisplay('evt-create-phases-question',             showPhasesQ);
 
-    // Phases zone : A5 = visible par défaut (tournoi = phases obligatoires)
-    // A4 = visible si phases_mode=oui sinon caché. A1/A2/A3 = jamais.
-    let showPhasesZoneEffective = showPhasesZone;
-    if (mode === 'A4') {
-      const radioOui = document.querySelector('#evt-create-phases-question input[name=phases_mode][value=oui]:checked');
-      showPhasesZoneEffective = !!radioOui;
-    }
+    // Phases zone : A5 tournoi = visible (phases obligatoires). A4 plateau
+    // et A1/A2/A3 = jamais. (v1.28 : plus de branche A4 conditionnelle.)
+    const showPhasesZoneEffective = showPhasesZone;
     setDisplay('evt-create-phases-zone', showPhasesZoneEffective);
 
     // ──────────────────────────────────────────────────────────────
@@ -3731,8 +3780,11 @@
 
     const competSelect = document.getElementById('evt-create-compet');
     const sousType = competSelect ? competSelect.value : '';
-    const isA4 = sousType === 'plateau';
-    const isA5 = sousType === 'tournoi';
+    const isA4 = sousType === 'plateau';   // plateau = affectations N2 (matchs simples)
+    // v1.28 — isA5 retiré : l'affichage adv/phases est gouverné par le
+    // display réel posé par updateCreateConditionalFields (qui classe
+    // tournoi/Vié/inter-ligues/Seven en A5). Un test 'tournoi' en dur ici
+    // aurait raté les 3 autres formats à phases.
 
     const formatParEq = document.getElementById('evt-create-format-par-equipe');
     const advParEq    = document.getElementById('evt-create-adv-par-equipe-zone');
@@ -3745,12 +3797,14 @@
       if (nbCoches >= 2) buildFormatParEquipeLines(cbList);
     }
 
-    // Adv par équipe : peuplé si A4/A5 et au moins 1 équipe
-    if (advParEq && (isA4 || isA5) && nbCoches >= 1) {
+    // Adv par équipe : peuplé si la zone est VISIBLE (A4 plateau seul,
+    // v1.28) et au moins 1 équipe cochée. Gouverné par le display réel.
+    if (advParEq && advParEq.style.display !== 'none' && nbCoches >= 1) {
       buildAdvParEquipeLines(cbList);
     }
 
-    // Phases par équipe : peuplé si A4 (avec phases_mode=oui) ou A5
+    // Phases par équipe : peuplé si la zone est VISIBLE (A5 tournoi seul,
+    // v1.28) et au moins 1 équipe cochée.
     if (phasesParEq && phasesParEq.style.display !== 'none' && nbCoches >= 1) {
       buildPhasesParEquipeList(cbList);
     }
@@ -4531,9 +4585,13 @@
         return;
       }
 
-      // Mode A3 (1 équipe + 1 adversaire mono)
-      // Mode A4/A5 (multi-équipes + adv-par-équipe)
-      const isA3 = cbList.length === 1 && typeCompet !== 'plateau' && typeCompet !== 'tournoi';
+      // Mode A3 (1 équipe + 1 adversaire mono) : compétition simple SEULE.
+      // v1.28 — exclut plateau ET tous les sous-types à phases
+      // (tournoi/Vié/inter-ligues/Seven) ; sinon un Vié/Seven à 1 équipe
+      // basculerait à tort en adversaire mono au lieu de l'éditeur de phases.
+      const isA3 = cbList.length === 1
+        && typeCompet !== 'plateau'
+        && PHASES_SOUS_TYPES.indexOf(typeCompet) === -1;
 
       payload.equipes_engagees = cbList.map(function (cb, idx) {
         const eqId = cb.value;
@@ -4551,11 +4609,14 @@
           eng.format_de_jeu = formatRow.value;
         }
 
-        // Adversaires de cette équipe (mode A3 mono ou A4/A5 par équipe)
+        // Adversaires de cette équipe : A3 mono, ou A4 plateau par équipe.
+        // JAMAIS pour un sous-type à phases (tournoi/Vié/inter-ligues/Seven) :
+        // les matchs sont portés par l'éditeur de phases → bloc adv masqué,
+        // non lu, anti-doublon v1.28.
         const advs = [];
         if (isA3 && adversaire) {
           advs.push({ adversaire_nom: adversaire, ordre: 1 });
-        } else {
+        } else if (PHASES_SOUS_TYPES.indexOf(typeCompet) === -1) {
           const advInput = document.querySelector(
             '#evt-create-adv-par-equipe-lines .evt-eng-adv-row[data-equipe-id="' + eqId + '"] .evt-eng-adv-input');
           if (advInput && advInput.value.trim()) {
@@ -4567,12 +4628,10 @@
         return eng;
       });
 
-      // Phases par équipe (F19 arborescence) : modes A4 (avec phases_mode=oui) + A5
-      const phasesQ = document.getElementById('evt-create-phases-question');
-      const phasesQVisible = phasesQ && phasesQ.style.display !== 'none';
-      const phasesOuiEl = phasesQ && phasesQ.querySelector('input[name=phases_mode]:checked');
-      const phasesOui = (phasesQVisible && phasesOuiEl && phasesOuiEl.value === 'oui')
-                        || typeCompet === 'tournoi'; // A5 forcé
+      // Phases par équipe (éditeur réel v1.27) : sous-types à phases
+      // (tournoi/Vié/inter-ligues/Seven) UNIQUEMENT — v1.28 source unique
+      // PHASES_SOUS_TYPES. Le plateau A4 n'a pas de phases.
+      const phasesOui = (PHASES_SOUS_TYPES.indexOf(typeCompet) !== -1);
 
       if (phasesOui) {
         // v1.27 — Lecture RÉELLE de l'éditeur de phases (plus de phase
@@ -5339,7 +5398,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init v1.27 (S3 · éditeur de phases à la création)');
+    console.log('🏉 MOM Hub · Évènements Browser — init v1.28 (S3 · phases 4 sous-types + anti-doublon adv)');
 
     const list = document.getElementById('evt-list');
 
@@ -5413,7 +5472,7 @@
     closeFiche:        closeFiche
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.27 (S3 · éditeur de phases à la création) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.28 (S3 · phases 4 sous-types + anti-doublon adv) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
