@@ -1,18 +1,16 @@
 -- ============================================================
--- FIX — get_evenements_a_venir : évènements multi-équipes visibles
+-- FIX v6 — get_evenements_a_venir : tournoi multi-équipes COMPLET
 -- ============================================================
--- Bug terrain : un tournoi/plateau (évènement RACINE multi-équipes)
--- a e.equipe_id = NULL (les équipes vivent dans la table d'engagement
--- evenement_equipes_engagees / M3, pas sur la ligne racine). Le filtre
--- « AND (p_equipe_id IS NULL OR e.equipe_id = p_equipe_id) » excluait
--- donc tous les évènements multi-équipes quand l'app passe un
--- p_equipe_id (= UUID de SAR/MOM-M14-1). Résultat : entraînements
--- (equipe_id direct) visibles, compétitions multi-équipes invisibles.
+-- v5 (rappel) : un tournoi racine (e.equipe_id NULL) était exclu car le
+-- filtre testait e.equipe_id = p_equipe_id → ajout EXISTS sur M3.
 --
--- Fix : garder l'évènement si l'équipe est rattachée DIRECTEMENT
--- (e.equipe_id) OU si elle figure dans les équipes ENGAGÉES (M3).
--- WHERE booléen (pas de JOIN) → aucun doublon possible.
--- Seule la clause de filtre équipe change ; reste identique.
+-- v6 : les MATCHS d'un tournoi sont des petits-enfants (racine→phase→
+-- match). Ceux de l'équipe 2 (equipe_id=M14-2) n'étaient pas chargés
+-- quand l'app filtre sur M14-1 → la fiche ne montrait pas leurs matchs.
+-- Ajout d'une branche : charger tout descendant (phase ou match) dont la
+-- RACINE (jusqu'à 2 niveaux au-dessus) porte l'engagement de l'équipe.
+-- Charge ainsi les matchs des DEUX équipes engagées.
+-- Seule la clause de filtre équipe change.
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION public.get_evenements_a_venir(p_equipe_id uuid DEFAULT NULL::uuid, p_jours_a_venir integer DEFAULT 30)
@@ -62,10 +60,25 @@ AS $function$
     AND (
       p_equipe_id IS NULL
       OR e.equipe_id = p_equipe_id
+      -- équipe engagée directement sur CET évènement (racine multi-équipes)
       OR EXISTS (
         SELECT 1 FROM evenement_equipes_engagees m3
         WHERE m3.evenement_id = e.id
           AND m3.equipe_id = p_equipe_id
+      )
+      -- v6 — descendant (phase ou match) d'un tournoi où l'équipe est
+      -- engagée : on remonte jusqu'à 2 niveaux (match→phase→racine) et on
+      -- garde si la racine porte l'engagement. Charge ainsi les matchs des
+      -- DEUX équipes engagées (M14-1 ET M14-2), pas seulement equipe_id=p.
+      OR EXISTS (
+        SELECT 1
+        FROM evenements parent
+        JOIN evenement_equipes_engagees m3r ON m3r.evenement_id = parent.id
+        WHERE m3r.equipe_id = p_equipe_id
+          AND parent.id IN (
+            e.evenement_parent_id,
+            (SELECT pp.evenement_parent_id FROM evenements pp WHERE pp.id = e.evenement_parent_id)
+          )
       )
     )
   ORDER BY e.date_debut ASC;
