@@ -20,6 +20,9 @@
     .gb-head h2 { margin: 0 0 4px; font-size: 22px; }
     .gb-head .gb-sub { font-size: 13px; color: var(--ink-mute); }
     .gb-head .gb-sub + .gb-sub { margin-top: 2px; }
+    /* Barre de navigation du parcours (← fiche / compo →) */
+    .gb-parcours { display: flex; }
+    .gb-parcours a { text-decoration: none; }
 
     .gb-error {
       display: none; margin: 16px 0; padding: 14px 16px;
@@ -146,6 +149,10 @@
   <main class="gb-layout">
 
     <div class="gb-head">
+      <nav class="gb-parcours" id="gb-parcours" aria-label="Navigation du parcours" style="display:none; gap:10px; align-items:center; margin-bottom:10px;">
+        <a id="gb-nav-fiche" class="gb-btn" href="#" title="Retour à la fiche de l'évènement">← Fiche évènement</a>
+        <a id="gb-nav-compo" class="gb-btn" href="#" title="Aller aux compositions de cette équipe" style="margin-left:auto;">Compositions →</a>
+      </nav>
       <h2 id="gb-title">Groupe de base…</h2>
       <div class="gb-sub" id="gb-sub-plateau">Chargement…</div>
       <div class="gb-sub" id="gb-sub-collectif"></div>
