@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.35 — Match officiel/amical à 2+ équipes → comportement plateau (30 mai 2026)
+ * Version : 1.36 — Match officiel/amical à 2+ équipes : 1 adversaire par équipe (pas plateau) (31 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -1159,6 +1159,26 @@
  *          updateCreateConditionalFields + hook change, hors fonctions
  *          invariantes). Provenance md5 : v1.34 (436de799) → v1.35 (recollé
  *          après écriture, joint).
+ *
+ *   v1.36 : Match officiel/amical à 2+ équipes : 1 SEUL adversaire par
+ *          équipe (correction d'une sur-assimilation au plateau en v1.35).
+ *          Un match officiel/amical ≠ plateau : chacune de nos équipes a
+ *          UN adversaire programmé, pas une poule. buildAdvParEquipeLines
+ *          gagne un paramètre plateauMode : true (type='plateau') → poule
+ *          (multi-adversaires + nom de poule, v1.34) ; false (match_*
+ *          multi-équipes) → un seul champ adversaire par équipe, NI bouton
+ *          « + Adversaire » NI champ poule. updateMultiEquipesUI passe
+ *          sousType==='plateau'. Les deux variantes gardent
+ *          .evt-eng-adv-input + data-equipe-id → submitModalCreate lit sans
+ *          changement (variante match = 1 input, pas de .evt-eng-poule-input
+ *          → pas de notes). bindAdvEditor (boutons) appelé seulement en
+ *          variante plateau. Le basculement A3↔A4 selon le nombre d'équipes
+ *          (v1.35) est conservé.
+ *
+ *          ZÉRO SQL, RPC inchangée, evenements.html + supabase-client.js
+ *          NON touchés. Invariants byte-identiques (buildAdvParEquipeLines
+ *          hors fonctions invariantes suivies). Provenance md5 : v1.35
+ *          (39c5b6a0) → v1.36 (recollé après écriture, joint).
  */
 
 (function () {
@@ -3999,10 +4019,11 @@
       formatParEq.style.display = 'none';
     }
 
-    // Adv par équipe : peuplé si la zone est VISIBLE (A4 plateau seul,
-    // v1.28) et au moins 1 équipe cochée. Gouverné par le display réel.
+    // Adv par équipe : peuplé si la zone est VISIBLE (A4) et >= 1 équipe.
+    // v1.36 — variante selon le sous-type : 'plateau' = poule (multi-adv),
+    // sinon (match_championnat/match_amical multi-équipes) = 1 adv/équipe.
     if (advParEq && advParEq.style.display !== 'none' && nbCoches >= 1) {
-      buildAdvParEquipeLines(cbList);
+      buildAdvParEquipeLines(cbList, sousType === 'plateau');
     }
 
     // Phases par équipe : peuplé si la zone est VISIBLE (A5 tournoi seul,
@@ -4175,28 +4196,52 @@
    * changement RPC/schéma (option UI). Départ : 1 ligne adversaire vide.
    * Délégation des boutons : bindAdvEditor (posée 1×).
    */
-  function buildAdvParEquipeLines(checkedCbs) {
+  /**
+   * Bloc 8d — Adversaires par équipe (mode A4). v1.36 — DEUX variantes,
+   * car « match officiel/amical à 2 équipes » ≠ « plateau » (correction
+   * terrain) :
+   *   • plateauMode=true  (type_competition='plateau') : chaque équipe
+   *     rencontre PLUSIEURS adversaires (poule) → champ « Nom de poule »
+   *     (opt.) + LISTE d'adversaires empilables (« + Adversaire ») [v1.34].
+   *   • plateauMode=false (match_championnat/match_amical à 2+ équipes) :
+   *     chacune de nos équipes a UN SEUL adversaire programmé → un seul
+   *     champ par équipe, NI bouton « + Adversaire » NI nom de poule.
+   * Les deux variantes utilisent .evt-eng-adv-input + data-equipe-id sur
+   * .evt-eng-adv-row → submitModalCreate lit sans changement (variante
+   * match = 1 input/équipe, pas de .evt-eng-poule-input → pas de notes).
+   */
+  function buildAdvParEquipeLines(checkedCbs, plateauMode) {
     const wrap = document.getElementById('evt-create-adv-par-equipe-lines');
     if (!wrap) return;
+    const isPlateau = (plateauMode !== false);  // défaut = plateau (rétro-compat)
     const html = Array.prototype.map.call(checkedCbs, function (cb) {
       const equipeId = cb.value;
       const equipeLabel = cb.parentElement ? cb.parentElement.textContent.trim() : equipeId;
+      if (isPlateau) {
+        return '<div class="evt-eng-adv-row" data-equipe-id="' + escHtml(equipeId) + '" '
+          + 'style="margin-bottom:14px;">'
+          + '<div class="evt-eng-adv-head" '
+            + 'style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">'
+            + '<span class="evt-eng-adv-label">' + escHtml(equipeLabel) + '</span>'
+            + '<input type="text" class="evt-form-input evt-eng-poule-input" '
+            + 'placeholder="Nom de poule (opt.)" '
+            + 'style="max-width:200px; margin-left:auto;">'
+          + '</div>'
+          + '<div class="evt-eng-adv-list">' + _advRowHtml(1) + '</div>'
+          + '<button type="button" class="evt-eng-btn" data-action="add-adv" '
+            + 'style="margin-top:6px;">+ Adversaire</button>'
+          + '</div>';
+      }
+      // Variante MATCH simple : un seul adversaire par équipe.
       return '<div class="evt-eng-adv-row" data-equipe-id="' + escHtml(equipeId) + '" '
-        + 'style="margin-bottom:14px;">'
-        + '<div class="evt-eng-adv-head" '
-          + 'style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">'
-          + '<span class="evt-eng-adv-label">' + escHtml(equipeLabel) + '</span>'
-          + '<input type="text" class="evt-form-input evt-eng-poule-input" '
-          + 'placeholder="Nom de poule (opt.)" '
-          + 'style="max-width:200px; margin-left:auto;">'
-        + '</div>'
-        + '<div class="evt-eng-adv-list">' + _advRowHtml(1) + '</div>'
-        + '<button type="button" class="evt-eng-btn" data-action="add-adv" '
-          + 'style="margin-top:6px;">+ Adversaire</button>'
+        + 'style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">'
+        + '<span class="evt-eng-adv-label">' + escHtml(equipeLabel) + '</span>'
+        + '<input type="text" class="evt-form-input evt-eng-adv-input" '
+        + 'placeholder="Adversaire (opt.)" style="flex:1 1 auto;">'
         + '</div>';
     }).join('');
     wrap.innerHTML = html;
-    bindAdvEditor();
+    if (isPlateau) bindAdvEditor();
   }
 
   /**
@@ -4972,10 +5017,12 @@
         if (isA3 && adversaire) {
           advs.push({ adversaire_nom: adversaire, ordre: 1 });
         } else if (PHASES_SOUS_TYPES.indexOf(typeCompet) === -1) {
-          // v1.34 — plateau A4 : LISTE d'adversaires (poule), plus un seul.
-          // On lit tous les .evt-eng-adv-input de la ligne de l'équipe ;
-          // ordre incrémental sur les non-vides. Le nom de poule (opt.)
-          // va dans eng.notes (M3) — pas de colonne dédiée en base.
+          // v1.36 — A4 : lecture robuste aux DEUX variantes (plateau =
+          // N adversaires + poule ; match officiel/amical multi-équipes =
+          // 1 adversaire/équipe, pas de poule). On lit tous les
+          // .evt-eng-adv-input (1 ou N) ; ordre incrémental sur les non-
+          // vides. Le nom de poule (.evt-eng-poule-input, absent en variante
+          // match → null) va dans eng.notes (M3) — pas de colonne dédiée.
           const advRow = document.querySelector(
             '#evt-create-adv-par-equipe-lines .evt-eng-adv-row[data-equipe-id="' + eqId + '"]');
           if (advRow) {
@@ -5776,7 +5823,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init v1.35 (S3 · match 2+ equipes = plateau)');
+    console.log('🏉 MOM Hub · Évènements Browser — init v1.36 (S3 · match 2+ eq = 1 adv par equipe)');
 
     const list = document.getElementById('evt-list');
 
@@ -5850,7 +5897,7 @@
     closeFiche:        closeFiche
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.35 (S3 · match 2+ equipes = plateau) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.36 (S3 · match 2+ eq = 1 adv par equipe) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
