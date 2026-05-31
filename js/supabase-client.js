@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.35 — mai 2026
+ * Version : 1.36 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -925,6 +925,15 @@
  *              virgule ajoutée à sa ligne ; aucun autre mapping muté),
  *          + console.log boot 1.34 → 1.35.
  *          Aucune autre signature/call-site modifié. node --check OK.
+ *
+ *   v1.36 : listStaffDisponibles(categorieId) — param optionnel transmis à
+ *          la RPC list_staff_disponibles v2 (p_categorie_id). Fourni →
+ *          staff de la catégorie (fonction active fonction_staff) ; absent/
+ *          null → tout le staff (inchangé). Sortie {personne_id,nom,prenom}
+ *          inchangée. Va de pair avec evenements-browser v1.46 (case
+ *          « Afficher tout le staff »). ADDITION : signature élargie (1 arg
+ *          optionnel) + passage p_categorie_id au rpc() ; + console.log boot
+ *          1.35 → 1.36. node --check OK.
  */
 
 (function (global) {
@@ -5199,8 +5208,13 @@
      *   nom/prenom ; [] si erreur (dégradation honnête, miroir
      *   listJoueursCategorieEntente).
      */
-    async listStaffDisponibles() {
-      const { data, error } = await client.rpc('list_staff_disponibles');
+    async listStaffDisponibles(categorieId) {
+      // v1.36 — param categorieId optionnel transmis à la RPC v2
+      // (p_categorie_id). Fourni → staff de la catégorie (fonction active) ;
+      // absent/null → tout le staff du club (inchangé).
+      const { data, error } = await client.rpc('list_staff_disponibles', {
+        p_categorie_id: categorieId || null
+      });
       if (error) {
         console.error('MOM Hub: listStaffDisponibles()', error);
         return [];
@@ -5226,7 +5240,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.35 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.36 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
