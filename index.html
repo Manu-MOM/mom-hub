@@ -796,7 +796,12 @@
             <div class="tool-status on">Disponible</div>
           </div>
           <!-- 2.3 — Compos (renommé de Compositions, DISPONIBLE) -->
-          <div class="tool" onclick="location.href='compositions.html'" role="link" tabindex="0" title="Ouvrir l'éditeur de compositions">
+          <!-- P1 : la tuile mène à la liste « mes évènements avec compos »
+               (mes-compos.html), pas directement à l'éditeur. L'éditeur
+               sans évènement (compositions.html mode legacy) n'affichait
+               pas les feuilles créées via un évènement — la liste est la
+               porte saine, chaque ligne ouvre la feuille via ?evenement_equipe. -->
+          <div class="tool" onclick="location.href='mes-compos.html'" role="link" tabindex="0" title="Voir mes compositions">
             <div class="tool-top">
               <div class="tool-icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0-3-3.87"/></svg></div>
               <div>
@@ -1023,7 +1028,7 @@
         </div>
         <ul class="sb-shortcuts">
           <li><a>Annuaire complet</a></li>
-          <li><a href="compositions.html">Éditeur de compositions</a></li>
+          <li><a href="mes-compos.html">Mes compositions</a></li>
           <li><a href="bibliotheque.html">Bibliothèque ateliers</a></li>
         </ul>
       </div>
