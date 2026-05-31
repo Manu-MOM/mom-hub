@@ -6,6 +6,22 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.13 — Fix état joueur dans compo de match (31 mai 2026)
+ *   v3.13 : FIX 6c-6 (recette terrain Manu) — un remplacement dans une compo
+ *           de match restait marqué « BASE » (couleur bleue) et le compteur
+ *           affichait « 0 modification vs base ». Cause : onPickJoueurPourSlot
+ *           ET onPickPostePourJoueur posaient etat_joueur:'base' EN DUR, quel
+ *           que soit le type de compo. Or dans une compo de match, un joueur
+ *           qu'on place/remplace est une modification vs la base. FIX : helper
+ *           etatJoueurPourCompoCourante() → 'modifie' si la compo sélectionnée
+ *           est type_compo==='match', sinon 'base'. Les 2 chemins de placement
+ *           l'utilisent. La copie initiale (duplicateCompoFromBase, etat='base')
+ *           reste correcte (joueurs hérités = base, compteur 0 à la création).
+ *           Valeur 'modifie' : reconnue par compteurs() (!=='base'),
+ *           cssClassEtatJoueur (etat-modifie = couleur « Modifié pour ce
+ *           match ») et libelleEtatJoueurCourt ('Modifié'). addJoueurCompo
+ *           l'accepte (pas de whitelist). node --check OK.
+ *
  * Version : 3.12 — Création de compo de MATCH (étape 6c-6) (31 mai 2026)
  *   v3.12 : CHANTIER 6c-6 — « préparer ses compos de match ». Le bouton « + »
  *           était un placeholder (alert « à brancher en étape 6c-6 ») : la
@@ -376,6 +392,18 @@
     return { titulaires, remplacants, modifs };
   }
   function cssClassEtatJoueur(etat) { return 'etat-' + (etat || 'base'); }
+  // v3.13 (6c-6 fix) — état par défaut d'un joueur qu'on place MAINTENANT,
+  // selon le type de la compo courante : dans une compo de MATCH, tout joueur
+  // ajouté/remplacé est une modification par rapport à la base → 'modifie'
+  // (coloré « Modifié pour ce match », compté dans « N modifications vs base »).
+  // Dans la compo de base (ou hors contexte), reste 'base'. Centralise la
+  // logique pour les 2 chemins de placement (onPickJoueurPourSlot +
+  // onPickPostePourJoueur), qui posaient 'base' en dur (bug : un remplacement
+  // dans une compo de match restait marqué BASE, compteur à 0).
+  function etatJoueurPourCompoCourante() {
+    const compo = State.compos.find(c => c.id === State.selectedCompoId);
+    return (compo && compo.type_compo === 'match') ? 'modifie' : 'base';
+  }
   function libelleEtatJoueurCourt(etat) {
     if (etat === 'base')        return 'Base';
     if (etat === 'modifie')     return 'Modifié';
@@ -1318,7 +1346,7 @@
       composition_id: State.selectedCompoId,
       joueur_id: joueurId,
       role: pv.role || 'titulaire',
-      etat_joueur: 'base',
+      etat_joueur: etatJoueurPourCompoCourante(),
       est_depannage_hors_categorie: horsCat
     };
     if (pv.role === 'titulaire' && pv.posteId) {
@@ -1358,7 +1386,7 @@
     const params = {
       composition_id: State.selectedCompoId,
       joueur_id: pv.joueurId,
-      etat_joueur: 'base',
+      etat_joueur: etatJoueurPourCompoCourante(),
       est_depannage_hors_categorie: horsCat
     };
     if (posteId) {
@@ -1649,7 +1677,7 @@
     bindPopoverOutsideClick();
 
     console.log(
-      '%c🏉 Compositions Editor v3.12 chargé',
+      '%c🏉 Compositions Editor v3.13 chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         evenements: State.evenements.length,
