@@ -40,6 +40,15 @@
     }
     .event-banner__btn:hover .event-banner__label { color: var(--vert-prairie); }
     .event-banner__btn::after { content: '▾'; color: var(--ink-mute); font-size: 12px; margin-left: 6px; }
+    /* v3.14 (P2) — Mode U-N3 : l'évènement est fixé par l'URL, le bouton
+       n'est plus un sélecteur cliquable. On le neutralise (pas de ▾, pas de
+       hover, pas de curseur) MAIS on le laisse affiché pour que le type +
+       le titre + le lieu restent VISIBLES (fix « aucune réf évènement » quand
+       on arrive depuis un évènement). Le legacy ne porte jamais cette classe
+       → apparence/comportement bouton strictement inchangés. */
+    .event-banner__btn--static { cursor: default; }
+    .event-banner__btn--static::after { content: none; }
+    .event-banner__btn--static:hover .event-banner__label { color: var(--ink); }
     .event-banner__type {
       font-family: 'Oswald', sans-serif; font-size: 13px; font-weight: 600;
       letter-spacing: 0.08em; text-transform: uppercase;
