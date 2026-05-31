@@ -6,6 +6,35 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.12 — Création de compo de MATCH (étape 6c-6) (31 mai 2026)
+ *   v3.12 : CHANTIER 6c-6 — « préparer ses compos de match ». Le bouton « + »
+ *           était un placeholder (alert « à brancher en étape 6c-6 ») : la
+ *           création de compo de match n'existait pas. Implémenté en 4 briques.
+ *           Décisions actées avec Manu :
+ *           • Onglets pré-générés depuis les matchs saisis de l'équipe (option
+ *             A : TOUS les matchs en onglets d'emblée, même sans compo) ;
+ *             regroupés par phase SI plus d'une phase ; + un « + » pour une
+ *             compo libre (brouillon).
+ *           • Compo de match = COPIE de la base, puis ajustée
+ *             (duplicateCompoFromBase, wrapper existant).
+ *           • Option α (preuve : aucune contrainte evenement_id=racine ; la
+ *             ligne ~511 cherchait déjà l'évènement de m.evenement_id) : la
+ *             compo de match porte evenement_id = LE MATCH (pas la racine).
+ *             Pas de migration schéma.
+ *           Briques : (0) wrapper supabase-client listMatchsDeLequipe(racine,
+ *           equipe) [2 niveaux sous racine, filtre equipe_id + adversaire] ;
+ *           (1) loadComposForCurrentEvent charge State.matchsDeLequipe et
+ *           reconnaît les compos de match par compo_base_origine_id===base.id
+ *           SEUL (l'ancien filtre evenement_id===racine, faux en α, est retiré) ;
+ *           (2) renderCompoTabs réécrit : [Base] + onglets matchs (par phase si
+ *           >1), appariés à leur compo via compo.evenement_id===match.id, état
+ *           vide (--todo, clic=créer) vs composé (clic=ouvrir), + « + » libre ;
+ *           (3) onCreateMatchCompo(matchId) : garde isCreatingMatch, ouvre si
+ *           déjà composé sinon duplicateCompoFromBase(base.id, matchId||racine).
+ *           Mode legacy (sans équipe engagée) PRÉSERVÉ (branche else onglets
+ *           bruts). CSS compositions.html : --todo, __phase, flex-wrap.
+ *           node --check OK.
+ *
  * Version : 3.11 — Barre de parcours (← Fiche / ← Groupe de base) (31 mai 2026)
  *   v3.11 : NAVIGATION du parcours. Ajout d'une barre #compo-parcours en
  *           haut de page (HTML + CSS compo-parcours__link), avec deux liens
@@ -223,6 +252,7 @@
     // ────────────────────────────────────────────────────────
     evenementEquipeId: null,            // UUID si ?evenement_equipe=… (URL)
     evenementEquipeContext: null,       // résultat getEvenementEquipeContext
+    matchsDeLequipe: [],                // v3.12 (6c-6) matchs de l'équipe (onglets)
     includeHorsGroupe: false,           // toggle UN3-3 (repli hors-groupe)
     groupeIds: new Set(),               // cache personne_id du groupe N2
     // ────────────────────────────────────────────────────────
@@ -232,7 +262,8 @@
     // INSERT concurrent (cf. fix recette terrain 20/05). Mode legacy
     // ET U-N3 protégés (le bug guettait aussi en legacy).
     // ────────────────────────────────────────────────────────
-    isCreatingBase: false
+    isCreatingBase: false,
+    isCreatingMatch: false
   };
 
   // ============================================================
@@ -501,25 +532,88 @@
     }
     container.appendChild(baseTab);
 
-    const compoMatchs = State.compos.filter(c => c.type_compo === 'match')
-      .sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
-    for (const m of compoMatchs) {
-      const tab = document.createElement('button');
-      tab.type = 'button';
-      tab.className = 'compo-tabs__tab';
-      if (m.id === State.selectedCompoId) tab.classList.add('is-active');
-      tab.textContent = libelleEvenement(State.evenements.find(e => e.id === m.evenement_id)) || 'Match';
-      tab.addEventListener('click', function () { selectCompo(m.id); });
-      container.appendChild(tab);
+    // v3.12 (6c-6) — ONGLETS PAR MATCH. En mode U-N3 (équipe engagée), on
+    // affiche TOUS les matchs de l'équipe (State.matchsDeLequipe) en onglets,
+    // même sans compo encore (option A actée). Chaque match est apparié à sa
+    // compo éventuelle via compo.evenement_id === match.id (option α). Clic :
+    //   - match SANS compo → crée la compo (copie de la base) puis l'ouvre ;
+    //   - match AVEC compo → ouvre la compo.
+    // Regroupés par phase SI plus d'une phase (sinon à la suite). Un bouton
+    // « + » final permet une compo de match « libre » (brouillon, hors match).
+    const compoMatchs = State.compos.filter(c => c.type_compo === 'match');
+    const compoParMatch = {};   // match.id -> compo
+    compoMatchs.forEach(function (c) { if (c.evenement_id) compoParMatch[c.evenement_id] = c; });
+
+    if (State.evenementEquipeId && Array.isArray(State.matchsDeLequipe)) {
+      const matchs = State.matchsDeLequipe;
+      const phases = [];
+      matchs.forEach(function (m) {
+        const p = m.phase_libelle || '';
+        if (phases.indexOf(p) === -1) phases.push(p);
+      });
+      const plusieursPhases = phases.filter(Boolean).length > 1;
+
+      const appendMatchTab = function (m) {
+        const compo = compoParMatch[m.id] || null;
+        const tab = document.createElement('button');
+        tab.type = 'button';
+        tab.className = 'compo-tabs__tab';
+        const libMatch = (m.adversaire_nom && m.adversaire_nom.trim())
+          ? ('vs ' + m.adversaire_nom.trim())
+          : (m.libelle || 'Match');
+        if (compo) {
+          if (compo.id === State.selectedCompoId) tab.classList.add('is-active');
+          tab.textContent = libMatch;
+          tab.title = 'Compo de match : ' + libMatch;
+          tab.addEventListener('click', function () { selectCompo(compo.id); });
+        } else {
+          // Onglet « à faire » : style placeholder, clic = créer (copie base)
+          tab.classList.add('compo-tabs__tab--todo');
+          tab.textContent = libMatch;
+          tab.title = compoBase
+            ? 'Créer la compo de ce match (copie de la base)'
+            : "Crée d'abord la compo de base";
+          tab.disabled = !compoBase;
+          tab.addEventListener('click', function () { onCreateMatchCompo(m.id); });
+        }
+        container.appendChild(tab);
+      };
+
+      if (plusieursPhases) {
+        phases.forEach(function (p) {
+          if (p) {
+            const sep = document.createElement('span');
+            sep.className = 'compo-tabs__phase';
+            sep.textContent = p;
+            container.appendChild(sep);
+          }
+          matchs.filter(function (m) { return (m.phase_libelle || '') === p; })
+                .forEach(appendMatchTab);
+        });
+      } else {
+        matchs.forEach(appendMatchTab);
+      }
+    } else {
+      // Mode legacy (pas d'équipe engagée) : onglets compos de match bruts
+      compoMatchs.sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
+      for (const m of compoMatchs) {
+        const tab = document.createElement('button');
+        tab.type = 'button';
+        tab.className = 'compo-tabs__tab';
+        if (m.id === State.selectedCompoId) tab.classList.add('is-active');
+        tab.textContent = libelleEvenement(State.evenements.find(e => e.id === m.evenement_id)) || 'Match';
+        tab.addEventListener('click', function () { selectCompo(m.id); });
+        container.appendChild(tab);
+      }
     }
 
     const addTab = document.createElement('button');
     addTab.type = 'button';
     addTab.className = 'compo-tabs__tab compo-tabs__tab--add';
     addTab.textContent = '+';
-    addTab.title = compoBase ? 'Créer une compo de match dérivée de la base' : "Crée d'abord une compo de base";
+    addTab.title = compoBase ? 'Créer une compo de match libre (brouillon, hors match planifié)' : "Crée d'abord une compo de base";
     addTab.disabled = !compoBase;
-    addTab.addEventListener('click', function () { alert('Création de compo de match : à brancher en étape 6c-6'); });
+    addTab.addEventListener('click', function () { onCreateMatchCompo(null); });
     container.appendChild(addTab);
   }
 
@@ -1165,6 +1259,48 @@
     }
   }
 
+  // v3.12 (6c-6) — Crée une compo de MATCH par duplication de la base.
+  //   matchId fourni  → compo rattachée à ce match (evenement_id = matchId,
+  //                     option α). Cas onglet « à faire ».
+  //   matchId === null → compo « libre » (brouillon) rattachée à la racine
+  //                     (bouton « + »). Pas de match précis.
+  // Garde anti-double-clic (State.isCreatingMatch + try/finally), patron
+  // identique à onCreateBaseClick. Après succès : recharge, sélectionne la
+  // nouvelle compo, re-rend.
+  async function onCreateMatchCompo(matchId) {
+    if (State.isCreatingMatch) return;
+    const base = State.compos.find(c => c.type_compo === 'base');
+    if (!base) { alert('Crée d\'abord la compo de base.'); return; }
+    // Si ce match a DÉJÀ une compo, on l'ouvre au lieu d'en recréer une.
+    if (matchId) {
+      const existante = State.compos.find(
+        c => c.type_compo === 'match' && c.evenement_id === matchId
+      );
+      if (existante) { selectCompo(existante.id); return; }
+    }
+    State.isCreatingMatch = true;
+    try {
+      // evenement_id de la nouvelle compo : le match (α) ou la racine (libre).
+      const cibleEvenementId = matchId || State.selectedEvenementId;
+      const r = await SupabaseHub.duplicateCompoFromBase(base.id, cibleEvenementId);
+      if (!r || !r.ok) {
+        alert('Erreur création compo de match : ' + ((r && r.error) || 'inconnue'));
+        return;
+      }
+      await loadComposForCurrentEvent();
+      const newId = r.data && r.data.compo && r.data.compo.id;
+      if (newId) State.selectedCompoId = newId;
+      await loadCompoJoueurs();
+      renderEventBanner();
+      renderCompoTabs();
+      renderFillIndicator();
+      renderEditorArea();
+      renderEffectifPanel();
+    } finally {
+      State.isCreatingMatch = false;
+    }
+  }
+
   async function onPickJoueurPourSlot(joueurId) {
     const pv = State.popover;
     if (!pv) return;
@@ -1342,14 +1478,26 @@
       if (!base) {
         State.compos = [];
         State.selectedCompoId = null;
+        State.matchsDeLequipe = [];
         return;
       }
-      // matchs dérivés de cette base : remontée par compo_base_origine_id
+      // v3.12 (6c-6) — charge les MATCHS de cette équipe dans le tournoi
+      // (pour les onglets). Racine = evenement de la base ; equipe via ctx.
+      const racineId = State.selectedEvenementId;
+      const equipeId = State.evenementEquipeContext
+                    && State.evenementEquipeContext.equipe
+                    && State.evenementEquipeContext.equipe.id;
+      State.matchsDeLequipe = (racineId && equipeId)
+        ? await SupabaseHub.listMatchsDeLequipe(racineId, equipeId)
+        : [];
+      // v3.12 (6c-6, option α) — les compos de MATCH dérivées de cette base
+      // sont reconnues par compo_base_origine_id === base.id (lien robuste).
+      // Leur evenement_id pointe vers le MATCH (plus la racine) → on NE filtre
+      // PLUS par evenement_id === racine (ancien filtre v3.8 devenu faux en α).
       const all = await SupabaseHub.listCompositionsByEquipe(M14_TEAM_UUID);
       const matchsDeLaBase = (all || []).filter(
         c => c.type_compo === 'match' &&
-             c.compo_base_origine_id === base.id &&
-             c.evenement_id === State.selectedEvenementId
+             c.compo_base_origine_id === base.id
       );
       State.compos = [base].concat(matchsDeLaBase);
       State.selectedCompoId = base.id;
@@ -1501,7 +1649,7 @@
     bindPopoverOutsideClick();
 
     console.log(
-      '%c🏉 Compositions Editor v3.10 chargé',
+      '%c🏉 Compositions Editor v3.12 chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         evenements: State.evenements.length,
