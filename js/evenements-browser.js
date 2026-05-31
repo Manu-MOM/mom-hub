@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.48 — Fix pre-remplissage edition : equipes deduites des phases + attente active (31 mai 2026)
+ * Version : 1.49 — Fiche : retrait du resume Encadrement inline (Option B, anti-redondance avec la carte fonctionnelle) (31 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -1410,6 +1410,17 @@
  *          buildPhasesParEquipeList + buildAffectationsN2Lines byte-
  *          identiques. Provenance md5 : v1.47 (98ca6ff1) → v1.48 (recollé
  *          après écriture, joint).
+ *
+ *   v1.49 : FICHE anti-redondance encadrement (Option B « sobriété »). Le
+ *          résumé inline « Encadrement : Prénom N., … » du bloc Niveau 2 est
+ *          RETIRÉ de renderFiche : il dupliquait la carte fonctionnelle
+ *          « Encadrement » (renderFonctionCellule sectionId='encadrement')
+ *          qui liste déjà les encadrants au dépliage. L'encadrement devient
+ *          une fonction comme les autres (cohérent avec Compositions/Suivi).
+ *          La variable encadrants reste utilisée par la carte (inchangée).
+ *          ZÉRO SQL, supabase-client + HTML NON touchés. buildPhasesParEquipe-
+ *          List + buildAffectationsN2Lines byte-identiques. Provenance md5 :
+ *          v1.48 (a599fd76) → v1.49 (recollé après écriture, joint).
  */
 
 (function () {
@@ -3026,24 +3037,11 @@
       html += '</div>';
     }
 
-    // ENCADREMENT (résumé inline « Prénom N. »)
-    if (encadrants.length > 0) {
-      const noms = encadrants.map(function (enc) {
-        const prenom = enc.prenom || '';
-        const nom = enc.nom || '';
-        if (prenom && nom) return prenom + ' ' + nom.charAt(0) + '.';
-        return prenom || nom || '(sans nom)';
-      });
-      html += '<div class="evt-fiche-n2-cellule">';
-      html += '<div class="evt-fiche-n2-label">Encadrement</div>';
-      html += '<div class="evt-fiche-n2-value">' + noms.map(escHtml).join(', ') + '</div>';
-      html += '</div>';
-    } else {
-      html += '<div class="evt-fiche-n2-cellule">';
-      html += '<div class="evt-fiche-n2-label">Encadrement</div>';
-      html += '<div class="evt-fiche-n2-value evt-fiche-n2-empty">— aucun encadrant rattaché</div>';
-      html += '</div>';
-    }
+    // ENCADREMENT : le résumé inline « Prénom N. » a été RETIRÉ du Niveau 2
+    // (redondant avec la carte fonctionnelle « 🧑‍🏫 Encadrement » plus bas, qui
+    // liste déjà les encadrants au dépliage). Choix « sobriété » : l'encadrement
+    // est une fonction comme les autres (Compositions, Suivi…), pas un champ de
+    // résumé. Voir renderFonctionCellule sectionId='encadrement'.
 
     // NOTES (champ notes_internes existant, absorbé Niveau 2)
     if (evt.notes_internes) {
@@ -6426,7 +6424,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init v1.48 (S3 · fix prefill edition)');
+    console.log('🏉 MOM Hub · Évènements Browser — init v1.49 (S3 · fiche anti-redondance encadrement)');
 
     const list = document.getElementById('evt-list');
 
@@ -6500,7 +6498,7 @@
     closeFiche:        closeFiche
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.48 (S3 · fix prefill edition) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.49 (S3 · fiche anti-redondance encadrement) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
