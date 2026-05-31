@@ -1686,17 +1686,18 @@
         <label class="evt-filter-label" for="evt-soustype-select">Sous-type :</label>
         <select class="evt-form-select" id="evt-soustype-select"
                 style="max-width:280px; flex:0 1 auto;">
+          <!-- v3.1 — Filtre aligné sur les 4 MÉCANIQUES (cohérent avec la
+               création réduite). Les anciennes appellations (Vié, inter-
+               ligues, Seven, championnat phase 1/2/finales) ne sont plus
+               des options de filtre : les évènements qui les portent en
+               base restent VISIBLES sous « Tous sous-types » (et via la
+               recherche texte), simplement plus filtrables par sous-type
+               fin. Choix terrain assumé (33 évènements, recherche dispo). -->
           <option value="all" selected>Tous sous-types</option>
-          <option value="match_championnat">Match de championnat</option>
-          <option value="championnat_phase_1">Championnat phase 1</option>
-          <option value="championnat_phase_2">Championnat phase 2</option>
-          <option value="championnat_phases_finales">Championnat phases finales</option>
+          <option value="match_championnat">Match officiel</option>
           <option value="match_amical">Match amical</option>
           <option value="plateau">Plateau</option>
-          <option value="tournoi">Tournoi</option>
-          <option value="challenge_vie">Challenge Vié</option>
-          <option value="challenge_inter_ligues">Challenge Inter-Ligues</option>
-          <option value="seven">Seven</option>
+          <option value="tournoi">Tournoi multi-phases</option>
         </select>
       </div>
 
