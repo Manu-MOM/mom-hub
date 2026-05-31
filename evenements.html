@@ -1799,22 +1799,28 @@
         <!-- ====================================================
              BLOC 3 — Sous-type compétition (visible uniquement si
              type_evenement=competition, déterminera A3/A4/A5).
-             Aligné CHECK evenements_competition_check (10 sous-types).
+             v3.1 — Refonte UI (retour terrain) : CRÉATION réduite à
+             4 MÉCANIQUES parlantes. Les appellations fines (Vié,
+             inter-ligues, Seven, championnat phase 1/2/finales) ne
+             sont plus des sous-types à la création → elles passent en
+             SUGGESTIONS du LIBELLÉ (datalist, écriture libre). La base
+             (CHECK evenements_competition_check, 10 valeurs) et les
+             dropdowns filtre + édition restent INCHANGÉS (anciens
+             évènements et ré-édition préservés). Mapping mécanique →
+             valeur base / comportement :
+               Match officiel       → match_championnat (A3 match simple)
+               Match amical          → match_amical       (A3 match simple)
+               Plateau               → plateau            (A4 multi-équipes)
+               Tournoi multi-phases  → tournoi            (A5 éditeur phases)
              ==================================================== -->
         <div class="evt-form-group" id="evt-create-compet-group" style="display:none;">
           <label class="evt-form-label required" for="evt-create-compet">Sous-type</label>
           <select class="evt-form-select" id="evt-create-compet" name="type_competition">
             <option value="">— Choisir —</option>
-            <option value="match_championnat">Match de championnat</option>
-            <option value="championnat_phase_1">Championnat phase 1</option>
-            <option value="championnat_phase_2">Championnat phase 2</option>
-            <option value="championnat_phases_finales">Championnat phases finales</option>
+            <option value="match_championnat">Match officiel</option>
             <option value="match_amical">Match amical</option>
             <option value="plateau">Plateau</option>
-            <option value="tournoi">Tournoi</option>
-            <option value="challenge_vie">Challenge Vié</option>
-            <option value="challenge_inter_ligues">Challenge Inter-Ligues</option>
-            <option value="seven">Seven</option>
+            <option value="tournoi">Tournoi multi-phases</option>
           </select>
         </div>
 
@@ -1825,7 +1831,22 @@
         <div class="evt-form-group">
           <label class="evt-form-label required" for="evt-create-libelle">Libellé</label>
           <input type="text" class="evt-form-input" id="evt-create-libelle" name="libelle"
+                 list="evt-create-libelle-suggestions"
                  placeholder="Ex : Entraînement M14 du mercredi (28/05)" required>
+          <!-- v3.1 — Suggestions d'appellation (retour terrain) : les
+               anciennes appellations sorties du dropdown sous-type
+               (Vié, inter-ligues, Seven, championnat phase 1/2/finales)
+               deviennent des PROPOSITIONS de libellé via <datalist>.
+               L'utilisateur peut choisir une suggestion OU écrire
+               librement (datalist n'est pas une contrainte). -->
+          <datalist id="evt-create-libelle-suggestions">
+            <option value="Challenge Vié"></option>
+            <option value="Challenge Inter-Ligues"></option>
+            <option value="Seven"></option>
+            <option value="Championnat phase 1"></option>
+            <option value="Championnat phase 2"></option>
+            <option value="Championnat phases finales"></option>
+          </datalist>
         </div>
 
         <div class="evt-form-group-row">
