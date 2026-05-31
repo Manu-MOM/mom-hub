@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.38 — Fiche/carte/suivi : detection tournoi via type_competition (phases enfin affichees) (31 mai 2026)
+ * Version : 1.39 — Fiche : matchs affiches sous chaque phase (hierarchie 3 niveaux) (31 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -1218,6 +1218,31 @@
  *          via le helper) ; buildPhasesParEquipeList + buildAffectationsN2Lines
  *          byte-identiques. Provenance md5 : v1.37 (7a52ff5c) → v1.38
  *          (recollé après écriture, joint).
+ *
+ *   v1.39 : Fiche — les MATCHS s'affichent sous chaque phase (hiérarchie
+ *          3 niveaux racine→phase→match). Bug terrain : la section « Phases
+ *          du tournoi » de la fiche itérait sur les enfants DIRECTS de la
+ *          racine (= les phase-boîtes) et les affichait comme s'ils étaient
+ *          des matchs → « (adv. à déterminer) » partout, jamais les vrais
+ *          matchs (vs Nord Alsace…), qui sont les enfants des phase-boîtes
+ *          (CHILDREN_BY_PARENT[phaseBox.id]), pas de la racine. Données
+ *          pourtant présentes ET chargées (8 matchs confirmés). Fix
+ *          (renderFiche, section #evt-phases-detail) : regroupement par
+ *          phase_libelle, et sous chaque phase on liste ses VRAIS matchs
+ *          via CHILDREN_BY_PARENT[phaseBox.id] ; fusion des matchs des 2
+ *          équipes partageant une même phase ; fallback structure 2 niveaux
+ *          (phase-boîte portant elle-même un adversaire) préservé.
+ *          ACCOMPAGNÉ d'un fix SQL v6 (get_evenements_a_venir/passes) qui
+ *          charge les descendants des DEUX équipes engagées (sinon les
+ *          matchs de M14-2 manquaient, equipe_id≠M14-1).
+ *          TRACÉ (non fait ici) : renderEnfantsTournoi (carte dépliée) +
+ *          renderSuiviSection ont la même hiérarchie 2-niveaux à corriger.
+ *
+ *          evenements.html + supabase-client.js NON touchés (le fix SQL
+ *          vit dans fix-get_evenements_*.sql, à réexécuter en base).
+ *          renderFiche MODIFIÉ (tracé) ; buildPhasesParEquipeList +
+ *          buildAffectationsN2Lines byte-identiques. Provenance md5 :
+ *          v1.38 (ad38da26) → v1.39 (recollé après écriture, joint).
  */
 
 (function () {
@@ -2918,18 +2943,42 @@
     //     Regroupement par phase identique v1.24 (structure préservée).
     // ────────────────────────────────────────────────
     if (isTournoi && enfants.length > 0) {
+      // v1.39 — FIX hiérarchie 3 niveaux : les enfants DIRECTS de la
+      // racine sont les PHASE-BOÎTES (libellé = nom de phase) ; les MATCHS
+      // (vs X) sont les enfants des phase-boîtes (CHILDREN_BY_PARENT[
+      // phaseBox.id]), pas de la racine. L'ancien code affichait les
+      // phase-boîtes elles-mêmes comme des matchs → « (adv. à déterminer) »
+      // partout. On regroupe désormais par phase, et sous chaque phase on
+      // liste ses VRAIS matchs. Une même phase peut venir de 2 équipes
+      // engagées (équipe_1 + équipe_2) → on fusionne par phase_libelle et
+      // on agrège leurs matchs respectifs.
       const phases = [];
-      const byPhase = {};
-      enfants.forEach(function (c) {
-        const p = c.phase_libelle || '(sans phase)';
-        if (!byPhase[p]) { byPhase[p] = []; phases.push(p); }
-        byPhase[p].push(c);
+      const matchsByPhase = {};
+      enfants.forEach(function (phaseBox) {
+        const p = phaseBox.phase_libelle || phaseBox.libelle || '(sans phase)';
+        if (!matchsByPhase[p]) { matchsByPhase[p] = []; phases.push(p); }
+        // Matchs = enfants de cette phase-boîte. Fallback : si la
+        // phase-boîte n'a pas d'enfants mais porte elle-même un
+        // adversaire (structure 2 niveaux), on la traite comme un match.
+        const matchsDeLaPhase = CHILDREN_BY_PARENT[phaseBox.id] || [];
+        if (matchsDeLaPhase.length > 0) {
+          matchsDeLaPhase.forEach(function (m) { matchsByPhase[p].push(m); });
+        } else if (phaseBox.adversaire_nom
+                   || (phaseBox.libelle || '').toLowerCase().indexOf('vs ') === 0) {
+          matchsByPhase[p].push(phaseBox);
+        }
       });
       html += '<div class="evt-fiche-section" id="evt-phases-detail">';
       html += '<div class="evt-fiche-section-title">📋 Phases du tournoi (détail)</div>';
       phases.forEach(function (phaseName) {
         html += '<div class="evt-fiche-phase-titre">📍 ' + escHtml(phaseName) + '</div>';
-        byPhase[phaseName].forEach(function (child) {
+        const matchs = matchsByPhase[phaseName];
+        if (!matchs || matchs.length === 0) {
+          html += '<div class="evt-fiche-phase-row"><span style="flex:1;">'
+            + '<em style="color:var(--ink-mute)">(aucun match)</em></span></div>';
+          return;
+        }
+        matchs.forEach(function (child) {
           const heure = formatHeureOnly(child.date_debut);
           const childBadge = statutCompoBadge(child.compo_status_summary);
           const childLibStartsVs = (child.libelle || '').toLowerCase().indexOf('vs ') === 0;
@@ -5871,7 +5920,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init v1.38 (S3 · detection tournoi corrigee)');
+    console.log('🏉 MOM Hub · Évènements Browser — init v1.39 (S3 · matchs sous phases)');
 
     const list = document.getElementById('evt-list');
 
@@ -5945,7 +5994,7 @@
     closeFiche:        closeFiche
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.38 (S3 · detection tournoi corrigee) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.39 (S3 · matchs sous phases) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
