@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.53 — Fiche : bouton Retour au calendrier retire partout (redondant avec la croix) (31 mai 2026)
+ * Version : 1.54 — Deep-link fiche : ?fiche=<id> ouvre la fiche au chargement (retour depuis Groupe de base / Compositions) (31 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -1475,6 +1475,17 @@
  *          nécessaire). ZÉRO SQL. buildPhasesParEquipeList +
  *          buildAffectationsN2Lines byte-identiques. Provenance md5 :
  *          v1.52 (456c7294) → v1.53 (recollé après écriture, joint).
+ *
+ *   v1.54 : DEEP-LINK fiche. Nouveau : si l'URL porte ?fiche=<id_evenement>,
+ *          init() ouvre directement la fiche de cet évènement après le rendu
+ *          (EVENTS_BY_ID prêt, openFiche opérationnel ; id inconnu → ignoré).
+ *          Permet aux pages Groupe de base / Compositions de revenir SUR la
+ *          fiche (et non sur la liste) via evenements.html?fiche=<id> — la
+ *          fiche étant un modal sans URL propre, ce paramètre lui donne une
+ *          adresse. Va de pair avec groupe-base (flèche ← retour fiche).
+ *          ZÉRO SQL, supabase-client + HTML NON touchés. buildPhasesParEquipe-
+ *          List + buildAffectationsN2Lines byte-identiques. Provenance md5 :
+ *          v1.53 (ec969510) → v1.54 (recollé après écriture, joint).
  */
 
 (function () {
@@ -6522,7 +6533,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init v1.53 (S3 · retour calendrier retire)');
+    console.log('🏉 MOM Hub · Évènements Browser — init v1.54 (S3 · deep-link fiche)');
 
     const list = document.getElementById('evt-list');
 
@@ -6565,6 +6576,20 @@
       renderListe();
       renderMiniCal();
 
+      // v1.54 — Deep-link fiche : si l'URL porte ?fiche=<id>, ouvrir
+      // directement la fiche de cet évènement au chargement (permet à la
+      // page Groupe de base / Compositions de revenir SUR la fiche, pas
+      // seulement sur la liste). Ouverture après le rendu (EVENTS_BY_ID prêt,
+      // openFiche opérationnel). Id inconnu → ignoré silencieusement (liste).
+      try {
+        const ficheId = new URLSearchParams(window.location.search).get('fiche');
+        if (ficheId && EVENTS_BY_ID[ficheId]) {
+          openFiche(ficheId);
+        }
+      } catch (e) {
+        console.warn('deep-link ?fiche ignoré', e);
+      }
+
       // S2.4.b — Charge le contexte des modales (saison, organisateur, sites)
       // en arrière-plan, non bloquant pour l'affichage initial
       loadModalContext();
@@ -6596,7 +6621,7 @@
     closeFiche:        closeFiche
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.53 (S3 · retour calendrier retire) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.54 (S3 · deep-link fiche) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
