@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.50 — Fiche : etats traduits en clair (ETAT_LABELS) + separation visuelle des equipes sous une phase (31 mai 2026)
+ * Version : 1.51 — Fiche : dette MODELE-EVT-NOTES close (notes = texte libre), marqueur retire de l'UI (31 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -1437,6 +1437,17 @@
  *          ZÉRO SQL, supabase-client + HTML NON touchés. buildPhasesParEquipe-
  *          List + buildAffectationsN2Lines byte-identiques. Provenance md5 :
  *          v1.49 (58c0bb54) → v1.50 (recollé après écriture, joint).
+ *
+ *   v1.51 : FICHE — dette MODELE-EVT-NOTES CLOSE (analyse fiche, point 5).
+ *          Décision Manu : notes_internes reste un TEXTE LIBRE simple (pas de
+ *          champ structuré), conforme au principe de simplicité. Le marqueur
+ *          « Dette modèle MODELE-EVT-NOTES 🟡 (champ structuré à clarifier) »,
+ *          qui s'affichait au coach sous le bloc Notes quand vide, est RETIRÉ
+ *          de l'UI (il ne servait qu'au dev). Cas « aucune note » conservé,
+ *          classe n2-dette → n2-notes. ZÉRO SQL, supabase-client + HTML NON
+ *          touchés. buildPhasesParEquipeList + buildAffectationsN2Lines byte-
+ *          identiques. Provenance md5 : v1.50 (543767c7) → v1.51 (recollé
+ *          après écriture, joint).
  */
 
 (function () {
@@ -3081,10 +3092,13 @@
       html += '<div class="evt-fiche-n2-value evt-fiche-n2-prose">' + escHtml(evt.notes_internes) + '</div>';
       html += '</div>';
     } else {
-      html += '<div class="evt-fiche-n2-cellule evt-fiche-n2-dette">';
+      // v1.51 — Dette MODELE-EVT-NOTES CLOSE : décision Manu = notes_internes
+      // reste un TEXTE LIBRE simple (pas de champ structuré). Le marqueur de
+      // dette « 🟡 champ structuré à clarifier » est RETIRÉ de l'UI (il ne
+      // servait qu'au dev et s'affichait au coach).
+      html += '<div class="evt-fiche-n2-cellule evt-fiche-n2-notes">';
       html += '<div class="evt-fiche-n2-label">Notes</div>';
       html += '<div class="evt-fiche-n2-value evt-fiche-n2-empty">— aucune note</div>';
-      html += '<div class="evt-fiche-n2-footnote">Dette modèle <code>MODELE-EVT-NOTES</code> 🟡 (champ structuré à clarifier)</div>';
       html += '</div>';
     }
 
@@ -6466,7 +6480,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init v1.50 (S3 · fiche etats + separation equipes)');
+    console.log('🏉 MOM Hub · Évènements Browser — init v1.51 (S3 · dette notes close)');
 
     const list = document.getElementById('evt-list');
 
@@ -6540,7 +6554,7 @@
     closeFiche:        closeFiche
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.50 (S3 · fiche etats + separation equipes) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.51 (S3 · dette notes close) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
