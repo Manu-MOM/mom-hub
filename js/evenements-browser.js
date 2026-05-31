@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.49 — Fiche : retrait du resume Encadrement inline (Option B, anti-redondance avec la carte fonctionnelle) (31 mai 2026)
+ * Version : 1.50 — Fiche : etats traduits en clair (ETAT_LABELS) + separation visuelle des equipes sous une phase (31 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -1421,6 +1421,22 @@
  *          ZÉRO SQL, supabase-client + HTML NON touchés. buildPhasesParEquipe-
  *          List + buildAffectationsN2Lines byte-identiques. Provenance md5 :
  *          v1.48 (a599fd76) → v1.49 (recollé après écriture, joint).
+ *
+ *   v1.50 : FICHE — deux améliorations d'affichage (analyse fiche, points 6+7).
+ *          (n°6) États traduits en clair : table ETAT_LABELS (creation→« En
+ *            préparation », compo→« Compositions en cours », joue→« Joué »,
+ *            resultat→« Résultats saisis », archive→« Archivé », annule→
+ *            « Annulé »). Le badge affiche le libellé ; la valeur technique
+ *            reste pour la classe CSS. Fallback brut si état inconnu.
+ *            (L'ÉVOLUTION AUTOMATIQUE de l'état reste un chantier À PART,
+ *            tracé, non traité : c'est de la logique métier.)
+ *          (n°7) Séparation visuelle des équipes sous une phase : chaque
+ *            groupe équipe (M14-1 / M14-2) est entouré d'un conteneur
+ *            .evt-fiche-phase-equipe-bloc (bordure gauche verte + léger fond),
+ *            uniquement quand un en-tête équipe est affiché (multi-équipes).
+ *          ZÉRO SQL, supabase-client + HTML NON touchés. buildPhasesParEquipe-
+ *          List + buildAffectationsN2Lines byte-identiques. Provenance md5 :
+ *          v1.49 (58c0bb54) → v1.50 (recollé après écriture, joint).
  */
 
 (function () {
@@ -1512,6 +1528,19 @@
     match:               'Match',
     tournoi:             'Tournoi',
     journee_championnat: 'Journée champ.'
+  };
+
+  // v1.50 — Libellés lisibles des états (domaine réel : creation|compo|joue|
+  // resultat|archive|annule, cf. C12-a). Traduit le jargon technique en
+  // vocabulaire coach pour l'affichage. La valeur technique reste utilisée
+  // pour la classe CSS. Fallback : libellé brut si état inconnu.
+  const ETAT_LABELS = {
+    creation: 'En préparation',
+    compo:    'Compositions en cours',
+    joue:     'Joué',
+    resultat: 'Résultats saisis',
+    archive:  'Archivé',
+    annule:   'Annulé'
   };
 
   const TYPE_ICONS = {
@@ -2846,13 +2875,15 @@
     // ────────────────────────────────────────────────
     const dateLib = formatDateShort(evt.date_debut);
     const typeLbl = TYPE_LABELS[evt.type_evenement] || evt.type_evenement;
-    const etatPillCls = 'evt-fiche-pill-etat-' + (evt.etat || 'creation');
+    const etatVal = evt.etat || 'creation';
+    const etatPillCls = 'evt-fiche-pill-etat-' + etatVal;
+    const etatLbl = ETAT_LABELS[etatVal] || etatVal;
 
     html += '<div class="evt-fiche-identite">';
     html += '<div class="evt-fiche-identite-meta">' + escHtml(dateLib) + ' · ' + escHtml(typeLbl) + '</div>';
     html += '<div class="evt-fiche-identite-libelle">' + escHtml(evt.libelle || '(sans libellé)') + '</div>';
     html += '<div class="evt-fiche-identite-row">';
-    html += '<span class="evt-fiche-pill ' + etatPillCls + '">État : ' + escHtml(evt.etat || 'creation') + '</span>';
+    html += '<span class="evt-fiche-pill ' + etatPillCls + '">État : ' + escHtml(etatLbl) + '</span>';
     if (evt.type_competition) {
       html += '<span class="evt-fiche-pill">' + escHtml(evt.type_competition) + '</span>';
     }
@@ -3231,10 +3262,18 @@
           const nomEq = (eqKey !== '_sans_equipe')
             ? (eqNames[eqKey] || eqKey)
             : null;
-          if (nomEq && (eqOrder.length > 1 || eqKey !== '_sans_equipe')) {
+          const showEqHeader = nomEq && (eqOrder.length > 1 || eqKey !== '_sans_equipe');
+          // v1.50 (n°7) — conteneur visuel par équipe : bordure gauche +
+          // léger fond, pour séparer nettement M14-1 / M14-2 sous une phase.
+          // Seulement quand il y a vraiment un en-tête équipe (multi-équipes).
+          if (showEqHeader) {
+            html += '<div class="evt-fiche-phase-equipe-bloc" '
+              + 'style="border-left:3px solid var(--vert-pelouse); '
+              + 'background:rgba(0,0,0,0.02); border-radius:0 6px 6px 0; '
+              + 'margin:8px 0 8px 12px; padding:4px 0 4px 8px;">';
             html += '<div class="evt-fiche-phase-equipe" '
               + 'style="font-size:0.85em; font-weight:600; color:var(--vert-pelouse); '
-              + 'margin:6px 0 2px 18px;">' + escHtml(nomEq) + '</div>';
+              + 'margin:0 0 2px 6px;">' + escHtml(nomEq) + '</div>';
           }
           byEq[eqKey].forEach(function (child) {
             const heure = formatHeureOnly(child.date_debut);
@@ -3256,6 +3295,9 @@
             }
             html += '</div>';
           });
+          if (showEqHeader) {
+            html += '</div>';  // ferme evt-fiche-phase-equipe-bloc
+          }
         });
       });
       html += '</div>';
@@ -6424,7 +6466,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init v1.49 (S3 · fiche anti-redondance encadrement)');
+    console.log('🏉 MOM Hub · Évènements Browser — init v1.50 (S3 · fiche etats + separation equipes)');
 
     const list = document.getElementById('evt-list');
 
@@ -6498,7 +6540,7 @@
     closeFiche:        closeFiche
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.49 (S3 · fiche anti-redondance encadrement) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.50 (S3 · fiche etats + separation equipes) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
