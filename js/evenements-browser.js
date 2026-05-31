@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.33 — Date de fin masquée tant que « plusieurs jours » décoché (30 mai 2026)
+ * Version : 1.34 — Plateau : adversaires multiples par équipe (poule) + nom de poule (30 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -1111,6 +1111,30 @@
  *          NON touchés. 1 ligne logique modifiée dans
  *          updateCreateConditionalFields (hors fonctions invariantes).
  *          Provenance md5 : v1.32 (5ba27fb9) → v1.33 (recollé après
+ *          écriture, joint).
+ *
+ *   v1.34 : Plateau (A4) — adversaires MULTIPLES par équipe + nom de poule
+ *          (coquille terrain signalée). Un plateau est par nature une
+ *          compétition où chaque équipe rencontre PLUSIEURS adversaires
+ *          (poule) ; l'UI n'en permettait qu'UN (input unique par équipe).
+ *          buildAdvParEquipeLines refondue : par équipe cochée, un champ
+ *          « Nom de poule » (opt.) + une LISTE d'adversaires empilables
+ *          (helper _advRowHtml, bouton « + Adversaire » data-action=add-adv,
+ *          croix data-action=remove-adv ; délégation bindAdvEditor posée 1×,
+ *          calquée sur bindPhasesEditor). submitModalCreate (bloc adv A4)
+ *          lit désormais TOUS les .evt-eng-adv-input non vides → eng.
+ *          adversaires[] avec ordre incrémental, et le nom de poule →
+ *          eng.notes (M3). La RPC sql/52 consomme déjà adversaires[] (M5,
+ *          boucle jsonb_array_elements L399) et notes M3 (L375) → AUCUN
+ *          changement RPC/schéma. Bloc cantonné A4 (showAdvParEq = mode
+ *          'A4') : A3 mono et A5 phases intacts. Classes .evt-eng-btn /
+ *          .evt-eng-btn-remove déjà en CSS → evenements.html NON touché.
+ *
+ *          ZÉRO SQL, RPC inchangée, evenements.html + supabase-client.js
+ *          NON touchés. Invariants (12 Suivi A/B/C + Niveau 0 + renderFiche
+ *          + renderFonctionCellule + buildPhasesParEquipeList) byte-
+ *          identiques ; buildAdvParEquipeLines modifiée (tracée) + helpers
+ *          neufs. Provenance md5 : v1.33 (f29a3fa6) → v1.34 (recollé après
  *          écriture, joint).
  */
 
@@ -4089,19 +4113,92 @@
    * Bloc 8d — Adversaires par équipe (visible modes A4/A5 multi-équipes).
    * 1 input texte par équipe pour saisir l'adversaire / nom de poule.
    */
+  /**
+   * Helper v1.34 — une ligne adversaire (plateau A4, poule). Emplacement
+   * texte libre + croix de retrait. `n` = numéro d'ordre affiché.
+   * Classes alignées sur le pattern de l'éditeur de phases.
+   */
+  function _advRowHtml(n) {
+    return '<div class="evt-eng-adv-item" '
+      + 'style="display:flex; align-items:center; gap:6px; margin-top:6px;">'
+      + '<input type="text" class="evt-form-input evt-eng-adv-input" '
+      + 'placeholder="Adversaire ' + n + '">'
+      + '<button type="button" class="evt-eng-btn-remove" '
+      + 'data-action="remove-adv" title="Retirer cet adversaire">✕</button>'
+      + '</div>';
+  }
+
+  /**
+   * Bloc 8d — Adversaires par équipe (plateau A4). v1.34 — REFONTE :
+   * un plateau est une compétition où chaque équipe rencontre PLUSIEURS
+   * adversaires (poule), pas un seul (coquille terrain signalée). Par
+   * équipe cochée : un champ « Nom de poule » (opt., → notes M3) + une
+   * LISTE d'adversaires empilables (bouton « + Adversaire », croix de
+   * retrait), au lieu d'un input unique. La RPC sql/52 consomme déjà
+   * adversaires[] (M5, boucle jsonb_array_elements) et notes M3 → aucun
+   * changement RPC/schéma (option UI). Départ : 1 ligne adversaire vide.
+   * Délégation des boutons : bindAdvEditor (posée 1×).
+   */
   function buildAdvParEquipeLines(checkedCbs) {
     const wrap = document.getElementById('evt-create-adv-par-equipe-lines');
     if (!wrap) return;
     const html = Array.prototype.map.call(checkedCbs, function (cb) {
       const equipeId = cb.value;
       const equipeLabel = cb.parentElement ? cb.parentElement.textContent.trim() : equipeId;
-      return '<div class="evt-eng-adv-row" data-equipe-id="' + escHtml(equipeId) + '">'
-        + '<span class="evt-eng-adv-label">' + escHtml(equipeLabel) + '</span>'
-        + '<input type="text" class="evt-form-input evt-eng-adv-input" '
-        + 'placeholder="Adversaire / nom poule (opt.)">'
+      return '<div class="evt-eng-adv-row" data-equipe-id="' + escHtml(equipeId) + '" '
+        + 'style="margin-bottom:14px;">'
+        + '<div class="evt-eng-adv-head" '
+          + 'style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">'
+          + '<span class="evt-eng-adv-label">' + escHtml(equipeLabel) + '</span>'
+          + '<input type="text" class="evt-form-input evt-eng-poule-input" '
+          + 'placeholder="Nom de poule (opt.)" '
+          + 'style="max-width:200px; margin-left:auto;">'
+        + '</div>'
+        + '<div class="evt-eng-adv-list">' + _advRowHtml(1) + '</div>'
+        + '<button type="button" class="evt-eng-btn" data-action="add-adv" '
+          + 'style="margin-top:6px;">+ Adversaire</button>'
         + '</div>';
     }).join('');
     wrap.innerHTML = html;
+    bindAdvEditor();
+  }
+
+  /**
+   * v1.34 — Délégation des boutons du bloc adversaires-par-équipe
+   * (plateau A4) : + Adversaire / retrait. Posée 1× sur le conteneur.
+   */
+  function bindAdvEditor() {
+    const wrap = document.getElementById('evt-create-adv-par-equipe-lines');
+    if (!wrap || wrap._advEditorBound) return;
+    wrap._advEditorBound = true;
+    wrap.addEventListener('click', function (e) {
+      const actEl = e.target.closest ? e.target.closest('[data-action]') : null;
+      if (!actEl || !wrap.contains(actEl)) return;
+      const action = actEl.getAttribute('data-action');
+      if (action === 'add-adv') {
+        const row = actEl.closest('.evt-eng-adv-row');
+        const list = row && row.querySelector('.evt-eng-adv-list');
+        if (list) {
+          const n = list.querySelectorAll('.evt-eng-adv-item').length + 1;
+          const tmp = document.createElement('div');
+          tmp.innerHTML = _advRowHtml(n);
+          list.appendChild(tmp.firstChild);
+        }
+        return;
+      }
+      if (action === 'remove-adv') {
+        const item = actEl.closest('.evt-eng-adv-item');
+        const list = item && item.parentElement;
+        // Ne pas vider complètement : on garde au moins 1 ligne.
+        if (list && list.querySelectorAll('.evt-eng-adv-item').length > 1) {
+          item.remove();
+        } else if (item) {
+          const input = item.querySelector('.evt-eng-adv-input');
+          if (input) input.value = '';
+        }
+        return;
+      }
+    });
   }
 
   /**
@@ -4833,10 +4930,23 @@
         if (isA3 && adversaire) {
           advs.push({ adversaire_nom: adversaire, ordre: 1 });
         } else if (PHASES_SOUS_TYPES.indexOf(typeCompet) === -1) {
-          const advInput = document.querySelector(
-            '#evt-create-adv-par-equipe-lines .evt-eng-adv-row[data-equipe-id="' + eqId + '"] .evt-eng-adv-input');
-          if (advInput && advInput.value.trim()) {
-            advs.push({ adversaire_nom: advInput.value.trim(), ordre: 1 });
+          // v1.34 — plateau A4 : LISTE d'adversaires (poule), plus un seul.
+          // On lit tous les .evt-eng-adv-input de la ligne de l'équipe ;
+          // ordre incrémental sur les non-vides. Le nom de poule (opt.)
+          // va dans eng.notes (M3) — pas de colonne dédiée en base.
+          const advRow = document.querySelector(
+            '#evt-create-adv-par-equipe-lines .evt-eng-adv-row[data-equipe-id="' + eqId + '"]');
+          if (advRow) {
+            const inputs = advRow.querySelectorAll('.evt-eng-adv-input');
+            let ord = 0;
+            Array.prototype.forEach.call(inputs, function (inp) {
+              const val = inp.value.trim();
+              if (val) { ord += 1; advs.push({ adversaire_nom: val, ordre: ord }); }
+            });
+            const pouleInput = advRow.querySelector('.evt-eng-poule-input');
+            if (pouleInput && pouleInput.value.trim()) {
+              eng.notes = pouleInput.value.trim();
+            }
           }
         }
         if (advs.length > 0) eng.adversaires = advs;
@@ -5624,7 +5734,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init v1.33 (S3 · date fin pilotee par multijours)');
+    console.log('🏉 MOM Hub · Évènements Browser — init v1.34 (S3 · plateau adversaires multiples)');
 
     const list = document.getElementById('evt-list');
 
@@ -5698,7 +5808,7 @@
     closeFiche:        closeFiche
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.33 (S3 · date fin pilotee par multijours) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.34 (S3 · plateau adversaires multiples) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
