@@ -84,6 +84,17 @@
     }
     .compo-validate-btn--back:hover { filter: none; color: var(--ink); border-color: var(--ink-soft); }
 
+    /* Barre de navigation du parcours (← fiche / ← groupe de base) */
+    .compo-parcours { display: flex; }
+    .compo-parcours__link {
+      font-family: 'Oswald', sans-serif; font-size: 13px; font-weight: 500;
+      letter-spacing: 0.04em; text-decoration: none;
+      padding: 6px 14px; border-radius: 4px;
+      color: var(--ink-soft); background: var(--paper-warm); border: 1px solid var(--line);
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .compo-parcours__link:hover { color: var(--ink); border-color: var(--ink-soft); }
+
     /* Sélecteur d'événement */
     .event-selector {
       list-style: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0;
@@ -429,6 +440,11 @@
   </header>
 
   <main class="compo-layout">
+
+    <nav class="compo-parcours" id="compo-parcours" aria-label="Navigation du parcours" style="display:none; gap:10px; align-items:center; margin-bottom:14px;">
+      <a id="compo-nav-fiche" class="compo-parcours__link" href="#" title="Retour à la fiche de l'évènement">← Fiche évènement</a>
+      <a id="compo-nav-groupe" class="compo-parcours__link" href="#" title="Retour au groupe de base de cette équipe">← Groupe de base</a>
+    </nav>
 
     <section class="event-banner" aria-label="Événement en cours">
       <button type="button" class="event-banner__btn" id="event-selector-btn" aria-haspopup="listbox" aria-expanded="false">
