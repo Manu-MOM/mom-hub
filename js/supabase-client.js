@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.36 — mai 2026
+ * Version : 1.37 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -934,6 +934,14 @@
  *          « Afficher tout le staff »). ADDITION : signature élargie (1 arg
  *          optionnel) + passage p_categorie_id au rpc() ; + console.log boot
  *          1.35 → 1.36. node --check OK.
+ *
+ *   v1.37 : Wrapper modifierEvenementComplet(evenementId, payload) — édition
+ *          complète via RPC modifier_evenement_complet (sql/53). Symétrique
+ *          de createEvenementComplet : même payload (sans code/saison/
+ *          organisateur, conservés serveur) + l'id en tête. Mappe les params
+ *          p_* (méta + horaires + équipes + phases + encadrants + N2).
+ *          ADDITION PURE : 1 méthode insérée après createEvenementComplet ;
+ *          + console.log boot 1.36 → 1.37. node --check OK.
  */
 
 (function (global) {
@@ -1471,6 +1479,53 @@
         };
       }
       // RPC retourne directement l'UUID évènement parent (RETURNS UUID)
+      return { ok: true, evenementId: data };
+    },
+
+    /**
+     * Modification COMPLÈTE d'un évènement (méta + horaires + équipes +
+     * phases + matchs + encadrants), via RPC modifier_evenement_complet
+     * (sql/53, transaction atomique, stratégie « replace children »).
+     * Symétrique de createEvenementComplet : même payload, + l'id.
+     * @param {string} evenementId UUID racine
+     * @param {Object} payload mêmes clés que createEvenementComplet (sans code)
+     * @returns {Promise<{ok:boolean, evenementId?:string, error?:string}>}
+     */
+    async modifierEvenementComplet(evenementId, payload) {
+      if (!evenementId) return { ok: false, error: 'evenementId manquant' };
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+        return { ok: false, error: 'Payload manquant ou invalide' };
+      }
+      const required = ['libelle', 'date_debut'];
+      const missing = required.filter(f => !payload[f]);
+      if (missing.length > 0) {
+        return { ok: false, error: 'Champs requis manquants : ' + missing.join(', ') };
+      }
+      const rpcParams = {
+        p_evenement_id:              evenementId,
+        p_libelle:                   payload.libelle,
+        p_date_debut:                payload.date_debut,
+        p_type_competition:          payload.type_competition          ?? null,
+        p_format_de_jeu:             payload.format_de_jeu             ?? null,
+        p_date_fin:                  payload.date_fin                  ?? null,
+        p_site_id:                   payload.site_id                   ?? null,
+        p_domicile_exterieur:        payload.domicile_exterieur        ?? null,
+        p_equipe_id:                 payload.equipe_id                 ?? null,
+        p_notes_internes:            payload.notes_internes            ?? null,
+        p_equipes_engagees:          payload.equipes_engagees          ?? null,
+        p_phases_par_equipe:         payload.phases_par_equipe         ?? null,
+        p_encadrants:                payload.encadrants                ?? null,
+        p_affectations_n2:           payload.affectations_n2           ?? null,
+        p_debut_match:               payload.debut_match               ?? null,
+        p_fin_prevue:                payload.fin_prevue                ?? null,
+        p_rdv_heure:                 payload.rdv_heure                 ?? null,
+        p_rdv_lieu:                  payload.rdv_lieu                  ?? null
+      };
+      const { data, error } = await client.rpc('modifier_evenement_complet', rpcParams);
+      if (error) {
+        console.error('MOM Hub: modifierEvenementComplet()', error);
+        return { ok: false, error: error.message || 'Erreur RPC modifier_evenement_complet' };
+      }
       return { ok: true, evenementId: data };
     },
 
@@ -5240,7 +5295,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.36 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.37 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
