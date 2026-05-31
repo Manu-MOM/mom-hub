@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.47 — Modifier rouvre le modal de creation pre-rempli (edition complete via RPC modifier_evenement_complet) (31 mai 2026)
+ * Version : 1.48 — Fix pre-remplissage edition : equipes deduites des phases + attente active (31 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -1392,6 +1392,24 @@
  *          Complet) + RPC sql/53. buildPhasesParEquipeList +
  *          buildAffectationsN2Lines byte-identiques. Provenance md5 :
  *          v1.46 (73a544c5) → v1.47 (recollé après écriture, joint).
+ *
+ *   v1.48 : FIX pré-remplissage de l'édition (v1.47 ne pré-remplissait pas
+ *          les phases/matchs). Deux causes corrigées :
+ *          (1) Les équipes à cocher étaient lues sur evt._equipesEngagees,
+ *              ABSENT de l'objet (getEvenementWithEncadrants ne le renvoie
+ *              pas → undefined → aucune équipe cochée → aucun bloc de phases).
+ *              Désormais DÉDUITES des equipe_id distincts des phases enfants
+ *              (CHILDREN_BY_PARENT[evtId]), toujours présents.
+ *          (2) Les setTimeout fixes (60/250ms) étaient fragiles (peuplement
+ *              async des cases). Remplacés par _waitFor (poll 50ms, ~3s max) :
+ *              attend que les cases équipes existent → coche → updateMulti-
+ *              EquipesUI → attend que les blocs équipe soient construits →
+ *              _prefillPhasesEditor. Idem pour les encadrants.
+ *          _prefillPhasesEditor : signature réduite à (phaseBoxes) ; clics
+ *          programmatiques +Phase/+Match puis remplissage libellé/adversaire.
+ *          buildPhasesParEquipeList + buildAffectationsN2Lines byte-
+ *          identiques. Provenance md5 : v1.47 (98ca6ff1) → v1.48 (recollé
+ *          après écriture, joint).
  */
 
 (function () {
@@ -4235,30 +4253,48 @@
     const rdvLieuEl = document.getElementById('evt-create-rdv-lieu');
     if (rdvLieuEl && evt.rdv_lieu) rdvLieuEl.value = evt.rdv_lieu;
 
-    // Compétition : cocher équipes engagées + reconstruire phases/matchs
+    // Compétition : cocher équipes engagées + reconstruire phases/matchs.
+    // Les équipes sont DÉDUITES des equipe_id des phases enfants (l'objet
+    // evt n'a PAS de _equipesEngagees — getEvenementWithEncadrants ne le
+    // renvoie pas). Attente ACTIVE (poll) au lieu de setTimeout fixes :
+    // robuste face au peuplement asynchrone des cases équipes.
     if (fam === 'competition') {
-      const enfants = CHILDREN_BY_PARENT[evtId] || [];
-      const eqEng = Array.isArray(evt._equipesEngagees) ? evt._equipesEngagees : [];
-      setTimeout(function () {
-        eqEng.forEach(function (e) {
-          const cb = document.querySelector('#evt-create-equipes .evt-eng-equipe-cb[value="' + e.equipe_id + '"]');
+      const enfants = CHILDREN_BY_PARENT[evtId] || [];   // phase-boîtes
+      const eqIds = Array.from(new Set(
+        enfants.map(function (e) { return e.equipe_id; }).filter(Boolean)));
+
+      // 1) Attendre que les cases équipes existent, puis cocher.
+      _waitFor(function () {
+        return document.querySelectorAll('#evt-create-equipes .evt-eng-equipe-cb').length > 0;
+      }, function () {
+        eqIds.forEach(function (eqId) {
+          const cb = document.querySelector('#evt-create-equipes .evt-eng-equipe-cb[value="' + eqId + '"]');
           if (cb) cb.checked = true;
         });
-        updateMultiEquipesUI();
-        setTimeout(function () { _prefillPhasesEditor(eqEng, enfants); }, 60);
-      }, 60);
+        updateMultiEquipesUI();   // construit l'éditeur de phases par équipe
+        // 2) Attendre que les blocs équipe soient construits, puis pré-remplir.
+        _waitFor(function () {
+          const w = document.getElementById('evt-create-phases-par-equipe-list');
+          return w && w.querySelectorAll('.evt-phases-equipe-block').length > 0;
+        }, function () {
+          _prefillPhasesEditor(enfants);
+        });
+      });
     }
 
-    // Encadrants : cocher ceux rattachés (evt.encadrants, chargé par la fiche)
+    // Encadrants : cocher ceux rattachés (evt.encadrants, chargé par la fiche).
+    // Attente active (peuplerStaff est asynchrone).
     const encs = Array.isArray(evt.encadrants) ? evt.encadrants : [];
     if (encs.length > 0) {
-      setTimeout(function () {
+      _waitFor(function () {
+        return document.querySelectorAll('#evt-create-staff .evt-eng-staff-cb').length > 0;
+      }, function () {
         encs.forEach(function (enc) {
           const pid = enc.personne_id || enc.id;
           const cb = document.querySelector('#evt-create-staff .evt-eng-staff-cb[value="' + pid + '"]');
           if (cb) cb.checked = true;
         });
-      }, 250);
+      });
     }
 
     // Titre + bouton adaptés
@@ -4268,8 +4304,23 @@
     if (submitBtn) submitBtn.textContent = 'Enregistrer les modifications';
   }
 
-  // Reconstruit l'éditeur de phases/matchs par équipe depuis les enfants.
-  function _prefillPhasesEditor(eqEng, phaseBoxes) {
+  // Attente active : exécute onReady() dès que condFn() est vraie. Poll
+  // toutes les 50ms, abandon après ~3s (60 essais) avec log. Évite les
+  // setTimeout à délai fixe, fragiles face au réseau (coupures fréquentes).
+  function _waitFor(condFn, onReady, _tries) {
+    _tries = _tries || 0;
+    if (condFn()) { onReady(); return; }
+    if (_tries > 60) {
+      console.warn('_waitFor : condition non remplie après ~3s, abandon');
+      return;
+    }
+    setTimeout(function () { _waitFor(condFn, onReady, _tries + 1); }, 50);
+  }
+
+  // Reconstruit l'éditeur de phases/matchs par équipe depuis les enfants
+  // (phase-boîtes + leurs matchs via CHILDREN_BY_PARENT). Appelé une fois les
+  // blocs équipe construits (cf. _waitFor dans openModalEditComplet).
+  function _prefillPhasesEditor(phaseBoxes) {
     const editorWrap = document.getElementById('evt-create-phases-par-equipe-list');
     if (!editorWrap) return;
     const phasesByEq = {};
@@ -6375,7 +6426,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init v1.47 (S3 · edition complete)');
+    console.log('🏉 MOM Hub · Évènements Browser — init v1.48 (S3 · fix prefill edition)');
 
     const list = document.getElementById('evt-list');
 
@@ -6449,7 +6500,7 @@
     closeFiche:        closeFiche
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.47 (S3 · edition complete) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.48 (S3 · fix prefill edition) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
