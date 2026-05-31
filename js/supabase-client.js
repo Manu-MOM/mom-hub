@@ -18,7 +18,7 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.34 — mai 2026
+ * Version : 1.35 — mai 2026
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -912,6 +912,19 @@
  *          Aucune signature publique modifiée. Aucun call-site modifié.
  *          Provenance md5 : v1.33 fa6603c2 → v1.34 (recollé après
  *          écriture). node --check OK.
+ *
+ *   v1.35 : Horaires détaillés — ÉTAPE 3/4 (wrapper). createEvenementComplet
+ *          mappe désormais 4 nouveaux champs du payload vers les paramètres
+ *          RPC v7 : p_debut_match/p_fin_prevue/p_rdv_heure (TIME),
+ *          p_rdv_lieu (TEXT), absents → null (DEFAULT côté SQL). Va de pair
+ *          avec evenements-browser v1.42 (lecture des champs) + RPC v7 +
+ *          migration colonnes. ADDITION PURE : 3 zones —
+ *          (a) version header 1.34 → 1.35,
+ *          (b) entrée changelog (ce bloc),
+ *          (c) 4 lignes ajoutées dans rpcParams (après p_affectations_n2 ;
+ *              virgule ajoutée à sa ligne ; aucun autre mapping muté),
+ *          + console.log boot 1.34 → 1.35.
+ *          Aucune autre signature/call-site modifié. node --check OK.
  */
 
 (function (global) {
@@ -1430,7 +1443,13 @@
         p_equipes_engagees:          payload.equipes_engagees          ?? null,
         p_phases_par_equipe:         payload.phases_par_equipe         ?? null,
         p_encadrants:                payload.encadrants                ?? null,
-        p_affectations_n2:           payload.affectations_n2           ?? null
+        p_affectations_n2:           payload.affectations_n2           ?? null,
+        // v1.35 (étape 3/4 horaires détaillés) — 4 nouveaux paramètres RPC
+        // v7 (DEFAULT NULL côté SQL). Champs absents du payload → null.
+        p_debut_match:               payload.debut_match               ?? null,
+        p_fin_prevue:                payload.fin_prevue                ?? null,
+        p_rdv_heure:                 payload.rdv_heure                 ?? null,
+        p_rdv_lieu:                  payload.rdv_lieu                  ?? null
       };
 
       const { data, error } = await client.rpc('creer_evenement_complet', rpcParams);
@@ -5207,7 +5226,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.34 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.35 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
