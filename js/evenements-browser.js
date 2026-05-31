@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.46 — Staff filtre par categorie (fonction_staff) + case Afficher tout le staff (31 mai 2026)
+ * Version : 1.47 — Modifier rouvre le modal de creation pre-rempli (edition complete via RPC modifier_evenement_complet) (31 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -1370,6 +1370,28 @@
  *          jointure fonction_staff). buildPhasesParEquipeList +
  *          buildAffectationsN2Lines byte-identiques. Provenance md5 :
  *          v1.45 (f001dbbe) → v1.46 (recollé après écriture, joint).
+ *
+ *   v1.47 : ÉDITION COMPLÈTE — « Modifier » rouvre le MODAL DE CRÉATION
+ *          pré-rempli (objectif produit Manu : retomber sur le formulaire de
+ *          création avec tout éditable). Avant : openModalEdit ouvrait un
+ *          modal réduit aux méta. Maintenant : edit-from-fiche → closeFiche()
+ *          + openModalEditComplet(id). Cette fonction ouvre le modal de
+ *          création, pose MODAL_CREATE_EDIT_ID, et pré-remplit type, méta,
+ *          date, horaires (TIME→HH:MM), équipes engagées (cochées via
+ *          evt._equipesEngagees), phases+matchs (éditeur par équipe reconstruit
+ *          par _prefillPhasesEditor : clics programmatiques +Phase/+Match puis
+ *          remplissage), encadrants (cochés via evt.encadrants). Titre +
+ *          bouton adaptés (« Modifier… » / « Enregistrer les modifications »).
+ *          submitModalCreate bascule : si MODAL_CREATE_EDIT_ID → modifier-
+ *          EvenementComplet(id, payload) (RPC sql/53) au lieu de createEvene-
+ *          mentComplet. openModalCreate reset titre + drapeau (anti-résidu) ;
+ *          closeModalCreate idem. Décisions techniques tranchées seul (mandat
+ *          Manu) : RPC atomique « replace children » (supprime/recrée les
+ *          enfants), garde de sécurité serveur si suivi/séances rattachés.
+ *          Va de pair avec supabase-client v1.37 (wrapper modifierEvenement-
+ *          Complet) + RPC sql/53. buildPhasesParEquipeList +
+ *          buildAffectationsN2Lines byte-identiques. Provenance md5 :
+ *          v1.46 (73a544c5) → v1.47 (recollé après écriture, joint).
  */
 
 (function () {
@@ -3438,7 +3460,10 @@
     document.querySelectorAll('[data-action="edit-from-fiche"]').forEach(btn => {
       btn.addEventListener('click', function () {
         const id = this.getAttribute('data-event-id');
-        if (id) openModalEdit(id);
+        // « Modifier » rouvre désormais le MODAL DE CRÉATION pré-rempli
+        // (édition complète : méta + horaires + équipes + phases + matchs +
+        // encadrants), au lieu de l'ancien modal d'édition réduit aux méta.
+        if (id) { closeFiche(); openModalEditComplet(id); }
       });
     });
     // ── NEUF v1.25 (§3.3 ACTIONS) : Dupliquer = rouvre modale création
@@ -4037,6 +4062,8 @@
 
   // P2-E.1 : état duplication
   let MODAL_CREATE_DUP_SRC_ID = null;
+  // Édition complète : id de l'évènement en cours d'édition (null = création)
+  let MODAL_CREATE_EDIT_ID = null;
 
   /**
    * Peuple le dropdown source duplication dans E3 (événements parents uniquement,
@@ -4129,6 +4156,12 @@
       submitBtn.disabled = false;
       submitBtn.textContent = "Créer l'évènement";
     }
+    // Reset titre + mode édition (anti-résidu après une édition précédente).
+    // NB : openModalEditComplet rappelle openModalCreate puis repose ces
+    // valeurs en mode édition — l'ordre est donc correct.
+    const titleEl0 = document.getElementById('evt-create-title');
+    if (titleEl0) titleEl0.textContent = 'Nouvel évènement';
+    MODAL_CREATE_EDIT_ID = null;
 
     // v1.16 — reset des zones répétables U1/U2 (form.reset() ne vide
     // pas le DOM injecté). Anti-résidu entre 2 ouvertures de modale.
@@ -4146,6 +4179,128 @@
 
   function closeModalCreate() {
     document.getElementById('evt-overlay-create').classList.remove('show');
+    MODAL_CREATE_EDIT_ID = null;  // toujours réinitialiser le mode édition
+  }
+
+  // ────────────────────────────────────────────────────────────────
+  // ÉDITION COMPLÈTE — « Modifier » rouvre le MODAL DE CRÉATION pré-rempli
+  // (objectif produit Manu). Réutilise toute la richesse du formulaire de
+  // création ; au submit, submitModalCreate bascule sur modifierEvenement-
+  // Complet (RPC sql/53) car MODAL_CREATE_EDIT_ID est posé.
+  // ────────────────────────────────────────────────────────────────
+  async function openModalEditComplet(evtId) {
+    const evt = EVENTS_BY_ID[evtId];
+    if (!evt) { console.error('openModalEditComplet : évènement introuvable', evtId); return; }
+
+    openModalCreate();              // reset complet + ouverture
+    MODAL_CREATE_EDIT_ID = evtId;   // bascule mode édition
+
+    const f = document.getElementById('evt-create-form');
+    if (!f) return;
+
+    // Type d'évènement
+    const fam = evt.type_evenement;
+    const radioType = f.querySelector('input[name=type_evenement][value="' + fam + '"]');
+    if (radioType) radioType.checked = true;
+
+    // Mode vierge (pas duplication)
+    const radioVierge = f.querySelector('input[name=create_mode][value=vierge]');
+    if (radioVierge) radioVierge.checked = true;
+    MODAL_CREATE_DUP_SRC_ID = null;
+
+    // Méta
+    f.elements.libelle.value = evt.libelle || '';
+    if (f.elements.type_competition) f.elements.type_competition.value = evt.type_competition || '';
+    if (f.elements.format_de_jeu)    f.elements.format_de_jeu.value    = evt.format_de_jeu || '';
+    if (f.elements.adversaire_nom)   f.elements.adversaire_nom.value   = evt.adversaire_nom || '';
+    if (f.elements.domicile_exterieur) f.elements.domicile_exterieur.value = evt.domicile_exterieur || '';
+    if (f.elements.site_id && evt.site_id) f.elements.site_id.value = evt.site_id;
+    if (f.elements.notes_internes) f.elements.notes_internes.value = evt.notes_internes || '';
+
+    // Date début/fin (input type=date → yyyy-mm-dd)
+    if (f.elements.date_debut && evt.date_debut) f.elements.date_debut.value = String(evt.date_debut).slice(0, 10);
+    if (f.elements.date_fin && evt.date_fin)     f.elements.date_fin.value   = String(evt.date_fin).slice(0, 10);
+
+    // Recalcule les blocs conditionnels (affiche horaires/engagement) AVANT prefill
+    updateCreateConditionalFields();
+
+    // Horaires (TIME "HH:MM:SS" → "HH:MM")
+    const setTime = function (id, val) {
+      const el = document.getElementById(id);
+      if (el && val) el.value = String(val).slice(0, 5);
+    };
+    setTime('evt-create-debut-match', evt.debut_match);
+    setTime('evt-create-fin-prevue',  evt.fin_prevue);
+    setTime('evt-create-rdv-heure',   evt.rdv_heure);
+    const rdvLieuEl = document.getElementById('evt-create-rdv-lieu');
+    if (rdvLieuEl && evt.rdv_lieu) rdvLieuEl.value = evt.rdv_lieu;
+
+    // Compétition : cocher équipes engagées + reconstruire phases/matchs
+    if (fam === 'competition') {
+      const enfants = CHILDREN_BY_PARENT[evtId] || [];
+      const eqEng = Array.isArray(evt._equipesEngagees) ? evt._equipesEngagees : [];
+      setTimeout(function () {
+        eqEng.forEach(function (e) {
+          const cb = document.querySelector('#evt-create-equipes .evt-eng-equipe-cb[value="' + e.equipe_id + '"]');
+          if (cb) cb.checked = true;
+        });
+        updateMultiEquipesUI();
+        setTimeout(function () { _prefillPhasesEditor(eqEng, enfants); }, 60);
+      }, 60);
+    }
+
+    // Encadrants : cocher ceux rattachés (evt.encadrants, chargé par la fiche)
+    const encs = Array.isArray(evt.encadrants) ? evt.encadrants : [];
+    if (encs.length > 0) {
+      setTimeout(function () {
+        encs.forEach(function (enc) {
+          const pid = enc.personne_id || enc.id;
+          const cb = document.querySelector('#evt-create-staff .evt-eng-staff-cb[value="' + pid + '"]');
+          if (cb) cb.checked = true;
+        });
+      }, 250);
+    }
+
+    // Titre + bouton adaptés
+    const titleEl = document.getElementById('evt-create-title');
+    if (titleEl) titleEl.textContent = 'Modifier l\'évènement';
+    const submitBtn = document.getElementById('evt-create-submit');
+    if (submitBtn) submitBtn.textContent = 'Enregistrer les modifications';
+  }
+
+  // Reconstruit l'éditeur de phases/matchs par équipe depuis les enfants.
+  function _prefillPhasesEditor(eqEng, phaseBoxes) {
+    const editorWrap = document.getElementById('evt-create-phases-par-equipe-list');
+    if (!editorWrap) return;
+    const phasesByEq = {};
+    phaseBoxes.forEach(function (pb) {
+      const k = pb.equipe_id || '_';
+      if (!phasesByEq[k]) phasesByEq[k] = [];
+      phasesByEq[k].push(pb);
+    });
+    editorWrap.querySelectorAll('.evt-phases-equipe-block').forEach(function (block) {
+      const eqId = block.getAttribute('data-equipe-id');
+      const phases = phasesByEq[eqId] || [];
+      phases.forEach(function (pb) {
+        const addPhaseBtn = block.querySelector('[data-action="add-phase"]');
+        if (addPhaseBtn) addPhaseBtn.click();
+        const boxes = block.querySelectorAll('.evt-phase-box');
+        const box = boxes[boxes.length - 1];
+        if (!box) return;
+        const libInput = box.querySelector('.evt-phase-libelle');
+        if (libInput) libInput.value = pb.phase_libelle || pb.libelle || '';
+        const matchs = CHILDREN_BY_PARENT[pb.id] || [];
+        matchs.forEach(function (m) {
+          const addMatchBtn = box.querySelector('[data-action="add-match"]');
+          if (addMatchBtn) addMatchBtn.click();
+          const rows = box.querySelectorAll('.evt-phase-match-row');
+          const row = rows[rows.length - 1];
+          if (!row) return;
+          const advInput = row.querySelector('.evt-match-adversaire');
+          if (advInput) advInput.value = m.adversaire_nom || '';
+        });
+      });
+    });
   }
 
   /**
@@ -5553,12 +5708,15 @@
     // ──────────────────────────────────────────────────────────────
     // Appel RPC composite
     // ──────────────────────────────────────────────────────────────
+    const isEdit = !!MODAL_CREATE_EDIT_ID;
     submitBtn.disabled = true;
-    submitBtn.textContent = 'Création…';
+    submitBtn.textContent = isEdit ? 'Enregistrement…' : 'Création…';
     msg.innerHTML = '';
 
     try {
-      const res = await SupabaseHub.createEvenementComplet(payload);
+      const res = isEdit
+        ? await SupabaseHub.modifierEvenementComplet(MODAL_CREATE_EDIT_ID, payload)
+        : await SupabaseHub.createEvenementComplet(payload);
 
       if (!res || !res.ok) {
         msg.innerHTML = '<div class="evt-form-error">Échec : '
@@ -5566,12 +5724,14 @@
         const modalBody = document.querySelector('#evt-overlay-create .evt-modal-body');
         if (modalBody) modalBody.scrollTop = 0;
         submitBtn.disabled = false;
-        submitBtn.textContent = "Créer l'évènement";
+        submitBtn.textContent = isEdit ? 'Enregistrer les modifications' : "Créer l'évènement";
         return;
       }
 
-      const createdId = res.evenementId;
-      msg.innerHTML = '<div class="evt-form-success">✅ Évènement créé (transaction atomique).</div>';
+      const resultId = res.evenementId || MODAL_CREATE_EDIT_ID;
+      msg.innerHTML = '<div class="evt-form-success">✅ '
+        + (isEdit ? 'Modifications enregistrées.' : 'Évènement créé (transaction atomique).')
+        + '</div>';
 
       const modalBody = document.querySelector('#evt-overlay-create .evt-modal-body');
       if (modalBody) modalBody.scrollTop = 0;
@@ -5579,9 +5739,11 @@
       setTimeout(async () => {
         closeModalCreate();
         await reloadEvents();
-        // Ouvre la fiche si compétition (pour ajustements voie « lente »)
-        if (familleEvt === 'competition' && createdId) {
-          openFiche(createdId);
+        // Ouvre la fiche : toujours en édition, ou si compétition en création
+        if (isEdit && resultId) {
+          openFiche(resultId);
+        } else if (familleEvt === 'competition' && resultId) {
+          openFiche(resultId);
         }
       }, 500);
     } catch (err) {
@@ -5591,7 +5753,7 @@
       const modalBody = document.querySelector('#evt-overlay-create .evt-modal-body');
       if (modalBody) modalBody.scrollTop = 0;
       submitBtn.disabled = false;
-      submitBtn.textContent = "Créer l'évènement";
+      submitBtn.textContent = MODAL_CREATE_EDIT_ID ? 'Enregistrer les modifications' : "Créer l'évènement";
     }
   }
 
@@ -6213,7 +6375,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init v1.46 (S3 · staff filtre categorie)');
+    console.log('🏉 MOM Hub · Évènements Browser — init v1.47 (S3 · edition complete)');
 
     const list = document.getElementById('evt-list');
 
@@ -6287,7 +6449,7 @@
     closeFiche:        closeFiche
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.46 (S3 · staff filtre categorie) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.47 (S3 · edition complete) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
