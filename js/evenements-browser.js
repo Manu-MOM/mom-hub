@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.34 — Plateau : adversaires multiples par équipe (poule) + nom de poule (30 mai 2026)
+ * Version : 1.35 — Match officiel/amical à 2+ équipes → comportement plateau (30 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -1136,6 +1136,29 @@
  *          identiques ; buildAdvParEquipeLines modifiée (tracée) + helpers
  *          neufs. Provenance md5 : v1.33 (f29a3fa6) → v1.34 (recollé après
  *          écriture, joint).
+ *
+ *   v1.35 : Match officiel/amical à 2+ équipes → comportement PLATEAU
+ *          (coquille terrain). Le mode était calculé par le seul sous-type :
+ *          match_championnat/match_amical → toujours A3 (mono-adversaire),
+ *          même avec 2 équipes cochées → un seul champ adversaire affiché.
+ *          Or 2 de nos équipes engagées = chacune son/ses adversaire(s)
+ *          (cohérent avec le texte d'aide « 2+ = multi-équipes »). Fix :
+ *          (A) calcul du mode — MATCH_SIMPLE_SOUS_TYPES (championnat/amical)
+ *          bascule A3→A4 dès _nbEqCochees >= 2 (lecture des cases cochées) ;
+ *          à 1 équipe, reste A3. (B) le hook change des cases équipe appelle
+ *          désormais updateCreateConditionalFields() (recalcul du mode),
+ *          plus seulement updateMultiEquipesUI() — peuplerEquipesEngagees
+ *          étant idempotent (_eq4aLoadedForCat), la case cochée n'est pas
+ *          détruite. Le submit était DÉJÀ correct (isA3 = cbList.length===1,
+ *          donc 2 équipes → branche plateau, lecture adv par équipe v1.34).
+ *          phasesOui basé sur PHASES_SOUS_TYPES → aucune exigence de phase
+ *          pour un match à 2 équipes. Le sous-type stocké ne change pas.
+ *
+ *          ZÉRO SQL, RPC inchangée, evenements.html + supabase-client.js
+ *          NON touchés. Invariants byte-identiques (modifs dans
+ *          updateCreateConditionalFields + hook change, hors fonctions
+ *          invariantes). Provenance md5 : v1.34 (436de799) → v1.35 (recollé
+ *          après écriture, joint).
  */
 
 (function () {
@@ -3821,12 +3844,25 @@
     // A4 plateau = matchs simples (adversaires par équipe), JAMAIS de phases.
     const PHASES_OBLIG_SOUS_TYPES = PHASES_SOUS_TYPES;  // A5
     const PHASES_OPTIONNEL_SOUS_TYPES = ['plateau'];    // A4 (multi-équipes, matchs simples)
+    // v1.35 — Nombre d'équipes cochées (coquille terrain) : un match
+    // officiel/amical (match_championnat/match_amical) avec 2+ de NOS
+    // équipes engagées n'est plus un match simple à 1 adversaire — chaque
+    // équipe a son/ses adversaire(s). Il bascule donc en comportement
+    // PLATEAU (A4 : adversaires par équipe). Cohérent avec le texte d'aide
+    // « 1 équipe = match simple (A3) · 2+ = multi-équipes ». À 1 équipe,
+    // il reste A3 (mono-adversaire). Le sous-type stocké en base ne change
+    // pas (toujours match_championnat/match_amical) ; seul le COMPORTEMENT
+    // de saisie s'adapte au nombre d'équipes.
+    const _nbEqCochees = document.querySelectorAll(
+      '#evt-create-equipes .evt-eng-equipe-cb:checked').length;
+    const MATCH_SIMPLE_SOUS_TYPES = ['match_championnat', 'match_amical'];
     let mode = 'A1';
     if (famille === 'entrainement')      mode = 'A1';
     else if (famille === 'stage')         mode = 'A2';
     else if (famille === 'competition') {
       if (PHASES_OBLIG_SOUS_TYPES.indexOf(sousType) !== -1)     mode = 'A5';
       else if (PHASES_OPTIONNEL_SOUS_TYPES.indexOf(sousType) !== -1) mode = 'A4';
+      else if (MATCH_SIMPLE_SOUS_TYPES.indexOf(sousType) !== -1 && _nbEqCochees >= 2) mode = 'A4';
       else                                                      mode = 'A3';
     }
 
@@ -4559,7 +4595,13 @@
         const line = cb.closest('.evt-eng-equipe-line');
         const fmtRow = line ? line.querySelector('.evt-eng-format-inline') : null;
         if (fmtRow) fmtRow.style.display = cb.checked ? 'inline-flex' : 'none';
-        updateMultiEquipesUI();
+        // v1.35 — Recalcule le MODE (pas seulement les blocs multi-équipes) :
+        // un match officiel/amical bascule A3↔A4 selon qu'on coche 1 ou 2+
+        // équipes. updateCreateConditionalFields rappelle updateMultiEquipesUI
+        // en fin de course, et peuplerEquipesEngagees est idempotent
+        // (_eq4aLoadedForCat) → la case qu'on vient de cocher n'est pas
+        // détruite.
+        updateCreateConditionalFields();
       });
     });
   }
@@ -5734,7 +5776,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init v1.34 (S3 · plateau adversaires multiples)');
+    console.log('🏉 MOM Hub · Évènements Browser — init v1.35 (S3 · match 2+ equipes = plateau)');
 
     const list = document.getElementById('evt-list');
 
@@ -5808,7 +5850,7 @@
     closeFiche:        closeFiche
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.34 (S3 · plateau adversaires multiples) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.35 (S3 · match 2+ equipes = plateau) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
