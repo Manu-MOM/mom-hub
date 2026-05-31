@@ -1,11 +1,9 @@
 -- ============================================================
--- FIX — get_evenements_passes : évènements multi-équipes visibles
+-- FIX v6 — get_evenements_passes : tournoi multi-équipes COMPLET
 -- ============================================================
--- Même bug que get_evenements_a_venir : le filtre équipe sur
--- e.equipe_id excluait les évènements RACINE multi-équipes (tournoi/
--- plateau, e.equipe_id NULL, équipes dans M3). Même correctif :
--- garder si rattachement direct OU équipe engagée (M3).
--- Seule la clause de filtre équipe change ; reste identique.
+-- Même évolution que get_evenements_a_venir v6 : charge les descendants
+-- (phases + matchs des DEUX équipes) d'un tournoi passé où l'équipe est
+-- engagée. Seule la clause de filtre équipe change.
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION public.get_evenements_passes(p_equipe_id uuid DEFAULT NULL::uuid, p_jours_passes integer DEFAULT 30, p_limit integer DEFAULT 50)
@@ -59,6 +57,17 @@ AS $function$
         SELECT 1 FROM evenement_equipes_engagees m3
         WHERE m3.evenement_id = e.id
           AND m3.equipe_id = p_equipe_id
+      )
+      -- v6 — descendant (phase/match) d'un tournoi où l'équipe est engagée.
+      OR EXISTS (
+        SELECT 1
+        FROM evenements parent
+        JOIN evenement_equipes_engagees m3r ON m3r.evenement_id = parent.id
+        WHERE m3r.equipe_id = p_equipe_id
+          AND parent.id IN (
+            e.evenement_parent_id,
+            (SELECT pp.evenement_parent_id FROM evenements pp WHERE pp.id = e.evenement_parent_id)
+          )
       )
     )
   ORDER BY e.date_debut DESC
