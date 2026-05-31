@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.40 — Matchs par equipe + coherence noms equipe + banniere Groupes de base (31 mai 2026)
+ * Version : 1.41 — Heure masquee si minuit UTC (faux 2h des evts crees sans heure) (31 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -1266,6 +1266,24 @@
  *          bindFicheEvents MODIFIÉS (tracé) ; buildPhasesParEquipeList +
  *          buildAffectationsN2Lines byte-identiques. Provenance md5 :
  *          v1.39 (f589c731) → v1.40 (recollé après écriture, joint).
+ *
+ *   v1.41 : Heure « 2h » fantôme corrigée. Un évènement créé sans heure
+ *          (input type=date, v3.4) est stocké à minuit UTC (00:00:00+00) ;
+ *          affiché en heure de Paris (UTC+2 l'été) ça donnait « 2h » dans
+ *          la cellule Horaires de la fiche — une heure que l'utilisateur
+ *          n'a jamais saisie. Fix dans formatHeureOnly (helper central, donc
+ *          corrige fiche + matchs + phases d'un coup) : si getUTCHours()===0
+ *          ET getUTCMinutes()===0 (minuit UTC pile = heure non saisie) →
+ *          renvoie '' (rien affiché). Les vraies heures (entraînements 18h
+ *          Paris = 16h UTC, etc.) ont getUTCHours()≠0 → affichées normalement.
+ *          Cellule Horaires de la fiche masquée si aucune heure significative
+ *          (évite cellule vide / « → » orphelin).
+ *
+ *          evenements.html + supabase-client.js NON touchés. formatHeureOnly
+ *          + cellule Horaires renderFiche MODIFIÉS (tracé) ;
+ *          buildPhasesParEquipeList + buildAffectationsN2Lines byte-
+ *          identiques. Provenance md5 : v1.40 (ca0ce515) → v1.41 (recollé
+ *          après écriture, joint).
  */
 
 (function () {
@@ -1488,6 +1506,13 @@
   function formatHeureOnly(isoString) {
     if (!isoString) return '';
     const d = new Date(isoString);
+    // v1.41 — Heure NON significative : un évènement créé sans heure (input
+    // type=date, v3.4) est stocké à minuit UTC (00:00:00+00). Affiché en
+    // heure de Paris ça donnait un faux « 2h » (UTC+2 en été). On teste les
+    // composantes UTC (pas locales) : minuit UTC pile = pas d'heure saisie
+    // → on n'affiche rien. Les vraies heures (entraînements 18h Paris =
+    // 16h UTC, etc.) ont getUTCHours()≠0 → affichées normalement.
+    if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0) return '';
     const h = d.getHours();
     const m = d.getMinutes();
     return m === 0 ? h + 'h' : h + 'h' + String(m).padStart(2, '0');
@@ -2708,16 +2733,24 @@
     // ────────────────────────────────────────────────
     html += '<div class="evt-fiche-banniere-n1">';
 
-    // HORAIRES (toujours visible si date_debut)
+    // HORAIRES — affichée seulement si une heure SIGNIFICATIVE existe
+    // (v1.41 : formatHeureOnly renvoie '' pour minuit UTC = créé sans heure).
+    // Évite une cellule « Horaires » vide ou un « → » orphelin.
     if (evt.date_debut) {
-      let horairesCellule = escHtml(formatHeureOnly(evt.date_debut));
-      if (evt.date_fin) {
-        horairesCellule += ' → ' + escHtml(formatHeureOnly(evt.date_fin));
+      const hDeb = formatHeureOnly(evt.date_debut);
+      const hFin = evt.date_fin ? formatHeureOnly(evt.date_fin) : '';
+      let horairesCellule = escHtml(hDeb);
+      if (hFin) {
+        horairesCellule = horairesCellule
+          ? horairesCellule + ' → ' + escHtml(hFin)
+          : escHtml(hFin);
       }
-      html += '<div class="evt-fiche-n1-cellule">';
-      html += '<div class="evt-fiche-n1-label">Horaires</div>';
-      html += '<div class="evt-fiche-n1-value">' + horairesCellule + '</div>';
-      html += '</div>';
+      if (horairesCellule) {
+        html += '<div class="evt-fiche-n1-cellule">';
+        html += '<div class="evt-fiche-n1-label">Horaires</div>';
+        html += '<div class="evt-fiche-n1-value">' + horairesCellule + '</div>';
+        html += '</div>';
+      }
     }
 
     // LIEU + sous-ligne domicile/extérieur
@@ -5998,7 +6031,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init v1.40 (S3 · matchs par equipe + UX groupes)');
+    console.log('🏉 MOM Hub · Évènements Browser — init v1.41 (S3 · heure minuit UTC masquee)');
 
     const list = document.getElementById('evt-list');
 
@@ -6072,7 +6105,7 @@
     closeFiche:        closeFiche
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.40 (S3 · matchs par equipe + UX groupes) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.41 (S3 · heure minuit UTC masquee) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
