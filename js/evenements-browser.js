@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.52 — Fiche : retablissement du bouton 📝 Notes (modal de saisie dedie, champ notes redevenu remplissable) (31 mai 2026)
+ * Version : 1.53 — Fiche : bouton Retour au calendrier retire partout (redondant avec la croix) (31 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -1462,6 +1462,19 @@
  *          pure de l'existant). buildPhasesParEquipeList +
  *          buildAffectationsN2Lines byte-identiques. Provenance md5 :
  *          v1.51 (7d30f85f) → v1.52 (recollé après écriture, joint).
+ *
+ *   v1.53 : FICHE — bouton « ← Retour au calendrier » RETIRÉ (partout, tous
+ *          écrans). Redondant avec la croix ✕ qui ferme la fiche sur tous les
+ *          écrans (décision Manu : retirer partout, pas seulement desktop). Le
+ *          rendu du bouton (.evt-fiche-back) est supprimé de renderFiche ; le
+ *          handler retour-calendrier reste (inoffensif, plus de cible). Le
+ *          « ↩ Retour au tournoi parent » (.evt-fiche-back-parent) est
+ *          CONSERVÉ (action distincte). La règle CSS mobile-only (min-width
+ *          769px) ajoutée en v1.50 côté evenements.html est RETIRÉE → le HTML
+ *          revient byte-identique à d802f559 (pas de redéploiement HTML
+ *          nécessaire). ZÉRO SQL. buildPhasesParEquipeList +
+ *          buildAffectationsN2Lines byte-identiques. Provenance md5 :
+ *          v1.52 (456c7294) → v1.53 (recollé après écriture, joint).
  */
 
 (function () {
@@ -2885,7 +2898,9 @@
     // (1) HEADER NAVIGATION : retour calendrier F-4 + retour parent contextuel
     // ────────────────────────────────────────────────
     html += '<div class="evt-fiche-header">';
-    html += '<button type="button" class="evt-btn evt-fiche-back" data-action="retour-calendrier">← Retour au calendrier</button>';
+    // v1.53 — Bouton « ← Retour au calendrier » RETIRÉ (partout) : redondant
+    // avec la croix ✕ qui ferme la fiche sur tous les écrans. Le « ↩ Retour
+    // au tournoi parent » ci-dessous est conservé (action distincte).
     if (evt.evenement_parent_id) {
       const parent = EVENTS_BY_ID[evt.evenement_parent_id];
       if (parent) {
@@ -6507,7 +6522,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init v1.52 (S3 · bouton Notes retabli)');
+    console.log('🏉 MOM Hub · Évènements Browser — init v1.53 (S3 · retour calendrier retire)');
 
     const list = document.getElementById('evt-list');
 
@@ -6581,7 +6596,7 @@
     closeFiche:        closeFiche
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.52 (S3 · bouton Notes retabli) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.53 (S3 · retour calendrier retire) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
