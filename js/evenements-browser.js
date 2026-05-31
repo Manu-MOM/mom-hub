@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.42 — Submit lit les horaires detailles et les passe a la RPC v7 (31 mai 2026)
+ * Version : 1.43 — Fiche affiche les horaires detailles (RDV/debut/fin), libelle adapte au type (31 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -1298,6 +1298,26 @@
  *          racines) ; buildPhasesParEquipeList + buildAffectationsN2Lines
  *          byte-identiques. Provenance md5 : v1.41 (95ba7da3) → v1.42
  *          (recollé après écriture, joint).
+ *
+ *   v1.43 : Horaires détaillés — ÉTAPE 4/4 (affichage fiche). La section
+ *          « Rendez-vous » de la fiche affichait toujours « non saisi » +
+ *          dette MODELE-EVT-HORAIRES-RDV 🔴. Maintenant que les horaires
+ *          sont persistés (étapes 1-3), la section (renommée « Rendez-vous &
+ *          horaires ») affiche les valeurs réelles : RDV (heure + lieu),
+ *          début, fin prévue ; lignes construites seulement si renseignées ;
+ *          repli « non saisi » honnête si tout vide ; DETTE LEVÉE (footnote
+ *          retirée). Libellé du début ADAPTÉ au type (retour terrain) :
+ *          « Début des matchs » (compétition) / « Début des activités »
+ *          (stage) / « Début de l'entraînement » (entraînement). Helper
+ *          local fmtT : TIME base "HH:MM:SS" → "HHhMM".
+ *          ACCOMPAGNÉ du fix SQL v7 (get_evenements_a_venir/passes) qui
+ *          REMONTE les 4 colonnes horaires (RETURNS TABLE + SELECT) — sans
+ *          ça, evt.debut_match serait undefined côté fiche malgré la base.
+ *          RESTE (volet B, tracé) : libellés ADAPTATIFS dans le FORMULAIRE
+ *          de création (evenements.html + JS) selon le type sélectionné.
+ *          renderFiche MODIFIÉ (tracé) ; buildPhasesParEquipeList +
+ *          buildAffectationsN2Lines byte-identiques. Provenance md5 :
+ *          v1.42 (dec1db5f) → v1.43 (recollé après écriture, joint).
  */
 
 (function () {
@@ -2854,12 +2874,49 @@
       html += '</div>';
     }
 
-    // RENDEZ-VOUS (dette MODELE-EVT-HORAIRES-RDV 🟠 — dégradation honnête)
-    html += '<div class="evt-fiche-n2-cellule evt-fiche-n2-dette">';
-    html += '<div class="evt-fiche-n2-label">Rendez-vous</div>';
-    html += '<div class="evt-fiche-n2-value evt-fiche-n2-empty">— non saisi</div>';
-    html += '<div class="evt-fiche-n2-footnote">Dette modèle <code>MODELE-EVT-HORAIRES-RDV</code> 🟠</div>';
-    html += '</div>';
+    // RENDEZ-VOUS & HORAIRES (v1.43 — dette MODELE-EVT-HORAIRES-RDV LEVÉE :
+    // les horaires détaillés sont désormais persistés (colonnes TIME/TEXT +
+    // RPC v7 + submit v1.42). Affichage des valeurs réelles, repli « non
+    // saisi » honnête si vide. Libellé du début adapté au type d'évènement.
+    {
+      // Format TIME base "HH:MM:SS" → "HHhMM" (ou "HHh" si minutes nulles).
+      const fmtT = function (t) {
+        if (!t) return '';
+        const parts = String(t).split(':');
+        const h = parseInt(parts[0], 10);
+        const m = parseInt(parts[1] || '0', 10);
+        if (isNaN(h)) return '';
+        return m === 0 ? h + 'h' : h + 'h' + String(m).padStart(2, '0');
+      };
+      // Libellé « début » adapté au type (retour terrain) :
+      const labelDebut = evt.type_evenement === 'competition' ? 'Début des matchs'
+                       : evt.type_evenement === 'stage'        ? 'Début des activités'
+                       : 'Début de l\'entraînement';
+      const hDeb = fmtT(evt.debut_match);
+      const hFin = fmtT(evt.fin_prevue);
+      const hRdv = fmtT(evt.rdv_heure);
+      const lRdv = (evt.rdv_lieu || '').trim();
+
+      // Lignes construites seulement si renseignées.
+      const lignes = [];
+      if (hRdv || lRdv) {
+        let rdv = 'RDV';
+        if (hRdv) rdv += ' ' + escHtml(hRdv);
+        if (lRdv) rdv += (hRdv ? ' · ' : ' ') + escHtml(lRdv);
+        lignes.push(rdv);
+      }
+      if (hDeb) lignes.push(escHtml(labelDebut) + ' ' + escHtml(hDeb));
+      if (hFin) lignes.push('Fin prévue ' + escHtml(hFin));
+
+      html += '<div class="evt-fiche-n2-cellule">';
+      html += '<div class="evt-fiche-n2-label">Rendez-vous & horaires</div>';
+      if (lignes.length > 0) {
+        html += '<div class="evt-fiche-n2-value">' + lignes.join('<br>') + '</div>';
+      } else {
+        html += '<div class="evt-fiche-n2-value evt-fiche-n2-empty">— non saisi</div>';
+      }
+      html += '</div>';
+    }
 
     // STATUT COMPOSITIONS
     const compoSummary = evt.compo_status_summary;
@@ -6058,7 +6115,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init v1.42 (S3 · horaires detailles submit)');
+    console.log('🏉 MOM Hub · Évènements Browser — init v1.43 (S3 · horaires detailles fiche)');
 
     const list = document.getElementById('evt-list');
 
@@ -6132,7 +6189,7 @@
     closeFiche:        closeFiche
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.42 (S3 · horaires detailles submit) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.43 (S3 · horaires detailles fiche) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
