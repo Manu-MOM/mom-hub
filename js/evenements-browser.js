@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.39 — Fiche : matchs affiches sous chaque phase (hierarchie 3 niveaux) (31 mai 2026)
+ * Version : 1.40 — Matchs par equipe + coherence noms equipe + banniere Groupes de base (31 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -1243,6 +1243,29 @@
  *          renderFiche MODIFIÉ (tracé) ; buildPhasesParEquipeList +
  *          buildAffectationsN2Lines byte-identiques. Provenance md5 :
  *          v1.38 (ad38da26) → v1.39 (recollé après écriture, joint).
+ *
+ *   v1.40 : Trois retours terrain (fiche tournoi).
+ *          (n°1) Matchs groupés par PHASE puis par ÉQUIPE : sous chaque
+ *          phase, un sous-titre par équipe engagée (« SAR/MOM-M14-1 », etc.)
+ *          puis ses matchs. v1.39 fusionnait toutes équipes → on ne savait
+ *          pas qui affrontait qui. Regroupement par equipe_id, nom via
+ *          eqNames, repli UUID ; sous-titre masqué si une seule équipe.
+ *          (n°2) Cohérence des noms d'équipe : eqNames utilise désormais
+ *          nom_officiel EN PREMIER (homogène : SAR/MOM-M14-1 / -2) au lieu
+ *          de libelle_court (incohérent : « M14 » pour M14-1, null→repli
+ *          pour M14-2). Corrige aussi les vignettes Compositions/Groupes
+ *          (renderFonctionCellule reçoit eqNames, non modifié).
+ *          (n°3) Bannière « prochaine étape » pleine largeur au-dessus de
+ *          la grille des fonctionnalités, mettant en avant Groupes de base
+ *          (compétition + ≥1 équipe). Additive (grille des 8 fonctions =
+ *          invariant NON touché) : bandeau cliquable data-action=
+ *          focus-groupe-base → scrolle + surligne la vignette « groupes »
+ *          existante. Handler neuf, réutilise la cellule, ne la duplique pas.
+ *
+ *          evenements.html + supabase-client.js NON touchés. renderFiche +
+ *          bindFicheEvents MODIFIÉS (tracé) ; buildPhasesParEquipeList +
+ *          buildAffectationsN2Lines byte-identiques. Provenance md5 :
+ *          v1.39 (f589c731) → v1.40 (recollé après écriture, joint).
  */
 
 (function () {
@@ -2079,8 +2102,14 @@
               evt._equipesClub = Array.isArray(_liste) ? _liste : [];
               evt._equipesClub.forEach(function (e) {
                 if (e && e.id) {
+                  // v1.40 (n°2 cohérence) — nom_officiel EN PREMIER : il est
+                  // rempli et homogène pour toutes les équipes (SAR/MOM-M14-1,
+                  // SAR/MOM-M14-2). libelle_court était incohérent (M14-1 →
+                  // « M14 », M14-2 → null → repli nom long) d'où l'affichage
+                  // mixte « M14 » vs « SAR/MOM-M14-2 ». Repli libelle_court/
+                  // code/id si nom_officiel absent.
                   evt._equipeNames[e.id] =
-                    e.libelle_court || e.nom_officiel || e.code || e.id;
+                    e.nom_officiel || e.libelle_court || e.code || e.id;
                 }
               });
             }
@@ -2852,6 +2881,29 @@
     //     selon nombre d'équipes engagées (1→direct INVARIANT, N→expand).
     // ────────────────────────────────────────────────
     html += '<div class="evt-fiche-grille-fonctions">';
+
+    // v1.40 (n°3 retour terrain) — Bannière « prochaine étape » pleine
+    // largeur mettant en avant Groupes de base, l'étape logique juste après
+    // la création d'une compétition. Additive (ne modifie pas la grille des
+    // 8 fonctions, invariant) : un simple bandeau cliquable au-dessus.
+    // Cliquer scrolle/ouvre la vignette Groupes de base existante (action
+    // partagée 'focus-groupe-base' → handler qui met en avant la cellule).
+    // Affichée seulement si l'étape est pertinente (compétition + au moins
+    // une équipe engagée).
+    if (isCompetition && eqEng.length > 0) {
+      html += '<button type="button" class="evt-fiche-next-step" '
+        + 'data-action="focus-groupe-base" '
+        + 'style="display:block; width:100%; text-align:left; cursor:pointer; '
+        + 'border:1px solid var(--vert-pelouse); border-radius:10px; '
+        + 'background:rgba(45,106,79,0.06); padding:14px 16px; margin-bottom:14px;">'
+        + '<div style="font-weight:700; color:var(--vert-pelouse); font-size:1.05em;">'
+        + '👥 Groupes de base</div>'
+        + '<div style="color:var(--ink-mute); margin-top:2px;">'
+        + 'Prochaine étape : sélectionnez votre groupe de base parmi le vivier '
+        + 'de vos joueurs&nbsp;!</div>'
+        + '</button>';
+    }
+
     html += '<div class="evt-fiche-grille-titre">Fonctionnalités de l\'évènement</div>';
     html += '<div class="evt-fiche-grille-list">';
 
@@ -2943,23 +2995,16 @@
     //     Regroupement par phase identique v1.24 (structure préservée).
     // ────────────────────────────────────────────────
     if (isTournoi && enfants.length > 0) {
-      // v1.39 — FIX hiérarchie 3 niveaux : les enfants DIRECTS de la
-      // racine sont les PHASE-BOÎTES (libellé = nom de phase) ; les MATCHS
-      // (vs X) sont les enfants des phase-boîtes (CHILDREN_BY_PARENT[
-      // phaseBox.id]), pas de la racine. L'ancien code affichait les
-      // phase-boîtes elles-mêmes comme des matchs → « (adv. à déterminer) »
-      // partout. On regroupe désormais par phase, et sous chaque phase on
-      // liste ses VRAIS matchs. Une même phase peut venir de 2 équipes
-      // engagées (équipe_1 + équipe_2) → on fusionne par phase_libelle et
-      // on agrège leurs matchs respectifs.
+      // v1.40 — Groupement par phase PUIS par ÉQUIPE (retour terrain :
+      // savoir quelle équipe affronte quel adversaire). Sous chaque phase,
+      // les matchs sont regroupés par equipe_id, avec un sous-titre
+      // d'équipe (nom via eqNames, repli UUID). v1.39 fusionnait toutes
+      // équipes confondues → on ne savait pas qui jouait quoi.
       const phases = [];
-      const matchsByPhase = {};
+      const matchsByPhase = {};   // phase -> [matchs]
       enfants.forEach(function (phaseBox) {
         const p = phaseBox.phase_libelle || phaseBox.libelle || '(sans phase)';
         if (!matchsByPhase[p]) { matchsByPhase[p] = []; phases.push(p); }
-        // Matchs = enfants de cette phase-boîte. Fallback : si la
-        // phase-boîte n'a pas d'enfants mais porte elle-même un
-        // adversaire (structure 2 niveaux), on la traite comme un match.
         const matchsDeLaPhase = CHILDREN_BY_PARENT[phaseBox.id] || [];
         if (matchsDeLaPhase.length > 0) {
           matchsDeLaPhase.forEach(function (m) { matchsByPhase[p].push(m); });
@@ -2978,25 +3023,45 @@
             + '<em style="color:var(--ink-mute)">(aucun match)</em></span></div>';
           return;
         }
-        matchs.forEach(function (child) {
-          const heure = formatHeureOnly(child.date_debut);
-          const childBadge = statutCompoBadge(child.compo_status_summary);
-          const childLibStartsVs = (child.libelle || '').toLowerCase().indexOf('vs ') === 0;
-          const advBlock = childLibStartsVs
-            ? ''
-            : (child.adversaire_nom
-                ? ' · vs ' + escHtml(child.adversaire_nom)
-                : ' · <em style="color:var(--ink-mute)">(adv. à déterminer)</em>');
-          const isChildAnnule = child.etat === 'annule';
-          html += '<div class="evt-fiche-phase-row">';
-          html += '<span class="evt-fiche-phase-heure">' + escHtml(heure) + '</span>';
-          html += '<span style="flex:1;">' + escHtml(child.libelle || '') + advBlock + '</span>';
-          if (isChildAnnule) {
-            html += '<span class="evt-card-badge evt-badge-annule evt-badge-sm">Annulé</span>';
-          } else {
-            html += '<span class="evt-card-badge evt-badge-' + childBadge.cls + ' evt-badge-sm">' + escHtml(childBadge.libelle) + '</span>';
+        // Regroupe les matchs de cette phase par équipe (ordre d'apparition).
+        const eqOrder = [];
+        const byEq = {};
+        matchs.forEach(function (m) {
+          const k = m.equipe_id || '_sans_equipe';
+          if (!byEq[k]) { byEq[k] = []; eqOrder.push(k); }
+          byEq[k].push(m);
+        });
+        eqOrder.forEach(function (eqKey) {
+          // Sous-titre équipe (sauf si une seule équipe sans id → on
+          // n'affiche pas de sous-titre superflu).
+          const nomEq = (eqKey !== '_sans_equipe')
+            ? (eqNames[eqKey] || eqKey)
+            : null;
+          if (nomEq && (eqOrder.length > 1 || eqKey !== '_sans_equipe')) {
+            html += '<div class="evt-fiche-phase-equipe" '
+              + 'style="font-size:0.85em; font-weight:600; color:var(--vert-pelouse); '
+              + 'margin:6px 0 2px 18px;">' + escHtml(nomEq) + '</div>';
           }
-          html += '</div>';
+          byEq[eqKey].forEach(function (child) {
+            const heure = formatHeureOnly(child.date_debut);
+            const childBadge = statutCompoBadge(child.compo_status_summary);
+            const childLibStartsVs = (child.libelle || '').toLowerCase().indexOf('vs ') === 0;
+            const advBlock = childLibStartsVs
+              ? ''
+              : (child.adversaire_nom
+                  ? ' · vs ' + escHtml(child.adversaire_nom)
+                  : ' · <em style="color:var(--ink-mute)">(adv. à déterminer)</em>');
+            const isChildAnnule = child.etat === 'annule';
+            html += '<div class="evt-fiche-phase-row">';
+            html += '<span class="evt-fiche-phase-heure">' + escHtml(heure) + '</span>';
+            html += '<span style="flex:1;">' + escHtml(child.libelle || '') + advBlock + '</span>';
+            if (isChildAnnule) {
+              html += '<span class="evt-card-badge evt-badge-annule evt-badge-sm">Annulé</span>';
+            } else {
+              html += '<span class="evt-card-badge evt-badge-' + childBadge.cls + ' evt-badge-sm">' + escHtml(childBadge.libelle) + '</span>';
+            }
+            html += '</div>';
+          });
         });
       });
       html += '</div>';
@@ -3306,6 +3371,19 @@
         const target = document.getElementById('evt-phases-detail');
         if (target && target.scrollIntoView) {
           target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    });
+    // v1.40 (n°3) — Bannière « prochaine étape » : scrolle vers la vignette
+    // Groupes de base (data-fonction-section="groupes") et la met en
+    // évidence brièvement. Réutilise la cellule existante, ne la duplique pas.
+    document.querySelectorAll('[data-action="focus-groupe-base"]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        const cell = document.querySelector('[data-fonction-section="groupes"]');
+        if (cell && cell.scrollIntoView) {
+          cell.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          cell.classList.add('evt-card-highlight');
+          setTimeout(function () { cell.classList.remove('evt-card-highlight'); }, 1500);
         }
       });
     });
@@ -5920,7 +5998,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init v1.39 (S3 · matchs sous phases)');
+    console.log('🏉 MOM Hub · Évènements Browser — init v1.40 (S3 · matchs par equipe + UX groupes)');
 
     const list = document.getElementById('evt-list');
 
@@ -5994,7 +6072,7 @@
     closeFiche:        closeFiche
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.39 (S3 · matchs sous phases) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.40 (S3 · matchs par equipe + UX groupes) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
