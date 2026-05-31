@@ -19,7 +19,7 @@
  * écran dédié, pas une extension de l'éditeur (l'éditeur = U-N3,
  * étape c). Aucune logique d'éditeur dupliquée (P1).
  *
- * Version : 1.0 — étape (b) chantier Collectif & compo 3 niveaux.
+ * Version : 1.1 — flèches de parcours (← fiche évènement / compositions →) ; v1.0 étape (b) chantier Collectif & compo 3 niveaux.
  *   v1.0 : 2 colonnes (vivier N1 / groupe N2) ; filtres rôle+statut
  *          + recherche nom (UN2-1/2/6) ; statut sous-ligne (UN2-2) ;
  *          cumul inter-équipes du même évènement visible non bloqué
@@ -29,6 +29,13 @@
  *          validation » (UN2-4) ; bandeau bas N2→N3 (UN2-7). Zéro
  *          localStorage/sessionStorage (état en mémoire). Dégradation
  *          honnête sur chaque erreur (jamais de trou silencieux).
+ *   v1.1 : Flèches de PARCOURS dans l'en-tête (barre #gb-parcours, révélée
+ *          après loadContext). « ← Fiche évènement » → evenements.html?fiche=
+ *          <ctx.evenement.id> (deep-link lu par evenements-browser v1.54, la
+ *          fiche étant un modal sans URL propre). « Compositions → » →
+ *          compositions.html?evenement_equipe=<State.evtEqId> (même paramètre
+ *          que cet écran). Href remplis dynamiquement dans renderHeader (ids
+ *          connus après contexte). Matérialise le flux N2 → fiche / N2 → N3.
  */
 (function (global) {
   'use strict';
@@ -66,7 +73,10 @@
     grpStaff:     () => document.getElementById('gb-grp-staff'),
     cntJoueurs:   () => document.getElementById('gb-cnt-joueurs'),
     cntStaff:     () => document.getElementById('gb-cnt-staff'),
-    banner:       () => document.getElementById('gb-banner')
+    banner:       () => document.getElementById('gb-banner'),
+    parcours:     () => document.getElementById('gb-parcours'),
+    navFiche:     () => document.getElementById('gb-nav-fiche'),
+    navCompo:     () => document.getElementById('gb-nav-compo')
   };
 
   // ----------------------------------------------------------
@@ -171,6 +181,23 @@
     DOM.title().textContent = 'Groupe de base — ' + equipeLib;
     DOM.subPlateau().textContent = evtLib + (evtDate ? ' · ' + evtDate : '');
     DOM.subCollectif().textContent = 'Collectif ' + collLib;
+
+    // Navigation du parcours : ← Fiche évènement (modal sans URL → deep-link
+    // evenements.html?fiche=<id>, lu par evenements-browser v1.54) ;
+    // Compositions → (même évènement_equipe que cet écran). On remplit les
+    // href dynamiquement (ids connus seulement après loadContext) et on
+    // révèle la barre.
+    const evId = ctx.evenement && ctx.evenement.id;
+    const navFiche = DOM.navFiche();
+    const navCompo = DOM.navCompo();
+    if (navFiche && evId) {
+      navFiche.setAttribute('href', 'evenements.html?fiche=' + encodeURIComponent(evId));
+    }
+    if (navCompo && State.evtEqId) {
+      navCompo.setAttribute('href', 'compositions.html?evenement_equipe=' + encodeURIComponent(State.evtEqId));
+    }
+    const parcours = DOM.parcours();
+    if (parcours) parcours.style.display = 'flex';
   }
 
   function groupeIds() {
