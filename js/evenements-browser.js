@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.43 — Fiche affiche les horaires detailles (RDV/debut/fin), libelle adapte au type (31 mai 2026)
+ * Version : 1.44 — Horaires detailles pour TOUS les types + labels formulaire adaptatifs (31 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -1318,6 +1318,23 @@
  *          renderFiche MODIFIÉ (tracé) ; buildPhasesParEquipeList +
  *          buildAffectationsN2Lines byte-identiques. Provenance md5 :
  *          v1.42 (dec1db5f) → v1.43 (recollé après écriture, joint).
+ *
+ *   v1.44 : Horaires détaillés — VOLET B (formulaire de création).
+ *          (1) Le bloc horaires s'affiche désormais pour TOUS les types
+ *          (showHoraires = true) — avant : A3/A4/A5 (compétition) seulement,
+ *          donc absent en entraînement (A1) et stage (A2). Retour terrain :
+ *          les horaires sont utiles pour tous.
+ *          (2) Libellé du champ « début » ADAPTÉ au type sélectionné, comme
+ *          en fiche : « Début des matchs » (compétition) / « des activités »
+ *          (stage) / « de l'entraînement » (entraînement). Mise à jour du
+ *          <label for="evt-create-debut-match"> dans updateMultiEquipesUI
+ *          (au même endroit que le calcul du mode), sans toucher au HTML.
+ *          Accompagné côté HTML (evenements.html, déployé v3.4) du retrait
+ *          du bandeau jaune « pour mémoire » (faux : horaires persistés) +
+ *          MAJ du commentaire bloc 6.
+ *          buildPhasesParEquipeList + buildAffectationsN2Lines byte-
+ *          identiques. Provenance md5 : v1.43 (e2dc7e5b) → v1.44 (recollé
+ *          après écriture, joint).
  */
 
 (function () {
@@ -4177,7 +4194,7 @@
     // ──────────────────────────────────────────────────────────────
     const showCompet      = famille === 'competition';            // Bloc 3 sous-type
     const showEngagement  = famille === 'competition';            // Bloc 8 engagement
-    const showHoraires    = mode === 'A3' || mode === 'A4' || mode === 'A5'; // Bloc 6 horaires détaillés
+    const showHoraires    = true;                                // Bloc 6 horaires détaillés — TOUS les types (v1.44 : A1-A5)
     const showRecurrence  = mode === 'A1';                        // Bloc 7 série récurrente
     const showMultijours  = mode === 'A4' || mode === 'A5';       // Toggle multi-jours
     const showDateFin     = famille === 'stage';                  // Date fin auto pour stage
@@ -4201,6 +4218,17 @@
     setDisplay('evt-create-compet-group',                showCompet);
     setDisplay('evt-create-engagement',                  showEngagement);
     setDisplay('evt-create-horaires-detailles-zone',     showHoraires);
+    // v1.44 (volet B) — Libellé du champ « début » adapté au type, comme en
+    // fiche (cohérence). Cible le <label for="evt-create-debut-match"> sans
+    // toucher au HTML. Famille connue ici (entrainement|stage|competition).
+    {
+      const _lblDebut = document.querySelector('label[for="evt-create-debut-match"]');
+      if (_lblDebut) {
+        _lblDebut.textContent = famille === 'competition' ? 'Début des matchs'
+                              : famille === 'stage'        ? 'Début des activités'
+                              : 'Début de l\'entraînement';
+      }
+    }
     setDisplay('evt-create-recurrence-zone',             showRecurrence);
     setDisplay('evt-create-multijours-toggle-group',     showMultijours);
     // v1.33 — La date de fin ne s'affiche à l'ouverture que si le type
@@ -6115,7 +6143,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init v1.43 (S3 · horaires detailles fiche)');
+    console.log('🏉 MOM Hub · Évènements Browser — init v1.44 (S3 · horaires tous types + labels)');
 
     const list = document.getElementById('evt-list');
 
@@ -6189,7 +6217,7 @@
     closeFiche:        closeFiche
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.43 (S3 · horaires detailles fiche) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.44 (S3 · horaires tous types + labels) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
