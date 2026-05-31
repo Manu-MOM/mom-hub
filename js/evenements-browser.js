@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.44 — Horaires detailles pour TOUS les types + labels formulaire adaptatifs (31 mai 2026)
+ * Version : 1.45 — Cablage encadrants : peuplerStaff branche sur listStaffDisponibles (31 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -1335,6 +1335,25 @@
  *          buildPhasesParEquipeList + buildAffectationsN2Lines byte-
  *          identiques. Provenance md5 : v1.43 (e2dc7e5b) → v1.44 (recollé
  *          après écriture, joint).
+ *
+ *   v1.45 : Câblage des ENCADRANTS (zone « Encadrement » du formulaire de
+ *          création). Bug : peuplerStaff() cherchait les wrappers
+ *          listStaffParCategorie / listCollectifMembresStaff qui n'ont
+ *          JAMAIS existé → fallback « wrapper non livré », zone vide, aucun
+ *          encadrant cochable, payload.encadrants toujours vide. Or le
+ *          wrapper réellement livré (v1.34 supabase-client) est
+ *          listStaffDisponibles() (RPC list_staff_disponibles sql/56,
+ *          SECURITY DEFINER, sortie {personne_id,nom,prenom} — exactement
+ *          ce que peuplerStaff attend). Fix : branchement de
+ *          listStaffDisponibles EN PREMIER dans peuplerStaff (fallbacks
+ *          conservés). Chaîne complète rétablie : liste peuplée → cases
+ *          cochées → payload.encadrants (uuid[]) → RPC insère M8
+ *          evenement_encadrants. TRACÉ : la RPC renvoie TOUT le staff (46,
+ *          toutes catégories), pas filtré M14 — raffinement ultérieur (la
+ *          RPC n'a pas de paramètre catégorie). ZÉRO SQL, supabase-client
+ *          + HTML NON touchés. buildPhasesParEquipeList +
+ *          buildAffectationsN2Lines byte-identiques. Provenance md5 :
+ *          v1.44 (48d4c2e4) → v1.45 (recollé après écriture, joint).
  */
 
 (function () {
@@ -4379,9 +4398,18 @@
 
     let membres = [];
     try {
-      // Pattern défensif : si SupabaseHub.listStaffParCategorie n'existe pas
-      // (wrapper potentiellement non livré), on tombe sur fallback honnête.
-      if (typeof SupabaseHub.listStaffParCategorie === 'function') {
+      // v1.45 — CÂBLAGE encadrants : le wrapper réellement livré est
+      // listStaffDisponibles() (RPC list_staff_disponibles, SECURITY
+      // DEFINER, sql/56). peuplerStaff cherchait listStaffParCategorie /
+      // listCollectifMembresStaff qui n'ont jamais existé → zone vide
+      // (« wrapper non livré »). On branche d'abord listStaffDisponibles.
+      // Note : cette RPC renvoie TOUT le staff (46, toutes catégories),
+      // pas filtré CTX_CATEGORIE_ID — acceptable (le coach coche les bons) ;
+      // un filtrage par catégorie serait un raffinement ultérieur (la RPC
+      // ne prend pas de paramètre catégorie aujourd'hui).
+      if (typeof SupabaseHub.listStaffDisponibles === 'function') {
+        membres = await SupabaseHub.listStaffDisponibles();
+      } else if (typeof SupabaseHub.listStaffParCategorie === 'function') {
         membres = await SupabaseHub.listStaffParCategorie(CTX_CATEGORIE_ID);
       } else if (typeof SupabaseHub.listCollectifMembresStaff === 'function') {
         membres = await SupabaseHub.listCollectifMembresStaff(CTX_CATEGORIE_ID);
@@ -6143,7 +6171,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init v1.44 (S3 · horaires tous types + labels)');
+    console.log('🏉 MOM Hub · Évènements Browser — init v1.45 (S3 · cablage encadrants)');
 
     const list = document.getElementById('evt-list');
 
@@ -6217,7 +6245,7 @@
     closeFiche:        closeFiche
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.44 (S3 · horaires tous types + labels) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.45 (S3 · cablage encadrants) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
