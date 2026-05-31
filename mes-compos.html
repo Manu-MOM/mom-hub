@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mes compositions · MOM Hub</title>
+  <link rel="icon" type="image/png" href="assets/logo-m2m.png">
+  <meta name="description" content="Mes évènements avec compositions — MOM Hub." />
+
+  <link rel="stylesheet" href="css/hub.css">
+
+  <style>
+    body.auth-pending { visibility: hidden; }
+
+    .mc-layout { max-width: 1000px; margin: 0 auto; padding: 28px 22px 60px; }
+
+    .mc-head { margin-bottom: 22px; }
+    .mc-title {
+      font-family: 'Oswald', sans-serif; font-size: 24px; font-weight: 500;
+      color: var(--ink); letter-spacing: 0.3px; margin: 0 0 4px;
+    }
+    .mc-subtitle {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      letter-spacing: 0.12em; color: var(--ink-mute); text-transform: uppercase;
+    }
+
+    .mc-list { display: flex; flex-direction: column; gap: 10px; }
+
+    .mc-row {
+      display: flex; align-items: center; gap: 16px;
+      background: #fff; border: 1px solid var(--line); border-radius: 12px;
+      padding: 16px 20px; cursor: pointer;
+      text-decoration: none; color: inherit;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .mc-row:hover { border-color: var(--vert-prairie); }
+    .mc-row__type {
+      font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 600;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--vert-prairie); background: var(--vert-light);
+      padding: 4px 10px; border-radius: 4px; white-space: nowrap;
+    }
+    .mc-row__main { flex: 1; min-width: 0; }
+    .mc-row__label {
+      font-family: 'Oswald', sans-serif; font-size: 17px; font-weight: 500;
+      color: var(--ink); letter-spacing: 0.2px;
+    }
+    .mc-row__meta {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      letter-spacing: 0.1em; color: var(--ink-mute); text-transform: uppercase;
+      margin-top: 3px;
+    }
+    .mc-row__state {
+      font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 500;
+      letter-spacing: 0.16em; text-transform: uppercase;
+      padding: 4px 12px; border-radius: 4px; white-space: nowrap;
+      background: var(--paper-warm); color: var(--ink-soft); border: 1px solid var(--line);
+    }
+    .mc-row__state.state-brouillon { color: var(--ink-mute); }
+    .mc-row__state.state-validee   { color: var(--vert-prairie); border-color: var(--vert-prairie); }
+    .mc-row__state.state-utilisee  { color: var(--bleu-base);    border-color: var(--bleu-base); }
+    .mc-row__state.state-archivee  { color: var(--ink-mute); opacity: 0.6; }
+    .mc-row__chev { color: var(--ink-mute); font-size: 16px; }
+
+    .mc-empty, .mc-loading {
+      text-align: center; padding: 48px 20px;
+      color: var(--ink-mute); font-size: 15px;
+    }
+    .mc-empty__hint {
+      font-size: 13px; color: var(--ink-mute); margin-top: 8px;
+    }
+
+    @media (max-width: 640px) {
+      .mc-row { flex-wrap: wrap; gap: 8px 12px; }
+      .mc-row__main { flex-basis: 100%; order: 3; }
+    }
+  </style>
+</head>
+<body class="auth-pending">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo"><img src="assets/logo-m2m.png" alt="MOM Rugby"></div>
+      <div class="brand-text">
+        <h1>MOM Hub</h1>
+        <p>Mutzig Ovalie Molsheim</p>
+      </div>
+    </div>
+
+    <div class="season-pill">SAISON 2025 / 2026</div>
+
+    <nav class="main-nav">
+      <a href="./">Tableau de bord</a>
+      <a class="active">Compositions</a>
+      <a>Annuaire</a>
+      <a>Configuration</a>
+    </nav>
+
+    <div class="icon-row">
+      <button class="icon-btn" title="Recherche" aria-label="Recherche">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      </button>
+      <button class="icon-btn has-notif" title="Notifications" aria-label="Notifications">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+      </button>
+    </div>
+
+    <div class="user-profile">
+      <div class="avatar">EJ</div>
+      <div class="user-info">
+        <div class="user-name">Emmanuel Jung</div>
+        <div class="user-role">Référent M14</div>
+      </div>
+      <a href="./" class="user-action" title="Retour au portail" aria-label="Retour au portail">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/></svg>
+      </a>
+      <button type="button" class="user-action" id="btn-signout" title="Se déconnecter" aria-label="Se déconnecter">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="mc-layout">
+    <div class="mc-head">
+      <h2 class="mc-title">Mes compositions</h2>
+      <p class="mc-subtitle">Les évènements pour lesquels une feuille existe</p>
+    </div>
+
+    <div id="mc-list" class="mc-list">
+      <div class="mc-loading">Chargement…</div>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/supabase-client.js"></script>
+
+  <script>
+    (async function () {
+      'use strict';
+
+      const session = await SupabaseHub.getSession();
+      if (!session) { window.location.replace('login.html'); return; }
+      const roles = await SupabaseHub.getMyRoles();
+      const isAdminOrCoach = roles.indexOf('admin') !== -1 || roles.indexOf('coach') !== -1;
+      if (!isAdminOrCoach) { window.location.replace('./'); return; }
+
+      document.body.classList.remove('auth-pending');
+      document.body.classList.add('auth-resolved');
+      if (roles.indexOf('admin') !== -1) document.body.classList.add('auth-admin');
+
+      const signoutBtn = document.getElementById('btn-signout');
+      if (signoutBtn) {
+        signoutBtn.addEventListener('click', async function () {
+          signoutBtn.disabled = true;
+          await SupabaseHub.signOut();
+        });
+      }
+      SupabaseHub.onAuthChange(function (event) {
+        if (event === 'SIGNED_OUT') window.location.replace('login.html');
+      });
+
+      const MOIS = ['janvier','février','mars','avril','mai','juin','juillet',
+                    'août','septembre','octobre','novembre','décembre'];
+      const JOURS = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+      function formatDateLong(iso) {
+        if (!iso) return '';
+        const d = new Date(iso);
+        if (isNaN(d.getTime())) return '';
+        return JOURS[d.getDay()] + ' ' + d.getDate() + ' ' + MOIS[d.getMonth()] + ' ' + d.getFullYear();
+      }
+      function libelleType(t) {
+        switch (t) {
+          case 'entrainement': return 'Entraînement';
+          case 'stage':        return 'Stage';
+          case 'competition':  return 'Compétition';
+          default:             return t || '—';
+        }
+      }
+      function libelleEtat(e) {
+        switch (e) {
+          case 'brouillon': return 'Brouillon';
+          case 'validee':   return 'Validée';
+          case 'utilisee':  return 'Utilisée';
+          case 'archivee':  return 'Archivée';
+          default:          return e || '';
+        }
+      }
+      function escapeHtml(s) {
+        return String(s == null ? '' : s)
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+      }
+
+      const host = document.getElementById('mc-list');
+
+      let rows = [];
+      try {
+        rows = await SupabaseHub.listMesEvenementsAvecCompos(100);
+      } catch (err) {
+        console.error('MOM Hub: mes-compos chargement', err);
+        rows = [];
+      }
+
+      const usable = (rows || []).filter(function (r) {
+        return r && r.evenement && r.evenement_equipe_id;
+      });
+
+      if (usable.length === 0) {
+        host.innerHTML =
+          '<div class="mc-empty">' +
+            'Aucune composition pour le moment.' +
+            '<div class="mc-empty__hint">Crée une feuille depuis la fiche d\'un évènement.</div>' +
+          '</div>';
+        return;
+      }
+
+      host.innerHTML = '';
+      usable.forEach(function (r) {
+        const evt = r.evenement;
+        const equipe = r.equipe && r.equipe.libelle ? r.equipe.libelle : '';
+        const meta = formatDateLong(evt.date_debut) + (equipe ? '  ·  ' + equipe : '');
+
+        const a = document.createElement('a');
+        a.className = 'mc-row';
+        a.href = 'compositions.html?evenement_equipe=' + encodeURIComponent(r.evenement_equipe_id);
+        a.innerHTML =
+          '<span class="mc-row__type">' + escapeHtml(libelleType(evt.type_evenement)) + '</span>' +
+          '<span class="mc-row__main">' +
+            '<span class="mc-row__label">' + escapeHtml(evt.libelle || 'Évènement') + '</span>' +
+            '<span class="mc-row__meta">' + escapeHtml(meta) + '</span>' +
+          '</span>' +
+          '<span class="mc-row__state state-' + escapeHtml(r.etat || '') + '">' + escapeHtml(libelleEtat(r.etat)) + '</span>' +
+          '<span class="mc-row__chev" aria-hidden="true">›</span>';
+        host.appendChild(a);
+      });
+
+      console.log(
+        '%c🏉 Mes compositions chargé',
+        'color: #2D7D46; font-weight: bold;',
+        { lignes: usable.length }
+      );
+    })();
+  </script>
+</body>
+</html>
