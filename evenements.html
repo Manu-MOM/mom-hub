@@ -1906,19 +1906,15 @@
         </div>
 
         <!-- ====================================================
-             BLOC 6 — Horaires détaillés (modes A3/A4/A5, masqué A1/A2)
-             D7 §3.1.6 doc UX, F17 résolu UI. Persistance DIFFÉRÉE :
-             dette modèle MODELE-EVT-HORAIRES-RDV 🟠 ouverte, ces
-             champs NE SONT PAS envoyés à creer_evenement_complet
-             (sql/52) — bandeau jaune honnête, JS L3 les ignore au
-             submit. Saisis pour mémoire utilisateur uniquement.
+             BLOC 6 — Horaires détaillés (TOUS les types : entraînement,
+             stage, compétition — v1.44). D7 §3.1.6 doc UX, F17 résolu UI.
+             PERSISTÉS : colonnes debut_match/fin_prevue/rdv_heure (TIME) +
+             rdv_lieu (TEXT), envoyés à creer_evenement_complet v7 et
+             affichés en fiche. Dette MODELE-EVT-HORAIRES-RDV LEVÉE.
+             Le libellé du champ « début » est adapté au type par le JS
+             (Début des matchs / des activités / de l'entraînement).
              ==================================================== -->
         <div class="evt-form-group" id="evt-create-horaires-detailles-zone" style="display:none;">
-          <div class="evt-bandeau-info"
-               id="evt-create-horaires-bandeau"
-               style="background:#fff8e1; border-left:4px solid #ffc107; padding:8px 12px; margin-bottom:8px;">
-            ⚠ Horaires détaillés (RDV / fin prévue / lieu RDV) saisis pour mémoire — persistance différée, dette modèle <code>MODELE-EVT-HORAIRES-RDV</code> en cours.
-          </div>
           <div class="evt-form-group-row">
             <div class="evt-form-group">
               <label class="evt-form-label" for="evt-create-debut-match">Début match</label>
