@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.51 — Fiche : dette MODELE-EVT-NOTES close (notes = texte libre), marqueur retire de l'UI (31 mai 2026)
+ * Version : 1.52 — Fiche : retablissement du bouton 📝 Notes (modal de saisie dedie, champ notes redevenu remplissable) (31 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -1448,6 +1448,20 @@
  *          touchés. buildPhasesParEquipeList + buildAffectationsN2Lines byte-
  *          identiques. Provenance md5 : v1.50 (543767c7) → v1.51 (recollé
  *          après écriture, joint).
+ *
+ *   v1.52 : FICHE — bouton « 📝 Notes » RÉTABLI. Constat : le champ
+ *          notes_internes s'affichait (lecture, Niveau 2) mais n'était
+ *          remplissable NULLE PART d'accessible — son bouton d'ouverture avait
+ *          été retiré quand les Notes ont été absorbées en lecture (v1.24),
+ *          alors que le modal de saisie dédié (#evt-overlay-notes) et toute sa
+ *          chaîne (openModalEditNotes / submitModalEditNotes via updateEvenement
+ *          / close-notes) restaient INTACTS et câblés. On rajoute (1) le bouton
+ *          « 📝 Notes » dans les actions de la fiche (entre Modifier et
+ *          Dupliquer, etat éditable), (2) son handler notes-from-fiche →
+ *          openModalEditNotes(id). ZÉRO modif du modal/HTML/SQL (réutilisation
+ *          pure de l'existant). buildPhasesParEquipeList +
+ *          buildAffectationsN2Lines byte-identiques. Provenance md5 :
+ *          v1.51 (7d30f85f) → v1.52 (recollé après écriture, joint).
  */
 
 (function () {
@@ -3370,6 +3384,7 @@
     html += '<div class="evt-fiche-actions">';
     if (editableEtat) {
       html += '<button type="button" class="evt-btn evt-btn-primary" data-action="edit-from-fiche" data-event-id="' + escHtml(evt.id) + '">✏️ Modifier</button>';
+      html += '<button type="button" class="evt-btn" data-action="notes-from-fiche" data-event-id="' + escHtml(evt.id) + '">📝 Notes</button>';
       html += '<button type="button" class="evt-btn" data-action="duplicate-from-fiche" data-event-id="' + escHtml(evt.id) + '">📋 Dupliquer</button>';
       html += '<div class="evt-fiche-actions-spacer"></div>';
       html += '<button type="button" class="evt-btn evt-btn-danger" data-action="cancel-from-fiche" data-event-id="' + escHtml(evt.id) + '">🗑 Supprimer</button>';
@@ -3536,6 +3551,18 @@
         // (édition complète : méta + horaires + équipes + phases + matchs +
         // encadrants), au lieu de l'ancien modal d'édition réduit aux méta.
         if (id) { closeFiche(); openModalEditComplet(id); }
+      });
+    });
+    // ── RÉTABLI v1.52 : bouton « 📝 Notes » → modal de saisie dédié
+    //    (openModalEditNotes). Le modal et sa chaîne submit existaient déjà
+    //    (intacts) mais son bouton d'ouverture avait été retiré quand les
+    //    Notes ont été absorbées en lecture dans le Niveau 2 → champ devenu
+    //    orphelin en écriture. On ne ferme PAS la fiche (le modal notes se
+    //    superpose puis rouvre la fiche après save).
+    document.querySelectorAll('[data-action="notes-from-fiche"]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        const id = this.getAttribute('data-event-id');
+        if (id) openModalEditNotes(id);
       });
     });
     // ── NEUF v1.25 (§3.3 ACTIONS) : Dupliquer = rouvre modale création
@@ -6480,7 +6507,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init v1.51 (S3 · dette notes close)');
+    console.log('🏉 MOM Hub · Évènements Browser — init v1.52 (S3 · bouton Notes retabli)');
 
     const list = document.getElementById('evt-list');
 
@@ -6554,7 +6581,7 @@
     closeFiche:        closeFiche
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.51 (S3 · dette notes close) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.52 (S3 · bouton Notes retabli) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
