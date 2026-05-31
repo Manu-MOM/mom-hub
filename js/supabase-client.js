@@ -18,7 +18,16 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.38 — mai 2026
+ * Version : 1.39 — mai 2026
+ *   v1.39 : wrapper listMesEvenementsAvecCompos(limit) pour la page-
+ *          raccourci P1 (« mes évènements avec compos », lien Compositions
+ *          du menu). Liste 1 ligne par compo de base ACTIVE = 1 feuille
+ *          d'équipe engagée. Part de compositions et embarque l'évènement
+ *          + l'équipe engagée via la FK evenement_equipe_id (N3) — PAS de
+ *          jointure evenements!inner mono-équipe, contrairement à
+ *          listCompositionsByEquipe : les tournois multi-équipes (equipe_id
+ *          NULL, ex. Challenge Vié) remontent enfin. Addition pure, aucun
+ *          wrapper existant touché.
  *   v1.38 : wrapper listMatchsDeLequipe(racineId, equipeId) pour les
  *          onglets de compo de match (étape 6c-6) : récupère 2 niveaux
  *          d'évènements sous la racine, filtre par equipe_id + présence
@@ -4731,6 +4740,91 @@
     },
 
     /**
+     * P1 — Liste « mes évènements avec compos » pour la page-raccourci
+     * (lien « Compositions » du menu). Une ligne par COMPO DE BASE
+     * ACTIVE = une feuille d'équipe engagée.
+     *
+     * Pourquoi un wrapper neuf et pas listCompositionsByEquipe : ce
+     * dernier joint evenements!inner sur evenements.equipe_id = M14,
+     * ce qui EXCLUT les évènements multi-équipes (tournois, equipe_id
+     * NULL) — prouvé à la source (Challenge Vié, equipe_id NULL, 2
+     * bases d'équipes engagées invisibles côté tableau de bord). Ici
+     * on part de compositions et on embarque l'évènement + l'équipe
+     * engagée par la FK evenement_equipe_id (N3), sans filtre mono-
+     * équipe → les tournois remontent.
+     *
+     * Embeds calqués sur getEvenementEquipeContext (prouvé déployé) :
+     *   compositions → evenements (libellé/date/type)
+     *   compositions → evenement_equipes_engagees → equipes (libellé)
+     * Si PostgREST renvoie une ambiguïté d'embed (PGRST201) sur
+     * evenement_equipes_engagees, désambiguïser par le nom de
+     * contrainte FK (pattern projet pt 15). Au boot, le 1ᵉʳ appel
+     * tranchera.
+     *
+     * Filtre : type_compo='base' + est_active=true + cote='mom'
+     * (la feuille MOM, pas un éventuel côté adverse). evenement_equipe_id
+     * NOT NULL implicite (une base sans équipe engagée = compo legacy
+     * mono-équipe, hors scope multi-équipes ; on l'inclut quand même
+     * si elle porte un evenement_id résoluble — voir mapping).
+     *
+     * @param {number} [limit=100] plafond de lignes
+     * @returns {Promise<Array>} lignes prêtes pour l'affichage :
+     *   [{ compo_id, etat, evenement_equipe_id, evenement: {id, libelle,
+     *      date_debut, type_evenement}, equipe: {id, libelle} }]
+     *   triées par date d'évènement décroissante ; [] si erreur
+     *   (dégradation honnête, pattern getVivierCompo).
+     */
+    async listMesEvenementsAvecCompos(limit = 100) {
+      const { data, error } = await client
+        .from('compositions')
+        .select(`
+          id, etat, est_active, type_compo, cote,
+          evenement_equipe_id,
+          evenements ( id, code, libelle, date_debut, type_evenement ),
+          evenement_equipes_engagees (
+            id, equipe_id,
+            equipes ( id, code, libelle_court, nom_officiel )
+          )
+        `)
+        .eq('type_compo', 'base')
+        .eq('est_active', true)
+        .eq('cote', 'mom')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (error) {
+        console.error('MOM Hub: listMesEvenementsAvecCompos()', error);
+        return [];
+      }
+      const rows = Array.isArray(data) ? data : [];
+      const out = rows.map(function (c) {
+        const evt = c.evenements || null;
+        const eee = c.evenement_equipes_engagees || null;
+        const team = (eee && eee.equipes) ? eee.equipes : null;
+        const equipeLibelle = team
+          ? (team.libelle_court || team.nom_officiel || team.code || '')
+          : '';
+        return {
+          compo_id: c.id,
+          etat: c.etat,
+          evenement_equipe_id: c.evenement_equipe_id,
+          evenement: evt ? {
+            id:             evt.id,
+            libelle:        evt.libelle,
+            date_debut:     evt.date_debut,
+            type_evenement: evt.type_evenement
+          } : null,
+          equipe: team ? { id: team.id, libelle: equipeLibelle } : null
+        };
+      });
+      out.sort(function (a, b) {
+        const da = (a.evenement && a.evenement.date_debut) || '';
+        const db = (b.evenement && b.evenement.date_debut) || '';
+        return db.localeCompare(da);
+      });
+      return out;
+    },
+
+    /**
      * U-admin pioche — « les joueurs de la catégorie » (doc UX §4) :
      * personnes affectées (equipe_joueurs ACTIVE, date_sortie IS
      * NULL) à une equipe dont entente_id = l'entente sélectionnée.
@@ -5342,7 +5436,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.37 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.39 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
