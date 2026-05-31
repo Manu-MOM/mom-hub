@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.32 — Fix collision code evenements (entropie HHMMSS + rand6) (30 mai 2026)
+ * Version : 1.33 — Date de fin masquée tant que « plusieurs jours » décoché (30 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -1091,6 +1091,27 @@
  *          + supabase-client.js NON touchés. Invariants byte-identiques
  *          (generateEventCode hors fonctions invariantes). Provenance md5 :
  *          v1.31 (bdff2789) → v1.32 (recollé après écriture, joint).
+ *
+ *   v1.33 : Date de fin masquée tant que « Sur plusieurs jours » décoché
+ *          (détail terrain). Symptôme : en mode tournoi/plateau (A4/A5),
+ *          le champ DATE FIN s'affichait dès l'ouverture alors que la case
+ *          « Sur plusieurs jours » n'était pas cochée. Cause : dans
+ *          updateCreateConditionalFields, setDisplay('…-date-fin-group',
+ *          showDateFin || showMultijours) → proposer la case multijours
+ *          (showMultijours vrai en A4/A5) affichait AUSSI la date de fin
+ *          immédiatement, avant toute interaction. Fix : la date de fin
+ *          ne s'affiche à l'ouverture que si showDateFin (type qui la
+ *          porte nativement, ex. stage) OU si la case multijours est
+ *          EFFECTIVEMENT cochée (showMultijours && toggle.checked) ; sinon
+ *          c'est le handler change de la case qui la révèle. form.reset()
+ *          à l'ouverture (openModalCreate) décoche la case → pas d'état
+ *          résiduel entre deux créations. Handler change inchangé.
+ *
+ *          ZÉRO SQL, RPC inchangée, evenements.html + supabase-client.js
+ *          NON touchés. 1 ligne logique modifiée dans
+ *          updateCreateConditionalFields (hors fonctions invariantes).
+ *          Provenance md5 : v1.32 (5ba27fb9) → v1.33 (recollé après
+ *          écriture, joint).
  */
 
 (function () {
@@ -3821,7 +3842,16 @@
     setDisplay('evt-create-horaires-detailles-zone',     showHoraires);
     setDisplay('evt-create-recurrence-zone',             showRecurrence);
     setDisplay('evt-create-multijours-toggle-group',     showMultijours);
-    setDisplay('evt-create-date-fin-group',              showDateFin || showMultijours);
+    // v1.33 — La date de fin ne s'affiche à l'ouverture que si le type
+    // la porte nativement (showDateFin, ex. stage). En mode multijours
+    // (A4/A5), on affiche la CASE « Sur plusieurs jours » mais la date de
+    // fin reste MASQUÉE tant que la case n'est pas cochée — c'est le
+    // handler change de la case (bindEvents) qui la révèle. On préserve
+    // le cas « case déjà cochée » (réouverture/rebascule de type) en
+    // testant l'état réel de la case.
+    var _mjToggle = document.getElementById('evt-create-multijours-toggle');
+    var _mjChecked = !!(_mjToggle && _mjToggle.checked);
+    setDisplay('evt-create-date-fin-group',              showDateFin || (showMultijours && _mjChecked));
     setDisplay('evt-create-format-group',                showFormatGlob);
     setDisplay('evt-create-adversaire-mono-group',       showAdvMono);
     setDisplay('evt-create-adv-par-equipe-zone',         showAdvParEq);
@@ -5594,7 +5624,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init v1.32 (S3 · fix collision code)');
+    console.log('🏉 MOM Hub · Évènements Browser — init v1.33 (S3 · date fin pilotee par multijours)');
 
     const list = document.getElementById('evt-list');
 
@@ -5668,7 +5698,7 @@
     closeFiche:        closeFiche
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.32 (S3 · fix collision code) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.33 (S3 · date fin pilotee par multijours) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
