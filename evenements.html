@@ -1105,6 +1105,17 @@
     color: var(--ink-mute);
     font-size: 11px;
   }
+  /* Le bouton « ← Retour au calendrier » fait doublon avec la croix ✕ sur
+   * desktop (où la croix est facile à viser). On le réserve au MOBILE, où
+   * un bouton texte explicite en haut de contenu est plus confortable que la
+   * petite croix du coin. Breakpoint projet : 768px. Le « Retour au tournoi
+   * parent » (.evt-fiche-back-parent), lui, reste visible partout (action
+   * distincte : remonter d'un match à son tournoi). */
+  @media (min-width: 769px) {
+    .evt-fiche-back {
+      display: none;
+    }
+  }
 
   /* --- (3) Bannière Niveau 1 : 5 cellules essentielles auto-adaptatives §3.2
    * HORAIRES · LIEU+domicile · ÉQUIPES ENGAGÉES+formats · ADVERSAIRES
