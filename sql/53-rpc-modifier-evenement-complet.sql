@@ -5,13 +5,25 @@
 -- au submit, on persiste TOUTES les modifications (méta + horaires +
 -- équipes engagées + adversaires + phases + matchs + encadrants).
 --
--- STRATÉGIE (décision technique, simplicité > diff fin) : « replace children ».
+-- STRATÉGIE (décision technique, simplicité > diff fin) : « replace children »
+--   POUR LES PHASES/MATCHS, mais RÉCONCILIATION PAR equipe_id POUR LES
+--   ÉQUIPES ENGAGÉES (M3) — sinon les compos de base cassent (cf. ci-dessous).
 --   • Racine (méta + horaires) → UPDATE.
---   • Enfants (M3 équipes, M5 adversaires, phases+matchs niveau evenements,
---     M8 encadrants) → SUPPRIMÉS puis RECRÉÉS depuis le payload (mêmes
---     structures que creer_evenement_complet v7). CASCADE FK supprime
---     automatiquement phases/matchs (evenement_parent_id), compositions,
---     présences, encadrants, équipes engagées.
+--   • Phases/matchs + encadrants → SUPPRIMÉS puis RECRÉÉS (pas de compo de
+--     match à ce stade ; CASCADE gère leurs descendants).
+--   • Équipes engagées (M3) → RÉCONCILIÉES par equipe_id : UPDATE si déjà
+--     présente (PRÉSERVE l'id), INSERT si nouvelle, DELETE si retirée. Les
+--     adversaires (M5) de chaque équipe sont vidés/recréés (sans compo).
+--
+-- POURQUOI NE PAS SUPPRIMER/RECRÉER LES M3 (bug corrigé) :
+--   compositions.evenement_equipe_id → FK SET NULL. La compo de BASE est
+--   rattachée à une équipe engagée via ce champ. Supprimer l'équipe engagée
+--   passe la compo de base à NULL ; or l'index
+--   idx_compositions_active_base_per_event_equipe_cote est UNIQUE sur
+--   (evenement_id, evenement_equipe_id, cote) avec NULLS NOT DISTINCT et
+--   WHERE est_active AND type_compo='base'. Deux compos de base → deux NULL
+--   → COLLISION → « duplicate key ». En préservant l'id de l'équipe engagée
+--   (UPDATE), la compo de base reste rattachée et l'unicité est respectée.
 --
 -- GARDE DE SÉCURITÉ (FK RESTRICT/NO ACTION) : avant de supprimer les
 --   phases/matchs (lignes evenements enfants), on REFUSE proprement si l'un
@@ -137,32 +149,66 @@ BEGIN
     updated_at         = NOW()
   WHERE id = p_evenement_id;
 
-  -- (4) SUPPRESSION des enfants (CASCADE gère phases/matchs/compos/présences/
-  --     encadrants/équipes engagées). On supprime explicitement les enfants
-  --     evenements (phases+matchs) ; M3/M8 partent par CASCADE de la racine
-  --     ? NON : la racine n'est pas supprimée. On supprime donc M3/M8/enfants
-  --     manuellement.
+  -- (4) SUPPRESSION des enfants SAUF les équipes engagées (M3).
+  --     Phases/matchs + encadrants supprimés et recréés (pas de compo de match
+  --     chez Manu à ce stade). Les ÉQUIPES ENGAGÉES (M3) ne sont PAS
+  --     supprimées ici : leur FK depuis compositions.evenement_equipe_id est
+  --     SET NULL → les supprimer ferait passer les compos de base à NULL, et
+  --     l'index unique idx_compositions_active_base_per_event_equipe_cote
+  --     (evenement_id, evenement_equipe_id, cote) NULLS NOT DISTINCT
+  --     entrerait en collision (2 compos base → (racine, NULL, mom)).
+  --     → On RÉCONCILIE les M3 par equipe_id en (5) (UPDATE/INSERT/DELETE),
+  --       ce qui PRÉSERVE l'id des équipes inchangées → compos de base intactes.
   DELETE FROM public.evenement_encadrants WHERE evenement_id = p_evenement_id;
   -- enfants phases+matchs (2 niveaux) : supprimer d'abord petits-enfants
   DELETE FROM public.evenements
    WHERE evenement_parent_id IN (
      SELECT id FROM public.evenements WHERE evenement_parent_id = p_evenement_id);
   DELETE FROM public.evenements WHERE evenement_parent_id = p_evenement_id;
-  -- M3 (et M5 adversaires + N2 partent par CASCADE de evenement_equipes_engagees)
-  DELETE FROM public.evenement_equipes_engagees WHERE evenement_id = p_evenement_id;
 
-  -- (5) RECRÉATION M3 + M5 (identique à creer_evenement_complet)
+  -- (5) RÉCONCILIATION des équipes engagées (M3) PAR equipe_id, pour préserver
+  --     les ids (donc les compos de base). Adversaires (M5) : pas de compo
+  --     dessus → on les vide et recrée par équipe (simple).
   IF p_equipes_engagees IS NOT NULL THEN
+    -- (5a) DELETE des équipes engagées ABSENTES du payload (retirées par le
+    --      coach). CASCADE supprime leurs M5/N2 ; SET NULL passe une éventuelle
+    --      compo de base à NULL (cas rare : on l'accepte ici, le coach a retiré
+    --      l'équipe en connaissance de cause — l'avertissement viendra avec le
+    --      diff fin ultérieur).
+    DELETE FROM public.evenement_equipes_engagees 
+     WHERE evenement_id = p_evenement_id
+       AND equipe_id NOT IN (
+         SELECT (e->>'equipe_id')::uuid
+         FROM jsonb_array_elements(p_equipes_engagees) e
+       );
+
     FOR v_engagement IN SELECT * FROM jsonb_array_elements(p_equipes_engagees) LOOP
-      INSERT INTO public.evenement_equipes_engagees (
-        evenement_id, equipe_id, format_de_jeu, ordre, notes
-      ) VALUES (
-        p_evenement_id,
-        (v_engagement->>'equipe_id')::uuid,
-        v_engagement->>'format_de_jeu',
-        NULLIF(v_engagement->>'ordre', '')::integer,
-        v_engagement->>'notes'
-      ) RETURNING id INTO v_evenement_equipe_id;
+      v_equipe_id_for_phase := (v_engagement->>'equipe_id')::uuid;
+
+      -- (5b) UPDATE si l'équipe est déjà engagée (préserve l'id → compo base) ;
+      --      sinon INSERT. On récupère l'id dans v_evenement_equipe_id.
+      SELECT id INTO v_evenement_equipe_id
+      FROM public.evenement_equipes_engagees
+      WHERE evenement_id = p_evenement_id AND equipe_id = v_equipe_id_for_phase
+      LIMIT 1;
+
+      IF v_evenement_equipe_id IS NULL THEN
+        INSERT INTO public.evenement_equipes_engagees (
+          evenement_id, equipe_id, format_de_jeu, ordre, notes
+        ) VALUES (
+          p_evenement_id, v_equipe_id_for_phase,
+          v_engagement->>'format_de_jeu',
+          NULLIF(v_engagement->>'ordre', '')::integer,
+          v_engagement->>'notes'
+        ) RETURNING id INTO v_evenement_equipe_id;
+      ELSE
+        UPDATE public.evenement_equipes_engagees SET
+          format_de_jeu = v_engagement->>'format_de_jeu',
+          ordre         = NULLIF(v_engagement->>'ordre', '')::integer,
+          notes         = v_engagement->>'notes',
+          updated_at    = NOW()
+        WHERE id = v_evenement_equipe_id;
+      END IF;
 
       v_local_id := v_engagement->>'evenement_equipe_id_local';
       IF v_local_id IS NOT NULL AND v_local_id <> '' THEN
@@ -175,6 +221,9 @@ BEGIN
         );
       END IF;
 
+      -- (5c) Adversaires (M5) : vider puis recréer pour CETTE équipe engagée
+      --      (aucune compo rattachée aux M5 → sans risque).
+      DELETE FROM public.evenement_adversaires WHERE evenement_equipe_id = v_evenement_equipe_id;
       IF v_engagement ? 'adversaires' AND jsonb_typeof(v_engagement->'adversaires') = 'array' THEN
         FOR v_adversaire IN SELECT * FROM jsonb_array_elements(v_engagement->'adversaires') LOOP
           INSERT INTO public.evenement_adversaires (
