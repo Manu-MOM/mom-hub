@@ -40,15 +40,16 @@
       color: var(--vert-prairie); background: var(--vert-light);
       padding: 4px 10px; border-radius: 4px; white-space: nowrap;
     }
-    .mc-row__main { flex: 1; min-width: 0; }
+    .mc-row__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
     .mc-row__label {
+      display: block;
       font-family: 'Oswald', sans-serif; font-size: 17px; font-weight: 500;
       color: var(--ink); letter-spacing: 0.2px;
     }
     .mc-row__meta {
+      display: block;
       font-family: 'JetBrains Mono', monospace; font-size: 11px;
       letter-spacing: 0.1em; color: var(--ink-mute); text-transform: uppercase;
-      margin-top: 3px;
     }
     .mc-row__state {
       font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 500;
