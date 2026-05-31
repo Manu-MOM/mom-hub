@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.36 — Match officiel/amical à 2+ équipes : 1 adversaire par équipe (pas plateau) (31 mai 2026)
+ * Version : 1.38 — Fiche/carte/suivi : detection tournoi via type_competition (phases enfin affichees) (31 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -1179,6 +1179,45 @@
  *          NON touchés. Invariants byte-identiques (buildAdvParEquipeLines
  *          hors fonctions invariantes suivies). Provenance md5 : v1.35
  *          (39c5b6a0) → v1.36 (recollé après écriture, joint).
+ *
+ *   v1.37 : Modals — plus de fermeture au clic HORS modal (retour terrain
+ *          critique : un clic accidentel sur le fond fermait le modal et
+ *          faisait perdre TOUTE la saisie — dramatique sur le formulaire
+ *          de création riche, 2 équipes × phases × adversaires). Le handler
+ *          générique .evt-overlay (click → si target===overlay, remove
+ *          'show') s'appliquait à TOUS les overlays, idem ficheOverlay.
+ *          Les deux handlers de clic-fond sont SUPPRIMÉS (décision Manu :
+ *          appliquer à tous les modals). Chaque modal garde son bouton de
+ *          fermeture explicite (close-create/edit/notes/logistique/cancel/
+ *          addmatch câblés L5526-5531 + croix close-fiche conservée) →
+ *          aucun modal prisonnier. On ne ferme plus QUE par bouton.
+ *
+ *          ZÉRO SQL, RPC inchangée, evenements.html + supabase-client.js
+ *          NON touchés. Invariants byte-identiques (modif dans bindEvents,
+ *          hors fonctions invariantes). Provenance md5 : v1.36 (23027526)
+ *          → v1.37 (recollé après écriture, joint).
+ *
+ *   v1.38 : Détection tournoi corrigée — phases/matchs ENFIN affichés
+ *          (carte, fiche, suivi). Bug terrain : un tournoi (Challenge Vié,
+ *          etc.) a en base type_evenement='competition' + type_competition=
+ *          'tournoi'. Or 3 endroits testaient `evt.type_evenement ===
+ *          'tournoi'` — TOUJOURS faux → la carte n'affichait pas le chevron
+ *          de déploiement, la fiche ne montrait pas la section « Phases du
+ *          tournoi » (et ne chargeait même pas les enfants : enfants =
+ *          isTournoi ? … : []), et le bloc Suivi ne listait pas les liens
+ *          par match. Données pourtant présentes (4 enfants confirmés en
+ *          base ET chargés côté client). Fix : helper estEvtAPhases(evt)
+ *          basé sur type_competition ∈ PHASES_SOUS_TYPES (source de vérité
+ *          unique), substitué aux 3 occurrences (renderCard L1534,
+ *          renderFiche L2576, renderSuiviSection L2323). Plus aucun test
+ *          actif sur type_evenement==='tournoi' (reste 1 commentaire).
+ *
+ *          ZÉRO SQL, RPC inchangée, evenements.html + supabase-client.js
+ *          NON touchés. INVARIANTS renderCard/renderFiche/renderSuiviSection
+ *          MODIFIÉS (tracé : vrai bug, détection corrigée — 1 ligne chacun
+ *          via le helper) ; buildPhasesParEquipeList + buildAffectationsN2Lines
+ *          byte-identiques. Provenance md5 : v1.37 (7a52ff5c) → v1.38
+ *          (recollé après écriture, joint).
  */
 
 (function () {
@@ -1196,6 +1235,17 @@
   // Décision Manu : multi-phases = tournoi + Challenge Vié + Inter-Ligues
   // + Seven. Cohérent doc FAIT FOI §3.4 (universalité par nommage libre).
   const PHASES_SOUS_TYPES = ['tournoi', 'challenge_vie', 'challenge_inter_ligues', 'seven'];
+
+  // v1.38 — Reconnaît un évènement « à phases » (tournoi/Vié/inter-ligues/
+  // Seven). FIX terrain : la détection se fait sur `type_competition`
+  // (valeur réelle en base, ex. 'tournoi') et NON sur `type_evenement`
+  // (qui vaut 'competition', jamais 'tournoi'). L'ancien test
+  // `type_evenement === 'tournoi'` était donc TOUJOURS faux → la carte et
+  // la fiche n'affichaient jamais les phases/matchs d'un tournoi pourtant
+  // présent en base. Source de vérité unique : PHASES_SOUS_TYPES.
+  function estEvtAPhases(evt) {
+    return !!evt && PHASES_SOUS_TYPES.indexOf(evt.type_competition) !== -1;
+  }
 
   const FENETRE_JOURS_AVENIR  = 90;
   const FENETRE_JOURS_PASSES  = 30;
@@ -1503,7 +1553,7 @@
       isPasse ? 'evt-card-passe' : ''
     ].filter(Boolean).join(' ');
 
-    const isTournoi = evt.type_evenement === 'tournoi';
+    const isTournoi = estEvtAPhases(evt);  // v1.38 — via type_competition
     const isExpanded = state.expandedTournois.has(evt.id);
     const enfants = CHILDREN_BY_PARENT[evt.id] || [];
 
@@ -2292,7 +2342,7 @@
     let html = '<div class="evt-fiche-section" id="evt-suivi-section">';
     html += '<div class="evt-fiche-section-title">🔗 Suivi de la rencontre</div>';
 
-    if (evt.type_evenement === 'tournoi') {
+    if (estEvtAPhases(evt)) {  // v1.38 — via type_competition (était type_evenement==='tournoi', tjrs faux)
       // A-Q3 : 1 lien par match enfant, DANS la structure du tournoi.
       // Réutilise le regroupement par phase déjà utilisé par la
       // section « Phases du tournoi » (structure non réinventée).
@@ -2545,7 +2595,7 @@
     let html = '';
 
     const isCompetition = evt.type_evenement === 'competition';
-    const isTournoi     = evt.type_evenement === 'tournoi';
+    const isTournoi     = estEvtAPhases(evt);  // v1.38 — via type_competition
     const isMatch       = evt.type_evenement === 'match';
     const eqEng  = Array.isArray(evt._equipesEngagees) ? evt._equipesEngagees : [];
     const advAll = Array.isArray(evt._adversaires) ? evt._adversaires : [];
@@ -5601,22 +5651,20 @@
       });
     }
 
-    document.querySelectorAll('.evt-overlay').forEach(overlay => {
-      overlay.addEventListener('click', function (e) {
-        if (e.target === overlay) overlay.classList.remove('show');
-      });
-    });
+    // v1.37 — Fermeture au clic sur le FOND retirée pour TOUS les overlays
+    // (retour terrain : un clic accidentel hors du modal fermait et faisait
+    // perdre toute la saisie — critique sur le formulaire de création riche,
+    // 2 équipes × phases × adversaires). Chaque modal a un bouton de
+    // fermeture explicite (close-create/edit/notes/logistique/cancel/
+    // addmatch + croix close-fiche, vérifiés), donc aucun modal n'est
+    // prisonnier. On ne ferme plus QUE par bouton explicite.
+    // (Anciens handlers de clic-fond .evt-overlay + ficheOverlay supprimés ;
+    //  le bouton croix close-fiche ci-dessous est CONSERVÉ.)
 
-    // Fermeture du panneau fiche détaillée
+    // Fermeture du panneau fiche détaillée par son bouton croix (conservé).
     document.querySelectorAll('[data-action="close-fiche"]').forEach(b => {
       b.addEventListener('click', closeFiche);
     });
-    const ficheOverlay = document.getElementById('evt-fiche-overlay');
-    if (ficheOverlay) {
-      ficheOverlay.addEventListener('click', function (e) {
-        if (e.target === ficheOverlay) closeFiche();
-      });
-    }
 
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') {
@@ -5823,7 +5871,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init v1.36 (S3 · match 2+ eq = 1 adv par equipe)');
+    console.log('🏉 MOM Hub · Évènements Browser — init v1.38 (S3 · detection tournoi corrigee)');
 
     const list = document.getElementById('evt-list');
 
@@ -5897,7 +5945,7 @@
     closeFiche:        closeFiche
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.36 (S3 · match 2+ eq = 1 adv par equipe) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.38 (S3 · detection tournoi corrigee) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
