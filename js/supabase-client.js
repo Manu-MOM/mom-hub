@@ -18,7 +18,13 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.37 — mai 2026
+ * Version : 1.38 — mai 2026
+ *   v1.38 : wrapper listMatchsDeLequipe(racineId, equipeId) pour les
+ *          onglets de compo de match (étape 6c-6) : récupère 2 niveaux
+ *          d'évènements sous la racine, filtre par equipe_id + présence
+ *          d'adversaire (isole les matchs réels des boîtes de phase),
+ *          trie par phase puis ordre_dans_phase. Addition pure, aucun
+ *          wrapper existant touché.
  *   v1.0 : initial (référentiels publics + getDashboardStats)
  *   v1.1 : ajout auth Magic Link (requestMagicLink, getSession) — Phase 2.5.3
  *   v1.2 : requestMagicLink calcule explicitement emailRedirectTo
@@ -2435,6 +2441,47 @@
       }
 
       return { ok: true, data: { compo: newCompo, joueurs: insertedJoueurs || [] } };
+    },
+
+    /**
+     * Liste les MATCHS d'une équipe dans un tournoi (pour les onglets de
+     * compo de match, étape 6c-6). Les matchs sont des lignes `evenements`
+     * descendantes de la racine `racineId` (enfants = phases, petits-enfants
+     * = matchs portant adversaire_nom). On récupère 2 niveaux sous la racine
+     * puis on filtre : equipe_id == equipeId ET (adversaire_nom non vide OU
+     * libellé « vs … »), ce qui isole les matchs réels (pas les phases).
+     * @param {string} racineId UUID racine (tournoi)
+     * @param {string} equipeId UUID equipe
+     * @returns {Promise<Array>} matchs triés par phase puis ordre
+     */
+    async listMatchsDeLequipe(racineId, equipeId) {
+      if (!racineId || !equipeId) return [];
+      const cols = 'id, libelle, adversaire_nom, phase_libelle, ordre_dans_phase, evenement_parent_id, equipe_id';
+      const { data: enfants, error: e1 } = await client
+        .from('evenements').select(cols).eq('evenement_parent_id', racineId);
+      if (e1) { console.error('MOM Hub: listMatchsDeLequipe() niveau 1', e1); return []; }
+      const phaseIds = (enfants || []).map(function (e) { return e.id; });
+      let petitsEnfants = [];
+      if (phaseIds.length > 0) {
+        const { data: pe, error: e2 } = await client
+          .from('evenements').select(cols).in('evenement_parent_id', phaseIds);
+        if (e2) { console.error('MOM Hub: listMatchsDeLequipe() niveau 2', e2); }
+        else { petitsEnfants = pe || []; }
+      }
+      const estMatch = function (e) {
+        if (!e || e.equipe_id !== equipeId) return false;
+        const adv = (e.adversaire_nom || '').trim();
+        const lib = (e.libelle || '').trim().toLowerCase();
+        return adv !== '' || lib.indexOf('vs ') === 0;
+      };
+      const pool = petitsEnfants.length > 0 ? petitsEnfants : (enfants || []);
+      const matchs = pool.filter(estMatch);
+      matchs.sort(function (a, b) {
+        const pa = a.phase_libelle || '', pb = b.phase_libelle || '';
+        if (pa !== pb) return pa.localeCompare(pb, 'fr');
+        return (a.ordre_dans_phase || 0) - (b.ordre_dans_phase || 0);
+      });
+      return matchs;
     },
 
     /**
