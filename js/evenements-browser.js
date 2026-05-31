@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.45 — Cablage encadrants : peuplerStaff branche sur listStaffDisponibles (31 mai 2026)
+ * Version : 1.46 — Staff filtre par categorie (fonction_staff) + case Afficher tout le staff (31 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -1354,6 +1354,22 @@
  *          + HTML NON touchés. buildPhasesParEquipeList +
  *          buildAffectationsN2Lines byte-identiques. Provenance md5 :
  *          v1.44 (48d4c2e4) → v1.45 (recollé après écriture, joint).
+ *
+ *   v1.46 : Staff FILTRÉ par catégorie (lève le « tout le staff » de v1.45).
+ *          peuplerStaff(showAll) : par défaut (showAll falsy) appelle
+ *          listStaffDisponibles(CTX_CATEGORIE_ID) → seul le staff ayant une
+ *          fonction ACTIVE dans la catégorie (table fonction_staff, RPC v2
+ *          p_categorie_id) ; pour M14 = RULFO + JUNG. Case à cocher
+ *          « Afficher tout le staff du club » en tête de zone : cochée →
+ *          peuplerStaff(true) → listStaffDisponibles(null) = tout le staff.
+ *          Idempotence refondue : _staffLoadedKey = mode (cat:<id> | all),
+ *          sinon le toggle ne rechargerait pas. Garde CTX_CATEGORIE_ID
+ *          requise seulement en mode catégorie. Helper _bindStaffShowAll-
+ *          Toggle neuf. Va de pair avec supabase-client v1.36 (param
+ *          categorieId) + RPC list_staff_disponibles v2 (p_categorie_id +
+ *          jointure fonction_staff). buildPhasesParEquipeList +
+ *          buildAffectationsN2Lines byte-identiques. Provenance md5 :
+ *          v1.45 (f001dbbe) → v1.46 (recollé après écriture, joint).
  */
 
 (function () {
@@ -4374,23 +4390,27 @@
   // saison courante via SupabaseHub. Cache résultats par catégorie
   // pour éviter re-fetch. Cases checkbox value=personne_id.
   // ────────────────────────────────────────────────────────────────
-  let _staffLoadedForCat = null;
+  let _staffLoadedKey = null;   // clé = catégorie + mode (M14 | all)
   let _staffCache = [];
 
-  async function peuplerStaff() {
+  async function peuplerStaff(showAll) {
     const wrap = document.getElementById('evt-create-staff');
     if (!wrap) return;
 
-    // Idempotent : même catégorie déjà chargée
-    if (_staffLoadedForCat && _staffLoadedForCat === CTX_CATEGORIE_ID
-        && wrap.querySelector('input[type=checkbox]')) {
+    // Clé d'idempotence : dépend du mode (staff catégorie vs tout le staff)
+    // pour que cocher/décocher « Afficher tout le staff » recharge bien.
+    const modeKey = showAll ? 'all' : ('cat:' + (CTX_CATEGORIE_ID || '?'));
+    if (_staffLoadedKey === modeKey
+        && wrap.querySelector('input.evt-eng-staff-cb')) {
       return;
     }
 
-    if (!CTX_CATEGORIE_ID) {
+    // En mode catégorie, CTX_CATEGORIE_ID est requis ; en mode « tout », non.
+    if (!showAll && !CTX_CATEGORIE_ID) {
       wrap.innerHTML = '<div class="evt-form-error">Catégorie non '
-        + 'résolue : impossible de lister le staff. L\'évènement reste '
-        + 'créable ; complétez l\'encadrement depuis la fiche.</div>';
+        + 'résolue : impossible de filtrer le staff par catégorie. '
+        + 'Cochez « Afficher tout le staff du club » ou complétez '
+        + 'l\'encadrement depuis la fiche.</div>';
       return;
     }
 
@@ -4398,17 +4418,14 @@
 
     let membres = [];
     try {
-      // v1.45 — CÂBLAGE encadrants : le wrapper réellement livré est
-      // listStaffDisponibles() (RPC list_staff_disponibles, SECURITY
-      // DEFINER, sql/56). peuplerStaff cherchait listStaffParCategorie /
-      // listCollectifMembresStaff qui n'ont jamais existé → zone vide
-      // (« wrapper non livré »). On branche d'abord listStaffDisponibles.
-      // Note : cette RPC renvoie TOUT le staff (46, toutes catégories),
-      // pas filtré CTX_CATEGORIE_ID — acceptable (le coach coche les bons) ;
-      // un filtrage par catégorie serait un raffinement ultérieur (la RPC
-      // ne prend pas de paramètre catégorie aujourd'hui).
+      // v1.46 — CÂBLAGE encadrants FILTRÉ par catégorie. listStaffDisponibles
+      // accepte désormais un categorieId (RPC v2 p_categorie_id) :
+      //   showAll=false → CTX_CATEGORIE_ID (staff de la catégorie, fonction
+      //                   active dans fonction_staff) ;
+      //   showAll=true  → null (tout le staff du club).
+      // Fallbacks legacy conservés (listStaffParCategorie/Collectif) au cas où.
       if (typeof SupabaseHub.listStaffDisponibles === 'function') {
-        membres = await SupabaseHub.listStaffDisponibles();
+        membres = await SupabaseHub.listStaffDisponibles(showAll ? null : CTX_CATEGORIE_ID);
       } else if (typeof SupabaseHub.listStaffParCategorie === 'function') {
         membres = await SupabaseHub.listStaffParCategorie(CTX_CATEGORIE_ID);
       } else if (typeof SupabaseHub.listCollectifMembresStaff === 'function') {
@@ -4426,12 +4443,25 @@
     }
 
     _staffCache = Array.isArray(membres) ? membres : [];
-    _staffLoadedForCat = CTX_CATEGORIE_ID;
+    _staffLoadedKey = modeKey;
+
+    // Case « Afficher tout le staff du club » — toujours rendue en tête,
+    // état reflétant le mode courant. Cochée → recharge sans filtre.
+    const toggleHtml = '<label class="evt-eng-equipe-row" '
+      + 'style="font-weight:600; margin-bottom:6px;">'
+      + '<input type="checkbox" id="evt-create-staff-showall"'
+      + (showAll ? ' checked' : '') + '> '
+      + 'Afficher tout le staff du club</label>';
 
     if (_staffCache.length === 0) {
-      wrap.innerHTML = '<div class="evt-form-hint">Aucun staff actif '
-        + 'sur cette catégorie pour la saison en cours. Vous pourrez '
-        + 'ajouter les encadrants depuis la fiche.</div>';
+      wrap.innerHTML = toggleHtml
+        + '<div class="evt-form-hint">'
+        + (showAll
+            ? 'Aucun staff actif pour la saison en cours.'
+            : 'Aucun staff rattaché à cette catégorie. Cochez « Afficher '
+              + 'tout le staff du club » pour voir l\'ensemble.')
+        + '</div>';
+      _bindStaffShowAllToggle();
       return;
     }
 
@@ -4446,13 +4476,25 @@
         + 'value="' + escHtml(pid) + '"> '
         + nom + '</label>';
     }).join('');
-    wrap.innerHTML = html;
+    wrap.innerHTML = toggleHtml + html;
+    _bindStaffShowAllToggle();
 
     // Hook change → met à jour le dropdown affectations N2 (qui ne
     // doit proposer que les staff cochés ici, cohérence intra-modale
     // D10 §3.1.6 doc UX).
     wrap.querySelectorAll('.evt-eng-staff-cb').forEach(function (cb) {
       cb.addEventListener('change', updateMultiEquipesUI);
+    });
+  }
+
+  // v1.46 — Câble la case « Afficher tout le staff du club » : au changement,
+  // recharge la liste dans le mode correspondant (tout vs catégorie). Le
+  // changement de mode invalide l'idempotence (clé modeKey différente).
+  function _bindStaffShowAllToggle() {
+    const toggle = document.getElementById('evt-create-staff-showall');
+    if (!toggle) return;
+    toggle.addEventListener('change', function () {
+      peuplerStaff(toggle.checked);
     });
   }
 
@@ -6171,7 +6213,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init v1.45 (S3 · cablage encadrants)');
+    console.log('🏉 MOM Hub · Évènements Browser — init v1.46 (S3 · staff filtre categorie)');
 
     const list = document.getElementById('evt-list');
 
@@ -6245,7 +6287,7 @@
     closeFiche:        closeFiche
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.45 (S3 · cablage encadrants) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.46 (S3 · staff filtre categorie) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
