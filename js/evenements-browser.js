@@ -21,7 +21,7 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.41 — Heure masquee si minuit UTC (faux 2h des evts crees sans heure) (31 mai 2026)
+ * Version : 1.42 — Submit lit les horaires detailles et les passe a la RPC v7 (31 mai 2026)
  *   v1.0 : S2.1 squelette init basique
  *   v1.1 : S2.2 — vraies cartes événements
  *   v1.2 : S2.2.fix — correction adversaire tournois
@@ -1284,6 +1284,20 @@
  *          buildPhasesParEquipeList + buildAffectationsN2Lines byte-
  *          identiques. Provenance md5 : v1.40 (ca0ce515) → v1.41 (recollé
  *          après écriture, joint).
+ *
+ *   v1.42 : Horaires détaillés — ÉTAPE 3/4 (submit). Le bloc submit lit
+ *          désormais les 4 champs horaires du formulaire (#evt-create-
+ *          debut-match / -fin-prevue / -rdv-heure / -rdv-lieu) et les ajoute
+ *          au payload createEvenementComplet (debut_match/fin_prevue/
+ *          rdv_heure/rdv_lieu), seulement si renseignés (optionnels). Va de
+ *          pair avec supabase-client v1.35 (mapping wrapper → p_debut_match
+ *          etc.) et la RPC v7 (4 params + INSERT racine). Base = étape 1
+ *          (migration colonnes TIME/TEXT, faite). RESTE étape 4/4 : afficher
+ *          ces horaires en fiche + retirer le bandeau « pour mémoire » du HTML.
+ *          Addition pure dans submitModalCreate (après les champs optionnels
+ *          racines) ; buildPhasesParEquipeList + buildAffectationsN2Lines
+ *          byte-identiques. Provenance md5 : v1.41 (95ba7da3) → v1.42
+ *          (recollé après écriture, joint).
  */
 
 (function () {
@@ -5158,6 +5172,19 @@
     if (domicile)  payload.domicile_exterieur = domicile;
     if (notes)     payload.notes_internes = notes;
 
+    // v1.42 (étape 3/4 horaires détaillés) — lecture des 4 champs horaires
+    // (type=time → "HH:MM" ou "" ; type=text pour le lieu). Ajoutés au
+    // payload seulement si renseignés (champs optionnels, RPC v7 DEFAULT
+    // NULL). Persistés sur la racine via createEvenementComplet.
+    const _debutMatch = (document.getElementById('evt-create-debut-match') || {}).value || '';
+    const _finPrevue  = (document.getElementById('evt-create-fin-prevue')  || {}).value || '';
+    const _rdvHeure   = (document.getElementById('evt-create-rdv-heure')   || {}).value || '';
+    const _rdvLieu    = ((document.getElementById('evt-create-rdv-lieu')   || {}).value || '').trim();
+    if (_debutMatch) payload.debut_match = _debutMatch;
+    if (_finPrevue)  payload.fin_prevue  = _finPrevue;
+    if (_rdvHeure)   payload.rdv_heure   = _rdvHeure;
+    if (_rdvLieu)    payload.rdv_lieu    = _rdvLieu;
+
     // equipe_id racine : modes A1/A2 (entraînement/stage) → M14_TEAM_UUID
     // requis par CHECK equipe_obligatoire_si_pas_parent. Modes A3/A4/A5
     // (competition) → NULL (l'équipe est portée par les M3 evenement_
@@ -6031,7 +6058,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init v1.41 (S3 · heure minuit UTC masquee)');
+    console.log('🏉 MOM Hub · Évènements Browser — init v1.42 (S3 · horaires detailles submit)');
 
     const list = document.getElementById('evt-list');
 
@@ -6105,7 +6132,7 @@
     closeFiche:        closeFiche
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.41 (S3 · heure minuit UTC masquee) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.42 (S3 · horaires detailles submit) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
