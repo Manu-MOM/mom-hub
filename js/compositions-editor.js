@@ -6,6 +6,23 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.14 — Fix réf évènement en mode U-N3 (P2) (31 mai 2026)
+ *   v3.14 : FIX P2 (retour terrain Manu) — quand on arrivait sur la page
+ *           Compositions DEPUIS un évènement (mode U-N3, ?evenement_equipe=…),
+ *           aucune référence à l'évènement n'était visible (ni titre, ni date,
+ *           ni équipe) : on tombait directement sur le bandeau d'état. Cause :
+ *           init() faisait selBtn.style.display='none' en U-N3 (v3.8, pour
+ *           retirer le sélecteur d'évènement qui n'a pas de sens quand l'évt
+ *           est fixé par l'URL) — or #event-selector-btn EST le conteneur de
+ *           event-type + event-label + event-meta (le titre que renderEventBanner
+ *           remplit). Le masquer effaçait le titre avec le bouton. FIX : en U-N3
+ *           on NE masque plus, on neutralise — classe CSS event-banner__btn--static
+ *           (pas de ▾, pas de hover, curseur normal) ; le bouton reste affiché donc
+ *           le titre redevient visible, mais n'agit plus (aucun handler de toggle
+ *           attaché). Legacy strictement byte-identique (handler attaché, pas de
+ *           classe). Modif bornée : header + 1 bloc init() (display:none → classList.add)
+ *           + console.log boot + 3 règles CSS dans compositions.html. node --check OK.
+ *
  * Version : 3.13 — Fix état joueur dans compo de match (31 mai 2026)
  *   v3.13 : FIX 6c-6 (recette terrain Manu) — un remplacement dans une compo
  *           de match restait marqué « BASE » (couleur bleue) et le compteur
@@ -1653,11 +1670,18 @@
 
     // v3.8 — A1 : en mode U-N3, l'évènement est fixé par l'URL ;
     // le sélecteur d'évènements n'a pas de sens (retour à la fiche
-    // évènement pour changer). On masque le bouton et on coupe son
-    // handler. En legacy : comportement v3.7 byte-identique.
+    // évènement pour changer). On COUPE son handler (plus de toggle).
+    // v3.14 (P2) — mais on NE masque plus le bouton : il porte le
+    // titre + le type + le lieu de l'évènement (event-type / event-label
+    // / event-meta sont ses enfants). Le masquer (display:none, ancien
+    // v3.8) effaçait toute référence à l'évènement quand on arrivait
+    // depuis un évènement (« aucune réf »). On le rend STATIQUE (classe
+    // --static : pas de ▾, pas de hover, curseur normal) → le titre
+    // reste visible, le bouton n'agit plus. En legacy : comportement
+    // v3.7 byte-identique (handler de toggle attaché, pas de classe).
     const selBtn = DOM.eventSelectorBtn();
     if (State.evenementEquipeId) {
-      if (selBtn) selBtn.style.display = 'none';
+      if (selBtn) selBtn.classList.add('event-banner__btn--static');
     } else {
       if (selBtn) selBtn.addEventListener('click', function (e) { e.stopPropagation(); toggleEventSelector(); });
     }
@@ -1677,7 +1701,7 @@
     bindPopoverOutsideClick();
 
     console.log(
-      '%c🏉 Compositions Editor v3.13 chargé',
+      '%c🏉 Compositions Editor v3.14 chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         evenements: State.evenements.length,
