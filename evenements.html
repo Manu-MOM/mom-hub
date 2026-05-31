@@ -1852,12 +1852,19 @@
 
         <div class="evt-form-group-row">
           <div class="evt-form-group">
-            <label class="evt-form-label required" for="evt-create-date-debut">Date début</label>
-            <input type="datetime-local" class="evt-form-input" id="evt-create-date-debut" name="date_debut" required>
+            <!-- v3.4 (retour terrain) : « Date » sans heure (type=date).
+                 L'heure administrative de l'évènement n'a pas d'intérêt à
+                 ce stade ; les heures utiles (RDV, début/fin de match)
+                 relèvent du bloc horaires détaillés (dette MODELE-EVT-
+                 HORAIRES-RDV). date_debut reste TIMESTAMPTZ en base :
+                 une date seule est stockée à minuit, submit inchangé
+                 (new Date(date).toISOString() → même jour, pas de décalage). -->
+            <label class="evt-form-label required" for="evt-create-date-debut">Date</label>
+            <input type="date" class="evt-form-input" id="evt-create-date-debut" name="date_debut" required>
           </div>
           <div class="evt-form-group" id="evt-create-date-fin-group">
             <label class="evt-form-label" for="evt-create-date-fin">Date fin (opt.)</label>
-            <input type="datetime-local" class="evt-form-input" id="evt-create-date-fin" name="date_fin">
+            <input type="date" class="evt-form-input" id="evt-create-date-fin" name="date_fin">
           </div>
         </div>
 
@@ -1871,28 +1878,31 @@
         </div>
 
         <!-- ====================================================
-             BLOC 5 — Lieu + déduction domicile/extérieur (R1 §3.1.6
-             doc UX : LIEU unique avec déduction modifiable, F5 résolu)
+             BLOC 5 — Domicile/Extérieur PUIS Lieu (réordre retour
+             terrain v3.3 : le statut domicile/ext se choisit AVANT le
+             site). NB : le filtrage des sites selon domicile (ne montrer
+             que les sites à domicile) nécessite une donnée site↔équipe
+             absente en base — tracé comme évolution, non fait ici.
              ==================================================== -->
         <div class="evt-form-group">
-          <label class="evt-form-label" for="evt-create-site">Lieu</label>
-          <select class="evt-form-select" id="evt-create-site" name="site_id">
-            <option value="">— Choisir un site —</option>
-          </select>
-          <div class="evt-form-hint" id="evt-create-domicile-deduction">
-            <!-- Déduction domicile/extérieur affichée ici par JS L3
-                 (R1 §3.1.6 : domicile/exterieur/neutre selon le site) -->
-          </div>
-        </div>
-
-        <div class="evt-form-group">
-          <label class="evt-form-label" for="evt-create-domicile">Domicile / Extérieur (déduit, modifiable)</label>
+          <label class="evt-form-label" for="evt-create-domicile">Domicile / Extérieur</label>
           <select class="evt-form-select" id="evt-create-domicile" name="domicile_exterieur">
             <option value="">— Non renseigné —</option>
             <option value="domicile">Domicile</option>
             <option value="exterieur">Extérieur</option>
             <option value="neutre">Neutre</option>
           </select>
+        </div>
+
+        <div class="evt-form-group">
+          <label class="evt-form-label" for="evt-create-site">Lieu</label>
+          <select class="evt-form-select" id="evt-create-site" name="site_id">
+            <option value="">— Choisir un site —</option>
+          </select>
+          <div class="evt-form-hint" id="evt-create-domicile-deduction">
+            <!-- Conteneur conservé (alimenté par JS L3 le cas échéant).
+                 Réordre v3.3 : domicile choisi avant le site. -->
+          </div>
         </div>
 
         <!-- ====================================================
