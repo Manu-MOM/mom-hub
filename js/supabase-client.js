@@ -18,7 +18,14 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.39 — mai 2026
+ * Version : 1.40 — mai 2026
+ *   v1.40 : listMesEvenementsAvecCompos — priorité d'affichage de l'équipe
+ *          changée en nom_officiel || libelle_court || code (D9). Motif :
+ *          libelle_court peut être NULL sur certaines équipes engagées
+ *          (ex. SAR/MOM-M14-2, prouvé en base) → l'ancien ordre affichait
+ *          « M14 » pour l'une et « SAR/MOM-M14-2 » pour l'autre (incohérent).
+ *          nom_officiel est rempli sur les deux → libellés homogènes dans
+ *          la page-raccourci. 1 ligne changée, reste identique.
  *   v1.39 : wrapper listMesEvenementsAvecCompos(limit) pour la page-
  *          raccourci P1 (« mes évènements avec compos », lien Compositions
  *          du menu). Liste 1 ligne par compo de base ACTIVE = 1 feuille
@@ -4801,7 +4808,7 @@
         const eee = c.evenement_equipes_engagees || null;
         const team = (eee && eee.equipes) ? eee.equipes : null;
         const equipeLibelle = team
-          ? (team.libelle_court || team.nom_officiel || team.code || '')
+          ? (team.nom_officiel || team.libelle_court || team.code || '')
           : '';
         return {
           compo_id: c.id,
@@ -5436,7 +5443,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.39 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.40 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
