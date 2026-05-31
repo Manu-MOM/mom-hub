@@ -6,6 +6,21 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.11 — Barre de parcours (← Fiche / ← Groupe de base) (31 mai 2026)
+ *   v3.11 : NAVIGATION du parcours. Ajout d'une barre #compo-parcours en
+ *           haut de page (HTML + CSS compo-parcours__link), avec deux liens
+ *           remplis dynamiquement (renderParcours, appelée par renderEvent-
+ *           Banner) : « ← Fiche évènement » → evenements.html?fiche=<evenement
+ *           .id> (deep-link lu par evenements-browser v1.54 ; lève la dette
+ *           SUIVI-COACH-deeplink mentionnée en v3.6) ; « ← Groupe de base » →
+ *           groupe-base.html?evenement_equipe=<evenementEquipeId>. Le bouton
+ *           « Retour aux évènements » rendu dans la bannière (v3.6, navigation
+ *           sèche vers la liste, conditionné état validé) est RETIRÉ au profit
+ *           de cette barre (toujours visible en mode U-N3). Affichée seulement
+ *           si contexte équipe engagée présent (evenementEquipeId + evenement).
+ *           ids tirés de State.evenementEquipeContext (déjà chargé, rien de
+ *           neuf côté données). node --check OK.
+ *
  * Version : 3.10 — Hygiène console.log boot (20 mai 2026)
  *   v3.10 : HYGIÈNE — bump console.log boot (conv `Production ·
  *           Hygiène — console.log boots + nettoyage données test`,
@@ -230,6 +245,9 @@
     eventBannerMeta:   () => document.getElementById('event-meta'),
     eventBannerState:  () => document.getElementById('event-state'),
     compoValidateHost: () => document.getElementById('compo-validate-host'),
+    compoParcours:     () => document.getElementById('compo-parcours'),
+    compoNavFiche:     () => document.getElementById('compo-nav-fiche'),
+    compoNavGroupe:    () => document.getElementById('compo-nav-groupe'),
     eventSelectorBtn:  () => document.getElementById('event-selector-btn'),
     eventSelectorList: () => document.getElementById('event-selector-list'),
     compoTabs:         () => document.getElementById('compo-tabs'),
@@ -345,7 +363,27 @@
   // 4. RENDUS — banner, sélecteur, onglets, indicateur
   // ============================================================
 
+  // v3.11 — Barre de parcours : « ← Fiche évènement » (deep-link
+  // evenements.html?fiche=<id>) + « ← Groupe de base » (groupe-base.html?
+  // evenement_equipe=<id>). Révélée seulement en mode U-N3 (contexte équipe
+  // engagée présent), car hors de ce mode l'écran n'a pas d'évènement_equipe
+  // ni d'évènement unique de référence.
+  function renderParcours() {
+    const bar = DOM.compoParcours();
+    if (!bar) return;
+    const ctx = State.evenementEquipeContext;
+    const evId = ctx && ctx.evenement && ctx.evenement.id;
+    const evtEqId = State.evenementEquipeId;
+    if (!evtEqId || !evId) { bar.style.display = 'none'; return; }
+    const navFiche = DOM.compoNavFiche();
+    const navGroupe = DOM.compoNavGroupe();
+    if (navFiche)  navFiche.setAttribute('href', 'evenements.html?fiche=' + encodeURIComponent(evId));
+    if (navGroupe) navGroupe.setAttribute('href', 'groupe-base.html?evenement_equipe=' + encodeURIComponent(evtEqId));
+    bar.style.display = 'flex';
+  }
+
   function renderEventBanner() {
+    renderParcours();
     const evt = State.evenements.find(e => e.id === State.selectedEvenementId);
     if (!evt) {
       DOM.eventBannerType().textContent  = '—';
@@ -414,19 +452,12 @@
     }
     // 'utilisee' / 'archivee' : pas de bascule d'état (verrou aval, hors périmètre Compos)
 
-    // v3.6 — une fois la compo au moins validée, raccourci de sortie vers
-    // la liste des évènements. Navigation simple, SANS paramètre : un
-    // retour ciblé sur la rencontre (refocus côté Évènements) suppose une
-    // convention d'URL côté evenements.html — autre module, autre conv
-    // (dette SUIVI-COACH-deeplink). Ici : zéro couplage, zéro invention.
-    if (base.etat === 'validee' || base.etat === 'utilisee' || base.etat === 'archivee') {
-      const back = document.createElement('button');
-      back.type = 'button';
-      back.className = 'compo-validate-btn compo-validate-btn--back';
-      back.textContent = 'Retour aux évènements';
-      back.addEventListener('click', function () { window.location.href = 'evenements.html'; });
-      host.appendChild(back);
-    }
+    // v3.11 — le bouton « Retour aux évènements » (ancien, navigation sèche
+    // vers la liste, conditionné à l'état validé) est RETIRÉ d'ici : remplacé
+    // par la barre de parcours en haut de page (#compo-parcours), toujours
+    // visible, avec « ← Fiche évènement » (deep-link ?fiche=<id>, dette
+    // SUIVI-COACH-deeplink LEVÉE par evenements-browser v1.54) et « ← Groupe
+    // de base ». Voir renderParcours().
   }
 
   function renderEventSelector() {
