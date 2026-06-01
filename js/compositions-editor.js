@@ -6,6 +6,18 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.27 — Suivi live éducateur seul : chrono de rencontre (L2/3a) (1 juin 2026)
+ *   v3.27 : CHRONO L2/3a. renderEditorSuivi réécrit : config des durées
+ *           (avant coup d'envoi) + chrono persistant (C12-n) qui tourne
+ *           (recalcul depuis horodatages, survit au reload) + pause/
+ *           reprise/mi-temps/fin. Objet SuiviChrono (interval désarmé en
+ *           sortie d'onglet via setMode, anti-fuite). Adversaire résolu
+ *           via State.matchsDeLequipe (point parké L1 corrigé). Voie
+ *           coach (actionChronoCoach/getChronoRencontreCoach). Mode
+ *           rebours + score = 3b. Chemin Liste/Terrain inchangé.
+ *   v3.26 : SUIVI L1. 3e onglet « Suivi » + aiguillage renderEditorArea
+ *           → renderEditorSuivi (ajout pur) ; compo de match → écran prêt,
+ *           base → message inerte (D2). bindViewTabs câble tabs[2].
  * Version : 3.25 — Deep-link de mode ?vue=terrain|reseaux depuis la fiche évènement (1 juin 2026)
  *   v3.25 : DEEP-LINK DE MODE. Les vignettes « Vue terrain » et « Vue
  *           réseaux sociaux » de la fiche évènement (evenements-browser.js)
@@ -959,15 +971,71 @@
   }
 
   // ════════════════════════════════════════════════════════════
-  // L1 (Suivi live éducateur seul) — squelette + aiguillage + sas.
-  // D2 : actif uniquement sur compo de MATCH (base = inerte).
-  // D3 : adversaire déjà connu (compo.adversaire_nom), démarrage direct.
-  // D4 : bouton ▶ Coup d'envoi présent ; INERTE en L1 (chrono/saisie
-  //      livrés en L2+). Aucune écriture, aucune RPC ici.
+  // L2/3a (Suivi live éducateur seul) — CHRONO de rencontre.
+  // D2 : compo de MATCH uniquement. D3 : adversaire résolu via
+  // State.matchsDeLequipe (compo.evenement_id === match.id, option α).
+  // D4 : ▶ Coup d'envoi fonctionnel. Chrono persistant (C12-n) :
+  //   config durées (avant coup d'envoi) + minutes recalculées depuis
+  //   les horodatages (survit au rechargement) + pause/reprise/mi-temps/
+  //   fin. Mode rebours + score = 3b. Voie coach (actionChronoCoach /
+  //   getChronoRencontreCoach). Aucune minute figée (I-esprit).
   // ════════════════════════════════════════════════════════════
+
+  // Objet de contrôle du chrono — état runtime + interval d'affichage.
+  // Hors State (transient, lié à l'écran). Cycle de vie : armé à
+  // l'entrée de l'onglet Suivi (match en cours), désarmé en sortie /
+  // re-rendu — pas de fuite d'interval.
+  var SuiviChrono = {
+    intervalId: null,
+    evtId: null,         // UUID du MATCH piloté
+    etat: null,          // dernier état lu (objet RPC) ou null
+    busy: false,         // garde anti-double-clic pendant une action
+
+    desarmer: function () {
+      if (this.intervalId) { clearInterval(this.intervalId); this.intervalId = null; }
+    },
+
+    // Minutes/secondes écoulées de la période courante, en tenant
+    // compte des pauses. Recalcul pur depuis les horodatages.
+    secondesEcoulees: function () {
+      var e = this.etat;
+      if (!e || !e.debut_periode_at) return 0;
+      var debut = new Date(e.debut_periode_at).getTime();
+      var maintenant = Date.now();
+      var pauseEnCours = 0;
+      if (e.en_pause && e.pause_depuis_at) {
+        pauseEnCours = Math.floor((maintenant - new Date(e.pause_depuis_at).getTime()) / 1000);
+      }
+      var brut = Math.floor((maintenant - debut) / 1000);
+      var net = brut - (e.pause_cumul_secondes || 0) - pauseEnCours;
+      return net > 0 ? net : 0;
+    }
+  };
+
+  function _fmtMMSS(totalSec) {
+    var m = Math.floor(totalSec / 60);
+    var s = totalSec % 60;
+    return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+  }
+
+  // Résout l'adversaire du match porté par la compo (point parké L1) :
+  // l'objet COMPO ne porte pas adversaire_nom — c'est l'objet MATCH
+  // (State.matchsDeLequipe) qui le porte, apparié par evenement_id.
+  function _adversaireDeCompo(compo) {
+    var m = (Array.isArray(State.matchsDeLequipe))
+      ? State.matchsDeLequipe.find(function (x) { return x.id === compo.evenement_id; })
+      : null;
+    if (m && m.adversaire_nom && m.adversaire_nom.trim()) return 'vs ' + m.adversaire_nom.trim();
+    if (compo.adversaire_nom && compo.adversaire_nom.trim()) return 'vs ' + compo.adversaire_nom.trim();
+    return compo.libelle || 'Match à suivre';
+  }
+
   function renderEditorSuivi(el, compo) {
+    SuiviChrono.desarmer();
+
     // D2 — la base ne porte pas d'adversaire : on ne suit pas un match.
     if (!compo || compo.type_compo !== 'match') {
+      SuiviChrono.evtId = null; SuiviChrono.etat = null;
       el.innerHTML =
         '<div class="view-suivi">' +
           '<div class="view-suivi__inert">' +
@@ -978,20 +1046,146 @@
       return;
     }
 
-    // D3 — adversaire déjà connu (même résolution que renderCompoTabs).
-    var adversaire = (compo.adversaire_nom && compo.adversaire_nom.trim())
-      ? ('vs ' + compo.adversaire_nom.trim())
-      : (compo.libelle || 'Match à suivre');
+    var evtId = compo.evenement_id || null;
+    SuiviChrono.evtId = evtId;
+    var adversaire = _adversaireDeCompo(compo);
 
-    var html = '<div class="view-suivi">';
-    html +=   '<div class="view-suivi__ready">';
-    html +=     '<div class="view-suivi__match-label">Suivi du match</div>';
-    html +=     '<div class="view-suivi__adversaire">' + escapeHtml(adversaire) + '</div>';
-    html +=     '<button type="button" class="view-suivi__kickoff" id="btn-suivi-kickoff" disabled>▶ Coup d\'envoi</button>';
-    html +=     '<div class="view-suivi__hint">Le chrono et la saisie arrivent à la prochaine étape (L2).</div>';
-    html +=   '</div>';
+    // Rendu initial (chargement), puis lecture asynchrone de l'état.
+    el.innerHTML =
+      '<div class="view-suivi">' +
+        '<div class="view-suivi__match-label">Suivi du match — ' + escapeHtml(adversaire) + '</div>' +
+        '<div id="suivi-chrono-host" class="suivi-chrono"><div class="view-suivi__hint">Chargement du chrono…</div></div>' +
+      '</div>';
+
+    if (!evtId) {
+      var host0 = document.getElementById('suivi-chrono-host');
+      if (host0) host0.innerHTML = '<div class="view-suivi__hint">Match non résolu (evenement_id absent).</div>';
+      return;
+    }
+
+    _rafraichirChrono(evtId, true);
+  }
+
+  // Lit l'état en base puis (re)peint l'écran. Si armerInterval, lance
+  // le tick d'affichage chaque seconde (uniquement si chrono actif).
+  function _rafraichirChrono(evtId, armerInterval) {
+    if (!window.SupabaseHub || !SupabaseHub.getChronoRencontreCoach) return;
+    SupabaseHub.getChronoRencontreCoach(evtId).then(function (etat) {
+      if (SuiviChrono.evtId !== evtId) return; // on a changé d'onglet entre-temps
+      SuiviChrono.etat = etat; // peut être null (chrono pas encore initialisé)
+      _peindreChrono();
+      SuiviChrono.desarmer();
+      var actif = SuiviChrono.etat && SuiviChrono.etat.coup_envoi_at && !SuiviChrono.etat.termine_at;
+      if (armerInterval && actif) {
+        SuiviChrono.intervalId = setInterval(_peindreChronoTick, 1000);
+      }
+    });
+  }
+
+  // Tick léger : ne touche qu'au temps affiché (pas de re-render complet,
+  // pas d'appel réseau). Le re-render complet est réservé aux actions.
+  function _peindreChronoTick() {
+    var t = document.getElementById('suivi-chrono-time');
+    if (!t || !SuiviChrono.etat) return;
+    if (SuiviChrono.etat.en_pause) return; // figé en pause
+    t.textContent = _fmtMMSS(SuiviChrono.secondesEcoulees());
+  }
+
+  // Peint l'écran complet selon l'état (config / prêt / en cours /
+  // pause / terminé). Câble les boutons.
+  function _peindreChrono() {
+    var host = document.getElementById('suivi-chrono-host');
+    if (!host) return;
+    var e = SuiviChrono.etat;
+    var evtId = SuiviChrono.evtId;
+
+    // Cas 1 — pas encore de coup d'envoi (état null OU coup_envoi_at null) :
+    // CONFIG des durées + bouton coup d'envoi.
+    if (!e || !e.coup_envoi_at) {
+      var d1 = (e && Array.isArray(e.durees_periodes) && e.durees_periodes[0]) ? e.durees_periodes[0] : 30;
+      var d2 = (e && Array.isArray(e.durees_periodes) && e.durees_periodes[1]) ? e.durees_periodes[1] : 30;
+      host.innerHTML =
+        '<div class="suivi-chrono__config">' +
+          '<div class="suivi-chrono__config-title">Durées des mi-temps (minutes)</div>' +
+          '<div class="suivi-chrono__config-row"><label for="chrono-d1">1re mi-temps</label>' +
+            '<input id="chrono-d1" type="number" min="1" max="60" value="' + d1 + '"></div>' +
+          '<div class="suivi-chrono__config-row"><label for="chrono-d2">2e mi-temps</label>' +
+            '<input id="chrono-d2" type="number" min="1" max="60" value="' + d2 + '"></div>' +
+        '</div>' +
+        '<button type="button" class="suivi-chrono__btn suivi-chrono__btn--primary" id="chrono-kickoff">▶ Coup d\'envoi</button>';
+      var bk = document.getElementById('chrono-kickoff');
+      if (bk) bk.addEventListener('click', function () {
+        var v1 = parseInt(document.getElementById('chrono-d1').value, 10);
+        var v2 = parseInt(document.getElementById('chrono-d2').value, 10);
+        var durees = [ (v1 > 0 ? v1 : 30), (v2 > 0 ? v2 : 30) ];
+        // Config PUIS coup d'envoi (2 actions ; config n'agit qu'avant le KO).
+        _actionChrono(evtId, 'config', { durees: durees }, function () {
+          _actionChrono(evtId, 'coup_envoi', null, null);
+        });
+      });
+      return;
+    }
+
+    // Cas 3 — terminé.
+    if (e.termine_at) {
+      host.innerHTML =
+        '<div class="suivi-chrono__periode">Match terminé</div>' +
+        '<div class="suivi-chrono__time suivi-chrono__time--paused">--:--</div>' +
+        '<div class="suivi-chrono__state suivi-chrono__state--done">Rencontre clôturée</div>';
+      return;
+    }
+
+    // Cas 2 — en cours (avec ou sans pause).
+    var sec = SuiviChrono.secondesEcoulees();
+    var enPause = !!e.en_pause;
+    var html =
+      '<div class="suivi-chrono__periode">' + (e.periode_courante || 1) + 're / 2e mi-temps · période ' + (e.periode_courante || 1) + '</div>' +
+      '<div id="suivi-chrono-time" class="suivi-chrono__time' + (enPause ? ' suivi-chrono__time--paused' : '') + '">' + _fmtMMSS(sec) + '</div>' +
+      '<div class="suivi-chrono__state' + (enPause ? ' suivi-chrono__state--paused' : '') + '">' + (enPause ? '⏸ En pause' : '● En cours') + '</div>' +
+      '<div class="suivi-chrono__controls">';
+    if (enPause) {
+      html += '<button type="button" class="suivi-chrono__btn suivi-chrono__btn--primary" id="chrono-reprise">▶ Reprise</button>';
+    } else {
+      html += '<button type="button" class="suivi-chrono__btn" id="chrono-pause">⏸ Pause</button>';
+    }
+    html += '<button type="button" class="suivi-chrono__btn" id="chrono-periode">Mi-temps suivante</button>';
+    html += '<button type="button" class="suivi-chrono__btn suivi-chrono__btn--danger" id="chrono-fin">⏹ Fin du match</button>';
     html += '</div>';
-    el.innerHTML = html;
+    host.innerHTML = html;
+
+    var bp = document.getElementById('chrono-pause');
+    if (bp) bp.addEventListener('click', function () { _actionChrono(evtId, 'pause', null, null); });
+    var br = document.getElementById('chrono-reprise');
+    if (br) br.addEventListener('click', function () { _actionChrono(evtId, 'reprise', null, null); });
+    var bper = document.getElementById('chrono-periode');
+    if (bper) bper.addEventListener('click', function () {
+      if (window.confirm('Passer à la mi-temps suivante ? Le chrono de la période repart à zéro.')) {
+        _actionChrono(evtId, 'periode_suivante', null, null);
+      }
+    });
+    var bf = document.getElementById('chrono-fin');
+    if (bf) bf.addEventListener('click', function () {
+      if (window.confirm('Terminer le match ? Le chrono s\'arrête définitivement.')) {
+        _actionChrono(evtId, 'fin', null, null);
+      }
+    });
+  }
+
+  // Exécute une action chrono (voie coach) puis relit l'état et repeint.
+  // Garde anti-double-clic. onApres = callback optionnel après succès.
+  function _actionChrono(evtId, action, opts, onApres) {
+    if (SuiviChrono.busy) return;
+    if (!window.SupabaseHub || !SupabaseHub.actionChronoCoach) return;
+    SuiviChrono.busy = true;
+    SupabaseHub.actionChronoCoach(evtId, action, opts || undefined).then(function (res) {
+      SuiviChrono.busy = false;
+      if (!res || !res.ok) {
+        window.alert('Action chrono impossible : ' + ((res && res.error) || 'erreur inconnue'));
+        return;
+      }
+      if (typeof onApres === 'function') { onApres(); return; }
+      _rafraichirChrono(evtId, true);
+    });
   }
   // régénérés) → câblage unique au boot. Clic = set viewMode +
   // is-active + re-rendu de l'éditeur. Le HTML retire le is-active
@@ -1001,6 +1195,9 @@
     if (!tabs || tabs.length < 2) return;
     const setMode = function (mode, clickedTab) {
       State.viewMode = mode;
+      // L2/3a — en quittant l'onglet Suivi, stopper le tick d'affichage
+      // (le chrono continue en base ; l'affichage resync au retour).
+      if (mode !== 'suivi' && typeof SuiviChrono !== 'undefined') SuiviChrono.desarmer();
       tabs.forEach(function (t) { t.classList.remove('is-active'); });
       clickedTab.classList.add('is-active');
       renderEditorArea();
