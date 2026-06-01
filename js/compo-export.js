@@ -50,7 +50,7 @@
       accent: [40, 80, 130], jaune: [240, 216, 0], blanc: [255, 255, 255],
       sub: [144, 216, 240], pied: [90, 110, 140],
       liseroAv: [144, 216, 240], liseroAr: [240, 216, 0],
-      logoKey: 'entente', filigraneKey: 'mom', filigraneAlpha: 0.07, filigraneBright: 1.0,
+      logoKey: 'entente', filigraneKey: null, filigraneAlpha: 0.07, filigraneBright: 1.0,
       badge: { SAR: [144, 216, 240], MOM: [240, 216, 0], ASCS: [120, 170, 220] },
       badgeTxt: [8, 28, 60]
     }
@@ -176,7 +176,11 @@
       var titulaires = data.titulaires || [];
       var remplacants = data.remplacants || [];
       var yCards = top + 90;
-      var yRemplTitre = 1560;
+      // Bloc remplaçants ancré au bas (au-dessus du pied) : titre + filet (82)
+      // + 4 rangées de 64 = 338px. Pied à H-40. On laisse ~30px de marge.
+      var remRows = Math.ceil(Math.max(remplacants.length, 1) / 2);
+      var blocRemplH = 82 + remRows * 64;
+      var yRemplTitre = H - 70 - blocRemplH;
       var nbRows = Math.ceil(Math.max(titulaires.length, 1) / 2);
       var zone = yRemplTitre - 40 - yCards;
       var rowh = Math.floor(zone / Math.max(nbRows, 1));
