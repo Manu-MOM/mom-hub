@@ -6,6 +6,20 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.19 — Vue Terrain : banc drag+drop, rempl. au picker Liste, pastilles +grandes (1 juin 2026)
+ *   v3.19 : suite recette drag (retours Manu). (1) BANC drag+drop bidirectionnel :
+ *           les remplaçants (vt-bench-item) sont draggables (source) → on peut
+ *           les glisser sur un poste (montée au XV) ; le bandeau banc est une
+ *           zone de drop (.vt-bench-drop) → déposer un titulaire l'envoie au
+ *           banc (onDropJoueurSurBanc, prochain n° 16-23, refus si plein).
+ *           Corrige le bug v3.18 « impossible de sortir un joueur du banc ».
+ *           (2) Picker vue LISTE : sur un poste vacant, section « Remplaçants »
+ *           ajoutée (popoverListItemsSlotVide) → cliquer un remplaçant le
+ *           promeut au XV via onPickJoueurPourSlot (handler existant inchangé,
+ *           addJoueurCompo réaffecte ; banc non recompacté). (3) Pastilles
+ *           agrandies : disque 48→54px, numéro 22→24px. compositions.html :
+ *           CSS pastilles + feedback banc + section remplaçants. node --check OK.
+ *
  * Version : 3.18 — Vue Terrain étape C : édition au drag (1 juin 2026)
  *   v3.18 : ÉDITION AU DRAG sur le terrain (sortie du lecture seule). 3 gestes :
  *           pastille→pastille (déplacer un titulaire), vivier→pastille (faire
@@ -954,14 +968,15 @@
     // Bandeau remplaçants sous le terrain (lecture seule, compact)
     const remplacants = State.compoJoueurs.filter(cj => cj.role === 'remplacant')
       .sort((a, b) => (a.ordre_remplacement || a.numero_maillot || 99) - (b.ordre_remplacement || b.numero_maillot || 99));
-    html += '<div class="view-terrain__bench">';
+    html += '<div class="view-terrain__bench vt-bench-drop">';
     html += '<span class="view-terrain__bench-title">Remplaçants</span>';
     if (remplacants.length === 0) {
       html += '<span class="view-terrain__bench-empty">aucun</span>';
     } else {
       for (let i = 0; i < remplacants.length; i++) {
         const cj = remplacants[i];
-        html += '<span class="vt-bench-item">' +
+        html += '<span class="vt-bench-item vt-drag" draggable="true" data-joueur-id="' + escapeHtml(cj.joueur_id) + '" title="' +
+                  escapeHtml(nomJoueurComplet(cj) + ' (glisser sur un poste ou hors du banc)') + '">' +
                   '<span class="vt-bench-item__num">' + escapeHtml(cj.numero_maillot != null ? cj.numero_maillot : (16 + i)) + '</span>' +
                   escapeHtml(nomJoueurCompact(cj)) +
                 '</span>';
@@ -1004,6 +1019,21 @@
         cible.classList.remove('vt-drop-hover');
         const joueurId = e.dataTransfer.getData('text/plain');
         if (joueurId) onDropJoueurSurPoste(joueurId, cible.dataset.posteId);
+      });
+    });
+    // v3.19 — le BANC est une zone de drop : déposer un joueur → remplaçant.
+    root.querySelectorAll('.vt-bench-drop').forEach(function (bench) {
+      bench.addEventListener('dragover', function (e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        bench.classList.add('vt-bench-hover');
+      });
+      bench.addEventListener('dragleave', function () { bench.classList.remove('vt-bench-hover'); });
+      bench.addEventListener('drop', function (e) {
+        e.preventDefault();
+        bench.classList.remove('vt-bench-hover');
+        const joueurId = e.dataTransfer.getData('text/plain');
+        if (joueurId) onDropJoueurSurBanc(joueurId);
       });
     });
   }
@@ -1123,6 +1153,51 @@
         est_depannage_hors_categorie: horsCat
       });
       if (!rAdd.ok) { alert('Erreur (ajout) : ' + rAdd.error); return; }
+    }
+
+    await loadCompoJoueurs();
+    renderFillIndicator();
+    renderEditorArea();
+    renderEffectifPanel();
+  }
+
+  // v3.19 — dépôt d'un joueur sur le BANC : il devient remplaçant (prochain
+  // n° 16-23 libre). S'il était titulaire, son poste se libère. S'il est déjà
+  // au banc, rien à faire. Si le banc est plein, on refuse proprement.
+  async function onDropJoueurSurBanc(joueurId) {
+    if (!joueurId) return;
+    const joueur = getJoueurVivier(joueurId);
+    if (!joueur) return;
+
+    const existant = State.compoJoueurs.find(cj => cj.joueur_id === joueurId);
+    if (existant && existant.role === 'remplacant') return; // déjà au banc
+
+    const numBanc = prochainNumeroBancLibre();
+    if (numBanc == null) { alert('Le banc est complet (8 remplaçants).'); return; }
+
+    const etat = etatJoueurPourCompoCourante();
+    const horsCat = State.evenementEquipeId
+      ? !!joueur._horsGroupe
+      : (joueur.categorie_id !== M14_CATEGORIE_ID);
+
+    if (existant) {
+      const r = await SupabaseHub.updateJoueurCompo(existant.id, {
+        role: 'remplacant', numero_maillot: numBanc, etat_joueur: etat
+      });
+      if (!r.ok) { alert('Erreur (envoi au banc) : ' + r.error); return; }
+    } else {
+      const libres = postesVides();
+      const posteId = libres.length > 0 ? libres[0].id : (State.postes[0] && State.postes[0].id);
+      const r = await SupabaseHub.addJoueurCompo({
+        composition_id: State.selectedCompoId,
+        joueur_id: joueurId,
+        role: 'remplacant',
+        numero_maillot: numBanc,
+        poste_id: posteId,
+        etat_joueur: etat,
+        est_depannage_hors_categorie: horsCat
+      });
+      if (!r.ok) { alert('Erreur (ajout au banc) : ' + r.error); return; }
     }
 
     await loadCompoJoueurs();
@@ -1427,6 +1502,34 @@
       .sort(compareJoueurs);
 
     let html = '';
+
+    // v3.19 — section « Remplaçants » : on propose AUSSI les joueurs du banc
+    // pour les promouvoir sur ce poste (le clic appelle onPickJoueurPourSlot
+    // comme pour le vivier ; addJoueurCompo réaffecte le joueur au poste →
+    // il quitte le banc, sa place se libère, banc non recompacté). N'apparaît
+    // que pour un poste de titulaire (pas quand on remplit un slot banc).
+    if (pv.role === 'titulaire' && pv.posteId) {
+      const remps = State.compoJoueurs
+        .filter(cj => cj.role === 'remplacant')
+        .map(cj => getJoueurVivier(cj.joueur_id))
+        .filter(j => j && (!search || ((j.nom || '') + ' ' + (j.prenom || '')).toLowerCase().includes(search)))
+        .sort(compareJoueurs);
+      if (remps.length > 0) {
+        html += '<li class="popover__group-label">Remplaçants (monter au XV)</li>';
+        for (const j of remps) {
+          html += '<li class="popover__item popover__item--from-bench" data-joueur-id="' + escapeHtml(j.joueur_id) + '">';
+          html +=   '<span class="effectif-item__avatar">' + escapeHtml(initiales(j.prenom, j.nom)) + '</span>';
+          html +=   '<span class="effectif-item__name">';
+          html +=     '<span class="effectif-item__nom">' + escapeHtml(j.nom || '?') + '</span>';
+          html +=     '<span class="effectif-item__prenom">' + escapeHtml(j.prenom || '') + '</span>';
+          html +=   '</span>';
+          html +=   '<span class="effectif-item__tag effectif-item__tag--bench" title="Actuellement remplaçant">banc</span>';
+          html += '</li>';
+        }
+        html += '<li class="popover__group-label">Vivier</li>';
+      }
+    }
+
     if (candidates.length === 0) {
       html += '<li class="popover__empty">Aucun joueur disponible.</li>';
     } else {
@@ -2113,7 +2216,7 @@
     bindPopoverOutsideClick();
 
     console.log(
-      '%c🏉 Compositions Editor v3.18 chargé',
+      '%c🏉 Compositions Editor v3.19 chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         evenements: State.evenements.length,
