@@ -6,6 +6,11 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.29 — Suivi live : bouton Réinitialiser le chrono (1 juin 2026)
+ *   v3.29 : CHRONO bouton ↺ Réinitialiser (action reset, C12-q) dans les
+ *           états armée / en cours / terminé, avec confirmation. Remet le
+ *           chrono à zéro (config durées conservée) ; ne touche PAS les
+ *           observables de jeu. Helpers _btnReset/_bindReset. Retour terrain.
  * Version : 3.28 — Suivi live : démarrage manuel par période + périodes variables (1 juin 2026)
  *   v3.28 : CHRONO retour terrain. (1) Démarrage MANUEL de chaque période :
  *           « ▶ Démarrer » par période ; « Fin de la <période> » arme la
@@ -1121,6 +1126,21 @@
     return _ordinalFr(n) + ' ' + terme;
   }
 
+  // Bouton « Réinitialiser » (action destructrice du chrono seul, avec
+  // confirmation). Disponible dès qu'un chrono est lancé/terminé.
+  function _btnReset() {
+    return '<button type="button" class="suivi-chrono__btn suivi-chrono__btn--danger" id="chrono-reset">↺ Réinitialiser</button>';
+  }
+  function _bindReset(evtId) {
+    var b = document.getElementById('chrono-reset');
+    if (!b) return;
+    b.addEventListener('click', function () {
+      if (window.confirm('Réinitialiser le chrono ? La configuration des durées est conservée, mais le temps écoulé et la période sont remis à zéro. Les actions de match déjà saisies ne sont PAS touchées.')) {
+        _actionChrono(evtId, 'reset', null, null);
+      }
+    });
+  }
+
   function _peindreChrono() {
     var host = document.getElementById('suivi-chrono-host');
     if (!host) return;
@@ -1137,7 +1157,9 @@
       host.innerHTML =
         '<div class="suivi-chrono__periode">Match terminé</div>' +
         '<div class="suivi-chrono__time suivi-chrono__time--paused">--:--</div>' +
-        '<div class="suivi-chrono__state suivi-chrono__state--done">Rencontre clôturée</div>';
+        '<div class="suivi-chrono__state suivi-chrono__state--done">Rencontre clôturée</div>' +
+        '<div class="suivi-chrono__controls">' + _btnReset() + '</div>';
+      _bindReset(evtId);
       return;
     }
 
@@ -1192,10 +1214,12 @@
         '<div class="suivi-chrono__state suivi-chrono__state--paused">En attente — prêt à démarrer</div>' +
         '<div class="suivi-chrono__controls">' +
           '<button type="button" class="suivi-chrono__btn suivi-chrono__btn--primary" id="chrono-demarrer-p">▶ Démarrer la ' + _libellePeriode(perCourante, nbPeriodes).toLowerCase() + '</button>' +
+          _btnReset() +
           '<button type="button" class="suivi-chrono__btn suivi-chrono__btn--danger" id="chrono-fin">⏹ Fin du match</button>' +
         '</div>';
       var bdp = document.getElementById('chrono-demarrer-p');
       if (bdp) bdp.addEventListener('click', function () { _actionChrono(evtId, 'demarrer_periode', null, null); });
+      _bindReset(evtId);
       var bfa = document.getElementById('chrono-fin');
       if (bfa) bfa.addEventListener('click', function () {
         if (window.confirm('Terminer le match ?')) _actionChrono(evtId, 'fin', null, null);
@@ -1220,6 +1244,7 @@
     if (!estDerniere) {
       html += '<button type="button" class="suivi-chrono__btn" id="chrono-periode">Fin de la ' + _libellePeriode(perCourante, nbPeriodes).toLowerCase() + '</button>';
     }
+    html += _btnReset();
     html += '<button type="button" class="suivi-chrono__btn suivi-chrono__btn--danger" id="chrono-fin">⏹ Fin du match</button>';
     html += '</div>';
     host.innerHTML = html;
@@ -1241,6 +1266,7 @@
         _actionChrono(evtId, 'fin', null, null);
       }
     });
+    _bindReset(evtId);
   }
 
   // Lit les durées saisies dans le formulaire de config (champs .chrono-duree).
