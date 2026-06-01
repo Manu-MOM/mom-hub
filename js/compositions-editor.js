@@ -6,6 +6,16 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.25 — Deep-link de mode ?vue=terrain|reseaux depuis la fiche évènement (1 juin 2026)
+ *   v3.25 : DEEP-LINK DE MODE. Les vignettes « Vue terrain » et « Vue
+ *           réseaux sociaux » de la fiche évènement (evenements-browser.js)
+ *           pointent vers compositions.html?evenement_equipe=<id>&vue=<terrain
+ *           |reseaux>. Au boot, après bindViewTabs/bindExportImage et le
+ *           chargement de la compo : ?vue=terrain bascule State.viewMode et
+ *           active l'onglet Terrain ; ?vue=reseaux déclenche le bouton
+ *           d'export (ouvre la modale). Ajout PUR (un bloc try au boot,
+ *           aucune fonction existante touchée). node --check OK.
+ *
  * Version : 3.24 — FIX chargement feuilles de match multi-équipes (1 juin 2026)
  *   v3.24 : FIX 409 « duplicate key idx_compositions_active_match_per_base_cote ».
  *           En multi-équipes engagées, loadComposForCurrentEvent chargeait les
@@ -2508,6 +2518,31 @@
     bindViewTabs(); // v3.15 — câble les onglets Liste/Terrain (statiques, 1 fois)
     bindExportImage(); // v3.23 — câble le bouton « Image » (export réseaux sociaux)
 
+    // v3.25 — Deep-link de mode depuis la fiche évènement : ?vue=terrain
+    // ouvre directement la vue Terrain ; ?vue=reseaux ouvre la modale
+    // d'export image. Les vignettes « Vue terrain » / « Vue réseaux
+    // sociaux » de la fiche évènement (evenements-browser.js) pointent
+    // vers compositions.html?evenement_equipe=<id>&vue=<terrain|reseaux>.
+    // La compo courante est déjà chargée à ce stade (loadCompoJoueurs
+    // ci-dessus) ; si aucune compo n'existe encore, terrain s'affiche
+    // vide et l'export prévient « aucune composition » (dégradation
+    // honnête, décision Manu).
+    try {
+      const vue = new URLSearchParams(window.location.search).get('vue');
+      if (vue === 'terrain') {
+        State.viewMode = 'terrain';
+        renderEditorArea();
+        const tabs = document.querySelectorAll('.view-tabs__tab');
+        if (tabs && tabs.length >= 2) {
+          tabs.forEach(function (t) { t.classList.remove('is-active'); });
+          tabs[1].classList.add('is-active');
+        }
+      } else if (vue === 'reseaux') {
+        const btnImg = document.getElementById('btn-export-image');
+        if (btnImg) btnImg.click();
+      }
+    } catch (_) { /* contexte sans window — ignorer */ }
+
     // v3.8 — A1 : en mode U-N3, l'évènement est fixé par l'URL ;
     // le sélecteur d'évènements n'a pas de sens (retour à la fiche
     // évènement pour changer). On COUPE son handler (plus de toggle).
@@ -2541,7 +2576,7 @@
     bindPopoverOutsideClick();
 
     console.log(
-      '%c🏉 Compositions Editor v3.24 chargé',
+      '%c🏉 Compositions Editor v3.25 chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         evenements: State.evenements.length,
