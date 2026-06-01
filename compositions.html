@@ -216,6 +216,26 @@
       text-transform: uppercase; transition: opacity 0.15s;
     }
     .view-suivi__kickoff:disabled { opacity: 0.5; cursor: not-allowed; }
+    /* ── Chrono (L2/3a) ── */
+    .suivi-chrono { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 28px 22px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+    .suivi-chrono__periode { font-family: 'Oswald', sans-serif; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-mute); }
+    .suivi-chrono__time { font-family: 'JetBrains Mono', monospace; font-size: 52px; font-weight: 700; line-height: 1; color: var(--ink); }
+    .suivi-chrono__time--paused { color: var(--ink-mute); }
+    .suivi-chrono__state { font-size: 12px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--vert-prairie); }
+    .suivi-chrono__state--paused { color: #c08a00; }
+    .suivi-chrono__state--done { color: var(--ink-mute); }
+    .suivi-chrono__controls { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+    .suivi-chrono__btn { padding: 10px 20px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); cursor: pointer; font-family: 'Oswald', sans-serif; font-size: 14px; letter-spacing: 0.04em; text-transform: uppercase; transition: all 0.15s; }
+    .suivi-chrono__btn:hover { background: var(--paper-warm, #faf8f3); }
+    .suivi-chrono__btn--primary { background: var(--vert-prairie); color: #fff; border-color: var(--vert-prairie); }
+    .suivi-chrono__btn--danger { color: #b3261e; border-color: #e0b4b0; }
+    .suivi-chrono__btn--danger:hover { background: #fbeae8; }
+    /* Config durées (avant coup d'envoi) */
+    .suivi-chrono__config { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 340px; }
+    .suivi-chrono__config-title { font-family: 'Oswald', sans-serif; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-mute); text-align: center; }
+    .suivi-chrono__config-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .suivi-chrono__config-row label { font-size: 13px; color: var(--ink); }
+    .suivi-chrono__config-row input { width: 70px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; font-size: 14px; text-align: center; font-family: inherit; }
     .compo-export-overlay {
       position: fixed; inset: 0; background: rgba(0,0,0,0.6);
       display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px;
