@@ -926,6 +926,14 @@
       return;
     }
 
+    // L1 (Suivi live éducateur seul, D1-D4) — aiguillage d'affichage.
+    // En mode 'suivi', écran de saisie live (compo de match uniquement,
+    // D2). Le chemin 'liste' ci-dessous reste strictement inchangé.
+    if (State.viewMode === 'suivi') {
+      renderEditorSuivi(el, compo);
+      return;
+    }
+
     let html = '<div class="view-liste">';
     html += '<section class="view-liste__section">';
     html +=   '<h3 class="view-liste__title">XV de départ</h3>';
@@ -951,9 +959,40 @@
   }
 
   // ════════════════════════════════════════════════════════════
-  // v3.15 (Vue Terrain, étape A) — câblage des onglets Liste/Terrain
+  // L1 (Suivi live éducateur seul) — squelette + aiguillage + sas.
+  // D2 : actif uniquement sur compo de MATCH (base = inerte).
+  // D3 : adversaire déjà connu (compo.adversaire_nom), démarrage direct.
+  // D4 : bouton ▶ Coup d'envoi présent ; INERTE en L1 (chrono/saisie
+  //      livrés en L2+). Aucune écriture, aucune RPC ici.
   // ════════════════════════════════════════════════════════════
-  // Les onglets sont statiques dans compositions.html (jamais
+  function renderEditorSuivi(el, compo) {
+    // D2 — la base ne porte pas d'adversaire : on ne suit pas un match.
+    if (!compo || compo.type_compo !== 'match') {
+      el.innerHTML =
+        '<div class="view-suivi">' +
+          '<div class="view-suivi__inert">' +
+            'Le suivi en direct s\'ouvre sur une <strong>feuille de match</strong>.<br>' +
+            'Sélectionne un onglet de match ci-dessus (ou crée-le) pour suivre la rencontre.' +
+          '</div>' +
+        '</div>';
+      return;
+    }
+
+    // D3 — adversaire déjà connu (même résolution que renderCompoTabs).
+    var adversaire = (compo.adversaire_nom && compo.adversaire_nom.trim())
+      ? ('vs ' + compo.adversaire_nom.trim())
+      : (compo.libelle || 'Match à suivre');
+
+    var html = '<div class="view-suivi">';
+    html +=   '<div class="view-suivi__ready">';
+    html +=     '<div class="view-suivi__match-label">Suivi du match</div>';
+    html +=     '<div class="view-suivi__adversaire">' + escapeHtml(adversaire) + '</div>';
+    html +=     '<button type="button" class="view-suivi__kickoff" id="btn-suivi-kickoff" disabled>▶ Coup d\'envoi</button>';
+    html +=     '<div class="view-suivi__hint">Le chrono et la saisie arrivent à la prochaine étape (L2).</div>';
+    html +=   '</div>';
+    html += '</div>';
+    el.innerHTML = html;
+  }
   // régénérés) → câblage unique au boot. Clic = set viewMode +
   // is-active + re-rendu de l'éditeur. Le HTML retire le is-active
   // codé en dur (piloté ici). Robuste si les boutons sont absents.
@@ -966,12 +1005,18 @@
       clickedTab.classList.add('is-active');
       renderEditorArea();
     };
-    // Convention HTML : 1er onglet = Liste, 2e = Terrain.
+    // Convention HTML : 1er onglet = Liste, 2e = Terrain, 3e = Suivi (L1).
     tabs[0].addEventListener('click', function () { setMode('liste', tabs[0]); });
     tabs[1].addEventListener('click', function () { setMode('terrain', tabs[1]); });
+    if (tabs[2]) {
+      tabs[2].addEventListener('click', function () { setMode('suivi', tabs[2]); });
+    }
     // État initial cohérent avec State.viewMode (défaut 'liste').
     tabs.forEach(function (t) { t.classList.remove('is-active'); });
-    (State.viewMode === 'terrain' ? tabs[1] : tabs[0]).classList.add('is-active');
+    var initialTab = tabs[0];
+    if (State.viewMode === 'terrain') initialTab = tabs[1];
+    else if (State.viewMode === 'suivi' && tabs[2]) initialTab = tabs[2];
+    initialTab.classList.add('is-active');
   }
 
   // ════════════════════════════════════════════════════════════
