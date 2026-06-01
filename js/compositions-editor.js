@@ -6,6 +6,19 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.24 — FIX chargement feuilles de match multi-équipes (1 juin 2026)
+ *   v3.24 : FIX 409 « duplicate key idx_compositions_active_match_per_base_cote ».
+ *           En multi-équipes engagées, loadComposForCurrentEvent chargeait les
+ *           feuilles de match via listCompositionsByEquipe(M14_TEAM_UUID), dont
+ *           la jointure evenements!inner filtre sur equipe_id=M14. Or une feuille
+ *           de match a pour evenement_id le MATCH, dont equipe_id = l'équipe
+ *           ENGAGÉE (≠ M14) → exclue à tort → onglet affiché « à faire » alors
+ *           que la compo existe → clic = re-création → 409 (contrainte unique).
+ *           FIX : chargement par compo_base_origine_id via le nouveau wrapper
+ *           SupabaseHub.listMatchsParBaseOrigine(base.id) (lien robuste, sans
+ *           jointure equipe_id restrictive). Aucune donnée touchée, bug 100%
+ *           côté lecture front. node --check OK.
+ *
  * Version : 3.23 — Export image de la composition (réseaux sociaux) (1 juin 2026)
  *   v3.23 : EXPORT IMAGE. Bouton « 📷 Image » ajouté à côté des onglets
  *           Liste/Terrain (action, pas un mode de vue). Au clic, collecte
@@ -2346,11 +2359,13 @@
       // sont reconnues par compo_base_origine_id === base.id (lien robuste).
       // Leur evenement_id pointe vers le MATCH (plus la racine) → on NE filtre
       // PLUS par evenement_id === racine (ancien filtre v3.8 devenu faux en α).
-      const all = await SupabaseHub.listCompositionsByEquipe(M14_TEAM_UUID);
-      const matchsDeLaBase = (all || []).filter(
-        c => c.type_compo === 'match' &&
-             c.compo_base_origine_id === base.id
-      );
+      // v3.24 — FIX multi-équipes : les feuilles de match portent
+      // l'evenement_id du MATCH (equipe_id = équipe ENGAGÉE, ≠ M14), donc
+      // listCompositionsByEquipe(M14) les excluait via sa jointure
+      // evenements!inner sur equipe_id (bug : onglet match affiché « à faire »
+      // alors que la compo existe → re-création → 409 contrainte unique).
+      // On lit désormais les matchs par compo_base_origine_id (lien robuste).
+      const matchsDeLaBase = await SupabaseHub.listMatchsParBaseOrigine(base.id);
       State.compos = [base].concat(matchsDeLaBase);
       State.selectedCompoId = base.id;
       return;
@@ -2526,7 +2541,7 @@
     bindPopoverOutsideClick();
 
     console.log(
-      '%c🏉 Compositions Editor v3.23 chargé',
+      '%c🏉 Compositions Editor v3.24 chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         evenements: State.evenements.length,
