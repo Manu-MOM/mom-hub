@@ -6,6 +6,14 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.28 — Suivi live : démarrage manuel par période + périodes variables (1 juin 2026)
+ *   v3.28 : CHRONO retour terrain. (1) Démarrage MANUEL de chaque période :
+ *           « ▶ Démarrer » par période ; « Fin de la <période> » arme la
+ *           suivante SANS la relancer (état armé en attente). Émet
+ *           demarrer_periode (cf. C12-p), plus coup_envoi. (2) Nombre de
+ *           périodes VARIABLE (1/2/3…) + durée par période, vocabulaire
+ *           adaptatif (période unique / mi-temps / tiers-temps). _peindreChrono
+ *           réécrit : config / armée / en cours / terminé.
  * Version : 3.27 — Suivi live éducateur seul : chrono de rencontre (L2/3a) (1 juin 2026)
  *   v3.27 : CHRONO L2/3a. renderEditorSuivi réécrit : config des durées
  *           (avant coup d'envoi) + chrono persistant (C12-n) qui tourne
@@ -1093,41 +1101,39 @@
 
   // Peint l'écran complet selon l'état (config / prêt / en cours /
   // pause / terminé). Câble les boutons.
+  // Vocabulaire adaptatif selon le nombre de périodes (D : 1/2/3…).
+  //   1 → « période unique » ; 2 → mi-temps ; 3 → tiers-temps ; sinon période.
+  function _termePeriode(nbPeriodes) {
+    if (nbPeriodes === 2) return 'mi-temps';
+    if (nbPeriodes === 3) return 'tiers-temps';
+    return 'période';
+  }
+  function _ordinalFr(n) {
+    if (n === 1) return '1re';
+    return n + 'e';
+  }
+  // Libellé d'une période : « 2e mi-temps », « 1er tiers-temps », « période unique »…
+  function _libellePeriode(n, nbPeriodes) {
+    if (nbPeriodes <= 1) return 'Période unique';
+    var terme = _termePeriode(nbPeriodes);
+    // « tiers-temps » → ordinal masculin (1er) ; « mi-temps » → 1re/2e
+    if (terme === 'tiers-temps') return (n === 1 ? '1er' : n + 'e') + ' ' + terme;
+    return _ordinalFr(n) + ' ' + terme;
+  }
+
   function _peindreChrono() {
     var host = document.getElementById('suivi-chrono-host');
     if (!host) return;
     var e = SuiviChrono.etat;
     var evtId = SuiviChrono.evtId;
 
-    // Cas 1 — pas encore de coup d'envoi (état null OU coup_envoi_at null) :
-    // CONFIG des durées + bouton coup d'envoi.
-    if (!e || !e.coup_envoi_at) {
-      var d1 = (e && Array.isArray(e.durees_periodes) && e.durees_periodes[0]) ? e.durees_periodes[0] : 30;
-      var d2 = (e && Array.isArray(e.durees_periodes) && e.durees_periodes[1]) ? e.durees_periodes[1] : 30;
-      host.innerHTML =
-        '<div class="suivi-chrono__config">' +
-          '<div class="suivi-chrono__config-title">Durées des mi-temps (minutes)</div>' +
-          '<div class="suivi-chrono__config-row"><label for="chrono-d1">1re mi-temps</label>' +
-            '<input id="chrono-d1" type="number" min="1" max="60" value="' + d1 + '"></div>' +
-          '<div class="suivi-chrono__config-row"><label for="chrono-d2">2e mi-temps</label>' +
-            '<input id="chrono-d2" type="number" min="1" max="60" value="' + d2 + '"></div>' +
-        '</div>' +
-        '<button type="button" class="suivi-chrono__btn suivi-chrono__btn--primary" id="chrono-kickoff">▶ Coup d\'envoi</button>';
-      var bk = document.getElementById('chrono-kickoff');
-      if (bk) bk.addEventListener('click', function () {
-        var v1 = parseInt(document.getElementById('chrono-d1').value, 10);
-        var v2 = parseInt(document.getElementById('chrono-d2').value, 10);
-        var durees = [ (v1 > 0 ? v1 : 30), (v2 > 0 ? v2 : 30) ];
-        // Config PUIS coup d'envoi (2 actions ; config n'agit qu'avant le KO).
-        _actionChrono(evtId, 'config', { durees: durees }, function () {
-          _actionChrono(evtId, 'coup_envoi', null, null);
-        });
-      });
-      return;
-    }
+    var durees = (e && Array.isArray(e.durees_periodes) && e.durees_periodes.length)
+      ? e.durees_periodes : [30, 30];
+    var nbPeriodes = durees.length;
+    var perCourante = (e && e.periode_courante) ? e.periode_courante : 1;
 
-    // Cas 3 — terminé.
-    if (e.termine_at) {
+    // ── Cas TERMINÉ ──
+    if (e && e.termine_at) {
       host.innerHTML =
         '<div class="suivi-chrono__periode">Match terminé</div>' +
         '<div class="suivi-chrono__time suivi-chrono__time--paused">--:--</div>' +
@@ -1135,11 +1141,74 @@
       return;
     }
 
-    // Cas 2 — en cours (avec ou sans pause).
+    // ── Cas CONFIG (rien n'a jamais démarré : pas de coup_envoi_at) ──
+    if (!e || !e.coup_envoi_at) {
+      var rows = '';
+      for (var i = 0; i < nbPeriodes; i++) {
+        rows +=
+          '<div class="suivi-chrono__config-row">' +
+            '<label for="chrono-d' + i + '">' + _libellePeriode(i + 1, nbPeriodes) + '</label>' +
+            '<input id="chrono-d' + i + '" class="chrono-duree" type="number" min="1" max="60" value="' + (durees[i] || 30) + '"></div>';
+      }
+      host.innerHTML =
+        '<div class="suivi-chrono__config">' +
+          '<div class="suivi-chrono__config-row">' +
+            '<label for="chrono-nb">Nombre de périodes</label>' +
+            '<input id="chrono-nb" type="number" min="1" max="5" value="' + nbPeriodes + '"></div>' +
+          '<div class="suivi-chrono__config-title">Durée de chaque période (minutes)</div>' +
+          '<div id="chrono-durees">' + rows + '</div>' +
+        '</div>' +
+        '<button type="button" class="suivi-chrono__btn suivi-chrono__btn--primary" id="chrono-demarrer">▶ Démarrer la ' + _libellePeriode(1, nbPeriodes).toLowerCase() + '</button>';
+
+      // Le champ « nombre de périodes » régénère les lignes de durée (sans appel réseau).
+      var nb = document.getElementById('chrono-nb');
+      if (nb) nb.addEventListener('change', function () {
+        var n = parseInt(nb.value, 10); if (!(n > 0)) n = 1; if (n > 5) n = 5;
+        // Conserver les durées déjà saisies, compléter à 30 par défaut.
+        var cur = _lireDureesConfig();
+        var next = [];
+        for (var k = 0; k < n; k++) next.push(cur[k] || 30);
+        // Mémo transitoire dans l'état pour re-rendu cohérent.
+        SuiviChrono.etat = Object.assign({}, e || {}, { durees_periodes: next, periode_courante: 1 });
+        _peindreChrono();
+      });
+
+      var bd = document.getElementById('chrono-demarrer');
+      if (bd) bd.addEventListener('click', function () {
+        var dd = _lireDureesConfig();
+        // Config (nb périodes + durées) PUIS démarrage de la 1re période.
+        _actionChrono(evtId, 'config', { durees: dd }, function () {
+          _actionChrono(evtId, 'demarrer_periode', null, null);
+        });
+      });
+      return;
+    }
+
+    // ── Cas PÉRIODE ARMÉE (coup d'envoi déjà donné, mais période pas lancée) ──
+    if (!e.debut_periode_at) {
+      host.innerHTML =
+        '<div class="suivi-chrono__periode">' + _libellePeriode(perCourante, nbPeriodes) + '</div>' +
+        '<div class="suivi-chrono__time suivi-chrono__time--paused">' + _fmtMMSS(0) + '</div>' +
+        '<div class="suivi-chrono__state suivi-chrono__state--paused">En attente — prêt à démarrer</div>' +
+        '<div class="suivi-chrono__controls">' +
+          '<button type="button" class="suivi-chrono__btn suivi-chrono__btn--primary" id="chrono-demarrer-p">▶ Démarrer la ' + _libellePeriode(perCourante, nbPeriodes).toLowerCase() + '</button>' +
+          '<button type="button" class="suivi-chrono__btn suivi-chrono__btn--danger" id="chrono-fin">⏹ Fin du match</button>' +
+        '</div>';
+      var bdp = document.getElementById('chrono-demarrer-p');
+      if (bdp) bdp.addEventListener('click', function () { _actionChrono(evtId, 'demarrer_periode', null, null); });
+      var bfa = document.getElementById('chrono-fin');
+      if (bfa) bfa.addEventListener('click', function () {
+        if (window.confirm('Terminer le match ?')) _actionChrono(evtId, 'fin', null, null);
+      });
+      return;
+    }
+
+    // ── Cas EN COURS (période lancée, avec ou sans pause) ──
     var sec = SuiviChrono.secondesEcoulees();
     var enPause = !!e.en_pause;
+    var estDerniere = (perCourante >= nbPeriodes);
     var html =
-      '<div class="suivi-chrono__periode">' + (e.periode_courante || 1) + 're / 2e mi-temps · période ' + (e.periode_courante || 1) + '</div>' +
+      '<div class="suivi-chrono__periode">' + _libellePeriode(perCourante, nbPeriodes) + '</div>' +
       '<div id="suivi-chrono-time" class="suivi-chrono__time' + (enPause ? ' suivi-chrono__time--paused' : '') + '">' + _fmtMMSS(sec) + '</div>' +
       '<div class="suivi-chrono__state' + (enPause ? ' suivi-chrono__state--paused' : '') + '">' + (enPause ? '⏸ En pause' : '● En cours') + '</div>' +
       '<div class="suivi-chrono__controls">';
@@ -1148,7 +1217,9 @@
     } else {
       html += '<button type="button" class="suivi-chrono__btn" id="chrono-pause">⏸ Pause</button>';
     }
-    html += '<button type="button" class="suivi-chrono__btn" id="chrono-periode">Mi-temps suivante</button>';
+    if (!estDerniere) {
+      html += '<button type="button" class="suivi-chrono__btn" id="chrono-periode">Fin de la ' + _libellePeriode(perCourante, nbPeriodes).toLowerCase() + '</button>';
+    }
     html += '<button type="button" class="suivi-chrono__btn suivi-chrono__btn--danger" id="chrono-fin">⏹ Fin du match</button>';
     html += '</div>';
     host.innerHTML = html;
@@ -1159,7 +1230,8 @@
     if (br) br.addEventListener('click', function () { _actionChrono(evtId, 'reprise', null, null); });
     var bper = document.getElementById('chrono-periode');
     if (bper) bper.addEventListener('click', function () {
-      if (window.confirm('Passer à la mi-temps suivante ? Le chrono de la période repart à zéro.')) {
+      var suiv = _libellePeriode(perCourante + 1, nbPeriodes).toLowerCase();
+      if (window.confirm('Terminer la ' + _libellePeriode(perCourante, nbPeriodes).toLowerCase() + ' ? La ' + suiv + ' sera prête à démarrer manuellement.')) {
         _actionChrono(evtId, 'periode_suivante', null, null);
       }
     });
@@ -1169,6 +1241,17 @@
         _actionChrono(evtId, 'fin', null, null);
       }
     });
+  }
+
+  // Lit les durées saisies dans le formulaire de config (champs .chrono-duree).
+  function _lireDureesConfig() {
+    var inputs = document.querySelectorAll('#chrono-durees .chrono-duree');
+    var arr = [];
+    inputs.forEach(function (inp) {
+      var v = parseInt(inp.value, 10);
+      arr.push(v > 0 ? v : 30);
+    });
+    return arr.length ? arr : [30, 30];
   }
 
   // Exécute une action chrono (voie coach) puis relit l'état et repeint.
