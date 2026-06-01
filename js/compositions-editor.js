@@ -6,6 +6,21 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.20 — Vue Terrain/Liste : fix promotion remplaçant + bouton « ↓ banc » (1 juin 2026)
+ *   v3.20 : 2 fixes issus de la recette (Manu). (1) BUG promotion remplaçant
+ *           depuis le picker vue Liste : un remplaçant cliqué sur un poste
+ *           vacant passait par onPickJoueurPourSlot (INSERT) → violait
+ *           composition_joueurs_unique_per_compo (joueur déjà présent). Fix :
+ *           les items « --from-bench » du picker sont routés vers
+ *           onDropJoueurSurPoste (gère existant→updateJoueurCompo) ; le vivier
+ *           garde le chemin add (onPickJoueurPourSlot inchangé). (2) En vue
+ *           Liste, le slot titulaire a désormais DEUX actions : « ↓ banc »
+ *           (rétrograder en remplaçant, via onDropJoueurSurBanc) ET « × »
+ *           (retrait TOTAL de la compo, ex. blessure — onRemoveJoueurClick,
+ *           inchangé). renderSlotPoste + bindSlotHandlers modifiés en
+ *           conséquence (ajouts ciblés, croix existante préservée).
+ *           compositions.html : CSS .slot__bench. node --check OK.
+ *
  * Version : 3.19 — Vue Terrain : banc drag+drop, rempl. au picker Liste, pastilles +grandes (1 juin 2026)
  *   v3.19 : suite recette drag (retours Manu). (1) BANC drag+drop bidirectionnel :
  *           les remplaçants (vt-bench-item) sont draggables (source) → on peut
@@ -1229,7 +1244,8 @@
         '</span>' +
         (cj.est_depannage_hors_categorie ? '<span class="slot__warning" title="Joueur hors catégorie M14">⚠</span>' : '') +
         '<span class="slot__etat" title="État du joueur">' + libelleEtatJoueurCourt(cj.etat_joueur) + '</span>' +
-        '<button class="slot__remove" title="Retirer ce joueur" type="button">×</button>' +
+        '<button class="slot__bench" title="Envoyer au banc" type="button">↓ banc</button>' +
+        '<button class="slot__remove" title="Retirer totalement de la compo" type="button">×</button>' +
       '</li>'
     );
   }
@@ -1276,6 +1292,18 @@
         e.stopPropagation();
         const cjId = btn.closest('.slot').dataset.compoJoueurId;
         if (cjId) onRemoveJoueurClick(cjId);
+      });
+    });
+    // v3.19→ fix bug 1 : bouton « ↓ banc » = rétrograder un titulaire au banc
+    // (≠ croix × qui le sort totalement de la compo, ex. blessure). Réutilise
+    // onDropJoueurSurBanc (passe par le joueur_id, pas le compo_joueur_id).
+    document.querySelectorAll('.slot--occupe .slot__bench').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        const slot = btn.closest('.slot');
+        const cjId = slot.dataset.compoJoueurId;
+        const cj = State.compoJoueurs.find(function (x) { return x.id === cjId; });
+        if (cj) onDropJoueurSurBanc(cj.joueur_id);
       });
     });
   }
@@ -1662,9 +1690,24 @@
     }
 
     if (State.popover && State.popover.mode === 'slot-vide') {
-      root.querySelectorAll('.popover__item[data-joueur-id]').forEach(li =>
-        li.addEventListener('click', function (e) { e.stopPropagation(); onPickJoueurPourSlot(li.dataset.joueurId); })
-      );
+      root.querySelectorAll('.popover__item[data-joueur-id]').forEach(function (li) {
+        li.addEventListener('click', function (e) {
+          e.stopPropagation();
+          const joueurId = li.dataset.joueurId;
+          // v3.19→ fix : un joueur DÉJÀ dans la compo (remplaçant promu, classe
+          // --from-bench) ne peut pas passer par onPickJoueurPourSlot (INSERT →
+          // viole l'unicité). On le promeut via onDropJoueurSurPoste qui gère
+          // existant→updateJoueurCompo. Les joueurs du vivier (nouveaux) gardent
+          // le chemin add historique (onPickJoueurPourSlot, byte-identique).
+          if (li.classList.contains('popover__item--from-bench')) {
+            const posteId = State.popover && State.popover.posteId;
+            closePopover();
+            if (posteId) onDropJoueurSurPoste(joueurId, posteId);
+          } else {
+            onPickJoueurPourSlot(joueurId);
+          }
+        });
+      });
     } else if (State.popover && State.popover.mode === 'joueur-vivier') {
       root.querySelectorAll('.popover__item[data-poste-id]').forEach(li =>
         li.addEventListener('click', function (e) { e.stopPropagation(); onPickPostePourJoueur(li.dataset.posteId); })
@@ -2216,7 +2259,7 @@
     bindPopoverOutsideClick();
 
     console.log(
-      '%c🏉 Compositions Editor v3.19 chargé',
+      '%c🏉 Compositions Editor v3.20 chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         evenements: State.evenements.length,
