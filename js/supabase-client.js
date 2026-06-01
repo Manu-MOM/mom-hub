@@ -18,18 +18,12 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.50 — juin 2026
- *   v1.50 : wrappers ciblés NON destructeurs pour l'ÉDITION d'évènement
- *           (format par équipe + staff), en évitant la RPC
- *           modifier_evenement_complet (« replace children » → détruirait
- *           les evenement_equipes_engagees référencées par les compos).
- *           (1) updateEquipeEngagee(liaisonId, patch) : UPDATE en place du
- *           format_de_jeu/ordre/notes, préserve l'id (compos N3 intactes).
- *           (2) evenementEquipeHasCompo(eeId) : garde avant retrait d'équipe.
- *           (3) setEncadrants(evenementId, personneIds) : réconciliation
- *           staff par DELETE+INSERT ciblée sur l'évènement (non destructeur
- *           compos). Aucune fonction existante modifiée (ajouts purs).
- *
+ * Version : 1.41 — juin 2026
+ *   v1.41 : listMatchsParBaseOrigine(baseId) — wrapper ADDITIF lisant les
+ *           feuilles de match par compo_base_origine_id (sans jointure
+ *           evenements!inner sur equipe_id, qui excluait à tort les matchs
+ *           des équipes engagées ≠ M14 → bug 409 multi-équipes côté éditeur
+ *           v3.24). Aucune méthode existante touchée. node --check OK.
  * Version : 1.40 — mai 2026
  *   v1.40 : listMesEvenementsAvecCompos — priorité d'affichage de l'équipe
  *          changée en nom_officiel || libelle_court || code (D9). Motif :
@@ -2032,113 +2026,6 @@
       if (error) {
         console.error('MOM Hub: removeEquipeEngagee()', error);
         return { ok: false, error: error.message || 'Erreur DELETE evenement_equipes_engagees' };
-      }
-      return { ok: true };
-    },
-
-    /**
-     * v1.50 — Met à jour EN PLACE une équipe engagée (UPDATE ciblé, par id
-     * de liaison). Opération NON destructrice : ne touche qu'à la ligne
-     * evenement_equipes_engagees visée, préserve son id → les compositions
-     * qui la référencent via compositions.evenement_equipe_id (N3) restent
-     * intactes. C'est le wrapper clé pour poser le format_de_jeu par équipe
-     * en ÉDITION sans passer par la RPC « replace children » (qui, elle,
-     * détruirait/recréerait les engagements et casserait les compos liées).
-     * Whitelist identique à addEquipeEngagee : format_de_jeu, ordre, notes.
-     *
-     * @param {string} liaisonId UUID de la ligne evenement_equipes_engagees
-     * @param {Object} patch champs à mettre à jour (whitelist)
-     * @returns {Promise<{ok:boolean, data?:Object, error?:string}>}
-     */
-    async updateEquipeEngagee(liaisonId, patch) {
-      if (!liaisonId) return { ok: false, error: 'liaisonId requis' };
-      if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
-        return { ok: false, error: 'patch (objet) requis' };
-      }
-      const allowedFields = ['format_de_jeu', 'ordre', 'notes'];
-      const cleanPatch = {};
-      allowedFields.forEach(f => {
-        if (Object.prototype.hasOwnProperty.call(patch, f)) cleanPatch[f] = patch[f];
-      });
-      if (Object.keys(cleanPatch).length === 0) {
-        return { ok: false, error: 'Aucun champ autorisé dans le patch' };
-      }
-      const { data, error } = await client
-        .from('evenement_equipes_engagees')
-        .update(cleanPatch)
-        .eq('id', liaisonId)
-        .select()
-        .maybeSingle();
-      if (error) {
-        console.error('MOM Hub: updateEquipeEngagee()', error);
-        return { ok: false, error: error.message || 'Erreur UPDATE evenement_equipes_engagees' };
-      }
-      return { ok: true, data: data };
-    },
-
-    /**
-     * v1.50 — Détecte si une équipe engagée (liaison M3) a au moins une
-     * composition rattachée (compositions.evenement_equipe_id = N3). Sert
-     * de GARDE avant un retrait d'équipe en édition (UX : demander
-     * confirmation « cette équipe a une feuille, la retirer la supprimera »).
-     *
-     * @param {string} evenementEquipeId UUID de la liaison M3
-     * @returns {Promise<{ok:boolean, count?:number, error?:string}>}
-     */
-    async evenementEquipeHasCompo(evenementEquipeId) {
-      if (!evenementEquipeId) return { ok: false, error: 'evenementEquipeId requis' };
-      const { count, error } = await client
-        .from('compositions')
-        .select('id', { count: 'exact', head: true })
-        .eq('evenement_equipe_id', evenementEquipeId);
-      if (error) {
-        console.error('MOM Hub: evenementEquipeHasCompo()', error);
-        return { ok: false, error: error.message || 'Erreur lecture compositions' };
-      }
-      return { ok: true, count: count || 0 };
-    },
-
-    /**
-     * v1.50 — Réconcilie la liste des encadrants d'un évènement (staff).
-     * Stratégie DELETE+INSERT ciblée SUR CE SEUL évènement : on efface les
-     * lignes evenement_encadrants de l'évènement puis on réinsère la liste
-     * fournie. NON destructeur pour les compos (les encadrants ne sont pas
-     * référencés par compositions). Si la liste est vide, l'évènement se
-     * retrouve sans encadrant (cas légitime).
-     *
-     * ⚠️ Colonnes d'insert supposées : evenement_id, personne_id, ordre.
-     * Si la table evenement_encadrants impose une colonne NOT NULL
-     * supplémentaire (ex. roles_encadrement), l'INSERT échouera proprement
-     * et remontera l'erreur — à ajuster en recette le cas échéant.
-     *
-     * @param {string} evenementId UUID de l'évènement
-     * @param {string[]} personneIds liste des personne_id encadrants
-     * @returns {Promise<{ok:boolean, error?:string}>}
-     */
-    async setEncadrants(evenementId, personneIds) {
-      if (!evenementId) return { ok: false, error: 'evenementId requis' };
-      const ids = Array.isArray(personneIds) ? personneIds.filter(Boolean) : [];
-      // 1) purge des encadrants actuels de l'évènement
-      const del = await client
-        .from('evenement_encadrants')
-        .delete()
-        .eq('evenement_id', evenementId);
-      if (del.error) {
-        console.error('MOM Hub: setEncadrants() delete', del.error);
-        return { ok: false, error: del.error.message || 'Erreur purge encadrants' };
-      }
-      // 2) réinsertion de la nouvelle liste (si non vide)
-      if (ids.length > 0) {
-        const rows = ids.map((pid, idx) => ({
-          evenement_id: evenementId,
-          personne_id: pid,
-          ordre: idx + 1
-        }));
-        const ins = await client.from('evenement_encadrants').insert(rows);
-        if (ins.error) {
-          console.error('MOM Hub: setEncadrants() insert', ins.error);
-          return { ok: false, error: ins.error.message || 'Erreur insertion encadrants' };
-        }
       }
       return { ok: true };
     },
@@ -4761,6 +4648,37 @@
     },
 
     /**
+     * Liste les compos de MATCH dérivées d'une base donnée, via le lien
+     * robuste compo_base_origine_id (option α). Multi-équipes : on NE filtre
+     * PAS par equipe_id de l'évènement — les feuilles de match portent
+     * l'evenement_id du match (dont equipe_id = équipe ENGAGÉE, ≠ M14), donc
+     * une jointure evenements!inner sur M14 les exclurait à tort (bug 6c-6
+     * multi-équipes). La base étant déjà résolue par équipe engagée
+     * (getCompoForEvenementEquipe), son id suffit à retrouver ses matchs.
+     */
+    async listMatchsParBaseOrigine(baseId) {
+      if (!baseId) {
+        console.error('MOM Hub: listMatchsParBaseOrigine() requiert un baseId');
+        return [];
+      }
+      const { data, error } = await client
+        .from('compositions')
+        .select(`
+          id, evenement_id, evenement_equipe_id, type_compo,
+          compo_base_origine_id, cote, etat,
+          version, est_active, notes_compo, created_at, updated_at
+        `)
+        .eq('type_compo', 'match')
+        .eq('compo_base_origine_id', baseId)
+        .order('created_at', { ascending: true });
+      if (error) {
+        console.error('MOM Hub: listMatchsParBaseOrigine()', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
      * N3 — Rattache (ou détache) une compo existante à une équipe
      * engagée : UPDATE compositions.evenement_equipe_id (sql/46,
      * colonne additive). null = retour mono-équipe (rétro-compat
@@ -5562,7 +5480,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.40 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.41 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
