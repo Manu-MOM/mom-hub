@@ -188,6 +188,34 @@
       font-size: 14px; font-family: inherit;
     }
     .view-tabs__action:hover { background: var(--vert-bouteille); color: #fff; border-color: var(--vert-bouteille); }
+    /* ── Vue Suivi (écran live éducateur seul) — L1 squelette ── */
+    .view-suivi { display: flex; flex-direction: column; gap: 16px; }
+    .view-suivi__inert {
+      padding: 28px 22px; border: 1px dashed var(--line); border-radius: 12px;
+      background: var(--paper-warm, #faf8f3); color: var(--ink-mute);
+      font-size: 14px; line-height: 1.6; text-align: center;
+    }
+    .view-suivi__ready {
+      display: flex; flex-direction: column; align-items: center; gap: 18px;
+      padding: 32px 22px; border: 1px solid var(--line); border-radius: 12px;
+      background: #fff;
+    }
+    .view-suivi__match-label {
+      font-family: 'Oswald', sans-serif; font-size: 13px; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--ink-mute);
+    }
+    .view-suivi__adversaire {
+      font-family: 'Oswald', sans-serif; font-size: 26px; font-weight: 600;
+      color: var(--ink); text-align: center;
+    }
+    .view-suivi__hint { font-size: 13px; color: var(--ink-mute); text-align: center; }
+    .view-suivi__kickoff {
+      padding: 14px 36px; border: none; border-radius: 10px;
+      background: var(--vert-prairie); color: #fff; cursor: pointer;
+      font-family: 'Oswald', sans-serif; font-size: 17px; letter-spacing: 0.04em;
+      text-transform: uppercase; transition: opacity 0.15s;
+    }
+    .view-suivi__kickoff:disabled { opacity: 0.5; cursor: not-allowed; }
     .compo-export-overlay {
       position: fixed; inset: 0; background: rgba(0,0,0,0.6);
       display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px;
@@ -630,6 +658,7 @@
     <nav class="view-tabs" aria-label="Mode de visualisation">
       <button class="view-tabs__tab" type="button">Liste</button>
       <button class="view-tabs__tab" type="button" title="Vue Terrain de la composition">Terrain</button>
+      <button class="view-tabs__tab" type="button" title="Suivi du match en direct">Suivi</button>
       <button class="view-tabs__action" id="btn-export-image" type="button" title="Exporter la composition en image">📷 Image</button>
     </nav>
 
