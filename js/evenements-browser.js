@@ -21,7 +21,13 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.55.1 — Édition : format par équipe SANS perturber le timing des phases (1 juin 2026)
+ * Version : 1.55.2 — Édition : fix duplication des phases en réédition (1 juin 2026)
+ *   v1.55.2 : FIX duplication des phases/matchs en réédition (bug d'idempotence
+ *           PRÉEXISTANT, sans rapport avec le fix format v1.55.x). _prefillPhasesEditor
+ *           est additif (clics add-phase/add-match) ; rouvrir un évènement en
+ *           édition empilait les phases (« 4 phases·8 matchs » au lieu de 2·4).
+ *           Fix : vider les .evt-phase-box du bloc équipe avant de pré-remplir
+ *           → idempotent. Sans risque (appelé qu'en édition). node --check OK.
  *   v1.55.1 : CORRECTIF du v1.55 — l'await getEquipesEngagees placé avant le
  *           _waitFor décalait le flux et CASSAIT le pré-remplissage des phases
  *           (régression : phases vides/dupliquées). Retiré : la lecture des
@@ -4502,6 +4508,15 @@
     });
     editorWrap.querySelectorAll('.evt-phases-equipe-block').forEach(function (block) {
       const eqId = block.getAttribute('data-equipe-id');
+      // v1.55.2 — FIX duplication des phases en réédition (bug d'idempotence
+      // préexistant) : _prefillPhasesEditor est purement ADDITIF (il clique
+      // « add-phase »/« add-match » pour chaque enfant). Si la fonction tourne
+      // plus d'une fois, ou si le bloc équipe contenait déjà des phases d'une
+      // ouverture précédente, les phases s'accumulent (« 4 phases · 8 matchs »
+      // au lieu de 2·4). On VIDE donc les phases déjà présentes dans ce bloc
+      // avant de (re)construire. Sans risque : _prefillPhasesEditor n'est
+      // appelé qu'en édition (openModalEditComplet), jamais en création pure.
+      block.querySelectorAll('.evt-phase-box').forEach(function (b) { b.remove(); });
       const phases = phasesByEq[eqId] || [];
       phases.forEach(function (pb) {
         const addPhaseBtn = block.querySelector('[data-action="add-phase"]');
