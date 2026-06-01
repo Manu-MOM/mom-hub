@@ -437,7 +437,7 @@
       position: absolute;
       transform: translate(-50%, -50%);
       display: flex; flex-direction: column; align-items: center;
-      width: 84px; text-align: center;
+      width: 110px; text-align: center;
       color: #fff;
     }
     .vt-mark__poste {
@@ -447,20 +447,21 @@
       padding: 1px 5px; margin-bottom: 2px; white-space: nowrap;
     }
     .vt-mark__disc {
-      width: 40px; height: 40px; border-radius: 50%;
+      width: 48px; height: 48px; border-radius: 50%;
       background: var(--bleu-base, #2f3da8);
-      border: 2px solid #f5c518;
+      border: 2.5px solid #f5c518;
       display: flex; align-items: center; justify-content: center;
     }
     .vt-mark__num {
-      font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 18px;
+      font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 22px;
       color: #fff; line-height: 1;
     }
     .vt-mark__nom {
-      font-family: 'JetBrains Mono', monospace; font-size: 9px;
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
       letter-spacing: 0.02em; margin-top: 3px;
-      max-width: 84px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-      text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+      max-width: 110px; line-height: 1.2;
+      overflow-wrap: anywhere; word-break: break-word;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.65);
     }
     .vt-mark--vide { opacity: 0.55; }
     .vt-mark--vide .vt-mark__disc { border-style: dashed; background: rgba(13,43,78,0.5); }
