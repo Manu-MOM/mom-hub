@@ -21,7 +21,14 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.55 — Édition : pré-remplissage du format par équipe (fix persistance) (1 juin 2026)
+ * Version : 1.55.1 — Édition : format par équipe SANS perturber le timing des phases (1 juin 2026)
+ *   v1.55.1 : CORRECTIF du v1.55 — l'await getEquipesEngagees placé avant le
+ *           _waitFor décalait le flux et CASSAIT le pré-remplissage des phases
+ *           (régression : phases vides/dupliquées). Retiré : la lecture des
+ *           formats est désormais lancée EN PARALLÈLE (Promise non bloquante)
+ *           et appliquée dans un _waitFor SÉPARÉ (révèle + pré-sélectionne le
+ *           format), totalement découplé du flux phases — lequel redevient
+ *           byte-identique à v1.54. node --check OK.
  *   v1.55 : FIX persistance format_de_jeu par équipe en ÉDITION. Cause réelle
  *           (diagnostic à la source) : « Modifier » passe par openModalEditComplet
  *           → modal de CRÉATION réutilisé (MODAL_CREATE_EDIT_ID) ; les cases
@@ -4388,38 +4395,33 @@
       const eqIds = Array.from(new Set(
         enfants.map(function (e) { return e.equipe_id; }).filter(Boolean)));
 
-      // v1.55 — FIX persistance format par équipe en ÉDITION. Le cochage
-      // programmatique (cb.checked=true) ne déclenche PAS le handler 'change'
-      // qui révèle + pré-sélectionne le <select> format de la ligne. Résultat
-      // (bug) : à la sauvegarde, le « replace children » réécrivait le format
-      // par défaut/vide → format_de_jeu NULL en base. On charge donc les
-      // engagements réels (avec leur format) et, après cochage, on révèle le
-      // select de chaque équipe cochée et on y pré-sélectionne le format réel.
-      let _fmtParEquipe = {};
-      try {
-        const engs = await SupabaseHub.getEquipesEngagees(evtId);
-        (engs || []).forEach(function (e) {
-          if (e && e.equipe_id) _fmtParEquipe[e.equipe_id] = e.format_de_jeu || '';
-        });
-      } catch (e) { console.error('openModalEditComplet() getEquipesEngagees', e); }
+      // v1.55.1 — FIX persistance format par équipe en ÉDITION, SANS perturber
+      // le timing du pré-remplissage des phases. Le cochage programmatique
+      // (cb.checked=true) ne déclenche pas le 'change' qui révèle/pré-sélectionne
+      // le <select> format → à la sauvegarde le format réécrit était vide → NULL.
+      // IMPORTANT : on NE met PAS d'await ici (un await décalait le flux et
+      // cassait le pré-remplissage des phases, régression v1.55). On lance la
+      // lecture des formats EN PARALLÈLE (promesse non bloquante) et on applique
+      // le format dans un _waitFor séparé, qui attend à la fois les selects ET
+      // la résolution de la promesse. Le flux des phases reste identique à v1.54.
+      let _fmtParEquipe = null; // null = pas encore chargé
+      Promise.resolve(SupabaseHub.getEquipesEngagees(evtId))
+        .then(function (engs) {
+          const map = {};
+          (engs || []).forEach(function (e) {
+            if (e && e.equipe_id) map[e.equipe_id] = e.format_de_jeu || '';
+          });
+          _fmtParEquipe = map;
+        })
+        .catch(function (e) { console.error('openModalEditComplet() getEquipesEngagees', e); _fmtParEquipe = {}; });
 
-      // 1) Attendre que les cases équipes existent, puis cocher.
+      // 1) Attendre que les cases équipes existent, puis cocher (flux v1.54 intact).
       _waitFor(function () {
         return document.querySelectorAll('#evt-create-equipes .evt-eng-equipe-cb').length > 0;
       }, function () {
         eqIds.forEach(function (eqId) {
           const cb = document.querySelector('#evt-create-equipes .evt-eng-equipe-cb[value="' + eqId + '"]');
-          if (cb) {
-            cb.checked = true;
-            // Révéler le select format de la ligne (le 'change' programmatique
-            // ne se déclenche pas) + pré-sélectionner le format réel.
-            const line = cb.closest('.evt-eng-equipe-line');
-            const fmtRow = line ? line.querySelector('.evt-eng-format-inline') : null;
-            if (fmtRow) fmtRow.style.display = 'inline-flex';
-            const sel = line ? line.querySelector('.evt-eng-format-select') : null;
-            const fmtReel = _fmtParEquipe[eqId];
-            if (sel && fmtReel) sel.value = fmtReel;
-          }
+          if (cb) cb.checked = true;
         });
         updateMultiEquipesUI();   // construit l'éditeur de phases par équipe
         // 2) Attendre que les blocs équipe soient construits, puis pré-remplir.
@@ -4428,6 +4430,25 @@
           return w && w.querySelectorAll('.evt-phases-equipe-block').length > 0;
         }, function () {
           _prefillPhasesEditor(enfants);
+        });
+      });
+
+      // 3) Pré-remplissage du FORMAT par équipe, DÉCOUPLÉ du flux phases :
+      // attend que les selects format existent ET que les formats soient
+      // chargés, puis révèle + pré-sélectionne. N'interfère pas avec les phases.
+      _waitFor(function () {
+        return _fmtParEquipe !== null
+          && document.querySelectorAll('#evt-create-equipes .evt-eng-equipe-cb').length > 0;
+      }, function () {
+        eqIds.forEach(function (eqId) {
+          const cb = document.querySelector('#evt-create-equipes .evt-eng-equipe-cb[value="' + eqId + '"]');
+          if (!cb) return;
+          const line = cb.closest('.evt-eng-equipe-line');
+          const fmtRow = line ? line.querySelector('.evt-eng-format-inline') : null;
+          if (fmtRow) fmtRow.style.display = 'inline-flex';
+          const sel = line ? line.querySelector('.evt-eng-format-select') : null;
+          const fmtReel = _fmtParEquipe[eqId];
+          if (sel && fmtReel) sel.value = fmtReel;
         });
       });
     }
