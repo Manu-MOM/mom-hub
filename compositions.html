@@ -447,13 +447,13 @@
       padding: 1px 5px; margin-bottom: 2px; white-space: nowrap;
     }
     .vt-mark__disc {
-      width: 48px; height: 48px; border-radius: 50%;
+      width: 54px; height: 54px; border-radius: 50%;
       background: var(--bleu-base, #2f3da8);
-      border: 2.5px solid #f5c518;
+      border: 3px solid #f5c518;
       display: flex; align-items: center; justify-content: center;
     }
     .vt-mark__num {
-      font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 22px;
+      font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 24px;
       color: #fff; line-height: 1;
     }
     .vt-mark__nom {
@@ -470,6 +470,17 @@
     .vt-drag:active { cursor: grabbing; }
     .vt-dragging { opacity: 0.4; }
     .vt-drop-hover .vt-mark__disc { box-shadow: 0 0 0 4px rgba(245,197,24,0.6); transform: scale(1.08); }
+    /* v3.19 — le banc comme zone de drop + section remplaçants du picker */
+    .vt-bench-hover { outline: 2px dashed var(--vert-prairie); outline-offset: 2px; }
+    .popover__group-label {
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-mute);
+      padding: 8px 12px 4px; list-style: none;
+    }
+    .effectif-item__tag--bench {
+      background: var(--bleu-base, #0d2b4e); color: #fff;
+      font-size: 10px; padding: 1px 7px; border-radius: 8px;
+    }
     /* Réutilise les classes d'état de la vue Liste (cssClassEtatJoueur = 'etat-'+etat) */
     .vt-mark.etat-modifie     .vt-mark__disc { border-color: var(--clay); }
     .vt-mark.etat-independant .vt-mark__disc { border-color: var(--vert-prairie); }
