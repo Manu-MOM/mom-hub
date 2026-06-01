@@ -465,6 +465,11 @@
     }
     .vt-mark--vide { opacity: 0.55; }
     .vt-mark--vide .vt-mark__disc { border-style: dashed; background: rgba(13,43,78,0.5); }
+    /* v3.18 — feedback drag & drop */
+    .vt-drag { cursor: grab; }
+    .vt-drag:active { cursor: grabbing; }
+    .vt-dragging { opacity: 0.4; }
+    .vt-drop-hover .vt-mark__disc { box-shadow: 0 0 0 4px rgba(245,197,24,0.6); transform: scale(1.08); }
     /* Réutilise les classes d'état de la vue Liste (cssClassEtatJoueur = 'etat-'+etat) */
     .vt-mark.etat-modifie     .vt-mark__disc { border-color: var(--clay); }
     .vt-mark.etat-independant .vt-mark__disc { border-color: var(--vert-prairie); }
