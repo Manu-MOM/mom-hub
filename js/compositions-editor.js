@@ -6,6 +6,14 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.30 — Suivi live : mode rebours + score affiché (L2/3b) (1 juin 2026)
+ *   v3.30 : CHRONO 3b. (1) Mode compte à REBOURS : secondesAffichees()
+ *           selon mode_affichage (durée période − écoulé, borné 0) ;
+ *           toggle ⏳/⏱ qui persiste via set_mode (C12-r). (2) SCORE
+ *           calculé affiché en haut (MOM x — y ADV), _calculerScore
+ *           répliqué de suivi-app.js (I1 jamais stocké), lu via
+ *           getChronologieRencontreCoach, rafraîchi à chaque action.
+ *           Reste à 0-0 jusqu'à L3 (saisie d'observables).
  * Version : 3.29 — Suivi live : bouton Réinitialiser le chrono (1 juin 2026)
  *   v3.29 : CHRONO bouton ↺ Réinitialiser (action reset, C12-q) dans les
  *           états armée / en cours / terminé, avec confirmation. Remet le
@@ -1002,6 +1010,7 @@
     intervalId: null,
     evtId: null,         // UUID du MATCH piloté
     etat: null,          // dernier état lu (objet RPC) ou null
+    score: { mom: 0, adv: 0 },  // L2/3b — score calculé (jamais stocké, I1)
     busy: false,         // garde anti-double-clic pendant une action
 
     desarmer: function () {
@@ -1022,6 +1031,32 @@
       var brut = Math.floor((maintenant - debut) / 1000);
       var net = brut - (e.pause_cumul_secondes || 0) - pauseEnCours;
       return net > 0 ? net : 0;
+    },
+
+    // L2/3b — durée (secondes) de la période courante, depuis la config.
+    dureePeriodeSecondes: function () {
+      var e = this.etat;
+      if (!e || !Array.isArray(e.durees_periodes)) return 0;
+      var idx = (e.periode_courante || 1) - 1;
+      var min = e.durees_periodes[idx];
+      return (min > 0 ? min : 0) * 60;
+    },
+
+    // L2/3b — temps à AFFICHER selon le mode : écoulé, ou rebours
+    // (durée période − écoulé, borné à 0). Le mode vient de l'état persistant.
+    secondesAffichees: function () {
+      var ecoule = this.secondesEcoulees();
+      var e = this.etat;
+      if (e && e.mode_affichage === 'rebours') {
+        var d = this.dureePeriodeSecondes();
+        var reste = d - ecoule;
+        return reste > 0 ? reste : 0;
+      }
+      return ecoule;
+    },
+
+    estRebours: function () {
+      return !!(this.etat && this.etat.mode_affichage === 'rebours');
     }
   };
 
@@ -1029,6 +1064,23 @@
     var m = Math.floor(totalSec / 60);
     var s = totalSec % 60;
     return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+  }
+
+  // L2/3b — score calculé (somme valeur_points par camp, hors annulées).
+  // Réplique calculerScore de suivi-app.js (I1 : jamais stocké en live).
+  function _calculerScore(lignes) {
+    var mom = 0, adv = 0;
+    if (lignes && lignes.length) {
+      for (var i = 0; i < lignes.length; i++) {
+        var l = lignes[i];
+        if (!l || l.annule === true) continue;
+        var pts = (typeof l.valeur_points === 'number') ? l.valeur_points : 0;
+        if (!pts) continue;
+        if (l.equipe_concernee === 'adverse') adv += pts;
+        else mom += pts;
+      }
+    }
+    return { mom: mom, adv: adv };
   }
 
   // Résout l'adversaire du match porté par la compo (point parké L1) :
@@ -1067,6 +1119,7 @@
     el.innerHTML =
       '<div class="view-suivi">' +
         '<div class="view-suivi__match-label">Suivi du match — ' + escapeHtml(adversaire) + '</div>' +
+        '<div id="suivi-score" class="suivi-score">' + _scoreHTML() + '</div>' +
         '<div id="suivi-chrono-host" class="suivi-chrono"><div class="view-suivi__hint">Chargement du chrono…</div></div>' +
       '</div>';
 
@@ -1083,6 +1136,15 @@
   // le tick d'affichage chaque seconde (uniquement si chrono actif).
   function _rafraichirChrono(evtId, armerInterval) {
     if (!window.SupabaseHub || !SupabaseHub.getChronoRencontreCoach) return;
+    // L2/3b — charge aussi le score (chronologie de jeu), en parallèle.
+    if (SupabaseHub.getChronologieRencontreCoach) {
+      SupabaseHub.getChronologieRencontreCoach(evtId).then(function (lignes) {
+        if (SuiviChrono.evtId !== evtId) return;
+        SuiviChrono.score = _calculerScore(lignes);
+        var sc = document.getElementById('suivi-score');
+        if (sc) sc.innerHTML = _scoreHTML();
+      });
+    }
     SupabaseHub.getChronoRencontreCoach(evtId).then(function (etat) {
       if (SuiviChrono.evtId !== evtId) return; // on a changé d'onglet entre-temps
       SuiviChrono.etat = etat; // peut être null (chrono pas encore initialisé)
@@ -1095,13 +1157,20 @@
     });
   }
 
+  // Bloc score (calculé, jamais stocké — I1). Adversaire abrégé « ADV ».
+  function _scoreHTML() {
+    return 'MOM <span class="suivi-score__pts">' + SuiviChrono.score.mom + '</span>' +
+           ' — ' +
+           '<span class="suivi-score__pts">' + SuiviChrono.score.adv + '</span> ADV';
+  }
+
   // Tick léger : ne touche qu'au temps affiché (pas de re-render complet,
   // pas d'appel réseau). Le re-render complet est réservé aux actions.
   function _peindreChronoTick() {
     var t = document.getElementById('suivi-chrono-time');
     if (!t || !SuiviChrono.etat) return;
     if (SuiviChrono.etat.en_pause) return; // figé en pause
-    t.textContent = _fmtMMSS(SuiviChrono.secondesEcoulees());
+    t.textContent = _fmtMMSS(SuiviChrono.secondesAffichees());
   }
 
   // Peint l'écran complet selon l'état (config / prêt / en cours /
@@ -1228,11 +1297,12 @@
     }
 
     // ── Cas EN COURS (période lancée, avec ou sans pause) ──
-    var sec = SuiviChrono.secondesEcoulees();
+    var sec = SuiviChrono.secondesAffichees();
     var enPause = !!e.en_pause;
+    var rebours = SuiviChrono.estRebours();
     var estDerniere = (perCourante >= nbPeriodes);
     var html =
-      '<div class="suivi-chrono__periode">' + _libellePeriode(perCourante, nbPeriodes) + '</div>' +
+      '<div class="suivi-chrono__periode">' + _libellePeriode(perCourante, nbPeriodes) + (rebours ? ' · à rebours' : '') + '</div>' +
       '<div id="suivi-chrono-time" class="suivi-chrono__time' + (enPause ? ' suivi-chrono__time--paused' : '') + '">' + _fmtMMSS(sec) + '</div>' +
       '<div class="suivi-chrono__state' + (enPause ? ' suivi-chrono__state--paused' : '') + '">' + (enPause ? '⏸ En pause' : '● En cours') + '</div>' +
       '<div class="suivi-chrono__controls">';
@@ -1244,11 +1314,16 @@
     if (!estDerniere) {
       html += '<button type="button" class="suivi-chrono__btn" id="chrono-periode">Fin de la ' + _libellePeriode(perCourante, nbPeriodes).toLowerCase() + '</button>';
     }
+    html += '<button type="button" class="suivi-chrono__btn" id="chrono-mode">' + (rebours ? '⏱ Afficher écoulé' : '⏳ Afficher rebours') + '</button>';
     html += _btnReset();
     html += '<button type="button" class="suivi-chrono__btn suivi-chrono__btn--danger" id="chrono-fin">⏹ Fin du match</button>';
     html += '</div>';
     host.innerHTML = html;
 
+    var bmode = document.getElementById('chrono-mode');
+    if (bmode) bmode.addEventListener('click', function () {
+      _actionChrono(evtId, 'set_mode', { modeAffichage: (rebours ? 'ecoule' : 'rebours') }, null);
+    });
     var bp = document.getElementById('chrono-pause');
     if (bp) bp.addEventListener('click', function () { _actionChrono(evtId, 'pause', null, null); });
     var br = document.getElementById('chrono-reprise');
