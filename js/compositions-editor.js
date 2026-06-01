@@ -6,6 +6,17 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.21 — État joueur DÉRIVÉ par comparaison à la base (fix rouge figé) (1 juin 2026)
+ *   v3.21 : FIX bug « modifié rouge figé » (Manu) — un joueur revenu à son
+ *           choix de base restait marqué modifié. L'état base/modifié n'est
+ *           plus lu du champ stocké etat_joueur mais DÉRIVÉ (etatDeriveJoueur)
+ *           par comparaison à la compo de BASE (par poste + rôle, décisions
+ *           Manu). loadCompoJoueurs charge State.baseJoueurs (compo de base)
+ *           quand la courante est un match. Les états explicites blesse/
+ *           independant sont préservés. Tous les rendus (Liste slot titulaire
+ *           & remplaçant, Terrain pastille) et le compteur « N modifs vs base »
+ *           utilisent l'état dérivé. node --check OK.
+ *
  * Version : 3.20 — Vue Terrain/Liste : fix promotion remplaçant + bouton « ↓ banc » (1 juin 2026)
  *   v3.20 : 2 fixes issus de la recette (Manu). (1) BUG promotion remplaçant
  *           depuis le picker vue Liste : un remplaçant cliqué sur un poste
@@ -405,7 +416,8 @@
     // La compo reste la source de vérité ; le terrain ne fait que
     // refléter (aucune édition en étape A).
     // ────────────────────────────────────────────────────────
-    viewMode: 'liste'
+    viewMode: 'liste',
+    baseJoueurs: []
   };
 
   // ============================================================
@@ -514,10 +526,38 @@
   function compteurs() {
     const titulaires = State.compoJoueurs.filter(cj => cj.role === 'titulaire').length;
     const remplacants = State.compoJoueurs.filter(cj => cj.role === 'remplacant').length;
-    const modifs = State.compoJoueurs.filter(cj => cj.etat_joueur && cj.etat_joueur !== 'base').length;
+    const modifs = State.compoJoueurs.filter(cj => etatDeriveJoueur(cj) !== 'base').length;
     return { titulaires, remplacants, modifs };
   }
   function cssClassEtatJoueur(etat) { return 'etat-' + (etat || 'base'); }
+
+  // v3.21 — état d'affichage DÉRIVÉ d'un joueur de la compo courante.
+  // Corrige le bug « rouge figé » : l'état base/modifié n'est plus lu du champ
+  // stocké etat_joueur (qui restait 'modifie' même après retour au choix de
+  // base), mais CALCULÉ par comparaison à la compo de BASE.
+  //  • Les états explicites 'blesse' / 'independant' sont PRÉSERVÉS (posés
+  //    volontairement par l'éducateur, ils priment).
+  //  • Sur une compo de BASE (ou hors contexte de comparaison), l'état stocké
+  //    est rendu tel quel (la base est sa propre référence).
+  //  • Sur une compo de MATCH : 'base' si le poste est tenu par le MÊME joueur
+  //    AVEC le même rôle qu'en base ; sinon 'modifie'. (Comparaison par poste
+  //    + rôle, décisions Manu.)
+  function etatDeriveJoueur(cj) {
+    if (!cj) return 'base';
+    if (cj.etat_joueur === 'blesse' || cj.etat_joueur === 'independant') {
+      return cj.etat_joueur;
+    }
+    const compoCourante = State.compos.find(c => c.id === State.selectedCompoId);
+    if (!compoCourante || compoCourante.type_compo !== 'match') {
+      return cj.etat_joueur || 'base';
+    }
+    // Compo de match : comparer à la base (par poste + rôle).
+    const enBase = (State.baseJoueurs || []).find(b => b.poste_id === cj.poste_id);
+    if (enBase && enBase.joueur_id === cj.joueur_id && enBase.role === cj.role) {
+      return 'base';
+    }
+    return 'modifie';
+  }
   // v3.13 (6c-6 fix) — état par défaut d'un joueur qu'on place MAINTENANT,
   // selon le type de la compo courante : dans une compo de MATCH, tout joueur
   // ajouté/remplacé est une modification par rapport à la base → 'modifie'
@@ -967,7 +1007,7 @@
                 '</div>';
         continue;
       }
-      html += '<div class="vt-mark vt-drop vt-drag ' + cssClassEtatJoueur(cj.etat_joueur) + '" draggable="true"' +
+      html += '<div class="vt-mark vt-drop vt-drag ' + cssClassEtatJoueur(etatDeriveJoueur(cj)) + '" draggable="true"' +
                 ' data-joueur-id="' + escapeHtml(cj.joueur_id) + '"' +
                 ' data-poste-id="' + escapeHtml(poste.id) + '"' +
                 ' style="' + style + '" title="' +
@@ -1235,7 +1275,7 @@
     }
     const j = getJoueurVivier(cj.joueur_id) || {};
     return (
-      '<li class="slot slot--occupe ' + cssClassEtatJoueur(cj.etat_joueur) + '" data-compo-joueur-id="' + escapeHtml(cj.id) + '" data-poste-id="' + escapeHtml(poste.id) + '">' +
+      '<li class="slot slot--occupe ' + cssClassEtatJoueur(etatDeriveJoueur(cj)) + '" data-compo-joueur-id="' + escapeHtml(cj.id) + '" data-poste-id="' + escapeHtml(poste.id) + '">' +
         '<span class="slot__num">' + escapeHtml(cj.numero_maillot != null ? cj.numero_maillot : poste.numero_xv || '') + '</span>' +
         '<span class="slot__poste-label">' + escapeHtml(poste.libelle_court || poste.code) + '</span>' +
         '<span class="slot__joueur">' +
@@ -1243,7 +1283,7 @@
           '<span class="slot__prenom">' + escapeHtml(j.prenom || '') + '</span>' +
         '</span>' +
         (cj.est_depannage_hors_categorie ? '<span class="slot__warning" title="Joueur hors catégorie M14">⚠</span>' : '') +
-        '<span class="slot__etat" title="État du joueur">' + libelleEtatJoueurCourt(cj.etat_joueur) + '</span>' +
+        '<span class="slot__etat" title="État du joueur">' + libelleEtatJoueurCourt(etatDeriveJoueur(cj)) + '</span>' +
         '<button class="slot__bench" title="Envoyer au banc" type="button">↓ banc</button>' +
         '<button class="slot__remove" title="Retirer totalement de la compo" type="button">×</button>' +
       '</li>'
@@ -1263,7 +1303,7 @@
     }
     const j = getJoueurVivier(cj.joueur_id) || {};
     return (
-      '<li class="slot slot--occupe slot--remplacant ' + cssClassEtatJoueur(cj.etat_joueur) + '" data-compo-joueur-id="' + escapeHtml(cj.id) + '">' +
+      '<li class="slot slot--occupe slot--remplacant ' + cssClassEtatJoueur(etatDeriveJoueur(cj)) + '" data-compo-joueur-id="' + escapeHtml(cj.id) + '">' +
         '<span class="slot__num">' + escapeHtml(cj.numero_maillot || numeroMaillot) + '</span>' +
         '<span class="slot__poste-label">Remp.</span>' +
         '<span class="slot__joueur">' +
@@ -1271,7 +1311,7 @@
           '<span class="slot__prenom">' + escapeHtml(j.prenom || '') + '</span>' +
         '</span>' +
         (cj.est_depannage_hors_categorie ? '<span class="slot__warning" title="Joueur hors catégorie M14">⚠</span>' : '') +
-        '<span class="slot__etat">' + libelleEtatJoueurCourt(cj.etat_joueur) + '</span>' +
+        '<span class="slot__etat">' + libelleEtatJoueurCourt(etatDeriveJoueur(cj)) + '</span>' +
         '<button class="slot__remove" title="Retirer ce joueur" type="button">×</button>' +
       '</li>'
     );
@@ -2113,9 +2153,25 @@
     else                                 State.selectedCompoId = null;
   }
   async function loadCompoJoueurs() {
-    if (!State.selectedCompoId) { State.compoJoueurs = []; return; }
+    if (!State.selectedCompoId) { State.compoJoueurs = []; State.baseJoueurs = []; return; }
     const complet = await SupabaseHub.getCompoComplete(State.selectedCompoId);
     State.compoJoueurs = complet ? complet.joueurs : [];
+    // v3.21 — pour dériver l'état (base/modifié) par comparaison, on charge
+    // aussi les joueurs de la compo de BASE quand la compo courante est un
+    // match. Indexés par poste pour comparaison rapide. Pour la base elle-même
+    // (ou hors contexte), baseJoueurs reste vide (pas de comparaison).
+    const compoCourante = State.compos.find(c => c.id === State.selectedCompoId);
+    if (compoCourante && compoCourante.type_compo === 'match') {
+      const base = State.compos.find(c => c.type_compo === 'base');
+      if (base) {
+        const baseComplet = await SupabaseHub.getCompoComplete(base.id);
+        State.baseJoueurs = baseComplet ? baseComplet.joueurs : [];
+      } else {
+        State.baseJoueurs = [];
+      }
+    } else {
+      State.baseJoueurs = [];
+    }
   }
   async function loadVivier() {
     // v3.8 — En mode U-N3, la pioche = groupe N2 de l'équipe engagée
@@ -2259,7 +2315,7 @@
     bindPopoverOutsideClick();
 
     console.log(
-      '%c🏉 Compositions Editor v3.20 chargé',
+      '%c🏉 Compositions Editor v3.21 chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         evenements: State.evenements.length,
