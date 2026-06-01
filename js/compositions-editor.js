@@ -6,6 +6,19 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.23 — Export image de la composition (réseaux sociaux) (1 juin 2026)
+ *   v3.23 : EXPORT IMAGE. Bouton « 📷 Image » ajouté à côté des onglets
+ *           Liste/Terrain (action, pas un mode de vue). Au clic, collecte
+ *           la compo COURANTE (titulaires triés par numero_xv + remplaçants
+ *           16→23, badge club via club_principal_nom_court, ligne av/ch/ar
+ *           dérivée du numéro) et délègue au module autonome window.CompoExport
+ *           (js/compo-export.js, rendu Canvas natif, versions MOM/entente,
+ *           export PNG). Aucune fonction d'écriture ni de rendu existante
+ *           touchée : ajouts purs (bindExportImage + _collecterDonneesExport
+ *           + _ligneDePoste). v1 : initiales (pas de photos), pas de staff.
+ *           Logos chargés depuis img/ (ecusson-mom.png, logo-entente.png).
+ *           node --check OK.
+ *
  * Version : 3.22 — Vue Terrain MULTI-FORMAT (XV / XIII / X / VII) (1 juin 2026)
  *   v3.22 : MULTI-FORMAT de la vue Terrain (chantier UX-EVT-VUE-TERRAIN).
  *           Jusque-là la vue Terrain plaçait les joueurs avec la seule table
@@ -936,6 +949,102 @@
     // État initial cohérent avec State.viewMode (défaut 'liste').
     tabs.forEach(function (t) { t.classList.remove('is-active'); });
     (State.viewMode === 'terrain' ? tabs[1] : tabs[0]).classList.add('is-active');
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // v3.23 — EXPORT IMAGE (réseaux sociaux). Bouton « Image » à côté
+  // des onglets. Collecte la compo COURANTE (titulaires + remplaçants)
+  // et délègue le rendu Canvas au module autonome window.CompoExport.
+  // N'altère aucune fonction d'écriture/rendu existante.
+  // ════════════════════════════════════════════════════════════
+  // Classe un poste en ligne d'affichage : avants (1-8), charnière
+  // (9-10), arrières (11-15). Dérivé de numero_xv (robuste, multi-format).
+  function _ligneDePoste(poste) {
+    var n = poste && poste.numero_xv ? Number(poste.numero_xv) : 99;
+    if (n <= 8) return 'av';
+    if (n <= 10) return 'ch';
+    return 'ar';
+  }
+
+  function _collecterDonneesExport() {
+    var ctx = State.evenementEquipeContext;
+    var evt = ctx && ctx.evenement ? ctx.evenement : null;
+    var eq  = ctx && ctx.equipe ? ctx.equipe : null;
+
+    // Titulaires triés par numero_xv du poste (1→15) ; remplaçants par ordre.
+    var tit = State.compoJoueurs
+      .filter(function (cj) { return cj.role === 'titulaire'; })
+      .map(function (cj) {
+        var p = getPoste(cj.poste_id) || {};
+        var j = getJoueurVivier(cj.joueur_id) || {};
+        return {
+          num: (cj.numero_maillot != null ? cj.numero_maillot : (p.numero_xv || '')),
+          ordre: p.numero_xv || 99,
+          nom: (j.nom || '').trim(),
+          prenom: (j.prenom || '').trim(),
+          poste: (p.libelle_long || p.libelle_court || p.code || ''),
+          club: (j.club_principal_nom_court || '').toUpperCase(),
+          ligne: _ligneDePoste(p)
+        };
+      })
+      .sort(function (a, b) { return a.ordre - b.ordre; });
+
+    var remBruts = State.compoJoueurs
+      .filter(function (cj) { return cj.role === 'remplacant'; })
+      .sort(function (a, b) {
+        return (a.ordre_remplacement || a.numero_maillot || 99) -
+               (b.ordre_remplacement || b.numero_maillot || 99);
+      })
+      .map(function (cj, idx) {
+        var j = getJoueurVivier(cj.joueur_id) || {};
+        return {
+          num: (cj.numero_maillot != null ? cj.numero_maillot : (16 + idx)),
+          nom: nomJoueurCompact(cj)
+        };
+      });
+    // Compléter jusqu'à 8 emplacements (16→23) avec des places vides.
+    var rem = [];
+    for (var i = 0; i < 8; i++) {
+      rem.push(remBruts[i] || { num: 16 + i, nom: '–' });
+    }
+
+    // Méta : titre, sous-titre (équipe), compétition/date/lieu.
+    var titre = (eq && (eq.nom_officiel || eq.libelle_court)) || 'COMPOSITION';
+    var sousTitre = (eq && eq.libelle_court) ? eq.libelle_court : '';
+    var meta1 = evt ? (evt.libelle || '') : '';
+    var dateStr = evt && evt.date_debut ? new Date(evt.date_debut).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+    var meta2 = dateStr;
+
+    return {
+      titre: titre.toUpperCase(),
+      sousTitre: sousTitre,
+      meta1: meta1,
+      meta2: meta2,
+      dateExport: new Date().toLocaleDateString('fr-FR'),
+      slug: (titre || 'compo').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+      titulaires: tit,
+      remplacants: rem,
+      logos: {
+        mom: 'img/ecusson-mom.png',
+        entente: 'img/logo-entente.png'
+      }
+    };
+  }
+
+  function bindExportImage() {
+    var btn = document.getElementById('btn-export-image');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      if (!window.CompoExport) {
+        alert("Le module d'export n'est pas chargé.");
+        return;
+      }
+      if (!State.compoJoueurs || State.compoJoueurs.length === 0) {
+        alert('Aucune composition à exporter pour le moment.');
+        return;
+      }
+      window.CompoExport.ouvrir(_collecterDonneesExport());
+    });
   }
 
   // ════════════════════════════════════════════════════════════
@@ -2382,6 +2491,7 @@
     renderEffectifPanel();
     renderPopover();
     bindViewTabs(); // v3.15 — câble les onglets Liste/Terrain (statiques, 1 fois)
+    bindExportImage(); // v3.23 — câble le bouton « Image » (export réseaux sociaux)
 
     // v3.8 — A1 : en mode U-N3, l'évènement est fixé par l'URL ;
     // le sélecteur d'évènements n'a pas de sens (retour à la fiche
@@ -2416,7 +2526,7 @@
     bindPopoverOutsideClick();
 
     console.log(
-      '%c🏉 Compositions Editor v3.22 chargé',
+      '%c🏉 Compositions Editor v3.23 chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         evenements: State.evenements.length,
