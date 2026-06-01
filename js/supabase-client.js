@@ -18,6 +18,10 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 1.42 — juin 2026
+ *   v1.42 : actionChronoCoach(evt, action, opts) + getChronoRencontreCoach(evt)
+ *           — wrappers ADDITIFS voie coach du chrono persistant (C12-n).
+ *           Suivi live éducateur seul, L2. Aucun wrapper existant touché.
  * Version : 1.41 — juin 2026
  *   v1.41 : listMatchsParBaseOrigine(baseId) — wrapper ADDITIF lisant les
  *           feuilles de match par compo_base_origine_id (sans jointure
@@ -4959,6 +4963,60 @@
     },
 
     // ============================================================
+    // SUIVI LIVE · CHRONO DE RENCONTRE (C12-n) — voie COACH
+    //   Chrono persistant : coup d'envoi / pause / reprise /
+    //   période suivante / fin / config. État = horodatages+durées
+    //   en base ; l'écran recalcule les minutes (survit au reload).
+    //   Voie jeton (bénévole) = suivi-client.js, ajout ultérieur.
+    // ============================================================
+
+    /**
+     * ÉCRITURE — applique une action au chrono (coach authentifié).
+     * RPC SECURITY DEFINER action_chrono_coach (C12-n).
+     * @param {string} evenementUuid  le MATCH
+     * @param {string} action  coup_envoi|pause|reprise|periode_suivante|fin|config
+     * @param {{durees?:number[], modeAffichage?:string}} [opts]
+     *   durees = minutes par période (config) ; modeAffichage = 'ecoule'|'rebours'
+     * @returns {Promise<{ok:boolean, error?:string}>}
+     */
+    async actionChronoCoach(evenementUuid, action, opts) {
+      if (!evenementUuid) return { ok: false, error: 'evenementUuid manquant' };
+      if (!action)        return { ok: false, error: 'action manquante' };
+      const params = { p_evenement_uuid: evenementUuid, p_action: action };
+      if (opts && Array.isArray(opts.durees)) params.p_durees = opts.durees;
+      if (opts && opts.modeAffichage)         params.p_mode_affichage = opts.modeAffichage;
+      const { error } = await client.rpc('action_chrono_coach', params);
+      if (error) {
+        console.error('MOM Hub: actionChronoCoach()', error);
+        return { ok: false, error: error.message || 'Erreur action_chrono_coach' };
+      }
+      return { ok: true };
+    },
+
+    /**
+     * LECTURE — état brut du chrono (coach authentifié). RPC
+     * get_chrono_rencontre_coach (C12-n). L'écran recalcule les
+     * minutes à partir des horodatages+durées renvoyés.
+     * @param {string} evenementUuid  le MATCH
+     * @returns {Promise<object|null>} 1 ligne d'état, ou null si
+     *   chrono pas encore initialisé / refus (convention lecture).
+     */
+    async getChronoRencontreCoach(evenementUuid) {
+      if (!evenementUuid) {
+        console.error('MOM Hub: getChronoRencontreCoach() requiert un evenementUuid');
+        return null;
+      }
+      const { data, error } = await client.rpc('get_chrono_rencontre_coach', {
+        p_evenement_uuid: evenementUuid
+      });
+      if (error) {
+        console.error('MOM Hub: getChronoRencontreCoach()', error);
+        return null;
+      }
+      return Array.isArray(data) ? (data[0] || null) : (data || null);
+    },
+
+    // ============================================================
     // ADMIN-(ii) · ESPACE ADMINISTRATION TRANSVERSE  (v1.31)
     //   Sous-chantier (1) Équipes par catégorie + (3) Ententes
     //   intégré. Doc FAIT FOI Conception-UX-ADMIN-ii-v1.md
@@ -5480,7 +5538,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.41 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.42 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
