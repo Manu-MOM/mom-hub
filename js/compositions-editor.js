@@ -6,6 +6,15 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.31 — Suivi live : palette Cat A + saisie score adverse (L3a) (1 juin 2026)
+ *   v3.31 : L3a. Référentiel observables FETCHÉ une fois depuis
+ *           data/observables-match.json (objet SuiviObs ; cible
+ *           OBSERVABLES-ADMIN = éditable admin plus tard). Palette score
+ *           sous le chrono (période en cours) : essai/transfo/pénalité/
+ *           drop, 2 boutons Nous (inerte L3a) / Adverse (actif). Boutons
+ *           Adverse → insererObservableCoach (equipe adverse, sans joueur,
+ *           minute du chrono) → score rafraîchi. _saisirObservable.
+ *           Attribution nominative côté Nous = L3b.
  * Version : 3.30 — Suivi live : mode rebours + score affiché (L2/3b) (1 juin 2026)
  *   v3.30 : CHRONO 3b. (1) Mode compte à REBOURS : secondesAffichees()
  *           selon mode_affichage (durée période − écoulé, borné 0) ;
@@ -1083,6 +1092,33 @@
     return { mom: mom, adv: adv };
   }
 
+  // L3a — Référentiel observables Cat A, FETCHÉ une fois depuis
+  // data/observables-match.json (cible : éditable en admin plus tard,
+  // chantier OBSERVABLES-ADMIN). Mémo runtime ; dégradation honnête si
+  // le fetch échoue (palette indisponible, le chrono reste utilisable).
+  var SuiviObs = {
+    catA: null,        // { score:[], discipline:[], mouvement:[], jeu_collectif:[] } ou null
+    charge: false,
+    enCours: false,
+    charger: function (cb) {
+      if (this.charge) { if (cb) cb(this.catA); return; }
+      if (this.enCours) { return; }
+      this.enCours = true;
+      var self = this;
+      fetch('data/observables-match.json', { cache: 'no-store' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) {
+          self.catA = (d && d.categorie_A) ? d.categorie_A : null;
+          self.charge = true; self.enCours = false;
+          if (cb) cb(self.catA);
+        })
+        .catch(function () {
+          self.charge = true; self.enCours = false; self.catA = null;
+          if (cb) cb(null);
+        });
+    }
+  };
+
   // Résout l'adversaire du match porté par la compo (point parké L1) :
   // l'objet COMPO ne porte pas adversaire_nom — c'est l'objet MATCH
   // (State.matchsDeLequipe) qui le porte, apparié par evenement_id.
@@ -1121,6 +1157,7 @@
         '<div class="view-suivi__match-label">Suivi du match — ' + escapeHtml(adversaire) + '</div>' +
         '<div id="suivi-score" class="suivi-score">' + _scoreHTML() + '</div>' +
         '<div id="suivi-chrono-host" class="suivi-chrono"><div class="view-suivi__hint">Chargement du chrono…</div></div>' +
+        '<div id="suivi-palette"></div>' +
       '</div>';
 
     if (!evtId) {
@@ -1215,6 +1252,9 @@
     if (!host) return;
     var e = SuiviChrono.etat;
     var evtId = SuiviChrono.evtId;
+    // L3a — palette vidée par défaut ; seul l'état « en cours » la remplit.
+    var palReset = document.getElementById('suivi-palette');
+    if (palReset) palReset.innerHTML = '';
 
     var durees = (e && Array.isArray(e.durees_periodes) && e.durees_periodes.length)
       ? e.durees_periodes : [30, 30];
@@ -1342,6 +1382,81 @@
       }
     });
     _bindReset(evtId);
+    // L3a — palette de saisie (uniquement période en cours, hors pause facultatif).
+    _peindrePalette(evtId, perCourante);
+  }
+
+  // L3a — Palette de saisie Cat A (score d'abord). Rendue sous le chrono,
+  // dans #suivi-palette. En L3a : boutons « Adverse » câblés (score brut,
+  // sans attribution, D7) ; boutons « Nous » présents mais inertes
+  // (attribution nominative = L3b). minute_match = minute du chrono.
+  function _peindrePalette(evtId, perCourante) {
+    var pal = document.getElementById('suivi-palette');
+    if (!pal) return;
+    SuiviObs.charger(function (catA) {
+      if (SuiviChrono.evtId !== evtId) return;
+      if (!catA || !Array.isArray(catA.score)) {
+        pal.innerHTML = '<div class="view-suivi__hint">Palette indisponible (référentiel non chargé).</div>';
+        return;
+      }
+      var html = '<div class="suivi-palette">';
+      html += '<div class="suivi-palette__title">Score</div>';
+      html += '<div class="suivi-palette__grid">';
+      catA.score.forEach(function (obs) {
+        // Deux boutons par action : Nous (inerte L3a) / Adverse (actif).
+        html +=
+          '<div class="suivi-palette__action">' +
+            '<span class="suivi-palette__lbl">' + (obs.icone || '') + ' ' + escapeHtml(obs.libelle_court) + ' <em>+' + obs.points + '</em></span>' +
+            '<div class="suivi-palette__btns">' +
+              '<button type="button" class="suivi-palette__btn suivi-palette__btn--nous" disabled title="Attribution nominative à venir (L3b)" data-obs="' + escapeHtml(obs.uuid) + '">Nous</button>' +
+              '<button type="button" class="suivi-palette__btn suivi-palette__btn--adv" data-obs="' + escapeHtml(obs.uuid) + '" data-pts="' + obs.points + '">Adverse</button>' +
+            '</div>' +
+          '</div>';
+      });
+      html += '</div></div>';
+      pal.innerHTML = html;
+
+      // Câblage des boutons Adverse uniquement (L3a).
+      var btns = pal.querySelectorAll('.suivi-palette__btn--adv');
+      btns.forEach(function (b) {
+        b.addEventListener('click', function () {
+          var obsId = b.getAttribute('data-obs');
+          var pts = parseInt(b.getAttribute('data-pts'), 10) || 0;
+          var minute = Math.floor(SuiviChrono.secondesEcoulees() / 60);
+          _saisirObservable(evtId, {
+            observableId: obsId,
+            categorieObs: 'A',
+            valeurPoints: pts,
+            equipeConcernee: 'adverse',
+            minuteMatch: minute,
+            periode: perCourante
+          });
+        });
+      });
+    });
+  }
+
+  // L3a — enregistre un observable (voie coach) puis rafraîchit le score.
+  function _saisirObservable(evtId, obs) {
+    if (SuiviChrono.busy) return;
+    if (!window.SupabaseHub || !SupabaseHub.insererObservableCoach) return;
+    SuiviChrono.busy = true;
+    SupabaseHub.insererObservableCoach(evtId, obs).then(function (res) {
+      SuiviChrono.busy = false;
+      if (!res || !res.ok) {
+        window.alert('Saisie impossible : ' + ((res && res.error) || 'erreur inconnue'));
+        return;
+      }
+      // Rafraîchir le score (relecture chronologie).
+      if (SupabaseHub.getChronologieRencontreCoach) {
+        SupabaseHub.getChronologieRencontreCoach(evtId).then(function (lignes) {
+          if (SuiviChrono.evtId !== evtId) return;
+          SuiviChrono.score = _calculerScore(lignes);
+          var sc = document.getElementById('suivi-score');
+          if (sc) sc.innerHTML = _scoreHTML();
+        });
+      }
+    });
   }
 
   // Lit les durées saisies dans le formulaire de config (champs .chrono-duree).
