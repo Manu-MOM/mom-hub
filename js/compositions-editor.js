@@ -6,6 +6,25 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.22 — Vue Terrain MULTI-FORMAT (XV / XIII / X / VII) (1 juin 2026)
+ *   v3.22 : MULTI-FORMAT de la vue Terrain (chantier UX-EVT-VUE-TERRAIN).
+ *           Jusque-là la vue Terrain plaçait les joueurs avec la seule table
+ *           TERRAIN_POS_XV en dur. Ajout de 3 tables sœurs (TERRAIN_POS_13,
+ *           TERRAIN_POS_X, TERRAIN_POS_7), d'un sélecteur TERRAIN_POS_PAR_FORMAT
+ *           et d'un helper terrainPosCourant() qui lit le format de l'équipe
+ *           engagée (State.evenementEquipeContext.evenement_equipe.format_de_jeu)
+ *           et renvoie la table adéquate, DÉFAUT XV (legacy/NULL/inconnu :
+ *           dégradation honnête). renderEditorTerrain itère désormais sur la
+ *           table courante au lieu de TERRAIN_POS_XV en dur (seule ligne de
+ *           rendu modifiée ; tout le reste — DnD, banc, états — inchangé).
+ *           Compositions par format alignées sur postes.formats_applicables
+ *           corrigé en base (sql/70) : XIII = XV sans flankers (coords XV
+ *           réutilisées) ; X (10) = pack à 5 dont 2L sur les extérieurs +
+ *           9-10-12-14-15 ; VII (7) = 3 avants + 9-10 + 12 + 11. Vocabulaires
+ *           format non alignés (format_de_jeu 12/7 ≠ formats_applicables
+ *           XV/13/X/7 ≠ dropdown Évènements) réconciliés par mapping front
+ *           ('12'→XV) — dette MODELE-FORMAT-VOCAB. node --check OK.
+ *
  * Version : 3.21 — État joueur DÉRIVÉ par comparaison à la base (fix rouge figé) (1 juin 2026)
  *   v3.21 : FIX bug « modifié rouge figé » (Manu) — un joueur revenu à son
  *           choix de base restait marqué modifié. L'état base/modifié n'est
@@ -957,6 +976,86 @@
     'AR':  { x: 50.0, y: 93.4 }
   };
 
+  // v3.22 — Tables de coordonnées des AUTRES formats (multi-format vue
+  // Terrain, chantier UX-EVT-VUE-TERRAIN). Mêmes conventions que XV :
+  // clés = code poste, valeurs = { x:%, y:% } dans le viewBox SVG 100×140,
+  // PACK EN HAUT → ARRIÈRE EN BAS. Les postes retenus par format sont
+  // alignés sur postes.formats_applicables corrigé en base (sql/70) :
+  //   XIII {XV,13} = XV sans les flankers 3LG/3LD (N8 conservé) → 13 postes,
+  //                  coordonnées XV RÉUTILISÉES à l'identique (sous-ensemble).
+  //   X    {X}     = pack à 5 (1-2-3 + 2L sur les EXTÉRIEURS) + 9-10-12-14-15
+  //                  → 10 postes (compo dictée par Manu).
+  //   VII  {7}     = 3 avants (1-2-3) + charnière 9-10 + 1 centre (12) +
+  //                  1 ailier (11=AG) → 7 postes (compo dictée par Manu).
+  // Coordonnées définies en dur côté front (la base postes n'a pas de x/y).
+  const TERRAIN_POS_13 = {
+    'PG':  { x: 30.0, y: 8.5 },
+    'TAL': { x: 45.0, y: 8.5 },
+    'PD':  { x: 60.0, y: 8.5 },
+    '2LG': { x: 37.5, y: 19.9 },
+    '2LD': { x: 52.5, y: 19.9 },
+    'N8':  { x: 45.0, y: 33.2 },
+    'DM':  { x: 33.8, y: 51.6 },
+    'DO':  { x: 57.0, y: 59.2 },
+    'AG':  { x: 12.5, y: 75.9 },
+    'CG':  { x: 40.0, y: 75.9 },
+    'CD':  { x: 65.0, y: 75.9 },
+    'AD':  { x: 87.5, y: 75.9 },
+    'AR':  { x: 50.0, y: 93.4 }
+  };
+  const TERRAIN_POS_X = {
+    'PG':  { x: 30.0, y: 8.5 },
+    'TAL': { x: 45.0, y: 8.5 },
+    'PD':  { x: 60.0, y: 8.5 },
+    '2LG': { x: 14.0, y: 20.0 },   // 2L sur l'extérieur gauche (consigne Manu)
+    '2LD': { x: 86.0, y: 20.0 },   // 2L sur l'extérieur droit
+    'DM':  { x: 34.0, y: 46.0 },
+    'DO':  { x: 55.0, y: 55.0 },
+    'CG':  { x: 32.0, y: 78.0 },
+    'AD':  { x: 78.0, y: 78.0 },
+    'AR':  { x: 45.0, y: 93.0 }
+  };
+  const TERRAIN_POS_7 = {
+    'PG':  { x: 30.0, y: 8.5 },
+    'TAL': { x: 45.0, y: 8.5 },
+    'PD':  { x: 60.0, y: 8.5 },
+    'DM':  { x: 30.0, y: 42.0 },
+    'DO':  { x: 52.0, y: 52.0 },
+    'CG':  { x: 30.0, y: 80.0 },
+    'AG':  { x: 62.0, y: 80.0 }
+  };
+
+  // v3.22 — Sélecteur de table par format. Les vocabulaires NE SONT PAS
+  // alignés entre les tables (dette MODELE-FORMAT-VOCAB) :
+  //   • evenement_equipes_engagees.format_de_jeu : '12', '7' (réels en base)
+  //   • postes.formats_applicables                : 'XV','13','X','7'
+  //   • dropdown Évènements                        : 'XV','13','12','X','9','8','7'
+  // On réconcilie ici par un mapping front explicite. '12' → structure XV
+  // (effectif réduit, placement XV conservé — décision Manu). Tout format
+  // inconnu / NULL / legacy → XV (dégradation honnête, jamais d'écran vide).
+  const TERRAIN_POS_PAR_FORMAT = {
+    'XV': TERRAIN_POS_XV,
+    '15': TERRAIN_POS_XV,
+    '12': TERRAIN_POS_XV,   // rugby à XII = structure XV, effectif réduit
+    '13': TERRAIN_POS_13,
+    'X':  TERRAIN_POS_X,
+    '10': TERRAIN_POS_X,
+    '7':  TERRAIN_POS_7,
+    'VII': TERRAIN_POS_7
+  };
+
+  // v3.22 — Table de coordonnées à utiliser pour la compo courante.
+  // Lit le format de l'équipe engagée (mode U-N3) ; défaut XV sinon.
+  function terrainPosCourant() {
+    const ctx = State.evenementEquipeContext;
+    const fmt = ctx && ctx.evenement_equipe && ctx.evenement_equipe.format_de_jeu;
+    if (fmt != null) {
+      const key = String(fmt).trim().toUpperCase();
+      if (TERRAIN_POS_PAR_FORMAT[key]) return TERRAIN_POS_PAR_FORMAT[key];
+    }
+    return TERRAIN_POS_XV; // legacy / NULL / format inconnu
+  }
+
   // SVG du terrain de rugby (fond) : en-buts, lignes 22m / 10m / médiane,
   // poteaux haut et bas. viewBox 100×140 (ratio terrain), tracé en blanc
   // semi-transparent sur fond vert. Indépendant des joueurs.
@@ -990,8 +1089,10 @@
     html += pitchSvg();
 
     // Pastilles positionnées en absolu (left/top %) par-dessus le terrain.
-    for (const code in TERRAIN_POS_XV) {
-      const pos = TERRAIN_POS_XV[code];
+    // v3.22 — table de coordonnées selon le format de l'équipe (défaut XV).
+    const TERRAIN_POS = terrainPosCourant();
+    for (const code in TERRAIN_POS) {
+      const pos = TERRAIN_POS[code];
       const poste = posteParCode.get(code);
       if (!poste) continue; // robustesse : code absent du référentiel
       const cj = joueurDuPoste(poste.id);
@@ -2315,7 +2416,7 @@
     bindPopoverOutsideClick();
 
     console.log(
-      '%c🏉 Compositions Editor v3.21 chargé',
+      '%c🏉 Compositions Editor v3.22 chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         evenements: State.evenements.length,
