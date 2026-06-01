@@ -6,6 +6,29 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.15 — Vue Terrain étape A (lecture seule) (1 juin 2026)
+ *   v3.15 : VUE TERRAIN, étape A (chantier UX-EVT-VUE-TERRAIN). Câble
+ *           enfin les onglets Liste/Terrain (morts jusque-là : aucun
+ *           handler) via bindViewTabs() au boot. Nouveau State.viewMode
+ *           ('liste'|'terrain', préférence d'affichage indépendante de la
+ *           compo). renderEditorArea() aiguille : si viewMode==='terrain',
+ *           appelle renderEditorTerrain(el, compo) et sort ; le chemin
+ *           'liste' est byte-identique (mêmes gardes, même bloc view-liste,
+ *           même bindSlotHandlers). renderEditorTerrain = projection
+ *           LECTURE SEULE de la compo COURANTE (State.compoJoueurs, suit
+ *           l'onglet base/match) sur un terrain : placement dérivé de
+ *           postes.ligne (7 rangs, PACK EN HAUT → ARRIÈRE EN BAS), nom
+ *           résolu comme la vue Liste (getJoueurVivier → prenom/nom),
+ *           états réutilisant cssClassEtatJoueur. Bandeau remplaçants sous
+ *           le terrain. AUCUNE édition (pas de bindSlotHandlers en terrain).
+ *           Étape A = format XV figé (15 postes) ; le filtre multi-format
+ *           (VII/XIII/X via formats_applicables + format_de_jeu, déjà
+ *           exposé par getEvenementEquipeContext) = étape A-bis, séparée.
+ *           compositions.html : retrait du is-active codé en dur sur
+ *           l'onglet Liste (piloté par bindViewTabs) + CSS .view-terrain
+ *           (esthétique minimale assumée ; charte Top 14 = chantier export
+ *           réseaux sociaux). node --check OK.
+ *
  * Version : 3.14 — Fix réf évènement en mode U-N3 (P2) (31 mai 2026)
  *   v3.14 : FIX P2 (retour terrain Manu) — quand on arrivait sur la page
  *           Compositions DEPUIS un évènement (mode U-N3, ?evenement_equipe=…),
@@ -296,7 +319,18 @@
     // ET U-N3 protégés (le bug guettait aussi en legacy).
     // ────────────────────────────────────────────────────────
     isCreatingBase: false,
-    isCreatingMatch: false
+    isCreatingMatch: false,
+    // ────────────────────────────────────────────────────────
+    // v3.15 (Vue Terrain, étape A) — mode d'affichage de l'éditeur :
+    // 'liste' (défaut, rendu historique byte-identique) ou 'terrain'
+    // (projection LECTURE SEULE de la compo courante sur le terrain).
+    // C'est une préférence d'AFFICHAGE, indépendante de la compo
+    // sélectionnée : changer d'onglet base↔match conserve viewMode,
+    // le terrain se met simplement à jour avec State.compoJoueurs.
+    // La compo reste la source de vérité ; le terrain ne fait que
+    // refléter (aucune édition en étape A).
+    // ────────────────────────────────────────────────────────
+    viewMode: 'liste'
   };
 
   // ============================================================
@@ -712,6 +746,16 @@
       return;
     }
 
+    // v3.15 (Vue Terrain, étape A) — aiguillage d'affichage. En mode
+    // 'terrain', on projette la compo courante sur le terrain (lecture
+    // seule) et on sort. Le chemin 'liste' ci-dessous est strictement
+    // inchangé (mêmes gardes au-dessus, même bloc view-liste, même
+    // bindSlotHandlers) → invariant recetté préservé.
+    if (State.viewMode === 'terrain') {
+      renderEditorTerrain(el, compo);
+      return;
+    }
+
     let html = '<div class="view-liste">';
     html += '<section class="view-liste__section">';
     html +=   '<h3 class="view-liste__title">XV de départ</h3>';
@@ -734,6 +778,134 @@
     el.innerHTML = html;
 
     bindSlotHandlers();
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // v3.15 (Vue Terrain, étape A) — câblage des onglets Liste/Terrain
+  // ════════════════════════════════════════════════════════════
+  // Les onglets sont statiques dans compositions.html (jamais
+  // régénérés) → câblage unique au boot. Clic = set viewMode +
+  // is-active + re-rendu de l'éditeur. Le HTML retire le is-active
+  // codé en dur (piloté ici). Robuste si les boutons sont absents.
+  function bindViewTabs() {
+    const tabs = document.querySelectorAll('.view-tabs__tab');
+    if (!tabs || tabs.length < 2) return;
+    const setMode = function (mode, clickedTab) {
+      State.viewMode = mode;
+      tabs.forEach(function (t) { t.classList.remove('is-active'); });
+      clickedTab.classList.add('is-active');
+      renderEditorArea();
+    };
+    // Convention HTML : 1er onglet = Liste, 2e = Terrain.
+    tabs[0].addEventListener('click', function () { setMode('liste', tabs[0]); });
+    tabs[1].addEventListener('click', function () { setMode('terrain', tabs[1]); });
+    // État initial cohérent avec State.viewMode (défaut 'liste').
+    tabs.forEach(function (t) { t.classList.remove('is-active'); });
+    (State.viewMode === 'terrain' ? tabs[1] : tabs[0]).classList.add('is-active');
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // v3.15 (Vue Terrain, étape A) — RENDU TERRAIN, LECTURE SEULE
+  // ════════════════════════════════════════════════════════════
+  // Projection de la compo COURANTE (State.compoJoueurs, qui suit
+  // l'onglet base/match sélectionné) sur un terrain. Aucune édition :
+  // pour modifier, l'utilisateur repasse en vue Liste. La compo reste
+  // la source de vérité.
+  //
+  // Placement dérivé de postes.ligne : 7 rangs, PACK EN HAUT →
+  // ARRIÈRE EN BAS (orientation validée). Étape A = format XV figé
+  // (les 15 postes de State.postes, déjà filtrés est_regroupement=false
+  // par loadPostes). Le filtre multi-format (VII/XIII/X via
+  // formats_applicables + format_de_jeu) est l'étape A-bis, séparée.
+  //
+  // Ordre des lignes (haut→bas) et disposition horizontale par rang.
+  const TERRAIN_LIGNES = [
+    { ligne: 'Première ligne',  ordre: ['PG', 'TAL', 'PD'] },
+    { ligne: 'Deuxième ligne',  ordre: ['2LG', '2LD'] },
+    { ligne: 'Troisième ligne', ordre: ['3LG', 'N8', '3LD'] },
+    { ligne: 'Demis',           ordre: ['DM', 'DO'] },
+    { ligne: 'Centres',         ordre: ['CG', 'CD'] },
+    { ligne: 'Ailiers',         ordre: ['AG', 'AD'] },
+    { ligne: 'Arrière',         ordre: ['AR'] }
+  ];
+
+  function renderEditorTerrain(el, compo) {
+    // Index des postes par code, pour respecter l'ordre intra-ligne
+    // défini dans TERRAIN_LIGNES (et non l'ordre de State.postes).
+    const posteParCode = new Map();
+    for (const p of State.postes) posteParCode.set(p.code, p);
+
+    let html = '<div class="view-terrain" aria-label="Vue terrain de la composition (lecture seule)">';
+    html += '<div class="view-terrain__pitch">';
+
+    for (const rang of TERRAIN_LIGNES) {
+      html += '<div class="view-terrain__row">';
+      for (const code of rang.ordre) {
+        const poste = posteParCode.get(code);
+        if (!poste) continue; // robustesse : code absent du référentiel
+        const cj = joueurDuPoste(poste.id);
+        const num = poste.numero_xv || '';
+        if (!cj) {
+          html += '<div class="vt-pastille vt-pastille--vide" title="' +
+                    escapeHtml(poste.libelle_long || poste.libelle_court || poste.code) + ' — libre">' +
+                    '<span class="vt-pastille__num">' + escapeHtml(num) + '</span>' +
+                    '<span class="vt-pastille__nom">—</span>' +
+                  '</div>';
+          continue;
+        }
+        const nom = nomJoueurCompact(cj);
+        html += '<div class="vt-pastille ' + cssClassEtatJoueur(cj.etat_joueur) + '" title="' +
+                  escapeHtml((poste.libelle_long || poste.libelle_court || poste.code) + ' · ' + nomJoueurComplet(cj)) + '">' +
+                  '<span class="vt-pastille__num">' + escapeHtml(num) + '</span>' +
+                  '<span class="vt-pastille__nom">' + escapeHtml(nom) + '</span>' +
+                '</div>';
+      }
+      html += '</div>';
+    }
+
+    html += '</div>'; // pitch
+
+    // Bandeau remplaçants sous le terrain (lecture seule, compact)
+    const remplacants = State.compoJoueurs.filter(cj => cj.role === 'remplacant')
+      .sort((a, b) => (a.ordre_remplacement || a.numero_maillot || 99) - (b.ordre_remplacement || b.numero_maillot || 99));
+    html += '<div class="view-terrain__bench">';
+    html += '<span class="view-terrain__bench-title">Remplaçants</span>';
+    if (remplacants.length === 0) {
+      html += '<span class="view-terrain__bench-empty">aucun</span>';
+    } else {
+      for (let i = 0; i < remplacants.length; i++) {
+        const cj = remplacants[i];
+        html += '<span class="vt-bench-item">' +
+                  '<span class="vt-bench-item__num">' + escapeHtml(cj.numero_maillot != null ? cj.numero_maillot : (16 + i)) + '</span>' +
+                  escapeHtml(nomJoueurCompact(cj)) +
+                '</span>';
+      }
+    }
+    html += '</div>';
+
+    html += '</div>'; // view-terrain
+    el.innerHTML = html;
+    // Lecture seule : aucun handler de placement attaché.
+  }
+
+  // Nom compact pour pastille terrain : « INITIALE.NOM » si possible.
+  function nomJoueurCompact(cj) {
+    const full = nomJoueurComplet(cj);
+    if (!full) return '';
+    const parts = full.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0].charAt(0) + '.' + parts.slice(1).join(' ')).toUpperCase();
+    }
+    return full.toUpperCase();
+  }
+
+  // Nom complet d'un compo_joueur via le vivier (RLS-safe).
+  // S'aligne EXACTEMENT sur la vue Liste (renderSlotPoste) : lookup via
+  // getJoueurVivier(joueur_id), champs .nom / .prenom.
+  function nomJoueurComplet(cj) {
+    if (!cj) return '';
+    const j = getJoueurVivier(cj.joueur_id) || {};
+    return ((j.prenom || '') + ' ' + (j.nom || '')).trim();
   }
 
   // v3.2 : lookup joueur depuis State.vivierById (RLS-safe via RPC get_vivier_compo)
@@ -1667,6 +1839,7 @@
     renderEditorArea();
     renderEffectifPanel();
     renderPopover();
+    bindViewTabs(); // v3.15 — câble les onglets Liste/Terrain (statiques, 1 fois)
 
     // v3.8 — A1 : en mode U-N3, l'évènement est fixé par l'URL ;
     // le sélecteur d'évènements n'a pas de sens (retour à la fiche
@@ -1701,7 +1874,7 @@
     bindPopoverOutsideClick();
 
     console.log(
-      '%c🏉 Compositions Editor v3.14 chargé',
+      '%c🏉 Compositions Editor v3.15 chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         evenements: State.evenements.length,
