@@ -21,6 +21,14 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
+ * Version : 1.55.3 — Édition : pré-cochage du staff (encadrants chargés via RPC) (1 juin 2026)
+ *   v1.55.3 : FIX pré-cochage staff en réédition. L'objet evt vient de
+ *           EVENTS_BY_ID (liste) qui NE PORTE PAS encadrants (enrichi seulement
+ *           par getEvenementWithEncadrants, côté fiche) → modal d'édition
+ *           n'affichait aucun coach coché (et risque d'écrasement à la save).
+ *           Fix : charger les encadrants via la RPC enrichie EN PARALLÈLE
+ *           (non bloquant) et cocher dans un _waitFor. node --check OK.
+ *
  * Version : 1.55.2 — Édition : fix duplication des phases en réédition (1 juin 2026)
  *   v1.55.2 : FIX duplication des phases/matchs en réédition (bug d'idempotence
  *           PRÉEXISTANT, sans rapport avec le fix format v1.55.x). _prefillPhasesEditor
@@ -4459,20 +4467,38 @@
       });
     }
 
-    // Encadrants : cocher ceux rattachés (evt.encadrants, chargé par la fiche).
-    // Attente active (peuplerStaff est asynchrone).
-    const encs = Array.isArray(evt.encadrants) ? evt.encadrants : [];
-    if (encs.length > 0) {
-      _waitFor(function () {
-        return document.querySelectorAll('#evt-create-staff .evt-eng-staff-cb').length > 0;
-      }, function () {
-        encs.forEach(function (enc) {
-          const pid = enc.personne_id || enc.id;
-          const cb = document.querySelector('#evt-create-staff .evt-eng-staff-cb[value="' + pid + '"]');
-          if (cb) cb.checked = true;
-        });
+    // Encadrants : cocher ceux rattachés. v1.55.3 — FIX : l'objet evt vient
+    // de EVENTS_BY_ID (liste), qui NE PORTE PAS l'array encadrants (seul
+    // getEvenementWithEncadrants l'enrichit, utilisé par la fiche). D'où le
+    // bug « la fiche montre les coachs mais le modal d'édition ne les coche
+    // pas » → et risque d'écrasement à la sauvegarde (replace children avec
+    // staff vide). On charge donc les encadrants via la RPC enrichie, EN
+    // PARALLÈLE (non bloquant, comme pour le format), et on coche dans le
+    // _waitFor une fois la liste cases ET la donnée disponibles.
+    let _encsRattaches = null; // null = pas encore chargé
+    Promise.resolve(
+      (typeof SupabaseHub.getEvenementWithEncadrants === 'function')
+        ? SupabaseHub.getEvenementWithEncadrants(evtId)
+        : null
+    ).then(function (full) {
+      const arr = (full && Array.isArray(full.encadrants)) ? full.encadrants
+                : (Array.isArray(evt.encadrants) ? evt.encadrants : []);
+      _encsRattaches = arr;
+    }).catch(function (e) {
+      console.error('openModalEditComplet() getEvenementWithEncadrants', e);
+      _encsRattaches = Array.isArray(evt.encadrants) ? evt.encadrants : [];
+    });
+
+    _waitFor(function () {
+      return _encsRattaches !== null
+        && document.querySelectorAll('#evt-create-staff .evt-eng-staff-cb').length > 0;
+    }, function () {
+      _encsRattaches.forEach(function (enc) {
+        const pid = enc.personne_id || enc.id;
+        const cb = document.querySelector('#evt-create-staff .evt-eng-staff-cb[value="' + pid + '"]');
+        if (cb) cb.checked = true;
       });
-    }
+    });
 
     // Titre + bouton adaptés
     const titleEl = document.getElementById('evt-create-title');
