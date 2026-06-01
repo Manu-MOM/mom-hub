@@ -6,6 +6,21 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.18 — Vue Terrain étape C : édition au drag (1 juin 2026)
+ *   v3.18 : ÉDITION AU DRAG sur le terrain (sortie du lecture seule). 3 gestes :
+ *           pastille→pastille (déplacer un titulaire), vivier→pastille (faire
+ *           entrer un joueur), dépôt sur poste vide. Règle (Manu) : dépôt sur
+ *           poste OCCUPÉ → l'occupant part au BANC (prochain n° 16-23 libre ;
+ *           si banc plein → sort au vivier), puis le joueur déposé prend le
+ *           poste. Drag autorisé même sur compo validée. onDropJoueurSurPoste
+ *           applique la règle et écrit UNIQUEMENT via la couche existante
+ *           (addJoueurCompo / updateJoueurCompo / removeJoueurCompo) ; état via
+ *           etatJoueurPourCompoCourante() (→ 'modifie' en compo de match).
+ *           Pastilles : draggable + data-joueur-id (source) + data-poste-id
+ *           (cible), câblage bindTerrainDnD. Items vivier rendus draggables
+ *           (dragstart) dans renderEffectifPanel (U-N3 + legacy). compositions.html :
+ *           CSS feedback (grab, survol cible, dragging). node --check OK.
+ *
  * Version : 3.17 — Vue Terrain : pastilles agrandies + noms complets (1 juin 2026)
  *   v3.17 : retours recette terrain Manu sur la vue Terrain (étape B). (1)
  *           Pastilles agrandies : disque 40→48px, numéro 18→22px (lisibilité).
@@ -915,16 +930,19 @@
       const style = 'left:' + pos.x + '%;top:' + pos.y + '%;';
       const libellePoste = poste.libelle_long || poste.libelle_court || poste.code;
       if (!cj) {
-        html += '<div class="vt-mark vt-mark--vide" style="' + style + '" title="' +
-                  escapeHtml(libellePoste + ' — libre') + '">' +
+        html += '<div class="vt-mark vt-mark--vide vt-drop" data-poste-id="' + escapeHtml(poste.id) + '" style="' + style + '" title="' +
+                  escapeHtml(libellePoste + ' — libre (déposer un joueur ici)') + '">' +
                   '<span class="vt-mark__poste">' + escapeHtml(poste.libelle_court || poste.code) + '</span>' +
                   '<span class="vt-mark__disc"><span class="vt-mark__num">' + escapeHtml(num) + '</span></span>' +
                   '<span class="vt-mark__nom">—</span>' +
                 '</div>';
         continue;
       }
-      html += '<div class="vt-mark ' + cssClassEtatJoueur(cj.etat_joueur) + '" style="' + style + '" title="' +
-                escapeHtml(libellePoste + ' · ' + nomJoueurComplet(cj)) + '">' +
+      html += '<div class="vt-mark vt-drop vt-drag ' + cssClassEtatJoueur(cj.etat_joueur) + '" draggable="true"' +
+                ' data-joueur-id="' + escapeHtml(cj.joueur_id) + '"' +
+                ' data-poste-id="' + escapeHtml(poste.id) + '"' +
+                ' style="' + style + '" title="' +
+                escapeHtml(libellePoste + ' · ' + nomJoueurComplet(cj) + ' (glisser pour déplacer)') + '">' +
                 '<span class="vt-mark__poste">' + escapeHtml(poste.libelle_court || poste.code) + '</span>' +
                 '<span class="vt-mark__disc"><span class="vt-mark__num">' + escapeHtml(num) + '</span></span>' +
                 '<span class="vt-mark__nom">' + escapeHtml(nomJoueurCompact(cj)) + '</span>' +
@@ -953,7 +971,41 @@
 
     html += '</div>'; // view-terrain
     el.innerHTML = html;
-    // Lecture seule : aucun handler de placement attaché.
+    bindTerrainDnD(el); // v3.18 — édition au drag (3 gestes + éviction au banc)
+  }
+
+  // v3.18 — câblage drag & drop du terrain. Source = pastilles draggables
+  // (.vt-drag, data-joueur-id) ET items du panneau vivier (.effectif-item
+  // [data-joueur-id], rendus draggables par renderEffectifPanel). Cibles =
+  // toutes les pastilles (.vt-drop, data-poste-id). Le drop appelle
+  // onDropJoueurSurPoste, qui applique la règle d'éviction et écrit via la
+  // couche existante.
+  function bindTerrainDnD(scope) {
+    const root = scope || document;
+    // Sources internes au terrain (titulaires déplaçables)
+    root.querySelectorAll('.vt-drag[data-joueur-id]').forEach(function (mark) {
+      mark.addEventListener('dragstart', function (e) {
+        e.dataTransfer.setData('text/plain', mark.dataset.joueurId);
+        e.dataTransfer.effectAllowed = 'move';
+        mark.classList.add('vt-dragging');
+      });
+      mark.addEventListener('dragend', function () { mark.classList.remove('vt-dragging'); });
+    });
+    // Cibles (toutes les pastilles, vides ou occupées)
+    root.querySelectorAll('.vt-drop[data-poste-id]').forEach(function (cible) {
+      cible.addEventListener('dragover', function (e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        cible.classList.add('vt-drop-hover');
+      });
+      cible.addEventListener('dragleave', function () { cible.classList.remove('vt-drop-hover'); });
+      cible.addEventListener('drop', function (e) {
+        e.preventDefault();
+        cible.classList.remove('vt-drop-hover');
+        const joueurId = e.dataTransfer.getData('text/plain');
+        if (joueurId) onDropJoueurSurPoste(joueurId, cible.dataset.posteId);
+      });
+    });
   }
 
   // Nom compact pour pastille terrain : « INITIALE.NOM » si possible.
@@ -979,6 +1031,104 @@
     if (!cj) return '';
     const j = getJoueurVivier(cj.joueur_id) || {};
     return ((j.prenom || '') + ' ' + (j.nom || '')).trim();
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // v3.18 (Vue Terrain, étape C) — ÉDITION AU DRAG
+  // ════════════════════════════════════════════════════════════
+  // Règle (décisions Manu) : déposer un joueur sur un poste —
+  //  • poste VIDE → placement simple ;
+  //  • poste OCCUPÉ → l'occupant part au BANC (remplaçant, prochain
+  //    n° 16-23 libre ; si banc plein → sort vers le vivier), puis le
+  //    joueur déposé prend le poste.
+  // Le joueur déposé peut venir d'une pastille du terrain (titulaire qui
+  // se déplace — il libère son ancien poste) ou du panneau vivier.
+  // Drag autorisé même sur compo validée. Écriture UNIQUEMENT via la
+  // couche existante (addJoueurCompo / updateJoueurCompo / removeJoueurCompo) ;
+  // état via etatJoueurPourCompoCourante() (→ 'modifie' en compo de match).
+  //
+  // Calcule le prochain numéro de banc libre (16..23) ou null si plein.
+  function prochainNumeroBancLibre() {
+    const used = new Set(
+      State.compoJoueurs
+        .filter(cj => cj.role === 'remplacant')
+        .map(cj => cj.numero_maillot)
+        .filter(n => n != null)
+    );
+    for (let n = 16; n <= 23; n++) { if (!used.has(n)) return n; }
+    return null; // banc plein
+  }
+
+  // Applique un dépôt « joueur → poste cible ». joueurId = joueur déposé.
+  // posteCibleId = poste de destination. Réutilise la couche d'écriture.
+  async function onDropJoueurSurPoste(joueurId, posteCibleId) {
+    if (!joueurId || !posteCibleId) return;
+    const compo = State.compos.find(c => c.id === State.selectedCompoId);
+    if (!compo) return;
+
+    const joueur = getJoueurVivier(joueurId);
+    if (!joueur) return;
+
+    // Occupant actuel du poste cible (titulaire), s'il existe.
+    const occupant = State.compoJoueurs.find(
+      cj => cj.role === 'titulaire' && cj.poste_id === posteCibleId
+    );
+    // Si on dépose le joueur sur SON propre poste : rien à faire.
+    if (occupant && occupant.joueur_id === joueurId) return;
+
+    const posteCible = getPoste(posteCibleId);
+    const numMaillotCible = (posteCible && posteCible.numero_xv) ? posteCible.numero_xv : null;
+    const etat = etatJoueurPourCompoCourante();
+    const horsCat = State.evenementEquipeId
+      ? !!joueur._horsGroupe
+      : (joueur.categorie_id !== M14_CATEGORIE_ID);
+
+    // 1) Évincer l'occupant vers le banc (ou le vivier si banc plein).
+    if (occupant) {
+      const numBanc = prochainNumeroBancLibre();
+      if (numBanc == null) {
+        // Banc plein → l'occupant sort de la compo (vers le vivier).
+        const rOut = await SupabaseHub.removeJoueurCompo(occupant.id);
+        if (!rOut.ok) { alert('Erreur (sortie occupant) : ' + rOut.error); return; }
+      } else {
+        const rBanc = await SupabaseHub.updateJoueurCompo(occupant.id, {
+          role: 'remplacant',
+          numero_maillot: numBanc,
+          etat_joueur: etat
+        });
+        if (!rBanc.ok) { alert('Erreur (envoi au banc) : ' + rBanc.error); return; }
+      }
+    }
+
+    // 2) Le joueur déposé est-il déjà dans la compo (déplacement) ou nouveau (vivier) ?
+    const existant = State.compoJoueurs.find(cj => cj.joueur_id === joueurId);
+    if (existant) {
+      // Déplacement : on met à jour son poste/numéro/rôle.
+      const rMove = await SupabaseHub.updateJoueurCompo(existant.id, {
+        role: 'titulaire',
+        poste_id: posteCibleId,
+        numero_maillot: numMaillotCible,
+        etat_joueur: etat
+      });
+      if (!rMove.ok) { alert('Erreur (déplacement) : ' + rMove.error); return; }
+    } else {
+      // Nouveau joueur (depuis le vivier) : ajout sur le poste cible.
+      const rAdd = await SupabaseHub.addJoueurCompo({
+        composition_id: State.selectedCompoId,
+        joueur_id: joueurId,
+        role: 'titulaire',
+        poste_id: posteCibleId,
+        numero_maillot: numMaillotCible,
+        etat_joueur: etat,
+        est_depannage_hors_categorie: horsCat
+      });
+      if (!rAdd.ok) { alert('Erreur (ajout) : ' + rAdd.error); return; }
+    }
+
+    await loadCompoJoueurs();
+    renderFillIndicator();
+    renderEditorArea();
+    renderEffectifPanel();
   }
 
   // v3.2 : lookup joueur depuis State.vivierById (RLS-safe via RPC get_vivier_compo)
@@ -1128,6 +1278,14 @@
           const joueurId = item.dataset.joueurId;
           if (joueurId) openPickerForJoueur(joueurId);
         });
+        // v3.18 — drag vers le terrain (geste vivier → poste)
+        if (item.dataset.joueurId) {
+          item.setAttribute('draggable', 'true');
+          item.addEventListener('dragstart', function (e) {
+            e.dataTransfer.setData('text/plain', item.dataset.joueurId);
+            e.dataTransfer.effectAllowed = 'move';
+          });
+        }
       });
       return;
     }
@@ -1186,6 +1344,14 @@
         const joueurId = item.dataset.joueurId;
         if (joueurId) openPickerForJoueur(joueurId);
       });
+      // v3.18 — drag vers le terrain (geste vivier → poste)
+      if (item.dataset.joueurId) {
+        item.setAttribute('draggable', 'true');
+        item.addEventListener('dragstart', function (e) {
+          e.dataTransfer.setData('text/plain', item.dataset.joueurId);
+          e.dataTransfer.effectAllowed = 'move';
+        });
+      }
     });
   }
 
@@ -1947,7 +2113,7 @@
     bindPopoverOutsideClick();
 
     console.log(
-      '%c🏉 Compositions Editor v3.17 chargé',
+      '%c🏉 Compositions Editor v3.18 chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         evenements: State.evenements.length,
