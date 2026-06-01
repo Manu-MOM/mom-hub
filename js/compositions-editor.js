@@ -6,6 +6,18 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.17 — Vue Terrain : pastilles agrandies + noms complets (1 juin 2026)
+ *   v3.17 : retours recette terrain Manu sur la vue Terrain (étape B). (1)
+ *           Pastilles agrandies : disque 40→48px, numéro 18→22px (lisibilité).
+ *           (2) Noms longs ne sont plus tronqués : nomJoueurCompact utilise
+ *           désormais les champs SÉPARÉS prenom/nom du vivier (au lieu de
+ *           re-découper la chaîne concaténée, qui cassait sur les prénoms
+ *           composés — « Sidi-Mohamed Chakor » → « S.MOHAMED CHAK… ») →
+ *           initiale du prénom + nom de famille COMPLET ; CSS .vt-mark__nom
+ *           élargi (110px) sans ellipse, retour à la ligne autorisé
+ *           (overflow-wrap:anywhere). compositions.html : CSS pastilles.
+ *           node --check OK.
+ *
  * Version : 3.16 — Vue Terrain étape B (terrain dessiné + placement oblique) (1 juin 2026)
  *   v3.16 : VUE TERRAIN, étape B. renderEditorTerrain RÉÉCRIT : remplace la
  *           grille de l'étape A par un terrain de rugby DESSINÉ (SVG fond :
@@ -945,14 +957,19 @@
   }
 
   // Nom compact pour pastille terrain : « INITIALE.NOM » si possible.
+  // Nom compact pour pastille terrain : « I.NOM-DE-FAMILLE » en entier.
+  // v3.17 — utilise les champs SÉPARÉS prenom/nom du vivier (pas un
+  // re-découpage de la chaîne concaténée, qui cassait sur les prénoms
+  // composés type « Sidi-Mohamed Chakor » → affichait « S.MOHAMED CHAK… »).
+  // Initiale du 1er prénom + nom de famille COMPLET (jamais tronqué).
   function nomJoueurCompact(cj) {
-    const full = nomJoueurComplet(cj);
-    if (!full) return '';
-    const parts = full.trim().split(/\s+/);
-    if (parts.length >= 2) {
-      return (parts[0].charAt(0) + '.' + parts.slice(1).join(' ')).toUpperCase();
-    }
-    return full.toUpperCase();
+    if (!cj) return '';
+    const j = getJoueurVivier(cj.joueur_id) || {};
+    const nom = (j.nom || '').trim();
+    const prenom = (j.prenom || '').trim();
+    if (!nom && !prenom) return '';
+    const initiale = prenom ? (prenom.charAt(0) + '.') : '';
+    return (initiale + nom).toUpperCase().trim();
   }
 
   // Nom complet d'un compo_joueur via le vivier (RLS-safe).
@@ -1930,7 +1947,7 @@
     bindPopoverOutsideClick();
 
     console.log(
-      '%c🏉 Compositions Editor v3.16 chargé',
+      '%c🏉 Compositions Editor v3.17 chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         evenements: State.evenements.length,
