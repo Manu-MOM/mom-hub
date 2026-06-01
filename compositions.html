@@ -40,15 +40,6 @@
     }
     .event-banner__btn:hover .event-banner__label { color: var(--vert-prairie); }
     .event-banner__btn::after { content: '▾'; color: var(--ink-mute); font-size: 12px; margin-left: 6px; }
-    /* v3.14 (P2) — Mode U-N3 : l'évènement est fixé par l'URL, le bouton
-       n'est plus un sélecteur cliquable. On le neutralise (pas de ▾, pas de
-       hover, pas de curseur) MAIS on le laisse affiché pour que le type +
-       le titre + le lieu restent VISIBLES (fix « aucune réf évènement » quand
-       on arrive depuis un évènement). Le legacy ne porte jamais cette classe
-       → apparence/comportement bouton strictement inchangés. */
-    .event-banner__btn--static { cursor: default; }
-    .event-banner__btn--static::after { content: none; }
-    .event-banner__btn--static:hover .event-banner__label { color: var(--ink); }
     .event-banner__type {
       font-family: 'Oswald', sans-serif; font-size: 13px; font-weight: 600;
       letter-spacing: 0.08em; text-transform: uppercase;
@@ -182,6 +173,41 @@
     }
     .view-tabs__tab:hover { color: var(--ink); }
     .view-tabs__tab.is-active { background: var(--vert-prairie); color: #fff; border-color: var(--vert-prairie); }
+    .view-tabs__action {
+      margin-left: auto; padding: 8px 16px; border: 1px solid var(--line);
+      border-radius: 8px; background: #fff; color: var(--ink); cursor: pointer;
+      font-size: 14px; font-family: inherit;
+    }
+    .view-tabs__action:hover { background: var(--vert-bouteille); color: #fff; border-color: var(--vert-bouteille); }
+    .compo-export-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+      display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px;
+    }
+    .compo-export-modal {
+      background: #fff; border-radius: 14px; max-width: 520px; width: 100%;
+      max-height: 92vh; display: flex; flex-direction: column; overflow: hidden;
+    }
+    .compo-export-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px; border-bottom: 1px solid var(--line);
+    }
+    .compo-export-title { font-family: 'Oswald', sans-serif; font-size: 17px; color: var(--ink); letter-spacing: 0.3px; }
+    .compo-export-close { border: none; background: none; font-size: 20px; cursor: pointer; color: var(--ink-mute); line-height: 1; }
+    .compo-export-tabs { display: flex; gap: 8px; padding: 12px 20px 0; }
+    .compo-export-vtab {
+      flex: 1; padding: 8px; border: 1px solid var(--line); border-radius: 8px;
+      background: #fff; cursor: pointer; font-size: 14px; font-family: inherit; color: var(--ink);
+    }
+    .compo-export-vtab.is-active { background: var(--vert-prairie); color: #fff; border-color: var(--vert-prairie); }
+    .compo-export-preview { padding: 16px 20px; overflow: auto; display: flex; justify-content: center; }
+    .compo-export-canvas { width: 100%; max-width: 360px; height: auto; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.2); }
+    .compo-export-actions { padding: 12px 20px 20px; border-top: 1px solid var(--line); }
+    .compo-export-dl {
+      width: 100%; padding: 12px; border: none; border-radius: 8px;
+      background: var(--vert-prairie); color: #fff; cursor: pointer;
+      font-size: 15px; font-family: 'Oswald', sans-serif; letter-spacing: 0.3px;
+    }
+    .compo-export-dl:hover { background: var(--vert-bouteille); }
 
     /* Grille */
     .compo-grid { display: grid; grid-template-columns: 320px 1fr; gap: 20px; align-items: start; }
@@ -343,14 +369,6 @@
       cursor: pointer; line-height: 1; transition: all 0.1s;
     }
     .slot__remove:hover { background: rgba(199, 62, 62, 0.12); color: var(--rouge-blesse); }
-    /* v3.19 — bouton « ↓ banc » (rétrograder au banc), à côté de la croix */
-    .slot__bench {
-      background: transparent; border: 1px solid var(--line); color: var(--ink-mute);
-      font-size: 11px; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.04em;
-      padding: 2px 8px; border-radius: 4px; cursor: pointer; line-height: 1;
-      white-space: nowrap; transition: all 0.1s; margin-right: 4px;
-    }
-    .slot__bench:hover { background: var(--vert-light); color: var(--vert-prairie); border-color: var(--vert-prairie); }
 
     /* Popover Picker */
     .popover-root {
@@ -417,104 +435,6 @@
       .event-selector__item { grid-template-columns: 90px 90px 1fr; gap: 8px; }
       .slot { grid-template-columns: 32px 80px 1fr auto auto; }
       .popover { max-width: calc(100% - 32px); margin: 0 16px; }
-    }
-
-    /* ════════════════════════════════════════════════════════
-       v3.16 (Vue Terrain, étape B) — terrain dessiné + placement
-       oblique. Le SVG du terrain est en fond (position absolue,
-       remplit le conteneur) ; les pastilles .vt-mark sont posées
-       en absolu à leurs coordonnées (left/top %). Lecture seule.
-       Esthétique « outil » ; la charte Top 14 reste le chantier
-       export réseaux sociaux (séparé).
-       ════════════════════════════════════════════════════════ */
-    .view-terrain { display: flex; flex-direction: column; gap: 14px; }
-    .view-terrain__pitch {
-      position: relative;
-      width: 100%;
-      /* ratio terrain ~ 100/140 → padding-top 140% pour la hauteur */
-      padding-top: 140%;
-      border-radius: 12px;
-      overflow: hidden;
-      border: 1px solid rgba(0,0,0,0.15);
-    }
-    .vt-pitch-svg {
-      position: absolute; inset: 0; width: 100%; height: 100%;
-      display: block;
-    }
-    .vt-mark {
-      position: absolute;
-      transform: translate(-50%, -50%);
-      display: flex; flex-direction: column; align-items: center;
-      width: 110px; text-align: center;
-      color: #fff;
-    }
-    .vt-mark__poste {
-      font-family: 'Oswald', sans-serif; font-size: 9px; font-weight: 600;
-      letter-spacing: 0.02em; color: #0d2b4e;
-      background: rgba(255,255,255,0.82); border-radius: 3px;
-      padding: 1px 5px; margin-bottom: 2px; white-space: nowrap;
-    }
-    .vt-mark__disc {
-      width: 54px; height: 54px; border-radius: 50%;
-      background: var(--bleu-base, #2f3da8);
-      border: 3px solid #f5c518;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .vt-mark__num {
-      font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 24px;
-      color: #fff; line-height: 1;
-    }
-    .vt-mark__nom {
-      font-family: 'JetBrains Mono', monospace; font-size: 10px;
-      letter-spacing: 0.02em; margin-top: 3px;
-      max-width: 110px; line-height: 1.2;
-      overflow-wrap: anywhere; word-break: break-word;
-      text-shadow: 0 1px 2px rgba(0,0,0,0.65);
-    }
-    .vt-mark--vide { opacity: 0.55; }
-    .vt-mark--vide .vt-mark__disc { border-style: dashed; background: rgba(13,43,78,0.5); }
-    /* v3.18 — feedback drag & drop */
-    .vt-drag { cursor: grab; }
-    .vt-drag:active { cursor: grabbing; }
-    .vt-dragging { opacity: 0.4; }
-    .vt-drop-hover .vt-mark__disc { box-shadow: 0 0 0 4px rgba(245,197,24,0.6); transform: scale(1.08); }
-    /* v3.19 — le banc comme zone de drop + section remplaçants du picker */
-    .vt-bench-hover { outline: 2px dashed var(--vert-prairie); outline-offset: 2px; }
-    .popover__group-label {
-      font-family: 'JetBrains Mono', monospace; font-size: 10px;
-      letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-mute);
-      padding: 8px 12px 4px; list-style: none;
-    }
-    .effectif-item__tag--bench {
-      background: var(--bleu-base, #0d2b4e); color: #fff;
-      font-size: 10px; padding: 1px 7px; border-radius: 8px;
-    }
-    /* Réutilise les classes d'état de la vue Liste (cssClassEtatJoueur = 'etat-'+etat) */
-    .vt-mark.etat-modifie     .vt-mark__disc { border-color: var(--clay); }
-    .vt-mark.etat-independant .vt-mark__disc { border-color: var(--vert-prairie); }
-    .vt-mark.etat-blesse      .vt-mark__disc { border-color: var(--rouge-blesse); }
-    .view-terrain__bench {
-      display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
-      padding: 10px 12px; background: var(--paper-warm, #f4f1e8);
-      border: 1px solid var(--line, #e0ddd2); border-radius: 10px;
-    }
-    .view-terrain__bench-title {
-      font-family: 'JetBrains Mono', monospace; font-size: 10px;
-      letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-mute, #8a877d);
-      margin-right: 4px;
-    }
-    .view-terrain__bench-empty { font-size: 12px; color: var(--ink-mute, #8a877d); font-style: italic; }
-    .vt-bench-item {
-      display: inline-flex; align-items: center; gap: 5px;
-      font-size: 12px; color: var(--ink, #2a2a28);
-      background: #fff; border: 1px solid var(--line, #e0ddd2);
-      border-radius: 14px; padding: 3px 10px 3px 4px;
-    }
-    .vt-bench-item__num {
-      display: inline-flex; align-items: center; justify-content: center;
-      width: 18px; height: 18px; border-radius: 50%;
-      background: var(--bleu-base, #0d2b4e); color: #f5c518;
-      font-family: 'Oswald', sans-serif; font-size: 11px; font-weight: 600;
     }
   </style>
 </head>
@@ -593,8 +513,9 @@
     <div class="fill-indicator" id="fill-indicator" aria-live="polite">Chargement…</div>
 
     <nav class="view-tabs" aria-label="Mode de visualisation">
-      <button class="view-tabs__tab" type="button">Liste</button>
-      <button class="view-tabs__tab" type="button" title="Vue Terrain de la composition">Terrain</button>
+      <button class="view-tabs__tab is-active" type="button">Liste</button>
+      <button class="view-tabs__tab" type="button" title="Vue Terrain — étape 6c-5">Terrain</button>
+      <button class="view-tabs__action" id="btn-export-image" type="button" title="Exporter la composition en image">📷 Image</button>
     </nav>
 
     <div class="compo-grid">
@@ -625,6 +546,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="js/supabase-client.js"></script>
+  <script src="js/compo-export.js"></script>
   <script src="js/compositions-editor.js"></script>
 
   <script>
