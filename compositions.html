@@ -412,46 +412,62 @@
     }
 
     /* ════════════════════════════════════════════════════════
-       v3.15 (Vue Terrain, étape A) — projection lecture seule.
-       Esthétique minimale assumée (le raffinement charte Top 14
-       relève du chantier export réseaux sociaux, séparé).
+       v3.16 (Vue Terrain, étape B) — terrain dessiné + placement
+       oblique. Le SVG du terrain est en fond (position absolue,
+       remplit le conteneur) ; les pastilles .vt-mark sont posées
+       en absolu à leurs coordonnées (left/top %). Lecture seule.
+       Esthétique « outil » ; la charte Top 14 reste le chantier
+       export réseaux sociaux (séparé).
        ════════════════════════════════════════════════════════ */
     .view-terrain { display: flex; flex-direction: column; gap: 14px; }
     .view-terrain__pitch {
-      background: #2f7d3a;
-      background-image:
-        repeating-linear-gradient(0deg, transparent, transparent 48px,
-          rgba(255,255,255,0.05) 48px, rgba(255,255,255,0.05) 96px);
-      border: 1px solid rgba(0,0,0,0.15);
+      position: relative;
+      width: 100%;
+      /* ratio terrain ~ 100/140 → padding-top 140% pour la hauteur */
+      padding-top: 140%;
       border-radius: 12px;
-      padding: 22px 16px;
-      display: flex; flex-direction: column; gap: 16px;
+      overflow: hidden;
+      border: 1px solid rgba(0,0,0,0.15);
     }
-    .view-terrain__row {
-      display: flex; justify-content: center; align-items: center;
-      gap: 18px; flex-wrap: wrap;
+    .vt-pitch-svg {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      display: block;
     }
-    .vt-pastille {
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      width: 78px; min-height: 64px; padding: 6px 4px;
-      background: var(--bleu-base, #0d2b4e);
-      border: 2px solid #f5c518; border-radius: 12px;
-      color: #fff; text-align: center;
+    .vt-mark {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      display: flex; flex-direction: column; align-items: center;
+      width: 84px; text-align: center;
+      color: #fff;
     }
-    .vt-pastille__num {
-      font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 20px;
-      color: #f5c518; line-height: 1;
+    .vt-mark__poste {
+      font-family: 'Oswald', sans-serif; font-size: 9px; font-weight: 600;
+      letter-spacing: 0.02em; color: #0d2b4e;
+      background: rgba(255,255,255,0.82); border-radius: 3px;
+      padding: 1px 5px; margin-bottom: 2px; white-space: nowrap;
     }
-    .vt-pastille__nom {
+    .vt-mark__disc {
+      width: 40px; height: 40px; border-radius: 50%;
+      background: var(--bleu-base, #2f3da8);
+      border: 2px solid #f5c518;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .vt-mark__num {
+      font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 18px;
+      color: #fff; line-height: 1;
+    }
+    .vt-mark__nom {
       font-family: 'JetBrains Mono', monospace; font-size: 9px;
-      letter-spacing: 0.03em; margin-top: 4px;
-      max-width: 72px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      letter-spacing: 0.02em; margin-top: 3px;
+      max-width: 84px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.6);
     }
-    .vt-pastille--vide { opacity: 0.5; border-style: dashed; }
+    .vt-mark--vide { opacity: 0.55; }
+    .vt-mark--vide .vt-mark__disc { border-style: dashed; background: rgba(13,43,78,0.5); }
     /* Réutilise les classes d'état de la vue Liste (cssClassEtatJoueur = 'etat-'+etat) */
-    .vt-pastille.etat-modifie     { border-color: var(--clay); }
-    .vt-pastille.etat-independant { border-color: var(--vert-prairie); }
-    .vt-pastille.etat-blesse      { border-color: var(--rouge-blesse); }
+    .vt-mark.etat-modifie     .vt-mark__disc { border-color: var(--clay); }
+    .vt-mark.etat-independant .vt-mark__disc { border-color: var(--vert-prairie); }
+    .vt-mark.etat-blesse      .vt-mark__disc { border-color: var(--rouge-blesse); }
     .view-terrain__bench {
       display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
       padding: 10px 12px; background: var(--paper-warm, #f4f1e8);
