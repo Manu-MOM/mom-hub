@@ -16,7 +16,7 @@
  *           export PNG). Aucune fonction d'écriture ni de rendu existante
  *           touchée : ajouts purs (bindExportImage + _collecterDonneesExport
  *           + _ligneDePoste). v1 : initiales (pas de photos), pas de staff.
- *           Logos chargés depuis img/ (ecusson-mom.png, logo-entente.png).
+ *           Logos chargés depuis assets/ (ecusson-mom.png, logo-entente.png).
  *           node --check OK.
  *
  * Version : 3.22 — Vue Terrain MULTI-FORMAT (XV / XIII / X / VII) (1 juin 2026)
@@ -1025,8 +1025,8 @@
       titulaires: tit,
       remplacants: rem,
       logos: {
-        mom: 'img/ecusson-mom.png',
-        entente: 'img/logo-entente.png'
+        mom: 'assets/ecusson-mom.png',
+        entente: 'assets/logo-entente.png'
       }
     };
   }
