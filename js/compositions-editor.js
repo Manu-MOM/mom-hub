@@ -6,6 +6,25 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.16 — Vue Terrain étape B (terrain dessiné + placement oblique) (1 juin 2026)
+ *   v3.16 : VUE TERRAIN, étape B. renderEditorTerrain RÉÉCRIT : remplace la
+ *           grille de l'étape A par un terrain de rugby DESSINÉ (SVG fond :
+ *           en-buts, lignes 22m/10m/médiane, poteaux haut+bas) avec les
+ *           pastilles positionnées à leurs COORDONNÉES TACTIQUES (table
+ *           TERRAIN_POS_XV en % left/top, dérivée d'une maquette validée
+ *           par Manu : 1ʳᵉ ligne 1-2-3 à plat ; 4-5 ; flankers 6-7 avancés
+ *           et écartés ; N°8 à la base ; charnière 9-10 en diagonale ;
+ *           trois-quarts 11-12-13-14 ALIGNÉS ; arrière 15 centré ; PACK EN
+ *           HAUT → ARRIÈRE EN BAS). Pastille .vt-mark = libellé poste +
+ *           disque numéroté + nom compact, posée en absolu (translate -50%).
+ *           Toujours LECTURE SEULE, toujours branché sur la compo COURANTE
+ *           (suit base/match). Le câblage onglets/viewMode/aiguillage de
+ *           l'étape A est conservé tel quel. Coordonnées figées côté front
+ *           (la base postes n'a pas de x/y) ; format XV uniquement (les
+ *           autres formats auront leur propre table, étape ultérieure).
+ *           compositions.html : CSS .view-terrain réécrit (pitch en ratio
+ *           140%, SVG en fond, .vt-mark en absolu). node --check OK.
+ *
  * Version : 3.15 — Vue Terrain étape A (lecture seule) (1 juin 2026)
  *   v3.15 : VUE TERRAIN, étape A (chantier UX-EVT-VUE-TERRAIN). Câble
  *           enfin les onglets Liste/Terrain (morts jusque-là : aucun
@@ -812,55 +831,92 @@
   // pour modifier, l'utilisateur repasse en vue Liste. La compo reste
   // la source de vérité.
   //
-  // Placement dérivé de postes.ligne : 7 rangs, PACK EN HAUT →
-  // ARRIÈRE EN BAS (orientation validée). Étape A = format XV figé
-  // (les 15 postes de State.postes, déjà filtrés est_regroupement=false
-  // par loadPostes). Le filtre multi-format (VII/XIII/X via
-  // formats_applicables + format_de_jeu) est l'étape A-bis, séparée.
+  // v3.16 (Vue Terrain, étape B) — TERRAIN DESSINÉ + PLACEMENT OBLIQUE.
+  // Remplace la grille de l'étape A par un terrain de rugby dessiné (SVG)
+  // avec les pastilles positionnées à leurs coordonnées tactiques réelles.
   //
-  // Ordre des lignes (haut→bas) et disposition horizontale par rang.
-  const TERRAIN_LIGNES = [
-    { ligne: 'Première ligne',  ordre: ['PG', 'TAL', 'PD'] },
-    { ligne: 'Deuxième ligne',  ordre: ['2LG', '2LD'] },
-    { ligne: 'Troisième ligne', ordre: ['3LG', 'N8', '3LD'] },
-    { ligne: 'Demis',           ordre: ['DM', 'DO'] },
-    { ligne: 'Centres',         ordre: ['CG', 'CD'] },
-    { ligne: 'Ailiers',         ordre: ['AG', 'AD'] },
-    { ligne: 'Arrière',         ordre: ['AR'] }
-  ];
+  // Coordonnées XV en % du terrain (left x, top y), dérivées de la maquette
+  // validée terrain par Manu (positions : 1ʳᵉ ligne 1-2-3 à plat en haut ;
+  // 2ᵉ ligne 4-5 ; flankers 6-7 avancés et écartés ; N°8 à la base ;
+  // charnière 9-10 en diagonale ; trois-quarts 11-12-13-14 ALIGNÉS ;
+  // arrière 15 centré en bas). PACK EN HAUT → ARRIÈRE EN BAS.
+  // Étape B = format XV figé ; les autres formats (VII/XIII/X) auront
+  // leur propre table de coordonnées (étape ultérieure ; la base n'a pas
+  // de x/y, ces positions sont donc définies ici en dur côté front).
+  const TERRAIN_POS_XV = {
+    'PG':  { x: 30.0, y: 8.5 },
+    'TAL': { x: 45.0, y: 8.5 },
+    'PD':  { x: 60.0, y: 8.5 },
+    '2LG': { x: 37.5, y: 19.9 },
+    '2LD': { x: 52.5, y: 19.9 },
+    '3LG': { x: 22.5, y: 28.8 },
+    '3LD': { x: 67.5, y: 28.8 },
+    'N8':  { x: 45.0, y: 33.2 },
+    'DM':  { x: 33.8, y: 51.6 },
+    'DO':  { x: 57.0, y: 59.2 },
+    'AG':  { x: 12.5, y: 75.9 },
+    'CG':  { x: 40.0, y: 75.9 },
+    'CD':  { x: 65.0, y: 75.9 },
+    'AD':  { x: 87.5, y: 75.9 },
+    'AR':  { x: 50.0, y: 93.4 }
+  };
+
+  // SVG du terrain de rugby (fond) : en-buts, lignes 22m / 10m / médiane,
+  // poteaux haut et bas. viewBox 100×140 (ratio terrain), tracé en blanc
+  // semi-transparent sur fond vert. Indépendant des joueurs.
+  function pitchSvg() {
+    return '' +
+      '<svg class="vt-pitch-svg" viewBox="0 0 100 140" preserveAspectRatio="none" aria-hidden="true">' +
+        '<rect x="0" y="0" width="100" height="140" fill="#3f9b4f"/>' +
+        '<rect x="0" y="0" width="100" height="9" fill="#379247"/>' +
+        '<rect x="0" y="131" width="100" height="9" fill="#379247"/>' +
+        '<g stroke="#ffffff" stroke-width="0.5" fill="none" opacity="0.85">' +
+          '<rect x="5" y="9" width="90" height="122"/>' +
+          '<line x1="5" y1="28" x2="95" y2="28"/>' +
+          '<line x1="5" y1="112" x2="95" y2="112"/>' +
+          '<line x1="5" y1="47" x2="95" y2="47" stroke-dasharray="2 2"/>' +
+          '<line x1="5" y1="93" x2="95" y2="93" stroke-dasharray="2 2"/>' +
+          '<line x1="5" y1="70" x2="95" y2="70"/>' +
+        '</g>' +
+        '<g stroke="#cfd3d6" stroke-width="0.8" fill="none">' +
+          '<line x1="46" y1="1" x2="47.5" y2="9"/><line x1="54" y1="1" x2="52.5" y2="9"/><line x1="46.5" y1="5" x2="53.5" y2="5"/>' +
+          '<line x1="47.5" y1="131" x2="46" y2="139"/><line x1="52.5" y1="131" x2="54" y2="139"/><line x1="46.5" y1="135" x2="53.5" y2="135"/>' +
+        '</g>' +
+      '</svg>';
+  }
 
   function renderEditorTerrain(el, compo) {
-    // Index des postes par code, pour respecter l'ordre intra-ligne
-    // défini dans TERRAIN_LIGNES (et non l'ordre de State.postes).
     const posteParCode = new Map();
     for (const p of State.postes) posteParCode.set(p.code, p);
 
     let html = '<div class="view-terrain" aria-label="Vue terrain de la composition (lecture seule)">';
     html += '<div class="view-terrain__pitch">';
+    html += pitchSvg();
 
-    for (const rang of TERRAIN_LIGNES) {
-      html += '<div class="view-terrain__row">';
-      for (const code of rang.ordre) {
-        const poste = posteParCode.get(code);
-        if (!poste) continue; // robustesse : code absent du référentiel
-        const cj = joueurDuPoste(poste.id);
-        const num = poste.numero_xv || '';
-        if (!cj) {
-          html += '<div class="vt-pastille vt-pastille--vide" title="' +
-                    escapeHtml(poste.libelle_long || poste.libelle_court || poste.code) + ' — libre">' +
-                    '<span class="vt-pastille__num">' + escapeHtml(num) + '</span>' +
-                    '<span class="vt-pastille__nom">—</span>' +
-                  '</div>';
-          continue;
-        }
-        const nom = nomJoueurCompact(cj);
-        html += '<div class="vt-pastille ' + cssClassEtatJoueur(cj.etat_joueur) + '" title="' +
-                  escapeHtml((poste.libelle_long || poste.libelle_court || poste.code) + ' · ' + nomJoueurComplet(cj)) + '">' +
-                  '<span class="vt-pastille__num">' + escapeHtml(num) + '</span>' +
-                  '<span class="vt-pastille__nom">' + escapeHtml(nom) + '</span>' +
+    // Pastilles positionnées en absolu (left/top %) par-dessus le terrain.
+    for (const code in TERRAIN_POS_XV) {
+      const pos = TERRAIN_POS_XV[code];
+      const poste = posteParCode.get(code);
+      if (!poste) continue; // robustesse : code absent du référentiel
+      const cj = joueurDuPoste(poste.id);
+      const num = poste.numero_xv || '';
+      const style = 'left:' + pos.x + '%;top:' + pos.y + '%;';
+      const libellePoste = poste.libelle_long || poste.libelle_court || poste.code;
+      if (!cj) {
+        html += '<div class="vt-mark vt-mark--vide" style="' + style + '" title="' +
+                  escapeHtml(libellePoste + ' — libre') + '">' +
+                  '<span class="vt-mark__poste">' + escapeHtml(poste.libelle_court || poste.code) + '</span>' +
+                  '<span class="vt-mark__disc"><span class="vt-mark__num">' + escapeHtml(num) + '</span></span>' +
+                  '<span class="vt-mark__nom">—</span>' +
                 '</div>';
+        continue;
       }
-      html += '</div>';
+      html += '<div class="vt-mark ' + cssClassEtatJoueur(cj.etat_joueur) + '" style="' + style + '" title="' +
+                escapeHtml(libellePoste + ' · ' + nomJoueurComplet(cj)) + '">' +
+                '<span class="vt-mark__poste">' + escapeHtml(poste.libelle_court || poste.code) + '</span>' +
+                '<span class="vt-mark__disc"><span class="vt-mark__num">' + escapeHtml(num) + '</span></span>' +
+                '<span class="vt-mark__nom">' + escapeHtml(nomJoueurCompact(cj)) + '</span>' +
+              '</div>';
     }
 
     html += '</div>'; // pitch
@@ -1874,7 +1930,7 @@
     bindPopoverOutsideClick();
 
     console.log(
-      '%c🏉 Compositions Editor v3.15 chargé',
+      '%c🏉 Compositions Editor v3.16 chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         evenements: State.evenements.length,
