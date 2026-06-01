@@ -154,15 +154,15 @@
 
       ctx.fillStyle = rgb(t.headTxt);
       ctx.font = font(52, 700);
-      ctx.fillText(data.titre || '', tx, 42);
+      ctx.fillText(data.titre || '', tx, 30);
       ctx.font = font(40, 700, 'italic');
       ctx.fillStyle = (version === 'mom') ? rgb(t.headTxt) : rgb(t.jaune);
-      ctx.fillText(data.sousTitre || '', tx, 112);
+      ctx.fillText(data.sousTitre || '', tx, 92);
       ctx.fillStyle = rgb(t.headSub);
-      ctx.font = font(26, 400);
-      ctx.fillText(data.meta1 || '', tx, 172);
-      ctx.font = font(24, 400);
-      ctx.fillText(data.meta2 || '', tx, 202);
+      ctx.font = font(32, 500);
+      ctx.fillText(data.meta1 || '', tx, 148);
+      ctx.font = font(30, 500);
+      ctx.fillText(data.meta2 || '', tx, 186);
 
       // 4) Titre de section
       var top = hd + 40;
