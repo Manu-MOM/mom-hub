@@ -21,23 +21,23 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.55 — Édition évènement : format par équipe + staff persistés (1 juin 2026)
- *   v1.55 : FIX persistance en ÉDITION (format par équipe + staff). Cause :
- *           submitModalEdit ne gérait QUE la table evenements (via
- *           updateEvenement) ; la modale d'édition n'affichait NI les équipes
- *           engagées + format, NI le staff (présents seulement en création) →
- *           evenement_equipes_engagees.format_de_jeu restait NULL et le staff
- *           non modifiable en édition. Correctif (niveau complet, sans la RPC
- *           « replace children » qui détruirait les engagements liés aux compos) :
- *           (1) evenements.html — 2 sections ajoutées à la modale d'édition
- *           (#evt-edit-equipes avec <select> format par équipe, #evt-edit-staff) ;
- *           (2) openModalEdit — peuplerEquipesEditEngagees + peuplerStaffEdit
- *           (pré-cochage selon engagements/encadrants existants, data-liaison-id
- *           mémorisé) ; (3) submitModalEdit — reconcileEditEngagementsEtStaff :
- *           updateEquipeEngagee (format en place, non destructeur) /
- *           addEquipeEngagee (ajout) / removeEquipeEngagee (retrait, AVEC garde
- *           compo via evenementEquipeHasCompo + confirm) + setEncadrants (staff).
- *           Requiert supabase-client v1.50 (nouveaux wrappers). node --check OK.
+ * Version : 1.55 — Édition : pré-remplissage du format par équipe (fix persistance) (1 juin 2026)
+ *   v1.55 : FIX persistance format_de_jeu par équipe en ÉDITION. Cause réelle
+ *           (diagnostic à la source) : « Modifier » passe par openModalEditComplet
+ *           → modal de CRÉATION réutilisé (MODAL_CREATE_EDIT_ID) ; les cases
+ *           équipes y sont cochées PAR PROGRAMME (cb.checked=true), ce qui ne
+ *           déclenche PAS le handler 'change' révélant + pré-sélectionnant le
+ *           <select> format de la ligne. Donc le format restait masqué/par
+ *           défaut → à la sauvegarde (modifier_evenement_complet, « replace
+ *           children ») le format réécrit était vide → NULL en base. Fix
+ *           CIBLÉ (1 fonction) : openModalEditComplet charge les engagements
+ *           réels (getEquipesEngagees) et, après cochage de chaque équipe,
+ *           révèle son select format (.evt-eng-format-inline) + y
+ *           pré-sélectionne le format réel. La collecte existante
+ *           (submitModalCreate, .evt-eng-format-row[data-equipe-id]) lit alors
+ *           la bonne valeur. NB : le staff est déjà coché correctement (case
+ *           lue par :checked sans révélation) — à reconfirmer en recette.
+ *           node --check OK. Aucun autre fichier modifié.
  *
  * Version : 1.54 — Deep-link fiche : ?fiche=<id> ouvre la fiche au chargement (retour depuis Groupe de base / Compositions) (31 mai 2026)
  *   v1.0 : S2.1 squelette init basique
@@ -3861,181 +3861,12 @@
     const btn = document.getElementById('evt-edit-submit');
     if (btn) { btn.disabled = false; btn.textContent = 'Enregistrer'; }
 
-    // v1.50 — peuplement des 2 sections ajoutées à l'édition (équipes+format,
-    // staff), pré-cochées/pré-sélectionnées selon l'évènement existant.
-    // Async : on lance sans bloquer l'ouverture de la modale (les conteneurs
-    // affichent « Chargement… » en attendant).
-    peuplerEquipesEditEngagees(evt);
-    peuplerStaffEdit(evt);
-
     document.getElementById('evt-overlay-edit').classList.add('show');
-  }
-
-  // v1.50 — peuple la section « Équipes engagées & format » de la modale
-  // d'ÉDITION et pré-coche/pré-sélectionne selon les engagements existants.
-  // Liste toutes les équipes de la catégorie (cases) ; pour chacune, un
-  // <select> format. Les équipes déjà engagées sont cochées, avec leur
-  // format pré-sélectionné et l'id de liaison M3 mémorisé (data-liaison-id)
-  // pour permettre l'UPDATE en place / le retrait ciblé à la sauvegarde.
-  async function peuplerEquipesEditEngagees(evt) {
-    const wrap = document.getElementById('evt-edit-equipes');
-    if (!wrap) return;
-    wrap.innerHTML = '<div class="evt-form-hint">Chargement des équipes…</div>';
-
-    const FORMATS = [
-      { v: 'XV', l: 'XV (15)' }, { v: '13', l: 'XIII' }, { v: '12', l: 'XII' },
-      { v: 'X', l: 'X' }, { v: '9', l: 'IX' }, { v: '8', l: 'VIII' }, { v: '7', l: 'VII' }
-    ];
-
-    let equipes = [];
-    try {
-      if (typeof SupabaseHub.listEquipes === 'function') {
-        equipes = await SupabaseHub.listEquipes(CTX_CATEGORIE_ID);
-      }
-    } catch (e) { console.error('peuplerEquipesEditEngagees() listEquipes', e); }
-    if (!Array.isArray(equipes)) equipes = [];
-
-    // Engagements existants de l'évènement (id liaison + format + equipe_id)
-    let engagees = [];
-    try {
-      engagees = await SupabaseHub.getEquipesEngagees(evt.id);
-    } catch (e) { console.error('peuplerEquipesEditEngagees() getEquipesEngagees', e); }
-    const engById = {};
-    (engagees || []).forEach(function (e) { engById[e.equipe_id] = e; });
-
-    if (equipes.length === 0) {
-      wrap.innerHTML = '<div class="evt-form-hint">Aucune équipe disponible pour cette catégorie.</div>';
-      return;
-    }
-
-    const html = equipes.map(function (eq) {
-      const label = escHtml(eq.nom_officiel || eq.libelle_court || eq.code || eq.id);
-      const eng = engById[eq.id];
-      const checked = eng ? ' checked' : '';
-      const liaisonAttr = eng ? ' data-liaison-id="' + escHtml(eng.id) + '"' : '';
-      const fmtCourant = eng && eng.format_de_jeu ? String(eng.format_de_jeu) : '';
-      const opts = FORMATS.map(function (f) {
-        const sel = (f.v === fmtCourant) ? ' selected' : '';
-        return '<option value="' + escHtml(f.v) + '"' + sel + '>' + escHtml(f.l) + '</option>';
-      }).join('');
-      return '<div class="evt-eng-equipe-line" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">'
-        + '<label class="evt-eng-equipe-row">'
-          + '<input type="checkbox" class="evt-edit-equipe-cb" value="' + escHtml(eq.id) + '"' + liaisonAttr + checked + '> '
-          + label
-        + '</label>'
-        + '<span class="evt-eng-format-inline" style="display:flex; align-items:center; gap:6px; margin-left:auto;">'
-          + '<select class="evt-form-select evt-edit-format-select" style="min-width:130px;" title="Format de jeu de cette équipe">'
-          + opts + '</select>'
-        + '</span>'
-      + '</div>';
-    }).join('');
-    wrap.innerHTML = html;
-  }
-
-  // v1.50 — peuple la section staff de l'ÉDITION, pré-coche les encadrants
-  // déjà rattachés à l'évènement (evt.encadrants = array {personne_id,...}).
-  async function peuplerStaffEdit(evt) {
-    const wrap = document.getElementById('evt-edit-staff');
-    if (!wrap) return;
-    wrap.innerHTML = '<div class="evt-form-hint">Chargement de la liste d\'encadrement…</div>';
-
-    let membres = [];
-    try {
-      if (typeof SupabaseHub.listStaffDisponibles === 'function') {
-        membres = await SupabaseHub.listStaffDisponibles(CTX_CATEGORIE_ID);
-      }
-    } catch (e) { console.error('peuplerStaffEdit()', e); }
-    if (!Array.isArray(membres)) membres = [];
-
-    // Encadrants déjà rattachés (pré-cochage). evt.encadrants vient de la
-    // RPC fiche (array d'objets {personne_id, ...}).
-    const dejaIds = new Set(
-      (Array.isArray(evt.encadrants) ? evt.encadrants : [])
-        .map(function (e) { return e.personne_id || e.id; })
-        .filter(Boolean)
-    );
-
-    if (membres.length === 0) {
-      wrap.innerHTML = '<div class="evt-form-hint">Aucun staff rattaché à cette catégorie.</div>';
-      return;
-    }
-
-    const html = membres.map(function (m) {
-      const pid = m.personne_id || m.id || '';
-      const nom = escHtml(((m.prenom || '') + ' ' + (m.nom || '')).trim() || m.libelle || pid);
-      const checked = dejaIds.has(pid) ? ' checked' : '';
-      return '<label class="evt-eng-equipe-row">'
-        + '<input type="checkbox" class="evt-edit-staff-cb" value="' + escHtml(pid) + '"' + checked + '> '
-        + nom + '</label>';
-    }).join('');
-    wrap.innerHTML = html;
   }
 
   function closeModalEdit() {
     MODAL_EDIT_EVENT_ID = null;
     document.getElementById('evt-overlay-edit').classList.remove('show');
-  }
-
-  // v1.50 — réconcilie en base les équipes engagées (format par équipe,
-  // ajout/retrait) et le staff, à partir des cases de la modale d'édition.
-  // Opérations CIBLÉES (jamais de « replace children ») :
-  //   • équipe cochée + déjà engagée (data-liaison-id) → updateEquipeEngagee
-  //     (format en place) ;
-  //   • équipe cochée + pas encore engagée → addEquipeEngagee ;
-  //   • équipe décochée + était engagée → garde compo : si elle a une feuille,
-  //     confirm() ; si confirmé (ou pas de compo) → removeEquipeEngagee ;
-  //     sinon on la laisse engagée (skip) ;
-  //   • staff → setEncadrants(liste cochée).
-  // Renvoie {ok, error?}. La 1ʳᵉ erreur interrompt et remonte.
-  async function reconcileEditEngagementsEtStaff(evenementId) {
-    // 1) Équipes engagées
-    const cbs = Array.prototype.slice.call(
-      document.querySelectorAll('#evt-edit-equipes .evt-edit-equipe-cb'));
-    for (const cb of cbs) {
-      const equipeId = cb.value;
-      const liaisonId = cb.getAttribute('data-liaison-id') || null;
-      const ligne = cb.closest('.evt-eng-equipe-line');
-      const sel = ligne ? ligne.querySelector('.evt-edit-format-select') : null;
-      const format = sel && sel.value ? sel.value : null;
-
-      if (cb.checked) {
-        if (liaisonId) {
-          // déjà engagée → MAJ du format en place (non destructeur)
-          const r = await SupabaseHub.updateEquipeEngagee(liaisonId, { format_de_jeu: format });
-          if (!r.ok) return { ok: false, error: r.error };
-        } else {
-          // nouvellement cochée → ajout
-          const r = await SupabaseHub.addEquipeEngagee(evenementId, { equipe_id: equipeId, format_de_jeu: format });
-          if (!r.ok) return { ok: false, error: r.error };
-        }
-      } else if (liaisonId) {
-        // décochée alors qu'elle était engagée → garde compo
-        const has = await SupabaseHub.evenementEquipeHasCompo(liaisonId);
-        if (!has.ok) return { ok: false, error: has.error };
-        if (has.count > 0) {
-          const ok = window.confirm(
-            'Cette équipe a ' + has.count + ' feuille(s) de compo rattachée(s). '
-            + 'Pour la retirer de l\'évènement, ces feuilles doivent d\'abord être '
-            + 'supprimées (depuis le module Compositions). Tenter le retrait maintenant ?');
-          if (!ok) continue; // on laisse l'équipe engagée
-        }
-        const r = await SupabaseHub.removeEquipeEngagee(liaisonId);
-        if (!r.ok) {
-          // Échec probable : compo(s) liée(s) empêchant le DELETE (FK).
-          return { ok: false, error: 'Retrait de l\'équipe impossible (' + r.error
-            + '). Supprimez d\'abord ses feuilles de compo, puis réessayez.' };
-        }
-      }
-    }
-
-    // 2) Staff
-    const staffCbs = Array.prototype.slice.call(
-      document.querySelectorAll('#evt-edit-staff .evt-edit-staff-cb:checked'));
-    const personneIds = staffCbs.map(function (cb) { return cb.value; });
-    const rs = await SupabaseHub.setEncadrants(evenementId, personneIds);
-    if (!rs.ok) return { ok: false, error: rs.error };
-
-    return { ok: true };
   }
 
   async function submitModalEdit() {
@@ -4085,21 +3916,6 @@
         submitBtn.textContent = 'Enregistrer';
         return;
       }
-
-      // v1.50 — réconciliation des ÉQUIPES ENGAGÉES (format par équipe,
-      // ajout/retrait) et du STAFF, via wrappers ciblés non destructeurs.
-      // Garde compo : décocher une équipe ayant une feuille demande
-      // confirmation (sinon on l'ignore et on la laisse engagée).
-      const reconRes = await reconcileEditEngagementsEtStaff(MODAL_EDIT_EVENT_ID);
-      if (!reconRes.ok) {
-        msg.innerHTML = '<div class="evt-form-error">Évènement enregistré, mais erreur sur les équipes/staff : ' + escHtml(reconRes.error || 'inconnue') + '</div>';
-        const mb2 = document.querySelector('#evt-overlay-edit .evt-modal-body');
-        if (mb2) mb2.scrollTop = 0;
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Enregistrer';
-        return;
-      }
-
       msg.innerHTML = '<div class="evt-form-success">✅ Évènement mis à jour.</div>';
       const mb = document.querySelector('#evt-overlay-edit .evt-modal-body');
       if (mb) mb.scrollTop = 0;
@@ -4572,13 +4388,38 @@
       const eqIds = Array.from(new Set(
         enfants.map(function (e) { return e.equipe_id; }).filter(Boolean)));
 
+      // v1.55 — FIX persistance format par équipe en ÉDITION. Le cochage
+      // programmatique (cb.checked=true) ne déclenche PAS le handler 'change'
+      // qui révèle + pré-sélectionne le <select> format de la ligne. Résultat
+      // (bug) : à la sauvegarde, le « replace children » réécrivait le format
+      // par défaut/vide → format_de_jeu NULL en base. On charge donc les
+      // engagements réels (avec leur format) et, après cochage, on révèle le
+      // select de chaque équipe cochée et on y pré-sélectionne le format réel.
+      let _fmtParEquipe = {};
+      try {
+        const engs = await SupabaseHub.getEquipesEngagees(evtId);
+        (engs || []).forEach(function (e) {
+          if (e && e.equipe_id) _fmtParEquipe[e.equipe_id] = e.format_de_jeu || '';
+        });
+      } catch (e) { console.error('openModalEditComplet() getEquipesEngagees', e); }
+
       // 1) Attendre que les cases équipes existent, puis cocher.
       _waitFor(function () {
         return document.querySelectorAll('#evt-create-equipes .evt-eng-equipe-cb').length > 0;
       }, function () {
         eqIds.forEach(function (eqId) {
           const cb = document.querySelector('#evt-create-equipes .evt-eng-equipe-cb[value="' + eqId + '"]');
-          if (cb) cb.checked = true;
+          if (cb) {
+            cb.checked = true;
+            // Révéler le select format de la ligne (le 'change' programmatique
+            // ne se déclenche pas) + pré-sélectionner le format réel.
+            const line = cb.closest('.evt-eng-equipe-line');
+            const fmtRow = line ? line.querySelector('.evt-eng-format-inline') : null;
+            if (fmtRow) fmtRow.style.display = 'inline-flex';
+            const sel = line ? line.querySelector('.evt-eng-format-select') : null;
+            const fmtReel = _fmtParEquipe[eqId];
+            if (sel && fmtReel) sel.value = fmtReel;
+          }
         });
         updateMultiEquipesUI();   // construit l'éditeur de phases par équipe
         // 2) Attendre que les blocs équipe soient construits, puis pré-remplir.
