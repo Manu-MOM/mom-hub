@@ -2282,6 +2282,32 @@
           <input type="text" class="evt-form-input" id="evt-edit-adversaire" name="adversaire_nom">
         </div>
 
+        <!-- ====================================================
+             ÉDITION — ÉQUIPES ENGAGÉES + FORMAT PAR ÉQUIPE (v1.50)
+             Absent jusqu'ici de la modale d'édition (seule la création
+             les proposait) → format_de_jeu par équipe non éditable, d'où
+             les NULL en base. Conteneurs à id distincts de la création.
+             Peuplés + pré-cochés par openModalEdit ; collectés par
+             submitModalEdit ; persistés via updateEquipeEngagee (UPDATE
+             en place, non destructeur) / addEquipeEngagee / removeEquipeEngagee
+             (avec garde compo). ==================================== -->
+        <div class="evt-form-group">
+          <label class="evt-form-label">Équipes engagées &amp; format</label>
+          <div class="evt-eng-equipes" id="evt-edit-equipes">
+            <div class="evt-form-hint">Chargement des équipes…</div>
+          </div>
+          <div class="evt-form-hint">Cochez les équipes engagées et choisissez le format de jeu de chacune. Décocher une équipe ayant une feuille de compo demandera confirmation.</div>
+        </div>
+
+        <!-- ÉDITION — ENCADREMENT M8 (staff), même nature que la création -->
+        <div class="evt-form-group">
+          <label class="evt-form-label">Encadrement</label>
+          <div class="evt-eng-equipes" id="evt-edit-staff">
+            <div class="evt-form-hint">Chargement de la liste d'encadrement…</div>
+          </div>
+          <div class="evt-form-hint">Cochez les coachs / encadrants présents.</div>
+        </div>
+
       </form>
     </div>
     <div class="evt-modal-actions">
