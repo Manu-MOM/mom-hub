@@ -6,6 +6,22 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.41 — Suivi live : cadre charte réseaux (bandeau + liseré, MOM/entente) (2 juin 2026)
+ *   v3.41 : CADRE rappel charte « réseaux sociaux » (retour terrain Manu).
+ *           Bandeau en haut (logo + nom d'équipe + sous-titre + filet doré)
+ *           + liseré autour de .view-suivi. Toggle MOM / entente
+ *           (SuiviHabillage, runtime, défaut mom) qui ne change QUE le
+ *           cadre — l'intérieur sombre est inchangé. Couleurs reprises de
+ *           compo-export.js (mom : vert bouteille + or ; entente : bleu
+ *           marine + bleu ciel). node --check OK.
+ * Version : 3.40 — Suivi live : thème « tableau de stade » sur tout l'onglet (2 juin 2026)
+ *   v3.40 : DESIGN étendu (retour terrain Manu). Le thème sombre tableau
+ *           de stade s'applique désormais à TOUTE la feuille de suivi
+ *           (score, chrono à tous états dès avant le coup d'envoi, palette
+ *           score/mouvement/discipline/jeu collectif, attribution,
+ *           historique), scopé .view-suivi (Liste/Terrain restent clairs).
+ *           Purement CSS ; la classe conditionnelle suivi-chrono--stade de
+ *           v3.39 est retirée (plus nécessaire). node --check OK.
  * Version : 3.39 — Suivi live : design « tableau de stade » du chrono (2 juin 2026)
  *   v3.39 : DESIGN chrono pro (direction A, retour terrain Manu). Le bloc
  *           chrono en état EN COURS / PAUSE adopte un look tableau de stade :
@@ -1252,6 +1268,11 @@
     return 'Adversaire';
   }
 
+  // Habillage du cadre suivi (rappel charte réseaux sociaux) : 'mom' ou
+  // 'entente'. Confort d'affichage runtime, défaut 'mom'. Ne touche QUE
+  // le bandeau + liseré ; l'intérieur sombre est inchangé.
+  var SuiviHabillage = { choix: 'mom' };
+
   function renderEditorSuivi(el, compo) {
     SuiviChrono.desarmer();
 
@@ -1273,16 +1294,47 @@
     SuiviChrono.nomNous = _nomNotreEquipe();
     SuiviChrono.nomAdv = _nomAdversaireCourt(compo);
     var adversaire = _adversaireDeCompo(compo);
+    var habillage = (SuiviHabillage.choix === 'entente') ? 'entente' : 'mom';
 
     // Rendu initial (chargement), puis lecture asynchrone de l'état.
+    // Bandeau + liseré = rappel de la charte « réseaux sociaux »
+    // (versions mom / entente, cf. compo-export.js). N'habille QUE le
+    // pourtour ; l'intérieur (thème sombre) est inchangé.
     el.innerHTML =
-      '<div class="view-suivi">' +
-        '<div class="view-suivi__match-label">Suivi du match — ' + escapeHtml(adversaire) + '</div>' +
+      '<div class="view-suivi view-suivi--' + habillage + '">' +
+        '<div class="view-suivi__bandeau">' +
+          '<div class="view-suivi__brand">' +
+            '<img class="view-suivi__logo" src="assets/logo-m2m.png" alt="" aria-hidden="true">' +
+            '<div class="view-suivi__brand-txt">' +
+              '<div class="view-suivi__brand-eq">' + escapeHtml(SuiviChrono.nomNous) + '</div>' +
+              '<div class="view-suivi__brand-sub">Suivi du match — ' + escapeHtml(adversaire) + '</div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="view-suivi__habillage" role="group" aria-label="Habillage">' +
+            '<button type="button" class="view-suivi__hbtn" data-hab="mom"' + (habillage === 'mom' ? ' aria-pressed="true"' : '') + '>MOM</button>' +
+            '<button type="button" class="view-suivi__hbtn" data-hab="entente"' + (habillage === 'entente' ? ' aria-pressed="true"' : '') + '>Entente</button>' +
+          '</div>' +
+        '</div>' +
         '<div id="suivi-score" class="suivi-score">' + _scoreHTML() + '</div>' +
         '<div id="suivi-chrono-host" class="suivi-chrono"><div class="view-suivi__hint">Chargement du chrono…</div></div>' +
         '<div id="suivi-palette"></div>' +
         '<div id="suivi-historique" class="suivi-historique"></div>' +
       '</div>';
+
+    // Toggle d'habillage MOM / entente — ne change QUE le cadre (classe
+    // sur .view-suivi). Re-rend la vue pour réappliquer l'habillage.
+    var vue = el.querySelector('.view-suivi');
+    if (vue) {
+      vue.querySelectorAll('.view-suivi__hbtn').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var h = b.getAttribute('data-hab');
+          if (h && h !== SuiviHabillage.choix) {
+            SuiviHabillage.choix = h;
+            renderEditorSuivi(el, compo); // re-render (réapplique l'habillage)
+          }
+        });
+      });
+    }
 
     if (!evtId) {
       var host0 = document.getElementById('suivi-chrono-host');
@@ -1442,9 +1494,6 @@
     if (!host) return;
     var e = SuiviChrono.etat;
     var evtId = SuiviChrono.evtId;
-    // Design : le look « tableau de stade » (v3.39) ne s'applique qu'à
-    // l'état EN COURS / PAUSE. Retiré par défaut ; ajouté dans ce cas.
-    host.classList.remove('suivi-chrono--stade');
     // L3a — palette vidée par défaut ; seul l'état « en cours » la remplit.
     var palReset = document.getElementById('suivi-palette');
     if (palReset) palReset.innerHTML = '';
@@ -1552,7 +1601,6 @@
     html += '<button type="button" class="suivi-chrono__btn suivi-chrono__btn--danger" id="chrono-fin">⏹ Fin du match</button>';
     html += '</div>';
     host.innerHTML = html;
-    host.classList.add('suivi-chrono--stade'); // design tableau de stade (en cours/pause)
 
     var bmode = document.getElementById('chrono-mode');
     if (bmode) bmode.addEventListener('click', function () {
