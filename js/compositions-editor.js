@@ -6,6 +6,13 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.42 — Suivi live : score en 3 colonnes + palette score Nous/centre/Adverse (2 juin 2026)
+ *   v3.42 : Lisibilité (retour terrain Manu). (1) Bloc SCORE en 3 colonnes :
+ *           notre équipe + son score à gauche, « — » au centre, adverse +
+ *           son score à droite (nom en haut, gros score dessous). (2) Lignes
+ *           de la palette SCORE : bouton Nous à gauche, libellé centré,
+ *           bouton Adverse à droite (familles mouvement/discipline/jeu
+ *           collectif inchangées). Purement présentation. node --check OK.
  * Version : 3.41 — Suivi live : cadre charte réseaux (bandeau + liseré, MOM/entente) (2 juin 2026)
  *   v3.41 : CADRE rappel charte « réseaux sociaux » (retour terrain Manu).
  *           Bandeau en haut (logo + nom d'équipe + sous-titre + filet doré)
@@ -1367,11 +1374,15 @@
   function _scoreHTML() {
     var nous = escapeHtml(SuiviChrono.nomNous || 'Nous');
     var adv = escapeHtml(SuiviChrono.nomAdv || 'Adversaire');
-    return '<span class="suivi-score__eq">' + nous + '</span> ' +
-           '<span class="suivi-score__pts">' + SuiviChrono.score.mom + '</span>' +
-           ' — ' +
-           '<span class="suivi-score__pts">' + SuiviChrono.score.adv + '</span> ' +
-           '<span class="suivi-score__eq">' + adv + '</span>';
+    return '<div class="suivi-score__side">' +
+             '<div class="suivi-score__eq">' + nous + '</div>' +
+             '<div class="suivi-score__pts">' + SuiviChrono.score.mom + '</div>' +
+           '</div>' +
+           '<div class="suivi-score__sep">—</div>' +
+           '<div class="suivi-score__side">' +
+             '<div class="suivi-score__eq">' + adv + '</div>' +
+             '<div class="suivi-score__pts">' + SuiviChrono.score.adv + '</div>' +
+           '</div>';
   }
 
   // L4 — recharge la chronologie (annulées incluses) puis met à jour
@@ -1794,12 +1805,10 @@
       html += '<div class="suivi-palette__grid">';
       catA.score.forEach(function (obs, idx) {
         html +=
-          '<div class="suivi-palette__action">' +
-            '<span class="suivi-palette__lbl">' + (obs.icone || '') + ' ' + escapeHtml(obs.libelle_court) + ' <em>+' + obs.points + '</em></span>' +
-            '<div class="suivi-palette__btns">' +
-              '<button type="button" class="suivi-palette__btn suivi-palette__btn--nous" data-idx="' + idx + '">Nous</button>' +
-              '<button type="button" class="suivi-palette__btn suivi-palette__btn--adv" data-obs="' + escapeHtml(obs.uuid) + '" data-pts="' + obs.points + '">Adverse</button>' +
-            '</div>' +
+          '<div class="suivi-palette__action suivi-palette__action--score">' +
+            '<button type="button" class="suivi-palette__btn suivi-palette__btn--nous" data-idx="' + idx + '">Nous</button>' +
+            '<span class="suivi-palette__lbl suivi-palette__lbl--center">' + (obs.icone || '') + ' ' + escapeHtml(obs.libelle_court) + ' <em>+' + obs.points + '</em></span>' +
+            '<button type="button" class="suivi-palette__btn suivi-palette__btn--adv" data-obs="' + escapeHtml(obs.uuid) + '" data-pts="' + obs.points + '">Adverse</button>' +
           '</div>';
       });
       html += '</div>'; // fin grid score
