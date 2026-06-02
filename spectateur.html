@@ -5,7 +5,7 @@
 <!-- Tribune : mobile/desktop, lecture passive. Zoom accessibilité
      conservé (jamais user-scalable=no). -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="color-scheme" content="light">
+<meta name="color-scheme" content="dark">
 <meta name="robots" content="noindex,nofollow">
 <title>Suivi en direct · MOM Hub</title>
 
@@ -484,6 +484,81 @@ body.suivi-body {
   overflow: hidden; clip: rect(0 0 0 0);
   white-space: nowrap; border: 0;
 }
+/* =====================================================================
+   HABILLAGE « TABLEAU DE STADE » + CHARTE MOM (v1.1 — addition pure CSS).
+   Porté de l'interface coach (compositions). N'ajoute AUCUN élément HTML,
+   ne touche AUCUN id (contrat DOM intact pour spectateur.js), ne touche
+   PAS spectateur.js. Redéfinit les tokens --suivi-* vers la palette
+   sombre/charte + surcharge les zones à couleur fixe.
+   Habillage MOM par défaut, SANS toggle (le spectateur regarde ; le choix
+   d'habillage appartient au diffuseur — transmission par lien = futur).
+   Couleurs reprises de compo-export.js : vert bouteille #0e2816/#1e4626/
+   #285a30, or #f0d800 ; chiffres chrono ambre façon scoreboard.
+   ===================================================================== */
+:root {
+  --suivi-vert:        #5dcaa5;          /* accent vif lisible sur sombre */
+  --suivi-vert-fonce:  #1e4626;          /* bandeaux (zone A, histo bar)  */
+  --suivi-vert-clair:  rgba(240,216,0,.14); /* tag lecture seule          */
+  --suivi-encre:       #f6f3e8;          /* texte principal (crème)       */
+  --suivi-encre-doux:  #9aa6b2;          /* texte secondaire              */
+  --suivi-fond:        #0e2816;          /* fond vert bouteille profond   */
+  --suivi-surface:     #14301d;          /* cartes/corps légèrement clair */
+  --suivi-bord:        #285a30;          /* lisérés                        */
+  --suivi-alerte:      #f0d800;          /* or charte                      */
+  --suivi-focus:       0 0 0 4px rgba(240,216,0,.35);
+}
+/* Fond général + filet doré global (cadre charte discret) */
+body.suivi-body {
+  background: linear-gradient(180deg, #0e2816, #08200f);
+  color: var(--suivi-encre);
+}
+.suivi-app { border-left: 1px solid #285a30; border-right: 1px solid #285a30; }
+/* En-tête rencontre = bandeau charte (dégradé vert + filet doré épais) */
+.spec-entete {
+  background: linear-gradient(90deg, #1e4626, #285a30);
+  border-bottom: 4px solid #f0d800;
+}
+.spec-entete__match { color: #fff; }
+.spec-entete__meta  { color: #bedcb4; }
+/* Tag « vous suivez en spectateur » */
+.suivi-readonly-tag { color: #f0d800; background: rgba(240,216,0,.14); }
+/* Pastille d'état */
+.spec-statut[data-etat="direct"]  { background: #5dcaa5; color: #08200f; }
+.spec-statut[data-etat="termine"] { background: #3a4650; color: #e6ebf0; }
+/* Zone A — score + chrono « tableau de stade » */
+.suivi-za { background: #0a2012; border-bottom: 1px solid #285a30; }
+.suivi-za__score { color: #f6f3e8; }
+.suivi-za__score .pts {
+  color: #f0d800;
+  text-shadow: 0 0 16px rgba(240,216,0,.4);
+  font-size: 1.15em;
+}
+.suivi-za__chrono { color: #ffb000; opacity: 1; }
+/* Zone E — le fil (2 dernières) */
+.suivi-ze { background: #14301d; border-bottom: 1px solid #285a30; }
+.suivi-ze__title  { color: #9aa6b2; }
+.suivi-ze__toggle { background: #1e4626; border-color: #285a30; color: #e6ebf0; }
+.suivi-ze__list li  { color: #e6ebf0; }
+.suivi-ze__empty    { color: #9aa6b2; }
+/* Corps — fil complet */
+.spec-corps { background: #0e2816; }
+.spec-corps__hint   { color: #9aa6b2; }
+.spec-corps__list li { color: #e6ebf0; border-bottom-color: #285a30; }
+/* Pied — bouton rafraîchir */
+.suivi-btn-neutre {
+  background: #1e4626; border-color: #285a30; color: #f6f3e8;
+}
+.suivi-btn-neutre:active { background: #285a30; }
+/* Overlay « fil complet » */
+.suivi-histo { background: #0e2816; }
+.suivi-histo__bar { background: #1e4626; border-bottom: 1px solid #285a30; }
+.suivi-histo__list li { color: #e6ebf0; border-bottom-color: #285a30; }
+.suivi-histo__empty   { color: #9aa6b2; }
+/* États chargement / erreur / attente */
+.suivi-loading { color: #9aa6b2; }
+.suivi-loading__pulse { border-color: rgba(240,216,0,.2); border-top-color: #f0d800; }
+.suivi-error__title   { color: #f6f3e8; }
+.suivi-error__msg, .suivi-attente__title, .suivi-attente__msg { color: #9aa6b2; }
 </style>
 </head>
 
