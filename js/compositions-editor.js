@@ -6,6 +6,14 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.32 — Suivi live : attribution nominative côté Nous (L3b) (1 juin 2026)
+ *   v3.32 : L3b. Boutons « Nous » de la palette score ouvrent la liste
+ *           d'attribution (effectif compo trié titulaires 1→15 puis
+ *           remplaçants ; nom en avant + numéro en pastille). Tap joueur
+ *           → insererObservableCoach (equipe notre, joueurUuid=cj.joueur_id,
+ *           minute du chrono) → score rafraîchi, retour palette. Effectif
+ *           résolu via getJoueurVivier (cj.personnes bloqué par RLS).
+ *           _effectifPourSaisie / _ouvrirAttribution. node --check OK.
  * Version : 3.31 — Suivi live : palette Cat A + saisie score adverse (L3a) (1 juin 2026)
  *   v3.31 : L3a. Référentiel observables FETCHÉ une fois depuis
  *           data/observables-match.json (objet SuiviObs ; cible
@@ -1386,6 +1394,98 @@
     _peindrePalette(evtId, perCourante);
   }
 
+  // L3b — effectif de la compo courante pour l'attribution, trié
+  // (titulaires 1→15 par numero_xv, puis remplaçants). Réutilise
+  // getJoueurVivier (le nom n'est PAS sur cj — RLS bloque cj.personnes).
+  function _effectifPourSaisie() {
+    if (!Array.isArray(State.compoJoueurs)) return [];
+    var tit = State.compoJoueurs
+      .filter(function (cj) { return cj.role === 'titulaire'; })
+      .map(function (cj) {
+        var p = (typeof getPoste === 'function' ? getPoste(cj.poste_id) : null) || {};
+        var j = (typeof getJoueurVivier === 'function' ? getJoueurVivier(cj.joueur_id) : null) || {};
+        return {
+          uuid: cj.joueur_id,
+          num: (cj.numero_maillot != null ? cj.numero_maillot : (p.numero_xv || '')),
+          ordre: p.numero_xv || 99,
+          nom: (j.nom || '').trim(),
+          prenom: (j.prenom || '').trim()
+        };
+      })
+      .sort(function (a, b) { return a.ordre - b.ordre; });
+    var rem = State.compoJoueurs
+      .filter(function (cj) { return cj.role === 'remplacant'; })
+      .sort(function (a, b) {
+        return (a.ordre_remplacement || a.numero_maillot || 99) -
+               (b.ordre_remplacement || b.numero_maillot || 99);
+      })
+      .map(function (cj, idx) {
+        var j = (typeof getJoueurVivier === 'function' ? getJoueurVivier(cj.joueur_id) : null) || {};
+        return {
+          uuid: cj.joueur_id,
+          num: (cj.numero_maillot != null ? cj.numero_maillot : (16 + idx)),
+          ordre: 100 + idx,
+          nom: (j.nom || '').trim(),
+          prenom: (j.prenom || '').trim()
+        };
+      });
+    return tit.concat(rem);
+  }
+
+  // L3b — nom affiché « Prénom NOM » (nom en avant choisi par Manu :
+  // on met le nom de famille en majuscules, prénom derrière).
+  function _nomJoueur(jo) {
+    var nom = (jo.nom || '').toUpperCase();
+    var prenom = jo.prenom || '';
+    var plein = (nom + (prenom ? ' ' + prenom : '')).trim();
+    return plein || ('Joueur ' + (jo.num || '?'));
+  }
+
+  // L3b — ouvre la liste d'attribution dans #suivi-palette pour une
+  // action « Nous » ; au tap d'un joueur, enregistre puis revient à la palette.
+  function _ouvrirAttribution(evtId, perCourante, obs) {
+    var pal = document.getElementById('suivi-palette');
+    if (!pal) return;
+    var effectif = _effectifPourSaisie();
+    var html = '<div class="suivi-attrib">';
+    html += '<div class="suivi-attrib__title">' + (obs.icone || '') + ' ' + escapeHtml(obs.libelle_court) + ' — qui ?</div>';
+    if (!effectif.length) {
+      html += '<div class="view-suivi__hint">Aucun joueur dans la compo.</div>';
+    } else {
+      html += '<div class="suivi-attrib__list">';
+      effectif.forEach(function (jo) {
+        html +=
+          '<button type="button" class="suivi-attrib__joueur" data-uuid="' + escapeHtml(jo.uuid || '') + '">' +
+            '<span class="suivi-attrib__nom">' + escapeHtml(_nomJoueur(jo)) + '</span>' +
+            '<span class="suivi-attrib__num">' + escapeHtml(String(jo.num || '?')) + '</span>' +
+          '</button>';
+      });
+      html += '</div>';
+    }
+    html += '<button type="button" class="suivi-chrono__btn" id="attrib-annuler">↩ Annuler</button>';
+    html += '</div>';
+    pal.innerHTML = html;
+
+    var annul = document.getElementById('attrib-annuler');
+    if (annul) annul.addEventListener('click', function () { _peindrePalette(evtId, perCourante); });
+
+    pal.querySelectorAll('.suivi-attrib__joueur').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var uuid = b.getAttribute('data-uuid') || null;
+        var minute = Math.floor(SuiviChrono.secondesEcoulees() / 60);
+        _saisirObservable(evtId, {
+          observableId: obs.uuid,
+          categorieObs: 'A',
+          valeurPoints: obs.points,
+          equipeConcernee: 'notre',
+          joueurUuid: uuid,
+          minuteMatch: minute,
+          periode: perCourante
+        }, function () { _peindrePalette(evtId, perCourante); });
+      });
+    });
+  }
+
   // L3a — Palette de saisie Cat A (score d'abord). Rendue sous le chrono,
   // dans #suivi-palette. En L3a : boutons « Adverse » câblés (score brut,
   // sans attribution, D7) ; boutons « Nous » présents mais inertes
@@ -1402,13 +1502,12 @@
       var html = '<div class="suivi-palette">';
       html += '<div class="suivi-palette__title">Score</div>';
       html += '<div class="suivi-palette__grid">';
-      catA.score.forEach(function (obs) {
-        // Deux boutons par action : Nous (inerte L3a) / Adverse (actif).
+      catA.score.forEach(function (obs, idx) {
         html +=
           '<div class="suivi-palette__action">' +
             '<span class="suivi-palette__lbl">' + (obs.icone || '') + ' ' + escapeHtml(obs.libelle_court) + ' <em>+' + obs.points + '</em></span>' +
             '<div class="suivi-palette__btns">' +
-              '<button type="button" class="suivi-palette__btn suivi-palette__btn--nous" disabled title="Attribution nominative à venir (L3b)" data-obs="' + escapeHtml(obs.uuid) + '">Nous</button>' +
+              '<button type="button" class="suivi-palette__btn suivi-palette__btn--nous" data-idx="' + idx + '">Nous</button>' +
               '<button type="button" class="suivi-palette__btn suivi-palette__btn--adv" data-obs="' + escapeHtml(obs.uuid) + '" data-pts="' + obs.points + '">Adverse</button>' +
             '</div>' +
           '</div>';
@@ -1416,9 +1515,16 @@
       html += '</div></div>';
       pal.innerHTML = html;
 
-      // Câblage des boutons Adverse uniquement (L3a).
-      var btns = pal.querySelectorAll('.suivi-palette__btn--adv');
-      btns.forEach(function (b) {
+      // L3b — boutons « Nous » : ouvrent l'attribution nominative.
+      pal.querySelectorAll('.suivi-palette__btn--nous').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var idx = parseInt(b.getAttribute('data-idx'), 10);
+          var obs = catA.score[idx];
+          if (obs) _ouvrirAttribution(evtId, perCourante, obs);
+        });
+      });
+      // L3a — boutons « Adverse » : score brut, sans attribution.
+      pal.querySelectorAll('.suivi-palette__btn--adv').forEach(function (b) {
         b.addEventListener('click', function () {
           var obsId = b.getAttribute('data-obs');
           var pts = parseInt(b.getAttribute('data-pts'), 10) || 0;
@@ -1436,8 +1542,9 @@
     });
   }
 
-  // L3a — enregistre un observable (voie coach) puis rafraîchit le score.
-  function _saisirObservable(evtId, obs) {
+  // L3a/b — enregistre un observable (voie coach) puis rafraîchit le score.
+  // onApres : callback optionnel après succès (ex. retour à la palette).
+  function _saisirObservable(evtId, obs, onApres) {
     if (SuiviChrono.busy) return;
     if (!window.SupabaseHub || !SupabaseHub.insererObservableCoach) return;
     SuiviChrono.busy = true;
@@ -1454,7 +1561,10 @@
           SuiviChrono.score = _calculerScore(lignes);
           var sc = document.getElementById('suivi-score');
           if (sc) sc.innerHTML = _scoreHTML();
+          if (typeof onApres === 'function') onApres();
         });
+      } else if (typeof onApres === 'function') {
+        onApres();
       }
     });
   }
