@@ -6,6 +6,10 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.34 — Suivi live : historique replacé sous le chrono (1 juin 2026)
+ *   v3.34 : ORDRE de l'écran suivi : score → chrono → palette →
+ *           historique (le chrono, info de pilotage, juste sous le score ;
+ *           l'historique, consultatif, en bas). Retour terrain Manu.
  * Version : 3.33 — Suivi live : historique annulable (L4) (1 juin 2026)
  *   v3.33 : L4. Historique des actions sous le score (anti-chrono, récent
  *           en haut) : minute · action · joueur/camp, bouton « annuler »
@@ -1190,9 +1194,9 @@
       '<div class="view-suivi">' +
         '<div class="view-suivi__match-label">Suivi du match — ' + escapeHtml(adversaire) + '</div>' +
         '<div id="suivi-score" class="suivi-score">' + _scoreHTML() + '</div>' +
-        '<div id="suivi-historique" class="suivi-historique"></div>' +
         '<div id="suivi-chrono-host" class="suivi-chrono"><div class="view-suivi__hint">Chargement du chrono…</div></div>' +
         '<div id="suivi-palette"></div>' +
+        '<div id="suivi-historique" class="suivi-historique"></div>' +
       '</div>';
 
     if (!evtId) {
