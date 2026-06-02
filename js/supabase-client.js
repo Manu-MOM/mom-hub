@@ -18,6 +18,9 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 1.43 — juin 2026
+ *   v1.43 : annulerObservableCoach(evt, ligneId) — wrapper ADDITIF voie
+ *           coach de l'annulation (C12-t). Historique annulable (L4).
  * Version : 1.42 — juin 2026
  *   v1.42 : actionChronoCoach(evt, action, opts) + getChronoRencontreCoach(evt)
  *           — wrappers ADDITIFS voie coach du chrono persistant (C12-n).
@@ -4213,6 +4216,28 @@
     },
 
     /**
+     * ANNULATION (voie coach) — marque une ligne de chronologie annulée
+     * (annule = TRUE, jamais DELETE). RPC annuler_observable_coach (C12-t).
+     * Le score (calculé) ignore les lignes annulées → recalcul auto.
+     * @param {string} evenementUuid  le MATCH
+     * @param {string} ligneId        id de la ligne chronologie à annuler
+     * @returns {Promise<{ok:boolean, error?:string}>}
+     */
+    async annulerObservableCoach(evenementUuid, ligneId) {
+      if (!evenementUuid) return { ok: false, error: 'evenementUuid manquant' };
+      if (!ligneId)       return { ok: false, error: 'ligneId manquant' };
+      const { error } = await client.rpc('annuler_observable_coach', {
+        p_evenement_uuid: evenementUuid,
+        p_ligne_id: ligneId
+      });
+      if (error) {
+        console.error('MOM Hub: annulerObservableCoach()', error);
+        return { ok: false, error: error.message || 'Erreur annuler_observable_coach' };
+      }
+      return { ok: true };
+    },
+
+    /**
      * Annule une ligne chronologie en Mode Vidéo (coach).
      * Encapsule annuler_observable_coach (sql/C12-j). Signature
      * SQL réelle (fait foi) :
@@ -5538,7 +5563,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.42 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.43 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
