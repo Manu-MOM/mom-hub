@@ -228,6 +228,18 @@
     .suivi-chrono__state { font-size: 12px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--vert-prairie); }
     .suivi-chrono__state--paused { color: #c08a00; }
     .suivi-chrono__state--done { color: var(--ink-mute); }
+    /* ── Design « tableau de stade » (v3.39) — état en cours / pause ── */
+    .suivi-chrono--stade { background: #14181c; border-color: #14181c; gap: 10px; padding: 30px 20px; }
+    .suivi-chrono--stade .suivi-chrono__periode { color: #7c8a99; letter-spacing: 0.16em; }
+    .suivi-chrono--stade .suivi-chrono__time { font-family: 'Oswald', 'JetBrains Mono', sans-serif; font-weight: 700; font-size: clamp(64px, 22vw, 104px); color: #ffb000; letter-spacing: 0.03em; text-shadow: 0 0 20px rgba(255,176,0,0.38); }
+    .suivi-chrono--stade .suivi-chrono__time--paused { color: #8a939c; text-shadow: none; }
+    .suivi-chrono--stade .suivi-chrono__add { color: #ff7b00; }
+    .suivi-chrono--stade .suivi-chrono__state { color: #5dcaa5; }
+    .suivi-chrono--stade .suivi-chrono__state--paused { color: #ffb000; }
+    .suivi-chrono--stade .suivi-chrono__btn { background: #20262c; border-color: #2d353d; color: #e6ebf0; }
+    .suivi-chrono--stade .suivi-chrono__btn:hover { background: #2a3138; }
+    .suivi-chrono--stade .suivi-chrono__btn--primary { background: #1d9e75; border-color: #1d9e75; color: #fff; }
+    .suivi-chrono--stade .suivi-chrono__btn--danger { background: #20262c; border-color: #6e3a36; color: #f0a7a2; }
     .suivi-chrono__controls { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
     .suivi-chrono__btn { padding: 10px 20px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); cursor: pointer; font-family: 'Oswald', sans-serif; font-size: 14px; letter-spacing: 0.04em; text-transform: uppercase; transition: all 0.15s; }
     .suivi-chrono__btn:hover { background: var(--paper-warm, #faf8f3); }
