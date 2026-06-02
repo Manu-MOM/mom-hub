@@ -6,6 +6,18 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.46 — Suivi live : L5 observations Cat B + fix libellés historique (2 juin 2026)
+ *   v3.46 : L5. (1) Section repliable « Observations » (Cat B, en retrait,
+ *           D8) en bas de palette : observations qualitatives par joueur,
+ *           sans points ; liste selon tranche d'âge déduite du nom d'équipe
+ *           (SuiviObs.observablesB ; repli M-14_F-15) ; saisie via attribution
+ *           joueur, categorieObs='B', observable_id = slug (_slugObsB).
+ *           (2) FIX régression d'affichage : l'historique montrait les
+ *           identifiants bruts (obs-A-…) quand le référentiel n'était pas
+ *           encore chargé au 1er rendu. _peindreHistorique charge désormais
+ *           SuiviObs si besoin puis re-peint. SuiviObs.libelle résout aussi
+ *           les libellés Cat B. Référentiel fetché (admin = OBSERVABLES-ADMIN
+ *           futur). node --check OK.
  * Version : 3.45 — Suivi live : substitution filtrée (vrais entrants/sortants) (2 juin 2026)
  *   v3.45 : #3 version simple (retour terrain Manu). La substitution filtre
  *           désormais les listes : « qui sort ? » = joueurs sur le terrain,
@@ -1227,6 +1239,7 @@
   // le fetch échoue (palette indisponible, le chrono reste utilisable).
   var SuiviObs = {
     catA: null,        // { score:[], discipline:[], mouvement:[], jeu_collectif:[] } ou null
+    catB: null,        // { tranche: [{libelle}, …], … } ou null (L5)
     charge: false,
     enCours: false,
     charger: function (cb) {
@@ -1238,32 +1251,69 @@
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (d) {
           self.catA = (d && d.categorie_A) ? d.categorie_A : null;
+          self.catB = (d && d.categorie_B_pre_suggestions) ? d.categorie_B_pre_suggestions : null;
           self.charge = true; self.enCours = false;
           if (cb) cb(self.catA);
         })
         .catch(function () {
-          self.charge = true; self.enCours = false; self.catA = null;
+          self.charge = true; self.enCours = false; self.catA = null; self.catB = null;
           if (cb) cb(null);
         });
     },
-    // L4 — libellé court d'un observable par son uuid (toutes familles
-    // de catA : score, discipline, mouvement, jeu_collectif).
+    // L4/L5 — libellé d'un observable par son uuid (catA) ou slug (catB).
     libelle: function (observableId) {
-      if (!this.catA || !observableId) return null;
-      var familles = ['score', 'discipline', 'mouvement', 'jeu_collectif'];
-      for (var f = 0; f < familles.length; f++) {
-        var arr = this.catA[familles[f]];
-        if (Array.isArray(arr)) {
-          for (var i = 0; i < arr.length; i++) {
-            if (arr[i] && arr[i].uuid === observableId) {
-              return { libelle: arr[i].libelle_court, icone: arr[i].icone || '' };
+      if (!observableId) return null;
+      if (this.catA) {
+        var familles = ['score', 'discipline', 'mouvement', 'jeu_collectif'];
+        for (var f = 0; f < familles.length; f++) {
+          var arr = this.catA[familles[f]];
+          if (Array.isArray(arr)) {
+            for (var i = 0; i < arr.length; i++) {
+              if (arr[i] && arr[i].uuid === observableId) {
+                return { libelle: arr[i].libelle_court, icone: arr[i].icone || '' };
+              }
             }
           }
         }
       }
+      if (observableId.indexOf('obs-B-') === 0 && this.catB) {
+        for (var cle in this.catB) {
+          var liste = this.catB[cle];
+          if (Array.isArray(liste)) {
+            for (var j = 0; j < liste.length; j++) {
+              if (liste[j] && _slugObsB(liste[j].libelle) === observableId) {
+                return { libelle: liste[j].libelle, icone: '📝' };
+              }
+            }
+          }
+        }
+        return { libelle: 'Observation', icone: '📝' };
+      }
       return null;
+    },
+    // L5 — observables Cat B pour une équipe (tranche déduite du nom ;
+    // repli M-14_F-15). Édition admin = chantier OBSERVABLES-ADMIN.
+    observablesB: function (nomEquipe) {
+      if (!this.catB) return [];
+      var n = (nomEquipe || '').toUpperCase();
+      var cle = null;
+      if (/M-?16|M-?19/.test(n)) cle = 'M-16_M-19';
+      else if (/F-?18/.test(n)) cle = 'F-18';
+      else if (/M-?14|F-?15/.test(n)) cle = 'M-14_F-15';
+      else if (/M-?6|M-?8|M-?10|M-?12|EDR/.test(n)) cle = 'EDR_M-6_M-8_M-10_M-12';
+      else if (/\+ ?18|SENIOR|SEN/.test(n)) cle = 'M+18_F+18';
+      if (!cle || !this.catB[cle]) cle = 'M-14_F-15';
+      return Array.isArray(this.catB[cle]) ? this.catB[cle] : [];
     }
   };
+
+  // L5 — slug stable d'un observable Cat B depuis son libellé.
+  function _slugObsB(libelle) {
+    var s = (libelle || '').toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    return 'obs-B-' + (s || 'obs');
+  }
 
   // Résout l'adversaire du match porté par la compo (point parké L1) :
   // l'objet COMPO ne porte pas adversaire_nom — c'est l'objet MATCH
@@ -1444,6 +1494,13 @@
   function _peindreHistorique(evtId, lignes) {
     var box = document.getElementById('suivi-historique');
     if (!box) return;
+    // Le référentiel (libellés Cat A/B) doit être chargé pour afficher les
+    // libellés et non les identifiants bruts. S'il ne l'est pas encore, on
+    // le charge puis on re-peint (corrige l'affichage brut au 1er rendu).
+    if (!SuiviObs.charge) {
+      SuiviObs.charger(function () { _peindreHistorique(evtId, lignes); });
+      return;
+    }
     var actives = (lignes || []).slice();
     // Tri anti-chronologique par horodatage.
     actives.sort(function (a, b) {
@@ -1762,7 +1819,7 @@
         var minute = Math.floor(SuiviChrono.secondesEcoulees() / 60);
         var payload = {
           observableId: obs.uuid,
-          categorieObs: 'A',
+          categorieObs: (obs._categorieObs === 'B') ? 'B' : 'A',
           valeurPoints: (typeof obs.points === 'number' ? obs.points : 0),
           equipeConcernee: 'notre',
           joueurUuid: uuid,
@@ -1926,6 +1983,17 @@
         });
         html += '</div>';
       }
+      // L5 — section Cat B « Observations » (repliable, en retrait, D8).
+      var obsB = SuiviObs.observablesB(SuiviChrono.nomNous);
+      if (obsB.length) {
+        html += '<details class="suivi-obsb">';
+        html += '<summary class="suivi-obsb__summary">Observations (à froid)</summary>';
+        html += '<div class="suivi-obsb__grid">';
+        obsB.forEach(function (o, idx) {
+          html += '<button type="button" class="suivi-obsb__btn" data-bidx="' + idx + '">' + escapeHtml(o.libelle) + '</button>';
+        });
+        html += '</div></details>';
+      }
       html += '</div>'; // fin suivi-palette
       pal.innerHTML = html;
 
@@ -1989,6 +2057,21 @@
             equipeConcernee: 'notre',
             minuteMatch: minute,
             periode: perCourante
+          });
+        });
+      });
+      // L5 — boutons « Observations » Cat B : attribution joueur, sans points.
+      pal.querySelectorAll('.suivi-obsb__btn').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var idx = parseInt(b.getAttribute('data-bidx'), 10);
+          var o = obsB[idx];
+          if (!o) return;
+          _ouvrirAttribution(evtId, perCourante, {
+            uuid: _slugObsB(o.libelle),
+            libelle_court: o.libelle,
+            icone: '📝',
+            points: 0,
+            _categorieObs: 'B'
           });
         });
       });
