@@ -18,6 +18,9 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 1.44 — juin 2026
+ *   v1.44 : insererObservableCoach transmet joueurUuidEntrant
+ *           (p_joueur_uuid_entrant) pour la substitution (L3c).
  * Version : 1.43 — juin 2026
  *   v1.43 : annulerObservableCoach(evt, ligneId) — wrapper ADDITIF voie
  *           coach de l'annulation (C12-t). Historique annulable (L4).
@@ -4194,6 +4197,10 @@
       if (obs.joueurUuid !== undefined && obs.joueurUuid !== null) {
         params.p_joueur_uuid = obs.joueurUuid;
       }
+      // L3c — joueur entrant d'une substitution (joueur_uuid = sortant).
+      if (obs.joueurUuidEntrant !== undefined && obs.joueurUuidEntrant !== null) {
+        params.p_joueur_uuid_entrant = obs.joueurUuidEntrant;
+      }
       if (obs.modeSaisie !== undefined) params.p_mode_saisie = obs.modeSaisie;
       if (obs.minuteMatch !== undefined && obs.minuteMatch !== null) {
         params.p_minute_match = obs.minuteMatch;
@@ -5563,7 +5570,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.43 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.44 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
