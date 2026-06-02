@@ -6,6 +6,12 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.38 — Affichage équipe : nom_officiel prioritaire (1 juin 2026)
+ *   v3.38 : NOM D'ÉQUIPE. En-tête (eqLabel) + score du suivi (_nomNotreEquipe)
+ *           affichent désormais nom_officiel || libelle_court || code (au
+ *           lieu de libelle_court d'abord). Corrige « M14 » → « SAR/MOM-M14-1 »
+ *           et le cas libelle_court NULL (équipes E2/E3). Aligne les deux
+ *           endroits sur le même ordre (cohérent avec wrapper v1.39).
  * Version : 3.37 — Suivi live : temps additionnel + vrais noms d'équipes (1 juin 2026)
  *   v3.37 : Améliorations terrain. (1) TEMPS ADDITIONNEL : au-delà de la
  *           durée réglementaire, le chrono continue et affiche le
@@ -768,8 +774,8 @@
     let labelText = libelleEvenement(evt) + ' · ' + formatDateLong(evt.date_debut);
     if (State.evenementEquipeId && State.evenementEquipeContext &&
         State.evenementEquipeContext.equipe) {
-      const eqLabel = State.evenementEquipeContext.equipe.libelle_court ||
-                      State.evenementEquipeContext.equipe.nom_officiel ||
+      const eqLabel = State.evenementEquipeContext.equipe.nom_officiel ||
+                      State.evenementEquipeContext.equipe.libelle_court ||
                       State.evenementEquipeContext.equipe.code || '';
       if (eqLabel) labelText += ' — ' + eqLabel;
     }
@@ -1225,7 +1231,7 @@
   function _nomNotreEquipe() {
     var c = State.evenementEquipeContext;
     if (c && c.equipe) {
-      return (c.equipe.libelle_court || c.equipe.nom_officiel || c.equipe.code || 'Nous');
+      return (c.equipe.nom_officiel || c.equipe.libelle_court || c.equipe.code || 'Nous');
     }
     return 'Nous';
   }
