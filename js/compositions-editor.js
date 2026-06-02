@@ -6,6 +6,14 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.35 — Suivi live : substitution + blessure (L3c) (1 juin 2026)
+ *   v3.35 : L3c. Section « Mouvement » dans la palette. Substitution :
+ *           double sélection « qui sort ? » → « qui entre ? » (tout
+ *           l'effectif), enregistrée avec joueurUuid=sortant +
+ *           joueurUuidEntrant=entrant (consomme C12-m via wrapper v1.44).
+ *           Blessure : attribution simple + flag estBlessure. 0 point
+ *           (hors score). _ouvrirSubstitution ; _ouvrirAttribution gagne
+ *           opts.estBlessure + valeurPoints sécurisé. node --check OK.
  * Version : 3.34 — Suivi live : historique replacé sous le chrono (1 juin 2026)
  *   v3.34 : ORDRE de l'écran suivi : score → chrono → palette →
  *           historique (le chrono, info de pilotage, juste sous le score ;
@@ -1533,9 +1541,11 @@
     return plein || ('Joueur ' + (jo.num || '?'));
   }
 
-  // L3b — ouvre la liste d'attribution dans #suivi-palette pour une
-  // action « Nous » ; au tap d'un joueur, enregistre puis revient à la palette.
-  function _ouvrirAttribution(evtId, perCourante, obs) {
+  // L3b/c — ouvre la liste d'attribution dans #suivi-palette pour une
+  // action « Nous » à 1 joueur ; au tap, enregistre puis revient à la palette.
+  // opts.estBlessure : passe le flag (mouvement blessure).
+  function _ouvrirAttribution(evtId, perCourante, obs, opts) {
+    opts = opts || {};
     var pal = document.getElementById('suivi-palette');
     if (!pal) return;
     var effectif = _effectifPourSaisie();
@@ -1565,12 +1575,66 @@
       b.addEventListener('click', function () {
         var uuid = b.getAttribute('data-uuid') || null;
         var minute = Math.floor(SuiviChrono.secondesEcoulees() / 60);
+        var payload = {
+          observableId: obs.uuid,
+          categorieObs: 'A',
+          valeurPoints: (typeof obs.points === 'number' ? obs.points : 0),
+          equipeConcernee: 'notre',
+          joueurUuid: uuid,
+          minuteMatch: minute,
+          periode: perCourante
+        };
+        if (opts.estBlessure) payload.estBlessure = true;
+        _saisirObservable(evtId, payload, function () { _peindrePalette(evtId, perCourante); });
+      });
+    });
+  }
+
+  // L3c — substitution : double sélection « Qui sort ? » → « Qui entre ? ».
+  // joueur_uuid = sortant, joueur_uuid_entrant = entrant (cf. C12-m).
+  function _ouvrirSubstitution(evtId, perCourante, obs) {
+    var pal = document.getElementById('suivi-palette');
+    if (!pal) return;
+    var effectif = _effectifPourSaisie();
+
+    function rendreEtape(titre, onPick) {
+      var html = '<div class="suivi-attrib">';
+      html += '<div class="suivi-attrib__title">' + (obs.icone || '') + ' ' + titre + '</div>';
+      if (!effectif.length) {
+        html += '<div class="view-suivi__hint">Aucun joueur dans la compo.</div>';
+      } else {
+        html += '<div class="suivi-attrib__list">';
+        effectif.forEach(function (jo) {
+          html +=
+            '<button type="button" class="suivi-attrib__joueur" data-uuid="' + escapeHtml(jo.uuid || '') + '">' +
+              '<span class="suivi-attrib__nom">' + escapeHtml(_nomJoueur(jo)) + '</span>' +
+              '<span class="suivi-attrib__num">' + escapeHtml(String(jo.num || '?')) + '</span>' +
+            '</button>';
+        });
+        html += '</div>';
+      }
+      html += '<button type="button" class="suivi-chrono__btn" id="attrib-annuler">↩ Retour</button>';
+      html += '</div>';
+      pal.innerHTML = html;
+      var annul = document.getElementById('attrib-annuler');
+      if (annul) annul.addEventListener('click', function () { _peindrePalette(evtId, perCourante); });
+      pal.querySelectorAll('.suivi-attrib__joueur').forEach(function (b) {
+        b.addEventListener('click', function () { onPick(b.getAttribute('data-uuid') || null); });
+      });
+    }
+
+    // Étape 1 : qui sort ?
+    rendreEtape('Substitution — qui SORT ?', function (sortant) {
+      // Étape 2 : qui entre ?
+      rendreEtape('Substitution — qui ENTRE ?', function (entrant) {
+        var minute = Math.floor(SuiviChrono.secondesEcoulees() / 60);
         _saisirObservable(evtId, {
           observableId: obs.uuid,
           categorieObs: 'A',
-          valeurPoints: obs.points,
+          valeurPoints: 0,
           equipeConcernee: 'notre',
-          joueurUuid: uuid,
+          joueurUuid: sortant,
+          joueurUuidEntrant: entrant,
           minuteMatch: minute,
           periode: perCourante
         }, function () { _peindrePalette(evtId, perCourante); });
@@ -1604,7 +1668,24 @@
             '</div>' +
           '</div>';
       });
-      html += '</div></div>';
+      html += '</div>'; // fin grid score
+      // L3c — section Mouvement (substitution, blessure) côté nous.
+      var mvt = Array.isArray(catA.mouvement) ? catA.mouvement : [];
+      if (mvt.length) {
+        html += '<div class="suivi-palette__title suivi-palette__title--sep">Mouvement</div>';
+        html += '<div class="suivi-palette__grid">';
+        mvt.forEach(function (obs, idx) {
+          html +=
+            '<div class="suivi-palette__action">' +
+              '<span class="suivi-palette__lbl">' + (obs.icone || '') + ' ' + escapeHtml(obs.libelle_court) + '</span>' +
+              '<div class="suivi-palette__btns">' +
+                '<button type="button" class="suivi-palette__btn suivi-palette__btn--mvt" data-midx="' + idx + '">Saisir</button>' +
+              '</div>' +
+            '</div>';
+        });
+        html += '</div>';
+      }
+      html += '</div>'; // fin suivi-palette
       pal.innerHTML = html;
 
       // L3b — boutons « Nous » : ouvrent l'attribution nominative.
@@ -1629,6 +1710,20 @@
             minuteMatch: minute,
             periode: perCourante
           });
+        });
+      });
+      // L3c — boutons « Mouvement » : substitution (double choix) ou blessure.
+      pal.querySelectorAll('.suivi-palette__btn--mvt').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var idx = parseInt(b.getAttribute('data-midx'), 10);
+          var obs = mvt[idx];
+          if (!obs) return;
+          if (obs.uuid === 'obs-A-substitution') {
+            _ouvrirSubstitution(evtId, perCourante, obs);
+          } else {
+            // Blessure (et tout mouvement à 1 joueur) : attribution simple.
+            _ouvrirAttribution(evtId, perCourante, obs, { estBlessure: (obs.uuid === 'obs-A-blessure') });
+          }
         });
       });
     });
