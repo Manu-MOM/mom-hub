@@ -6,6 +6,14 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.39 — Suivi live : design « tableau de stade » du chrono (2 juin 2026)
+ *   v3.39 : DESIGN chrono pro (direction A, retour terrain Manu). Le bloc
+ *           chrono en état EN COURS / PAUSE adopte un look tableau de stade :
+ *           fond sombre (#14181c), chiffres ambre lumineux fluides
+ *           (clamp 64→104px, responsive mobile), halo, contrôles adaptés
+ *           au fond sombre. Classe modificatrice suivi-chrono--stade
+ *           posée/retirée dans _peindreChrono (états config/armé/terminé
+ *           gardent le style sobre). Aucune logique touchée. node --check OK.
  * Version : 3.38 — Affichage équipe : nom_officiel prioritaire (1 juin 2026)
  *   v3.38 : NOM D'ÉQUIPE. En-tête (eqLabel) + score du suivi (_nomNotreEquipe)
  *           affichent désormais nom_officiel || libelle_court || code (au
@@ -1434,6 +1442,9 @@
     if (!host) return;
     var e = SuiviChrono.etat;
     var evtId = SuiviChrono.evtId;
+    // Design : le look « tableau de stade » (v3.39) ne s'applique qu'à
+    // l'état EN COURS / PAUSE. Retiré par défaut ; ajouté dans ce cas.
+    host.classList.remove('suivi-chrono--stade');
     // L3a — palette vidée par défaut ; seul l'état « en cours » la remplit.
     var palReset = document.getElementById('suivi-palette');
     if (palReset) palReset.innerHTML = '';
@@ -1541,6 +1552,7 @@
     html += '<button type="button" class="suivi-chrono__btn suivi-chrono__btn--danger" id="chrono-fin">⏹ Fin du match</button>';
     html += '</div>';
     host.innerHTML = html;
+    host.classList.add('suivi-chrono--stade'); // design tableau de stade (en cours/pause)
 
     var bmode = document.getElementById('chrono-mode');
     if (bmode) bmode.addEventListener('click', function () {
