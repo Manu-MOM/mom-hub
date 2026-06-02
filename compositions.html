@@ -261,6 +261,18 @@
     .suivi-attrib__joueur:hover .suivi-attrib__num { background: #fff; color: var(--vert-prairie); }
     .suivi-attrib__nom { font-size: 15px; color: var(--ink); font-weight: 500; }
     .suivi-attrib__num { flex-shrink: 0; min-width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--vert-prairie); color: #fff; font-family: 'Oswald', sans-serif; font-size: 13px; font-weight: 600; }
+    /* ── Historique annulable (L4) ── */
+    .suivi-historique:empty { display: none; }
+    .suivi-histo { margin: 14px 0; border: 1px solid var(--line); border-radius: 12px; background: #fff; padding: 14px 16px; }
+    .suivi-histo__title { font-family: 'Oswald', sans-serif; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-mute); margin-bottom: 8px; }
+    .suivi-histo__list { display: flex; flex-direction: column; gap: 4px; max-height: 220px; overflow-y: auto; }
+    .suivi-histo__row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 8px; border-radius: 6px; font-size: 13px; }
+    .suivi-histo__row:nth-child(odd) { background: var(--paper-warm, #faf8f3); }
+    .suivi-histo__row--annulee .suivi-histo__txt { text-decoration: line-through; color: var(--ink-mute); }
+    .suivi-histo__txt { color: var(--ink); }
+    .suivi-histo__annuler { flex-shrink: 0; padding: 4px 10px; border: 1px solid #e0b4b0; border-radius: 6px; background: #fff; color: #b3261e; cursor: pointer; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; }
+    .suivi-histo__annuler:hover { background: #fbeae8; }
+    .suivi-histo__badge { flex-shrink: 0; font-size: 11px; color: var(--ink-mute); text-transform: uppercase; letter-spacing: 0.04em; }
     .compo-export-overlay {
       position: fixed; inset: 0; background: rgba(0,0,0,0.6);
       display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px;
