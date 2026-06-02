@@ -6,6 +6,15 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.33 — Suivi live : historique annulable (L4) (1 juin 2026)
+ *   v3.33 : L4. Historique des actions sous le score (anti-chrono, récent
+ *           en haut) : minute · action · joueur/camp, bouton « annuler »
+ *           par ligne active (annulerObservableCoach C12-t → annule=TRUE,
+ *           jamais DELETE) ; lignes annulées barrées (badge « annulée »).
+ *           Libellé via SuiviObs.libelle (uuid→libelle_court). Score +
+ *           historique rafraîchis ensemble (_rafraichirScoreEtHistorique,
+ *           lecture inclureAnnulees=true). Bouton liste joueurs renommé
+ *           « ↩ Retour » (vs annulation d'action). node --check OK.
  * Version : 3.32 — Suivi live : attribution nominative côté Nous (L3b) (1 juin 2026)
  *   v3.32 : L3b. Boutons « Nous » de la palette score ouvrent la liste
  *           d'attribution (effectif compo trié titulaires 1→15 puis
@@ -1124,6 +1133,23 @@
           self.charge = true; self.enCours = false; self.catA = null;
           if (cb) cb(null);
         });
+    },
+    // L4 — libellé court d'un observable par son uuid (toutes familles
+    // de catA : score, discipline, mouvement, jeu_collectif).
+    libelle: function (observableId) {
+      if (!this.catA || !observableId) return null;
+      var familles = ['score', 'discipline', 'mouvement', 'jeu_collectif'];
+      for (var f = 0; f < familles.length; f++) {
+        var arr = this.catA[familles[f]];
+        if (Array.isArray(arr)) {
+          for (var i = 0; i < arr.length; i++) {
+            if (arr[i] && arr[i].uuid === observableId) {
+              return { libelle: arr[i].libelle_court, icone: arr[i].icone || '' };
+            }
+          }
+        }
+      }
+      return null;
     }
   };
 
@@ -1164,6 +1190,7 @@
       '<div class="view-suivi">' +
         '<div class="view-suivi__match-label">Suivi du match — ' + escapeHtml(adversaire) + '</div>' +
         '<div id="suivi-score" class="suivi-score">' + _scoreHTML() + '</div>' +
+        '<div id="suivi-historique" class="suivi-historique"></div>' +
         '<div id="suivi-chrono-host" class="suivi-chrono"><div class="view-suivi__hint">Chargement du chrono…</div></div>' +
         '<div id="suivi-palette"></div>' +
       '</div>';
@@ -1181,15 +1208,8 @@
   // le tick d'affichage chaque seconde (uniquement si chrono actif).
   function _rafraichirChrono(evtId, armerInterval) {
     if (!window.SupabaseHub || !SupabaseHub.getChronoRencontreCoach) return;
-    // L2/3b — charge aussi le score (chronologie de jeu), en parallèle.
-    if (SupabaseHub.getChronologieRencontreCoach) {
-      SupabaseHub.getChronologieRencontreCoach(evtId).then(function (lignes) {
-        if (SuiviChrono.evtId !== evtId) return;
-        SuiviChrono.score = _calculerScore(lignes);
-        var sc = document.getElementById('suivi-score');
-        if (sc) sc.innerHTML = _scoreHTML();
-      });
-    }
+    // L4 — charge score + historique (chronologie de jeu), en parallèle.
+    _rafraichirScoreEtHistorique(evtId);
     SupabaseHub.getChronoRencontreCoach(evtId).then(function (etat) {
       if (SuiviChrono.evtId !== evtId) return; // on a changé d'onglet entre-temps
       SuiviChrono.etat = etat; // peut être null (chrono pas encore initialisé)
@@ -1207,6 +1227,74 @@
     return 'MOM <span class="suivi-score__pts">' + SuiviChrono.score.mom + '</span>' +
            ' — ' +
            '<span class="suivi-score__pts">' + SuiviChrono.score.adv + '</span> ADV';
+  }
+
+  // L4 — recharge la chronologie (annulées incluses) puis met à jour
+  // le score ET l'historique. Source unique de rafraîchissement.
+  function _rafraichirScoreEtHistorique(evtId) {
+    if (!window.SupabaseHub || !SupabaseHub.getChronologieRencontreCoach) return;
+    SupabaseHub.getChronologieRencontreCoach(evtId, true).then(function (lignes) {
+      if (SuiviChrono.evtId !== evtId) return;
+      var arr = Array.isArray(lignes) ? lignes : [];
+      SuiviChrono.score = _calculerScore(arr);
+      var sc = document.getElementById('suivi-score');
+      if (sc) sc.innerHTML = _scoreHTML();
+      _peindreHistorique(evtId, arr);
+    });
+  }
+
+  // L4 — historique annulable. Lignes anti-chronologiques (récent en
+  // haut) ; annulées barrées sans bouton ; actives avec « annuler ».
+  function _peindreHistorique(evtId, lignes) {
+    var box = document.getElementById('suivi-historique');
+    if (!box) return;
+    var actives = (lignes || []).slice();
+    // Tri anti-chronologique par horodatage.
+    actives.sort(function (a, b) {
+      return new Date(b.horodatage).getTime() - new Date(a.horodatage).getTime();
+    });
+    if (!actives.length) { box.innerHTML = ''; return; }
+
+    var html = '<div class="suivi-histo">';
+    html += '<div class="suivi-histo__title">Actions du match</div>';
+    html += '<div class="suivi-histo__list">';
+    actives.forEach(function (l) {
+      var ref = (typeof SuiviObs.libelle === 'function') ? SuiviObs.libelle(l.observable_id) : null;
+      var lib = ref ? ((ref.icone ? ref.icone + ' ' : '') + ref.libelle) : (l.observable_id || 'Action');
+      var qui = (l.equipe_concernee === 'adverse')
+        ? 'Adverse'
+        : (l.nom_court ? escapeHtml(l.nom_court) : 'Nous');
+      var min = (l.minute_match != null) ? (l.minute_match + "'") : '';
+      var pts = (l.valeur_points ? ' (+' + l.valeur_points + ')' : '');
+      var annulee = (l.annule === true);
+      html += '<div class="suivi-histo__row' + (annulee ? ' suivi-histo__row--annulee' : '') + '">';
+      html +=   '<span class="suivi-histo__txt">' + (min ? '<b>' + min + '</b> ' : '') + escapeHtml(lib) + pts + ' · ' + qui + '</span>';
+      if (!annulee) {
+        html += '<button type="button" class="suivi-histo__annuler" data-id="' + escapeHtml(l.id) + '">annuler</button>';
+      } else {
+        html += '<span class="suivi-histo__badge">annulée</span>';
+      }
+      html += '</div>';
+    });
+    html += '</div></div>';
+    box.innerHTML = html;
+
+    box.querySelectorAll('.suivi-histo__annuler').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var id = b.getAttribute('data-id');
+        if (!id || SuiviChrono.busy) return;
+        if (!window.SupabaseHub || !SupabaseHub.annulerObservableCoach) return;
+        SuiviChrono.busy = true;
+        SupabaseHub.annulerObservableCoach(evtId, id).then(function (res) {
+          SuiviChrono.busy = false;
+          if (!res || !res.ok) {
+            window.alert('Annulation impossible : ' + ((res && res.error) || 'erreur inconnue'));
+            return;
+          }
+          _rafraichirScoreEtHistorique(evtId);
+        });
+      });
+    });
   }
 
   // Tick léger : ne touche qu'au temps affiché (pas de re-render complet,
@@ -1462,7 +1550,7 @@
       });
       html += '</div>';
     }
-    html += '<button type="button" class="suivi-chrono__btn" id="attrib-annuler">↩ Annuler</button>';
+    html += '<button type="button" class="suivi-chrono__btn" id="attrib-annuler">↩ Retour</button>';
     html += '</div>';
     pal.innerHTML = html;
 
@@ -1554,18 +1642,9 @@
         window.alert('Saisie impossible : ' + ((res && res.error) || 'erreur inconnue'));
         return;
       }
-      // Rafraîchir le score (relecture chronologie).
-      if (SupabaseHub.getChronologieRencontreCoach) {
-        SupabaseHub.getChronologieRencontreCoach(evtId).then(function (lignes) {
-          if (SuiviChrono.evtId !== evtId) return;
-          SuiviChrono.score = _calculerScore(lignes);
-          var sc = document.getElementById('suivi-score');
-          if (sc) sc.innerHTML = _scoreHTML();
-          if (typeof onApres === 'function') onApres();
-        });
-      } else if (typeof onApres === 'function') {
-        onApres();
-      }
+      // L4 — rafraîchir score + historique (relecture chronologie).
+      _rafraichirScoreEtHistorique(evtId);
+      if (typeof onApres === 'function') onApres();
     });
   }
 
