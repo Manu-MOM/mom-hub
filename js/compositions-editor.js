@@ -6,6 +6,11 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.43 — Suivi live : fix logo du bandeau selon l'habillage (2 juin 2026)
+ *   v3.43 : FIX (retour terrain Manu). Le logo du bandeau suivait toujours
+ *           MOM (logo-m2m.png en dur). Désormais selon l'habillage :
+ *           assets/ecusson-mom.png (mom) / assets/logo-entente.png (entente),
+ *           chemins repris de _collecterDonneesExport. node --check OK.
  * Version : 3.42 — Suivi live : score en 3 colonnes + palette score Nous/centre/Adverse (2 juin 2026)
  *   v3.42 : Lisibilité (retour terrain Manu). (1) Bloc SCORE en 3 colonnes :
  *           notre équipe + son score à gauche, « — » au centre, adverse +
@@ -1302,6 +1307,7 @@
     SuiviChrono.nomAdv = _nomAdversaireCourt(compo);
     var adversaire = _adversaireDeCompo(compo);
     var habillage = (SuiviHabillage.choix === 'entente') ? 'entente' : 'mom';
+    var logoSrc = (habillage === 'entente') ? 'assets/logo-entente.png' : 'assets/ecusson-mom.png';
 
     // Rendu initial (chargement), puis lecture asynchrone de l'état.
     // Bandeau + liseré = rappel de la charte « réseaux sociaux »
@@ -1311,7 +1317,7 @@
       '<div class="view-suivi view-suivi--' + habillage + '">' +
         '<div class="view-suivi__bandeau">' +
           '<div class="view-suivi__brand">' +
-            '<img class="view-suivi__logo" src="assets/logo-m2m.png" alt="" aria-hidden="true">' +
+            '<img class="view-suivi__logo" src="' + logoSrc + '" alt="" aria-hidden="true">' +
             '<div class="view-suivi__brand-txt">' +
               '<div class="view-suivi__brand-eq">' + escapeHtml(SuiviChrono.nomNous) + '</div>' +
               '<div class="view-suivi__brand-sub">Suivi du match — ' + escapeHtml(adversaire) + '</div>' +
