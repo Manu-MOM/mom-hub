@@ -6,6 +6,14 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.45 — Suivi live : substitution filtrée (vrais entrants/sortants) (2 juin 2026)
+ *   v3.45 : #3 version simple (retour terrain Manu). La substitution filtre
+ *           désormais les listes : « qui sort ? » = joueurs sur le terrain,
+ *           « qui entre ? » = joueurs au banc. _etatTerrain() reconstitue
+ *           l'état à l'instant T depuis l'effectif (titulaires/remplaçants)
+ *           + les substitutions non annulées (ordre chrono). Lignes mémo
+ *           dans SuiviChrono.lignes (pas d'appel réseau au clic). Blessures/
+ *           cartons NON pris en compte (raffinement futur). node --check OK.
  * Version : 3.44 — Vue Terrain : cadre charte réseaux (bandeau + liseré, toggle partagé) (2 juin 2026)
  *   v3.44 : Le cadre « réseaux sociaux » (bandeau logo+nom + liseré +
  *           toggle MOM/entente) est désormais aussi sur l'onglet TERRAIN
@@ -1115,6 +1123,7 @@
     evtId: null,         // UUID du MATCH piloté
     etat: null,          // dernier état lu (objet RPC) ou null
     score: { mom: 0, adv: 0 },  // L2/3b — score calculé (jamais stocké, I1)
+    lignes: [],                 // #3 — dernière chronologie lue (calcul état terrain)
     nomNous: 'Nous',            // amélioration 2 — vrais noms d'équipes
     nomAdv: 'Adversaire',
     busy: false,         // garde anti-double-clic pendant une action
@@ -1422,6 +1431,7 @@
     SupabaseHub.getChronologieRencontreCoach(evtId, true).then(function (lignes) {
       if (SuiviChrono.evtId !== evtId) return;
       var arr = Array.isArray(lignes) ? lignes : [];
+      SuiviChrono.lignes = arr; // #3 — mémo pour le calcul d'état terrain (substitutions)
       SuiviChrono.score = _calculerScore(arr);
       var sc = document.getElementById('suivi-score');
       if (sc) sc.innerHTML = _scoreHTML();
@@ -1767,19 +1777,45 @@
 
   // L3c — substitution : double sélection « Qui sort ? » → « Qui entre ? ».
   // joueur_uuid = sortant, joueur_uuid_entrant = entrant (cf. C12-m).
+  // #3 — reconstitue l'état du terrain à l'instant T à partir de l'effectif
+  // (titulaires sur le terrain, remplaçants au banc) et des SUBSTITUTIONS
+  // non annulées (ordre chrono). Retourne { surTerrain:Set, auBanc:Set } d'uuid.
+  // Version simple : ne tient compte que des substitutions (pas blessures/cartons).
+  function _etatTerrain() {
+    var surTerrain = {}, auBanc = {};
+    (State.compoJoueurs || []).forEach(function (cj) {
+      if (cj.role === 'titulaire') surTerrain[cj.joueur_id] = true;
+      else if (cj.role === 'remplacant') auBanc[cj.joueur_id] = true;
+    });
+    // Substitutions dans l'ordre chronologique croissant.
+    var subs = (SuiviChrono.lignes || [])
+      .filter(function (l) { return l && l.observable_id === 'obs-A-substitution' && l.annule !== true; })
+      .slice()
+      .sort(function (a, b) { return new Date(a.horodatage) - new Date(b.horodatage); });
+    subs.forEach(function (l) {
+      var sortant = l.joueur_uuid, entrant = l.joueur_uuid_entrant;
+      if (sortant) { delete surTerrain[sortant]; auBanc[sortant] = true; }
+      if (entrant) { delete auBanc[entrant]; surTerrain[entrant] = true; }
+    });
+    return { surTerrain: surTerrain, auBanc: auBanc };
+  }
+
   function _ouvrirSubstitution(evtId, perCourante, obs) {
     var pal = document.getElementById('suivi-palette');
     if (!pal) return;
     var effectif = _effectifPourSaisie();
+    var etat = _etatTerrain();
+    var sortants = effectif.filter(function (jo) { return etat.surTerrain[jo.uuid]; });
+    var entrants = effectif.filter(function (jo) { return etat.auBanc[jo.uuid]; });
 
-    function rendreEtape(titre, onPick) {
+    function rendreEtape(titre, liste, vide, onPick) {
       var html = '<div class="suivi-attrib">';
       html += '<div class="suivi-attrib__title">' + (obs.icone || '') + ' ' + titre + '</div>';
-      if (!effectif.length) {
-        html += '<div class="view-suivi__hint">Aucun joueur dans la compo.</div>';
+      if (!liste.length) {
+        html += '<div class="view-suivi__hint">' + vide + '</div>';
       } else {
         html += '<div class="suivi-attrib__list">';
-        effectif.forEach(function (jo) {
+        liste.forEach(function (jo) {
           html +=
             '<button type="button" class="suivi-attrib__joueur" data-uuid="' + escapeHtml(jo.uuid || '') + '">' +
               '<span class="suivi-attrib__nom">' + escapeHtml(_nomJoueur(jo)) + '</span>' +
@@ -1798,10 +1834,10 @@
       });
     }
 
-    // Étape 1 : qui sort ?
-    rendreEtape('Substitution — qui SORT ?', function (sortant) {
-      // Étape 2 : qui entre ?
-      rendreEtape('Substitution — qui ENTRE ?', function (entrant) {
+    // Étape 1 : qui sort ? (joueurs sur le terrain)
+    rendreEtape('Substitution — qui SORT ?', sortants, 'Aucun joueur sur le terrain.', function (sortant) {
+      // Étape 2 : qui entre ? (joueurs au banc)
+      rendreEtape('Substitution — qui ENTRE ?', entrants, 'Aucun joueur disponible au banc.', function (entrant) {
         var minute = Math.floor(SuiviChrono.secondesEcoulees() / 60);
         _saisirObservable(evtId, {
           observableId: obs.uuid,
