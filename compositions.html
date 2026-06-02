@@ -251,6 +251,16 @@
     .suivi-palette__btn--nous:disabled { opacity: 0.4; cursor: not-allowed; }
     .suivi-palette__btn--adv { color: var(--ink); }
     .suivi-palette__btn--adv:hover { background: var(--paper-warm, #faf8f3); }
+    /* ── Attribution joueur (L3b) ── */
+    .suivi-attrib { margin-top: 16px; border: 1px solid var(--vert-prairie); border-radius: 12px; background: #fff; padding: 18px; }
+    .suivi-attrib__title { font-family: 'Oswald', sans-serif; font-size: 14px; letter-spacing: 0.04em; color: var(--ink); margin-bottom: 12px; text-align: center; }
+    .suivi-attrib__list { display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto; margin-bottom: 12px; }
+    .suivi-attrib__joueur { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 14px; border: 1px solid var(--line); border-radius: 8px; background: #fff; cursor: pointer; text-align: left; transition: all 0.12s; }
+    .suivi-attrib__joueur:hover { background: var(--vert-prairie); border-color: var(--vert-prairie); }
+    .suivi-attrib__joueur:hover .suivi-attrib__nom { color: #fff; }
+    .suivi-attrib__joueur:hover .suivi-attrib__num { background: #fff; color: var(--vert-prairie); }
+    .suivi-attrib__nom { font-size: 15px; color: var(--ink); font-weight: 500; }
+    .suivi-attrib__num { flex-shrink: 0; min-width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--vert-prairie); color: #fff; font-family: 'Oswald', sans-serif; font-size: 13px; font-weight: 600; }
     .compo-export-overlay {
       position: fixed; inset: 0; background: rgba(0,0,0,0.6);
       display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px;
