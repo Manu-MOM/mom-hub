@@ -229,17 +229,89 @@
     .suivi-chrono__state--paused { color: #c08a00; }
     .suivi-chrono__state--done { color: var(--ink-mute); }
     /* ── Design « tableau de stade » (v3.39) — état en cours / pause ── */
-    .suivi-chrono--stade { background: #14181c; border-color: #14181c; gap: 10px; padding: 30px 20px; }
-    .suivi-chrono--stade .suivi-chrono__periode { color: #7c8a99; letter-spacing: 0.16em; }
-    .suivi-chrono--stade .suivi-chrono__time { font-family: 'Oswald', 'JetBrains Mono', sans-serif; font-weight: 700; font-size: clamp(64px, 22vw, 104px); color: #ffb000; letter-spacing: 0.03em; text-shadow: 0 0 20px rgba(255,176,0,0.38); }
-    .suivi-chrono--stade .suivi-chrono__time--paused { color: #8a939c; text-shadow: none; }
-    .suivi-chrono--stade .suivi-chrono__add { color: #ff7b00; }
-    .suivi-chrono--stade .suivi-chrono__state { color: #5dcaa5; }
-    .suivi-chrono--stade .suivi-chrono__state--paused { color: #ffb000; }
-    .suivi-chrono--stade .suivi-chrono__btn { background: #20262c; border-color: #2d353d; color: #e6ebf0; }
-    .suivi-chrono--stade .suivi-chrono__btn:hover { background: #2a3138; }
-    .suivi-chrono--stade .suivi-chrono__btn--primary { background: #1d9e75; border-color: #1d9e75; color: #fff; }
-    .suivi-chrono--stade .suivi-chrono__btn--danger { background: #20262c; border-color: #6e3a36; color: #f0a7a2; }
+    /* ═══ THÈME « TABLEAU DE STADE » — tout l'onglet Suivi (v3.40) ═══ */
+    /* Scopé .view-suivi : n'affecte QUE l'onglet Suivi (Liste/Terrain clairs). */
+    .view-suivi { background: #14181c; border-radius: 14px; padding: 0 0 18px; overflow: hidden; border: 2px solid #1e4628; }
+    /* Cadre « réseaux sociaux » — bandeau + liseré, déclinés mom/entente */
+    .view-suivi__bandeau { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; border-bottom: 4px solid #f0d800; }
+    .view-suivi__brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .view-suivi__logo { width: 38px; height: 38px; object-fit: contain; flex-shrink: 0; }
+    .view-suivi__brand-eq { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 18px; letter-spacing: 0.03em; color: #fff; text-transform: uppercase; line-height: 1.1; }
+    .view-suivi__brand-sub { font-size: 12px; color: #bedcb4; letter-spacing: 0.02em; }
+    .view-suivi__habillage { display: flex; gap: 4px; flex-shrink: 0; }
+    .view-suivi__hbtn { font-family: 'Oswald', sans-serif; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; padding: 6px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.25); background: transparent; color: #ccd6dd; cursor: pointer; }
+    .view-suivi__hbtn[aria-pressed="true"] { background: #f0d800; border-color: #f0d800; color: #0c3d24; font-weight: 600; }
+    .view-suivi > #suivi-score, .view-suivi > #suivi-chrono-host,
+    .view-suivi > #suivi-palette, .view-suivi > #suivi-historique { margin-left: 18px; margin-right: 18px; }
+    .view-suivi > #suivi-score { margin-top: 16px; }
+    /* Habillage MOM (vert bouteille + or) */
+    .view-suivi--mom { border-color: #1e4628; background: #0e2816; }
+    .view-suivi--mom .view-suivi__bandeau { background: linear-gradient(90deg, #1e4626, #285a30); border-bottom-color: #f0d800; }
+    /* Habillage ENTENTE (bleu marine + bleu ciel) */
+    .view-suivi--entente { border-color: #143a64; background: #0a1428; }
+    .view-suivi--entente .view-suivi__bandeau { background: linear-gradient(90deg, #00285a, #14462d); border-bottom-color: #90d8f0; }
+    .view-suivi--entente .view-suivi__brand-sub { color: #90d8f0; }
+    .view-suivi--entente .view-suivi__hbtn[aria-pressed="true"] { background: #90d8f0; border-color: #90d8f0; color: #0a1428; }
+    .view-suivi__match-label { color: #7c8a99; }
+    .view-suivi__hint { color: #7c8a99; }
+    /* Score */
+    .view-suivi .suivi-score { color: #f6f3e8; }
+    .view-suivi .suivi-score__eq { color: #9aa6b2; }
+    .view-suivi .suivi-score__pts { color: #5dcaa5; }
+    /* Chrono — look stade à TOUS les états */
+    .view-suivi .suivi-chrono { background: #1c2228; border-color: #2a323a; gap: 12px; }
+    .view-suivi .suivi-chrono__periode { color: #7c8a99; letter-spacing: 0.16em; }
+    .view-suivi .suivi-chrono__time { font-family: 'Oswald', 'JetBrains Mono', sans-serif; font-weight: 700; font-size: clamp(64px, 22vw, 104px); color: #ffb000; letter-spacing: 0.03em; text-shadow: 0 0 20px rgba(255,176,0,0.38); }
+    .view-suivi .suivi-chrono__time--paused { color: #8a939c; text-shadow: none; }
+    .view-suivi .suivi-chrono__add { color: #ff7b00; }
+    .view-suivi .suivi-chrono__state { color: #5dcaa5; }
+    .view-suivi .suivi-chrono__state--paused { color: #ffb000; }
+    .view-suivi .suivi-chrono__state--done { color: #7c8a99; }
+    .view-suivi .suivi-chrono__config-title { color: #7c8a99; }
+    .view-suivi .suivi-chrono__config-row label { color: #c4ccd4; }
+    .view-suivi .suivi-chrono__config-row input { background: #14181c; border-color: #2a323a; color: #f6f3e8; }
+    /* Boutons chrono sur fond sombre */
+    .view-suivi .suivi-chrono__btn { background: #20262c; border-color: #2d353d; color: #e6ebf0; }
+    .view-suivi .suivi-chrono__btn:hover { background: #2a3138; }
+    .view-suivi .suivi-chrono__btn--primary { background: #1d9e75; border-color: #1d9e75; color: #fff; }
+    .view-suivi .suivi-chrono__btn--danger { background: #20262c; border-color: #6e3a36; color: #f0a7a2; }
+    .view-suivi .suivi-chrono__btn--danger:hover { background: #2a2022; }
+    /* Palette (score, mouvement, discipline, jeu collectif) */
+    .view-suivi .suivi-palette { background: #1c2228; border-color: #2a323a; }
+    .view-suivi .suivi-palette__title { color: #7c8a99; }
+    .view-suivi .suivi-palette__title--sep { border-top-color: #2a323a; }
+    .view-suivi .suivi-palette__lbl { color: #e6ebf0; }
+    .view-suivi .suivi-palette__lbl em { color: #5dcaa5; }
+    .view-suivi .suivi-palette__btn { background: #20262c; border-color: #2d353d; color: #e6ebf0; }
+    .view-suivi .suivi-palette__btn--nous { color: #5dcaa5; border-color: #2d6e58; }
+    .view-suivi .suivi-palette__btn--nous:hover { background: #173026; }
+    .view-suivi .suivi-palette__btn--adv { color: #e6ebf0; }
+    .view-suivi .suivi-palette__btn--adv:hover { background: #2a3138; }
+    .view-suivi .suivi-palette__btn--mvt { color: #aab8c4; border-color: #3a4650; }
+    .view-suivi .suivi-palette__btn--mvt:hover { background: #2a3138; }
+    .view-suivi .suivi-palette__btn--disc { color: #ffcf5a; border-color: #6e5a2a; }
+    .view-suivi .suivi-palette__btn--disc:hover { background: #2e2814; }
+    .view-suivi .suivi-palette__btn--jc:hover { background: #2a3138; }
+    /* Attribution joueur */
+    .view-suivi .suivi-attrib { background: #1c2228; border-color: #2d6e58; }
+    .view-suivi .suivi-attrib__title { color: #f6f3e8; }
+    .view-suivi .suivi-attrib__joueur { background: #20262c; border-color: #2d353d; }
+    .view-suivi .suivi-attrib__joueur:hover { background: #1d9e75; border-color: #1d9e75; }
+    .view-suivi .suivi-attrib__nom { color: #e6ebf0; }
+    .view-suivi .suivi-attrib__joueur:hover .suivi-attrib__nom { color: #fff; }
+    .view-suivi .suivi-attrib__num { background: #1d9e75; color: #fff; }
+    .view-suivi .suivi-attrib__joueur:hover .suivi-attrib__num { background: #fff; color: #0f6e56; }
+    /* Historique */
+    .view-suivi .suivi-histo { background: #1c2228; border-color: #2a323a; }
+    .view-suivi .suivi-histo__title { color: #7c8a99; }
+    .view-suivi .suivi-histo__row:nth-child(odd) { background: #20262c; }
+    .view-suivi .suivi-histo__txt { color: #e6ebf0; }
+    .view-suivi .suivi-histo__row--annulee .suivi-histo__txt { color: #6b7785; }
+    .view-suivi .suivi-histo__annuler { background: #20262c; border-color: #6e3a36; color: #f0a7a2; }
+    .view-suivi .suivi-histo__annuler:hover { background: #2a2022; }
+    .view-suivi .suivi-histo__badge { color: #6b7785; }
+    /* Coup d'envoi */
+    .view-suivi .view-suivi__kickoff { background: #1d9e75; border-color: #1d9e75; color: #fff; }
     .suivi-chrono__controls { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
     .suivi-chrono__btn { padding: 10px 20px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); cursor: pointer; font-family: 'Oswald', sans-serif; font-size: 14px; letter-spacing: 0.04em; text-transform: uppercase; transition: all 0.15s; }
     .suivi-chrono__btn:hover { background: var(--paper-warm, #faf8f3); }
