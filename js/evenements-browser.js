@@ -21,6 +21,16 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
+ * Version : 1.58 — Option B : gate suivi d'un tournoi = compo de BASE validée (matchs suivables sans validation par match) (2 juin 2026)
+ *   v1.58 : Décision Manu (option B). Le gate « compo prête » d'un match de
+ *           tournoi est désormais évalué UNE FOIS sur la compo de BASE du
+ *           tournoi (racine), puis appliqué à tous les matchs via le 2e
+ *           paramètre compoPreteOverride de renderSuiviRencontreBloc. Valider
+ *           la base suffit à rendre tous les matchs suivables — plus besoin de
+ *           valider chaque compo de match (qui n'était de toute façon pas
+ *           validable depuis l'UI, cf. bug COMPO-VALIDATION-ONGLET tracé).
+ *           Match simple : override undefined → test du match inchangé (zéro
+ *           régression). Front uniquement, RPC non touchée. node --check OK.
  * Version : 1.57 — FIX gate suiviActionnable : tournois à phases (type_competition) reconnus (2 juin 2026)
  *   v1.57 : FIX cause racine (retour terrain Manu : vignette Suivi inactive
  *           sur le Challenge Vié). suiviActionnable testait
@@ -2633,9 +2643,20 @@
   }
 
   // Bloc 3-états pour UNE rencontre (match simple OU match enfant).
-  function renderSuiviRencontreBloc(rencontre) {
+  function renderSuiviRencontreBloc(rencontre, compoPreteOverride) {
     const evtId = rencontre.id;
     const lien  = SUIVI_LIENS_SESSION.get(evtId);
+
+    // v1.58 — gate « compo prête » : pour un match de tournoi, on autorise
+    // la génération du lien dès que la compo de BASE du tournoi est validée
+    // (compoPreteOverride passé par renderSuiviSection, calculé une fois sur
+    // la racine), sans exiger une validation par match. Pour un match simple,
+    // compoPreteOverride est undefined → on retombe sur le test du match lui-
+    // même (comportement inchangé). Décision Manu (option B) : valider une
+    // fois la base, tous les matchs deviennent suivables.
+    const compoPrete = (typeof compoPreteOverride === 'boolean')
+      ? compoPreteOverride
+      : suiviCompoPrete(rencontre);
 
     // ÉTAT 3 — lien actif (borné session)
     if (lien) {
@@ -2654,9 +2675,9 @@
     }
 
     // ÉTAT 1 — compo pas prête
-    if (!suiviCompoPrete(rencontre)) {
+    if (!compoPrete) {
       let h = '<div style="padding:8px 0;">';
-      h += '<div style="font-size:13px;color:var(--ink);margin-bottom:8px;">La composition de cette rencontre doit être <strong>validée</strong> avant de pouvoir générer le lien de suivi.</div>';
+      h += '<div style="font-size:13px;color:var(--ink);margin-bottom:8px;">La composition doit être <strong>validée</strong> avant de pouvoir générer le lien de suivi (pour un tournoi, validez la composition de base).</div>';
       // Raccourci honnête : compositions.html est une page réelle. Le
       // deep-link vers la compo de CETTE rencontre nécessiterait la
       // convention d'URL de compositions.html — NON inventée ici.
@@ -2686,6 +2707,10 @@
       // A-Q3 : 1 lien par match enfant, DANS la structure du tournoi.
       // Réutilise le regroupement par phase déjà utilisé par la
       // section « Phases du tournoi » (structure non réinventée).
+      // v1.58 (option B) : le gate « compo prête » est évalué UNE FOIS sur
+      // la compo de BASE du tournoi (racine evt), puis appliqué à tous les
+      // matchs. Valider la base suffit à rendre tous les matchs suivables.
+      const compoPreteRacine = suiviCompoPrete(evt);
       const enfants = CHILDREN_BY_PARENT[evt.id] || [];
       if (enfants.length === 0) {
         html += '<div class="evt-fiche-empty">Aucun match interne pour ce tournoi — créez les matchs pour générer leurs liens de suivi.</div>';
@@ -2710,7 +2735,7 @@
             if (child.etat === 'annule' || child.etat === 'archive') {
               html += '<div style="font-size:12px;color:var(--ink-mute);padding:6px 0;">Match ' + escHtml(child.etat) + ' — pas de lien de suivi.</div>';
             } else {
-              html += renderSuiviRencontreBloc(child);
+              html += renderSuiviRencontreBloc(child, compoPreteRacine);
               html += renderModeVideoAcces(child);
               html += renderSpectateurAcces(child);
               html += renderTempsDeJeuMount(child);
