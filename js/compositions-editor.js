@@ -6,6 +6,15 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.37 — Suivi live : temps additionnel + vrais noms d'équipes (1 juin 2026)
+ *   v3.37 : Améliorations terrain. (1) TEMPS ADDITIONNEL : au-delà de la
+ *           durée réglementaire, le chrono continue et affiche le
+ *           dépassement « 30:00 +2:15 » (ou « 00:00 +2:15 » en rebours).
+ *           _tempsAffiche {principal, additionnel}. (2) NOMS D'ÉQUIPES :
+ *           score « MOM/ADV » remplacé par les vrais noms (notre équipe via
+ *           evenementEquipeContext, adversaire via matchsDeLequipe) — MOM
+ *           était faux pour une entente SAR/ASCS. _nomNotreEquipe /
+ *           _nomAdversaireCourt. node --check OK.
  * Version : 3.36 — Suivi live : discipline + jeu collectif (L3d) (1 juin 2026)
  *   v3.36 : L3d. Sections « Discipline » (cartons jaune/rouge,
  *           avertissement → attribution nominative comme un score Nous)
@@ -1056,6 +1065,8 @@
     evtId: null,         // UUID du MATCH piloté
     etat: null,          // dernier état lu (objet RPC) ou null
     score: { mom: 0, adv: 0 },  // L2/3b — score calculé (jamais stocké, I1)
+    nomNous: 'Nous',            // amélioration 2 — vrais noms d'équipes
+    nomAdv: 'Adversaire',
     busy: false,         // garde anti-double-clic pendant une action
 
     desarmer: function () {
@@ -1109,6 +1120,29 @@
     var m = Math.floor(totalSec / 60);
     var s = totalSec % 60;
     return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+  }
+
+  // Amélioration 1 — texte du chrono avec TEMPS ADDITIONNEL. Au-delà de
+  // la durée réglementaire de la période, le chrono ne s'arrête pas :
+  //   mode écoulé  : « 30:00 +2:15 » (durée figée + dépassement)
+  //   mode rebours : « 00:00 +2:15 » (rebours à 0 + dépassement)
+  // Renvoie { principal, additionnel } (additionnel = '' si pas de dépassement).
+  function _tempsAffiche() {
+    var ecoule = SuiviChrono.secondesEcoulees();
+    var d = SuiviChrono.dureePeriodeSecondes();
+    var rebours = SuiviChrono.estRebours();
+    var depassement = (d > 0 && ecoule > d) ? (ecoule - d) : 0;
+    var principal;
+    if (rebours) {
+      var reste = d - ecoule;
+      principal = _fmtMMSS(reste > 0 ? reste : 0);
+    } else {
+      principal = _fmtMMSS(depassement > 0 ? d : ecoule);
+    }
+    return {
+      principal: principal,
+      additionnel: depassement > 0 ? ('+' + _fmtMMSS(depassement).replace(/^0/, '')) : ''
+    };
   }
 
   // L2/3b — score calculé (somme valeur_points par camp, hors annulées).
@@ -1184,6 +1218,26 @@
     return compo.libelle || 'Match à suivre';
   }
 
+  // Amélioration 2 — noms COURTS des deux équipes pour le score
+  // (« MOM/ADV » remplacés par les vrais noms ; MOM est faux pour une
+  // entente SAR/ASCS). Notre équipe = contexte de la compo ; adversaire
+  // = objet match (State.matchsDeLequipe).
+  function _nomNotreEquipe() {
+    var c = State.evenementEquipeContext;
+    if (c && c.equipe) {
+      return (c.equipe.libelle_court || c.equipe.nom_officiel || c.equipe.code || 'Nous');
+    }
+    return 'Nous';
+  }
+  function _nomAdversaireCourt(compo) {
+    var m = (compo && Array.isArray(State.matchsDeLequipe))
+      ? State.matchsDeLequipe.find(function (x) { return x.id === compo.evenement_id; })
+      : null;
+    if (m && m.adversaire_nom && m.adversaire_nom.trim()) return m.adversaire_nom.trim();
+    if (compo && compo.adversaire_nom && compo.adversaire_nom.trim()) return compo.adversaire_nom.trim();
+    return 'Adversaire';
+  }
+
   function renderEditorSuivi(el, compo) {
     SuiviChrono.desarmer();
 
@@ -1202,6 +1256,8 @@
 
     var evtId = compo.evenement_id || null;
     SuiviChrono.evtId = evtId;
+    SuiviChrono.nomNous = _nomNotreEquipe();
+    SuiviChrono.nomAdv = _nomAdversaireCourt(compo);
     var adversaire = _adversaireDeCompo(compo);
 
     // Rendu initial (chargement), puis lecture asynchrone de l'état.
@@ -1243,9 +1299,13 @@
 
   // Bloc score (calculé, jamais stocké — I1). Adversaire abrégé « ADV ».
   function _scoreHTML() {
-    return 'MOM <span class="suivi-score__pts">' + SuiviChrono.score.mom + '</span>' +
+    var nous = escapeHtml(SuiviChrono.nomNous || 'Nous');
+    var adv = escapeHtml(SuiviChrono.nomAdv || 'Adversaire');
+    return '<span class="suivi-score__eq">' + nous + '</span> ' +
+           '<span class="suivi-score__pts">' + SuiviChrono.score.mom + '</span>' +
            ' — ' +
-           '<span class="suivi-score__pts">' + SuiviChrono.score.adv + '</span> ADV';
+           '<span class="suivi-score__pts">' + SuiviChrono.score.adv + '</span> ' +
+           '<span class="suivi-score__eq">' + adv + '</span>';
   }
 
   // L4 — recharge la chronologie (annulées incluses) puis met à jour
@@ -1322,7 +1382,8 @@
     var t = document.getElementById('suivi-chrono-time');
     if (!t || !SuiviChrono.etat) return;
     if (SuiviChrono.etat.en_pause) return; // figé en pause
-    t.textContent = _fmtMMSS(SuiviChrono.secondesAffichees());
+    var ta = _tempsAffiche();
+    t.innerHTML = ta.principal + (ta.additionnel ? ' <span class="suivi-chrono__add">' + ta.additionnel + '</span>' : '');
   }
 
   // Peint l'écran complet selon l'état (config / prêt / en cours /
@@ -1452,13 +1513,13 @@
     }
 
     // ── Cas EN COURS (période lancée, avec ou sans pause) ──
-    var sec = SuiviChrono.secondesAffichees();
+    var ta = _tempsAffiche();
     var enPause = !!e.en_pause;
     var rebours = SuiviChrono.estRebours();
     var estDerniere = (perCourante >= nbPeriodes);
     var html =
       '<div class="suivi-chrono__periode">' + _libellePeriode(perCourante, nbPeriodes) + (rebours ? ' · à rebours' : '') + '</div>' +
-      '<div id="suivi-chrono-time" class="suivi-chrono__time' + (enPause ? ' suivi-chrono__time--paused' : '') + '">' + _fmtMMSS(sec) + '</div>' +
+      '<div id="suivi-chrono-time" class="suivi-chrono__time' + (enPause ? ' suivi-chrono__time--paused' : '') + '">' + ta.principal + (ta.additionnel ? ' <span class="suivi-chrono__add">' + ta.additionnel + '</span>' : '') + '</div>' +
       '<div class="suivi-chrono__state' + (enPause ? ' suivi-chrono__state--paused' : '') + '">' + (enPause ? '⏸ En pause' : '● En cours') + '</div>' +
       '<div class="suivi-chrono__controls">';
     if (enPause) {
