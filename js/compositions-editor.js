@@ -6,6 +6,14 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.44 — Vue Terrain : cadre charte réseaux (bandeau + liseré, toggle partagé) (2 juin 2026)
+ *   v3.44 : Le cadre « réseaux sociaux » (bandeau logo+nom + liseré +
+ *           toggle MOM/entente) est désormais aussi sur l'onglet TERRAIN
+ *           (retour terrain Manu). Toggle PARTAGÉ avec Suivi via
+ *           SuiviHabillage. Bandeau factorisé : helpers _bandeauHTML /
+ *           _bindHabillageToggle / _habillageCourant / _logoHabillage,
+ *           réutilisés par renderEditorSuivi et renderEditorTerrain (zéro
+ *           duplication). Logo selon habillage. node --check OK.
  * Version : 3.43 — Suivi live : fix logo du bandeau selon l'habillage (2 juin 2026)
  *   v3.43 : FIX (retour terrain Manu). Le logo du bandeau suivait toujours
  *           MOM (logo-m2m.png en dur). Désormais selon l'habillage :
@@ -1285,6 +1293,44 @@
   // le bandeau + liseré ; l'intérieur sombre est inchangé.
   var SuiviHabillage = { choix: 'mom' };
 
+  // Helper factorisé (v3.44) : bandeau « charte réseaux » réutilisé par
+  // les vues Suivi et Terrain. logo + nom équipe + sous-titre + toggle.
+  function _habillageCourant() {
+    return (SuiviHabillage.choix === 'entente') ? 'entente' : 'mom';
+  }
+  function _logoHabillage(hab) {
+    return (hab === 'entente') ? 'assets/logo-entente.png' : 'assets/ecusson-mom.png';
+  }
+  function _bandeauHTML(nomEq, sousTitre) {
+    var hab = _habillageCourant();
+    return '<div class="view-suivi__bandeau">' +
+        '<div class="view-suivi__brand">' +
+          '<img class="view-suivi__logo" src="' + _logoHabillage(hab) + '" alt="" aria-hidden="true">' +
+          '<div class="view-suivi__brand-txt">' +
+            '<div class="view-suivi__brand-eq">' + escapeHtml(nomEq || '') + '</div>' +
+            '<div class="view-suivi__brand-sub">' + escapeHtml(sousTitre || '') + '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="view-suivi__habillage" role="group" aria-label="Habillage">' +
+          '<button type="button" class="view-suivi__hbtn" data-hab="mom"' + (hab === 'mom' ? ' aria-pressed="true"' : '') + '>MOM</button>' +
+          '<button type="button" class="view-suivi__hbtn" data-hab="entente"' + (hab === 'entente' ? ' aria-pressed="true"' : '') + '>Entente</button>' +
+        '</div>' +
+      '</div>';
+  }
+  // Câble le toggle d'habillage ; au changement, exécute rerender().
+  function _bindHabillageToggle(racine, rerender) {
+    if (!racine) return;
+    racine.querySelectorAll('.view-suivi__hbtn').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var h = b.getAttribute('data-hab');
+        if (h && h !== SuiviHabillage.choix) {
+          SuiviHabillage.choix = h;
+          if (typeof rerender === 'function') rerender();
+        }
+      });
+    });
+  }
+
   function renderEditorSuivi(el, compo) {
     SuiviChrono.desarmer();
 
@@ -1306,8 +1352,7 @@
     SuiviChrono.nomNous = _nomNotreEquipe();
     SuiviChrono.nomAdv = _nomAdversaireCourt(compo);
     var adversaire = _adversaireDeCompo(compo);
-    var habillage = (SuiviHabillage.choix === 'entente') ? 'entente' : 'mom';
-    var logoSrc = (habillage === 'entente') ? 'assets/logo-entente.png' : 'assets/ecusson-mom.png';
+    var habillage = _habillageCourant();
 
     // Rendu initial (chargement), puis lecture asynchrone de l'état.
     // Bandeau + liseré = rappel de la charte « réseaux sociaux »
@@ -1315,39 +1360,18 @@
     // pourtour ; l'intérieur (thème sombre) est inchangé.
     el.innerHTML =
       '<div class="view-suivi view-suivi--' + habillage + '">' +
-        '<div class="view-suivi__bandeau">' +
-          '<div class="view-suivi__brand">' +
-            '<img class="view-suivi__logo" src="' + logoSrc + '" alt="" aria-hidden="true">' +
-            '<div class="view-suivi__brand-txt">' +
-              '<div class="view-suivi__brand-eq">' + escapeHtml(SuiviChrono.nomNous) + '</div>' +
-              '<div class="view-suivi__brand-sub">Suivi du match — ' + escapeHtml(adversaire) + '</div>' +
-            '</div>' +
-          '</div>' +
-          '<div class="view-suivi__habillage" role="group" aria-label="Habillage">' +
-            '<button type="button" class="view-suivi__hbtn" data-hab="mom"' + (habillage === 'mom' ? ' aria-pressed="true"' : '') + '>MOM</button>' +
-            '<button type="button" class="view-suivi__hbtn" data-hab="entente"' + (habillage === 'entente' ? ' aria-pressed="true"' : '') + '>Entente</button>' +
-          '</div>' +
-        '</div>' +
+        _bandeauHTML(SuiviChrono.nomNous, 'Suivi du match — ' + adversaire) +
         '<div id="suivi-score" class="suivi-score">' + _scoreHTML() + '</div>' +
         '<div id="suivi-chrono-host" class="suivi-chrono"><div class="view-suivi__hint">Chargement du chrono…</div></div>' +
         '<div id="suivi-palette"></div>' +
         '<div id="suivi-historique" class="suivi-historique"></div>' +
       '</div>';
 
-    // Toggle d'habillage MOM / entente — ne change QUE le cadre (classe
-    // sur .view-suivi). Re-rend la vue pour réappliquer l'habillage.
-    var vue = el.querySelector('.view-suivi');
-    if (vue) {
-      vue.querySelectorAll('.view-suivi__hbtn').forEach(function (b) {
-        b.addEventListener('click', function () {
-          var h = b.getAttribute('data-hab');
-          if (h && h !== SuiviHabillage.choix) {
-            SuiviHabillage.choix = h;
-            renderEditorSuivi(el, compo); // re-render (réapplique l'habillage)
-          }
-        });
-      });
-    }
+    // Toggle d'habillage MOM / entente — ne change QUE le cadre. Re-rend
+    // la vue suivi pour réappliquer l'habillage.
+    _bindHabillageToggle(el.querySelector('.view-suivi'), function () {
+      renderEditorSuivi(el, compo);
+    });
 
     if (!evtId) {
       var host0 = document.getElementById('suivi-chrono-host');
@@ -2251,7 +2275,10 @@
     const posteParCode = new Map();
     for (const p of State.postes) posteParCode.set(p.code, p);
 
-    let html = '<div class="view-terrain" aria-label="Vue terrain de la composition (lecture seule)">';
+    var habillage = _habillageCourant();
+    var sousTitreT = _adversaireDeCompo(compo); // « vs … » ou libellé
+    let html = '<div class="view-terrain view-suivi--' + habillage + '" aria-label="Vue terrain de la composition (lecture seule)">';
+    html += _bandeauHTML(_nomNotreEquipe(), sousTitreT);
     html += '<div class="view-terrain__pitch">';
     html += pitchSvg();
 
@@ -2310,6 +2337,10 @@
     html += '</div>'; // view-terrain
     el.innerHTML = html;
     bindTerrainDnD(el); // v3.18 — édition au drag (3 gestes + éviction au banc)
+    // Toggle d'habillage partagé (v3.44) — re-rend la vue terrain.
+    _bindHabillageToggle(el.querySelector('.view-terrain'), function () {
+      renderEditorTerrain(el, compo);
+    });
   }
 
   // v3.18 — câblage drag & drop du terrain. Source = pastilles draggables
