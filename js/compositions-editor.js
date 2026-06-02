@@ -6,6 +6,13 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.36 — Suivi live : discipline + jeu collectif (L3d) (1 juin 2026)
+ *   v3.36 : L3d. Sections « Discipline » (cartons jaune/rouge,
+ *           avertissement → attribution nominative comme un score Nous)
+ *           et « Jeu collectif » (mêlées/touches gagnées/perdues → fait
+ *           d'équipe, equipe=notre, sans joueur, 1 clic). 0 point (hors
+ *           score, dans l'historique). Palette Cat A désormais complète.
+ *           Motif optionnel des cartons = dette légère (non implémenté).
  * Version : 3.35 — Suivi live : substitution + blessure (L3c) (1 juin 2026)
  *   v3.35 : L3c. Section « Mouvement » dans la palette. Substitution :
  *           double sélection « qui sort ? » → « qui entre ? » (tout
@@ -1685,6 +1692,38 @@
         });
         html += '</div>';
       }
+      // L3d — section Discipline (cartons, avertissement) : attribution joueur.
+      var disc = Array.isArray(catA.discipline) ? catA.discipline : [];
+      if (disc.length) {
+        html += '<div class="suivi-palette__title suivi-palette__title--sep">Discipline</div>';
+        html += '<div class="suivi-palette__grid">';
+        disc.forEach(function (obs, idx) {
+          html +=
+            '<div class="suivi-palette__action">' +
+              '<span class="suivi-palette__lbl">' + (obs.icone || '') + ' ' + escapeHtml(obs.libelle_court) + '</span>' +
+              '<div class="suivi-palette__btns">' +
+                '<button type="button" class="suivi-palette__btn suivi-palette__btn--disc" data-didx="' + idx + '">Joueur…</button>' +
+              '</div>' +
+            '</div>';
+        });
+        html += '</div>';
+      }
+      // L3d — section Jeu collectif (mêlées/touches) : sans attribution, 1 clic.
+      var jc = Array.isArray(catA.jeu_collectif) ? catA.jeu_collectif : [];
+      if (jc.length) {
+        html += '<div class="suivi-palette__title suivi-palette__title--sep">Jeu collectif</div>';
+        html += '<div class="suivi-palette__grid">';
+        jc.forEach(function (obs, idx) {
+          html +=
+            '<div class="suivi-palette__action">' +
+              '<span class="suivi-palette__lbl">' + escapeHtml(obs.libelle_court) + '</span>' +
+              '<div class="suivi-palette__btns">' +
+                '<button type="button" class="suivi-palette__btn suivi-palette__btn--jc" data-jidx="' + idx + '">Saisir</button>' +
+              '</div>' +
+            '</div>';
+        });
+        html += '</div>';
+      }
       html += '</div>'; // fin suivi-palette
       pal.innerHTML = html;
 
@@ -1724,6 +1763,31 @@
             // Blessure (et tout mouvement à 1 joueur) : attribution simple.
             _ouvrirAttribution(evtId, perCourante, obs, { estBlessure: (obs.uuid === 'obs-A-blessure') });
           }
+        });
+      });
+      // L3d — boutons « Discipline » : attribution nominative (joueur).
+      pal.querySelectorAll('.suivi-palette__btn--disc').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var idx = parseInt(b.getAttribute('data-didx'), 10);
+          var obs = disc[idx];
+          if (obs) _ouvrirAttribution(evtId, perCourante, obs);
+        });
+      });
+      // L3d — boutons « Jeu collectif » : fait d'équipe, sans joueur, 1 clic.
+      pal.querySelectorAll('.suivi-palette__btn--jc').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var idx = parseInt(b.getAttribute('data-jidx'), 10);
+          var obs = jc[idx];
+          if (!obs) return;
+          var minute = Math.floor(SuiviChrono.secondesEcoulees() / 60);
+          _saisirObservable(evtId, {
+            observableId: obs.uuid,
+            categorieObs: 'A',
+            valeurPoints: 0,
+            equipeConcernee: 'notre',
+            minuteMatch: minute,
+            periode: perCourante
+          });
         });
       });
     });
