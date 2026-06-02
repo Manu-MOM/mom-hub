@@ -21,6 +21,19 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
+ * Version : 1.56 — Vignette « Suivi » : panneau d'accès in-situ (générateur de lien + spectateur + revoir) (2 juin 2026)
+ *   v1.56 : La vignette « ⏱ Suivi » de la grille passe d'une ancre scroll
+ *           (voir-suivi) à une EXPANSION in-situ (expand-fonction, comme
+ *           Encadrement), dont le panneau injecte le HTML de
+ *           renderSuiviSection : match simple → accès directs (générer/
+ *           copier/partager le lien coach, lien spectateur, revoir vidéo) ;
+ *           tournoi → par phase → par match → mêmes accès. La section
+ *           séparée #evt-suivi-rencontre est retirée (évite le doublon de
+ *           boutons/montures ; suiviHtml désormais consommé par la vignette).
+ *           Ajout PUR : 1 cas sectionId='suivi-acces' dans renderFonction-
+ *           Cellule + redéclaration vignette #2 ; handler voir-suivi
+ *           conservé (inerte, protégé null). Actions suivi câblées en
+ *           délégation = fonctionnent dans la vignette. node --check OK.
  * Version : 1.55 — Vignettes « Vue terrain » et « Vue réseaux sociaux » câblées (1 juin 2026)
  *   v1.55 : Les 2 vignettes de la grille fonctionnalités (fiche évènement)
  *           passent de en-cours/à-venir à DISPONIBLE (statut adaptatif
@@ -3163,11 +3176,11 @@
     // (5) BLOC SUIVI DE RENCONTRE — INVARIANT byte-identique
     //     renderSuiviSection préservée 100%. Wrapper id="evt-suivi-
     //     rencontre" = addition pure pour ancre depuis lien #2 grille.
+    // v1.56 — le HTML de suivi est désormais injecté DANS la vignette
+    // Suivi (expansion in-situ), plus dans une section séparée (évite le
+    // doublon de boutons/montures). suiviHtml reste calculé pour la vignette.
     // ────────────────────────────────────────────────
     const suiviHtml = renderSuiviSection(evt);
-    if (suiviHtml) {
-      html += '<div id="evt-suivi-rencontre">' + suiviHtml + '</div>';
-    }
 
     // ────────────────────────────────────────────────
     // (6) GRILLE FONCTIONNALITÉS DE L'ÉVÈNEMENT — 8 grands boutons §3.3
@@ -3213,14 +3226,18 @@
       sectionId: 'compositions'
     });
 
-    // Fonction #2 — Suivi (ancre interne vers bloc 5)
+    // Fonction #2 — Suivi : expansion in-situ (panneau d'accès au suivi,
+    // réutilise le HTML de renderSuiviSection : match simple → accès directs ;
+    // tournoi → par phase → par match → accès). v1.56.
     const suiviDispo = !!suiviHtml;
     html += renderFonctionCellule({
       titre: '⏱ Suivi',
       sousTitre: 'Saisie observables match',
       statut: suiviDispo ? 'disponible' : 'a-venir',
-      action: 'voir-suivi',
+      action: 'expand-fonction',
       evt: evt,
+      sectionId: 'suivi-acces',
+      suiviInnerHtml: suiviHtml,
       hintIndisponible: suiviDispo ? null : 'hors période ou type d\'évènement'
     });
 
@@ -3495,9 +3512,18 @@
           html += '</div>';
         }
       }
-      // Suivi : ancre interne scroll
+      // Suivi : ancre interne scroll (conservé, plus utilisé par défaut)
       else if (opts.action === 'voir-suivi') {
         html += '<button type="button" class="evt-btn evt-fiche-fonction-cta" data-action="voir-suivi" data-event-id="' + escHtml(evtId) + '">Voir ci-dessous ↓</button>';
+      }
+      // Suivi : expansion in-situ — panneau d'accès (v1.56). Réutilise le
+      // HTML de renderSuiviSection (générateur de lien, spectateur, revoir),
+      // organisé par match simple ou par phase→match (tournoi).
+      else if (opts.sectionId === 'suivi-acces') {
+        html += '<button type="button" class="evt-btn evt-fiche-fonction-cta" data-action="expand-fonction" data-fonction-target="suivi-acces" aria-expanded="false">Accéder au suivi ▼</button>';
+        html += '<div class="evt-fiche-fonction-expand" id="evt-fiche-expand-suivi-acces" hidden>';
+        html += (opts.suiviInnerHtml || '<div class="evt-fiche-empty">Suivi indisponible.</div>');
+        html += '</div>';
       }
       // Encadrement : expansion in-situ (liste détaillée M8)
       else if (opts.sectionId === 'encadrement') {
