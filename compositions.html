@@ -217,10 +217,12 @@
     }
     .view-suivi__kickoff:disabled { opacity: 0.5; cursor: not-allowed; }
     /* ── Chrono (L2/3a) ── */
-    .suivi-score { font-family: 'Oswald', sans-serif; font-size: 22px; font-weight: 600; letter-spacing: 0.04em; color: var(--ink); text-align: center; }
-    .suivi-score__eq { font-size: 16px; color: var(--ink-mute); text-transform: uppercase; letter-spacing: 0.06em; }
+    .suivi-score { font-family: 'Oswald', sans-serif; font-weight: 600; letter-spacing: 0.04em; color: var(--ink); display: flex; align-items: center; justify-content: center; gap: 18px; }
+    .suivi-score__side { display: flex; flex-direction: column; align-items: center; gap: 2px; flex: 1; min-width: 0; }
+    .suivi-score__sep { font-size: 24px; color: var(--ink-mute); flex-shrink: 0; }
+    .suivi-score__eq { font-size: 15px; color: var(--ink-mute); text-transform: uppercase; letter-spacing: 0.05em; text-align: center; line-height: 1.2; }
     .suivi-chrono__add { font-size: 0.5em; color: #c08a00; vertical-align: super; font-weight: 600; }
-    .suivi-score__pts { color: var(--vert-prairie); font-size: 26px; }
+    .suivi-score__pts { color: var(--vert-prairie); font-size: 40px; line-height: 1; }
     .suivi-chrono { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 28px 22px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
     .suivi-chrono__periode { font-family: 'Oswald', sans-serif; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-mute); }
     .suivi-chrono__time { font-family: 'JetBrains Mono', monospace; font-size: 52px; font-weight: 700; line-height: 1; color: var(--ink); }
@@ -258,6 +260,7 @@
     .view-suivi .suivi-score { color: #f6f3e8; }
     .view-suivi .suivi-score__eq { color: #9aa6b2; }
     .view-suivi .suivi-score__pts { color: #5dcaa5; }
+    .view-suivi .suivi-score__sep { color: #5a6b62; }
     /* Chrono — look stade à TOUS les états */
     .view-suivi .suivi-chrono { background: #1c2228; border-color: #2a323a; gap: 12px; }
     .view-suivi .suivi-chrono__periode { color: #7c8a99; letter-spacing: 0.16em; }
@@ -335,6 +338,9 @@
     .suivi-palette__btn--jc:hover { background: var(--paper-warm, #faf8f3); }
     .suivi-palette__grid { display: flex; flex-direction: column; gap: 10px; }
     .suivi-palette__action { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .suivi-palette__action--score { flex-wrap: nowrap; }
+    .suivi-palette__action--score .suivi-palette__lbl--center { flex: 1; text-align: center; }
+    .suivi-palette__action--score .suivi-palette__btn { flex-shrink: 0; min-width: 84px; }
     .suivi-palette__lbl { font-size: 14px; color: var(--ink); }
     .suivi-palette__lbl em { color: var(--vert-prairie); font-style: normal; font-weight: 600; }
     .suivi-palette__btns { display: flex; gap: 8px; }
