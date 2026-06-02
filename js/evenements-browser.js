@@ -21,6 +21,17 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
+ * Version : 1.57 — FIX gate suiviActionnable : tournois à phases (type_competition) reconnus (2 juin 2026)
+ *   v1.57 : FIX cause racine (retour terrain Manu : vignette Suivi inactive
+ *           sur le Challenge Vié). suiviActionnable testait
+ *           type_evenement ∈ {match, tournoi} — or type_evenement n'est
+ *           JAMAIS 'tournoi' en base (cf. correction v1.38 d'estEvtAPhases,
+ *           ligne ~1539). Le gate refusait donc TOUS les tournois →
+ *           renderSuiviSection renvoyait '' → section Suivi ET vignette
+ *           (v1.56) inactives. Désormais : match simple OU estEvtAPhases
+ *           (type_competition ∈ PHASES_SOUS_TYPES). 1 fonction, 1 usage
+ *           (renderSuiviSection). Aucune régression (journee_championnat
+ *           non-à-phases reste refusé comme avant). node --check OK.
  * Version : 1.56 — Vignette « Suivi » : panneau d'accès in-situ (générateur de lien + spectateur + revoir) (2 juin 2026)
  *   v1.56 : La vignette « ⏱ Suivi » de la grille passe d'une ancre scroll
  *           (voir-suivi) à une EXPANSION in-situ (expand-fonction, comme
@@ -2610,7 +2621,14 @@
   // (le seuil exact reste la dette Audits C12-gate — signalée).
   function suiviActionnable(rencontre) {
     if (!rencontre) return false;
-    if (rencontre.type_evenement !== 'match' && rencontre.type_evenement !== 'tournoi') return false;
+    // v1.57 FIX : aligner sur la correction v1.38. La détection « tournoi »
+    // se fait via type_competition (estEvtAPhases), PAS via type_evenement
+    // (qui n'est jamais 'tournoi' en base — cf. estEvtAPhases ligne ~1539).
+    // Avant, ce gate testait type_evenement==='tournoi' (toujours faux) →
+    // la section Suivi et la vignette restaient inactives pour les tournois
+    // (Challenge Vié, Seven, etc.). Désormais : match simple OU évt à phases.
+    var estMatch = rencontre.type_evenement === 'match';
+    if (!estMatch && !estEvtAPhases(rencontre)) return false;
     return rencontre.etat !== 'annule' && rencontre.etat !== 'archive';
   }
 
