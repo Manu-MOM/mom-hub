@@ -868,6 +868,56 @@
     }
     .rapport__btn:hover { background: var(--vert-prairie); color: #fff; }
 
+    /* ── Bloc SAISI (2e temps, pt 53→C13-a) : verdict de l'éducateur EN
+         HAUT (décision Manu), au-dessus du déduit. ─────────────────────── */
+    .rapport__saisi {
+      margin: 12px 18px 0; padding: 14px 16px;
+      border: 1px solid var(--line); border-radius: 12px;
+      background: var(--paper-warm, #faf8f3);
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .rapport__saisi-titre {
+      font-family: 'Oswald', sans-serif; font-size: 13px; font-weight: 600;
+      letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-mute);
+    }
+    .rapport__bilan {
+      width: 100%; box-sizing: border-box; min-height: 96px; resize: vertical;
+      padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px;
+      font-family: inherit; font-size: 14px; line-height: 1.55; color: var(--ink);
+      background: #fff;
+    }
+    /* Rendu lecture du bilan (impression + repli) — préserve les sauts de ligne. */
+    .rapport__bilan-lu {
+      width: 100%; box-sizing: border-box; padding: 4px 2px;
+      font-size: 14px; line-height: 1.55; color: var(--ink);
+      white-space: pre-wrap;
+    }
+    .rapport__bilan-vide { color: var(--ink-mute); font-style: italic; }
+    .rapport__saisi-actions {
+      display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+    }
+    .rapport__saisi-actions .rapport__btn { margin: 0; }
+    .rapport__btn--primary {
+      border-color: var(--vert-prairie);
+      background: var(--vert-prairie); color: #fff;
+    }
+    .rapport__btn--primary:hover { filter: brightness(1.08); background: var(--vert-prairie); }
+    .rapport__saisi-msg { font-size: 12px; color: var(--ink-mute); }
+    .rapport__saisi-msg--ok { color: var(--vert-prairie); }
+    .rapport__saisi-msg--err { color: #b00020; }
+    /* Pastille de statut dynamique. */
+    .rapport__statut .badge-statut {
+      display: inline-block; padding: 1px 9px; border-radius: 999px;
+      font-weight: 600; font-size: 11px; letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .rapport__statut .badge-statut--provisoire {
+      background: #fff3cd; color: #7a5b00; border: 1px solid #e6c34d;
+    }
+    .rapport__statut .badge-statut--finalise {
+      background: #d6f0db; color: #1e4628; border: 1px solid #6bbf82;
+    }
+
     /* ── Impression : ne garder que le rapport (boutons d'export inclus
          masqués). Déclenché par body.printing-rapport au clic Imprimer. ── */
     @media print {
@@ -880,7 +930,13 @@
       }
       /* Boutons et contrôles non imprimés. */
       body.printing-rapport .rapport__actions,
+      body.printing-rapport .rapport__saisi-actions,
+      body.printing-rapport .rapport__saisi-msg,
       body.printing-rapport .view-suivi__habillage { display: none !important; }
+      /* À l'impression on ne montre pas le champ éditable mais sa version
+         lecture (le JS la maintient à jour). */
+      body.printing-rapport .rapport__bilan { display: none !important; }
+      body.printing-rapport .rapport__bilan-lu { display: block !important; }
       /* Le panneau temps de jeu est déplié via JS (attribut open) avant
          impression ; on masque juste le résumé cliquable « ▶ … ». */
       body.printing-rapport .rapport-tdj__sum { list-style: none; }
