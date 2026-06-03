@@ -6,6 +6,65 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.47 — Rapport de match v1 (socle, lecture seule du déduit) (3 juin 2026)
+ *   v3.47 : pt 53. RAPPORT DE MATCH v1. 4e onglet « Rapport » à côté de
+ *           Suivi (compositions.html). renderEditorRapport (ajout pur,
+ *           calqué sur renderEditorSuivi) : LECTURE SEULE du déduit, sur
+ *           feuille de match uniquement (base → message inerte). Lit la
+ *           chronologie via SupabaseHub.getChronologieRencontreCoach
+ *           (C12-k) ET le référentiel (SuiviObs.charger), agrège 100 %
+ *           côté front : score (réutilise _calculerScore, SUM par camp
+ *           hors annulées), récap par famille (Score/Discipline/Jeu
+ *           collectif, mapping observable_id→famille via _familleDeObs
+ *           dérivé de SuiviObs.catA), substitutions nominatives
+ *           (sortant→entrant, noms via getCompoReduiteRencontreCoach +
+ *           libelleJoueurSuivi, repli #id court — jamais de faux nom),
+ *           panneau temps de jeu REPLIÉ avec libellé d'incertitude
+ *           permanent (minute_match peu fiable → dégradation honnête,
+ *           SUIVI-COACH-7). AUCUNE écriture (stockage du saisi reporté
+ *           au 2e temps). bindViewTabs câble tabs[3] ; renderEditorArea
+ *           aiguille viewMode==='rapport'. Chemins Liste/Terrain/Suivi
+ *           inchangés. node --check OK.
+ * Version : 3.46 — Suivi live : L5 observations Cat B + fix libellés historique (2 juin 2026)
+ *   v3.46 : L5. (1) Section repliable « Observations » (Cat B, en retrait,
+ *           D8) en bas de palette : observations qualitatives par joueur,
+ *           sans points ; liste selon tranche d'âge déduite du nom d'équipe
+ *           (SuiviObs.observablesB ; repli M-14_F-15) ; saisie via attribution
+ *           joueur, categorieObs='B', observable_id = slug (_slugObsB).
+ *           (2) FIX régression d'affichage : l'historique montrait les
+ *           identifiants bruts (obs-A-…) quand le référentiel n'était pas
+ *           encore chargé au 1er rendu. _peindreHistorique charge désormais
+ *           SuiviObs si besoin puis re-peint. SuiviObs.libelle résout aussi
+ *           les libellés Cat B. Référentiel fetché (admin = OBSERVABLES-ADMIN
+ *           futur). node --check OK.
+ * Version : 3.45 — Suivi live : substitution filtrée (vrais entrants/sortants) (2 juin 2026)
+ *   v3.45 : #3 version simple (retour terrain Manu). La substitution filtre
+ *           désormais les listes : « qui sort ? » = joueurs sur le terrain,
+ *           « qui entre ? » = joueurs au banc. _etatTerrain() reconstitue
+ *           l'état à l'instant T depuis l'effectif (titulaires/remplaçants)
+ *           + les substitutions non annulées (ordre chrono). Lignes mémo
+ *           dans SuiviChrono.lignes (pas d'appel réseau au clic). Blessures/
+ *           cartons NON pris en compte (raffinement futur). node --check OK.
+ * Version : 3.44 — Vue Terrain : cadre charte réseaux (bandeau + liseré, toggle partagé) (2 juin 2026)
+ *   v3.44 : Le cadre « réseaux sociaux » (bandeau logo+nom + liseré +
+ *           toggle MOM/entente) est désormais aussi sur l'onglet TERRAIN
+ *           (retour terrain Manu). Toggle PARTAGÉ avec Suivi via
+ *           SuiviHabillage. Bandeau factorisé : helpers _bandeauHTML /
+ *           _bindHabillageToggle / _habillageCourant / _logoHabillage,
+ *           réutilisés par renderEditorSuivi et renderEditorTerrain (zéro
+ *           duplication). Logo selon habillage. node --check OK.
+ * Version : 3.43 — Suivi live : fix logo du bandeau selon l'habillage (2 juin 2026)
+ *   v3.43 : FIX (retour terrain Manu). Le logo du bandeau suivait toujours
+ *           MOM (logo-m2m.png en dur). Désormais selon l'habillage :
+ *           assets/ecusson-mom.png (mom) / assets/logo-entente.png (entente),
+ *           chemins repris de _collecterDonneesExport. node --check OK.
+ * Version : 3.42 — Suivi live : score en 3 colonnes + palette score Nous/centre/Adverse (2 juin 2026)
+ *   v3.42 : Lisibilité (retour terrain Manu). (1) Bloc SCORE en 3 colonnes :
+ *           notre équipe + son score à gauche, « — » au centre, adverse +
+ *           son score à droite (nom en haut, gros score dessous). (2) Lignes
+ *           de la palette SCORE : bouton Nous à gauche, libellé centré,
+ *           bouton Adverse à droite (familles mouvement/discipline/jeu
+ *           collectif inchangées). Purement présentation. node --check OK.
  * Version : 3.41 — Suivi live : cadre charte réseaux (bandeau + liseré, MOM/entente) (2 juin 2026)
  *   v3.41 : CADRE rappel charte « réseaux sociaux » (retour terrain Manu).
  *           Bandeau en haut (logo + nom d'équipe + sous-titre + filet doré)
@@ -1051,6 +1110,15 @@
       return;
     }
 
+    // pt 53 (Rapport de match v1, lecture seule du déduit) — aiguillage.
+    // En mode 'rapport', on lit la chronologie du match et on agrège
+    // côté front (score / familles / substitutions / temps de jeu).
+    // Aucune écriture. Le chemin 'liste' ci-dessous reste inchangé.
+    if (State.viewMode === 'rapport') {
+      renderEditorRapport(el, compo);
+      return;
+    }
+
     let html = '<div class="view-liste">';
     html += '<section class="view-liste__section">';
     html +=   '<h3 class="view-liste__title">XV de départ</h3>';
@@ -1095,6 +1163,7 @@
     evtId: null,         // UUID du MATCH piloté
     etat: null,          // dernier état lu (objet RPC) ou null
     score: { mom: 0, adv: 0 },  // L2/3b — score calculé (jamais stocké, I1)
+    lignes: [],                 // #3 — dernière chronologie lue (calcul état terrain)
     nomNous: 'Nous',            // amélioration 2 — vrais noms d'équipes
     nomAdv: 'Adversaire',
     busy: false,         // garde anti-double-clic pendant une action
@@ -1198,6 +1267,7 @@
   // le fetch échoue (palette indisponible, le chrono reste utilisable).
   var SuiviObs = {
     catA: null,        // { score:[], discipline:[], mouvement:[], jeu_collectif:[] } ou null
+    catB: null,        // { tranche: [{libelle}, …], … } ou null (L5)
     charge: false,
     enCours: false,
     charger: function (cb) {
@@ -1209,32 +1279,69 @@
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (d) {
           self.catA = (d && d.categorie_A) ? d.categorie_A : null;
+          self.catB = (d && d.categorie_B_pre_suggestions) ? d.categorie_B_pre_suggestions : null;
           self.charge = true; self.enCours = false;
           if (cb) cb(self.catA);
         })
         .catch(function () {
-          self.charge = true; self.enCours = false; self.catA = null;
+          self.charge = true; self.enCours = false; self.catA = null; self.catB = null;
           if (cb) cb(null);
         });
     },
-    // L4 — libellé court d'un observable par son uuid (toutes familles
-    // de catA : score, discipline, mouvement, jeu_collectif).
+    // L4/L5 — libellé d'un observable par son uuid (catA) ou slug (catB).
     libelle: function (observableId) {
-      if (!this.catA || !observableId) return null;
-      var familles = ['score', 'discipline', 'mouvement', 'jeu_collectif'];
-      for (var f = 0; f < familles.length; f++) {
-        var arr = this.catA[familles[f]];
-        if (Array.isArray(arr)) {
-          for (var i = 0; i < arr.length; i++) {
-            if (arr[i] && arr[i].uuid === observableId) {
-              return { libelle: arr[i].libelle_court, icone: arr[i].icone || '' };
+      if (!observableId) return null;
+      if (this.catA) {
+        var familles = ['score', 'discipline', 'mouvement', 'jeu_collectif'];
+        for (var f = 0; f < familles.length; f++) {
+          var arr = this.catA[familles[f]];
+          if (Array.isArray(arr)) {
+            for (var i = 0; i < arr.length; i++) {
+              if (arr[i] && arr[i].uuid === observableId) {
+                return { libelle: arr[i].libelle_court, icone: arr[i].icone || '' };
+              }
             }
           }
         }
       }
+      if (observableId.indexOf('obs-B-') === 0 && this.catB) {
+        for (var cle in this.catB) {
+          var liste = this.catB[cle];
+          if (Array.isArray(liste)) {
+            for (var j = 0; j < liste.length; j++) {
+              if (liste[j] && _slugObsB(liste[j].libelle) === observableId) {
+                return { libelle: liste[j].libelle, icone: '📝' };
+              }
+            }
+          }
+        }
+        return { libelle: 'Observation', icone: '📝' };
+      }
       return null;
+    },
+    // L5 — observables Cat B pour une équipe (tranche déduite du nom ;
+    // repli M-14_F-15). Édition admin = chantier OBSERVABLES-ADMIN.
+    observablesB: function (nomEquipe) {
+      if (!this.catB) return [];
+      var n = (nomEquipe || '').toUpperCase();
+      var cle = null;
+      if (/M-?16|M-?19/.test(n)) cle = 'M-16_M-19';
+      else if (/F-?18/.test(n)) cle = 'F-18';
+      else if (/M-?14|F-?15/.test(n)) cle = 'M-14_F-15';
+      else if (/M-?6|M-?8|M-?10|M-?12|EDR/.test(n)) cle = 'EDR_M-6_M-8_M-10_M-12';
+      else if (/\+ ?18|SENIOR|SEN/.test(n)) cle = 'M+18_F+18';
+      if (!cle || !this.catB[cle]) cle = 'M-14_F-15';
+      return Array.isArray(this.catB[cle]) ? this.catB[cle] : [];
     }
   };
+
+  // L5 — slug stable d'un observable Cat B depuis son libellé.
+  function _slugObsB(libelle) {
+    var s = (libelle || '').toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    return 'obs-B-' + (s || 'obs');
+  }
 
   // Résout l'adversaire du match porté par la compo (point parké L1) :
   // l'objet COMPO ne porte pas adversaire_nom — c'est l'objet MATCH
@@ -1273,6 +1380,44 @@
   // le bandeau + liseré ; l'intérieur sombre est inchangé.
   var SuiviHabillage = { choix: 'mom' };
 
+  // Helper factorisé (v3.44) : bandeau « charte réseaux » réutilisé par
+  // les vues Suivi et Terrain. logo + nom équipe + sous-titre + toggle.
+  function _habillageCourant() {
+    return (SuiviHabillage.choix === 'entente') ? 'entente' : 'mom';
+  }
+  function _logoHabillage(hab) {
+    return (hab === 'entente') ? 'assets/logo-entente.png' : 'assets/ecusson-mom.png';
+  }
+  function _bandeauHTML(nomEq, sousTitre) {
+    var hab = _habillageCourant();
+    return '<div class="view-suivi__bandeau">' +
+        '<div class="view-suivi__brand">' +
+          '<img class="view-suivi__logo" src="' + _logoHabillage(hab) + '" alt="" aria-hidden="true">' +
+          '<div class="view-suivi__brand-txt">' +
+            '<div class="view-suivi__brand-eq">' + escapeHtml(nomEq || '') + '</div>' +
+            '<div class="view-suivi__brand-sub">' + escapeHtml(sousTitre || '') + '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="view-suivi__habillage" role="group" aria-label="Habillage">' +
+          '<button type="button" class="view-suivi__hbtn" data-hab="mom"' + (hab === 'mom' ? ' aria-pressed="true"' : '') + '>MOM</button>' +
+          '<button type="button" class="view-suivi__hbtn" data-hab="entente"' + (hab === 'entente' ? ' aria-pressed="true"' : '') + '>Entente</button>' +
+        '</div>' +
+      '</div>';
+  }
+  // Câble le toggle d'habillage ; au changement, exécute rerender().
+  function _bindHabillageToggle(racine, rerender) {
+    if (!racine) return;
+    racine.querySelectorAll('.view-suivi__hbtn').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var h = b.getAttribute('data-hab');
+        if (h && h !== SuiviHabillage.choix) {
+          SuiviHabillage.choix = h;
+          if (typeof rerender === 'function') rerender();
+        }
+      });
+    });
+  }
+
   function renderEditorSuivi(el, compo) {
     SuiviChrono.desarmer();
 
@@ -1294,7 +1439,7 @@
     SuiviChrono.nomNous = _nomNotreEquipe();
     SuiviChrono.nomAdv = _nomAdversaireCourt(compo);
     var adversaire = _adversaireDeCompo(compo);
-    var habillage = (SuiviHabillage.choix === 'entente') ? 'entente' : 'mom';
+    var habillage = _habillageCourant();
 
     // Rendu initial (chargement), puis lecture asynchrone de l'état.
     // Bandeau + liseré = rappel de la charte « réseaux sociaux »
@@ -1302,39 +1447,18 @@
     // pourtour ; l'intérieur (thème sombre) est inchangé.
     el.innerHTML =
       '<div class="view-suivi view-suivi--' + habillage + '">' +
-        '<div class="view-suivi__bandeau">' +
-          '<div class="view-suivi__brand">' +
-            '<img class="view-suivi__logo" src="assets/logo-m2m.png" alt="" aria-hidden="true">' +
-            '<div class="view-suivi__brand-txt">' +
-              '<div class="view-suivi__brand-eq">' + escapeHtml(SuiviChrono.nomNous) + '</div>' +
-              '<div class="view-suivi__brand-sub">Suivi du match — ' + escapeHtml(adversaire) + '</div>' +
-            '</div>' +
-          '</div>' +
-          '<div class="view-suivi__habillage" role="group" aria-label="Habillage">' +
-            '<button type="button" class="view-suivi__hbtn" data-hab="mom"' + (habillage === 'mom' ? ' aria-pressed="true"' : '') + '>MOM</button>' +
-            '<button type="button" class="view-suivi__hbtn" data-hab="entente"' + (habillage === 'entente' ? ' aria-pressed="true"' : '') + '>Entente</button>' +
-          '</div>' +
-        '</div>' +
+        _bandeauHTML(SuiviChrono.nomNous, 'Suivi du match — ' + adversaire) +
         '<div id="suivi-score" class="suivi-score">' + _scoreHTML() + '</div>' +
         '<div id="suivi-chrono-host" class="suivi-chrono"><div class="view-suivi__hint">Chargement du chrono…</div></div>' +
         '<div id="suivi-palette"></div>' +
         '<div id="suivi-historique" class="suivi-historique"></div>' +
       '</div>';
 
-    // Toggle d'habillage MOM / entente — ne change QUE le cadre (classe
-    // sur .view-suivi). Re-rend la vue pour réappliquer l'habillage.
-    var vue = el.querySelector('.view-suivi');
-    if (vue) {
-      vue.querySelectorAll('.view-suivi__hbtn').forEach(function (b) {
-        b.addEventListener('click', function () {
-          var h = b.getAttribute('data-hab');
-          if (h && h !== SuiviHabillage.choix) {
-            SuiviHabillage.choix = h;
-            renderEditorSuivi(el, compo); // re-render (réapplique l'habillage)
-          }
-        });
-      });
-    }
+    // Toggle d'habillage MOM / entente — ne change QUE le cadre. Re-rend
+    // la vue suivi pour réappliquer l'habillage.
+    _bindHabillageToggle(el.querySelector('.view-suivi'), function () {
+      renderEditorSuivi(el, compo);
+    });
 
     if (!evtId) {
       var host0 = document.getElementById('suivi-chrono-host');
@@ -1343,6 +1467,280 @@
     }
 
     _rafraichirChrono(evtId, true);
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // pt 53 — RAPPORT DE MATCH v1 (socle, LECTURE SEULE DU DÉDUIT).
+  // Onglet « Rapport » à côté de Suivi. Affiche, pour une feuille de
+  // match, le DÉDUIT calculé depuis la chronologie : score (SUM par
+  // camp), récap par famille (score/discipline/jeu collectif),
+  // substitutions (nominatif), et un panneau temps de jeu REPLIÉ avec
+  // libellé d'incertitude permanent (minute_match peu fiable, base de
+  // temps = horodatage ; dégradation honnête SUIVI-COACH-7).
+  // AUCUNE écriture : pas de stockage du saisi (reporté 2e temps).
+  // Agrégation 100 % front (mapping observable_id→famille via SuiviObs,
+  // référentiel JSON = seule source ; cf. gouvernance SQL↔JSON).
+  // ════════════════════════════════════════════════════════════
+
+  // Famille d'un observable (score|discipline|mouvement|jeu_collectif)
+  // dérivée du référentiel chargé. null si inconnu ou non chargé.
+  function _familleDeObs(observableId) {
+    if (!observableId || !SuiviObs.catA) return null;
+    var familles = ['score', 'discipline', 'mouvement', 'jeu_collectif'];
+    for (var f = 0; f < familles.length; f++) {
+      var arr = SuiviObs.catA[familles[f]];
+      if (Array.isArray(arr)) {
+        for (var i = 0; i < arr.length; i++) {
+          if (arr[i] && arr[i].uuid === observableId) return familles[f];
+        }
+      }
+    }
+    return null;
+  }
+
+  function renderEditorRapport(el, compo) {
+    SuiviChrono.desarmer();
+
+    // Comme le Suivi (D2) : le rapport de match s'ouvre sur une feuille
+    // de match (la base ne porte pas d'adversaire ni de chronologie).
+    if (!compo || compo.type_compo !== 'match') {
+      el.innerHTML =
+        '<div class="view-rapport">' +
+          '<div class="view-rapport__inert">' +
+            'Le rapport de match s\'affiche sur une <strong>feuille de match</strong>.<br>' +
+            'Sélectionne un onglet de match ci-dessus pour voir son rapport.' +
+          '</div>' +
+        '</div>';
+      return;
+    }
+
+    var evtId = compo.evenement_id || null;
+    var nomNous = _nomNotreEquipe();
+    var nomAdv = _nomAdversaireCourt(compo);
+    var adversaire = _adversaireDeCompo(compo);
+    var habillage = _habillageCourant();
+
+    el.innerHTML =
+      '<div class="view-rapport view-rapport--' + habillage + '">' +
+        _bandeauHTML(nomNous, 'Rapport de match — ' + adversaire) +
+        '<div class="rapport__statut">Statut : <strong>provisoire</strong> · lecture seule (déduit du suivi)</div>' +
+        '<div id="rapport-corps" class="rapport__corps">' +
+          '<div class="view-suivi__hint">Chargement du rapport…</div>' +
+        '</div>' +
+      '</div>';
+
+    _bindHabillageToggle(el.querySelector('.view-rapport'), function () {
+      renderEditorRapport(el, compo);
+    });
+
+    if (!evtId) {
+      var corps0 = document.getElementById('rapport-corps');
+      if (corps0) corps0.innerHTML = '<div class="view-suivi__hint">Match non résolu (evenement_id absent).</div>';
+      return;
+    }
+
+    if (!window.SupabaseHub || !SupabaseHub.getChronologieRencontreCoach) {
+      var corps1 = document.getElementById('rapport-corps');
+      if (corps1) corps1.innerHTML = '<div class="view-suivi__hint">Lecture du suivi indisponible.</div>';
+      return;
+    }
+
+    // Charge le référentiel (familles/libellés) ET la chronologie, puis
+    // peint. Le référentiel est mémo (SuiviObs.charger idempotent).
+    SuiviObs.charger(function () {
+      SupabaseHub.getChronologieRencontreCoach(evtId, true).then(function (lignes) {
+        // Anti-périmé : si on a quitté l'onglet entre-temps, ne rien peindre.
+        if (State.viewMode !== 'rapport' || State.selectedCompoId !== compo.id) return;
+        var arr = Array.isArray(lignes) ? lignes : [];
+        _peindreRapport(arr, nomNous, nomAdv);
+      }).catch(function () {
+        var c = document.getElementById('rapport-corps');
+        if (c) c.innerHTML = '<div class="view-suivi__hint">Lecture du suivi impossible.</div>';
+      });
+    });
+  }
+
+  // Agrège la chronologie et peint le corps du rapport. Lecture pure.
+  function _peindreRapport(lignes, nomNous, nomAdv) {
+    var corps = document.getElementById('rapport-corps');
+    if (!corps) return;
+
+    // Lignes effectives (annulées exclues du déduit).
+    var eff = [];
+    for (var i = 0; i < lignes.length; i++) {
+      if (lignes[i] && lignes[i].annule !== true) eff.push(lignes[i]);
+    }
+
+    if (eff.length === 0) {
+      corps.innerHTML =
+        '<div class="rapport__vide">Aucune action enregistrée pour ce match.<br>' +
+        'Le rapport se remplira à partir du suivi (onglet « Suivi »).</div>';
+      return;
+    }
+
+    // 1) Score (réutilise la logique SUM par camp, hors annulées).
+    var score = _calculerScore(lignes);
+
+    // 2) Décompte par observable et par camp.
+    //    compte[observable_id] = { nous, adv }
+    var compte = {};
+    var subs = [];        // substitutions effectives (sortant→entrant)
+    for (var j = 0; j < eff.length; j++) {
+      var l = eff[j];
+      var oid = l.observable_id;
+      if (!oid) continue;
+      if (oid === 'obs-A-substitution') {
+        subs.push(l);
+        continue;
+      }
+      if (!compte[oid]) compte[oid] = { nous: 0, adv: 0 };
+      if (l.equipe_concernee === 'adverse') compte[oid].adv += 1;
+      else compte[oid].nous += 1;
+    }
+
+    // 3) Regroupe par famille pour l'affichage.
+    var ordreFam = ['score', 'discipline', 'jeu_collectif'];
+    var titreFam = { score: 'Score', discipline: 'Discipline', jeu_collectif: 'Jeu collectif' };
+    var parFamille = { score: [], discipline: [], jeu_collectif: [], autre: [] };
+    for (var oid2 in compte) {
+      if (!compte.hasOwnProperty(oid2)) continue;
+      var fam = _familleDeObs(oid2);
+      var info = (typeof SuiviObs.libelle === 'function') ? SuiviObs.libelle(oid2) : null;
+      var ligne = {
+        libelle: (info && info.libelle) ? info.libelle : oid2,
+        icone: (info && info.icone) ? info.icone : '',
+        nous: compte[oid2].nous,
+        adv: compte[oid2].adv
+      };
+      if (fam === 'score') parFamille.score.push(ligne);
+      else if (fam === 'discipline') parFamille.discipline.push(ligne);
+      else if (fam === 'jeu_collectif') parFamille.jeu_collectif.push(ligne);
+      else if (fam === 'mouvement') { /* substitution déjà sortie ; blessure → mouvement */ parFamille.discipline.push(ligne); }
+      else parFamille.autre.push(ligne);
+    }
+
+    var html = '';
+
+    // SCORE en grand (le déduit phare).
+    html += '<div class="rapport-score">' +
+              '<div class="rapport-score__side">' +
+                '<div class="rapport-score__eq">' + escapeHtml(nomNous || 'Nous') + '</div>' +
+                '<div class="rapport-score__pts">' + score.mom + '</div>' +
+              '</div>' +
+              '<div class="rapport-score__sep">—</div>' +
+              '<div class="rapport-score__side">' +
+                '<div class="rapport-score__eq">' + escapeHtml(nomAdv || 'Adversaire') + '</div>' +
+                '<div class="rapport-score__pts">' + score.adv + '</div>' +
+              '</div>' +
+            '</div>';
+
+    // RÉCAP PAR FAMILLE (tableau Nous / Adverse).
+    for (var f = 0; f < ordreFam.length; f++) {
+      var key = ordreFam[f];
+      var liste = parFamille[key];
+      if (!liste || liste.length === 0) continue;
+      html += '<section class="rapport-bloc">' +
+                '<h4 class="rapport-bloc__titre">' + titreFam[key] + '</h4>' +
+                '<table class="rapport-tab">' +
+                  '<thead><tr><th>Action</th><th>' + escapeHtml(nomNous || 'Nous') + '</th><th>' + escapeHtml(nomAdv || 'Adv.') + '</th></tr></thead>' +
+                  '<tbody>';
+      for (var k = 0; k < liste.length; k++) {
+        var r = liste[k];
+        html += '<tr>' +
+                  '<td>' + (r.icone ? (escapeHtml(r.icone) + ' ') : '') + escapeHtml(r.libelle) + '</td>' +
+                  '<td class="rapport-tab__n">' + r.nous + '</td>' +
+                  '<td class="rapport-tab__n">' + r.adv + '</td>' +
+                '</tr>';
+      }
+      html += '</tbody></table></section>';
+    }
+
+    // SUBSTITUTIONS (nominatif sortant → entrant, côté nous).
+    if (subs.length > 0) {
+      html += '<section class="rapport-bloc">' +
+                '<h4 class="rapport-bloc__titre">🔄 Substitutions <span class="rapport-bloc__n">(' + subs.length + ')</span></h4>' +
+                '<ul id="rapport-subs" class="rapport-subs">' +
+                  '<li class="view-suivi__hint">Résolution des noms…</li>' +
+                '</ul>' +
+              '</section>';
+    }
+
+    // TEMPS DE JEU — panneau replié, incertitude assumée (SUIVI-COACH-7).
+    html += '<details class="rapport-tdj">' +
+              '<summary class="rapport-tdj__sum">⏱ Temps de jeu (estimation indicative)</summary>' +
+              '<div class="rapport-tdj__corps">' +
+                '<p class="rapport-tdj__avert">Estimation <strong>indicative</strong> : le suivi n\'enregistre pas de minutage fiable ' +
+                'pour ce match. Les durées ci-dessous sont calculées à partir de l\'ordre des actions, ' +
+                'pas d\'un chronomètre — à lire comme un ordre de grandeur, jamais comme un temps officiel.</p>' +
+                '<div id="rapport-tdj-detail">' +
+                  '<p class="view-suivi__hint">' + subs.length + ' substitution(s) enregistrée(s). ' +
+                  'Le détail par joueur sera affiné avec un minutage fiable.</p>' +
+                '</div>' +
+              '</div>' +
+            '</details>';
+
+    corps.innerHTML = html;
+
+    // Résolution asynchrone des noms pour les substitutions (compo réduite
+    // coach). Dégradation honnête : si indisponible, on garde les pastilles.
+    if (subs.length > 0) _peindreSubsRapport(subs);
+  }
+
+  // Résout les noms (sortant/entrant) des substitutions via la compo
+  // réduite coach, puis peint la liste. Lecture pure, jamais d'écriture.
+  function _peindreSubsRapport(subs) {
+    var ul = document.getElementById('rapport-subs');
+    if (!ul) return;
+
+    function peindre(resolveNom) {
+      var h = '';
+      for (var i = 0; i < subs.length; i++) {
+        var s = subs[i];
+        var sortant = resolveNom(s.joueur_uuid);
+        var entrant = resolveNom(s.joueur_uuid_entrant);
+        var min = (typeof s.minute_match === 'number') ? (' · ' + s.minute_match + '\'') : '';
+        h += '<li class="rapport-sub">' +
+               '<span class="rapport-sub__out">' + escapeHtml(sortant) + '</span>' +
+               '<span class="rapport-sub__arr">→</span>' +
+               '<span class="rapport-sub__in">' + escapeHtml(entrant) + '</span>' +
+               '<span class="rapport-sub__min">' + escapeHtml(min) + '</span>' +
+             '</li>';
+      }
+      ul.innerHTML = h || '<li class="view-suivi__hint">Aucune substitution.</li>';
+    }
+
+    var evtId = (State.compos.find(function (c) { return c.id === State.selectedCompoId; }) || {}).evenement_id || null;
+    if (evtId && window.SupabaseHub && SupabaseHub.getCompoReduiteRencontreCoach) {
+      SupabaseHub.getCompoReduiteRencontreCoach(evtId).then(function (compoRed) {
+        var parId = {};
+        var arr = Array.isArray(compoRed) ? compoRed : [];
+        for (var i = 0; i < arr.length; i++) {
+          var ligne = arr[i];
+          if (!ligne) continue;
+          var jid = ligne.joueur_id || ligne.joueur_uuid || ligne.id;
+          if (jid) parId[jid] = ligne;
+        }
+        peindre(function (uuid) {
+          if (!uuid) return '—';
+          var lj = parId[uuid];
+          if (lj && typeof SupabaseHub.libelleJoueurSuivi === 'function') {
+            return SupabaseHub.libelleJoueurSuivi(lj) || _idCourt(uuid);
+          }
+          return _idCourt(uuid);
+        });
+      }).catch(function () {
+        peindre(function (uuid) { return _idCourt(uuid); });
+      });
+    } else {
+      peindre(function (uuid) { return _idCourt(uuid); });
+    }
+  }
+
+  // Repli ultime quand le nom n'est pas résolvable : fragment d'UUID
+  // (jamais un faux nom). Honnêteté : on montre qu'on ne sait pas.
+  function _idCourt(uuid) {
+    if (!uuid) return '—';
+    return '#' + String(uuid).slice(0, 4);
   }
 
   // Lit l'état en base puis (re)peint l'écran. Si armerInterval, lance
@@ -1367,11 +1765,15 @@
   function _scoreHTML() {
     var nous = escapeHtml(SuiviChrono.nomNous || 'Nous');
     var adv = escapeHtml(SuiviChrono.nomAdv || 'Adversaire');
-    return '<span class="suivi-score__eq">' + nous + '</span> ' +
-           '<span class="suivi-score__pts">' + SuiviChrono.score.mom + '</span>' +
-           ' — ' +
-           '<span class="suivi-score__pts">' + SuiviChrono.score.adv + '</span> ' +
-           '<span class="suivi-score__eq">' + adv + '</span>';
+    return '<div class="suivi-score__side">' +
+             '<div class="suivi-score__eq">' + nous + '</div>' +
+             '<div class="suivi-score__pts">' + SuiviChrono.score.mom + '</div>' +
+           '</div>' +
+           '<div class="suivi-score__sep">—</div>' +
+           '<div class="suivi-score__side">' +
+             '<div class="suivi-score__eq">' + adv + '</div>' +
+             '<div class="suivi-score__pts">' + SuiviChrono.score.adv + '</div>' +
+           '</div>';
   }
 
   // L4 — recharge la chronologie (annulées incluses) puis met à jour
@@ -1381,6 +1783,7 @@
     SupabaseHub.getChronologieRencontreCoach(evtId, true).then(function (lignes) {
       if (SuiviChrono.evtId !== evtId) return;
       var arr = Array.isArray(lignes) ? lignes : [];
+      SuiviChrono.lignes = arr; // #3 — mémo pour le calcul d'état terrain (substitutions)
       SuiviChrono.score = _calculerScore(arr);
       var sc = document.getElementById('suivi-score');
       if (sc) sc.innerHTML = _scoreHTML();
@@ -1393,6 +1796,13 @@
   function _peindreHistorique(evtId, lignes) {
     var box = document.getElementById('suivi-historique');
     if (!box) return;
+    // Le référentiel (libellés Cat A/B) doit être chargé pour afficher les
+    // libellés et non les identifiants bruts. S'il ne l'est pas encore, on
+    // le charge puis on re-peint (corrige l'affichage brut au 1er rendu).
+    if (!SuiviObs.charge) {
+      SuiviObs.charger(function () { _peindreHistorique(evtId, lignes); });
+      return;
+    }
     var actives = (lignes || []).slice();
     // Tri anti-chronologique par horodatage.
     actives.sort(function (a, b) {
@@ -1711,7 +2121,7 @@
         var minute = Math.floor(SuiviChrono.secondesEcoulees() / 60);
         var payload = {
           observableId: obs.uuid,
-          categorieObs: 'A',
+          categorieObs: (obs._categorieObs === 'B') ? 'B' : 'A',
           valeurPoints: (typeof obs.points === 'number' ? obs.points : 0),
           equipeConcernee: 'notre',
           joueurUuid: uuid,
@@ -1726,19 +2136,45 @@
 
   // L3c — substitution : double sélection « Qui sort ? » → « Qui entre ? ».
   // joueur_uuid = sortant, joueur_uuid_entrant = entrant (cf. C12-m).
+  // #3 — reconstitue l'état du terrain à l'instant T à partir de l'effectif
+  // (titulaires sur le terrain, remplaçants au banc) et des SUBSTITUTIONS
+  // non annulées (ordre chrono). Retourne { surTerrain:Set, auBanc:Set } d'uuid.
+  // Version simple : ne tient compte que des substitutions (pas blessures/cartons).
+  function _etatTerrain() {
+    var surTerrain = {}, auBanc = {};
+    (State.compoJoueurs || []).forEach(function (cj) {
+      if (cj.role === 'titulaire') surTerrain[cj.joueur_id] = true;
+      else if (cj.role === 'remplacant') auBanc[cj.joueur_id] = true;
+    });
+    // Substitutions dans l'ordre chronologique croissant.
+    var subs = (SuiviChrono.lignes || [])
+      .filter(function (l) { return l && l.observable_id === 'obs-A-substitution' && l.annule !== true; })
+      .slice()
+      .sort(function (a, b) { return new Date(a.horodatage) - new Date(b.horodatage); });
+    subs.forEach(function (l) {
+      var sortant = l.joueur_uuid, entrant = l.joueur_uuid_entrant;
+      if (sortant) { delete surTerrain[sortant]; auBanc[sortant] = true; }
+      if (entrant) { delete auBanc[entrant]; surTerrain[entrant] = true; }
+    });
+    return { surTerrain: surTerrain, auBanc: auBanc };
+  }
+
   function _ouvrirSubstitution(evtId, perCourante, obs) {
     var pal = document.getElementById('suivi-palette');
     if (!pal) return;
     var effectif = _effectifPourSaisie();
+    var etat = _etatTerrain();
+    var sortants = effectif.filter(function (jo) { return etat.surTerrain[jo.uuid]; });
+    var entrants = effectif.filter(function (jo) { return etat.auBanc[jo.uuid]; });
 
-    function rendreEtape(titre, onPick) {
+    function rendreEtape(titre, liste, vide, onPick) {
       var html = '<div class="suivi-attrib">';
       html += '<div class="suivi-attrib__title">' + (obs.icone || '') + ' ' + titre + '</div>';
-      if (!effectif.length) {
-        html += '<div class="view-suivi__hint">Aucun joueur dans la compo.</div>';
+      if (!liste.length) {
+        html += '<div class="view-suivi__hint">' + vide + '</div>';
       } else {
         html += '<div class="suivi-attrib__list">';
-        effectif.forEach(function (jo) {
+        liste.forEach(function (jo) {
           html +=
             '<button type="button" class="suivi-attrib__joueur" data-uuid="' + escapeHtml(jo.uuid || '') + '">' +
               '<span class="suivi-attrib__nom">' + escapeHtml(_nomJoueur(jo)) + '</span>' +
@@ -1757,10 +2193,10 @@
       });
     }
 
-    // Étape 1 : qui sort ?
-    rendreEtape('Substitution — qui SORT ?', function (sortant) {
-      // Étape 2 : qui entre ?
-      rendreEtape('Substitution — qui ENTRE ?', function (entrant) {
+    // Étape 1 : qui sort ? (joueurs sur le terrain)
+    rendreEtape('Substitution — qui SORT ?', sortants, 'Aucun joueur sur le terrain.', function (sortant) {
+      // Étape 2 : qui entre ? (joueurs au banc)
+      rendreEtape('Substitution — qui ENTRE ?', entrants, 'Aucun joueur disponible au banc.', function (entrant) {
         var minute = Math.floor(SuiviChrono.secondesEcoulees() / 60);
         _saisirObservable(evtId, {
           observableId: obs.uuid,
@@ -1794,12 +2230,10 @@
       html += '<div class="suivi-palette__grid">';
       catA.score.forEach(function (obs, idx) {
         html +=
-          '<div class="suivi-palette__action">' +
-            '<span class="suivi-palette__lbl">' + (obs.icone || '') + ' ' + escapeHtml(obs.libelle_court) + ' <em>+' + obs.points + '</em></span>' +
-            '<div class="suivi-palette__btns">' +
-              '<button type="button" class="suivi-palette__btn suivi-palette__btn--nous" data-idx="' + idx + '">Nous</button>' +
-              '<button type="button" class="suivi-palette__btn suivi-palette__btn--adv" data-obs="' + escapeHtml(obs.uuid) + '" data-pts="' + obs.points + '">Adverse</button>' +
-            '</div>' +
+          '<div class="suivi-palette__action suivi-palette__action--score">' +
+            '<button type="button" class="suivi-palette__btn suivi-palette__btn--nous" data-idx="' + idx + '">Nous</button>' +
+            '<span class="suivi-palette__lbl suivi-palette__lbl--center">' + (obs.icone || '') + ' ' + escapeHtml(obs.libelle_court) + ' <em>+' + obs.points + '</em></span>' +
+            '<button type="button" class="suivi-palette__btn suivi-palette__btn--adv" data-obs="' + escapeHtml(obs.uuid) + '" data-pts="' + obs.points + '">Adverse</button>' +
           '</div>';
       });
       html += '</div>'; // fin grid score
@@ -1850,6 +2284,17 @@
             '</div>';
         });
         html += '</div>';
+      }
+      // L5 — section Cat B « Observations » (repliable, en retrait, D8).
+      var obsB = SuiviObs.observablesB(SuiviChrono.nomNous);
+      if (obsB.length) {
+        html += '<details class="suivi-obsb">';
+        html += '<summary class="suivi-obsb__summary">Observations (à froid)</summary>';
+        html += '<div class="suivi-obsb__grid">';
+        obsB.forEach(function (o, idx) {
+          html += '<button type="button" class="suivi-obsb__btn" data-bidx="' + idx + '">' + escapeHtml(o.libelle) + '</button>';
+        });
+        html += '</div></details>';
       }
       html += '</div>'; // fin suivi-palette
       pal.innerHTML = html;
@@ -1914,6 +2359,21 @@
             equipeConcernee: 'notre',
             minuteMatch: minute,
             periode: perCourante
+          });
+        });
+      });
+      // L5 — boutons « Observations » Cat B : attribution joueur, sans points.
+      pal.querySelectorAll('.suivi-obsb__btn').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var idx = parseInt(b.getAttribute('data-bidx'), 10);
+          var o = obsB[idx];
+          if (!o) return;
+          _ouvrirAttribution(evtId, perCourante, {
+            uuid: _slugObsB(o.libelle),
+            libelle_court: o.libelle,
+            icone: '📝',
+            points: 0,
+            _categorieObs: 'B'
           });
         });
       });
@@ -1986,11 +2446,16 @@
     if (tabs[2]) {
       tabs[2].addEventListener('click', function () { setMode('suivi', tabs[2]); });
     }
+    // pt 53 — 4e onglet « Rapport » (lecture seule du déduit).
+    if (tabs[3]) {
+      tabs[3].addEventListener('click', function () { setMode('rapport', tabs[3]); });
+    }
     // État initial cohérent avec State.viewMode (défaut 'liste').
     tabs.forEach(function (t) { t.classList.remove('is-active'); });
     var initialTab = tabs[0];
     if (State.viewMode === 'terrain') initialTab = tabs[1];
     else if (State.viewMode === 'suivi' && tabs[2]) initialTab = tabs[2];
+    else if (State.viewMode === 'rapport' && tabs[3]) initialTab = tabs[3];
     initialTab.classList.add('is-active');
   }
 
@@ -2236,7 +2701,10 @@
     const posteParCode = new Map();
     for (const p of State.postes) posteParCode.set(p.code, p);
 
-    let html = '<div class="view-terrain" aria-label="Vue terrain de la composition (lecture seule)">';
+    var habillage = _habillageCourant();
+    var sousTitreT = _adversaireDeCompo(compo); // « vs … » ou libellé
+    let html = '<div class="view-terrain view-suivi--' + habillage + '" aria-label="Vue terrain de la composition (lecture seule)">';
+    html += _bandeauHTML(_nomNotreEquipe(), sousTitreT);
     html += '<div class="view-terrain__pitch">';
     html += pitchSvg();
 
@@ -2295,6 +2763,10 @@
     html += '</div>'; // view-terrain
     el.innerHTML = html;
     bindTerrainDnD(el); // v3.18 — édition au drag (3 gestes + éviction au banc)
+    // Toggle d'habillage partagé (v3.44) — re-rend la vue terrain.
+    _bindHabillageToggle(el.querySelector('.view-terrain'), function () {
+      renderEditorTerrain(el, compo);
+    });
   }
 
   // v3.18 — câblage drag & drop du terrain. Source = pastilles draggables
@@ -3596,7 +4068,7 @@
     bindPopoverOutsideClick();
 
     console.log(
-      '%c🏉 Compositions Editor v3.25 chargé',
+      '%c🏉 Compositions Editor v3.47 chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         evenements: State.evenements.length,
