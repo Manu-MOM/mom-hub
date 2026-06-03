@@ -1025,6 +1025,63 @@
     .rapnv-tops__list li { margin: 3px 0; }
     .rapnv-tops__n { color: var(--vert-prairie, #2D7D46); font-weight: 700; font-variant-numeric: tabular-nums; }
 
+
+    /* ===== HERO de niveau (pt 55, v3.54) — punchy, charte MOM sombre ===== */
+    .rapnv-hero-zone { margin: 4px 0 12px; }
+    .rapnv-hero {
+      display: flex; flex-wrap: wrap; align-items: stretch; gap: 18px;
+      padding: 18px 20px; border-radius: 14px;
+      background: linear-gradient(135deg, #0f2a1a 0%, #1e4628 60%, #245232 100%);
+      color: #fff; box-shadow: 0 6px 20px rgba(15,42,26,0.25);
+    }
+    .rapnv-hero--load, .rapnv-hero--vide {
+      display: block; color: #cfe2d4; font-size: 13px; padding: 16px 20px;
+    }
+    .rapnv-hero__left {
+      flex: 1 1 220px; display: flex; flex-direction: column; justify-content: center;
+      border-right: 1px solid rgba(255,255,255,0.14); padding-right: 16px; min-width: 200px;
+    }
+    .rapnv-hero__rang-lbl {
+      font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: #f4d35e; font-weight: 700;
+    }
+    .rapnv-hero__rang {
+      font-size: 46px; font-weight: 800; line-height: 1; margin-top: 2px; color: #fff;
+      font-variant-numeric: tabular-nums;
+    }
+    .rapnv-hero__rang-tot { font-size: 24px; font-weight: 600; color: #cfe2d4; }
+    .rapnv-hero__rang--na { color: #6f8a78; }
+    .rapnv-hero__hint { font-size: 11px; color: #9bbfa6; margin-top: 4px; font-style: italic; }
+    .rapnv-hero__record { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 12px; font-size: 14px; }
+    .rapnv-hero__rec-item { color: #d7e6db; }
+    .rapnv-hero__rec-item b { font-size: 18px; color: #fff; font-weight: 800; }
+    .rapnv-hero__rec-item--v b { color: #7ee0a0; }
+    .rapnv-hero__rec-item--d b { color: #f3a3a3; }
+    .rapnv-hero__record--na { margin-top: 12px; font-size: 13px; color: #9bbfa6; font-style: italic; }
+    .rapnv-hero__cards {
+      flex: 2 1 320px; display: grid; align-content: center;
+      grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 12px;
+    }
+    .rapnv-hero__case {
+      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 10px; padding: 12px 10px; text-align: center;
+    }
+    .rapnv-hero__val { font-size: 26px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; line-height: 1; }
+    .rapnv-hero__lbl { font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; color: #a9c7b1; margin-top: 5px; }
+    .rapnv-hero__case--pos .rapnv-hero__val { color: #7ee0a0; }
+    .rapnv-hero__case--neg .rapnv-hero__val { color: #f3a3a3; }
+    .rapnv-hero__cards-na { grid-column: 1 / -1; font-size: 13px; color: #9bbfa6; font-style: italic; text-align: center; }
+    .rapnv-hero__note { font-size: 11px; color: var(--ink-mute, #777); margin-top: 6px; font-style: italic; }
+    .view-rapport--entente .rapnv-hero {
+      background: linear-gradient(135deg, #0c1f38 0%, #143a64 60%, #18406e 100%);
+    }
+    .view-rapport--entente .rapnv-hero__rang-lbl { color: #90d8f0; }
+    .view-rapport--entente .rapnv-hero__rec-item--v b { color: #8fd4f0; }
+    .rapnv-sub--rang { background: #fbf6df; border: 1px solid #efe3bd; border-radius: 10px; padding: 10px 12px; }
+    .rapnv-rang { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
+    .rapnv-rang__field { font-size: 12px; color: #6b5a1e; font-weight: 600; display: flex; flex-direction: column; gap: 4px; }
+    .rapnv-rang__sep { color: #8a7a3e; font-size: 13px; padding-bottom: 8px; }
+    .rapnv-inp--rang-final, .rapnv-inp--nbeq { flex: 0 0 80px; width: 80px; text-align: center; font-weight: 700; }
+
   </style>
 </head>
 
