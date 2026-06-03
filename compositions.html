@@ -1106,6 +1106,69 @@
     .rapnv-conq__pct { font-size: 13px; font-weight: 700; color: var(--vert-prairie, #2D7D46); margin-left: 4px; }
     .rapnv-conq__lbl { font-size: 11px; color: var(--ink-mute, #777); text-transform: uppercase; letter-spacing: .03em; margin-top: 4px; }
 
+
+    /* ===== v3.56 : hero éditable + actions style hero + export page/niveau ===== */
+    /* Champs rang éditables intégrés au hero (écran) */
+    .rapnv-hero__rang-edit { display: flex; align-items: baseline; gap: 6px; margin-top: 2px; }
+    .rapnv-hero__inp {
+      width: 70px; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 8px; color: #fff; font-size: 38px; font-weight: 800; text-align: center;
+      font-variant-numeric: tabular-nums; padding: 2px 4px; line-height: 1;
+    }
+    .rapnv-hero__inp--nbeq { width: 60px; font-size: 26px; font-weight: 600; color: #cfe2d4; }
+    .rapnv-hero__inp::placeholder { color: rgba(255,255,255,0.4); }
+    .rapnv-hero__inp:focus { outline: none; border-color: #f4d35e; background: rgba(255,255,255,0.18); }
+    .rapnv-hero__sur { color: #cfe2d4; font-size: 24px; font-weight: 600; }
+    .rapnv-hero__rang-print { display: none; }  /* visible seulement à l'impression */
+
+    /* 2e bandeau « actions marquantes » en style hero sombre (point 5) */
+    .rapnv-actions {
+      margin: 0 0 14px; padding: 14px 18px; border-radius: 14px;
+      background: linear-gradient(135deg, #14331f 0%, #1f4a2b 100%);
+      color: #fff; box-shadow: 0 4px 14px rgba(15,42,26,0.18);
+    }
+    .view-rapport--entente .rapnv-actions {
+      background: linear-gradient(135deg, #102a44 0%, #163d68 100%);
+    }
+    .rapnv-actions__titre {
+      font-size: 12px; font-weight: 700; color: #f4d35e; margin-bottom: 12px;
+      letter-spacing: .08em; text-transform: uppercase;
+    }
+    .view-rapport--entente .rapnv-actions__titre { color: #90d8f0; }
+    .rapnv-conq {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 12px;
+    }
+    .rapnv-conq__case {
+      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 10px; padding: 10px 12px; text-align: center;
+    }
+    .rapnv-conq__case--carton { background: rgba(243,163,60,0.16); }
+    .rapnv-conq__val { font-size: 20px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; line-height: 1.1; }
+    .rapnv-conq__pct { font-size: 13px; font-weight: 700; color: #7ee0a0; margin-left: 4px; }
+    .rapnv-conq__lbl { font-size: 10.5px; color: #a9c7b1; text-transform: uppercase; letter-spacing: .03em; margin-top: 4px; }
+    /* Tops joueurs sur fond sombre */
+    .rapnv-actions .rapnv-tops__titre { color: #f4d35e; }
+    .rapnv-actions .rapnv-tops__list { color: #e8f0ea; }
+    .rapnv-actions .rapnv-tops__n { color: #7ee0a0; }
+
+    /* EXPORT page par page : un niveau par page (point 1) */
+    @media print {
+      body.printing-rapport .rapnv-niveau {
+        page-break-inside: avoid; break-inside: avoid;
+        page-break-after: always; break-after: page;
+        border: none; box-shadow: none; padding: 0; margin: 0 0 12px;
+      }
+      body.printing-rapport .rapnv-niveau:last-child { page-break-after: auto; break-after: auto; }
+      /* Hero : masquer les champs de saisie, montrer la version texte. */
+      body.printing-rapport .rapnv-hero__rang-edit { display: none !important; }
+      body.printing-rapport .rapnv-hero__rang-print {
+        display: block !important; font-size: 46px; font-weight: 800; line-height: 1; color: #fff;
+      }
+      /* Éditeur structuré (boutons +ligne, ✕) non imprimés ; les valeurs restent. */
+      body.printing-rapport .rapnv-add,
+      body.printing-rapport .rapnv-del { display: none !important; }
+    }
+
   </style>
 </head>
 
