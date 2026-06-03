@@ -6,6 +6,20 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.53 — Rapports phase/tournoi : bandeau synthèse + V/N/D + tops joueurs (3 juin 2026)
+ *   v3.53 : DÉDUIT enrichi (pt 55). Le déduit de phase/tournoi gagne un
+ *           BANDEAU DE SYNTHÈSE condensé (essais pour/contre, points
+ *           pour/contre, différence, cartons), un bilan V/N/D déduit du
+ *           score (mention honnête « N matchs suivis »), et TOP SCOREURS /
+ *           TOP MARQUEURS (agrégats par joueur_uuid : points via
+ *           valeur_points, essais via obs-A-es ; noms résolus en lot par
+ *           SupabaseHub._resolveNoms, RGPD-safe, repli #id). Une seule
+ *           passe de lecture par match (_deduitAgrege enrichi). Dégradation
+ *           HONNÊTE partout : un chiffre n'apparaît que s'il a une base
+ *           réelle ; niveau sans suivi → « pas encore de données ». Ajouts
+ *           ADDITIFS : _peindreTopsJoueurs ; _deduitAgrege et
+ *           _peindreDeduitNiveau réécrits (mêmes signatures). Chemin match
+ *           (rapport de match v3.51) INTACT.
  * Version : 3.52 — Rapports de PHASE & TOURNOI (vues dérivées) (3 juin 2026)
  *   v3.52 : RAPPORTS PHASE & TOURNOI (pt 55). L'onglet « Rapport »
  *           devient contextuel (décision Manu, option 2) : sur une compo
@@ -1612,24 +1626,64 @@
   // la chronologie et somme les scores. Dégradation HONNÊTE : un match
   // sans suivi n'ajoute pas de faux 0, il est compté « non renseigné ».
   // cb({ momTotal, advTotal, nbMatchs, nbRenseignes, details:[{adv, mom, adv_pts, renseigne}] }).
+  // Déduit agrégé d'un niveau (enrichi pt 55 / v3.53). Une seule passe de
+  // lecture par match en sort : score, essais (obs-A-es) nous/adv, cartons
+  // (familles discipline), V/N/D déduit du score, et les agrégats PAR JOUEUR
+  // (points via valeur_points, essais via obs-A-es, côté nous uniquement).
+  // Dégradation HONNÊTE : un match sans suivi n'ajoute aucun faux chiffre.
+  // cb({ momTotal, advTotal, nbMatchs, nbRenseignes, essaisNous, essaisAdv,
+  //      cartons, v, n, d, parJoueur:{uuid:{pts,essais}}, details:[…] }).
   function _deduitAgrege(matchsDuNiveau, cb) {
     var matchs = Array.isArray(matchsDuNiveau) ? matchsDuNiveau : [];
-    if (matchs.length === 0) { cb({ momTotal: 0, advTotal: 0, nbMatchs: 0, nbRenseignes: 0, details: [] }); return; }
+    var base = { momTotal: 0, advTotal: 0, nbMatchs: 0, nbRenseignes: 0,
+                 essaisNous: 0, essaisAdv: 0, cartons: 0, v: 0, n: 0, d: 0,
+                 parJoueur: {}, details: [] };
+    if (matchs.length === 0) { cb(base); return; }
     if (!window.SupabaseHub || !SupabaseHub.getChronologieRencontreCoach) {
-      cb({ momTotal: 0, advTotal: 0, nbMatchs: matchs.length, nbRenseignes: 0, details: [], indispo: true });
-      return;
+      base.nbMatchs = matchs.length; base.indispo = true; cb(base); return;
     }
     var details = new Array(matchs.length);
     var restant = matchs.length;
-    var momTotal = 0, advTotal = 0, nbRenseignes = 0;
+    var acc = { momTotal: 0, advTotal: 0, nbRenseignes: 0,
+                essaisNous: 0, essaisAdv: 0, cartons: 0, v: 0, n: 0, d: 0,
+                parJoueur: {} };
+    // Quelles familles comptent comme « carton » : on s'appuie sur le
+    // libellé de l'observable (discipline) contenant « carton ».
+    function estCarton(oid) {
+      var info = (typeof SuiviObs.libelle === 'function') ? SuiviObs.libelle(oid) : null;
+      var lib = (info && info.libelle ? info.libelle : '').toLowerCase();
+      return lib.indexOf('carton') !== -1;
+    }
     matchs.forEach(function (m, idx) {
-      var evt = m.id; // dans listMatchsDeLequipe, m.id = l'evenement match
+      var evt = m.id; // listMatchsDeLequipe : m.id = l'evenement match
       SupabaseHub.getChronologieRencontreCoach(evt, true).then(function (lignes) {
         var arr = Array.isArray(lignes) ? lignes : [];
         var eff = arr.filter(function (l) { return l && l.annule !== true; });
         var renseigne = eff.length > 0;
         var sc = _calculerScore(arr);
-        if (renseigne) { momTotal += sc.mom; advTotal += sc.adv; nbRenseignes += 1; }
+        if (renseigne) {
+          acc.momTotal += sc.mom; acc.advTotal += sc.adv; acc.nbRenseignes += 1;
+          // V/N/D déduit du score de ce match.
+          if (sc.mom > sc.adv) acc.v += 1;
+          else if (sc.mom < sc.adv) acc.d += 1;
+          else acc.n += 1;
+          // Compteurs fins + agrégats joueurs (côté nous).
+          for (var i = 0; i < eff.length; i++) {
+            var l = eff[i];
+            var advLigne = (l.equipe_concernee === 'adverse');
+            if (l.observable_id === 'obs-A-es') {
+              if (advLigne) acc.essaisAdv += 1; else acc.essaisNous += 1;
+            }
+            if (!advLigne && estCarton(l.observable_id)) acc.cartons += 1;
+            // Agrégat par joueur (nous, joueur identifié).
+            if (!advLigne && l.joueur_uuid) {
+              if (!acc.parJoueur[l.joueur_uuid]) acc.parJoueur[l.joueur_uuid] = { pts: 0, essais: 0 };
+              var pts = (typeof l.valeur_points === 'number') ? l.valeur_points : 0;
+              if (pts) acc.parJoueur[l.joueur_uuid].pts += pts;
+              if (l.observable_id === 'obs-A-es') acc.parJoueur[l.joueur_uuid].essais += 1;
+            }
+          }
+        }
         details[idx] = {
           adv: (m.adversaire_nom || m.libelle || '—'),
           mom: sc.mom, adv_pts: sc.adv, renseigne: renseigne
@@ -1639,7 +1693,11 @@
       }).then(function () {
         restant -= 1;
         if (restant === 0) {
-          cb({ momTotal: momTotal, advTotal: advTotal, nbMatchs: matchs.length, nbRenseignes: nbRenseignes, details: details });
+          cb({ momTotal: acc.momTotal, advTotal: acc.advTotal,
+               nbMatchs: matchs.length, nbRenseignes: acc.nbRenseignes,
+               essaisNous: acc.essaisNous, essaisAdv: acc.essaisAdv,
+               cartons: acc.cartons, v: acc.v, n: acc.n, d: acc.d,
+               parJoueur: acc.parJoueur, details: details });
         }
       });
     });
@@ -1871,6 +1929,10 @@
   }
 
   // Peint la zone déduit d'un niveau à partir du résultat _deduitAgrege.
+  // Peint la zone déduit d'un niveau (v3.53) : bandeau de synthèse condensé
+  // (essais, points, diff, cartons) + V/N/D déduit + Top scoreur / Top
+  // marqueur (résolus en async via _resolveNoms) + détail par match.
+  // Dégradation HONNÊTE partout : un chiffre n'apparaît que s'il a une base.
   function _peindreDeduitNiveau(prefixe, nomNous, res) {
     var zone = document.getElementById(prefixe + '-deduit');
     if (!zone) return;
@@ -1882,19 +1944,52 @@
       zone.innerHTML = '<div class="rapport__vide">Aucun match rattaché à ce niveau.</div>';
       return;
     }
-    var html = '<div class="rapnv-deduit__titre">Déduit (agrégé depuis le suivi)</div>';
-    // Bandeau honnêteté si tout n'est pas renseigné.
+    if (res.nbRenseignes === 0) {
+      zone.innerHTML = '<div class="rapnv-deduit__titre">Déduit (agrégé depuis le suivi)</div>' +
+        '<div class="rapport__vide">Pas encore de données de suivi sur ce niveau ' +
+        '(' + res.nbMatchs + ' match' + (res.nbMatchs > 1 ? 's' : '') + ' sans saisie).</div>';
+      return;
+    }
+
+    var diff = res.momTotal - res.advTotal;
+    var diffTxt = (diff > 0 ? '+' : '') + diff;
+
+    // --- Bandeau de synthèse condensé (inspiré SAR×MOM, refondu charte MOM) ---
+    function carte(valeur, label, classe) {
+      return '<div class="rapnv-synth__case' + (classe ? ' ' + classe : '') + '">' +
+               '<div class="rapnv-synth__val">' + valeur + '</div>' +
+               '<div class="rapnv-synth__lbl">' + label + '</div>' +
+             '</div>';
+    }
+    var html = '<div class="rapnv-synth">';
+    // V/N/D (déduit du score, mention honnête du périmètre).
+    html += '<div class="rapnv-synth__vnd">' +
+              '<span class="rapnv-synth__vnd-n">' + res.nbRenseignes + '</span> ' +
+              (res.nbRenseignes > 1 ? 'matchs suivis' : 'match suivi') +
+              '<span class="rapnv-synth__vnd-detail"> · ' +
+                '<strong>' + res.v + '</strong> V · ' +
+                '<strong>' + res.n + '</strong> N · ' +
+                '<strong>' + res.d + '</strong> D</span>' +
+            '</div>';
+    html += '<div class="rapnv-synth__grid">';
+    html += carte(res.essaisNous + ' / ' + res.essaisAdv, 'Essais (pour / contre)');
+    html += carte(res.momTotal + ' / ' + res.advTotal, 'Points (pour / contre)');
+    html += carte(diffTxt, 'Différence', (diff >= 0 ? 'rapnv-synth__case--pos' : 'rapnv-synth__case--neg'));
+    if (res.cartons > 0) html += carte(String(res.cartons), 'Cartons');
+    html += '</div>';
+    // Note honnêteté si tout n'est pas suivi.
     if (res.nbRenseignes < res.nbMatchs) {
-      html += '<div class="rapnv-deduit__note">' +
-        res.nbRenseignes + ' match' + (res.nbRenseignes > 1 ? 's' : '') + ' sur ' + res.nbMatchs +
-        ' suivi' + (res.nbRenseignes > 1 ? 's' : '') + ' — les autres n\'ont pas de données (non comptés).</div>';
+      html += '<div class="rapnv-synth__note">Synthèse sur les ' + res.nbRenseignes +
+              ' match' + (res.nbRenseignes > 1 ? 's' : '') + ' suivi' + (res.nbRenseignes > 1 ? 's' : '') +
+              ' (sur ' + res.nbMatchs + ') ; les autres n\'ont pas de données.</div>';
     }
-    // Cumul des points (sur les seuls matchs renseignés).
-    if (res.nbRenseignes > 0) {
-      html += '<div class="rapnv-deduit__cumul">Cumul points : <strong>' +
-        escapeHtml(nomNous || 'Nous') + ' ' + res.momTotal + '</strong> — adversaires ' + res.advTotal + '</div>';
-    }
-    // Détail par match.
+    html += '</div>'; // .rapnv-synth
+
+    // --- Zone Tops (remplie en async après résolution des noms) ---
+    html += '<div class="rapnv-tops" id="' + prefixe + '-tops"></div>';
+
+    // --- Détail par match ---
+    html += '<div class="rapnv-deduit__titre">Détail par match</div>';
     html += '<table class="rapport-tab"><thead><tr><th>Match</th><th>' +
       escapeHtml(nomNous || 'Nous') + '</th><th>Adv.</th></tr></thead><tbody>';
     for (var i = 0; i < res.details.length; i++) {
@@ -1911,6 +2006,70 @@
     }
     html += '</tbody></table>';
     zone.innerHTML = html;
+
+    // --- Tops joueurs : résolution des noms en lot, puis peinture ---
+    _peindreTopsJoueurs(prefixe, res.parJoueur);
+  }
+
+  // Top scoreur (points) + Top marqueur (essais) d'un niveau. Agrégats déjà
+  // calculés par joueur_uuid (_deduitAgrege) ; on résout les noms en lot via
+  // _resolveNoms (RGPD-safe), repli #id. Dégradation honnête : rien si vide.
+  function _peindreTopsJoueurs(prefixe, parJoueur) {
+    var zone = document.getElementById(prefixe + '-tops');
+    if (!zone) return;
+    var uuids = parJoueur ? Object.keys(parJoueur) : [];
+    if (uuids.length === 0) { zone.innerHTML = ''; return; }
+
+    // Classements (top 3 chacun), en ignorant les zéros.
+    var scoreurs = uuids.filter(function (u) { return parJoueur[u].pts > 0; })
+      .sort(function (a, b) { return parJoueur[b].pts - parJoueur[a].pts; }).slice(0, 3);
+    var marqueurs = uuids.filter(function (u) { return parJoueur[u].essais > 0; })
+      .sort(function (a, b) { return parJoueur[b].essais - parJoueur[a].essais; }).slice(0, 3);
+    if (scoreurs.length === 0 && marqueurs.length === 0) { zone.innerHTML = ''; return; }
+
+    function peindre(nomDe) {
+      var h = '<div class="rapnv-tops__grid">';
+      if (scoreurs.length > 0) {
+        h += '<div class="rapnv-tops__col"><div class="rapnv-tops__titre">⭐ Top scoreurs</div><ol class="rapnv-tops__list">';
+        for (var i = 0; i < scoreurs.length; i++) {
+          h += '<li>' + escapeHtml(nomDe(scoreurs[i])) +
+               ' <span class="rapnv-tops__n">' + parJoueur[scoreurs[i]].pts + ' pts</span></li>';
+        }
+        h += '</ol></div>';
+      }
+      if (marqueurs.length > 0) {
+        h += '<div class="rapnv-tops__col"><div class="rapnv-tops__titre">🏉 Top marqueurs</div><ol class="rapnv-tops__list">';
+        for (var j = 0; j < marqueurs.length; j++) {
+          var e = parJoueur[marqueurs[j]].essais;
+          h += '<li>' + escapeHtml(nomDe(marqueurs[j])) +
+               ' <span class="rapnv-tops__n">' + e + ' essai' + (e > 1 ? 's' : '') + '</span></li>';
+        }
+        h += '</ol></div>';
+      }
+      h += '</div>';
+      zone.innerHTML = h;
+    }
+
+    function nomDepuisMap(map, uuid) {
+      var ent = map && map.get ? map.get(uuid) : null;
+      if (ent) {
+        var p = (ent.prenom || '').trim();
+        var n = (ent.nom || '').trim();
+        var label = (p + ' ' + n).trim();
+        if (label) return label;
+      }
+      return _idCourt(uuid);
+    }
+
+    if (window.SupabaseHub && typeof SupabaseHub._resolveNoms === 'function') {
+      SupabaseHub._resolveNoms(uuids).then(function (map) {
+        peindre(function (u) { return nomDepuisMap(map, u); });
+      }).catch(function () {
+        peindre(function (u) { return _idCourt(u); });
+      });
+    } else {
+      peindre(function (u) { return _idCourt(u); });
+    }
   }
 
   // RENDU des rapports de niveaux supérieurs (tournoi + phases), sur une
