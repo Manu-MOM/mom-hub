@@ -6,6 +6,20 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.56 — Rapports phase/tournoi : hero éditable, actions restylées, export page/niveau (3 juin 2026)
+ *   v3.56 : Refonte présentation (retours Manu). (1) HERO ÉDITABLE en
+ *           place : rang + nb d'équipes saisis directement dans le bandeau
+ *           (champs intégrés) ; rendu propre à l'impression (champs →
+ *           texte ordinal via @media print). La section « Classement
+ *           final » du bas est supprimée (plus de double saisie). (2) 2e
+ *           bandeau « actions marquantes » déplacé AU-DESSUS de l'avis du
+ *           coach, dans une zone dédiée (-actions), style hero sombre.
+ *           (3) Intro verbeuse supprimée. (4) EXPORT page par page :
+ *           saut de page par niveau à l'impression (CSS @media print).
+ *           Le rang/nb_equipes vit dans donnees jsonb (inchangé) ; save
+ *           lit les champs du hero (mêmes ids prefixe-rang/-nbeq). Chemin
+ *           match (v3.51) INTACT. Enchaînement des rapports de match en
+ *           queue : étape suivante (sonde _peindreRapport requise).
  * Version : 3.55 — Rapports phase/tournoi : 2e bandeau actions + éditeur contextuel + fix UUID essai (3 juin 2026)
  *   v3.55 : (1) FIX données — l'UUID de l'essai est 'obs-A-essai' (pas
  *           'obs-A-es' ; sonde référentiel pt 55). Le comptage des essais
@@ -1751,8 +1765,7 @@
   function _editeurStructureHTML(prefixe, donnees) {
     var classement = (donnees && Array.isArray(donnees.classement)) ? donnees.classement : [];
     var aiguillage = (donnees && Array.isArray(donnees.aiguillage)) ? donnees.aiguillage : [];
-    var rang       = (donnees && donnees.rang != null) ? donnees.rang : '';
-    var nbEquipes  = (donnees && donnees.nb_equipes != null) ? donnees.nb_equipes : '';
+    // rang/nb_equipes ne sont plus saisis ici (v3.56 : dans le hero).
 
     function ligneClassement(rang, equipe, note) {
       return '<div class="rapnv-row" data-kind="cl">' +
@@ -1780,22 +1793,9 @@
       aiHtml += ligneAiguillage(aiguillage[j].origine, aiguillage[j].destination);
     }
 
-    // Bloc rang/nb d'équipes : présent aux DEUX niveaux (pilote le hero).
-    var blocRang =
-        '<div class="rapnv-sub rapnv-sub--rang">' +
-          '<div class="rapnv-sub__titre">🥇 Classement final</div>' +
-          '<div class="rapnv-rang">' +
-            '<label class="rapnv-rang__field">Rang ' +
-              '<input type="text" inputmode="numeric" class="rapnv-inp rapnv-inp--rang-final" ' +
-                'id="' + prefixe + '-rang" placeholder="5" value="' + escapeHtml(String(rang)) + '"></label>' +
-            '<span class="rapnv-rang__sep">sur</span>' +
-            '<label class="rapnv-rang__field">Équipes ' +
-              '<input type="text" inputmode="numeric" class="rapnv-inp rapnv-inp--nbeq" ' +
-                'id="' + prefixe + '-nbeq" placeholder="10" value="' + escapeHtml(String(nbEquipes)) + '"></label>' +
-          '</div>' +
-        '</div>';
-
-    // Détail classement + aiguillage : NIVEAU PHASE uniquement (décision pt 55).
+    // Le rang/nb d'équipes est désormais saisi DANS le hero (v3.56) ;
+    // l'éditeur structuré ne porte plus que le détail classement +
+    // l'aiguillage, au NIVEAU PHASE uniquement (décision pt 55).
     // Au tournoi, le rang du hero suffit ; l'aiguillage décrit le parcours
     // ENTRE phases, sa place est donc dans le rapport de phase.
     var estTournoi = (_niveauType[prefixe] === 'tournoi');
@@ -1815,7 +1815,7 @@
     }
 
     return '<div class="rapnv-struct" id="' + prefixe + '-struct">' +
-        blocRang + blocPhase +
+        blocPhase +
       '</div>';
   }
 
@@ -2000,6 +2000,7 @@
         '<div class="rapnv-hero-zone" id="' + prefixe + '-hero">' +
           '<div class="rapnv-hero rapnv-hero--load">Calcul de la synthèse…</div>' +
         '</div>' +
+        '<div class="rapnv-actions-zone" id="' + prefixe + '-actions"></div>' +
         '<div class="rapport__saisi">' +
           '<div class="rapport__saisi-titre">Avis du coach</div>' +
           '<textarea id="' + prefixe + '-bilan" class="rapport__bilan" ' +
@@ -2039,10 +2040,20 @@
     if (!heroZone) return;
     var nomNous = _nomNousCache[prefixe] || 'Nous';
     var rang = _rangCache[prefixe] || null;
-    heroZone.innerHTML = _heroHTML(nomNous, res, rang);
+    heroZone.innerHTML = _heroHTML(nomNous, res, rang, prefixe);
+    // Sauvegarde immédiate quand on quitte un champ rang du hero (blur).
+    var champs = heroZone.querySelectorAll('.rapnv-hero__inp');
+    champs.forEach(function (c) {
+      c.addEventListener('change', function () {
+        _rangCache[prefixe] = {
+          rang: (document.getElementById(prefixe + '-rang') || {}).value || '',
+          nb_equipes: (document.getElementById(prefixe + '-nbeq') || {}).value || ''
+        };
+      });
+    });
   }
 
-  function _heroHTML(nomNous, res, rang) {
+  function _heroHTML(nomNous, res, rang, prefixe) {
     if (!res || res.indispo) {
       return '<div class="rapnv-hero rapnv-hero--vide">Lecture du suivi indisponible.</div>';
     }
@@ -2062,18 +2073,26 @@
              '</div>';
     }
 
+    var rangVal = (rang && rang.rang != null) ? String(rang.rang) : '';
+    var nbeqVal = (rang && rang.nb_equipes != null) ? String(rang.nb_equipes) : '';
+    var pfx = prefixe || '';
+
     var html = '<div class="rapnv-hero">';
     html += '<div class="rapnv-hero__left">';
-    if (rang && rang.rang) {
-      html += '<div class="rapnv-hero__rang-lbl">Classement</div>' +
-              '<div class="rapnv-hero__rang">' + ordinalFr(rang.rang) +
-                (rang.nb_equipes ? '<span class="rapnv-hero__rang-tot"> / ' + escapeHtml(String(rang.nb_equipes)) + '</span>' : '') +
-              '</div>';
-    } else {
-      html += '<div class="rapnv-hero__rang-lbl">Bilan</div>' +
-              '<div class="rapnv-hero__rang rapnv-hero__rang--na">\u2014</div>' +
-              '<div class="rapnv-hero__hint">Renseigne le rang ci-dessous</div>';
-    }
+    html += '<div class="rapnv-hero__rang-lbl">Classement final</div>';
+    // ÉCRAN : champs éditables intégrés au bandeau (point 4). IMPRESSION :
+    // les champs deviennent du texte (CSS @media print), rendu propre.
+    html += '<div class="rapnv-hero__rang-edit">' +
+              '<input type="text" inputmode="numeric" id="' + pfx + '-rang" ' +
+                'class="rapnv-hero__inp rapnv-hero__inp--rang" placeholder="–" value="' + escapeHtml(rangVal) + '">' +
+              '<span class="rapnv-hero__sur">/</span>' +
+              '<input type="text" inputmode="numeric" id="' + pfx + '-nbeq" ' +
+                'class="rapnv-hero__inp rapnv-hero__inp--nbeq" placeholder="N" value="' + escapeHtml(nbeqVal) + '">' +
+            '</div>';
+    // Rendu lecture/impression : ordinal si rang saisi, sinon tiret.
+    html += '<div class="rapnv-hero__rang-print">' +
+              (rangVal ? (ordinalFr(rangVal) + (nbeqVal ? ' / ' + escapeHtml(nbeqVal) : '')) : '—') +
+            '</div>';
     if (aSuivi) {
       html += '<div class="rapnv-hero__record">' +
                 '<span class="rapnv-hero__rec-item"><b>' + res.nbRenseignes + '</b> joue' + (res.nbRenseignes > 1 ? 's' : '') + '</span>' +
@@ -2132,26 +2151,29 @@
       return;
     }
 
-    var html = '';
-    // --- 2e BANDEAU : actions marquantes (v3.55) ---
-    html += '<div class="rapnv-actions">';
-    html += '<div class="rapnv-actions__titre">⚡ Actions marquantes</div>';
-    // Rangée conquête : mêlées / touches (gagnées-perdues + %) + cartons.
-    html += '<div class="rapnv-conq">';
-    html += _conquHTML('Mêlées', res.meleeG, res.meleeP, '🟢');
-    html += _conquHTML('Touches', res.toucheG, res.toucheP, '🔵');
-    if (res.cartons > 0) {
-      html += '<div class="rapnv-conq__case rapnv-conq__case--carton">' +
+    // --- 2e BANDEAU « actions marquantes » → zone dédiée, AU-DESSUS de
+    //     l'avis du coach, en style hero sombre (v3.56, points 5). ---
+    var actionsZone = document.getElementById(prefixe + '-actions');
+    if (actionsZone) {
+      var ah = '<div class="rapnv-actions">';
+      ah += '<div class="rapnv-actions__titre">⚡ Actions marquantes</div>';
+      ah += '<div class="rapnv-conq">';
+      ah += _conquHTML('Mêlées', res.meleeG, res.meleeP, '🟢');
+      ah += _conquHTML('Touches', res.toucheG, res.toucheP, '🔵');
+      if (res.cartons > 0) {
+        ah += '<div class="rapnv-conq__case rapnv-conq__case--carton">' +
                 '<div class="rapnv-conq__val">' + res.cartons + '</div>' +
                 '<div class="rapnv-conq__lbl">Cartons</div>' +
               '</div>';
+      }
+      ah += '</div>'; // .rapnv-conq
+      ah += '<div class="rapnv-tops" id="' + prefixe + '-tops"></div>';
+      ah += '</div>'; // .rapnv-actions
+      actionsZone.innerHTML = ah;
     }
-    html += '</div>'; // .rapnv-conq
-    // --- Zone Tops joueurs (remplie en async après résolution des noms) ---
-    html += '<div class="rapnv-tops" id="' + prefixe + '-tops"></div>';
-    html += '</div>'; // .rapnv-actions
 
-    // --- Détail par match ---
+    // --- Zone -deduit : seulement le détail par match ---
+    var html = '';
     html += '<div class="rapnv-deduit__titre">Détail par match</div>';
     html += '<table class="rapport-tab"><thead><tr><th>Match</th><th>' +
       escapeHtml(nomNous || 'Nous') + '</th><th>Adv.</th></tr></thead><tbody>';
@@ -2276,8 +2298,6 @@
     var html =
       '<div class="view-rapport view-rapport--' + habillage + '">' +
         _bandeauHTML(nomNous, titrePrefixe + (racine.libelle || 'Tournoi')) +
-        '<div class="rapnv-intro">Bilans des niveaux <strong>tournoi</strong> et <strong>phase</strong> ' +
-          '(le rapport de chaque <em>match</em> se saisit sur son onglet de match).</div>' +
         // Bloc TOURNOI (racine)
         _blocNiveauHTML('rapnv-t', '🏆 Tournoi · ' + (racine.libelle || ''),
                         (racine.date_debut ? _formatDateFr(racine.date_debut) : ''), true);
