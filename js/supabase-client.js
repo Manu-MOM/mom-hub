@@ -18,7 +18,15 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.45 — juin 2026
+ * Version : 1.46 — juin 2026
+ *   v1.46 : rapports phase & tournoi — saisi STRUCTURÉ (pt 55). Ajout
+ *           ADDITIF : _mapRapport expose `donnees` (jsonb classement +
+ *           aiguillage, NULL pour un match) ; upsertRapportMatch gagne
+ *           un 3e argument optionnel `donnees` (défaut undefined → non
+ *           transmis, le SQL préserve l'existant via COALESCE, C13-b).
+ *           Phase et tournoi se rattachent À L'IDENTIQUE sur leur UUID
+ *           (aucun nouveau wrapper, mêmes RPC). Appels 2-args du match
+ *           inchangés. Aucun wrapper existant touché.
  *   v1.45 : rapports de match — saisi (2e temps). 4 wrappers ADDITIFS
  *           voie coach garde auth.uid() (backend C13-a) :
  *           getRapportMatch / upsertRapportMatch / finaliserRapport /
@@ -5606,21 +5614,31 @@
     },
 
     /**
-     * Écrit / met à jour le bilan saisi d'un match (upsert). Crée la
-     * ligne à la volée si absente. Marche quel que soit le statut
-     * (mention, pas cadenas, pt 52). RPC upsert_rapport_match (C13-a).
-     * @param {string} evenementUuid  le MATCH
+     * Écrit / met à jour le saisi d'un rapport (upsert). Vaut pour les
+     * TROIS niveaux : match, phase, tournoi — chacun est un evenements à
+     * UUID propre, la RPC est la même (pt 55). Crée la ligne à la volée
+     * si absente. Marche quel que soit le statut (mention, pas cadenas,
+     * pt 52). RPC upsert_rapport_match (C13-a + C13-b).
+     * @param {string} evenementUuid  le MATCH, la PHASE ou le TOURNOI
      * @param {string} bilan          texte libre (peut être '')
+     * @param {object} [donnees]      saisi structuré (classement +
+     *   aiguillage) pour phase/tournoi. Omis/undefined → non transmis :
+     *   le SQL PRÉSERVE l'existant (COALESCE). Pour un match : laisser
+     *   omis. Convention front : renvoyer l'objet structuré COMPLET
+     *   courant à chaque upsert (pas de patch partiel).
      * @returns {Promise<{ok:boolean, data?:object, error?:string}>}
      */
-    async upsertRapportMatch(evenementUuid, bilan) {
+    async upsertRapportMatch(evenementUuid, bilan, donnees) {
       if (!evenementUuid) {
         return { ok: false, error: 'evenementUuid manquant' };
       }
-      const { data, error } = await client.rpc('upsert_rapport_match', {
+      const params = {
         p_evenement_uuid: evenementUuid,
         p_bilan:          (bilan === undefined ? null : bilan)
-      });
+      };
+      // n'envoie p_donnees QUE s'il est fourni (undefined → COALESCE SQL préserve)
+      if (donnees !== undefined) { params.p_donnees = donnees; }
+      const { data, error } = await client.rpc('upsert_rapport_match', params);
       if (error) {
         console.error('MOM Hub: upsertRapportMatch()', error);
         return { ok: false, error: error.message || 'Erreur upsert_rapport_match' };
@@ -5683,6 +5701,7 @@
       id:             r.out_id             !== undefined ? r.out_id             : r.id,
       evenement_uuid: r.out_evenement_uuid !== undefined ? r.out_evenement_uuid : r.evenement_uuid,
       bilan:          r.out_bilan          !== undefined ? r.out_bilan          : r.bilan,
+      donnees:        r.out_donnees        !== undefined ? r.out_donnees        : r.donnees,
       statut:         r.out_statut         !== undefined ? r.out_statut         : r.statut,
       finalise_le:    r.out_finalise_le    !== undefined ? r.out_finalise_le    : r.finalise_le,
       finalise_par:   r.out_finalise_par   !== undefined ? r.out_finalise_par   : r.finalise_par,
@@ -5697,7 +5716,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.45 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.46 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
