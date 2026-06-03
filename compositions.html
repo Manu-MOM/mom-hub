@@ -1188,14 +1188,15 @@
 
 
     /* ===== v3.57 : rapport de match — statut compact + page unique ===== */
-    .rapport__entete { position: relative; }
+    /* Statut compact : sous le bandeau, aligné à droite, en flux (pas
+       d'absolute — évite la collision avec le toggle MOM/Entente qui occupe
+       déjà le coin haut-droit du bandeau). Fix pt 55. */
+    .rapport__entete { display: flex; flex-direction: column; }
     .rapport__statut--compact {
-      position: absolute; top: 10px; right: 14px; z-index: 2;
-      margin: 0 !important; padding: 0 !important; background: none !important;
+      align-self: flex-end; margin: 6px 18px 0 0 !important; padding: 0 !important;
+      background: none !important; border: none !important;
     }
-    /* Le badge garde son style (badge-statut) ; on retire juste le cadre
-       pleine-ligne hérité de .rapport__statut. */
-    .rapport__statut--compact .badge-statut { box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
+    .rapport__statut--compact .badge-statut { box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
 
     @media print {
       /* Rapport de match : viser une page. Compactage + évite les coupures
