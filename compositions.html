@@ -941,6 +941,61 @@
          impression ; on masque juste le résumé cliquable « ▶ … ». */
       body.printing-rapport .rapport-tdj__sum { list-style: none; }
     }
+
+    /* ===== Rapports de PHASE & TOURNOI (pt 55, v3.52) ===== */
+    /* Réutilise rapport__saisi / rapport__btn / badge-statut / rapport-tab
+       existants ; ajoute le spécifique des niveaux empilés. Additif pur. */
+    .rapnv-intro {
+      margin: 4px 18px 0; font-size: 13px; color: var(--ink-mute, #6b6b6b);
+    }
+    .rapnv-niveau {
+      margin: 14px 18px 0; padding: 14px 16px;
+      border: 1px solid var(--paper-warm, #e8e5dd); border-radius: 12px;
+      background: var(--paper, #fff);
+    }
+    .rapnv-niveau__head { margin-bottom: 10px; }
+    .rapnv-niveau__titre { font-size: 16px; font-weight: 700; color: var(--ink); }
+    .rapnv-niveau__sous { font-size: 12px; color: var(--ink-mute, #6b6b6b); margin-top: 2px; }
+    .rapnv-niveau .rapport__statut { margin-top: 6px; }
+
+    /* Éditeur structuré (classement + aiguillage) */
+    .rapnv-struct { margin: 10px 0 4px; display: flex; flex-direction: column; gap: 12px; }
+    .rapnv-sub__titre { font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+    .rapnv-list { display: flex; flex-direction: column; gap: 6px; }
+    .rapnv-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .rapnv-inp {
+      flex: 1 1 auto; min-width: 90px; padding: 6px 8px; font-size: 13px;
+      border: 1px solid var(--paper-warm, #ddd); border-radius: 8px; color: var(--ink); background: #fff;
+    }
+    .rapnv-inp--rang { flex: 0 0 64px; min-width: 64px; }
+    .rapnv-inp--note { flex: 2 1 auto; }
+    .rapnv-fleche { color: var(--ink-mute, #888); font-weight: 700; }
+    .rapnv-del {
+      flex: 0 0 auto; border: none; background: transparent; cursor: pointer;
+      color: #b23b3b; font-size: 15px; line-height: 1; padding: 4px 6px; border-radius: 6px;
+    }
+    .rapnv-del:hover { background: #fbeaea; }
+    .rapnv-add {
+      align-self: flex-start; margin-top: 4px; border: 1px dashed var(--paper-warm, #ccc);
+      background: transparent; color: var(--vert-prairie, #2D7D46); cursor: pointer;
+      font-size: 12px; padding: 5px 10px; border-radius: 8px;
+    }
+    .rapnv-add:hover { background: rgba(45,125,70,0.08); }
+
+    /* Déduit agrégé */
+    .rapnv-deduit { margin-top: 12px; }
+    .rapnv-deduit__titre { font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 6px; }
+    .rapnv-deduit__note {
+      font-size: 12px; color: #8a6d1a; background: #fdf6e3;
+      border: 1px solid #efe3bd; border-radius: 8px; padding: 6px 10px; margin-bottom: 8px;
+    }
+    .rapnv-deduit__cumul { font-size: 14px; margin-bottom: 8px; color: var(--ink); }
+    .rapnv-tr--vide td { color: var(--ink-mute, #999); font-style: italic; }
+
+    /* Charte : bords des niveaux selon l'habillage */
+    .view-rapport--mom .rapnv-niveau { border-color: #cfe2d4; }
+    .view-rapport--entente .rapnv-niveau { border-color: #cfe0f0; }
+
   </style>
 </head>
 
