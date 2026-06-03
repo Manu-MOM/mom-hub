@@ -6,6 +6,23 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.51 — Rapport de match : stockage du SAISI (bilan + statut Finaliser/Rouvrir) (3 juin 2026)
+ *   v3.51 : pt 54. 2e TEMPS du rapport = le SAISI (verdict éducateur),
+ *           backend C13-a (table rapports + RPC). Bloc « rapport__saisi »
+ *           inséré EN HAUT (décision Manu : le verdict d'abord, le déduit
+ *           en appui dessous) entre le bandeau et le corps déduit :
+ *           textarea bilan + boutons Enregistrer / Finaliser / Rouvrir +
+ *           pastille de statut DYNAMIQUE (provisoire/finalisé). Le statut
+ *           est une MENTION, jamais un cadenas (pt 52) : le bilan reste
+ *           éditable et le rapport imprimable quel que soit le statut.
+ *           Boot : getRapportMatch charge bilan+statut ; handlers via
+ *           upsertRapportMatch / finaliserRapport / rouvrirRapport (v1.45).
+ *           Finaliser enregistre d'abord la frappe courante. Rendu lecture
+ *           du bilan (rapport__bilan-lu) pour l'impression (@media print
+ *           masque le textarea + les boutons). Le DÉDUIT (renderEditorRapport
+ *           corps / _peindreRapport / fil / subs) est INCHANGÉ. CSS ajouté
+ *           dans compositions.html (rapport__saisi, badge-statut, print).
+ *           node --check OK.
  * Version : 3.50 — Rapport de match : cadre charte (clair) + bouton Imprimer/PDF (3 juin 2026)
  *   v3.50 : pt 53. (1) CADRE CHARTE sur le rapport — variante CLAIRE
  *           (fond blanc gardé pour l'impression) : bordure colorée + filet
@@ -1567,7 +1584,21 @@
     el.innerHTML =
       '<div class="view-rapport view-rapport--' + habillage + '">' +
         _bandeauHTML(nomNous, 'Rapport de match — ' + adversaire) +
-        '<div class="rapport__statut">Statut : <strong>provisoire</strong> · lecture seule (déduit du suivi)</div>' +
+        '<div class="rapport__statut" id="rapport-statut">Statut : <span class="badge-statut badge-statut--provisoire">provisoire</span></div>' +
+        // ── Bloc SAISI (verdict éducateur EN HAUT, décision Manu). Le
+        //    déduit (rapport-corps) reste en appui dessous. C13-a / pt 53.
+        '<div class="rapport__saisi" id="rapport-saisi">' +
+          '<div class="rapport__saisi-titre">Bilan de l\'éducateur (à froid)</div>' +
+          '<textarea id="rapport-bilan" class="rapport__bilan" ' +
+            'placeholder="Ton verdict sur le match : ce qui a marché, les axes de travail, le ressenti…"></textarea>' +
+          '<div id="rapport-bilan-lu" class="rapport__bilan-lu" style="display:none;"></div>' +
+          '<div class="rapport__saisi-actions" id="rapport-saisi-actions">' +
+            '<button type="button" id="btn-rapport-save" class="rapport__btn rapport__btn--primary">💾 Enregistrer le bilan</button>' +
+            '<button type="button" id="btn-rapport-finaliser" class="rapport__btn">✓ Finaliser</button>' +
+            '<button type="button" id="btn-rapport-rouvrir" class="rapport__btn" style="display:none;">↻ Rouvrir</button>' +
+            '<span id="rapport-saisi-msg" class="rapport__saisi-msg"></span>' +
+          '</div>' +
+        '</div>' +
         '<div class="rapport__actions">' +
           '<button type="button" id="btn-rapport-print" class="rapport__btn" title="Imprimer ou enregistrer en PDF">🖨 Imprimer / PDF</button>' +
         '</div>' +
@@ -1605,7 +1636,101 @@
     if (!evtId) {
       var corps0 = document.getElementById('rapport-corps');
       if (corps0) corps0.innerHTML = '<div class="view-suivi__hint">Match non résolu (evenement_id absent).</div>';
+      var saisi0 = document.getElementById('rapport-saisi');
+      if (saisi0) saisi0.style.display = 'none';
       return;
+    }
+
+    // ── SAISI (C13-a) : charge le bilan + statut, câble les handlers.
+    //    Indépendant du déduit (chargé plus bas). Si les wrappers ne sont
+    //    pas là (vieux client), on masque le bloc (dégradation honnête).
+    if (!window.SupabaseHub || !SupabaseHub.getRapportMatch) {
+      var saisi1 = document.getElementById('rapport-saisi');
+      if (saisi1) saisi1.style.display = 'none';
+    } else {
+      var msgEl = document.getElementById('rapport-saisi-msg');
+      var taEl  = document.getElementById('rapport-bilan');
+      // État local du rapport saisi (statut courant), porté par la closure.
+      var etatSaisi = { statut: 'provisoire' };
+
+      // Charge l'existant.
+      SupabaseHub.getRapportMatch(evtId).then(function (res) {
+        if (State.viewMode !== 'rapport' || State.selectedCompoId !== compo.id) return;
+        if (res && res.ok && res.data) {
+          if (taEl) taEl.value = res.data.bilan || '';
+          etatSaisi.statut = res.data.statut || 'provisoire';
+        } else {
+          etatSaisi.statut = 'provisoire';
+        }
+        _appliquerEtatRapportSaisi(etatSaisi.statut);
+      }).catch(function () {
+        _appliquerEtatRapportSaisi('provisoire');
+      });
+
+      function _msg(txt, cls) {
+        if (!msgEl) return;
+        msgEl.textContent = txt || '';
+        msgEl.className = 'rapport__saisi-msg' + (cls ? ' rapport__saisi-msg--' + cls : '');
+      }
+
+      // Enregistrer le bilan (upsert ; marche quel que soit le statut).
+      var btnSave = document.getElementById('btn-rapport-save');
+      if (btnSave) btnSave.addEventListener('click', function () {
+        var val = taEl ? taEl.value : '';
+        _msg('Enregistrement…', null);
+        btnSave.disabled = true;
+        SupabaseHub.upsertRapportMatch(evtId, val).then(function (res) {
+          btnSave.disabled = false;
+          if (res && res.ok) {
+            if (res.data && res.data.statut) {
+              etatSaisi.statut = res.data.statut;
+              _appliquerEtatRapportSaisi(etatSaisi.statut);
+            }
+            _msg('Bilan enregistré.', 'ok');
+          } else {
+            _msg((res && res.error) || 'Échec de l\'enregistrement.', 'err');
+          }
+        });
+      });
+
+      // Finaliser (mention, jamais un cadenas : le bilan reste éditable).
+      var btnFin = document.getElementById('btn-rapport-finaliser');
+      if (btnFin) btnFin.addEventListener('click', function () {
+        _msg('Finalisation…', null);
+        btnFin.disabled = true;
+        // Enregistre d'abord le bilan courant pour ne pas perdre une frappe
+        // non sauvegardée, puis finalise.
+        var val = taEl ? taEl.value : '';
+        SupabaseHub.upsertRapportMatch(evtId, val).then(function () {
+          return SupabaseHub.finaliserRapport(evtId);
+        }).then(function (res) {
+          btnFin.disabled = false;
+          if (res && res.ok) {
+            etatSaisi.statut = (res.data && res.data.statut) || 'finalise';
+            _appliquerEtatRapportSaisi(etatSaisi.statut);
+            _msg('Rapport finalisé.', 'ok');
+          } else {
+            _msg((res && res.error) || 'Échec de la finalisation.', 'err');
+          }
+        });
+      });
+
+      // Rouvrir (repasse en provisoire ; le bilan est conservé).
+      var btnReo = document.getElementById('btn-rapport-rouvrir');
+      if (btnReo) btnReo.addEventListener('click', function () {
+        _msg('Réouverture…', null);
+        btnReo.disabled = true;
+        SupabaseHub.rouvrirRapport(evtId).then(function (res) {
+          btnReo.disabled = false;
+          if (res && res.ok) {
+            etatSaisi.statut = (res.data && res.data.statut) || 'provisoire';
+            _appliquerEtatRapportSaisi(etatSaisi.statut);
+            _msg('Rapport rouvert (provisoire).', 'ok');
+          } else {
+            _msg((res && res.error) || 'Échec de la réouverture.', 'err');
+          }
+        });
+      });
     }
 
     if (!window.SupabaseHub || !SupabaseHub.getChronologieRencontreCoach) {
@@ -1627,6 +1752,51 @@
         if (c) c.innerHTML = '<div class="view-suivi__hint">Lecture du suivi impossible.</div>';
       });
     });
+  }
+
+  // Met à jour l'affichage du bloc saisi selon le statut courant
+  // (pastille, boutons Finaliser/Rouvrir, rendu lecture pour l'impression).
+  // Ne touche PAS la valeur du textarea (préserve la frappe en cours).
+  // Le statut est une MENTION, jamais un cadenas (pt 52) : le textarea et
+  // « Enregistrer » restent actifs même en finalisé.
+  function _appliquerEtatRapportSaisi(statut) {
+    var st = (statut === 'finalise') ? 'finalise' : 'provisoire';
+    var statutEl = document.getElementById('rapport-statut');
+    if (statutEl) {
+      var libelle = (st === 'finalise') ? 'finalisé' : 'provisoire';
+      statutEl.innerHTML = 'Statut : <span class="badge-statut badge-statut--' + st + '">' +
+        libelle + '</span>';
+    }
+    var btnFin = document.getElementById('btn-rapport-finaliser');
+    var btnReo = document.getElementById('btn-rapport-rouvrir');
+    if (btnFin) btnFin.style.display = (st === 'finalise') ? 'none' : '';
+    if (btnReo) btnReo.style.display = (st === 'finalise') ? '' : 'none';
+
+    // Rendu lecture du bilan (utilisé à l'impression ; le @media print
+    // masque le textarea et montre ce div). Maintenu en phase à chaque
+    // changement d'état + à la frappe (listener ci-dessous).
+    _syncBilanLecture();
+  }
+
+  // Recopie le contenu du textarea dans le div lecture (pre-wrap), pour
+  // que l'impression montre le bilan même si le navigateur n'imprime pas
+  // proprement un <textarea>. Appelé à l'init, aux actions et à la frappe.
+  function _syncBilanLecture() {
+    var ta = document.getElementById('rapport-bilan');
+    var lu = document.getElementById('rapport-bilan-lu');
+    if (!ta || !lu) return;
+    var v = (ta.value || '').trim();
+    if (v) {
+      lu.textContent = ta.value;
+      lu.className = 'rapport__bilan-lu';
+    } else {
+      lu.textContent = '— Aucun bilan saisi —';
+      lu.className = 'rapport__bilan-lu rapport__bilan-vide';
+    }
+    if (!ta._bilanSyncBound) {
+      ta.addEventListener('input', _syncBilanLecture);
+      ta._bilanSyncBound = true;
+    }
   }
 
   // Agrège la chronologie et peint le corps du rapport. Lecture pure.
