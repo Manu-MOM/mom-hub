@@ -6,6 +6,20 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.55 — Rapports phase/tournoi : 2e bandeau actions + éditeur contextuel + fix UUID essai (3 juin 2026)
+ *   v3.55 : (1) FIX données — l'UUID de l'essai est 'obs-A-essai' (pas
+ *           'obs-A-es' ; sonde référentiel pt 55). Le comptage des essais
+ *           et le top marqueur étaient muets ; corrigés. (2) 2e BANDEAU
+ *           « actions marquantes » sous le hero : mêlées et touches
+ *           gagnées/perdues + %% de réussite (UUID distincts du référentiel :
+ *           obs-A-melee-gagnee/-perdue, obs-A-touche-gagnee/-perdue),
+ *           cartons, + top scoreurs/marqueurs (déplacés ici). (3) Éditeur
+ *           CONTEXTUEL : le détail classement + l'aiguillage ne s'affichent
+ *           qu'au niveau PHASE (décision Manu) ; au niveau TOURNOI, seul le
+ *           rang du hero (l'aiguillage décrit le parcours ENTRE phases).
+ *           Cache _niveauType. Temps de jeu EXCLU (donnée non fiable, dette
+ *           SUIVI-COACH-7). Ajout _conquHTML. Dégradation honnête. Chemin
+ *           match (v3.51) INTACT.
  * Version : 3.54 — Rapports phase/tournoi : HERO classement final + Avis du coach (3 juin 2026)
  *   v3.54 : HERO de niveau (pt 55, demande Manu). Le bandeau synthèse
  *           clair (v3.53) devient un HERO punchy (esprit SAR×MOM, charte
@@ -1652,6 +1666,7 @@
     var matchs = Array.isArray(matchsDuNiveau) ? matchsDuNiveau : [];
     var base = { momTotal: 0, advTotal: 0, nbMatchs: 0, nbRenseignes: 0,
                  essaisNous: 0, essaisAdv: 0, cartons: 0, v: 0, n: 0, d: 0,
+                 meleeG: 0, meleeP: 0, toucheG: 0, toucheP: 0,
                  parJoueur: {}, details: [] };
     if (matchs.length === 0) { cb(base); return; }
     if (!window.SupabaseHub || !SupabaseHub.getChronologieRencontreCoach) {
@@ -1661,6 +1676,7 @@
     var restant = matchs.length;
     var acc = { momTotal: 0, advTotal: 0, nbRenseignes: 0,
                 essaisNous: 0, essaisAdv: 0, cartons: 0, v: 0, n: 0, d: 0,
+                meleeG: 0, meleeP: 0, toucheG: 0, toucheP: 0,
                 parJoueur: {} };
     // Quelles familles comptent comme « carton » : on s'appuie sur le
     // libellé de l'observable (discipline) contenant « carton ».
@@ -1686,16 +1702,24 @@
           for (var i = 0; i < eff.length; i++) {
             var l = eff[i];
             var advLigne = (l.equipe_concernee === 'adverse');
-            if (l.observable_id === 'obs-A-es') {
+            var oid = l.observable_id;
+            if (oid === 'obs-A-essai') {
               if (advLigne) acc.essaisAdv += 1; else acc.essaisNous += 1;
             }
-            if (!advLigne && estCarton(l.observable_id)) acc.cartons += 1;
+            if (!advLigne && estCarton(oid)) acc.cartons += 1;
+            // Conquête (côté nous) — UUID distincts du référentiel (sonde pt 55).
+            if (!advLigne) {
+              if (oid === 'obs-A-melee-gagnee')  acc.meleeG  += 1;
+              else if (oid === 'obs-A-melee-perdue')  acc.meleeP  += 1;
+              else if (oid === 'obs-A-touche-gagnee') acc.toucheG += 1;
+              else if (oid === 'obs-A-touche-perdue') acc.toucheP += 1;
+            }
             // Agrégat par joueur (nous, joueur identifié).
             if (!advLigne && l.joueur_uuid) {
               if (!acc.parJoueur[l.joueur_uuid]) acc.parJoueur[l.joueur_uuid] = { pts: 0, essais: 0 };
               var pts = (typeof l.valeur_points === 'number') ? l.valeur_points : 0;
               if (pts) acc.parJoueur[l.joueur_uuid].pts += pts;
-              if (l.observable_id === 'obs-A-es') acc.parJoueur[l.joueur_uuid].essais += 1;
+              if (oid === 'obs-A-essai') acc.parJoueur[l.joueur_uuid].essais += 1;
             }
           }
         }
@@ -1712,6 +1736,8 @@
                nbMatchs: matchs.length, nbRenseignes: acc.nbRenseignes,
                essaisNous: acc.essaisNous, essaisAdv: acc.essaisAdv,
                cartons: acc.cartons, v: acc.v, n: acc.n, d: acc.d,
+               meleeG: acc.meleeG, meleeP: acc.meleeP,
+               toucheG: acc.toucheG, toucheP: acc.toucheP,
                parJoueur: acc.parJoueur, details: details });
         }
       });
@@ -1754,7 +1780,8 @@
       aiHtml += ligneAiguillage(aiguillage[j].origine, aiguillage[j].destination);
     }
 
-    return '<div class="rapnv-struct" id="' + prefixe + '-struct">' +
+    // Bloc rang/nb d'équipes : présent aux DEUX niveaux (pilote le hero).
+    var blocRang =
         '<div class="rapnv-sub rapnv-sub--rang">' +
           '<div class="rapnv-sub__titre">🥇 Classement final</div>' +
           '<div class="rapnv-rang">' +
@@ -1766,7 +1793,15 @@
               '<input type="text" inputmode="numeric" class="rapnv-inp rapnv-inp--nbeq" ' +
                 'id="' + prefixe + '-nbeq" placeholder="10" value="' + escapeHtml(String(nbEquipes)) + '"></label>' +
           '</div>' +
-        '</div>' +
+        '</div>';
+
+    // Détail classement + aiguillage : NIVEAU PHASE uniquement (décision pt 55).
+    // Au tournoi, le rang du hero suffit ; l'aiguillage décrit le parcours
+    // ENTRE phases, sa place est donc dans le rapport de phase.
+    var estTournoi = (_niveauType[prefixe] === 'tournoi');
+    var blocPhase = '';
+    if (!estTournoi) {
+      blocPhase =
         '<div class="rapnv-sub">' +
           '<div class="rapnv-sub__titre">🏆 Détail classement / résultat</div>' +
           '<div class="rapnv-list" id="' + prefixe + '-cl">' + clHtml + '</div>' +
@@ -1776,7 +1811,11 @@
           '<div class="rapnv-sub__titre">➡️ Aiguillage (où va chaque rang)</div>' +
           '<div class="rapnv-list" id="' + prefixe + '-ai">' + aiHtml + '</div>' +
           '<button type="button" class="rapnv-add" data-add="ai" data-prefixe="' + prefixe + '">+ ligne d\'aiguillage</button>' +
-        '</div>' +
+        '</div>';
+    }
+
+    return '<div class="rapnv-struct" id="' + prefixe + '-struct">' +
+        blocRang + blocPhase +
       '</div>';
   }
 
@@ -1950,7 +1989,8 @@
 
   // Bloc HTML d'un niveau (tournoi ou phase) : titre + saisi (bilan +
   // structure) + zone déduit (remplie en asynchrone).
-  function _blocNiveauHTML(prefixe, titre, sousTitre) {
+  function _blocNiveauHTML(prefixe, titre, sousTitre, estTournoi) {
+    _niveauType[prefixe] = estTournoi ? 'tournoi' : 'phase';
     return '<section class="rapnv-niveau" id="' + prefixe + '-niveau">' +
         '<header class="rapnv-niveau__head">' +
           '<div class="rapnv-niveau__titre">' + escapeHtml(titre) + '</div>' +
@@ -1990,6 +2030,7 @@
   var _deduitCache = {};
   var _nomNousCache = {};
   var _rangCache = {};
+  var _niveauType = {};   // prefixe -> 'tournoi' | 'phase' (pilote l'éditeur contextuel)
 
   function _repeindreHero(prefixe) {
     var res = _deduitCache[prefixe];
@@ -2092,8 +2133,23 @@
     }
 
     var html = '';
-    // --- Zone Tops (remplie en async après résolution des noms) ---
+    // --- 2e BANDEAU : actions marquantes (v3.55) ---
+    html += '<div class="rapnv-actions">';
+    html += '<div class="rapnv-actions__titre">⚡ Actions marquantes</div>';
+    // Rangée conquête : mêlées / touches (gagnées-perdues + %) + cartons.
+    html += '<div class="rapnv-conq">';
+    html += _conquHTML('Mêlées', res.meleeG, res.meleeP, '🟢');
+    html += _conquHTML('Touches', res.toucheG, res.toucheP, '🔵');
+    if (res.cartons > 0) {
+      html += '<div class="rapnv-conq__case rapnv-conq__case--carton">' +
+                '<div class="rapnv-conq__val">' + res.cartons + '</div>' +
+                '<div class="rapnv-conq__lbl">Cartons</div>' +
+              '</div>';
+    }
+    html += '</div>'; // .rapnv-conq
+    // --- Zone Tops joueurs (remplie en async après résolution des noms) ---
     html += '<div class="rapnv-tops" id="' + prefixe + '-tops"></div>';
+    html += '</div>'; // .rapnv-actions
 
     // --- Détail par match ---
     html += '<div class="rapnv-deduit__titre">Détail par match</div>';
@@ -2116,6 +2172,19 @@
 
     // --- Tops joueurs : résolution des noms en lot, puis peinture ---
     _peindreTopsJoueurs(prefixe, res.parJoueur);
+  }
+
+  // Carte conquête (mêlées ou touches) : gagnées / perdues + % de réussite.
+  // Dégradation honnête : si aucune donnée (0 tentative), affiche « — ».
+  function _conquHTML(label, gagnees, perdues, puce) {
+    var total = (gagnees || 0) + (perdues || 0);
+    var pct = total > 0 ? Math.round((gagnees / total) * 100) : null;
+    var valeur = total > 0 ? (gagnees + ' / ' + total) : '—';
+    var pctTxt = (pct != null) ? ('<span class="rapnv-conq__pct">' + pct + '%</span>') : '';
+    return '<div class="rapnv-conq__case">' +
+             '<div class="rapnv-conq__val">' + valeur + ' ' + pctTxt + '</div>' +
+             '<div class="rapnv-conq__lbl">' + (puce ? puce + ' ' : '') + escapeHtml(label) + ' gagnées</div>' +
+           '</div>';
   }
 
   // Top scoreur (points) + Top marqueur (essais) d'un niveau. Agrégats déjà
@@ -2211,7 +2280,7 @@
           '(le rapport de chaque <em>match</em> se saisit sur son onglet de match).</div>' +
         // Bloc TOURNOI (racine)
         _blocNiveauHTML('rapnv-t', '🏆 Tournoi · ' + (racine.libelle || ''),
-                        (racine.date_debut ? _formatDateFr(racine.date_debut) : ''));
+                        (racine.date_debut ? _formatDateFr(racine.date_debut) : ''), true);
 
     // Blocs PHASE (un par phase de l'équipe) — seulement si phases connues.
     for (var p = 0; p < phases.length; p++) {
@@ -2219,7 +2288,7 @@
       var pfx = 'rapnv-p' + p;
       // Si la phase n'a pas d'UUID propre (cas dégénéré), on n'offre pas le saisi.
       var sousT = ph.matchs.length + ' match' + (ph.matchs.length > 1 ? 's' : '');
-      html += _blocNiveauHTML(pfx, '📋 Phase · ' + (ph.libelle || ''), sousT);
+      html += _blocNiveauHTML(pfx, '📋 Phase · ' + (ph.libelle || ''), sousT, false);
     }
 
     html +=
