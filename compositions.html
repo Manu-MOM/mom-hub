@@ -831,6 +831,60 @@
     .rapport-fil__pts {
       font-variant-numeric: tabular-nums; font-weight: 600; color: var(--vert-prairie); text-align: right;
     }
+    /* ── Cadre charte (variante CLAIRE, fond blanc gardé pour impression) ── */
+    /* Le bandeau (_bandeauHTML) est déjà stylé par .view-suivi__bandeau ;
+       on ajoute ici la bordure du cadre + le filet coloré par habillage. */
+    .view-rapport {
+      border: 2px solid var(--line); border-radius: 14px; overflow: hidden;
+      background: #fff; padding-bottom: 18px;
+    }
+    .view-rapport .view-suivi__bandeau { margin-bottom: 4px; }
+    .view-rapport > .rapport__statut,
+    .view-rapport > .rapport__actions,
+    .view-rapport > .rapport__corps { margin-left: 18px; margin-right: 18px; }
+    .view-rapport > .rapport__statut { margin-top: 12px; }
+    /* MOM : bordure verte + filet doré sous le bandeau. */
+    .view-rapport--mom { border-color: #1e4628; }
+    .view-rapport--mom .view-suivi__bandeau {
+      background: linear-gradient(90deg, #1e4626, #285a30);
+      border-bottom: 3px solid #f0d800;
+    }
+    /* Entente : bordure marine + filet bleu ciel. */
+    .view-rapport--entente { border-color: #143a64; }
+    .view-rapport--entente .view-suivi__bandeau {
+      background: linear-gradient(90deg, #00285a, #14462d);
+      border-bottom: 3px solid #90d8f0;
+    }
+    .view-rapport--entente .view-suivi__brand-sub { color: #90d8f0; }
+    .view-rapport--entente .view-suivi__hbtn[aria-pressed="true"] {
+      background: #90d8f0; border-color: #90d8f0; color: #0a1428;
+    }
+    /* Barre d'actions (bouton Imprimer) — masquée à l'impression. */
+    .rapport__actions { display: flex; justify-content: flex-end; margin-top: 4px; }
+    .rapport__btn {
+      font-family: 'Oswald', sans-serif; font-size: 13px; letter-spacing: 0.03em;
+      padding: 8px 16px; border: 1px solid var(--vert-prairie); border-radius: 8px;
+      background: #fff; color: var(--vert-prairie); cursor: pointer;
+    }
+    .rapport__btn:hover { background: var(--vert-prairie); color: #fff; }
+
+    /* ── Impression : ne garder que le rapport (boutons d'export inclus
+         masqués). Déclenché par body.printing-rapport au clic Imprimer. ── */
+    @media print {
+      body.printing-rapport * { visibility: hidden; }
+      body.printing-rapport .view-rapport,
+      body.printing-rapport .view-rapport * { visibility: visible; }
+      body.printing-rapport .view-rapport {
+        position: absolute; left: 0; top: 0; width: 100%;
+        border: none; border-radius: 0;
+      }
+      /* Boutons et contrôles non imprimés. */
+      body.printing-rapport .rapport__actions,
+      body.printing-rapport .view-suivi__habillage { display: none !important; }
+      /* Le panneau temps de jeu est déplié via JS (attribut open) avant
+         impression ; on masque juste le résumé cliquable « ▶ … ». */
+      body.printing-rapport .rapport-tdj__sum { list-style: none; }
+    }
   </style>
 </head>
 
