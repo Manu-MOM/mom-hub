@@ -6,6 +6,29 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.59 — Fix : queue des rapports de match invisible (SuiviObs.charger avalait les callbacks) (3 juin 2026)
+ *   v3.59 : FIX la queue des rapports de match (v3.58) ne s'affichait
+ *           pas. Cause : SuiviObs.charger ignorait le callback si un
+ *           chargement était déjà en cours (if enCours return), or le
+ *           rapport tournoi appelle charger plusieurs fois (tournoi +
+ *           chaque phase + queue matchs) → le cb de la queue était jeté.
+ *           Correctif racine : charger EMPILE les callbacks en attente
+ *           (_cbQueue) et les vide tous à la fin du fetch. Bénéficie à
+ *           tout le module ; comportement inchangé pour un appel unique.
+ * Version : 3.58 — Rapport tournoi : queue des rapports de match (un par page) (3 juin 2026)
+ *   v3.58 : En queue du rapport TOURNOI, tous les rapports de match de
+ *           l'équipe sont enchaînés (idée Manu), un par page à l'export.
+ *           Le rendu d'un rapport de match est FACTORISÉ dans
+ *           _rendreRapportMatchDans(element, lignes, nomNous, nomAdv,
+ *           suffix) : le chemin match historique (_peindreRapport) en est
+ *           devenu un wrapper (suffix='' → ids 'rapport-subs/-fil/
+ *           -tdj-detail' INCHANGÉS ; équivalence nomAdv = SuiviChrono.nomAdv
+ *           prouvée). _peindreSubsRapport/_peindreFilRapport gagnent un
+ *           cibleId optionnel (+ nomAdv pour le fil) → réutilisables en
+ *           série sans collision d'ids. Chaque match de la queue : suffix
+ *           '-mN'. Dégradation honnête (match sans suivi → vide standard).
+ *           _calculerScore/_familleDeObs/renderEditorRapport/
+ *           _appliquerEtatRapportSaisi/_syncBilanLecture INTACTS.
  * Version : 3.57 — Rapport de MATCH : avis du coach en bas, statut compact, page unique (3 juin 2026)
  *   v3.57 : Refonte présentation du RAPPORT DE MATCH (retours Manu ;
  *           première modification de ce chemin depuis pt 53, assumée).
@@ -1416,22 +1439,31 @@
     catB: null,        // { tranche: [{libelle}, …], … } ou null (L5)
     charge: false,
     enCours: false,
+    _cbQueue: [],      // callbacks en attente pendant un chargement (fix pt 55)
     charger: function (cb) {
       if (this.charge) { if (cb) cb(this.catA); return; }
-      if (this.enCours) { return; }
+      // FIX pt 55 : si un chargement est déjà en cours, on EMPILE le callback
+      // au lieu de le jeter (sinon les appels multiples — tournoi + phases +
+      // queue matchs — perdaient leur cb, d'où des zones jamais peintes).
+      if (this.enCours) { if (cb) this._cbQueue.push(cb); return; }
       this.enCours = true;
+      if (cb) this._cbQueue.push(cb);
       var self = this;
+      function _vider(arg) {
+        var q = self._cbQueue; self._cbQueue = [];
+        for (var i = 0; i < q.length; i++) { try { q[i](arg); } catch (e) {} }
+      }
       fetch('data/observables-match.json', { cache: 'no-store' })
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (d) {
           self.catA = (d && d.categorie_A) ? d.categorie_A : null;
           self.catB = (d && d.categorie_B_pre_suggestions) ? d.categorie_B_pre_suggestions : null;
           self.charge = true; self.enCours = false;
-          if (cb) cb(self.catA);
+          _vider(self.catA);
         })
         .catch(function () {
           self.charge = true; self.enCours = false; self.catA = null; self.catB = null;
-          if (cb) cb(null);
+          _vider(null);
         });
     },
     // L4/L5 — libellé d'un observable par son uuid (catA) ou slug (catB).
@@ -2322,6 +2354,27 @@
       html += _blocNiveauHTML(pfx, '📋 Phase · ' + (ph.libelle || ''), sousT, false);
     }
 
+    // Queue : rapports de match détaillés (un par page à l'impression),
+    // rendus en asynchrone après chargement de chaque chronologie (pt 55).
+    var tousMatchsHtml = '';
+    var tousM = Array.isArray(State.matchsDeLequipe) ? State.matchsDeLequipe : [];
+    if (tousM.length > 0) {
+      tousMatchsHtml += '<div class="rapnv-matchs" id="rapnv-matchs">';
+      for (var mi = 0; mi < tousM.length; mi++) {
+        var mm = tousM[mi];
+        var advm = mm.adversaire_nom || mm.libelle || 'Adversaire';
+        tousMatchsHtml +=
+          '<section class="rapnv-match" id="rapnv-match-' + mi + '">' +
+            '<div class="rapnv-match__titre">📄 Rapport de match — ' + escapeHtml(advm) + '</div>' +
+            '<div class="rapport__corps" id="rapnv-match-corps-' + mi + '">' +
+              '<div class="view-suivi__hint">Chargement…</div>' +
+            '</div>' +
+          '</section>';
+      }
+      tousMatchsHtml += '</div>';
+    }
+    html += tousMatchsHtml;
+
     html +=
         '<div class="rapport__actions">' +
           '<button type="button" id="btn-rapnv-print" class="rapport__btn" title="Imprimer ou enregistrer en PDF">🖨 Imprimer / PDF</button>' +
@@ -2400,6 +2453,33 @@
           });
         });
       })(phases[q], q);
+    }
+
+    // QUEUE : rapport détaillé de chaque match (réutilise le rendu match
+    // factorisé _rendreRapportMatchDans, ids suffixés par l'index → pas de
+    // collision). nomAdv passé explicitement. Dégradation honnête : un match
+    // sans suivi affiche le vide standard de _rendreRapportMatchDans.
+    if (tousM.length > 0) {
+      SuiviObs.charger(function () {
+        for (var mj = 0; mj < tousM.length; mj++) {
+          (function (mm, idx) {
+            var cible = document.getElementById('rapnv-match-corps-' + idx);
+            if (!cible) return;
+            var advm = mm.adversaire_nom || mm.libelle || 'Adversaire';
+            if (!window.SupabaseHub || !SupabaseHub.getChronologieRencontreCoach) {
+              cible.innerHTML = '<div class="rapport__vide">Suivi indisponible.</div>';
+              return;
+            }
+            SupabaseHub.getChronologieRencontreCoach(mm.id, true).then(function (lignes) {
+              if (!niveauActif()) return;
+              var arr = Array.isArray(lignes) ? lignes : [];
+              _rendreRapportMatchDans(cible, arr, nomNous, advm, '-m' + idx);
+            }).catch(function () {
+              cible.innerHTML = '<div class="rapport__vide">Lecture du suivi impossible.</div>';
+            });
+          })(tousM[mj], mj);
+        }
+      });
     }
   }
 
@@ -2658,8 +2738,24 @@
 
   // Agrège la chronologie et peint le corps du rapport. Lecture pure.
   function _peindreRapport(lignes, nomNous, nomAdv) {
+    // Wrapper historique (chemin match) : peint dans #rapport-corps, ids
+    // non suffixés. Le rendu réel est factorisé dans _rendreRapportMatchDans
+    // (réutilisé en série pour la queue du rapport tournoi, pt 55).
     var corps = document.getElementById('rapport-corps');
     if (!corps) return;
+    _rendreRapportMatchDans(corps, lignes, nomNous, nomAdv, '');
+  }
+
+  // Rendu d'un rapport de match dans un ÉLÉMENT donné, avec un SUFFIX d'ids
+  // (vide pour le chemin match historique → ids 'rapport-subs'/'rapport-fil'/
+  // 'rapport-tdj-detail' inchangés ; suffixé pour chaque match de la queue
+  // tournoi → ids uniques). nomAdv passé explicitement (série multi-matchs).
+  function _rendreRapportMatchDans(corps, lignes, nomNous, nomAdv, suffix) {
+    if (!corps) return;
+    suffix = suffix || '';
+    var idSubs = 'rapport-subs' + suffix;
+    var idFil  = 'rapport-fil' + suffix;
+    var idTdj  = 'rapport-tdj-detail' + suffix;
 
     // Lignes effectives (annulées exclues du déduit).
     var eff = [];
@@ -2755,7 +2851,7 @@
     if (subs.length > 0) {
       html += '<section class="rapport-bloc">' +
                 '<h4 class="rapport-bloc__titre">🔄 Substitutions <span class="rapport-bloc__n">(' + subs.length + ')</span></h4>' +
-                '<ul id="rapport-subs" class="rapport-subs">' +
+                '<ul id="' + idSubs + '" class="rapport-subs">' +
                   '<li class="view-suivi__hint">Résolution des noms…</li>' +
                 '</ul>' +
               '</section>';
@@ -2767,7 +2863,7 @@
     // famille ci-dessus donne le « combien » ; ce fil donne le déroulé.
     html += '<section class="rapport-bloc">' +
               '<h4 class="rapport-bloc__titre">📋 Déroulé du match <span class="rapport-bloc__n">(' + eff.length + ')</span></h4>' +
-              '<div id="rapport-fil" class="rapport-fil">' +
+              '<div id="' + idFil + '" class="rapport-fil">' +
                 '<p class="view-suivi__hint">Résolution des noms…</p>' +
               '</div>' +
             '</section>';
@@ -2779,7 +2875,7 @@
                 '<p class="rapport-tdj__avert">Estimation <strong>indicative</strong> : le suivi n\'enregistre pas de minutage fiable ' +
                 'pour ce match. Les durées ci-dessous sont calculées à partir de l\'ordre des actions, ' +
                 'pas d\'un chronomètre — à lire comme un ordre de grandeur, jamais comme un temps officiel.</p>' +
-                '<div id="rapport-tdj-detail">' +
+                '<div id="' + idTdj + '">' +
                   '<p class="view-suivi__hint">' + subs.length + ' substitution(s) enregistrée(s). ' +
                   'Le détail par joueur sera affiné avec un minutage fiable.</p>' +
                 '</div>' +
@@ -2790,10 +2886,10 @@
 
     // Résolution asynchrone des noms pour les substitutions (RPC en lot
     // get_noms_personnes). Dégradation honnête : repli #id si non résolu.
-    if (subs.length > 0) _peindreSubsRapport(subs);
+    if (subs.length > 0) _peindreSubsRapport(subs, idSubs);
 
     // Fil chronologique (noms résolus en asynchrone, même voie).
-    _peindreFilRapport(eff);
+    _peindreFilRapport(eff, idFil, nomAdv);
   }
 
   // Résout les noms (sortant/entrant) des substitutions via la RPC en
@@ -2804,8 +2900,8 @@
   // la voie RGPD-safe dédiée (gardée has_role admin|coach, déployée),
   // et elle couvre titulaires ET remplaçants (résout par UUID, pas par
   // appartenance à une compo).
-  function _peindreSubsRapport(subs) {
-    var ul = document.getElementById('rapport-subs');
+  function _peindreSubsRapport(subs, cibleId) {
+    var ul = document.getElementById(cibleId || 'rapport-subs');
     if (!ul) return;
 
     function peindre(resolveNom) {
@@ -2871,9 +2967,12 @@
   // pure. La minute n'est affichée QUE si elle est strictement croissante
   // dans la période (sinon minute_match peu fiable → omise, jamais un
   // faux « 0' » ; même honnêteté que le panneau temps de jeu).
-  function _peindreFilRapport(eff) {
-    var box = document.getElementById('rapport-fil');
+  function _peindreFilRapport(eff, cibleId, nomAdvParam) {
+    var box = document.getElementById(cibleId || 'rapport-fil');
     if (!box) return;
+    // nomAdv : paramètre explicite (série multi-matchs) sinon SuiviChrono.nomAdv
+    // (chemin match historique). Évite d'afficher le mauvais adversaire en série.
+    var _nomAdvFil = (nomAdvParam != null) ? nomAdvParam : (SuiviChrono.nomAdv || 'Adversaire');
 
     // Ordre de jeu = horodatage (base de temps fiable). Tri stable.
     var arr = eff.slice().sort(function (a, b) {
@@ -2925,7 +3024,7 @@
         if (l.observable_id === 'obs-A-substitution') {
           acteur = nomDe(map, l.joueur_uuid) + ' → ' + nomDe(map, l.joueur_uuid_entrant);
         } else if (l.equipe_concernee === 'adverse') {
-          acteur = escapeHtml(SuiviChrono.nomAdv || 'Adversaire');
+          acteur = escapeHtml(_nomAdvFil);
         } else if (l.joueur_uuid) {
           acteur = nomDe(map, l.joueur_uuid);
         } else {
