@@ -1082,6 +1082,30 @@
     .rapnv-rang__sep { color: #8a7a3e; font-size: 13px; padding-bottom: 8px; }
     .rapnv-inp--rang-final, .rapnv-inp--nbeq { flex: 0 0 80px; width: 80px; text-align: center; font-weight: 700; }
 
+
+    /* ===== 2e bandeau « actions marquantes » (pt 55, v3.55) ===== */
+    .rapnv-actions {
+      margin: 4px 0 14px; padding: 14px 16px; border-radius: 12px;
+      background: var(--paper, #fff); border: 1px solid var(--paper-warm, #e8e5dd);
+    }
+    .rapnv-actions__titre {
+      font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 10px;
+      letter-spacing: .02em;
+    }
+    .rapnv-conq {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px; margin-bottom: 12px;
+    }
+    .rapnv-conq__case {
+      background: var(--paper-warm, #f6f4ee); border-radius: 10px; padding: 10px 12px; text-align: center;
+    }
+    .rapnv-conq__case--carton { background: #fdf0e3; }
+    .rapnv-conq__val {
+      font-size: 20px; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; line-height: 1.1;
+    }
+    .rapnv-conq__pct { font-size: 13px; font-weight: 700; color: var(--vert-prairie, #2D7D46); margin-left: 4px; }
+    .rapnv-conq__lbl { font-size: 11px; color: var(--ink-mute, #777); text-transform: uppercase; letter-spacing: .03em; margin-top: 4px; }
+
   </style>
 </head>
 
