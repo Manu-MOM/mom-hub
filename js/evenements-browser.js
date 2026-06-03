@@ -24,7 +24,9 @@
  * Version : 1.59 — Suivi : bouton « Suivez le match en live » (phases) + allègement vignette (3 juin 2026)
  *   v1.59 : Chantier « lien direct suivi coach » (pt 56). DEUX gestes.
  *           (1) Section « Phases du tournoi (détail) » : chaque match non
- *               annulé gagne un bouton « ▶ Suivez le match en live »
+ *               annulé gagne un bouton « Suivez le match en live » (classe
+ *               evt-btn-live : vert prairie + point « live » pulsant, CSS
+ *               dans evenements.html v+1)
  *               (data-action="suivre-match-live"). Handler = 4e miroir des
  *               ouvrir-vue-* : ouvre compositions.html?evenement_equipe=
  *               <evtEqId>&match=<child.id>&vue=suivi (éditeur v3.60 lit
@@ -3482,11 +3484,12 @@
               // v1.59 — Lien direct suivi coach. Affiché seulement si l'on
               // sait bâtir le lien (evtEqId résolu) : pas de bouton mort.
               if (_childEvtEqId) {
-                html += '<button type="button" class="evt-btn evt-badge-sm" '
+                html += '<button type="button" class="evt-btn evt-btn-live evt-badge-sm" '
                   + 'data-action="suivre-match-live" '
                   + 'data-evenement-equipe-id="' + escHtml(_childEvtEqId) + '" '
-                  + 'data-match-id="' + escHtml(child.id) + '" '
-                  + 'style="margin-left:8px;">▶ Suivez le match en live</button>';
+                  + 'data-match-id="' + escHtml(child.id) + '">'
+                  + '<span class="evt-btn-live__dot" aria-hidden="true"></span>'
+                  + 'Suivez le match en live</button>';
               }
             }
             html += '</div>';
