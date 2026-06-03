@@ -21,7 +21,35 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.59 — Suivi : bouton « Suivez le match en live » (phases) + allègement vignette (3 juin 2026)
+ * Version : 1.60 — Vignette « Suivi de la rencontre » supprimée : liens migrés vers l'éditeur (SUIVI-LIEN-COACH-MIGRATION ✅) (3 juin 2026)
+ *   v1.60 : LÈVE la dette SUIVI-LIEN-COACH-MIGRATION (passation pt 56).
+ *           La génération des liens partageables (bénévole + spectateur)
+ *           vit désormais dans l'onglet Suivi de l'éditeur
+ *           (compositions-editor v3.61). La vignette « Suivi de la
+ *           rencontre » (renderSuiviSection), seul générateur de lien du
+ *           Hub jusqu'ici, est NEUTRALISÉE (retourne '' inconditionnel-
+ *           lement, sans suppression du corps : les helpers Objet A/B/C
+ *           — suiviGenerer, spectGenerer, renderSpectateurAcces, etc. —
+ *           restent en place mais ne sont plus appelés ; geste minimal,
+ *           pas de chasse aux références, additivité prouvable par diff).
+ *           TROIS gestes (direction Manu pt 56, complétée tour pt 57) :
+ *           (1) Tuile « ⏱ Suivi » de la grille : passe d'une expansion
+ *               in-situ de la vignette à un DEEP-LINK vers l'éditeur Suivi
+ *               (action ouvrir-vue-suivi → compositions.html?evenement_
+ *               equipe=<id>&vue=suivi), miroir EXACT de ouvrir-vue-terrain
+ *               / ouvrir-vue-reseaux (même mécanisme multi-équipes
+ *               adaptatif : 1 équipe → bouton direct, N → choix équipe).
+ *           (2) Match SIMPLE (hors tournoi, pas de section Phases détail) :
+ *               gagne un bouton « Suivez le match en live » dans la tuile
+ *               Suivi (sinon plus aucun accès au suivi pour ce type). Le
+ *               deep-link porte &match=<evt.id> (le match = l'évènement
+ *               lui-même) + &vue=suivi.
+ *           (3) Le bouton « Suivez le match en live » des Phases du
+ *               tournoi (détail) RESTE l'unique point d'entrée granulaire
+ *               par match (libellé conservé, décision Manu pt 57).
+ *           AUCUN SQL (front pur). Module bénévole suivi.html /
+ *           suivi-app.js / suivi-client.js INTANGIBLE (non touché).
+ *           node --check OK ; chemins de saisie/phase/tournoi inchangés.
  *   v1.59 : Chantier « lien direct suivi coach » (pt 56). DEUX gestes.
  *           (1) Section « Phases du tournoi (détail) » : chaque match non
  *               annulé gagne un bouton « Suivez le match en live » (classe
@@ -2728,7 +2756,19 @@
   // Section complète « Suivi de la rencontre » (ou '' si non
   // applicable). id stable evt-suivi-section pour le rafraîchissement
   // en place après génération.
+  // v1.60 — NEUTRALISÉE : la vignette « Suivi de la rencontre » est
+  // supprimée ; la génération des liens (bénévole + spectateur) vit
+  // désormais dans l'onglet Suivi de l'éditeur (compositions-editor
+  // v3.61). On retourne '' inconditionnellement. Le corps historique
+  // (états bénévole, spectateur, par phase/match) est CONSERVÉ en aval
+  // de ce return mais devient mort : geste minimal, additivité prouvable
+  // (aucun helper supprimé, aucune référence à chasser). Dette
+  // SUIVI-LIEN-COACH-MIGRATION ✅ levée. Voir suiviGenerer/spectGenerer
+  // /renderSpectateurAcces ci-dessus : intacts mais plus appelés.
   function renderSuiviSection(evt) {
+    return '';
+
+    // eslint-disable-next-line no-unreachable
     if (!suiviActionnable(evt)) return '';
 
     let html = '<div class="evt-fiche-section" id="evt-suivi-section">';
@@ -3251,14 +3291,13 @@
     html += '</div>';  // /banniere-n2
 
     // ────────────────────────────────────────────────
-    // (5) BLOC SUIVI DE RENCONTRE — INVARIANT byte-identique
-    //     renderSuiviSection préservée 100%. Wrapper id="evt-suivi-
-    //     rencontre" = addition pure pour ancre depuis lien #2 grille.
-    // v1.56 — le HTML de suivi est désormais injecté DANS la vignette
-    // Suivi (expansion in-situ), plus dans une section séparée (évite le
-    // doublon de boutons/montures). suiviHtml reste calculé pour la vignette.
+    // (5) BLOC SUIVI DE RENCONTRE — v1.60 SUPPRIMÉ.
+    //     La vignette « Suivi de la rencontre » (renderSuiviSection) est
+    //     neutralisée : les liens partageables ont migré dans l'onglet
+    //     Suivi de l'éditeur. La tuile « ⏱ Suivi » (grille fonctionnalités,
+    //     plus bas) est désormais un deep-link vers l'éditeur. Plus aucun
+    //     HTML de suivi injecté ici. Dette SUIVI-LIEN-COACH-MIGRATION ✅.
     // ────────────────────────────────────────────────
-    const suiviHtml = renderSuiviSection(evt);
 
     // ────────────────────────────────────────────────
     // (6) GRILLE FONCTIONNALITÉS DE L'ÉVÈNEMENT — 8 grands boutons §3.3
@@ -3304,19 +3343,22 @@
       sectionId: 'compositions'
     });
 
-    // Fonction #2 — Suivi : expansion in-situ (panneau d'accès au suivi,
-    // réutilise le HTML de renderSuiviSection : match simple → accès directs ;
-    // tournoi → par phase → par match → accès). v1.56.
-    const suiviDispo = !!suiviHtml;
+    // Fonction #2 — Suivi : v1.60 — DEEP-LINK vers l'éditeur Suivi (miroir
+    // de Vue terrain / Réseaux). La vignette génératrice de liens a migré
+    // dans l'éditeur (compositions-editor v3.61) ; la tuile ne fait plus
+    // d'expansion in-situ. Pour un match simple, le handler ajoute
+    // &match=<evt.id> (le match = l'évènement). suivi disponible dès
+    // qu'une équipe est engagée (comme Compositions / Vue terrain).
     html += renderFonctionCellule({
       titre: '⏱ Suivi',
       sousTitre: 'Saisie observables match',
-      statut: suiviDispo ? 'disponible' : 'a-venir',
-      action: 'expand-fonction',
+      statut: eqEng.length > 0 ? 'disponible' : 'a-venir',
+      action: 'ouvrir-vue-suivi',
+      multiEquipes: eqEng,
+      eqNames: eqNames,
       evt: evt,
       sectionId: 'suivi-acces',
-      suiviInnerHtml: suiviHtml,
-      hintIndisponible: suiviDispo ? null : 'hors période ou type d\'évènement'
+      hintIndisponible: 'hors période ou type d\'évènement'
     });
 
     // Fonction #3 — Groupes de base (Pioche dans le vivier)
@@ -3600,7 +3642,7 @@
     // Statut disponible → mécanisme adaptatif
     if (statut === 'disponible') {
       // Compositions/Groupes multi-équipes adaptatif (Q4=C)
-      if (multi && (opts.action === 'ouvrir-feuille-equipe' || opts.action === 'ouvrir-groupe-base' || opts.action === 'ouvrir-vue-terrain' || opts.action === 'ouvrir-vue-reseaux')) {
+      if (multi && (opts.action === 'ouvrir-feuille-equipe' || opts.action === 'ouvrir-groupe-base' || opts.action === 'ouvrir-vue-terrain' || opts.action === 'ouvrir-vue-reseaux' || opts.action === 'ouvrir-vue-suivi')) {
         if (multi.length === 1) {
           // 1 équipe → bouton direct (handler Niveau 0 INVARIANT)
           const eq = multi[0];
@@ -3912,6 +3954,25 @@
         if (evtEqId) {
           window.location.href = 'compositions.html?evenement_equipe=' + encodeURIComponent(evtEqId) + '&vue=reseaux';
         }
+      });
+    });
+    // ── v1.60 : Vue Suivi (tuile « ⏱ Suivi ») — miroir de ouvrir-vue-
+    //    terrain + &vue=suivi. Pour un match SIMPLE (pas un tournoi), le
+    //    match = l'évènement lui-même → on ajoute &match=<evt.id> pour que
+    //    l'éditeur ouvre directement la feuille de match sur l'onglet Suivi
+    //    (compositions-editor v3.60 lit match/vue=suivi au boot). Pour un
+    //    tournoi, pas de &match (le coach choisit l'onglet de match, ou
+    //    utilise les boutons « Suivez le match en live » des Phases).
+    document.querySelectorAll('[data-action="ouvrir-vue-suivi"]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        const evtEqId = this.getAttribute('data-evenement-equipe-id');
+        if (!evtEqId) return;
+        let url = 'compositions.html?evenement_equipe=' + encodeURIComponent(evtEqId) + '&vue=suivi';
+        // Match simple : cibler le match (= l'évènement courant de la fiche).
+        if (FICHE_EVT_COURANT && !estEvtAPhases(FICHE_EVT_COURANT) && FICHE_EVT_COURANT.id) {
+          url += '&match=' + encodeURIComponent(FICHE_EVT_COURANT.id);
+        }
+        window.location.href = url;
       });
     });
     // ── v1.59 : « Suivez le match en live » — 4e miroir des ouvrir-vue-*.
