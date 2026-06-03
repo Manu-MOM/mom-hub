@@ -6,6 +6,21 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.54 — Rapports phase/tournoi : HERO classement final + Avis du coach (3 juin 2026)
+ *   v3.54 : HERO de niveau (pt 55, demande Manu). Le bandeau synthèse
+ *           clair (v3.53) devient un HERO punchy (esprit SAR×MOM, charte
+ *           MOM sombre) en TÊTE de chaque niveau : classement final en
+ *           grand « Xe / N » (SAISI : 2 champs rang + nb_equipes ajoutés à
+ *           l'éditeur, stockés dans donnees jsonb — AUCUN DDL), ligne
+ *           joués/V/N/D + cartes essais/points/diff/cartons (DÉDUIT).
+ *           « Bilan de l'éducateur » → « Avis du coach » (niveau
+ *           phase/tournoi UNIQUEMENT ; le rapport de match garde son
+ *           libellé). Recomposition hero via caches _deduitCache/_rangCache
+ *           + _repeindreHero (ordre async getRapportMatch/_deduitAgrege
+ *           indifférent). Ajouts : _heroHTML, _repeindreHero, champs
+ *           rang/nb_equipes (_editeurStructureHTML + _lireStructureDepuisDOM).
+ *           Tops + détail par match conservés sous le hero. Dégradation
+ *           honnête. Chemin match (v3.51) INTACT.
  * Version : 3.53 — Rapports phase/tournoi : bandeau synthèse + V/N/D + tops joueurs (3 juin 2026)
  *   v3.53 : DÉDUIT enrichi (pt 55). Le déduit de phase/tournoi gagne un
  *           BANDEAU DE SYNTHÈSE condensé (essais pour/contre, points
@@ -1710,6 +1725,8 @@
   function _editeurStructureHTML(prefixe, donnees) {
     var classement = (donnees && Array.isArray(donnees.classement)) ? donnees.classement : [];
     var aiguillage = (donnees && Array.isArray(donnees.aiguillage)) ? donnees.aiguillage : [];
+    var rang       = (donnees && donnees.rang != null) ? donnees.rang : '';
+    var nbEquipes  = (donnees && donnees.nb_equipes != null) ? donnees.nb_equipes : '';
 
     function ligneClassement(rang, equipe, note) {
       return '<div class="rapnv-row" data-kind="cl">' +
@@ -1738,8 +1755,20 @@
     }
 
     return '<div class="rapnv-struct" id="' + prefixe + '-struct">' +
+        '<div class="rapnv-sub rapnv-sub--rang">' +
+          '<div class="rapnv-sub__titre">🥇 Classement final</div>' +
+          '<div class="rapnv-rang">' +
+            '<label class="rapnv-rang__field">Rang ' +
+              '<input type="text" inputmode="numeric" class="rapnv-inp rapnv-inp--rang-final" ' +
+                'id="' + prefixe + '-rang" placeholder="5" value="' + escapeHtml(String(rang)) + '"></label>' +
+            '<span class="rapnv-rang__sep">sur</span>' +
+            '<label class="rapnv-rang__field">Équipes ' +
+              '<input type="text" inputmode="numeric" class="rapnv-inp rapnv-inp--nbeq" ' +
+                'id="' + prefixe + '-nbeq" placeholder="10" value="' + escapeHtml(String(nbEquipes)) + '"></label>' +
+          '</div>' +
+        '</div>' +
         '<div class="rapnv-sub">' +
-          '<div class="rapnv-sub__titre">🏆 Classement / résultat</div>' +
+          '<div class="rapnv-sub__titre">🏆 Détail classement / résultat</div>' +
           '<div class="rapnv-list" id="' + prefixe + '-cl">' + clHtml + '</div>' +
           '<button type="button" class="rapnv-add" data-add="cl" data-prefixe="' + prefixe + '">+ ligne de classement</button>' +
         '</div>' +
@@ -1755,6 +1784,13 @@
   // de l'éditeur préfixé. Ignore les lignes entièrement vides.
   function _lireStructureDepuisDOM(prefixe) {
     var donnees = { classement: [], aiguillage: [] };
+    // Classement final (rang + nb d'équipes) — pilote le hero (v3.54).
+    var rangEl = document.getElementById(prefixe + '-rang');
+    var nbeqEl = document.getElementById(prefixe + '-nbeq');
+    var rangV = rangEl ? (rangEl.value || '').trim() : '';
+    var nbeqV = nbeqEl ? (nbeqEl.value || '').trim() : '';
+    if (rangV) donnees.rang = rangV;
+    if (nbeqV) donnees.nb_equipes = nbeqV;
     var clRoot = document.getElementById(prefixe + '-cl');
     var aiRoot = document.getElementById(prefixe + '-ai');
     if (clRoot) {
@@ -1842,10 +1878,16 @@
         // Repeindre l'éditeur structuré avec donnees chargé.
         var hote = document.getElementById(prefixe + '-struct-hote');
         if (hote) hote.innerHTML = _editeurStructureHTML(prefixe, res.data.donnees || null);
+        var dn = res.data.donnees || null;
+        _rangCache[prefixe] = (dn && (dn.rang != null || dn.nb_equipes != null))
+          ? { rang: dn.rang, nb_equipes: dn.nb_equipes } : null;
+        _repeindreHero(prefixe);
       } else {
         _appliquerStatut('provisoire');
         var hote2 = document.getElementById(prefixe + '-struct-hote');
         if (hote2) hote2.innerHTML = _editeurStructureHTML(prefixe, null);
+        _rangCache[prefixe] = null;
+        _repeindreHero(prefixe);
       }
     }).catch(function () { _appliquerStatut('provisoire'); });
 
@@ -1859,6 +1901,11 @@
         btnSave.disabled = false;
         if (res && res.ok) {
           if (res.data && res.data.statut) _appliquerStatut(res.data.statut);
+          // Synchronise le hero avec le rang qui vient d'être saisi.
+          var dnow = _lireStructureDepuisDOM(prefixe);
+          _rangCache[prefixe] = (dnow.rang != null || dnow.nb_equipes != null)
+            ? { rang: dnow.rang, nb_equipes: dnow.nb_equipes } : null;
+          _repeindreHero(prefixe);
           _msg('Enregistré.', 'ok');
         } else {
           _msg((res && res.error) || 'Échec de l\'enregistrement.', 'err');
@@ -1910,8 +1957,11 @@
           (sousTitre ? '<div class="rapnv-niveau__sous">' + escapeHtml(sousTitre) + '</div>' : '') +
           '<div class="rapport__statut" id="' + prefixe + '-statut">Statut : <span class="badge-statut badge-statut--provisoire">provisoire</span></div>' +
         '</header>' +
+        '<div class="rapnv-hero-zone" id="' + prefixe + '-hero">' +
+          '<div class="rapnv-hero rapnv-hero--load">Calcul de la synthèse…</div>' +
+        '</div>' +
         '<div class="rapport__saisi">' +
-          '<div class="rapport__saisi-titre">Bilan de l\'éducateur</div>' +
+          '<div class="rapport__saisi-titre">Avis du coach</div>' +
           '<textarea id="' + prefixe + '-bilan" class="rapport__bilan" ' +
             'placeholder="Bilan du niveau : déroulé, points forts, axes…"></textarea>' +
           '<div id="' + prefixe + '-struct-hote">' + _editeurStructureHTML(prefixe, null) + '</div>' +
@@ -1933,6 +1983,88 @@
   // (essais, points, diff, cartons) + V/N/D déduit + Top scoreur / Top
   // marqueur (résolus en async via _resolveNoms) + détail par match.
   // Dégradation HONNÊTE partout : un chiffre n'apparaît que s'il a une base.
+  // Caches par niveau (v3.54) : dernier deduit + rang saisi, pour
+  // recomposer le HERO des que l'une OU l'autre source arrive (ordre
+  // asynchrone indifferent : getRapportMatch et _deduitAgrege courent
+  // en parallele).
+  var _deduitCache = {};
+  var _nomNousCache = {};
+  var _rangCache = {};
+
+  function _repeindreHero(prefixe) {
+    var res = _deduitCache[prefixe];
+    if (!res) return;
+    var heroZone = document.getElementById(prefixe + '-hero');
+    if (!heroZone) return;
+    var nomNous = _nomNousCache[prefixe] || 'Nous';
+    var rang = _rangCache[prefixe] || null;
+    heroZone.innerHTML = _heroHTML(nomNous, res, rang);
+  }
+
+  function _heroHTML(nomNous, res, rang) {
+    if (!res || res.indispo) {
+      return '<div class="rapnv-hero rapnv-hero--vide">Lecture du suivi indisponible.</div>';
+    }
+    var aSuivi = res.nbRenseignes > 0;
+    var diff = res.momTotal - res.advTotal;
+    var diffTxt = (diff > 0 ? '+' : '') + diff;
+
+    function ordinalFr(n) {
+      var v = parseInt(n, 10);
+      if (isNaN(v)) return escapeHtml(String(n));
+      return v + (v === 1 ? 'er' : 'e');
+    }
+    function carte(valeur, label, classe) {
+      return '<div class="rapnv-hero__case' + (classe ? ' ' + classe : '') + '">' +
+               '<div class="rapnv-hero__val">' + valeur + '</div>' +
+               '<div class="rapnv-hero__lbl">' + label + '</div>' +
+             '</div>';
+    }
+
+    var html = '<div class="rapnv-hero">';
+    html += '<div class="rapnv-hero__left">';
+    if (rang && rang.rang) {
+      html += '<div class="rapnv-hero__rang-lbl">Classement</div>' +
+              '<div class="rapnv-hero__rang">' + ordinalFr(rang.rang) +
+                (rang.nb_equipes ? '<span class="rapnv-hero__rang-tot"> / ' + escapeHtml(String(rang.nb_equipes)) + '</span>' : '') +
+              '</div>';
+    } else {
+      html += '<div class="rapnv-hero__rang-lbl">Bilan</div>' +
+              '<div class="rapnv-hero__rang rapnv-hero__rang--na">\u2014</div>' +
+              '<div class="rapnv-hero__hint">Renseigne le rang ci-dessous</div>';
+    }
+    if (aSuivi) {
+      html += '<div class="rapnv-hero__record">' +
+                '<span class="rapnv-hero__rec-item"><b>' + res.nbRenseignes + '</b> joue' + (res.nbRenseignes > 1 ? 's' : '') + '</span>' +
+                '<span class="rapnv-hero__rec-item rapnv-hero__rec-item--v"><b>' + res.v + '</b> V</span>' +
+                '<span class="rapnv-hero__rec-item rapnv-hero__rec-item--n"><b>' + res.n + '</b> N</span>' +
+                '<span class="rapnv-hero__rec-item rapnv-hero__rec-item--d"><b>' + res.d + '</b> D</span>' +
+              '</div>';
+    } else {
+      html += '<div class="rapnv-hero__record rapnv-hero__record--na">Pas encore de match suivi</div>';
+    }
+    html += '</div>';
+
+    html += '<div class="rapnv-hero__cards">';
+    if (aSuivi) {
+      html += carte(res.essaisNous + ' / ' + res.essaisAdv, 'Essais (p./c.)');
+      html += carte(res.momTotal + ' / ' + res.advTotal, 'Points (p./c.)');
+      html += carte(diffTxt, 'Diff.', (diff >= 0 ? 'rapnv-hero__case--pos' : 'rapnv-hero__case--neg'));
+      if (res.cartons > 0) html += carte(String(res.cartons), 'Cartons');
+    } else {
+      html += '<div class="rapnv-hero__cards-na">Les chiffres apparaitront avec le suivi des matchs.</div>';
+    }
+    html += '</div>';
+    html += '</div>';
+
+    if (aSuivi && res.nbRenseignes < res.nbMatchs) {
+      html += '<div class="rapnv-hero__note">Chiffres calcules sur ' + res.nbRenseignes +
+              ' match' + (res.nbRenseignes > 1 ? 's' : '') + ' suivi' + (res.nbRenseignes > 1 ? 's' : '') +
+              ' sur ' + res.nbMatchs + '.</div>';
+    }
+    return html;
+  }
+
   function _peindreDeduitNiveau(prefixe, nomNous, res) {
     var zone = document.getElementById(prefixe + '-deduit');
     if (!zone) return;
@@ -1944,47 +2076,22 @@
       zone.innerHTML = '<div class="rapport__vide">Aucun match rattaché à ce niveau.</div>';
       return;
     }
+    // Le HERO vit dans sa propre zone (prefixe-hero), peinte par
+    // _repeindreHero (combine déduit + rang saisi, ordre async indifférent).
+    // Ici, la zone -deduit porte : tops + détail par match.
+    _deduitCache[prefixe] = res;
+    _nomNousCache[prefixe] = nomNous;
+    _repeindreHero(prefixe);
+
+    // Cas sans suivi : pas de tops ni de tableau (le hero affiche déjà
+    // « pas encore de match suivi »). On vide la zone déduit.
     if (res.nbRenseignes === 0) {
-      zone.innerHTML = '<div class="rapnv-deduit__titre">Déduit (agrégé depuis le suivi)</div>' +
-        '<div class="rapport__vide">Pas encore de données de suivi sur ce niveau ' +
+      zone.innerHTML = '<div class="rapport__vide">Aucun match suivi pour le moment ' +
         '(' + res.nbMatchs + ' match' + (res.nbMatchs > 1 ? 's' : '') + ' sans saisie).</div>';
       return;
     }
 
-    var diff = res.momTotal - res.advTotal;
-    var diffTxt = (diff > 0 ? '+' : '') + diff;
-
-    // --- Bandeau de synthèse condensé (inspiré SAR×MOM, refondu charte MOM) ---
-    function carte(valeur, label, classe) {
-      return '<div class="rapnv-synth__case' + (classe ? ' ' + classe : '') + '">' +
-               '<div class="rapnv-synth__val">' + valeur + '</div>' +
-               '<div class="rapnv-synth__lbl">' + label + '</div>' +
-             '</div>';
-    }
-    var html = '<div class="rapnv-synth">';
-    // V/N/D (déduit du score, mention honnête du périmètre).
-    html += '<div class="rapnv-synth__vnd">' +
-              '<span class="rapnv-synth__vnd-n">' + res.nbRenseignes + '</span> ' +
-              (res.nbRenseignes > 1 ? 'matchs suivis' : 'match suivi') +
-              '<span class="rapnv-synth__vnd-detail"> · ' +
-                '<strong>' + res.v + '</strong> V · ' +
-                '<strong>' + res.n + '</strong> N · ' +
-                '<strong>' + res.d + '</strong> D</span>' +
-            '</div>';
-    html += '<div class="rapnv-synth__grid">';
-    html += carte(res.essaisNous + ' / ' + res.essaisAdv, 'Essais (pour / contre)');
-    html += carte(res.momTotal + ' / ' + res.advTotal, 'Points (pour / contre)');
-    html += carte(diffTxt, 'Différence', (diff >= 0 ? 'rapnv-synth__case--pos' : 'rapnv-synth__case--neg'));
-    if (res.cartons > 0) html += carte(String(res.cartons), 'Cartons');
-    html += '</div>';
-    // Note honnêteté si tout n'est pas suivi.
-    if (res.nbRenseignes < res.nbMatchs) {
-      html += '<div class="rapnv-synth__note">Synthèse sur les ' + res.nbRenseignes +
-              ' match' + (res.nbRenseignes > 1 ? 's' : '') + ' suivi' + (res.nbRenseignes > 1 ? 's' : '') +
-              ' (sur ' + res.nbMatchs + ') ; les autres n\'ont pas de données.</div>';
-    }
-    html += '</div>'; // .rapnv-synth
-
+    var html = '';
     // --- Zone Tops (remplie en async après résolution des noms) ---
     html += '<div class="rapnv-tops" id="' + prefixe + '-tops"></div>';
 
