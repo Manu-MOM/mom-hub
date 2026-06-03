@@ -335,6 +335,52 @@
     color: var(--paper);
     border-color: var(--clay, #c8896a);
   }
+  /* v1.59 — bouton « Suivez le match en live » (phases du tournoi).
+     Calé sur evt-btn-primary (vert prairie / paper) + point « live »
+     pulsant en tête. Distinct des badges de statut neutres voisins. */
+  .evt-btn-live {
+    background: var(--vert-prairie);
+    color: var(--paper);
+    border-color: var(--vert-prairie);
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .evt-btn-live:hover { background: var(--vert-bouteille, #0c3d24); }
+  .evt-btn-live__dot {
+    position: relative;
+    display: inline-flex;
+    width: 8px;
+    height: 8px;
+  }
+  .evt-btn-live__dot::before {
+    content: '';
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--paper);
+    opacity: 0.55;
+    animation: evtBtnLivePulse 1.6s ease-out infinite;
+  }
+  .evt-btn-live__dot::after {
+    content: '';
+    position: relative;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--paper);
+  }
+  @keyframes evtBtnLivePulse {
+    0%   { transform: scale(1);   opacity: 0.55; }
+    70%  { transform: scale(2.4); opacity: 0; }
+    100% { transform: scale(2.4); opacity: 0; }
+  }
+  /* Accessibilité : pas d'animation si l'utilisateur la refuse. */
+  @media (prefers-reduced-motion: reduce) {
+    .evt-btn-live__dot::before { animation: none; }
+  }
 
   /* ========== FOOTER smoke-check ========== */
   .evt-footer-smoke {
