@@ -921,12 +921,29 @@
     /* ── Impression : ne garder que le rapport (boutons d'export inclus
          masqués). Déclenché par body.printing-rapport au clic Imprimer. ── */
     @media print {
+      /* Fix pt 55 : on masque RÉELLEMENT (display:none) les gros blocs qui
+         réservaient de la hauteur fantôme (→ page 1 vide). Sélecteurs basés
+         sur la structure DOM réelle de compositions.html (topbar, bannière,
+         légende, colonne effectif), pas devinés. .view-rapport reste en flux
+         normal (l'ancien position:absolute créait le décalage). */
+      body.printing-rapport .topbar,
+      body.printing-rapport .event-banner,
+      body.printing-rapport .legend-bar,
+      body.printing-rapport .fill-indicator,
+      body.printing-rapport .effectif-panel,
+      body.printing-rapport .editor-tabs,
+      body.printing-rapport .view-tabs { display: none !important; }
+      /* Le reste : on masque le contenu mais on garde le rapport visible. */
       body.printing-rapport * { visibility: hidden; }
       body.printing-rapport .view-rapport,
       body.printing-rapport .view-rapport * { visibility: visible; }
+      body.printing-rapport .compo-grid { display: block !important; }
+      body.printing-rapport .editor-area {
+        border: none !important; padding: 0 !important; margin: 0 !important; min-height: 0 !important;
+      }
       body.printing-rapport .view-rapport {
-        position: absolute; left: 0; top: 0; width: 100%;
-        border: none; border-radius: 0;
+        position: static; width: 100%;
+        border: none; border-radius: 0; margin: 0;
       }
       /* Boutons et contrôles non imprimés. */
       body.printing-rapport .rapport__actions,
