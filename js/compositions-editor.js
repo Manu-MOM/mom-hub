@@ -6,6 +6,16 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.60 — Lien direct suivi : ?match=<id> cible une compo de match + ?vue=suivi ouvre l'onglet Suivi (3 juin 2026)
+ *   v3.60 : Au boot, après loadComposForCurrentEvent(), si ?match=<id>
+ *           est présent on sélectionne la compo de match dont
+ *           evenement_id===<id> (selectCompo, option α v3.12) puis on
+ *           recharge ses joueurs. La branche ?vue= gagne le cas 'suivi'
+ *           (State.viewMode='suivi' + onglet tabs[2] actif — mécanique
+ *           déjà supportée par setMode/bindViewTabs, ordre d'onglets
+ *           Liste/Terrain/Suivi/Rapport). Cibles 'match'/'vue=suivi'
+ *           ABSENTES = chemins v3.59 byte-identiques (additif pur).
+ *           Au passage : log de boot figé à 'v3.50' corrigé en 'v3.60'.
  * Version : 3.59 — Fix : queue des rapports de match invisible (SuiviObs.charger avalait les callbacks) (3 juin 2026)
  *   v3.59 : FIX la queue des rapports de match (v3.58) ne s'affichait
  *           pas. Cause : SuiviObs.charger ignorait le callback si un
@@ -5316,6 +5326,24 @@
       if (State.selectedCompoId) await loadCompoJoueurs();
     }
 
+    // v3.60 — Deep-link match : ?match=<id> cible la compo de match dont
+    // evenement_id===<id> (appariement option α, cf. renderCompoTabs v3.12).
+    // Posé APRÈS loadComposForCurrentEvent (State.compos peuplé) et AVANT
+    // les renders, pour que renderCompoTabs/renderEditorArea reflètent
+    // d'emblée la bonne compo. Param absent ou compo introuvable = no-op
+    // (chemin v3.59 préservé : on reste sur la compo par défaut déjà
+    // sélectionnée). selectCompo recharge déjà loadCompoJoueurs en interne.
+    try {
+      const matchId = new URLSearchParams(window.location.search).get('match');
+      if (matchId && matchId.trim()) {
+        const cibleId = matchId.trim();
+        const compoMatch = State.compos.find(function (c) {
+          return c.type_compo === 'match' && c.evenement_id === cibleId;
+        });
+        if (compoMatch) await selectCompo(compoMatch.id);
+      }
+    } catch (_) { /* contexte sans window — ignorer */ }
+
     renderEventBanner();
     renderEventSelector();
     renderCompoTabs();
@@ -5344,6 +5372,17 @@
         if (tabs && tabs.length >= 2) {
           tabs.forEach(function (t) { t.classList.remove('is-active'); });
           tabs[1].classList.add('is-active');
+        }
+      } else if (vue === 'suivi') {
+        // v3.60 — miroir du cas 'terrain' pour l'onglet Suivi (tabs[2],
+        // ordre Liste/Terrain/Suivi/Rapport, cf. bindViewTabs). 'suivi'
+        // est un viewMode déjà supporté par setMode/renderEditorArea.
+        State.viewMode = 'suivi';
+        renderEditorArea();
+        const tabs = document.querySelectorAll('.view-tabs__tab');
+        if (tabs && tabs.length >= 3) {
+          tabs.forEach(function (t) { t.classList.remove('is-active'); });
+          tabs[2].classList.add('is-active');
         }
       } else if (vue === 'reseaux') {
         const btnImg = document.getElementById('btn-export-image');
@@ -5384,7 +5423,7 @@
     bindPopoverOutsideClick();
 
     console.log(
-      '%c🏉 Compositions Editor v3.50 chargé',
+      '%c🏉 Compositions Editor v3.60 chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         evenements: State.evenements.length,
