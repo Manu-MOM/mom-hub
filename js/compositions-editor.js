@@ -6,6 +6,23 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.52 — Rapports de PHASE & TOURNOI (vues dérivées) (3 juin 2026)
+ *   v3.52 : RAPPORTS PHASE & TOURNOI (pt 55). L'onglet « Rapport »
+ *           devient contextuel (décision Manu, option 2) : sur une compo
+ *           de MATCH → rapport de match (chemin v3.51 INTACT) ; sur une
+ *           compo de BASE → rapports de TOURNOI (racine) + PHASE(s) de
+ *           l'équipe, empilés. Phase et tournoi sont des evenements à
+ *           UUID propre (sondes pt 55) → mêmes RPC rapports sur leur UUID
+ *           (aucune table neuve). SAISI v1 complète : bilan + classement
+ *           ordonné + aiguillage descriptif (jsonb donnees, C13-b /
+ *           supabase v1.46). DÉDUIT agrégé : scores des matchs du niveau
+ *           (getChronologieRencontreCoach par match), dégradation honnête
+ *           (match sans suivi = « non renseigné », jamais un faux 0).
+ *           Nouveaux : renderRapportNiveauxSuperieurs + helpers
+ *           _phasesDeLequipe / _deduitAgrege / _brancherSaisiNiveau /
+ *           _editeurStructureHTML / _lireStructureDepuisDOM. La branche
+ *           inerte de renderEditorRapport (compo non-match) aiguille
+ *           désormais vers ce rendu. Chemin match byte-identique.
  * Version : 3.51 — Rapport de match : stockage du SAISI (bilan + statut Finaliser/Rouvrir) (3 juin 2026)
  *   v3.51 : pt 54. 2e TEMPS du rapport = le SAISI (verdict éducateur),
  *           backend C13-a (table rapports + RPC). Bloc « rapport__saisi »
@@ -1559,19 +1576,487 @@
     return null;
   }
 
+  // ============================================================
+  // RAPPORTS DE PHASE & TOURNOI (pt 55, vues dérivées)
+  // ------------------------------------------------------------
+  // Phase et tournoi sont des `evenements` à UUID propre (sondes pt 55) :
+  // le SAISI se rattache à la MÊME table `rapports` sur leur UUID (mêmes
+  // RPC que le match), le DÉDUIT s'agrège front depuis les matchs du
+  // niveau. Affichés sur l'onglet « Rapport » d'une compo de BASE.
+  // ============================================================
+
+  // Regroupe State.matchsDeLequipe par phase. Une phase = un
+  // evenement_parent_id distinct (UUID propre de la phase, sonde a pt 55).
+  // Retourne [{ id, libelle, ordre, matchs:[...] }, …] trié.
+  function _phasesDeLequipe() {
+    var matchs = Array.isArray(State.matchsDeLequipe) ? State.matchsDeLequipe : [];
+    var parPhase = {};
+    var ordrePhase = [];
+    for (var i = 0; i < matchs.length; i++) {
+      var m = matchs[i];
+      var pid = m.evenement_parent_id || ('__sans__' + (m.phase_libelle || ''));
+      if (!parPhase[pid]) {
+        parPhase[pid] = {
+          id: (m.evenement_parent_id || null),
+          libelle: (m.phase_libelle || 'Phase'),
+          matchs: []
+        };
+        ordrePhase.push(pid);
+      }
+      parPhase[pid].matchs.push(m);
+    }
+    return ordrePhase.map(function (pid) { return parPhase[pid]; });
+  }
+
+  // Déduit agrégé d'un niveau : pour chaque match (par evenement_id), lit
+  // la chronologie et somme les scores. Dégradation HONNÊTE : un match
+  // sans suivi n'ajoute pas de faux 0, il est compté « non renseigné ».
+  // cb({ momTotal, advTotal, nbMatchs, nbRenseignes, details:[{adv, mom, adv_pts, renseigne}] }).
+  function _deduitAgrege(matchsDuNiveau, cb) {
+    var matchs = Array.isArray(matchsDuNiveau) ? matchsDuNiveau : [];
+    if (matchs.length === 0) { cb({ momTotal: 0, advTotal: 0, nbMatchs: 0, nbRenseignes: 0, details: [] }); return; }
+    if (!window.SupabaseHub || !SupabaseHub.getChronologieRencontreCoach) {
+      cb({ momTotal: 0, advTotal: 0, nbMatchs: matchs.length, nbRenseignes: 0, details: [], indispo: true });
+      return;
+    }
+    var details = new Array(matchs.length);
+    var restant = matchs.length;
+    var momTotal = 0, advTotal = 0, nbRenseignes = 0;
+    matchs.forEach(function (m, idx) {
+      var evt = m.id; // dans listMatchsDeLequipe, m.id = l'evenement match
+      SupabaseHub.getChronologieRencontreCoach(evt, true).then(function (lignes) {
+        var arr = Array.isArray(lignes) ? lignes : [];
+        var eff = arr.filter(function (l) { return l && l.annule !== true; });
+        var renseigne = eff.length > 0;
+        var sc = _calculerScore(arr);
+        if (renseigne) { momTotal += sc.mom; advTotal += sc.adv; nbRenseignes += 1; }
+        details[idx] = {
+          adv: (m.adversaire_nom || m.libelle || '—'),
+          mom: sc.mom, adv_pts: sc.adv, renseigne: renseigne
+        };
+      }).catch(function () {
+        details[idx] = { adv: (m.adversaire_nom || m.libelle || '—'), mom: 0, adv_pts: 0, renseigne: false };
+      }).then(function () {
+        restant -= 1;
+        if (restant === 0) {
+          cb({ momTotal: momTotal, advTotal: advTotal, nbMatchs: matchs.length, nbRenseignes: nbRenseignes, details: details });
+        }
+      });
+    });
+  }
+
+  // Éditeur HTML du saisi structuré (classement ordonné + aiguillage
+  // descriptif). Champs texte libres, P1. Sérialisé en objet `donnees`
+  // par _lireStructureDepuisDOM. Le prefixe rend les ids uniques par
+  // niveau (tournoi vs chaque phase).
+  function _editeurStructureHTML(prefixe, donnees) {
+    var classement = (donnees && Array.isArray(donnees.classement)) ? donnees.classement : [];
+    var aiguillage = (donnees && Array.isArray(donnees.aiguillage)) ? donnees.aiguillage : [];
+
+    function ligneClassement(rang, equipe, note) {
+      return '<div class="rapnv-row" data-kind="cl">' +
+        '<input type="text" class="rapnv-inp rapnv-inp--rang" placeholder="rang" value="' + escapeHtml(rang || '') + '">' +
+        '<input type="text" class="rapnv-inp rapnv-inp--eq" placeholder="équipe / classé" value="' + escapeHtml(equipe || '') + '">' +
+        '<input type="text" class="rapnv-inp rapnv-inp--note" placeholder="note (facultatif)" value="' + escapeHtml(note || '') + '">' +
+        '<button type="button" class="rapnv-del" title="Retirer">✕</button>' +
+      '</div>';
+    }
+    function ligneAiguillage(origine, destination) {
+      return '<div class="rapnv-row" data-kind="ai">' +
+        '<input type="text" class="rapnv-inp rapnv-inp--ori" placeholder="origine (ex. 1er de poule)" value="' + escapeHtml(origine || '') + '">' +
+        '<span class="rapnv-fleche">→</span>' +
+        '<input type="text" class="rapnv-inp rapnv-inp--dst" placeholder="destination (ex. Poule de classement)" value="' + escapeHtml(destination || '') + '">' +
+        '<button type="button" class="rapnv-del" title="Retirer">✕</button>' +
+      '</div>';
+    }
+
+    var clHtml = '';
+    for (var i = 0; i < classement.length; i++) {
+      clHtml += ligneClassement(classement[i].rang, classement[i].equipe, classement[i].note);
+    }
+    var aiHtml = '';
+    for (var j = 0; j < aiguillage.length; j++) {
+      aiHtml += ligneAiguillage(aiguillage[j].origine, aiguillage[j].destination);
+    }
+
+    return '<div class="rapnv-struct" id="' + prefixe + '-struct">' +
+        '<div class="rapnv-sub">' +
+          '<div class="rapnv-sub__titre">🏆 Classement / résultat</div>' +
+          '<div class="rapnv-list" id="' + prefixe + '-cl">' + clHtml + '</div>' +
+          '<button type="button" class="rapnv-add" data-add="cl" data-prefixe="' + prefixe + '">+ ligne de classement</button>' +
+        '</div>' +
+        '<div class="rapnv-sub">' +
+          '<div class="rapnv-sub__titre">➡️ Aiguillage (où va chaque rang)</div>' +
+          '<div class="rapnv-list" id="' + prefixe + '-ai">' + aiHtml + '</div>' +
+          '<button type="button" class="rapnv-add" data-add="ai" data-prefixe="' + prefixe + '">+ ligne d\'aiguillage</button>' +
+        '</div>' +
+      '</div>';
+  }
+
+  // Lit l'objet `donnees` { classement:[…], aiguillage:[…] } depuis le DOM
+  // de l'éditeur préfixé. Ignore les lignes entièrement vides.
+  function _lireStructureDepuisDOM(prefixe) {
+    var donnees = { classement: [], aiguillage: [] };
+    var clRoot = document.getElementById(prefixe + '-cl');
+    var aiRoot = document.getElementById(prefixe + '-ai');
+    if (clRoot) {
+      clRoot.querySelectorAll('.rapnv-row').forEach(function (row) {
+        var rang = (row.querySelector('.rapnv-inp--rang') || {}).value || '';
+        var eq   = (row.querySelector('.rapnv-inp--eq')   || {}).value || '';
+        var note = (row.querySelector('.rapnv-inp--note') || {}).value || '';
+        if (rang.trim() || eq.trim() || note.trim()) {
+          donnees.classement.push({ rang: rang.trim(), equipe: eq.trim(), note: note.trim() });
+        }
+      });
+    }
+    if (aiRoot) {
+      aiRoot.querySelectorAll('.rapnv-row').forEach(function (row) {
+        var ori = (row.querySelector('.rapnv-inp--ori') || {}).value || '';
+        var dst = (row.querySelector('.rapnv-inp--dst') || {}).value || '';
+        if (ori.trim() || dst.trim()) {
+          donnees.aiguillage.push({ origine: ori.trim(), destination: dst.trim() });
+        }
+      });
+    }
+    return donnees;
+  }
+
+  // Ajoute une ligne vide à un éditeur (clic « + ligne … »).
+  function _ajouterLigneStruct(prefixe, kind) {
+    var root = document.getElementById(prefixe + '-' + kind);
+    if (!root) return;
+    var div = document.createElement('div');
+    var html;
+    if (kind === 'cl') {
+      html = '<input type="text" class="rapnv-inp rapnv-inp--rang" placeholder="rang">' +
+             '<input type="text" class="rapnv-inp rapnv-inp--eq" placeholder="équipe / classé">' +
+             '<input type="text" class="rapnv-inp rapnv-inp--note" placeholder="note (facultatif)">' +
+             '<button type="button" class="rapnv-del" title="Retirer">✕</button>';
+    } else {
+      html = '<input type="text" class="rapnv-inp rapnv-inp--ori" placeholder="origine (ex. 1er de poule)">' +
+             '<span class="rapnv-fleche">→</span>' +
+             '<input type="text" class="rapnv-inp rapnv-inp--dst" placeholder="destination (ex. Poule de classement)">' +
+             '<button type="button" class="rapnv-del" title="Retirer">✕</button>';
+    }
+    div.className = 'rapnv-row';
+    div.setAttribute('data-kind', kind);
+    div.innerHTML = html;
+    root.appendChild(div);
+  }
+
+  // Câble le SAISI d'un niveau (tournoi ou phase) : charge l'existant
+  // (bilan + donnees + statut) via getRapportMatch sur l'UUID, branche
+  // Enregistrer / Finaliser / Rouvrir. Générique (réutilise les RPC).
+  // prefixe = id-namespace DOM ; uuid = evenement du niveau ; libelleNiveau
+  // pour les messages. Suit la logique du saisi de match (v3.51).
+  function _brancherSaisiNiveau(prefixe, uuid, niveauActif) {
+    if (!window.SupabaseHub || !SupabaseHub.getRapportMatch) return;
+    var msgEl = document.getElementById(prefixe + '-msg');
+    var taEl  = document.getElementById(prefixe + '-bilan');
+    var statutEl = document.getElementById(prefixe + '-statut');
+    var btnSave = document.getElementById(prefixe + '-save');
+    var btnFin  = document.getElementById(prefixe + '-finaliser');
+    var btnReo  = document.getElementById(prefixe + '-rouvrir');
+    var etat = { statut: 'provisoire' };
+
+    function _msg(txt, cls) {
+      if (!msgEl) return;
+      msgEl.textContent = txt || '';
+      msgEl.className = 'rapport__saisi-msg' + (cls ? ' rapport__saisi-msg--' + cls : '');
+    }
+    function _appliquerStatut(st) {
+      var s2 = (st === 'finalise') ? 'finalise' : 'provisoire';
+      etat.statut = s2;
+      if (statutEl) {
+        statutEl.innerHTML = 'Statut : <span class="badge-statut badge-statut--' + s2 + '">' +
+          (s2 === 'finalise' ? 'finalisé' : 'provisoire') + '</span>';
+      }
+      if (btnFin) btnFin.style.display = (s2 === 'finalise') ? 'none' : '';
+      if (btnReo) btnReo.style.display = (s2 === 'finalise') ? '' : 'none';
+    }
+
+    // Charge l'existant.
+    SupabaseHub.getRapportMatch(uuid).then(function (res) {
+      if (!niveauActif()) return;
+      if (res && res.ok && res.data) {
+        if (taEl) taEl.value = res.data.bilan || '';
+        _appliquerStatut(res.data.statut || 'provisoire');
+        // Repeindre l'éditeur structuré avec donnees chargé.
+        var hote = document.getElementById(prefixe + '-struct-hote');
+        if (hote) hote.innerHTML = _editeurStructureHTML(prefixe, res.data.donnees || null);
+      } else {
+        _appliquerStatut('provisoire');
+        var hote2 = document.getElementById(prefixe + '-struct-hote');
+        if (hote2) hote2.innerHTML = _editeurStructureHTML(prefixe, null);
+      }
+    }).catch(function () { _appliquerStatut('provisoire'); });
+
+    // Enregistrer (bilan + structure : on envoie TOUJOURS l'objet complet).
+    if (btnSave) btnSave.addEventListener('click', function () {
+      var bilan = taEl ? taEl.value : '';
+      var donnees = _lireStructureDepuisDOM(prefixe);
+      _msg('Enregistrement…', null);
+      btnSave.disabled = true;
+      SupabaseHub.upsertRapportMatch(uuid, bilan, donnees).then(function (res) {
+        btnSave.disabled = false;
+        if (res && res.ok) {
+          if (res.data && res.data.statut) _appliquerStatut(res.data.statut);
+          _msg('Enregistré.', 'ok');
+        } else {
+          _msg((res && res.error) || 'Échec de l\'enregistrement.', 'err');
+        }
+      });
+    });
+
+    // Finaliser (enregistre d'abord pour ne rien perdre, puis finalise).
+    if (btnFin) btnFin.addEventListener('click', function () {
+      var bilan = taEl ? taEl.value : '';
+      var donnees = _lireStructureDepuisDOM(prefixe);
+      _msg('Finalisation…', null);
+      btnFin.disabled = true;
+      SupabaseHub.upsertRapportMatch(uuid, bilan, donnees).then(function () {
+        return SupabaseHub.finaliserRapport(uuid);
+      }).then(function (res) {
+        btnFin.disabled = false;
+        if (res && res.ok) {
+          _appliquerStatut((res.data && res.data.statut) || 'finalise');
+          _msg('Rapport finalisé.', 'ok');
+        } else {
+          _msg((res && res.error) || 'Échec de la finalisation.', 'err');
+        }
+      });
+    });
+
+    // Rouvrir (bilan ET donnees conservés côté SQL).
+    if (btnReo) btnReo.addEventListener('click', function () {
+      _msg('Réouverture…', null);
+      btnReo.disabled = true;
+      SupabaseHub.rouvrirRapport(uuid).then(function (res) {
+        btnReo.disabled = false;
+        if (res && res.ok) {
+          _appliquerStatut((res.data && res.data.statut) || 'provisoire');
+          _msg('Rapport rouvert (provisoire).', 'ok');
+        } else {
+          _msg((res && res.error) || 'Échec de la réouverture.', 'err');
+        }
+      });
+    });
+  }
+
+  // Bloc HTML d'un niveau (tournoi ou phase) : titre + saisi (bilan +
+  // structure) + zone déduit (remplie en asynchrone).
+  function _blocNiveauHTML(prefixe, titre, sousTitre) {
+    return '<section class="rapnv-niveau" id="' + prefixe + '-niveau">' +
+        '<header class="rapnv-niveau__head">' +
+          '<div class="rapnv-niveau__titre">' + escapeHtml(titre) + '</div>' +
+          (sousTitre ? '<div class="rapnv-niveau__sous">' + escapeHtml(sousTitre) + '</div>' : '') +
+          '<div class="rapport__statut" id="' + prefixe + '-statut">Statut : <span class="badge-statut badge-statut--provisoire">provisoire</span></div>' +
+        '</header>' +
+        '<div class="rapport__saisi">' +
+          '<div class="rapport__saisi-titre">Bilan de l\'éducateur</div>' +
+          '<textarea id="' + prefixe + '-bilan" class="rapport__bilan" ' +
+            'placeholder="Bilan du niveau : déroulé, points forts, axes…"></textarea>' +
+          '<div id="' + prefixe + '-struct-hote">' + _editeurStructureHTML(prefixe, null) + '</div>' +
+          '<div class="rapport__saisi-actions">' +
+            '<button type="button" id="' + prefixe + '-save" class="rapport__btn rapport__btn--primary">💾 Enregistrer</button>' +
+            '<button type="button" id="' + prefixe + '-finaliser" class="rapport__btn">✓ Finaliser</button>' +
+            '<button type="button" id="' + prefixe + '-rouvrir" class="rapport__btn" style="display:none;">↻ Rouvrir</button>' +
+            '<span id="' + prefixe + '-msg" class="rapport__saisi-msg"></span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="rapnv-deduit" id="' + prefixe + '-deduit">' +
+          '<div class="view-suivi__hint">Calcul du déduit…</div>' +
+        '</div>' +
+      '</section>';
+  }
+
+  // Peint la zone déduit d'un niveau à partir du résultat _deduitAgrege.
+  function _peindreDeduitNiveau(prefixe, nomNous, res) {
+    var zone = document.getElementById(prefixe + '-deduit');
+    if (!zone) return;
+    if (res.indispo) {
+      zone.innerHTML = '<div class="view-suivi__hint">Lecture du suivi indisponible.</div>';
+      return;
+    }
+    if (res.nbMatchs === 0) {
+      zone.innerHTML = '<div class="rapport__vide">Aucun match rattaché à ce niveau.</div>';
+      return;
+    }
+    var html = '<div class="rapnv-deduit__titre">Déduit (agrégé depuis le suivi)</div>';
+    // Bandeau honnêteté si tout n'est pas renseigné.
+    if (res.nbRenseignes < res.nbMatchs) {
+      html += '<div class="rapnv-deduit__note">' +
+        res.nbRenseignes + ' match' + (res.nbRenseignes > 1 ? 's' : '') + ' sur ' + res.nbMatchs +
+        ' suivi' + (res.nbRenseignes > 1 ? 's' : '') + ' — les autres n\'ont pas de données (non comptés).</div>';
+    }
+    // Cumul des points (sur les seuls matchs renseignés).
+    if (res.nbRenseignes > 0) {
+      html += '<div class="rapnv-deduit__cumul">Cumul points : <strong>' +
+        escapeHtml(nomNous || 'Nous') + ' ' + res.momTotal + '</strong> — adversaires ' + res.advTotal + '</div>';
+    }
+    // Détail par match.
+    html += '<table class="rapport-tab"><thead><tr><th>Match</th><th>' +
+      escapeHtml(nomNous || 'Nous') + '</th><th>Adv.</th></tr></thead><tbody>';
+    for (var i = 0; i < res.details.length; i++) {
+      var d = res.details[i];
+      if (!d) continue;
+      if (d.renseigne) {
+        html += '<tr><td>' + escapeHtml(d.adv) + '</td>' +
+          '<td class="rapport-tab__n">' + d.mom + '</td>' +
+          '<td class="rapport-tab__n">' + d.adv_pts + '</td></tr>';
+      } else {
+        html += '<tr class="rapnv-tr--vide"><td>' + escapeHtml(d.adv) + '</td>' +
+          '<td class="rapport-tab__n" colspan="2">non renseigné</td></tr>';
+      }
+    }
+    html += '</tbody></table>';
+    zone.innerHTML = html;
+  }
+
+  // RENDU des rapports de niveaux supérieurs (tournoi + phases), sur une
+  // compo de BASE. Empile : tournoi (racine) puis chaque phase de l'équipe.
+  function renderRapportNiveauxSuperieurs(el, compo) {
+    SuiviChrono.desarmer();
+
+    var ctx = State.evenementEquipeContext;
+    var racine = (ctx && ctx.evenement) ? ctx.evenement : null;
+    var nomNous = _nomNotreEquipe();
+    var habillage = _habillageCourant();
+    var phases = _phasesDeLequipe();
+
+    // Garde-fou : besoin de la racine du tournoi + de matchs chargés.
+    if (!racine || !racine.id) {
+      el.innerHTML =
+        '<div class="view-rapport view-rapport--' + habillage + '">' +
+          _bandeauHTML(nomNous, 'Rapports phase & tournoi') +
+          '<div class="view-rapport__inert">Contexte du tournoi indisponible. ' +
+          'Ouvre cette feuille depuis la fiche de l\'évènement.</div>' +
+        '</div>';
+      return;
+    }
+
+    var estTournoi = phases.length > 0; // un tournoi a des phases ; sinon, match simple
+    var titrePrefixe = estTournoi ? 'Rapports — ' : 'Rapport — ';
+
+    var html =
+      '<div class="view-rapport view-rapport--' + habillage + '">' +
+        _bandeauHTML(nomNous, titrePrefixe + (racine.libelle || 'Tournoi')) +
+        '<div class="rapnv-intro">Bilans des niveaux <strong>tournoi</strong> et <strong>phase</strong> ' +
+          '(le rapport de chaque <em>match</em> se saisit sur son onglet de match).</div>' +
+        // Bloc TOURNOI (racine)
+        _blocNiveauHTML('rapnv-t', '🏆 Tournoi · ' + (racine.libelle || ''),
+                        (racine.date_debut ? _formatDateFr(racine.date_debut) : ''));
+
+    // Blocs PHASE (un par phase de l'équipe) — seulement si phases connues.
+    for (var p = 0; p < phases.length; p++) {
+      var ph = phases[p];
+      var pfx = 'rapnv-p' + p;
+      // Si la phase n'a pas d'UUID propre (cas dégénéré), on n'offre pas le saisi.
+      var sousT = ph.matchs.length + ' match' + (ph.matchs.length > 1 ? 's' : '');
+      html += _blocNiveauHTML(pfx, '📋 Phase · ' + (ph.libelle || ''), sousT);
+    }
+
+    html +=
+        '<div class="rapport__actions">' +
+          '<button type="button" id="btn-rapnv-print" class="rapport__btn" title="Imprimer ou enregistrer en PDF">🖨 Imprimer / PDF</button>' +
+        '</div>' +
+      '</div>';
+
+    el.innerHTML = html;
+
+    // Habillage toggle (re-rend ce même écran).
+    _bindHabillageToggle(el.querySelector('.view-rapport'), function () {
+      renderRapportNiveauxSuperieurs(el, compo);
+    });
+
+    // Délégation : ajout de lignes (+ classement / + aiguillage) et retrait (✕).
+    var root = el.querySelector('.view-rapport');
+    if (root) {
+      root.addEventListener('click', function (ev) {
+        var add = ev.target.closest ? ev.target.closest('.rapnv-add') : null;
+        if (add) {
+          _ajouterLigneStruct(add.getAttribute('data-prefixe'), add.getAttribute('data-add'));
+          return;
+        }
+        var del = ev.target.closest ? ev.target.closest('.rapnv-del') : null;
+        if (del) {
+          var row = del.closest('.rapnv-row');
+          if (row) row.parentNode.removeChild(row);
+        }
+      });
+    }
+
+    // Bouton imprimer (réutilise la classe body printing-rapport).
+    var btnPrint = document.getElementById('btn-rapnv-print');
+    if (btnPrint) {
+      btnPrint.addEventListener('click', function () {
+        document.body.classList.add('printing-rapport');
+        window.print();
+        setTimeout(function () { document.body.classList.remove('printing-rapport'); }, 0);
+      });
+    }
+
+    // Sentinelle « toujours sur ce rendu » : on est en mode rapport, compo
+    // de base courante. (Pas d'id de compo à comparer pour les niveaux.)
+    function niveauActif() {
+      return State.viewMode === 'rapport' && State.selectedCompoId === compo.id;
+    }
+
+    // SAISI tournoi (racine).
+    _brancherSaisiNiveau('rapnv-t', racine.id, niveauActif);
+    // DÉDUIT tournoi = tous les matchs de l'équipe (tous niveaux confondus).
+    var tousMatchs = Array.isArray(State.matchsDeLequipe) ? State.matchsDeLequipe : [];
+    SuiviObs.charger(function () {
+      _deduitAgrege(tousMatchs, function (res) {
+        if (!niveauActif()) return;
+        _peindreDeduitNiveau('rapnv-t', nomNous, res);
+      });
+    });
+
+    // SAISI + DÉDUIT par phase.
+    for (var q = 0; q < phases.length; q++) {
+      (function (ph, idx) {
+        var pfx = 'rapnv-p' + idx;
+        if (ph.id) {
+          _brancherSaisiNiveau(pfx, ph.id, niveauActif);
+        } else {
+          // Phase sans UUID propre : masque le saisi (dégradation honnête).
+          var sect = document.getElementById(pfx + '-niveau');
+          if (sect) {
+            var sa = sect.querySelector('.rapport__saisi');
+            if (sa) sa.innerHTML = '<div class="view-suivi__hint">Saisi indisponible (phase sans identifiant propre).</div>';
+          }
+        }
+        SuiviObs.charger(function () {
+          _deduitAgrege(ph.matchs, function (res) {
+            if (!niveauActif()) return;
+            _peindreDeduitNiveau(pfx, nomNous, res);
+          });
+        });
+      })(phases[q], q);
+    }
+  }
+
+  // Format date courte FR (réutilisable). YYYY-MM-DD → « dim. 7 juin 2026 ».
+  function _formatDateFr(iso) {
+    if (!iso) return '';
+    try {
+      var d = new Date(iso);
+      if (isNaN(d.getTime())) return iso;
+      return d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
+    } catch (e) { return iso; }
+  }
+
+
   function renderEditorRapport(el, compo) {
     SuiviChrono.desarmer();
 
-    // Comme le Suivi (D2) : le rapport de match s'ouvre sur une feuille
-    // de match (la base ne porte pas d'adversaire ni de chronologie).
+    // Onglet « Rapport » CONTEXTUEL (pt 55, décision Manu option 2) :
+    //   • compo de MATCH  → rapport de match (le code ci-dessous, INTACT) ;
+    //   • compo de BASE   → rapports de TOURNOI + PHASE(s) (niveaux
+    //     supérieurs : ces evenements ont un UUID propre, mêmes RPC).
     if (!compo || compo.type_compo !== 'match') {
-      el.innerHTML =
-        '<div class="view-rapport">' +
-          '<div class="view-rapport__inert">' +
-            'Le rapport de match s\'affiche sur une <strong>feuille de match</strong>.<br>' +
-            'Sélectionne un onglet de match ci-dessus pour voir son rapport.' +
-          '</div>' +
-        '</div>';
+      renderRapportNiveauxSuperieurs(el, compo);
       return;
     }
 
