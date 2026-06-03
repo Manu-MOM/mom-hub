@@ -6,6 +6,21 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.50 — Rapport de match : cadre charte (clair) + bouton Imprimer/PDF (3 juin 2026)
+ *   v3.50 : pt 53. (1) CADRE CHARTE sur le rapport — variante CLAIRE
+ *           (fond blanc gardé pour l'impression) : bordure colorée + filet
+ *           sous le bandeau selon l'habillage (MOM vert + doré / entente
+ *           marine + bleu ciel), couleurs reprises de .view-suivi--*, scopé
+ *           .view-rapport--* (le Suivi sombre n'est PAS touché). Toggle
+ *           MOM/entente déjà présent. (2) BOUTON « Imprimer / PDF » dans le
+ *           rapport → window.print() ; classe body.printing-rapport + @media
+ *           print ne gardent QUE le rapport (sidebar/onglets/topbar ET les
+ *           boutons d'export masqués — demande Manu) ; le panneau temps de
+ *           jeu (<details>) est déplié via JS (attribut open) avant
+ *           impression puis restauré. Aucun PNG (impression PDF suffit,
+ *           décision Manu). CSS ajouté dans compositions.html
+ *           (view-rapport--*, rapport__actions, @media print).
+ *           node --check OK.
  * Version : 3.49 — Rapport de match : fil chronologique du match (déroulé) (3 juin 2026)
  *   v3.49 : pt 53. Ajout du FIL CHRONOLOGIQUE au rapport de match
  *           (manque révélé par le rapport SAR×MOM de référence : le récap
@@ -1553,6 +1568,9 @@
       '<div class="view-rapport view-rapport--' + habillage + '">' +
         _bandeauHTML(nomNous, 'Rapport de match — ' + adversaire) +
         '<div class="rapport__statut">Statut : <strong>provisoire</strong> · lecture seule (déduit du suivi)</div>' +
+        '<div class="rapport__actions">' +
+          '<button type="button" id="btn-rapport-print" class="rapport__btn" title="Imprimer ou enregistrer en PDF">🖨 Imprimer / PDF</button>' +
+        '</div>' +
         '<div id="rapport-corps" class="rapport__corps">' +
           '<div class="view-suivi__hint">Chargement du rapport…</div>' +
         '</div>' +
@@ -1561,6 +1579,28 @@
     _bindHabillageToggle(el.querySelector('.view-rapport'), function () {
       renderEditorRapport(el, compo);
     });
+
+    // Bouton Imprimer / PDF — pose une classe sur <body> le temps de
+    // l'impression (le @media print masque tout sauf le rapport, boutons
+    // d'export inclus), puis window.print(). Le navigateur gère le PDF.
+    var btnPrint = document.getElementById('btn-rapport-print');
+    if (btnPrint) {
+      btnPrint.addEventListener('click', function () {
+        document.body.classList.add('printing-rapport');
+        // Déplier le panneau temps de jeu pour l'impression (l'attribut
+        // open est la voie fiable ; CSS ne force pas l'ouverture d'un
+        // <details>). On mémorise l'état pour le restaurer après.
+        var det = document.querySelector('.view-rapport details.rapport-tdj');
+        var etaitOuvert = det ? det.open : null;
+        if (det) det.open = true;
+        window.print();
+        // Nettoyage après le dialogue d'impression.
+        setTimeout(function () {
+          document.body.classList.remove('printing-rapport');
+          if (det && etaitOuvert === false) det.open = false;
+        }, 0);
+      });
+    }
 
     if (!evtId) {
       var corps0 = document.getElementById('rapport-corps');
@@ -4218,7 +4258,7 @@
     bindPopoverOutsideClick();
 
     console.log(
-      '%c🏉 Compositions Editor v3.49 chargé',
+      '%c🏉 Compositions Editor v3.50 chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         evenements: State.evenements.length,
