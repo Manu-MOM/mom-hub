@@ -996,6 +996,35 @@
     .view-rapport--mom .rapnv-niveau { border-color: #cfe2d4; }
     .view-rapport--entente .rapnv-niveau { border-color: #cfe0f0; }
 
+
+    /* ===== Bandeau synthèse + tops joueurs (pt 55, v3.53) ===== */
+    .rapnv-synth {
+      margin: 4px 0 10px; padding: 12px 14px; border-radius: 12px;
+      background: linear-gradient(180deg, #fbf6df 0%, #f7eecb 100%);
+      border: 1px solid #efe3bd;
+    }
+    .rapnv-synth__vnd { font-size: 13px; color: #6b5a1e; margin-bottom: 10px; }
+    .rapnv-synth__vnd-n { font-size: 18px; font-weight: 800; color: #8a6d1a; }
+    .rapnv-synth__vnd-detail strong { color: #5b4a14; }
+    .rapnv-synth__grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px;
+    }
+    .rapnv-synth__case {
+      background: rgba(255,255,255,0.7); border-radius: 10px; padding: 10px 12px; text-align: center;
+    }
+    .rapnv-synth__val { font-size: 22px; font-weight: 800; color: var(--ink, #2a2a2a); font-variant-numeric: tabular-nums; }
+    .rapnv-synth__lbl { font-size: 11px; color: #8a7a3e; text-transform: uppercase; letter-spacing: .04em; margin-top: 2px; }
+    .rapnv-synth__case--pos .rapnv-synth__val { color: #1e7a3c; }
+    .rapnv-synth__case--neg .rapnv-synth__val { color: #b23b3b; }
+    .rapnv-synth__note { font-size: 11px; color: #8a7a3e; margin-top: 8px; font-style: italic; }
+
+    .rapnv-tops { margin: 8px 0 12px; }
+    .rapnv-tops__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+    .rapnv-tops__titre { font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 6px; }
+    .rapnv-tops__list { margin: 0; padding-left: 20px; font-size: 14px; color: var(--ink); }
+    .rapnv-tops__list li { margin: 3px 0; }
+    .rapnv-tops__n { color: var(--vert-prairie, #2D7D46); font-weight: 700; font-variant-numeric: tabular-nums; }
+
   </style>
 </head>
 
