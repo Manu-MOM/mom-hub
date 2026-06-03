@@ -18,6 +18,14 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 1.45 — juin 2026
+ *   v1.45 : rapports de match — saisi (2e temps). 4 wrappers ADDITIFS
+ *           voie coach garde auth.uid() (backend C13-a) :
+ *           getRapportMatch / upsertRapportMatch / finaliserRapport /
+ *           rouvrirRapport + helper _mapRapport (sorties SQL out_* →
+ *           objet métier nu). bilan + statut provisoire/finalise ;
+ *           statut = mention, jamais un cadenas (pt 52). Aucun wrapper
+ *           existant touché.
  * Version : 1.44 — juin 2026
  *   v1.44 : insererObservableCoach transmet joueurUuidEntrant
  *           (p_joueur_uuid_entrant) pour la substitution (L3c).
@@ -5560,9 +5568,128 @@
           prenom: r.prenom || ''
         };
       });
+    },
+
+    // ============================================================
+    // RAPPORTS DE MATCH — saisi (2e temps). Wrappers ADDITIFS v1.45.
+    //   Backend C13-a (table rapports + RPC SECURITY DEFINER garde
+    //   auth.uid()). Le saisi = verdict « à froid » de l'éducateur
+    //   (bilan + statut provisoire/finalise). Le statut est une
+    //   MENTION, jamais un cadenas (pt 52) : l'écriture du bilan
+    //   marche quel que soit le statut. Le DÉDUIT (score/familles/
+    //   fil) reste calculé 100% front depuis chronologie_suivi
+    //   (socle pt 53), il ne passe PAS par ces wrappers.
+    //   Sorties SQL préfixées out_ (anti-ambiguïté 42702) → on
+    //   re-mappe en clés métier nues côté client.
+    // ============================================================
+
+    /**
+     * Lit le rapport (saisi) d'un match. RPC get_rapport_match (C13-a).
+     * Renvoie null si aucun rapport n'a encore été saisi (le front
+     * traite alors un rapport vierge, statut implicite 'provisoire').
+     * @param {string} evenementUuid  le MATCH (ou racine demain)
+     * @returns {Promise<{ok:boolean, data?:object|null, error?:string}>}
+     */
+    async getRapportMatch(evenementUuid) {
+      if (!evenementUuid) {
+        return { ok: false, error: 'evenementUuid manquant' };
+      }
+      const { data, error } = await client.rpc('get_rapport_match', {
+        p_evenement_uuid: evenementUuid
+      });
+      if (error) {
+        console.error('MOM Hub: getRapportMatch()', error);
+        return { ok: false, error: error.message || 'Erreur get_rapport_match' };
+      }
+      const r = Array.isArray(data) ? (data[0] || null) : (data || null);
+      return { ok: true, data: r ? _mapRapport(r) : null };
+    },
+
+    /**
+     * Écrit / met à jour le bilan saisi d'un match (upsert). Crée la
+     * ligne à la volée si absente. Marche quel que soit le statut
+     * (mention, pas cadenas, pt 52). RPC upsert_rapport_match (C13-a).
+     * @param {string} evenementUuid  le MATCH
+     * @param {string} bilan          texte libre (peut être '')
+     * @returns {Promise<{ok:boolean, data?:object, error?:string}>}
+     */
+    async upsertRapportMatch(evenementUuid, bilan) {
+      if (!evenementUuid) {
+        return { ok: false, error: 'evenementUuid manquant' };
+      }
+      const { data, error } = await client.rpc('upsert_rapport_match', {
+        p_evenement_uuid: evenementUuid,
+        p_bilan:          (bilan === undefined ? null : bilan)
+      });
+      if (error) {
+        console.error('MOM Hub: upsertRapportMatch()', error);
+        return { ok: false, error: error.message || 'Erreur upsert_rapport_match' };
+      }
+      const r = Array.isArray(data) ? (data[0] || null) : data;
+      return { ok: true, data: r ? _mapRapport(r) : null };
+    },
+
+    /**
+     * Finalise le rapport (statut='finalise' + audit). N'empêche PAS
+     * l'édition ultérieure ni l'export (mention, pt 52). Crée la
+     * ligne à la volée si besoin. RPC finaliser_rapport (C13-a).
+     * @param {string} evenementUuid  le MATCH
+     * @returns {Promise<{ok:boolean, data?:object, error?:string}>}
+     */
+    async finaliserRapport(evenementUuid) {
+      if (!evenementUuid) {
+        return { ok: false, error: 'evenementUuid manquant' };
+      }
+      const { data, error } = await client.rpc('finaliser_rapport', {
+        p_evenement_uuid: evenementUuid
+      });
+      if (error) {
+        console.error('MOM Hub: finaliserRapport()', error);
+        return { ok: false, error: error.message || 'Erreur finaliser_rapport' };
+      }
+      const r = Array.isArray(data) ? (data[0] || null) : data;
+      return { ok: true, data: r ? _mapRapport(r) : null };
+    },
+
+    /**
+     * Rouvre le rapport (statut='provisoire', audit effacé). Le bilan
+     * est CONSERVÉ (Rouvrir = enrichir, pt 52). Fail-loud côté SQL si
+     * aucun rapport n'existe. RPC rouvrir_rapport (C13-a).
+     * @param {string} evenementUuid  le MATCH
+     * @returns {Promise<{ok:boolean, data?:object, error?:string}>}
+     */
+    async rouvrirRapport(evenementUuid) {
+      if (!evenementUuid) {
+        return { ok: false, error: 'evenementUuid manquant' };
+      }
+      const { data, error } = await client.rpc('rouvrir_rapport', {
+        p_evenement_uuid: evenementUuid
+      });
+      if (error) {
+        console.error('MOM Hub: rouvrirRapport()', error);
+        return { ok: false, error: error.message || 'Erreur rouvrir_rapport' };
+      }
+      const r = Array.isArray(data) ? (data[0] || null) : data;
+      return { ok: true, data: r ? _mapRapport(r) : null };
     }
 
   };
+
+  // Normalise une ligne RPC rapports (sorties out_*) en objet métier nu.
+  // Tolère les deux conventions (out_ ou nom direct) par robustesse.
+  function _mapRapport(r) {
+    if (!r || typeof r !== 'object') return null;
+    return {
+      id:             r.out_id             !== undefined ? r.out_id             : r.id,
+      evenement_uuid: r.out_evenement_uuid !== undefined ? r.out_evenement_uuid : r.evenement_uuid,
+      bilan:          r.out_bilan          !== undefined ? r.out_bilan          : r.bilan,
+      statut:         r.out_statut         !== undefined ? r.out_statut         : r.statut,
+      finalise_le:    r.out_finalise_le    !== undefined ? r.out_finalise_le    : r.finalise_le,
+      finalise_par:   r.out_finalise_par   !== undefined ? r.out_finalise_par   : r.finalise_par,
+      created_at:     r.out_created_at     !== undefined ? r.out_created_at     : r.created_at,
+      updated_at:     r.out_updated_at     !== undefined ? r.out_updated_at     : r.updated_at
+    };
+  }
 
   // ============================================================
   // EXPOSITION GLOBALE
@@ -5570,7 +5697,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.44 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.45 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
