@@ -6,6 +6,17 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.57 — Rapport de MATCH : avis du coach en bas, statut compact, page unique (3 juin 2026)
+ *   v3.57 : Refonte présentation du RAPPORT DE MATCH (retours Manu ;
+ *           première modification de ce chemin depuis pt 53, assumée).
+ *           (2) « Bilan de l'éducateur (à froid) » → « Avis du coach »,
+ *           bloc déplacé EN BAS (après le déduit). (3) Statut en BADGE
+ *           compact dans l'en-tête (plus de pleine ligne). (1) Compactage
+ *           + page-break pour viser une page à l'impression (sans garantie
+ *           absolue : un match très fourni peut déborder — honnêteté).
+ *           Seules renderEditorRapport et _appliquerEtatRapportSaisi
+ *           changent ; déduit du match (_peindreRapport/_calculerScore/…)
+ *           prouvé byte-identique. Câblage par ID, ordre DOM indifférent.
  * Version : 3.56 — Rapports phase/tournoi : hero éditable, actions restylées, export page/niveau (3 juin 2026)
  *   v3.56 : Refonte présentation (retours Manu). (1) HERO ÉDITABLE en
  *           place : rang + nb d'équipes saisis directement dans le bandeau
@@ -2423,12 +2434,21 @@
 
     el.innerHTML =
       '<div class="view-rapport view-rapport--' + habillage + '">' +
-        _bandeauHTML(nomNous, 'Rapport de match — ' + adversaire) +
-        '<div class="rapport__statut" id="rapport-statut">Statut : <span class="badge-statut badge-statut--provisoire">provisoire</span></div>' +
-        // ── Bloc SAISI (verdict éducateur EN HAUT, décision Manu). Le
-        //    déduit (rapport-corps) reste en appui dessous. C13-a / pt 53.
+        // En-tête : bandeau + statut COMPACT (badge en coin, plus de pleine
+        //   ligne — point 3). Le déduit suit directement.
+        '<div class="rapport__entete">' +
+          _bandeauHTML(nomNous, 'Rapport de match — ' + adversaire) +
+          '<div class="rapport__statut rapport__statut--compact" id="rapport-statut">' +
+            '<span class="badge-statut badge-statut--provisoire">provisoire</span>' +
+          '</div>' +
+        '</div>' +
+        // Déduit (lecture) en premier ; il porte le score + le détail.
+        '<div id="rapport-corps" class="rapport__corps">' +
+          '<div class="view-suivi__hint">Chargement du rapport…</div>' +
+        '</div>' +
+        // ── Bloc SAISI « Avis du coach » EN BAS (points 2). C13-a / pt 53.
         '<div class="rapport__saisi" id="rapport-saisi">' +
-          '<div class="rapport__saisi-titre">Bilan de l\'éducateur (à froid)</div>' +
+          '<div class="rapport__saisi-titre">Avis du coach</div>' +
           '<textarea id="rapport-bilan" class="rapport__bilan" ' +
             'placeholder="Ton verdict sur le match : ce qui a marché, les axes de travail, le ressenti…"></textarea>' +
           '<div id="rapport-bilan-lu" class="rapport__bilan-lu" style="display:none;"></div>' +
@@ -2441,9 +2461,6 @@
         '</div>' +
         '<div class="rapport__actions">' +
           '<button type="button" id="btn-rapport-print" class="rapport__btn" title="Imprimer ou enregistrer en PDF">🖨 Imprimer / PDF</button>' +
-        '</div>' +
-        '<div id="rapport-corps" class="rapport__corps">' +
-          '<div class="view-suivi__hint">Chargement du rapport…</div>' +
         '</div>' +
       '</div>';
 
@@ -2604,7 +2621,7 @@
     var statutEl = document.getElementById('rapport-statut');
     if (statutEl) {
       var libelle = (st === 'finalise') ? 'finalisé' : 'provisoire';
-      statutEl.innerHTML = 'Statut : <span class="badge-statut badge-statut--' + st + '">' +
+      statutEl.innerHTML = '<span class="badge-statut badge-statut--' + st + '">' +
         libelle + '</span>';
     }
     var btnFin = document.getElementById('btn-rapport-finaliser');
