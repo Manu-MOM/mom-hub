@@ -811,6 +811,26 @@
       font-size: 13px; line-height: 1.6; color: var(--ink-mute);
       background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px;
     }
+    /* Fil chronologique (déroulé du match). */
+    .rapport-fil { display: flex; flex-direction: column; gap: 2px; }
+    .rapport-fil__periode {
+      font-family: 'Oswald', sans-serif; font-size: 11px; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--vert-prairie);
+      margin: 10px 0 4px; padding-bottom: 3px; border-bottom: 1px solid var(--line);
+    }
+    .rapport-fil__ligne {
+      display: grid; grid-template-columns: 42px 1fr auto 44px; align-items: baseline;
+      gap: 8px; padding: 5px 4px; border-bottom: 1px solid var(--paper-warm, #f1efe9);
+      font-size: 14px;
+    }
+    .rapport-fil__min {
+      font-variant-numeric: tabular-nums; font-size: 12px; color: var(--ink-mute); text-align: right;
+    }
+    .rapport-fil__act { color: var(--ink); }
+    .rapport-fil__who { color: var(--ink-mute); text-align: right; }
+    .rapport-fil__pts {
+      font-variant-numeric: tabular-nums; font-weight: 600; color: var(--vert-prairie); text-align: right;
+    }
   </style>
 </head>
 
