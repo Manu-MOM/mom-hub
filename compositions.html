@@ -1204,7 +1204,10 @@
       /* Rapport de match : viser une page. Compactage + évite les coupures
          au milieu d'un bloc. (Sans garantie absolue si le fil est très long.) */
       body.printing-rapport .view-rapport { font-size: 12px; }
-      body.printing-rapport .rapport__corps { page-break-inside: avoid; }
+      /* NB : PAS de page-break-inside:avoid sur .rapport__corps — ce bloc
+         dépasse une page (score + déroulé + temps de jeu) et le navigateur
+         le rejetait ENTIER sur la page suivante, laissant une page 1 vide
+         (fix pt 55). On laisse avoid seulement sur les petits sous-blocs. */
       body.printing-rapport .rapport-bloc,
       body.printing-rapport .rapport-score,
       body.printing-rapport .rapport__saisi { page-break-inside: avoid; break-inside: avoid; }
