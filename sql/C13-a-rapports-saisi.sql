@@ -45,6 +45,12 @@
 --   peuplés (lié IDENT-SYS). Tables fermées RLS, tout passe par RPC
 --   SECURITY DEFINER (patron C12-b / C12-n / C12-o).
 --
+-- NOTE PL/pgSQL (correctif post-sonde) : les colonnes de sortie des
+--   RETURNS TABLE sont des VARIABLES dans le corps → un nom identique à une
+--   colonne de table rend ON CONFLICT / SET ambigus (ERROR 42702). Les
+--   sorties sont donc préfixées `out_` ; les colonnes de table sont
+--   qualifiées par l'alias `r.`. Aucune ambiguïté possible.
+--
 -- Pré-requis : evenements (l'evenement_uuid = LE match aujourd'hui, une
 --   racine de tournoi demain). Aucune dépendance aux fonctions coach
 --   fantômes. Aucun GRANT public en écriture.
@@ -94,8 +100,7 @@ ALTER TABLE rapports ENABLE ROW LEVEL SECURITY;
 --  RPC SECURITY DEFINER ci-dessous, jamais en direct.)
 
 -- ---------------------------------------------------------------------
--- 3. Trigger updated_at (réutilise un éventuel helper projet sinon en pose
---    un local idempotent). On crée un trigger dédié à cette table.
+-- 3. Trigger updated_at.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION _rapports_touch_updated_at()
 RETURNS TRIGGER
@@ -114,6 +119,17 @@ CREATE TRIGGER trg_rapports_updated_at
     EXECUTE FUNCTION _rapports_touch_updated_at();
 
 -- ---------------------------------------------------------------------
+-- 3bis. DROP des RPC avant recréation. Nécessaire car PostgreSQL refuse
+--    CREATE OR REPLACE lorsqu'on change les NOMS des colonnes de sortie
+--    d'un RETURNS TABLE (« cannot change name of output parameter »).
+--    Idempotent (IF EXISTS). Sans effet au tout premier déploiement.
+-- ---------------------------------------------------------------------
+DROP FUNCTION IF EXISTS upsert_rapport_match(UUID, TEXT);
+DROP FUNCTION IF EXISTS finaliser_rapport(UUID);
+DROP FUNCTION IF EXISTS rouvrir_rapport(UUID);
+DROP FUNCTION IF EXISTS get_rapport_match(UUID);
+
+-- ---------------------------------------------------------------------
 -- 4. RPC d'écriture du bilan — upsert. Crée la ligne à la volée si
 --    absente. Marche QUEL QUE SOIT le statut (le statut n'est pas un
 --    cadenas, pt 52). Renvoie la ligne à jour.
@@ -123,13 +139,13 @@ CREATE OR REPLACE FUNCTION upsert_rapport_match(
     p_evenement_uuid UUID,
     p_bilan          TEXT
 ) RETURNS TABLE(
-    id             UUID,
-    evenement_uuid UUID,
-    bilan          TEXT,
-    statut         TEXT,
-    finalise_le    TIMESTAMPTZ,
-    finalise_par   UUID,
-    updated_at     TIMESTAMPTZ
+    out_id             UUID,
+    out_evenement_uuid UUID,
+    out_bilan          TEXT,
+    out_statut         TEXT,
+    out_finalise_le    TIMESTAMPTZ,
+    out_finalise_par   UUID,
+    out_updated_at     TIMESTAMPTZ
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -145,8 +161,7 @@ BEGIN
         RAISE EXCEPTION 'evenement_uuid requis.';
     END IF;
 
-    -- Fail-loud : l'évènement cible doit exister (cohérence référentielle
-    -- explicite avant écriture).
+    -- Fail-loud : l'évènement cible doit exister.
     IF NOT EXISTS (SELECT 1 FROM evenements e WHERE e.id = p_evenement_uuid) THEN
         RAISE EXCEPTION 'Évènement introuvable : %', p_evenement_uuid;
     END IF;
@@ -155,8 +170,7 @@ BEGIN
         VALUES (p_evenement_uuid, p_bilan)
     ON CONFLICT (evenement_uuid) DO UPDATE
         SET bilan = EXCLUDED.bilan;
-    -- updated_at posé par le trigger sur l'UPDATE ; sur l'INSERT il vaut
-    -- déjà now() par défaut.
+    -- updated_at posé par le trigger sur l'UPDATE ; sur l'INSERT = now() par défaut.
 
     RETURN QUERY
         SELECT r.id, r.evenement_uuid, r.bilan, r.statut,
@@ -169,19 +183,18 @@ $$;
 -- ---------------------------------------------------------------------
 -- 5. RPC finaliser — pose statut='finalise' + audit. N'EMPÊCHE PAS
 --    l'édition ultérieure (Rouvrir possible, et upsert marche en
---    finalise). Crée la ligne à la volée si on finalise sans bilan saisi
---    (cas limite : rapport finalisé sans texte, autorisé).
+--    finalise). Crée la ligne à la volée si on finalise sans bilan saisi.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION finaliser_rapport(
     p_evenement_uuid UUID
 ) RETURNS TABLE(
-    id             UUID,
-    evenement_uuid UUID,
-    bilan          TEXT,
-    statut         TEXT,
-    finalise_le    TIMESTAMPTZ,
-    finalise_par   UUID,
-    updated_at     TIMESTAMPTZ
+    out_id             UUID,
+    out_evenement_uuid UUID,
+    out_bilan          TEXT,
+    out_statut         TEXT,
+    out_finalise_le    TIMESTAMPTZ,
+    out_finalise_par   UUID,
+    out_updated_at     TIMESTAMPTZ
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -222,13 +235,13 @@ $$;
 CREATE OR REPLACE FUNCTION rouvrir_rapport(
     p_evenement_uuid UUID
 ) RETURNS TABLE(
-    id             UUID,
-    evenement_uuid UUID,
-    bilan          TEXT,
-    statut         TEXT,
-    finalise_le    TIMESTAMPTZ,
-    finalise_par   UUID,
-    updated_at     TIMESTAMPTZ
+    out_id             UUID,
+    out_evenement_uuid UUID,
+    out_bilan          TEXT,
+    out_statut         TEXT,
+    out_finalise_le    TIMESTAMPTZ,
+    out_finalise_par   UUID,
+    out_updated_at     TIMESTAMPTZ
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -244,8 +257,7 @@ BEGIN
         RAISE EXCEPTION 'evenement_uuid requis.';
     END IF;
 
-    -- Pas de création à la volée ici : rouvrir un rapport inexistant n'a
-    -- pas de sens. Fail-loud si absent.
+    -- Fail-loud si absent : rouvrir un rapport inexistant n'a pas de sens.
     IF NOT EXISTS (SELECT 1 FROM rapports r WHERE r.evenement_uuid = p_evenement_uuid) THEN
         RAISE EXCEPTION 'Aucun rapport à rouvrir pour : %', p_evenement_uuid;
     END IF;
@@ -272,14 +284,14 @@ $$;
 CREATE OR REPLACE FUNCTION get_rapport_match(
     p_evenement_uuid UUID
 ) RETURNS TABLE(
-    id             UUID,
-    evenement_uuid UUID,
-    bilan          TEXT,
-    statut         TEXT,
-    finalise_le    TIMESTAMPTZ,
-    finalise_par   UUID,
-    created_at     TIMESTAMPTZ,
-    updated_at     TIMESTAMPTZ
+    out_id             UUID,
+    out_evenement_uuid UUID,
+    out_bilan          TEXT,
+    out_statut         TEXT,
+    out_finalise_le    TIMESTAMPTZ,
+    out_finalise_par   UUID,
+    out_created_at     TIMESTAMPTZ,
+    out_updated_at     TIMESTAMPTZ
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -301,8 +313,8 @@ $$;
 
 -- ---------------------------------------------------------------------
 -- 8. GRANTs — tables fermées, RPC réservées aux comptes authentifiés.
---    Aucune voie jeton/anon (le rapport saisi est une surface COACH,
---    cohérent avec la persona « éducateur seul » du socle pt 53).
+--    Aucune voie jeton/anon (surface COACH, cohérent persona « éducateur
+--    seul » du socle pt 53).
 -- ---------------------------------------------------------------------
 REVOKE ALL ON FUNCTION upsert_rapport_match(UUID, TEXT)   FROM PUBLIC;
 REVOKE ALL ON FUNCTION finaliser_rapport(UUID)            FROM PUBLIC;
@@ -327,22 +339,18 @@ DO $verif$
 DECLARE
     v_ok BOOLEAN;
 BEGIN
-    -- (a) la table existe avec la contrainte d'unicité attendue.
     SELECT EXISTS (
-        SELECT 1 FROM pg_constraint
-        WHERE conname = 'rapports_evenement_unique'
+        SELECT 1 FROM pg_constraint WHERE conname = 'rapports_evenement_unique'
     ) INTO v_ok;
     IF NOT v_ok THEN
         RAISE EXCEPTION 'Invariant cassé : contrainte rapports_evenement_unique absente.';
     END IF;
 
-    -- (b) RLS bien active sur rapports.
-    SELECT relrowsecurity FROM pg_class WHERE relname = 'rapports' INTO v_ok;
+    SELECT relrowsecurity INTO v_ok FROM pg_class WHERE relname = 'rapports';
     IF NOT v_ok THEN
         RAISE EXCEPTION 'Invariant cassé : RLS non active sur rapports.';
     END IF;
 
-    -- (c) les 4 RPC publiques existent.
     IF (SELECT count(*) FROM pg_proc
         WHERE proname IN ('upsert_rapport_match','finaliser_rapport',
                           'rouvrir_rapport','get_rapport_match')) <> 4 THEN
@@ -360,6 +368,7 @@ COMMIT;
 --   upsert_rapport_match (bilan) · finaliser_rapport · rouvrir_rapport ·
 --   get_rapport_match. Tables fermées, RPC SECURITY DEFINER garde
 --   auth.uid(). Niveau MATCH ; phase/tournoi = vues dérivées futures
---   (même table). Prochaine étape : wrappers client supabase-client.js
+--   (même table). Colonnes de sortie préfixées out_ (anti-ambiguïté
+--   42702). Prochaine étape : wrappers client supabase-client.js
 --   (additifs) puis UI onglet Rapport (compositions-editor.js).
 -- =====================================================================
