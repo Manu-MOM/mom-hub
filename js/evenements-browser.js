@@ -21,6 +21,35 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
+ * Version : 1.59 — Suivi : bouton « Suivez le match en live » (phases) + allègement vignette (3 juin 2026)
+ *   v1.59 : Chantier « lien direct suivi coach » (pt 56). DEUX gestes.
+ *           (1) Section « Phases du tournoi (détail) » : chaque match non
+ *               annulé gagne un bouton « ▶ Suivez le match en live »
+ *               (data-action="suivre-match-live"). Handler = 4e miroir des
+ *               ouvrir-vue-* : ouvre compositions.html?evenement_equipe=
+ *               <evtEqId>&match=<child.id>&vue=suivi (éditeur v3.60 lit
+ *               match/vue=suivi au boot). evtEqId résolu via map locale
+ *               equipe_id→evenement_equipe.id construite sur evt.
+ *               _equipesEngagees (getEquipesEngagees : id=engagement,
+ *               equipe_id=équipe) — Voie A actée Manu (1 équipe = 1
+ *               engagement par tournoi, pas de doublon equipe_id).
+ *           (2) Vignette renderSuiviSection (branche tournoi) ALLÉGÉE :
+ *               retrait de renderModeVideoAcces + renderTempsDeJeuMount
+ *               (place naturelle = onglet Suivi/Rapport de l'éditeur).
+ *               CONSERVÉS : renderSuiviRencontreBloc (génération du lien
+ *               COACH — unique point de génération du Hub, cf. grep) et
+ *               renderSpectateurAcces (dépend du lien coach généré :
+ *               renvoie '' tant que SUIVI_LIENS_SESSION vide).
+ *           DETTE SUIVI-LIEN-COACH-MIGRATION (tracée, NON levée ici) : la
+ *               décision Manu pt 51 « vignette = lien spectateur seul » ne
+ *               sera honorée à la lettre qu'une fois la génération du lien
+ *               coach PORTÉE dans l'onglet Suivi de l'éditeur. Tant que
+ *               renderSuiviRencontreBloc est l'unique générateur, le
+ *               retirer de la vignette laisserait le lien spectateur
+ *               éternellement vide (UI cassée). Épuration finale =
+ *               chantier ultérieur (porter génération côté éditeur PUIS
+ *               retirer de la vignette). Option 2 actée Manu pt 56.
+ *           Branche match simple INCHANGÉE. node --check OK. Additif.
  * Version : 1.58 — Option B : gate suivi d'un tournoi = compo de BASE validée (matchs suivables sans validation par match) (2 juin 2026)
  *   v1.58 : Décision Manu (option B). Le gate « compo prête » d'un match de
  *           tournoi est désormais évalué UNE FOIS sur la compo de BASE du
@@ -2736,9 +2765,13 @@
               html += '<div style="font-size:12px;color:var(--ink-mute);padding:6px 0;">Match ' + escHtml(child.etat) + ' — pas de lien de suivi.</div>';
             } else {
               html += renderSuiviRencontreBloc(child, compoPreteRacine);
-              html += renderModeVideoAcces(child);
+              // v1.59 — Mode Vidéo (Objet B) + Temps de jeu (Objet C)
+              // retirés de la vignette (place naturelle = onglet Suivi/
+              // Rapport de l'éditeur). renderSuiviRencontreBloc CONSERVÉ
+              // (unique générateur du lien coach) ; renderSpectateurAcces
+              // CONSERVÉ (dépend du lien coach généré). Cf. dette
+              // SUIVI-LIEN-COACH-MIGRATION en en-tête.
               html += renderSpectateurAcces(child);
-              html += renderTempsDeJeuMount(child);
             }
             html += '</div>';
           });
@@ -3375,6 +3408,19 @@
           matchsByPhase[p].push(phaseBox);
         }
       });
+      // v1.59 — Map locale equipe_id → evenement_equipe.id (Voie A, actée
+      // Manu pt 56) pour bâtir le lien direct « Suivez le match en live ».
+      // Source : eqEng (= evt._equipesEngagees, getEquipesEngagees :
+      // chaque ligne porte id=evenement_equipe.id et equipe_id=équipe).
+      // 1 équipe = 1 engagement par tournoi (pas de doublon equipe_id),
+      // donc la clé equipe_id est non ambiguë. Le match enfant porte
+      // m.equipe_id (déjà utilisé pour le regroupement par équipe) → on
+      // résout son evenement_equipe_id par cette map. Map vide / équipe
+      // absente = pas de bouton (dégradation honnête, pas de lien mort).
+      const _eqEngParEquipe = {};
+      eqEng.forEach(function (eq) {
+        if (eq && eq.equipe_id && eq.id) _eqEngParEquipe[eq.equipe_id] = eq.id;
+      });
       html += '<div class="evt-fiche-section" id="evt-phases-detail">';
       html += '<div class="evt-fiche-section-title">📋 Phases du tournoi (détail)</div>';
       phases.forEach(function (phaseName) {
@@ -3422,6 +3468,10 @@
                   ? ' · vs ' + escHtml(child.adversaire_nom)
                   : ' · <em style="color:var(--ink-mute)">(adv. à déterminer)</em>');
             const isChildAnnule = child.etat === 'annule';
+            // v1.59 — résolution evtEqId du match via la map équipe→engagement.
+            const _childEvtEqId = (child.equipe_id && _eqEngParEquipe[child.equipe_id])
+              ? _eqEngParEquipe[child.equipe_id]
+              : null;
             html += '<div class="evt-fiche-phase-row">';
             html += '<span class="evt-fiche-phase-heure">' + escHtml(heure) + '</span>';
             html += '<span style="flex:1;">' + escHtml(child.libelle || '') + advBlock + '</span>';
@@ -3429,6 +3479,15 @@
               html += '<span class="evt-card-badge evt-badge-annule evt-badge-sm">Annulé</span>';
             } else {
               html += '<span class="evt-card-badge evt-badge-' + childBadge.cls + ' evt-badge-sm">' + escHtml(childBadge.libelle) + '</span>';
+              // v1.59 — Lien direct suivi coach. Affiché seulement si l'on
+              // sait bâtir le lien (evtEqId résolu) : pas de bouton mort.
+              if (_childEvtEqId) {
+                html += '<button type="button" class="evt-btn evt-badge-sm" '
+                  + 'data-action="suivre-match-live" '
+                  + 'data-evenement-equipe-id="' + escHtml(_childEvtEqId) + '" '
+                  + 'data-match-id="' + escHtml(child.id) + '" '
+                  + 'style="margin-left:8px;">▶ Suivez le match en live</button>';
+              }
             }
             html += '</div>';
           });
@@ -3849,6 +3908,20 @@
         const evtEqId = this.getAttribute('data-evenement-equipe-id');
         if (evtEqId) {
           window.location.href = 'compositions.html?evenement_equipe=' + encodeURIComponent(evtEqId) + '&vue=reseaux';
+        }
+      });
+    });
+    // ── v1.59 : « Suivez le match en live » — 4e miroir des ouvrir-vue-*.
+    //    Cible un MATCH précis + l'onglet Suivi. compositions-editor.js
+    //    v3.60 lit ?match=<id> (sélectionne la compo de match dont
+    //    evenement_id===<id>) et ?vue=suivi (active l'onglet Suivi) au boot.
+    document.querySelectorAll('[data-action="suivre-match-live"]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        const evtEqId = this.getAttribute('data-evenement-equipe-id');
+        const matchId = this.getAttribute('data-match-id');
+        if (evtEqId && matchId) {
+          window.location.href = 'compositions.html?evenement_equipe=' + encodeURIComponent(evtEqId)
+            + '&match=' + encodeURIComponent(matchId) + '&vue=suivi';
         }
       });
     });
