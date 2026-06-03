@@ -898,51 +898,60 @@ body.suivi-body {
    ===================================================================== */
 :root {
   --suivi-vert:        #5dcaa5;
-  --suivi-vert-fonce:  #1e4626;
-  --suivi-vert-clair:  rgba(240,216,0,.14);
+  --suivi-vert-fonce:  #242826;
+  --suivi-vert-clair:  rgba(240,216,0,.12);
   --suivi-encre:       #f6f3e8;
-  --suivi-encre-doux:  #9aa6b2;
-  --suivi-fond:        #0e2816;
-  --suivi-surface:     #14301d;
-  --suivi-bord:        #285a30;
+  --suivi-encre-doux:  #9aa0a2;
+  --suivi-fond:        #0d0f0e;
+  --suivi-surface:     #1a1d1c;
+  --suivi-bord:        #2c302e;
   --suivi-alerte:      #f0d800;
   --suivi-focus:       0 0 0 4px rgba(240,216,0,.35);
 }
 body.suivi-body {
-  background: linear-gradient(180deg, #0e2816, #08200f);
+  background: #0d0f0e;
   color: var(--suivi-encre);
 }
-.suivi-app { border-left: 1px solid #285a30; border-right: 1px solid #285a30; }
+.suivi-app { border-left: 1px solid #2c302e; border-right: 1px solid #2c302e; }
 
 /* Zone A — score + chrono « tableau de stade » */
-.suivi-za { background: #0a2012; border-bottom: 1px solid #285a30; }
+.suivi-za { background: #121413; border-bottom: 1px solid #2c302e; }
 .suivi-za__score { color: #f6f3e8; }
 .suivi-za__score .pts { color: #f0d800; text-shadow: 0 0 16px rgba(240,216,0,.4); }
 .suivi-za__chrono { color: #ffb000; opacity: 1; }
 .suivi-za__periode { background: rgba(255,255,255,.12); color: #f6f3e8; }
 .suivi-za__btn { background: rgba(255,255,255,.12); color: #f6f3e8; }
 
-/* Zones de saisie (camp, palette, fil) sur fond sombre */
+/* Zones de saisie (camp, palette, fil) sur fond gris-noir */
 .suivi-surface, .suivi-obs, .suivi-zb__tab, .suivi-zc, .suivi-ze {
   background: var(--suivi-surface);
-  border-color: #285a30;
+  border-color: #2c302e;
   color: #e6ebf0;
 }
-.suivi-ze__title, .suivi-ze__empty, .suivi-zc__placeholder { color: #9aa6b2; }
-.suivi-ze__toggle { background: #1e4626; border-color: #285a30; color: #e6ebf0; }
+.suivi-ze__title, .suivi-ze__empty, .suivi-zc__placeholder { color: #9aa0a2; }
+.suivi-ze__toggle { background: #242826; border-color: #2c302e; color: #e6ebf0; }
 .suivi-ze__list li { color: #e6ebf0; }
-.suivi-readonly-tag { color: #f0d800; background: rgba(240,216,0,.14); }
+.suivi-readonly-tag { color: #f0d800; background: rgba(240,216,0,.12); }
+
+/* Cartes SCORANTES : pas de voile (même surface que les autres), accent or
+   sur la bordure + points en OR (lisibilité, demande Manu). */
+.suivi-obs--score { border-color: #f0d800; background: var(--suivi-surface); }
+.suivi-obs--score .suivi-obs__pts { color: #f0d800; }
+.suivi-obs__pts { color: #f0d800; }
+
+/* Message d'erreur : surface sombre (au lieu du rose clair hérité). */
+.suivi-error { background: var(--suivi-surface); }
 
 /* Fil complet (overlay) */
-.suivi-histo { background: #0e2816; }
-.suivi-histo__bar { background: #1e4626; border-bottom: 1px solid #285a30; }
-.suivi-histo__list li { color: #e6ebf0; border-bottom-color: #285a30; }
-.suivi-histo__empty { color: #9aa6b2; }
+.suivi-histo { background: #0d0f0e; }
+.suivi-histo__bar { background: #242826; border-bottom: 1px solid #2c302e; }
+.suivi-histo__list li { color: #e6ebf0; border-bottom-color: #2c302e; }
+.suivi-histo__empty { color: #9aa0a2; }
 
 /* Boutons neutres + états chargement/erreur */
-.suivi-btn-neutre { background: #1e4626; border-color: #285a30; color: #f6f3e8; }
-.suivi-btn-neutre:active { background: #285a30; }
-.suivi-loading { color: #9aa6b2; }
+.suivi-btn-neutre { background: #242826; border-color: #2c302e; color: #f6f3e8; }
+.suivi-btn-neutre:active { background: #2c302e; }
+.suivi-loading { color: #9aa0a2; }
 .suivi-loading__pulse { border-color: rgba(240,216,0,.2); border-top-color: #f0d800; }
 .suivi-error__title { color: #f6f3e8; }
 
@@ -970,10 +979,8 @@ body.suivi-body {
 .suivi-brand__btn:focus-visible { outline: none; box-shadow: var(--suivi-focus); }
 
 /* ---- Variante ENTENTE (bleu marine + bleu ciel) ---- */
-body.suivi-entente {
-  background: linear-gradient(180deg, #0a1428, #060d1c);
-}
-body.suivi-entente .suivi-app { border-left-color: #143a64; border-right-color: #143a64; }
+body.suivi-entente { background: #0d0f0e; }
+body.suivi-entente .suivi-app { border-left-color: #2c302e; border-right-color: #2c302e; }
 body.suivi-entente .suivi-brand {
   background: linear-gradient(90deg, #00285a, #14462d);
   border-bottom-color: #90d8f0;
@@ -981,20 +988,11 @@ body.suivi-entente .suivi-brand {
 body.suivi-entente .suivi-brand__btn[aria-pressed="true"] {
   background: #90d8f0; border-color: #90d8f0; color: #0a1428;
 }
-body.suivi-entente .suivi-za { background: #08152b; border-bottom-color: #143a64; }
-body.suivi-entente .suivi-surface,
-body.suivi-entente .suivi-obs,
-body.suivi-entente .suivi-zb__tab,
-body.suivi-entente .suivi-zc,
-body.suivi-entente .suivi-ze,
-body.suivi-entente .suivi-histo { background: #10233f; border-color: #143a64; }
-body.suivi-entente .suivi-histo { background: #0a1428; }
-body.suivi-entente .suivi-ze__toggle,
-body.suivi-entente .suivi-btn-neutre,
-body.suivi-entente .suivi-histo__bar { background: #143a64; border-color: #1d4f86; }
-body.suivi-entente .suivi-app,
-body.suivi-entente .suivi-ze,
-body.suivi-entente .suivi-histo__list li { border-color: #143a64; }
+/* Surfaces neutres partagées (mêmes gris-noir que MOM) ; l'Entente ne
+   change QUE les accents (bandeau ciel + bordure carte scorante ciel). */
+body.suivi-entente .suivi-obs--score { border-color: #90d8f0; }
+body.suivi-entente .suivi-readonly-tag { color: #90d8f0; background: rgba(144,216,240,.12); }
+body.suivi-entente .suivi-za__chrono { color: #90d8f0; }
 </style>
 </head>
 
