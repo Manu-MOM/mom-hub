@@ -6,7 +6,40 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
- * Version : 3.60 — Lien direct suivi : ?match=<id> cible une compo de match + ?vue=suivi ouvre l'onglet Suivi (3 juin 2026)
+ * Version : 3.61 — Liens à partager (bénévole + spectateur) portés dans l'onglet Suivi (SUIVI-LIEN-COACH-MIGRATION) (3 juin 2026)
+ *   v3.61 : MIGRATION des liens partageables depuis la vignette
+ *           « Suivi de la rencontre » (evenements-browser.js) vers l'onglet
+ *           Suivi de l'éditeur. Motivation : la vignette était le SEUL
+ *           générateur de lien du Hub ; tant qu'elle l'était, elle ne
+ *           pouvait pas disparaître (dette SUIVI-LIEN-COACH-MIGRATION,
+ *           passation pt 56). Direction Manu (pt 56) : 1 bouton « Suivez le
+ *           match en live » par match → liens dans l'écran de suivi →
+ *           vignette supprimée (geste fait dans evenements-browser v1.60).
+ *           CONTRAT RPC (lu à la source, supabase-client v1.46, l.3938) :
+ *           genererLienEphemere(evenementUuid, role, creePar) avec
+ *           role ∈ {'saisie','spectateur'} (CHECK lien_suivi_role_check).
+ *           ÉCART HYPOTHÈSE↔FAIT (DS-1) : la passation §3 annonçait
+ *           role='coach' — le fait tranche, c'est 'saisie' (défaut RPC).
+ *           Nouveau bloc UI : encart <details class="view-suivi__liens">
+ *           REPLIÉ par défaut, posé juste sous le bandeau (placement C
+ *           validé Manu sur maquette : présent mais n'encombre pas la
+ *           saisie live ; le chrono reste roi). Trois états bénévole
+ *           (compo pas prête / générer / lien actif) RÉPLIQUÉS fidèlement
+ *           de renderSuiviRencontreBloc ; lien spectateur RÉPLIQUÉ de
+ *           renderSpectateurAcces — dépendance préservée : spectateur
+ *           visible UNIQUEMENT après génération du lien bénévole.
+ *           PERSISTANCE : lien 'saisie' relu au montage via
+ *           SupabaseHub.getLienSaisieActif (état 3 persistant entre
+ *           visites) ; spectateur borné session (aucune RPC de relecture
+ *           spectateur — honnête, calque vignette). evenement_id = l'UUID
+ *           du MATCH (compo.evenement_id, option α v3.12) — argument exact
+ *           de genererLienEphemere. Helper SuiviLiens isolé (IIFE-local),
+ *           additif : aucune logique de saisie live (chrono/score/palette)
+ *           touchée. CSS dans compositions.html (thème sombre scopé
+ *           .view-suivi ; .view-suivi__liens masqué @media print — filet
+ *           de sécurité Ctrl+P, le Suivi n'a pas d'export PDF dédié).
+ *           Module bénévole suivi.html/suivi-app.js INTANGIBLE (on émet
+ *           seulement le lien qu'il consomme).
  *   v3.60 : Au boot, après loadComposForCurrentEvent(), si ?match=<id>
  *           est présent on sélectionne la compo de match dont
  *           evenement_id===<id> (selectCompo, option α v3.12) puis on
@@ -1606,6 +1639,257 @@
     });
   }
 
+  // ════════════════════════════════════════════════════════════
+  // v3.61 — LIENS À PARTAGER (SUIVI-LIEN-COACH-MIGRATION).
+  // Encart « Liens à partager » de l'onglet Suivi : génère / copie /
+  // partage / régénère le lien BÉNÉVOLE (role='saisie') et le lien
+  // SPECTATEUR (role='spectateur'). Logique RÉPLIQUÉE fidèlement de la
+  // vignette (evenements-browser.js renderSuiviRencontreBloc /
+  // renderSpectateurAcces / suivi*/spect* — qui disparaît en v1.60).
+  // Isolé dans cet objet : ZÉRO retouche de la saisie live (chrono /
+  // score / palette / historique). evtId attendu = compo.evenement_id
+  // (UUID du MATCH, option α). Module bénévole suivi.html INTANGIBLE :
+  // on n'émet que les liens qu'il consomme (?t=<jeton>).
+  // ════════════════════════════════════════════════════════════
+  var SuiviLiens = {
+    // État courant (un seul match affiché à la fois dans l'éditeur).
+    evtId: null,
+    // Lien 'saisie' actif : { token, expire_le, url } | null.
+    // Pré-rempli au montage via getLienSaisieActif (persistance entre
+    // visites) ; mis à jour après génération/régénération.
+    saisie: null,
+    // Lien 'spectateur' : { token, expire_le, url } | null. Borné
+    // session (aucune RPC de relecture spectateur — calque vignette).
+    spect: null,
+    // Compo prête ? (calculée au montage, transmise par renderEditorSuivi).
+    compoPrete: false,
+
+    // URL de saisie du module bénévole (suivi.html?t=…). Contrat
+    // documenté (STATE) : suivi.html sans login, lit ?t=. Rien inventé.
+    buildUrlSaisie: function (token) {
+      var u = new URL('suivi.html', window.location.href);
+      u.search = '?t=' + encodeURIComponent(token);
+      return u.toString();
+    },
+    // URL de l'écran spectateur (spectateur.html?t=…). Contrat ?t=
+    // posé dans js/spectateur.js / suivi-client.js, réutilisé à l'identique.
+    buildUrlSpect: function (token) {
+      var u = new URL('spectateur.html', window.location.href);
+      u.search = '?t=' + encodeURIComponent(token);
+      return u.toString();
+    },
+
+    // Rendu de tout le contenu interne de l'encart (sans le <details>).
+    // Trois états bénévole + bloc spectateur conditionnel.
+    renderInner: function () {
+      var h = '';
+
+      // ── Lien BÉNÉVOLE (saisie) ──
+      if (this.saisie) {
+        // ÉTAT 3 — lien actif
+        h += '<div class="view-suivi__liens-bloc">';
+        h += '<div class="view-suivi__liens-lbl">Lien de saisie (à transmettre au bénévole)</div>';
+        h += '<div class="view-suivi__liens-url">' + escapeHtml(this.saisie.url) + '</div>';
+        h += '<div class="view-suivi__liens-exp">Valable jusqu\'au ' + escapeHtml(formatDateShort(this.saisie.expire_le)) + '</div>';
+        h += '<div class="view-suivi__liens-actions">';
+        h += '<button type="button" class="view-suivi__liens-btn" data-suivi-lien="copier" data-role="saisie">📋 Copier</button>';
+        h += '<button type="button" class="view-suivi__liens-btn" data-suivi-lien="partager" data-role="saisie">📤 Partager</button>';
+        h += '<button type="button" class="view-suivi__liens-btn view-suivi__liens-btn--danger" data-suivi-lien="regenerer" data-role="saisie">🔄 Régénérer</button>';
+        h += '</div>';
+        h += '<div class="view-suivi__liens-note">Régénérer crée un nouveau lien : l\'ancien cessera <strong>immédiatement</strong> de fonctionner.</div>';
+        h += '</div>';
+      } else if (!this.compoPrete) {
+        // ÉTAT 1 — compo pas prête
+        h += '<div class="view-suivi__liens-bloc">';
+        h += '<div class="view-suivi__liens-msg">La composition doit être <strong>validée</strong> avant de pouvoir générer le lien de suivi (pour un tournoi, validez la composition de base).</div>';
+        h += '</div>';
+      } else {
+        // ÉTAT 2 — compo prête → générer
+        h += '<div class="view-suivi__liens-bloc">';
+        h += '<button type="button" class="view-suivi__liens-btn view-suivi__liens-btn--primary" data-suivi-lien="generer" data-role="saisie">🔗 Générer le lien de suivi</button>';
+        h += '<div class="view-suivi__liens-note">Générer peut remplacer un lien émis précédemment pour cette rencontre (l\'ancien serait alors révoqué).</div>';
+        h += '</div>';
+      }
+
+      // ── Lien SPECTATEUR (dépend du lien bénévole : visible UNIQUEMENT
+      //    une fois le lien de saisie actif — dépendance préservée). ──
+      if (this.saisie) {
+        h += '<div class="view-suivi__liens-bloc view-suivi__liens-bloc--sep">';
+        if (this.spect) {
+          h += '<div class="view-suivi__liens-lbl">Lien spectateur (lecture seule — familles, public)</div>';
+          h += '<div class="view-suivi__liens-url">' + escapeHtml(this.spect.url) + '</div>';
+          h += '<div class="view-suivi__liens-exp">Valable jusqu\'au ' + escapeHtml(formatDateShort(this.spect.expire_le)) + '</div>';
+          h += '<div class="view-suivi__liens-actions">';
+          h += '<button type="button" class="view-suivi__liens-btn" data-suivi-lien="copier" data-role="spectateur">📋 Copier</button>';
+          h += '<button type="button" class="view-suivi__liens-btn" data-suivi-lien="partager" data-role="spectateur">📤 Partager</button>';
+          h += '<button type="button" class="view-suivi__liens-btn view-suivi__liens-btn--danger" data-suivi-lien="regenerer" data-role="spectateur">🔄 Régénérer</button>';
+          h += '</div>';
+          h += '<div class="view-suivi__liens-note">Lecture seule : ce lien ne permet jamais de saisir. Régénérer en crée un nouveau (les précédents restent valables jusqu\'à leur expiration).</div>';
+        } else {
+          h += '<button type="button" class="view-suivi__liens-btn" data-suivi-lien="generer" data-role="spectateur">👁 Lien spectateur (lecture seule)</button>';
+          h += '<div class="view-suivi__liens-note">Lien public à transmettre aux familles : suivi en lecture seule, aucune possibilité de saisie.</div>';
+        }
+        h += '</div>';
+      }
+
+      return h;
+    },
+
+    // Réinjecte le contenu de l'encart en place + re-câble (sans
+    // refermer le <details>, sans toucher chrono/score/historique).
+    refresh: function () {
+      var host = document.getElementById('suivi-liens-inner');
+      if (!host) return;
+      host.innerHTML = this.renderInner();
+      this.bind();
+    },
+
+    // Câble les boutons de l'encart (binding direct par élément, comme
+    // le reste de l'éditeur — pas de délégation globale).
+    bind: function () {
+      var self = this;
+      var host = document.getElementById('suivi-liens-inner');
+      if (!host) return;
+      host.querySelectorAll('[data-suivi-lien]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var action = btn.getAttribute('data-suivi-lien');
+          var role = btn.getAttribute('data-role'); // 'saisie' | 'spectateur'
+          if (action === 'generer')   { self.generer(role, btn, false); return; }
+          if (action === 'regenerer') { self.generer(role, btn, true);  return; }
+          if (action === 'copier')    { self.copier(role); return; }
+          if (action === 'partager')  { self.partager(role); return; }
+        });
+      });
+    },
+
+    // Génération / régénération. role='saisie' applique la garde PI-7
+    // (compo validée) côté RPC : le refus revient en error.message et
+    // est retraduit en message métier (jamais réinterprété ici).
+    // role='spectateur' : inconditionnel (la RPC n'applique ni PI-7 ni
+    // relais pour spectateur), anciens liens inoffensifs (lecture seule).
+    generer: function (role, btn, isRegen) {
+      var self = this;
+      var evtId = this.evtId;
+      if (!evtId) return;
+      if (!window.SupabaseHub || typeof SupabaseHub.genererLienEphemere !== 'function') {
+        alert('Génération de lien indisponible (client non chargé).');
+        return;
+      }
+      if (isRegen && role === 'saisie') {
+        var ok = window.confirm(
+          'Régénérer le lien de suivi ?\n\n' +
+          "L'ancien lien de cette rencontre cessera IMMÉDIATEMENT de " +
+          'fonctionner. Le bénévole devra utiliser le nouveau lien.'
+        );
+        if (!ok) return;
+      }
+      var labelInitial = btn ? btn.textContent : '';
+      if (btn) { btn.disabled = true; btn.textContent = isRegen ? 'Régénération…' : 'Génération…'; }
+
+      SupabaseHub.genererLienEphemere(evtId, role).then(function (res) {
+        if (!res || !res.ok) {
+          var msg = (res && res.error) || 'erreur inconnue';
+          if (role === 'saisie' && /PI-7|composition\s+valid|compo/i.test(msg)) {
+            alert(
+              "La composition de cette rencontre n'est pas validée côté " +
+              'serveur : le suivi ne peut pas démarrer.\n\n' +
+              'Validez la composition (la base pour un tournoi) puis réessayez.'
+            );
+          } else {
+            alert('Échec de la génération du lien : ' + msg);
+          }
+          if (btn) { btn.disabled = false; btn.textContent = labelInitial; }
+          return;
+        }
+        var d = res.data; // { token, role, expire_le }
+        if (role === 'spectateur') {
+          self.spect = { token: d.token, expire_le: d.expire_le, url: self.buildUrlSpect(d.token) };
+        } else {
+          self.saisie = { token: d.token, expire_le: d.expire_le, url: self.buildUrlSaisie(d.token) };
+        }
+        self.refresh();
+      }).catch(function (err) {
+        console.error('MOM Hub: SuiviLiens.generer()', err);
+        alert('Erreur inattendue : ' + (err && err.message ? err.message : err));
+        if (btn) { btn.disabled = false; btn.textContent = labelInitial; }
+      });
+    },
+
+    copier: function (role) {
+      var s = (role === 'spectateur') ? this.spect : this.saisie;
+      if (!s) return;
+      var label = (role === 'spectateur') ? 'Lien spectateur' : 'Lien de saisie';
+      navigator.clipboard.writeText(s.url).then(function () {
+        alert(label + ' copié dans le presse-papiers.');
+      }).catch(function () {
+        window.prompt('Copiez le ' + label.toLowerCase() + ' :', s.url);
+      });
+    },
+
+    partager: function (role) {
+      var s = (role === 'spectateur') ? this.spect : this.saisie;
+      if (!s) return;
+      var titre = (role === 'spectateur') ? 'Suivi de la rencontre (spectateur)' : 'Suivi de la rencontre';
+      var texte = (role === 'spectateur') ? 'Lien spectateur — suivi en lecture seule' : 'Lien de saisie du suivi de match';
+      if (navigator.share) {
+        navigator.share({ title: titre, text: texte, url: s.url }).catch(function () { /* annulé : silencieux */ });
+        return;
+      }
+      navigator.clipboard.writeText(s.url).then(function () {
+        alert('Partage non disponible sur cet appareil — lien copié à la place.');
+      }).catch(function () {
+        window.prompt('Copiez le lien :', s.url);
+      });
+    },
+
+    // Montage : (ré)initialise l'état pour evtId, rend l'encart, puis
+    // relit le lien 'saisie' actif (persistance). compoPrete transmis
+    // par renderEditorSuivi (notion déjà connue de la compo courante).
+    monter: function (evtId, compoPrete) {
+      var self = this;
+      this.evtId = evtId || null;
+      this.saisie = null;
+      this.spect = null;
+      this.compoPrete = !!compoPrete;
+      this.refresh();
+      if (!evtId || !window.SupabaseHub || typeof SupabaseHub.getLienSaisieActif !== 'function') return;
+      SupabaseHub.getLienSaisieActif(evtId).then(function (res) {
+        if (self.evtId !== evtId) return; // on a changé d'onglet entre-temps
+        if (res && res.ok && res.data && res.data.token) {
+          self.saisie = {
+            token:     res.data.token,
+            expire_le: res.data.expire_le,
+            url:       self.buildUrlSaisie(res.data.token)
+          };
+          self.refresh();
+        }
+      }).catch(function (err) {
+        console.error('MOM Hub: SuiviLiens.monter()', err);
+      });
+    }
+  };
+
+  // Compo « prête » côté éditeur. ANTI-INVENTION (DS-1) : l'objet compo
+  // de l'éditeur porte `etat` ('brouillon' | 'validee' | …), PAS de
+  // compo_status_summary (qui vit sur les évènements, vignette). Ici la
+  // notion « prête » = compo validée (etat==='validee'). C'est un simple
+  // pré-filtre UX (état 2 vs état 1) : le garde-fou DUR reste la RPC
+  // (PI-7 server-side), dont le refus est retraduit dans generer().
+  // Pour un match de tournoi, la validation porte sur la compo de BASE
+  // (la compo de match hérite — option B pt 51) ; on s'aligne en
+  // regardant aussi la base si la compo courante n'est pas elle-même
+  // 'validee'. Aucune règle métier dupliquée : on ne fait qu'éviter
+  // d'afficher le bouton « Générer » quand un refus PI-7 est certain.
+  function _suiviCompoPrete(compo) {
+    if (!compo) return false;
+    if (compo.etat === 'validee' || compo.etat === 'utilisee') return true;
+    // Compo de match d'un tournoi : la base validée suffit (option B).
+    var base = Array.isArray(State.compos)
+      ? State.compos.find(function (c) { return c.type_compo === 'base'; })
+      : null;
+    return !!(base && (base.etat === 'validee' || base.etat === 'utilisee'));
+  }
+
   function renderEditorSuivi(el, compo) {
     SuiviChrono.desarmer();
 
@@ -1636,6 +1920,13 @@
     el.innerHTML =
       '<div class="view-suivi view-suivi--' + habillage + '">' +
         _bandeauHTML(SuiviChrono.nomNous, 'Suivi du match — ' + adversaire) +
+        '<details class="view-suivi__liens" id="suivi-liens">' +
+          '<summary class="view-suivi__liens-summary">' +
+            '<span class="view-suivi__liens-summary-lbl">🔗 Liens à partager</span>' +
+            '<span class="view-suivi__liens-summary-hint">bénévole · spectateur</span>' +
+          '</summary>' +
+          '<div class="view-suivi__liens-inner" id="suivi-liens-inner"></div>' +
+        '</details>' +
         '<div id="suivi-score" class="suivi-score">' + _scoreHTML() + '</div>' +
         '<div id="suivi-chrono-host" class="suivi-chrono"><div class="view-suivi__hint">Chargement du chrono…</div></div>' +
         '<div id="suivi-palette"></div>' +
@@ -1647,6 +1938,10 @@
     _bindHabillageToggle(el.querySelector('.view-suivi'), function () {
       renderEditorSuivi(el, compo);
     });
+
+    // v3.61 — encart « Liens à partager » : monte l'état + relit le lien
+    // de saisie actif (persistance). Indépendant de la saisie live.
+    SuiviLiens.monter(evtId, _suiviCompoPrete(compo));
 
     if (!evtId) {
       var host0 = document.getElementById('suivi-chrono-host');
