@@ -6,6 +6,21 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.49 — Rapport de match : fil chronologique du match (déroulé) (3 juin 2026)
+ *   v3.49 : pt 53. Ajout du FIL CHRONOLOGIQUE au rapport de match
+ *           (manque révélé par le rapport SAR×MOM de référence : le récap
+ *           par famille donne le « combien », le fil donne le « comment »).
+ *           _peindreFilRapport : toutes les actions effectives, groupées
+ *           par période (_libellePeriode), ordonnées par HORODATAGE (base
+ *           de temps fiable). Par ligne : minute (affichée seulement si
+ *           > 0 — 0 = chrono non lancé sur nos données → omise, jamais un
+ *           faux « 0' »), action (libellé + icône via SuiviObs.libelle),
+ *           acteur (joueur via _resolveNoms / substitution sortant→entrant
+ *           / nom adversaire / vide si fait d'équipe), points (+N si > 0).
+ *           Noms résolus via _resolveNoms (repli #id). Inséré entre les
+ *           substitutions et le panneau temps de jeu. Lecture pure, zéro
+ *           écriture. + CSS .rapport-fil* dans compositions.html.
+ *           node --check OK.
  * Version : 3.48 — Rapport de match : noms des substitutions via get_noms_personnes (3 juin 2026)
  *   v3.48 : pt 53 (fix recette). Les substitutions du rapport affichaient
  *           « #87dd → #6366 » au lieu des noms : la résolution passait par
@@ -1679,6 +1694,17 @@
               '</section>';
     }
 
+    // FIL CHRONOLOGIQUE (le « comment » du match) — toutes les actions
+    // effectives, groupées par période, ordonnées par horodatage. Noms
+    // résolus en asynchrone (comme les substitutions). Le récap par
+    // famille ci-dessus donne le « combien » ; ce fil donne le déroulé.
+    html += '<section class="rapport-bloc">' +
+              '<h4 class="rapport-bloc__titre">📋 Déroulé du match <span class="rapport-bloc__n">(' + eff.length + ')</span></h4>' +
+              '<div id="rapport-fil" class="rapport-fil">' +
+                '<p class="view-suivi__hint">Résolution des noms…</p>' +
+              '</div>' +
+            '</section>';
+
     // TEMPS DE JEU — panneau replié, incertitude assumée (SUIVI-COACH-7).
     html += '<details class="rapport-tdj">' +
               '<summary class="rapport-tdj__sum">⏱ Temps de jeu (estimation indicative)</summary>' +
@@ -1698,6 +1724,9 @@
     // Résolution asynchrone des noms pour les substitutions (RPC en lot
     // get_noms_personnes). Dégradation honnête : repli #id si non résolu.
     if (subs.length > 0) _peindreSubsRapport(subs);
+
+    // Fil chronologique (noms résolus en asynchrone, même voie).
+    _peindreFilRapport(eff);
   }
 
   // Résout les noms (sortant/entrant) des substitutions via la RPC en
@@ -1766,6 +1795,102 @@
   function _idCourt(uuid) {
     if (!uuid) return '—';
     return '#' + String(uuid).slice(0, 4);
+  }
+
+  // Fil chronologique du match : toutes les actions effectives, groupées
+  // par période, ordonnées par horodatage. Pour chaque ligne : minute (si
+  // cohérente), action (libellé + icône via SuiviObs.libelle), camp/joueur,
+  // points (si > 0). Noms résolus via _resolveNoms (repli #id). Lecture
+  // pure. La minute n'est affichée QUE si elle est strictement croissante
+  // dans la période (sinon minute_match peu fiable → omise, jamais un
+  // faux « 0' » ; même honnêteté que le panneau temps de jeu).
+  function _peindreFilRapport(eff) {
+    var box = document.getElementById('rapport-fil');
+    if (!box) return;
+
+    // Ordre de jeu = horodatage (base de temps fiable). Tri stable.
+    var arr = eff.slice().sort(function (a, b) {
+      var ta = a.horodatage || ''; var tb = b.horodatage || '';
+      return ta < tb ? -1 : (ta > tb ? 1 : 0);
+    });
+
+    // Substitution : on a besoin du nom de l'entrant aussi.
+    var uuids = [];
+    for (var i = 0; i < arr.length; i++) {
+      if (arr[i].joueur_uuid) uuids.push(arr[i].joueur_uuid);
+      if (arr[i].joueur_uuid_entrant) uuids.push(arr[i].joueur_uuid_entrant);
+    }
+
+    function nomDe(map, uuid) {
+      if (!uuid) return '';
+      var e = map && map.get ? map.get(uuid) : null;
+      if (e) {
+        var lbl = ((e.prenom || '').trim() + ' ' + (e.nom || '').trim()).trim();
+        if (lbl) return lbl;
+      }
+      return _idCourt(uuid);
+    }
+
+    function peindre(map) {
+      var html = '';
+      var periodeCourante = null;
+      for (var i = 0; i < arr.length; i++) {
+        var l = arr[i];
+        var per = (typeof l.periode === 'number') ? l.periode : 1;
+
+        // Intertitre de période au changement.
+        if (per !== periodeCourante) {
+          periodeCourante = per;
+          html += '<div class="rapport-fil__periode">' + escapeHtml(_libellePeriode(per)) + '</div>';
+        }
+
+        var info = (typeof SuiviObs.libelle === 'function') ? SuiviObs.libelle(l.observable_id) : null;
+        var icone = (info && info.icone) ? info.icone : '';
+        var libelle = (info && info.libelle) ? info.libelle : (l.observable_id || 'Action');
+
+        // Minute : affichée seulement si > 0 (0 = chrono non lancé sur nos
+        // données réelles → omise plutôt que trompeuse).
+        var min = (typeof l.minute_match === 'number' && l.minute_match > 0)
+          ? (l.minute_match + '\'') : '';
+
+        // Acteur : substitution = sortant → entrant ; sinon joueur ou camp.
+        var acteur;
+        if (l.observable_id === 'obs-A-substitution') {
+          acteur = nomDe(map, l.joueur_uuid) + ' → ' + nomDe(map, l.joueur_uuid_entrant);
+        } else if (l.equipe_concernee === 'adverse') {
+          acteur = escapeHtml(SuiviChrono.nomAdv || 'Adversaire');
+        } else if (l.joueur_uuid) {
+          acteur = nomDe(map, l.joueur_uuid);
+        } else {
+          acteur = ''; // fait d'équipe sans joueur nommé (ex. mêlée gagnée)
+        }
+
+        var pts = (typeof l.valeur_points === 'number' && l.valeur_points > 0)
+          ? ('+' + l.valeur_points) : '';
+
+        html += '<div class="rapport-fil__ligne">' +
+                  '<span class="rapport-fil__min">' + escapeHtml(min) + '</span>' +
+                  '<span class="rapport-fil__act">' + (icone ? (escapeHtml(icone) + ' ') : '') + escapeHtml(libelle) + '</span>' +
+                  '<span class="rapport-fil__who">' + escapeHtml(acteur) + '</span>' +
+                  '<span class="rapport-fil__pts">' + escapeHtml(pts) + '</span>' +
+                '</div>';
+      }
+      box.innerHTML = html || '<p class="view-suivi__hint">Aucune action.</p>';
+    }
+
+    if (window.SupabaseHub && typeof SupabaseHub._resolveNoms === 'function') {
+      SupabaseHub._resolveNoms(uuids).then(function (map) { peindre(map); })
+        .catch(function () { peindre(new Map()); });
+    } else {
+      peindre(new Map());
+    }
+  }
+
+  // Libellé de période (vocabulaire rugby ; au-delà de 2 = « Période N »).
+  function _libellePeriode(p) {
+    if (p === 1) return '1re période';
+    if (p === 2) return '2e période';
+    return 'Période ' + p;
   }
 
   // Lit l'état en base puis (re)peint l'écran. Si armerInterval, lance
@@ -4093,7 +4218,7 @@
     bindPopoverOutsideClick();
 
     console.log(
-      '%c🏉 Compositions Editor v3.48 chargé',
+      '%c🏉 Compositions Editor v3.49 chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         evenements: State.evenements.length,
