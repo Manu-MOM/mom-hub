@@ -6,6 +6,20 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.48 — Rapport de match : noms des substitutions via get_noms_personnes (3 juin 2026)
+ *   v3.48 : pt 53 (fix recette). Les substitutions du rapport affichaient
+ *           « #87dd → #6366 » au lieu des noms : la résolution passait par
+ *           getCompoReduiteRencontreCoach, dont la RPC coach
+ *           (get_compo_reduite_rencontre_coach) N'EXISTE PAS en base
+ *           (seule get_compo_reduite_rencontre, voie jeton, est déployée —
+ *           pan « coach » jamais déployé, leçon pt 47-48). _peindreSubsRapport
+ *           résout désormais les noms via SupabaseHub._resolveNoms (RPC en
+ *           lot get_noms_personnes, gardée admin|coach, déployée, RGPD-safe) :
+ *           Map uuid→{nom,prenom}, composition « Prénom NOM », repli #id court
+ *           si non résolu (honnêteté). Couvre titulaires ET remplaçants
+ *           (résolution par UUID). Seul _peindreSubsRapport change ;
+ *           renderEditorRapport / _peindreRapport / _familleDeObs inchangés.
+ *           node --check OK.
  * Version : 3.47 — Rapport de match v1 (socle, lecture seule du déduit) (3 juin 2026)
  *   v3.47 : pt 53. RAPPORT DE MATCH v1. 4e onglet « Rapport » à côté de
  *           Suivi (compositions.html). renderEditorRapport (ajout pur,
@@ -1681,13 +1695,19 @@
 
     corps.innerHTML = html;
 
-    // Résolution asynchrone des noms pour les substitutions (compo réduite
-    // coach). Dégradation honnête : si indisponible, on garde les pastilles.
+    // Résolution asynchrone des noms pour les substitutions (RPC en lot
+    // get_noms_personnes). Dégradation honnête : repli #id si non résolu.
     if (subs.length > 0) _peindreSubsRapport(subs);
   }
 
-  // Résout les noms (sortant/entrant) des substitutions via la compo
-  // réduite coach, puis peint la liste. Lecture pure, jamais d'écriture.
+  // Résout les noms (sortant/entrant) des substitutions via la RPC en
+  // lot get_noms_personnes (SupabaseHub._resolveNoms → Map uuid→{nom,
+  // prenom}), puis peint la liste. Lecture pure, jamais d'écriture.
+  // NB : la voie compo-réduite-coach n'existe PAS en base (seule la voie
+  // jeton get_compo_reduite_rencontre est déployée) ; _resolveNoms est
+  // la voie RGPD-safe dédiée (gardée has_role admin|coach, déployée),
+  // et elle couvre titulaires ET remplaçants (résout par UUID, pas par
+  // appartenance à une compo).
   function _peindreSubsRapport(subs) {
     var ul = document.getElementById('rapport-subs');
     if (!ul) return;
@@ -1709,25 +1729,30 @@
       ul.innerHTML = h || '<li class="view-suivi__hint">Aucune substitution.</li>';
     }
 
-    var evtId = (State.compos.find(function (c) { return c.id === State.selectedCompoId; }) || {}).evenement_id || null;
-    if (evtId && window.SupabaseHub && SupabaseHub.getCompoReduiteRencontreCoach) {
-      SupabaseHub.getCompoReduiteRencontreCoach(evtId).then(function (compoRed) {
-        var parId = {};
-        var arr = Array.isArray(compoRed) ? compoRed : [];
-        for (var i = 0; i < arr.length; i++) {
-          var ligne = arr[i];
-          if (!ligne) continue;
-          var jid = ligne.joueur_id || ligne.joueur_uuid || ligne.id;
-          if (jid) parId[jid] = ligne;
-        }
-        peindre(function (uuid) {
-          if (!uuid) return '—';
-          var lj = parId[uuid];
-          if (lj && typeof SupabaseHub.libelleJoueurSuivi === 'function') {
-            return SupabaseHub.libelleJoueurSuivi(lj) || _idCourt(uuid);
-          }
-          return _idCourt(uuid);
-        });
+    // Compose « Prénom NOM » depuis l'entrée Map de _resolveNoms ; repli
+    // sur le fragment d'UUID si la personne n'est pas résolue (honnêteté).
+    function nomDepuisMap(map, uuid) {
+      if (!uuid) return '—';
+      var e = map && map.get ? map.get(uuid) : null;
+      if (e) {
+        var p = (e.prenom || '').trim();
+        var n = (e.nom || '').trim();
+        var label = (p + ' ' + n).trim();
+        if (label) return label;
+      }
+      return _idCourt(uuid);
+    }
+
+    // Lot d'UUID uniques (sortants + entrants).
+    var uuids = [];
+    for (var i = 0; i < subs.length; i++) {
+      if (subs[i].joueur_uuid) uuids.push(subs[i].joueur_uuid);
+      if (subs[i].joueur_uuid_entrant) uuids.push(subs[i].joueur_uuid_entrant);
+    }
+
+    if (window.SupabaseHub && typeof SupabaseHub._resolveNoms === 'function') {
+      SupabaseHub._resolveNoms(uuids).then(function (map) {
+        peindre(function (uuid) { return nomDepuisMap(map, uuid); });
       }).catch(function () {
         peindre(function (uuid) { return _idCourt(uuid); });
       });
@@ -4068,7 +4093,7 @@
     bindPopoverOutsideClick();
 
     console.log(
-      '%c🏉 Compositions Editor v3.47 chargé',
+      '%c🏉 Compositions Editor v3.48 chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         evenements: State.evenements.length,
