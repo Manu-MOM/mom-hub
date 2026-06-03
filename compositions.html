@@ -319,6 +319,36 @@
     .view-suivi .suivi-histo__badge { color: #6b7785; }
     /* Coup d'envoi */
     .view-suivi .view-suivi__kickoff { background: #1d9e75; border-color: #1d9e75; color: #fff; }
+    /* ── v3.61 · Encart « Liens à partager » (thème sombre, scopé .view-suivi) ──
+       Replié par défaut (<details> sans open). Posé sous le bandeau ;
+       n'encombre pas la saisie live. Masqué à l'impression (filet Ctrl+P
+       — le Suivi n'a pas d'export PDF dédié, mais on blinde). */
+    .view-suivi__liens { margin: 12px 18px 0; border: 1px solid #2a323a; border-radius: 10px; background: #1c2228; overflow: hidden; }
+    .view-suivi__liens-summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; user-select: none; }
+    .view-suivi__liens-summary::-webkit-details-marker { display: none; }
+    .view-suivi__liens-summary::after { content: '▾'; color: #7c8a99; font-size: 12px; transition: transform 0.15s; }
+    .view-suivi__liens[open] .view-suivi__liens-summary::after { transform: rotate(180deg); }
+    .view-suivi__liens-summary-lbl { font-family: 'Oswald', sans-serif; font-size: 13px; letter-spacing: 0.05em; text-transform: uppercase; color: #c4ccd4; }
+    .view-suivi__liens-summary-hint { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: #7c8a99; margin-left: auto; }
+    .view-suivi__liens-inner { padding: 0 14px 12px; }
+    .view-suivi__liens-bloc { padding: 10px 0; }
+    .view-suivi__liens-bloc--sep { border-top: 1px solid #2a323a; margin-top: 4px; }
+    .view-suivi__liens-lbl { font-family: 'JetBrains Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: #7c8a99; margin-bottom: 4px; }
+    .view-suivi__liens-url { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #e6ebf0; word-break: break-all; background: #14181c; padding: 8px; border-radius: 6px; border: 1px solid #2a323a; }
+    .view-suivi__liens-exp { font-size: 11px; color: #7c8a99; margin-top: 4px; }
+    .view-suivi__liens-msg { font-size: 13px; color: #cdd6dd; }
+    .view-suivi__liens-msg strong { color: #f6f3e8; }
+    .view-suivi__liens-note { font-size: 11px; color: #7c8a99; margin-top: 6px; }
+    .view-suivi__liens-note strong { color: #f0a7a2; }
+    .view-suivi__liens-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .view-suivi__liens-btn { padding: 7px 12px; border: 1px solid #2d353d; border-radius: 6px; background: #20262c; color: #e6ebf0; cursor: pointer; font-family: 'Oswald', sans-serif; font-size: 12px; letter-spacing: 0.03em; text-transform: uppercase; transition: all 0.15s; }
+    .view-suivi__liens-btn:hover { background: #2a3138; }
+    .view-suivi__liens-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .view-suivi__liens-btn--primary { background: #1d9e75; border-color: #1d9e75; color: #fff; }
+    .view-suivi__liens-btn--primary:hover { background: #17875f; }
+    .view-suivi__liens-btn--danger { background: #20262c; border-color: #6e3a36; color: #f0a7a2; }
+    .view-suivi__liens-btn--danger:hover { background: #2a2022; }
+    @media print { .view-suivi__liens { display: none !important; } }
     .suivi-chrono__controls { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
     .suivi-chrono__btn { padding: 10px 20px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); cursor: pointer; font-family: 'Oswald', sans-serif; font-size: 14px; letter-spacing: 0.04em; text-transform: uppercase; transition: all 0.15s; }
     .suivi-chrono__btn:hover { background: var(--paper-warm, #faf8f3); }
