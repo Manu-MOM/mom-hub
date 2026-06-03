@@ -1169,6 +1169,28 @@
       body.printing-rapport .rapnv-del { display: none !important; }
     }
 
+
+    /* ===== v3.57 : rapport de match — statut compact + page unique ===== */
+    .rapport__entete { position: relative; }
+    .rapport__statut--compact {
+      position: absolute; top: 10px; right: 14px; z-index: 2;
+      margin: 0 !important; padding: 0 !important; background: none !important;
+    }
+    /* Le badge garde son style (badge-statut) ; on retire juste le cadre
+       pleine-ligne hérité de .rapport__statut. */
+    .rapport__statut--compact .badge-statut { box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
+
+    @media print {
+      /* Rapport de match : viser une page. Compactage + évite les coupures
+         au milieu d'un bloc. (Sans garantie absolue si le fil est très long.) */
+      body.printing-rapport .view-rapport { font-size: 12px; }
+      body.printing-rapport .rapport__corps { page-break-inside: avoid; }
+      body.printing-rapport .rapport-bloc,
+      body.printing-rapport .rapport-score,
+      body.printing-rapport .rapport__saisi { page-break-inside: avoid; break-inside: avoid; }
+      body.printing-rapport .rapport__statut--compact { position: static; text-align: right; margin-bottom: 6px !important; }
+    }
+
   </style>
 </head>
 
