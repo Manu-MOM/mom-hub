@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="assets/logo-m2m.png">
   <title>Pilotage de saison · MOM Hub</title>
   <style>
     :root {
@@ -32,6 +33,11 @@
     .ss-kpi { background: var(--gris-clair); border-radius: 8px; padding: .6rem .7rem; text-align: center; }
     .ss-kpi__v { display: block; font-size: 1.3rem; font-weight: 700; color: var(--vert-fonce); }
     .ss-kpi__l { display: block; font-size: .75rem; color: var(--gris); text-transform: uppercase; letter-spacing: .03em; margin-top: .15rem; }
+    /* Bloc Niveau équipe (pt 65) */
+    .ss-eq-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+    .ss-eq-carte { border: 1px solid var(--bord); border-radius: 10px; padding: 1rem; background: var(--carte); }
+    .ss-eq-carte h3 { margin: 0 0 .75rem; font-size: 1rem; color: var(--vert-fonce); }
+    .ss-eq-carte .ss-kpis { grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: .5rem; }
     .ss-table { width: 100%; border-collapse: collapse; font-size: .92rem; }
     .ss-table th, .ss-table td { text-align: left; padding: .5rem .55rem; border-bottom: 1px solid var(--bord); vertical-align: top; }
     .ss-table th { color: var(--gris); font-weight: 600; font-size: .82rem; text-transform: uppercase; letter-spacing: .02em; }
