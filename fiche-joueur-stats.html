@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fiche stats joueur · MOM Hub</title>
+  <style>
+    :root {
+      --vert: #2D7D46; --vert-fonce: #1f5a32; --gris: #5b6470;
+      --gris-clair: #eef1f4; --bord: #d8dee5; --attente: #8a93a0;
+      --fond: #f7f9fb; --carte: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--fond); color: #1c232b;
+      font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+      line-height: 1.5; padding: 1.5rem 1rem 4rem;
+    }
+    .ss-wrap { max-width: 680px; margin: 0 auto; }
+    .ss-fiche-head { border-bottom: 3px solid var(--vert); padding-bottom: .75rem; margin-bottom: 1.25rem; }
+    .ss-fiche-head h1 { margin: 0; font-size: 1.9rem; color: var(--vert-fonce); }
+    .ss-sub { margin: .25rem 0 0; color: var(--gris); font-size: .95rem; }
+    .ss-bloc {
+      background: var(--carte); border: 1px solid var(--bord); border-radius: 10px;
+      padding: 1rem 1.1rem; margin-bottom: 1rem;
+    }
+    .ss-bloc h2 { margin: 0 0 .6rem; font-size: 1.05rem; color: var(--vert-fonce); }
+    .ss-list { margin: 0; padding-left: 1.1rem; }
+    .ss-list li { margin: .2rem 0; }
+    .ss-attente { color: var(--attente); font-style: italic; margin: 0; }
+    .ss-flag { color: #b06a00; margin: .5rem 0 0; font-size: .9rem; }
+    .ss-load { color: var(--gris); }
+    footer { max-width: 680px; margin: 2rem auto 0; color: var(--attente); font-size: .8rem; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="ss-wrap">
+    <main id="ss-fiche"><p class="ss-load">Initialisation…</p></main>
+  </div>
+  <footer>MOM Hub · restitution famille — Mutzig Ovalie Molsheim</footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/stats-saison.js"></script>
+  <script>
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      var joueurId = params.get('joueur_id');
+      var mount = document.getElementById('ss-fiche');
+      if (!window.StatsSaison) {
+        mount.innerHTML = '<section class="ss-bloc"><h2>Erreur</h2><p>Module stats-saison indisponible.</p></section>';
+        return;
+      }
+      StatsSaison.renderFicheJoueur(joueurId, mount);
+    })();
+  </script>
+</body>
+</html>
