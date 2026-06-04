@@ -221,12 +221,17 @@
       // 5) Cartes joueurs (2 colonnes, réparties pour remplir la hauteur)
       var titulaires = data.titulaires || [];
       var remplacants = data.remplacants || [];
+      var staff = (data.staff || []).filter(function (s) { return s && s.nom; });
       var yCards = top + 90;
-      // Bloc remplaçants ancré au bas (au-dessus du pied) : titre + filet (82)
-      // + 4 rangées de 64 = 338px. Pied à H-40. On laisse ~30px de marge.
+      // Bloc bas = remplaçants + (staff si présent), ancré au-dessus du pied.
+      // remplaçants : titre + filet (82) + remRows × 64.
+      // staff : titre (40) + staffRows × 40 (2 colonnes).
       var remRows = Math.ceil(Math.max(remplacants.length, 1) / 2);
       var blocRemplH = 82 + remRows * 64;
-      var yRemplTitre = H - 70 - blocRemplH;
+      var staffRows = staff.length ? Math.ceil(staff.length / 2) : 0;
+      var blocStaffH = staff.length ? (40 + staffRows * 40) : 0;
+      var basH = blocRemplH + (blocStaffH ? blocStaffH + 16 : 0);
+      var yRemplTitre = H - 70 - basH;
       var nbRows = Math.ceil(Math.max(titulaires.length, 1) / 2);
       var zone = yRemplTitre - 40 - yCards;
       var rowh = Math.floor(zone / Math.max(nbRows, 1));
@@ -306,22 +311,27 @@
         ctx.fillText(vide ? '–' : r.nom, rx + 158, yy + 12);
       }
 
-      // 6bis) Staff (encadrants de l'évènement) — bandeau condensé au-dessus du pied.
-      // Source : data.staff (peut être vide → on n'affiche rien, dégradation honnête).
-      var staff = (data.staff || []).filter(function (s) { return s && s.nom; });
+      // 6bis) Staff (encadrants de l'évènement) — 2 colonnes, SOUS les remplaçants.
+      // Position calculée depuis yRemplTitre + blocRemplH (la réserve basse a été
+      // dimensionnée pour ne pas chevaucher, cf. basH plus haut). staff déjà filtré.
       if (staff.length) {
-        var syTitre = H - 96;
-        ctx.fillStyle = rgb(t.jaune);
-        ctx.font = font(26, 700);
+        var syTitre = yRemplTitre + blocRemplH + 16;
+        ctx.fillStyle = rgb(t.jaune); ctx.font = font(34, 700);
         ctx.fillText('STAFF', 40, syTitre);
-        ctx.font = font(24, 400);
-        ctx.fillStyle = rgb(t.sub);
-        var parts = staff.map(function (s) {
+        var sy0 = syTitre + 44, srh = 40;
+        for (i = 0; i < staff.length; i++) {
+          var s = staff[i];
+          var sc = i % 2, srow = Math.floor(i / 2);
+          var sx = 40 + sc * (cw + 30), syy = sy0 + srow * srh;
+          ctx.fillStyle = rgb(t.card2);
+          roundRect(ctx, sx, syy, cw, srh - 8, 8); ctx.fill();
+          ctx.fillStyle = rgb(t.sub); ctx.font = font(22, 500);
+          ctx.fillText(libelleRoleStaff(s.roles), sx + 16, syy + 7);
+          ctx.fillStyle = rgb(t.blanc); ctx.font = font(24, 700);
           var pr = (s.prenom || '').trim();
-          var initPr = pr ? (pr.charAt(0).toUpperCase() + '. ') : '';
-          return libelleRoleStaff(s.roles) + ' : ' + initPr + (s.nom || '').toUpperCase();
-        });
-        ctx.fillText(parts.join('   ·   '), 130, syTitre + 2);
+          var nm = (pr ? (pr.charAt(0).toUpperCase() + '. ') : '') + (s.nom || '').toUpperCase();
+          ctx.fillText(nm, sx + 200, syy + 6);
+        }
       }
 
       // 7) Pied de page
