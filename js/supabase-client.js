@@ -18,6 +18,18 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 1.49 — juin 2026
+ *   v1.49 : PILOTAGE CATÉGORIE (pt 63). 2 wrappers ADDITIFS de LECTURE :
+ *           listPilotageCategorie(categorieId) — lignes joueur × équipe ×
+ *           rôle × poste × match pour toute la catégorie (collectif M14,
+ *           N équipes), compétition uniquement, via la RPC SECURITY DEFINER
+ *           pilotage_categorie_lignes (sql pt 63, gardée admin|coach ;
+ *           SELECT prouvé sonde S10). mesCategoriesAutorisees() — résout la
+ *           catégorie du référent connecté via la RPC B5 mes_categories_
+ *           autorisees() (D-PILOT-CAT-1). Aucun wrapper existant touché ;
+ *           node --check OK. NB : forme de retour de mes_categories_autorisees
+ *           non sondable hors session (gardée) → champ categorie_id supposé,
+ *           à confirmer en recette en-app (tracé pt 63).
  * Version : 1.48 — juin 2026
  *   v1.48 : STATS SAISON (pt 61). 1 wrapper ADDITIF de LECTURE :
  *           listComposMatchDuJoueur(joueurId) — lignes de compo match d'un
@@ -4829,6 +4841,55 @@
         .eq('compositions.est_active', true);
       if (error) {
         console.error('MOM Hub: listComposMatchDuJoueur()', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * Pilotage CATÉGORIE (pt 63) — lignes joueur × équipe × rôle ×
+     * poste × match pour TOUTE la catégorie (collectif M14, N équipes),
+     * compétition uniquement. Appelle la RPC SECURITY DEFINER
+     * pilotage_categorie_lignes (sql pt 63), gardée has_role(admin|coach),
+     * qui traverse la self-FK compo_base_origine_id (embed PostgREST 5
+     * niveaux jugé fragile → RPC, décision Manu pt 63). Le SELECT sous-
+     * jacent est prouvé par la sonde S10 (base fait foi). nom_officiel =
+     * seul champ équipe fiable (S3). Le poste est déjà résolu par la RPC
+     * (numero_xv + poste_court) → le client n'a pas à re-joindre postes.
+     *
+     * @param {string} categorieId UUID de la catégorie
+     * @returns {Promise<Array>} lignes brutes (1 par occurrence en feuille
+     *   de match) ; [] si erreur ou accès refusé (dégradation honnête).
+     */
+    async listPilotageCategorie(categorieId) {
+      if (!categorieId) {
+        console.error('MOM Hub: listPilotageCategorie() requiert un categorieId');
+        return [];
+      }
+      const { data, error } = await client.rpc('pilotage_categorie_lignes', {
+        p_categorie_id: categorieId
+      });
+      if (error) {
+        console.error('MOM Hub: listPilotageCategorie() / pilotage_categorie_lignes', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * Pilotage CATÉGORIE — résout la catégorie de la personne connectée
+     * via la RPC B5 mes_categories_autorisees() (déjà en base, gardée).
+     * Pas de sélecteur : le référent pilote SA catégorie (D-PILOT-CAT-1).
+     * Renvoie la liste des catégories autorisées ; le client décide quoi
+     * faire si 0 (message honnête) ou N>1 (proposer un choix minimal).
+     *
+     * @returns {Promise<Array>} [{categorie_id, ...}] selon la RPC ; []
+     *   si erreur / hors session authentifiée (dégradation honnête).
+     */
+    async mesCategoriesAutorisees() {
+      const { data, error } = await client.rpc('mes_categories_autorisees');
+      if (error) {
+        console.error('MOM Hub: mesCategoriesAutorisees() / mes_categories_autorisees', error);
         return [];
       }
       return Array.isArray(data) ? data : [];
