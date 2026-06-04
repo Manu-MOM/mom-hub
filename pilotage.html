@@ -40,10 +40,18 @@
     .ss-num { text-align: right; }
     .ss-table th.ss-num { text-align: right; }
     footer { max-width: 920px; margin: 2rem auto 0; color: var(--attente); font-size: .8rem; text-align: center; }
+    .ss-retour {
+      display: inline-flex; align-items: center; gap: .35rem; margin-bottom: 1rem;
+      padding: .4rem .8rem; border: 1px solid var(--bord); border-radius: 8px;
+      background: var(--carte); color: var(--vert-fonce); font-size: .9rem;
+      font-weight: 600; cursor: pointer; text-decoration: none;
+    }
+    .ss-retour:hover { background: var(--gris-clair); }
   </style>
 </head>
 <body>
   <div class="ss-wrap">
+    <button type="button" class="ss-retour" onclick="if(history.length>1){history.back()}else{location.href='index.html'}">← Retour</button>
     <main id="ss-pilotage"><p class="ss-load">Initialisation…</p></main>
   </div>
   <footer>MOM Hub · pilotage M14 — Mutzig Ovalie Molsheim</footer>
