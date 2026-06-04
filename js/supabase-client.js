@@ -18,6 +18,17 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 1.48 — juin 2026
+ *   v1.48 : STATS SAISON (pt 61). 1 wrapper ADDITIF de LECTURE :
+ *           listComposMatchDuJoueur(joueurId) — lignes de compo match d'un
+ *           joueur sur la saison, toutes bases, via composition_joueurs
+ *           (policy SELECT authenticated=true, sonde S61.7) joint
+ *           compositions!inner filtré cote='mom'/type_compo='match'/
+ *           est_active=true. JAMAIS equipe_id (D-FICHE-B, bug 6c-6).
+ *           Voie d'agrégation saison de la fiche stats joueur (Objet 1).
+ *           Aucun wrapper existant modifié. RGPD : noms hors scope ici
+ *           (résolus par _resolveNoms côté appelant).
+ *
  * Version : 1.47 — juin 2026
  *   v1.47 : getTempsDeJeuRencontre(evt [, evenementEquipeId]) — wrapper
  *           ADDITIF voie coach garde auth.uid() (backend C12-w,
@@ -4775,6 +4786,55 @@
     },
 
     /**
+     * STATS SAISON (pt 61) — Liste les LIGNES de compo match d'un joueur sur
+     * la saison, toutes bases confondues, via le lien robuste D-FICHE-B.
+     *
+     * Pourquoi ce wrapper : la fiche stats joueur agrège un joueur sur toute
+     * sa saison ; il faut donc retrouver ses compos match SANS passer par
+     * evenement_equipes.equipe_id (NULL multi-équipes → exclut tout, prouvé
+     * 164 vs 0, bug 6c-6). On part de composition_joueurs (policy SELECT
+     * `composition_joueurs_select_authenticated` = true, sonde pt 61 S61.7 :
+     * lecture libre pour authentifié, pattern getCompoComplete) et on joint
+     * compositions en !inner avec les filtres saison côté table embarquée
+     * (pattern prouvé : listCompositionsByEquipe filtre déjà sur embed !inner).
+     *
+     * Filtres : role ∈ (titulaire,remplacant) ; compositions.cote='mom',
+     * type_compo='match', est_active=true. PAS de filtre `etat` (la compo
+     * match active peut être 'brouillon', learning pt 60). JAMAIS de jointure
+     * equipe_id (D-FICHE-B).
+     *
+     * @param {string} joueurId UUID personne (= composition_joueurs.joueur_id,
+     *   prouvé personnes.id, sonde pt 61 S61.4)
+     * @returns {Promise<Array>} lignes [{ role, poste_id,
+     *   est_depannage_hors_categorie, composition_id, compositions:{ id,
+     *   evenement_id, compo_base_origine_id, cote, type_compo, est_active } }]
+     *   — [] si aucun / erreur (dégradation honnête).
+     */
+    async listComposMatchDuJoueur(joueurId) {
+      if (!joueurId) {
+        console.error('MOM Hub: listComposMatchDuJoueur() requiert un joueurId');
+        return [];
+      }
+      const { data, error } = await client
+        .from('composition_joueurs')
+        .select(`
+          role, poste_id, est_depannage_hors_categorie, composition_id,
+          compositions!inner ( id, evenement_id, compo_base_origine_id,
+                               cote, type_compo, est_active )
+        `)
+        .eq('joueur_id', joueurId)
+        .in('role', ['titulaire', 'remplacant'])
+        .eq('compositions.cote', 'mom')
+        .eq('compositions.type_compo', 'match')
+        .eq('compositions.est_active', true);
+      if (error) {
+        console.error('MOM Hub: listComposMatchDuJoueur()', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
      * U-N2 entrée — résout le contexte d'une équipe engagée pour
      * l'écran Groupe de base (doc UX §2 UN2-1, 3 dimensions :
      * « Plateau · date » = evenements ; « Groupe — Équipe » =
@@ -5763,7 +5823,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.46 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.48 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
