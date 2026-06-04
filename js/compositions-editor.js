@@ -6,6 +6,13 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.63 — Boot : deep-link ?vue=rapport (onglet Rapport via la vignette de la fiche évènement) (4 juin 2026)
+ *   v3.63 : DEEP-LINK ?vue=rapport. Le boot captait terrain/suivi/reseaux
+ *           mais PAS rapport → un lien ...&vue=rapport ouvrait l'onglet Liste.
+ *           Ajout du cas 'rapport' (miroir exact de 'suivi', tabs[3], ordre
+ *           Liste/Terrain/Suivi/Rapport). Consommé par la vignette « Rapports »
+ *           de la fiche évènement (evenements-browser ouvrir-vue-rapport).
+ *           Ajout pur : 1 branche else-if au boot, aucun chemin existant touché.
  * Version : 3.62 — Export réseaux v2 : enrichit le payload (code poste + staff encadrants) (4 juin 2026)
  *   v3.62 : EXPORT RÉSEAUX v2. _collecterDonneesExport devient async et
  *           enrichit le payload pour CompoExport : (a) `code` (code poste)
@@ -5719,6 +5726,19 @@
           tabs.forEach(function (t) { t.classList.remove('is-active'); });
           tabs[2].classList.add('is-active');
         }
+      } else if (vue === 'rapport') {
+        // v3.63 — miroir du cas 'suivi' pour l'onglet Rapport (tabs[3],
+        // ordre Liste/Terrain/Suivi/Rapport, cf. bindViewTabs). 'rapport'
+        // est un viewMode déjà supporté par setMode/renderEditorArea
+        // (cf. State.viewMode === 'rapport' l.1339). Permet le deep-link
+        // depuis la vignette Rapports de la fiche évènement (eb.js).
+        State.viewMode = 'rapport';
+        renderEditorArea();
+        const tabs = document.querySelectorAll('.view-tabs__tab');
+        if (tabs && tabs.length >= 4) {
+          tabs.forEach(function (t) { t.classList.remove('is-active'); });
+          tabs[3].classList.add('is-active');
+        }
       } else if (vue === 'reseaux') {
         const btnImg = document.getElementById('btn-export-image');
         if (btnImg) btnImg.click();
@@ -5758,7 +5778,7 @@
     bindPopoverOutsideClick();
 
     console.log(
-      '%c🏉 Compositions Editor v3.62 chargé',
+      '%c🏉 Compositions Editor v3.63 chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         evenements: State.evenements.length,
