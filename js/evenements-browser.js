@@ -21,6 +21,14 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
+ * Version : 1.62 — Vignette « Statistiques » câblée (deep-link pilotage.html?evenement_equipe=) (4 juin 2026)
+ *   v1.62 : VIGNETTE #8 STATISTIQUES CÂBLÉE. La fonctionnalité Pilotage de
+ *           saison existe (pilotage.html, pt 62) ; la vignette #8, jusqu'ici
+ *           inerte « à venir », devient active en miroir EXACT de Rapports :
+ *           statut adaptatif (eqEng.length>0) + action ouvrir-vue-statistiques
+ *           + mécanisme multi-équipes + handler → pilotage.html?evenement_equipe=
+ *           (pilotage.html étendu pt 65 résout la compo de base). Pilotage de
+ *           l'ÉQUIPE choisie. Aucune autre fonction touchée.
  * Version : 1.61 — Vignette « Rapports » câblée (deep-link compositions.html?vue=rapport) (4 juin 2026)
  *   v1.61 : VIGNETTE #7 RAPPORTS CÂBLÉE. La fonctionnalité Rapports existe
  *           déjà (onglet « Rapport » de l'éditeur, pt 53-55) ; la vignette
@@ -3439,12 +3447,21 @@
       sectionId: 'vue-rapport'
     });
 
-    // Fonction #8 — Statistiques (à venir)
+    // Fonction #8 — Statistiques (deep-link vers pilotage.html?evenement_equipe=)
+    //   v1.62 — La fonctionnalité Pilotage de saison EXISTE (pilotage.html,
+    //   pt 62). On câble la vignette en miroir EXACT des autres (Vue terrain /
+    //   Réseaux / Rapports) : statut adaptatif + action ouvrir-vue-statistiques
+    //   + mécanisme multi-équipes. pilotage.html (étendu pt 65) accepte
+    //   ?evenement_equipe=<id> et résout lui-même la compo de base.
     html += renderFonctionCellule({
       titre: '📊 Statistiques',
-      sousTitre: 'Synthèse chiffrée',
-      statut: 'a-venir',
-      evt: evt
+      sousTitre: 'Pilotage de saison',
+      statut: eqEng.length > 0 ? 'disponible' : 'a-venir',
+      action: 'ouvrir-vue-statistiques',
+      multiEquipes: eqEng,
+      eqNames: eqNames,
+      evt: evt,
+      sectionId: 'vue-statistiques'
     });
 
     html += '</div>';  // /grille-list
@@ -3665,7 +3682,7 @@
     // Statut disponible → mécanisme adaptatif
     if (statut === 'disponible') {
       // Compositions/Groupes multi-équipes adaptatif (Q4=C)
-      if (multi && (opts.action === 'ouvrir-feuille-equipe' || opts.action === 'ouvrir-groupe-base' || opts.action === 'ouvrir-vue-terrain' || opts.action === 'ouvrir-vue-reseaux' || opts.action === 'ouvrir-vue-suivi' || opts.action === 'ouvrir-vue-rapport')) {
+      if (multi && (opts.action === 'ouvrir-feuille-equipe' || opts.action === 'ouvrir-groupe-base' || opts.action === 'ouvrir-vue-terrain' || opts.action === 'ouvrir-vue-reseaux' || opts.action === 'ouvrir-vue-suivi' || opts.action === 'ouvrir-vue-rapport' || opts.action === 'ouvrir-vue-statistiques')) {
         if (multi.length === 1) {
           // 1 équipe → bouton direct (handler Niveau 0 INVARIANT)
           const eq = multi[0];
@@ -3991,6 +4008,19 @@
         const evtEqId = this.getAttribute('data-evenement-equipe-id');
         if (evtEqId) {
           window.location.href = 'compositions.html?evenement_equipe=' + encodeURIComponent(evtEqId) + '&vue=rapport';
+        }
+      });
+    });
+    // ── v1.62 : Vue Statistiques (tuile « 📊 Statistiques ») — miroir EXACT
+    //    de ouvrir-vue-rapport, cible pilotage.html. Le pilotage de saison
+    //    vit dans pilotage.html (pt 62) ; étendu pt 65 pour accepter
+    //    ?evenement_equipe=<id> (résolution interne vers la compo de base via
+    //    getCompoForEvenementEquipe). Pilotage de l'ÉQUIPE de cet évènement.
+    document.querySelectorAll('[data-action="ouvrir-vue-statistiques"]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        const evtEqId = this.getAttribute('data-evenement-equipe-id');
+        if (evtEqId) {
+          window.location.href = 'pilotage.html?evenement_equipe=' + encodeURIComponent(evtEqId);
         }
       });
     });
