@@ -26,14 +26,33 @@
 
     .mc-list { display: flex; flex-direction: column; gap: 10px; }
 
+    /* pt 62 — .mc-row est désormais un CONTENEUR (zone compo + bouton
+       pilotage). La zone cliquable « ouvrir la compo » porte .mc-row__open ;
+       le bouton « Pilotage » porte .mc-row__pilot. */
     .mc-row {
-      display: flex; align-items: center; gap: 16px;
+      display: flex; align-items: stretch; gap: 0;
       background: #fff; border: 1px solid var(--line); border-radius: 12px;
-      padding: 16px 20px; cursor: pointer;
-      text-decoration: none; color: inherit;
+      overflow: hidden;
       transition: border-color 0.15s, box-shadow 0.15s;
     }
     .mc-row:hover { border-color: var(--vert-prairie); }
+    .mc-row__open {
+      flex: 1; min-width: 0;
+      display: flex; align-items: center; gap: 16px;
+      padding: 16px 20px; cursor: pointer;
+      text-decoration: none; color: inherit;
+    }
+    .mc-row__pilot {
+      flex: 0 0 auto; display: flex; align-items: center; gap: 4px;
+      padding: 0 18px; cursor: pointer;
+      text-decoration: none; white-space: nowrap;
+      font-family: 'Oswald', sans-serif; font-size: 13px; font-weight: 500;
+      letter-spacing: 0.04em;
+      color: var(--vert-prairie); background: var(--vert-light);
+      border-left: 1px solid var(--line);
+      transition: background 0.15s, color 0.15s;
+    }
+    .mc-row__pilot:hover { background: var(--vert-prairie); color: #fff; }
     .mc-row__type {
       font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 600;
       letter-spacing: 0.08em; text-transform: uppercase;
@@ -72,8 +91,13 @@
     }
 
     @media (max-width: 640px) {
-      .mc-row { flex-wrap: wrap; gap: 8px 12px; }
+      .mc-row { flex-wrap: wrap; }
+      .mc-row__open { flex-basis: 100%; flex-wrap: wrap; gap: 8px 12px; }
       .mc-row__main { flex-basis: 100%; order: 3; }
+      .mc-row__pilot {
+        flex-basis: 100%; justify-content: center;
+        border-left: none; border-top: 1px solid var(--line); padding: 12px 18px;
+      }
     }
   </style>
 </head>
@@ -221,10 +245,21 @@
         const equipe = r.equipe && r.equipe.libelle ? r.equipe.libelle : '';
         const meta = formatDateLong(evt.date_debut) + (equipe ? '  ·  ' + equipe : '');
 
-        const a = document.createElement('a');
-        a.className = 'mc-row';
-        a.href = 'compositions.html?evenement_equipe=' + encodeURIComponent(r.evenement_equipe_id);
-        a.innerHTML =
+        // pt 62 (câblage accès) — la rangée porte désormais DEUX accès :
+        //   (1) zone principale → ouvre la feuille (compositions.html, inchangé) ;
+        //   (2) bouton « Pilotage » → pilotage.html?compo_base=<compo_id>.
+        // r.compo_id EST l'id de la compo de base (la page liste des
+        // type_compo='base'), = exactement le compo_base attendu par le
+        // pilotage (renderPilotage agrège les compos match dont
+        // compo_base_origine_id === ce baseId). Aucun wrapper à adapter.
+        // La rangée passe de <a> à <div> pour éviter un lien imbriqué.
+        const row = document.createElement('div');
+        row.className = 'mc-row';
+
+        const main = document.createElement('a');
+        main.className = 'mc-row__open';
+        main.href = 'compositions.html?evenement_equipe=' + encodeURIComponent(r.evenement_equipe_id);
+        main.innerHTML =
           '<span class="mc-row__type">' + escapeHtml(libelleType(evt.type_evenement)) + '</span>' +
           '<span class="mc-row__main">' +
             '<span class="mc-row__label">' + escapeHtml(evt.libelle || 'Évènement') + '</span>' +
@@ -232,7 +267,18 @@
           '</span>' +
           '<span class="mc-row__state state-' + escapeHtml(r.etat || '') + '">' + escapeHtml(libelleEtat(r.etat)) + '</span>' +
           '<span class="mc-row__chev" aria-hidden="true">›</span>';
-        host.appendChild(a);
+        row.appendChild(main);
+
+        if (r.compo_id) {
+          const pilot = document.createElement('a');
+          pilot.className = 'mc-row__pilot';
+          pilot.href = 'pilotage.html?compo_base=' + encodeURIComponent(r.compo_id);
+          pilot.title = 'Statistiques de saison (pilotage d\'équipe)';
+          pilot.innerHTML = '📊 Pilotage';
+          row.appendChild(pilot);
+        }
+
+        host.appendChild(row);
       });
 
       console.log(
