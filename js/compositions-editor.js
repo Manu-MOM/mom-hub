@@ -6,7 +6,17 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
- * Version : 3.61 — Liens à partager (bénévole + spectateur) portés dans l'onglet Suivi (SUIVI-LIEN-COACH-MIGRATION) (3 juin 2026)
+ * Version : 3.62 — Export réseaux v2 : enrichit le payload (code poste + staff encadrants) (4 juin 2026)
+ *   v3.62 : EXPORT RÉSEAUX v2. _collecterDonneesExport devient async et
+ *           enrichit le payload pour CompoExport : (a) `code` (code poste)
+ *           par titulaire → placement sur la vue terrain de l'export paysage
+ *           (mêmes coords que la vue Terrain de l'app) ; (b) `staff` =
+ *           encadrants de l'évènement via getEvenementWithEncadrants (décision
+ *           Manu : pas de staff propre à la compo en base ; dégradation
+ *           honnête si pas de RPC/erreur → staff vide). bindExportImage
+ *           consomme désormais la Promise (.then). Photos NON incluses
+ *           (dette EXPORT-PHOTOS-JOUEURS : aucune source en base + droit
+ *           image réseaux non exploité sur mineurs). node --check OK.
  *   v3.61 : MIGRATION des liens partageables depuis la vignette
  *           « Suivi de la rencontre » (evenements-browser.js) vers l'onglet
  *           Suivi de l'éditeur. Motivation : la vignette était le SEUL
@@ -4095,7 +4105,7 @@
     return 'ar';
   }
 
-  function _collecterDonneesExport() {
+  async function _collecterDonneesExport() {
     var ctx = State.evenementEquipeContext;
     var evt = ctx && ctx.evenement ? ctx.evenement : null;
     var eq  = ctx && ctx.equipe ? ctx.equipe : null;
@@ -4112,6 +4122,7 @@
           nom: (j.nom || '').trim(),
           prenom: (j.prenom || '').trim(),
           poste: (p.libelle_long || p.libelle_court || p.code || ''),
+          code: (p.code || ''),
           club: (j.club_principal_nom_court || '').toUpperCase(),
           ligne: _ligneDePoste(p)
         };
@@ -4144,6 +4155,28 @@
     var dateStr = evt && evt.date_debut ? new Date(evt.date_debut).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
     var meta2 = dateStr;
 
+    // Staff = encadrants de l'évènement (décision Manu : pas de staff propre à la
+    // compo en base). Source : getEvenementWithEncadrants (RPC déployée, recettée).
+    // Dégradation honnête : si pas d'évènement, pas de RPC ou erreur → staff vide,
+    // l'export n'affiche simplement pas de bloc staff.
+    var staff = [];
+    try {
+      if (evt && evt.id && window.SupabaseHub && SupabaseHub.getEvenementWithEncadrants) {
+        var evtFull = await SupabaseHub.getEvenementWithEncadrants(evt.id);
+        var encs = (evtFull && Array.isArray(evtFull.encadrants)) ? evtFull.encadrants : [];
+        staff = encs.map(function (e) {
+          return {
+            nom: (e.nom || '').trim(),
+            prenom: (e.prenom || '').trim(),
+            roles: Array.isArray(e.roles_encadrement) ? e.roles_encadrement : []
+          };
+        }).filter(function (s) { return s.nom; });
+      }
+    } catch (err) {
+      console.warn('MOM Hub: collecte staff export échouée (non bloquant)', err);
+      staff = [];
+    }
+
     return {
       titre: titre.toUpperCase(),
       sousTitre: sousTitre,
@@ -4153,6 +4186,7 @@
       slug: (titre || 'compo').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
       titulaires: tit,
       remplacants: rem,
+      staff: staff,
       logos: {
         mom: 'assets/ecusson-mom.png',
         entente: 'assets/logo-entente.png'
@@ -4172,7 +4206,13 @@
         alert('Aucune composition à exporter pour le moment.');
         return;
       }
-      window.CompoExport.ouvrir(_collecterDonneesExport());
+      // _collecterDonneesExport est async (charge le staff via RPC encadrants).
+      _collecterDonneesExport().then(function (data) {
+        window.CompoExport.ouvrir(data);
+      }).catch(function (err) {
+        console.error('MOM Hub: export image — collecte des données échouée', err);
+        alert("Impossible de préparer l'export pour le moment.");
+      });
     });
   }
 
@@ -5718,7 +5758,7 @@
     bindPopoverOutsideClick();
 
     console.log(
-      '%c🏉 Compositions Editor v3.60 chargé',
+      '%c🏉 Compositions Editor v3.62 chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         evenements: State.evenements.length,
