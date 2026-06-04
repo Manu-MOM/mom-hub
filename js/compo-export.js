@@ -336,6 +336,48 @@
     });
   }
 
+  // ── Maillot/jersey stylisé (avatar terrain) ──────────────────────────────
+  // Dessine une forme de maillot centrée en (cx, cy), hauteur ~h, avec le
+  // numéro dessus et les initiales sous le col. avant=true → maillot plein
+  // (couleur jaune charte), sinon contour (arrières). Canvas pur, lisible petit.
+  function dessinerMaillot(ctx, cx, cy, h, j, t, version, avant) {
+    var w = h * 0.92;
+    var x = cx - w / 2, y = cy - h / 2;
+    // points du maillot (épaules, manches, corps)
+    var sh = h * 0.22;           // hauteur d'épaule
+    var nk = w * 0.30;           // demi-encolure
+    ctx.beginPath();
+    ctx.moveTo(x + w * 0.28, y);                 // épaule gauche haut
+    ctx.lineTo(cx - nk, y + sh * 0.55);          // encolure gauche
+    ctx.quadraticCurveTo(cx, y + sh * 0.95, cx + nk, y + sh * 0.55); // col
+    ctx.lineTo(x + w * 0.72, y);                 // épaule droite haut
+    ctx.lineTo(x + w, y + sh);                   // manche droite
+    ctx.lineTo(x + w * 0.80, y + sh * 1.6);      // dessous manche droite
+    ctx.lineTo(x + w * 0.80, y + h);             // bas droit
+    ctx.lineTo(x + w * 0.20, y + h);             // bas gauche
+    ctx.lineTo(x + w * 0.20, y + sh * 1.6);      // dessous manche gauche
+    ctx.lineTo(x, y + sh);                       // manche gauche
+    ctx.closePath();
+    var coul = (version === 'mom') ? t.jaune : (avant ? t.jaune : t.sub);
+    if (avant) {
+      ctx.fillStyle = rgb(t.jaune); ctx.fill();
+      ctx.lineWidth = Math.max(2, h * 0.04); ctx.strokeStyle = rgb(t.bgBot); ctx.stroke();
+    } else {
+      ctx.fillStyle = rgb(t.card); ctx.fill();
+      ctx.lineWidth = Math.max(2, h * 0.05); ctx.strokeStyle = rgb(coul); ctx.stroke();
+    }
+    // numéro sur le maillot
+    ctx.fillStyle = avant ? rgb(t.bgBot) : rgb(coul);
+    ctx.font = font(Math.round(h * 0.42), 700);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(String(j.num != null ? j.num : ''), cx, y + h * 0.60);
+    // initiales sous le maillot
+    ctx.fillStyle = rgb(t.blanc);
+    ctx.font = font(Math.round(h * 0.26), 700);
+    ctx.fillText(initiales(j.prenom, j.nom), cx, y + h + h * 0.20);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  }
+
   // ── Rendu PAYSAGE (1920×1080) : liste+staff à gauche, terrain à droite ────
   // Réutilise les mêmes helpers/THEMES que le vertical. Le terrain place les
   // joueurs par CODE POSTE via TERRAIN_POS_XV (placement = vue Terrain de l'app).
@@ -359,13 +401,12 @@
       g.addColorStop(0, rgb(t.bgTop)); g.addColorStop(1, rgb(t.bgBot));
       ctx.fillStyle = g; ctx.fillRect(0, 0, PW, PH);
 
-      // 2) En-tête (bandeau dégradé horizontal + filet doré)
+      // 2) En-tête
       var hd = 132;
       var gh = ctx.createLinearGradient(0, 0, PW, 0);
       gh.addColorStop(0, rgb(t.headL)); gh.addColorStop(1, rgb(t.headR));
       ctx.fillStyle = gh; ctx.fillRect(0, 0, PW, hd);
       ctx.fillStyle = rgb(t.jaune); ctx.fillRect(0, hd - 5, PW, 5);
-
       var logoW = 0;
       if (logoHead) logoW = drawImgH(ctx, logoHead, 36, 20, 96);
       var tx = 36 + (logoW || 0) + (logoW ? 30 : 0);
@@ -379,164 +420,152 @@
       var metaLine = [data.meta1, data.meta2].filter(Boolean).join('  ·  ');
       ctx.fillText(metaLine, tx + (data.sousTitre ? 150 : 0), 78);
 
-      // ── Géométrie 2 colonnes ──
-      var colGap = 0;
-      var leftX = 0, leftW = Math.round(PW * 0.52);
+      // Géométrie 2 colonnes principales (gauche = liste, droite = terrain)
+      var leftW = Math.round(PW * 0.52);
       var rightX = leftW, rightW = PW - leftW;
-      // séparateur
       ctx.fillStyle = rgb(t.accent);
       ctx.fillRect(leftW, hd + 14, 2, PH - hd - 34);
 
-      // 3) COLONNE GAUCHE — liste + remplaçants + staff
-      var pad = 30;
-      var lx = leftX + pad;
+      // 3) COLONNE GAUCHE — liste (2 colonnes internes) + remplaçants + staff
+      var pad = 28;
+      var lx = pad;
       var lw = leftW - pad * 2;
-      var y = hd + 26;
-
+      var y = hd + 24;
       ctx.fillStyle = rgb(t.jaune); ctx.font = font(30, 700);
       ctx.fillText('LE XV DE DÉPART', lx, y);
-      ctx.fillStyle = rgb(t.accent); ctx.fillRect(lx, y + 40, lw, 3);
-      y += 54;
+      ctx.fillStyle = rgb(t.accent); ctx.fillRect(lx, y + 38, lw, 3);
+      y += 50;
 
       var titulaires = data.titulaires || [];
       var remplacants = data.remplacants || [];
       var staff = (data.staff || []).filter(function (s) { return s && s.nom; });
 
-      // Hauteur réservée bas de colonne : remplaçants + staff.
+      // Réserve bas : remplaçants (2 col) + staff (2 col)
       var remRows = Math.ceil(Math.max(remplacants.length, 1) / 2);
-      var blocRem = 40 + remRows * 40;
-      var blocStaff = staff.length ? (34 + staff.length * 32) : 0;
-      var basReserve = blocRem + blocStaff + 24;
+      var staffRows = staff.length ? Math.ceil(staff.length / 2) : 0;
+      var hRem = 30 + remRows * 34;
+      var hStaff = staff.length ? (30 + staffRows * 30) : 0;
+      var basReserve = hRem + hStaff + 20;
 
+      // Liste sur 2 colonnes internes : col gauche 1→8, col droite 9→15
+      var innerGap = 16;
+      var colW = Math.floor((lw - innerGap) / 2);
+      var col1 = titulaires.slice(0, 8);
+      var col2 = titulaires.slice(8);
+      var nbRows = Math.max(col1.length, col2.length, 1);
       var zone = (PH - 30 - basReserve) - y;
-      var rowh = Math.max(34, Math.floor(zone / Math.max(titulaires.length, 1)));
-      var ch = rowh - 6;
+      var rowh = Math.max(30, Math.floor(zone / nbRows));
+      var ch = rowh - 5;
 
-      function carteL(yy, j) {
+      function carteL(cx0, yy, j) {
+        if (!j) return;
         ctx.fillStyle = rgb(t.card);
-        roundRect(ctx, lx, yy, lw, ch, 8); ctx.fill();
+        roundRect(ctx, cx0, yy, colW, ch, 7); ctx.fill();
         var lis = (j.ligne === 'av') ? t.liseroAv : t.liseroAr;
-        ctx.fillStyle = rgb(lis); ctx.fillRect(lx, yy + 4, 6, ch - 8);
+        ctx.fillStyle = rgb(lis); ctx.fillRect(cx0, yy + 3, 5, ch - 6);
         // numéro
-        ctx.fillStyle = rgb(t.jaune); ctx.font = font(Math.min(28, ch - 6), 700);
-        ctx.fillText(String(j.num != null ? j.num : ''), lx + 16, yy + ch / 2 - (Math.min(28, ch - 6) / 2));
+        ctx.fillStyle = rgb(t.jaune); ctx.font = font(Math.min(24, ch - 6), 700);
+        ctx.fillText(String(j.num != null ? j.num : ''), cx0 + 12, yy + ch / 2 - Math.min(24, ch - 6) / 2);
         // pastille initiales
-        var rr = Math.min(18, (ch - 8) / 2);
-        var cx = lx + 70, cy = yy + ch / 2;
+        var rr = Math.min(15, (ch - 6) / 2);
+        var pcx = cx0 + 52, pcy = yy + ch / 2;
         ctx.fillStyle = rgb(t.card2);
-        ctx.beginPath(); ctx.arc(cx, cy, rr, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(pcx, pcy, rr, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = rgb(version === 'mom' ? t.jaune : t.sub);
-        ctx.font = font(Math.max(12, rr), 700);
+        ctx.font = font(Math.max(10, rr - 1), 700);
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(initiales(j.prenom, j.nom), cx, cy + 1);
+        ctx.fillText(initiales(j.prenom, j.nom), pcx, pcy + 1);
         ctx.textAlign = 'left'; ctx.textBaseline = 'top';
         // nom + sous-ligne
-        var tX = cx + rr + 14;
-        ctx.fillStyle = rgb(t.blanc); ctx.font = font(Math.min(24, ch - 12), 700);
-        ctx.fillText((j.nom || '').toUpperCase(), tX, yy + ch / 2 - Math.min(24, ch - 12) + 2);
-        ctx.fillStyle = rgb(t.sub); ctx.font = font(Math.min(16, ch - 16), 400);
-        var sous = (j.prenom || '') + (j.poste ? ('  ·  ' + j.poste) : '');
-        ctx.fillText(sous, tX, yy + ch / 2 + 2);
+        var nX = pcx + rr + 10;
+        ctx.fillStyle = rgb(t.blanc); ctx.font = font(Math.min(19, ch - 10), 700);
+        ctx.fillText((j.nom || '').toUpperCase(), nX, yy + (ch - 14) / 2 - 7);
+        ctx.fillStyle = rgb(t.sub); ctx.font = font(Math.min(13, ch - 14), 400);
+        ctx.fillText((j.poste || ''), nX, yy + ch / 2 + 3);
       }
-      var yy = y;
-      for (var i = 0; i < titulaires.length; i++) { carteL(yy, titulaires[i]); yy += rowh; }
+      for (var r = 0; r < nbRows; r++) {
+        var yy = y + r * rowh;
+        carteL(lx, yy, col1[r]);
+        carteL(lx + colW + innerGap, yy, col2[r]);
+      }
 
       // Remplaçants (2 colonnes)
-      var yRem = PH - 30 - basReserve + 6;
-      ctx.fillStyle = rgb(t.jaune); ctx.font = font(24, 700);
+      var yRem = PH - 30 - basReserve + 4;
+      ctx.fillStyle = rgb(t.jaune); ctx.font = font(22, 700);
       ctx.fillText('REMPLAÇANTS', lx, yRem);
-      var colW = Math.floor((lw - 16) / 2);
-      var ry = yRem + 34;
-      for (i = 0; i < remplacants.length; i++) {
-        var r = remplacants[i];
-        var col = i % 2, row = Math.floor(i / 2);
-        var rx = lx + col * (colW + 16), ey = ry + row * 40;
-        var vide = (!r.nom || r.nom === '–');
-        ctx.fillStyle = rgb(t.card2); roundRect(ctx, rx, ey, colW, 34, 6); ctx.fill();
-        ctx.fillStyle = vide ? 'rgb(110,110,90)' : rgb(t.jaune); ctx.font = font(20, 700);
-        ctx.fillText(String(r.num != null ? r.num : ''), rx + 12, ey + 8);
-        ctx.fillStyle = vide ? 'rgb(110,110,90)' : rgb(t.blanc); ctx.font = font(19, 700);
-        ctx.fillText(vide ? '–' : r.nom, rx + 48, ey + 9);
+      var ry = yRem + 28;
+      for (var i = 0; i < remplacants.length; i++) {
+        var rm = remplacants[i];
+        var c = i % 2, rr2 = Math.floor(i / 2);
+        var rx = lx + c * (colW + innerGap), ey = ry + rr2 * 34;
+        var vide = (!rm.nom || rm.nom === '–');
+        ctx.fillStyle = rgb(t.card2); roundRect(ctx, rx, ey, colW, 28, 6); ctx.fill();
+        ctx.fillStyle = vide ? 'rgb(110,110,90)' : rgb(t.jaune); ctx.font = font(18, 700);
+        ctx.fillText(String(rm.num != null ? rm.num : ''), rx + 10, ey + 6);
+        ctx.fillStyle = vide ? 'rgb(110,110,90)' : rgb(t.blanc); ctx.font = font(17, 700);
+        ctx.fillText(vide ? '–' : rm.nom, rx + 44, ey + 7);
       }
 
-      // Staff (sous les remplaçants)
+      // Staff (2 colonnes, sous les remplaçants)
       if (staff.length) {
-        var ys = ry + remRows * 40 + 12;
-        ctx.fillStyle = rgb(t.jaune); ctx.font = font(24, 700);
-        ctx.fillText('STAFF', lx, ys); ys += 30;
+        var ys = ry + remRows * 34 + 8;
+        ctx.fillStyle = rgb(t.jaune); ctx.font = font(22, 700);
+        ctx.fillText('STAFF', lx, ys); ys += 26;
         for (i = 0; i < staff.length; i++) {
           var s = staff[i];
-          ctx.fillStyle = rgb(t.card2); roundRect(ctx, lx, ys, lw, 28, 6); ctx.fill();
-          ctx.fillStyle = rgb(t.sub); ctx.font = font(17, 500);
-          ctx.fillText(libelleRoleStaff(s.roles), lx + 12, ys + 6);
-          ctx.fillStyle = rgb(t.blanc); ctx.font = font(18, 700);
+          var c2 = i % 2, sr = Math.floor(i / 2);
+          var sx = lx + c2 * (colW + innerGap), sy = ys + sr * 30;
+          ctx.fillStyle = rgb(t.card2); roundRect(ctx, sx, sy, colW, 26, 6); ctx.fill();
+          ctx.fillStyle = rgb(t.sub); ctx.font = font(13, 500);
+          ctx.fillText(libelleRoleStaff(s.roles), sx + 10, sy + 6);
+          ctx.fillStyle = rgb(t.blanc); ctx.font = font(15, 700);
           var pr = (s.prenom || '').trim();
           var nm = (pr ? (pr.charAt(0).toUpperCase() + '. ') : '') + (s.nom || '').toUpperCase();
-          ctx.fillText(nm, lx + 180, ys + 5);
-          ys += 32;
+          ctx.fillText(nm, sx + 96, sy + 5);
         }
       }
 
       // 4) COLONNE DROITE — terrain
-      var rpad = 28;
-      var tX0 = rightX + rpad, tY0 = hd + 26;
+      var rpad = 26;
+      var tX0c = rightX + rpad, tY0 = hd + 24;
       var tW = rightW - rpad * 2;
       ctx.fillStyle = rgb(t.jaune); ctx.font = font(28, 700);
       ctx.textAlign = 'center';
       ctx.fillText('SUR LE TERRAIN', rightX + rightW / 2, tY0);
       ctx.textAlign = 'left';
-      var fieldY = tY0 + 42;
+      var fieldY = tY0 + 40;
       var fieldH = PH - 30 - fieldY;
-      // surface terrain
       ctx.fillStyle = rgb(t.card2);
-      roundRect(ctx, tX0, fieldY, tW, fieldH, 12); ctx.fill();
-      // clip pour le filigrane + lignes
+      roundRect(ctx, tX0c, fieldY, tW, fieldH, 12); ctx.fill();
       ctx.save();
-      roundRect(ctx, tX0, fieldY, tW, fieldH, 12); ctx.clip();
-      // filigrane derrière le terrain (écusson MOM / logo entente), ~16%
+      roundRect(ctx, tX0c, fieldY, tW, fieldH, 12); ctx.clip();
+      // filigrane derrière le terrain — MOM gardé, ENTENTE réduit (retour terrain)
       if (filigrane) {
-        var ffh = Math.round(fieldH * 0.7);
+        var frac = (version === 'mom') ? 0.70 : 0.46;   // entente réduit
+        var alph = (version === 'mom') ? 0.16 : 0.12;
+        var ffh = Math.round(fieldH * frac);
         var ffw = Math.round(ffh * (filigrane.width / filigrane.height));
-        drawImgH(ctx, filigrane, Math.round(tX0 + tW / 2 - ffw / 2),
-                 Math.round(fieldY + fieldH / 2 - ffh / 2), ffh, 0.16);
+        drawImgH(ctx, filigrane, Math.round(tX0c + tW / 2 - ffw / 2),
+                 Math.round(fieldY + fieldH / 2 - ffh / 2), ffh, alph);
       }
-      // lignes de terrain
-      ctx.strokeStyle = rgb(t.accent); ctx.globalAlpha = 0.55; ctx.lineWidth = 2;
+      ctx.strokeStyle = rgb(t.accent); ctx.globalAlpha = 0.5; ctx.lineWidth = 2;
       [0.14, 0.86].forEach(function (fx) {
-        ctx.beginPath(); ctx.moveTo(tX0 + tW * fx, fieldY); ctx.lineTo(tX0 + tW * fx, fieldY + fieldH); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(tX0c + tW * fx, fieldY); ctx.lineTo(tX0c + tW * fx, fieldY + fieldH); ctx.stroke();
       });
-      ctx.beginPath(); ctx.moveTo(tX0, fieldY + fieldH / 2); ctx.lineTo(tX0 + tW, fieldY + fieldH / 2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(tX0c, fieldY + fieldH / 2); ctx.lineTo(tX0c + tW, fieldY + fieldH / 2); ctx.stroke();
       ctx.globalAlpha = 1;
       ctx.restore();
 
-      // pastilles joueurs par CODE POSTE
-      var rPast = Math.max(20, Math.min(30, Math.round(tW / 14)));
-      function pastille(j) {
+      // maillots joueurs par CODE POSTE
+      var mH = Math.max(48, Math.min(72, Math.round(tW / 9)));
+      function placerMaillot(j) {
         var pos = j.code ? TERRAIN_POS_XV[j.code] : null;
-        if (!pos) return; // poste hors XV (autre format) : non placé, dégradation honnête
-        var px = tX0 + tW * (pos.x / 100);
+        if (!pos) return;
+        var px = tX0c + tW * (pos.x / 100);
         var py = fieldY + fieldH * (pos.y / 100);
-        var avant = (j.ligne === 'av');
-        // disque : avants pleins jaune, arrières contour
-        if (avant) {
-          ctx.fillStyle = rgb(t.jaune);
-          ctx.beginPath(); ctx.arc(px, py, rPast, 0, Math.PI * 2); ctx.fill();
-          ctx.fillStyle = rgb(t.bgBot);
-        } else {
-          ctx.fillStyle = rgb(t.card);
-          ctx.beginPath(); ctx.arc(px, py, rPast, 0, Math.PI * 2); ctx.fill();
-          ctx.lineWidth = 2; ctx.strokeStyle = rgb(version === 'mom' ? t.jaune : t.sub); ctx.stroke();
-          ctx.fillStyle = rgb(version === 'mom' ? t.jaune : t.sub);
-        }
-        ctx.font = font(Math.round(rPast * 0.62), 700);
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(initiales(j.prenom, j.nom), px, py);
-        // numéro sous la pastille
-        ctx.fillStyle = rgb(t.blanc); ctx.font = font(Math.round(rPast * 0.5), 700);
-        ctx.fillText(String(j.num != null ? j.num : ''), px, py + rPast + 9);
-        ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+        dessinerMaillot(ctx, px, py - mH * 0.15, mH, j, t, version, (j.ligne === 'av'));
       }
-      for (i = 0; i < titulaires.length; i++) pastille(titulaires[i]);
+      for (i = 0; i < titulaires.length; i++) placerMaillot(titulaires[i]);
 
       // 5) Pied de page
       ctx.fillStyle = rgb(t.pied); ctx.font = font(18, 400);
