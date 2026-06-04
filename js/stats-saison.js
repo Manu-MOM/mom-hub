@@ -5,6 +5,11 @@
  *   - Objet 1 : Fiche stats joueur (restitution famille, un joueur)
  *   - Objet 2 : Vue pilotage (équipe en haut + effectif en lignes triables)
  *
+ * Version : 1.1 — pt 63. + renderPilotageCategorie (pilotage catégorie/saison,
+ *           collectif M14 toutes équipes, ventilation joueur × équipe × rôle ×
+ *           poste, dénominateur N1 best-effort). renderFicheJoueur/renderPilotage
+ *           INCHANGÉS. Réutilise helpers (resoudreNoms/labelJoueur/escapeHtml/_bloc/
+ *           _kpi). Lignes via SupabaseHub.listPilotageCategorie (RPC pt 63).
  * Version : 1.0 — pt 61. Conception FAIT FOI md5 50012ece.
  *
  * SOCLE PROUVÉ (sondes S61.1→S61.5, lecture compositions-editor.js v3.62 +
@@ -530,14 +535,226 @@
     return '<div class="ss-kpi"><span class="ss-kpi__v">' + escapeHtml(valeur) + '</span><span class="ss-kpi__l">' + escapeHtml(label) + '</span></div>';
   }
 
+  // ============================================================
+  // PILOTAGE CATÉGORIE (pt 63) — collectif M14, toutes équipes
+  // ------------------------------------------------------------
+  // Maille = la catégorie (N équipes), pas une compo de base. Source
+  // des lignes = RPC pilotage_categorie_lignes via SupabaseHub
+  // .listPilotageCategorie (poste DÉJÀ résolu : numero_xv + poste_court).
+  // Dénominateur = collectif N1 (D-PILOT-CAT-2), chargé en best-effort
+  // (chaîne saison active → entente → collectif) ; si indisponible,
+  // dégradation honnête (on affiche les joueurs vus, note explicite).
+  // Compétition uniquement (la RPC ne renvoie que type_compo='match').
+  // Ventilation par joueur : équipe × rôle × poste (idée Manu, S6/S10).
+  // ============================================================
+
+  // Agrège les lignes brutes de la RPC en { parJoueur, equipes, nbMatchs }.
+  // - matchs distincts par joueur = nb d'evenement_id distincts (rotation
+  //   intra-match → plusieurs lignes même évènement, on dédoublonne).
+  // - parEquipe[nom] = { matchs(set evt), titulaire, remplacant, postes{} }.
+  function _agregerCategorie(lignes) {
+    var parJoueur = {};
+    var equipesSet = {};
+    var evtGlobal = {};
+    (Array.isArray(lignes) ? lignes : []).forEach(function (l) {
+      var jid = l.joueur_id;
+      if (!jid) return;
+      var eq = l.equipe_nom || '—';
+      equipesSet[eq] = true;
+      if (l.evenement_id) evtGlobal[l.evenement_id] = true;
+
+      if (!parJoueur[jid]) parJoueur[jid] = { evts: {}, parEquipe: {}, depannage: false };
+      var rec = parJoueur[jid];
+      if (l.evenement_id) rec.evts[l.evenement_id] = true;
+      if (l.depannage === true) rec.depannage = true;
+
+      if (!rec.parEquipe[eq]) rec.parEquipe[eq] = { evts: {}, titulaire: 0, remplacant: 0, postes: {} };
+      var re = rec.parEquipe[eq];
+      if (l.evenement_id) re.evts[l.evenement_id] = true;
+      if (l.role === 'titulaire') re.titulaire += 1;
+      else if (l.role === 'remplacant') re.remplacant += 1;
+      // poste résolu par la RPC : on indexe par numero_xv (ordre XV) +
+      // libellé court. poste_id peut être NULL (LEFT JOIN) → on ignore.
+      if (l.poste_id) {
+        var key = (typeof l.numero_xv === 'number' ? l.numero_xv : 9999) + '|' + (l.poste_court || '?');
+        re.postes[key] = (re.postes[key] || 0) + 1;
+      }
+    });
+    var equipes = Object.keys(equipesSet).sort();
+    return { parJoueur: parJoueur, equipes: equipes, nbMatchs: Object.keys(evtGlobal).length };
+  }
+
+  // Charge le collectif N1 (dénominateur) en best-effort. Renvoie une
+  // Map<joueur_id, true> des membres actifs, OU null si indisponible.
+  function _chargerCollectifN1(categorieId) {
+    var hub = _hub();
+    if (!hub || typeof hub.getSaisonActive !== 'function'
+        || typeof hub.getEntenteCadre !== 'function'
+        || typeof hub.listCollectifMembres !== 'function') {
+      return Promise.resolve(null);
+    }
+    return Promise.resolve(hub.getSaisonActive()).then(function (saison) {
+      if (!saison || !saison.id) return null;
+      return Promise.resolve(hub.getEntenteCadre(categorieId, saison.id)).then(function (res) {
+        if (!res || !res.ok || !res.data || !res.data.id) return null;
+        return Promise.resolve(
+          hub.listCollectifMembres(res.data.id, { role: 'joueur', actifsSeuls: true })
+        ).then(function (membres) {
+          var set = new Map();
+          (Array.isArray(membres) ? membres : []).forEach(function (m) {
+            if (m && m.personne_id) set.set(m.personne_id, true);
+          });
+          return set;
+        });
+      });
+    }).catch(function () { return null; });
+  }
+
+  function renderPilotageCategorie(categorieId, mount) {
+    var el = (typeof mount === 'string') ? document.getElementById(mount) : mount;
+    if (!el) return Promise.resolve();
+    if (!categorieId) {
+      el.innerHTML = _bloc('Catégorie indéterminée',
+        '<p>Aucune catégorie n\'a pu être déterminée pour votre compte. ' +
+        'Le pilotage de saison est réservé au référent d\'une catégorie.</p>');
+      return Promise.resolve();
+    }
+    el.innerHTML = '<p class="ss-load">Chargement du pilotage de saison…</p>';
+
+    var hub = _hub();
+    if (!hub || typeof hub.listPilotageCategorie !== 'function') {
+      el.innerHTML = _bloc('Erreur', '<p>Service de pilotage indisponible.</p>');
+      return Promise.resolve();
+    }
+
+    return Promise.resolve(hub.listPilotageCategorie(categorieId)).then(function (lignes) {
+      var agg = _agregerCategorie(lignes);
+      var joueurIds = Object.keys(agg.parJoueur);
+      return Promise.all([
+        resoudreNoms(joueurIds),
+        _chargerCollectifN1(categorieId)
+      ]).then(function (r) {
+        _peindrePilotageCategorie(el, agg, r[0] || new Map(), r[1]);
+      });
+    }).catch(function (e) {
+      if (typeof console !== 'undefined') console.error('StatsSaison.renderPilotageCategorie', e);
+      el.innerHTML = _bloc('Erreur', '<p>Impossible de charger le pilotage de saison.</p>');
+    });
+  }
+
+  function _peindrePilotageCategorie(el, agg, noms, collectifSet) {
+    // résumé des postes d'une équipe : "n°9 Demi ×4, n°10 Ouv ×2"
+    function postesEquipe(postesMap) {
+      var keys = Object.keys(postesMap).sort(function (a, b) {
+        return parseInt(a, 10) - parseInt(b, 10);
+      });
+      if (!keys.length) return '—';
+      return keys.map(function (k) {
+        var parts = k.split('|');
+        var num = parts[0];
+        var court = parts[1] || '?';
+        var n = postesMap[k];
+        var prefixe = (num !== '9999') ? ('n°' + num + ' ') : '';
+        return prefixe + court + (n > 1 ? ' ×' + n : '');
+      }).join(', ');
+    }
+
+    // détail par équipe pour un joueur
+    function detailEquipes(parEquipe) {
+      var eqNames = Object.keys(parEquipe).sort();
+      return eqNames.map(function (eq) {
+        var re = parEquipe[eq];
+        var nbM = Object.keys(re.evts).length;
+        var roleTxt = [];
+        if (re.titulaire) roleTxt.push(re.titulaire + ' tit.');
+        if (re.remplacant) roleTxt.push(re.remplacant + ' rempl.');
+        return '<div class="ss-cat-eq">' +
+          '<span class="ss-cat-eq__nom">' + escapeHtml(eq) + '</span> ' +
+          '<span class="ss-cat-eq__m">' + nbM + ' match' + (nbM > 1 ? 's' : '') + '</span> ' +
+          '<span class="ss-cat-eq__r">' + escapeHtml(roleTxt.join(' · ')) + '</span>' +
+          '<div class="ss-cat-eq__p">' + escapeHtml(postesEquipe(re.postes)) + '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    // construire la liste des joueurs : collectif N1 si dispo (D-PILOT-CAT-2),
+    // sinon les joueurs vus. Un joueur du collectif à 0 match apparaît.
+    var ids;
+    var denomNote;
+    if (collectifSet && collectifSet.size > 0) {
+      ids = Array.from(collectifSet.keys());
+      // ajouter d'éventuels joueurs vus mais hors collectif (dépannage)
+      Object.keys(agg.parJoueur).forEach(function (jid) {
+        if (!collectifSet.has(jid)) ids.push(jid);
+      });
+      denomNote = collectifSet.size + ' joueurs au collectif (N1). ' +
+        'Les joueurs sans match disputé apparaissent à 0 — c\'est volontaire.';
+    } else {
+      ids = Object.keys(agg.parJoueur);
+      denomNote = 'Effectif du collectif (N1) indisponible — liste limitée aux joueurs ayant disputé au moins un match. ' +
+        Object.keys(agg.parJoueur).length + ' joueur(s) vu(s) en compétition.';
+    }
+
+    var lignes = ids.map(function (jid) {
+      var rec = agg.parJoueur[jid] || { evts: {}, parEquipe: {}, depannage: false };
+      var nm = noms.get(jid) || {};
+      var label = labelJoueur(nm.nom, nm.prenom) || ('#' + String(jid).slice(0, 8));
+      var nbM = Object.keys(rec.evts).length;
+      return { label: label, nbMatchs: nbM, rec: rec };
+    });
+    // tri : plus de matchs d'abord, puis alpha
+    lignes.sort(function (a, b) {
+      if (b.nbMatchs !== a.nbMatchs) return b.nbMatchs - a.nbMatchs;
+      return a.label.localeCompare(b.label);
+    });
+
+    var nbJoues = lignes.filter(function (l) { return l.nbMatchs > 0; }).length;
+    var nbZero = lignes.length - nbJoues;
+
+    var corps = lignes.length ? lignes.map(function (l) {
+      var detail = (l.nbMatchs > 0)
+        ? detailEquipes(l.rec.parEquipe)
+        : '<span class="ss-attente">Aucun match disputé</span>';
+      var dep = l.rec.depannage ? ' <span class="ss-cat-dep" title="A dépanné hors catégorie">⤴</span>' : '';
+      return '<tr>' +
+        '<td>' + escapeHtml(l.label) + dep + '</td>' +
+        '<td class="ss-num">' + l.nbMatchs + '</td>' +
+        '<td>' + detail + '</td>' +
+      '</tr>';
+    }).join('') : '<tr><td colspan="3" class="ss-attente">Aucune donnée de compétition sur la catégorie.</td></tr>';
+
+    el.innerHTML =
+      '<header class="ss-pilot-head"><h1>Pilotage de saison</h1>' +
+        '<p class="ss-sub">Catégorie · collectif complet · ' + agg.equipes.length + ' équipe' + (agg.equipes.length > 1 ? 's' : '') + '</p></header>' +
+      '<section class="ss-bloc">' +
+        '<div class="ss-kpis">' +
+          _kpi('Joueurs', String(lignes.length)) +
+          _kpi('Ont joué', String(nbJoues)) +
+          _kpi('À 0 match', String(nbZero)) +
+          _kpi('Matchs (cat.)', String(agg.nbMatchs)) +
+          _kpi('Équipes', String(agg.equipes.length)) +
+        '</div>' +
+        '<p class="ss-note">' + escapeHtml(denomNote) + '</p>' +
+      '</section>' +
+      '<section class="ss-bloc">' +
+        '<h2>Participation par joueur</h2>' +
+        '<table class="ss-table"><thead><tr>' +
+          '<th>Joueur</th><th class="ss-num">Matchs</th><th>Détail par équipe · rôle · poste</th>' +
+        '</tr></thead><tbody>' + corps + '</tbody></table>' +
+        '<p class="ss-note">Compétition uniquement (matchs &amp; tournois). Un joueur peut figurer dans plusieurs équipes — chaque ligne d\'équipe détaille rôle et postes occupés.</p>' +
+      '</section>';
+  }
+
   // ---- API publique ----
   window.StatsSaison = {
-    version: '1.0',
+    version: '1.1',
     renderFicheJoueur: renderFicheJoueur,
     renderPilotage: renderPilotage,
+    renderPilotageCategorie: renderPilotageCategorie,
     // exposés pour test / réutilisation éventuelle
     _agregerEffectifSaison: agregerEffectifSaison,
     _agregerEquipe: agregerEquipe,
-    _agregerTempsDeJeu: agregerTempsDeJeu
+    _agregerTempsDeJeu: agregerTempsDeJeu,
+    _agregerCategorie: _agregerCategorie
   };
 })();
