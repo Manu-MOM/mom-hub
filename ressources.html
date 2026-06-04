@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ressources pédagogiques · MOM Hub</title>
+  <link rel="icon" type="image/png" href="assets/logo-m2m.png">
+  <meta name="description" content="Ressources pédagogiques EDR du MOM — la boîte à outils de l'éducateur (fiches techniques, comportements par poste, référentiels, cartes mentales)." />
+
+  <link rel="stylesheet" href="css/hub.css">
+
+  <style>
+    /* ============================================================
+       Styles spécifiques à ressources.html
+       Frère de bibliotheque.html (design system MOM Hub, hub.css).
+       NUANCE assumée : accent DORÉ (vs vert prairie de la Biblio) +
+       signature COULEUR PAR NATURE (chaque famille a sa teinte).
+       Classes préfixées .res-* pour éviter tout conflit.
+       ============================================================ */
+
+    body.auth-pending { visibility: hidden; }
+
+    .res-layout {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 18px 16px 48px;
+      position: relative;
+      z-index: 2;
+    }
+
+    /* ===== BANNER (accent doré) ===== */
+    .res-banner {
+      background: linear-gradient(135deg, var(--vert-bouteille) 0%, var(--vert-bouteille-deep) 100%);
+      color: #fff;
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 16px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 4px 16px var(--shadow);
+      border-top: 3px solid var(--gold);
+    }
+    .res-banner::before {
+      content: "";
+      position: absolute;
+      right: -30px; top: -30px;
+      width: 200px; height: 200px;
+      background: radial-gradient(circle, rgba(212,169,58,.28) 0%, transparent 70%);
+    }
+    .res-banner-title {
+      font-family: 'Oswald', sans-serif;
+      font-size: 24px;
+      font-weight: 700;
+      line-height: 1.05;
+      letter-spacing: 0.02em;
+      position: relative; z-index: 1;
+      text-transform: uppercase;
+    }
+    .res-banner-title b { color: var(--gold); }
+    .res-banner-sub {
+      font-size: 12px;
+      color: rgba(255,255,255,.7);
+      margin-top: 6px;
+      position: relative; z-index: 1;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.03em;
+    }
+    .res-stats {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+      margin-top: 16px;
+      position: relative; z-index: 1;
+    }
+    .res-stat {
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 10px;
+      padding: 10px;
+      text-align: center;
+    }
+    .res-stat-n {
+      font-family: 'Oswald', sans-serif;
+      font-size: 26px;
+      font-weight: 700;
+      line-height: 1;
+      color: #fff;
+    }
+    .res-stat-n.gold { color: var(--gold); }
+    .res-stat-l {
+      font-size: 9px;
+      font-weight: 600;
+      color: rgba(255,255,255,.55);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-top: 4px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* ===== TOOLBAR : recherche en PROUE (D4) ===== */
+    .res-toolbar {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 14px;
+      box-shadow: 0 2px 8px var(--shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .res-search-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .res-search-input {
+      flex: 1;
+      background: var(--paper-warm);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 13px 16px;
+      font-size: 15px;
+      font-family: inherit;
+      color: var(--ink);
+      outline: none;
+      transition: border-color .15s, background .15s, box-shadow .15s;
+    }
+    .res-search-input::placeholder { color: var(--ink-mute); }
+    .res-search-input:focus {
+      border-color: var(--gold);
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(212,169,58,.18);
+    }
+    .res-view-toggle {
+      display: flex;
+      gap: 2px;
+      background: var(--paper-warm);
+      padding: 2px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      flex-shrink: 0;
+    }
+    .res-view-toggle button {
+      background: transparent;
+      border: none;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 9px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      color: var(--ink-mute);
+      transition: all .15s;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .res-view-toggle button.on {
+      background: var(--gold);
+      color: var(--vert-bouteille-deep);
+      box-shadow: 0 1px 2px rgba(0,0,0,.1);
+    }
+    .res-view-toggle button svg { width: 14px; height: 14px; }
+
+    /* ===== HINT BANNER (sans recherche) ===== */
+    .res-hint-banner {
+      background: #fff8e6;
+      border: 1px dashed var(--gold);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 13px;
+      color: #7c5200;
+      margin-bottom: 14px;
+    }
+
+    /* ===== RÉSULTATS DE RECHERCHE ===== */
+    .res-results-count {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--ink-mute);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 10px;
+    }
+    .res-results {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+    .res-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--vert-prairie);
+      border-radius: 10px;
+      box-shadow: 0 1px 4px var(--shadow);
+      cursor: pointer;
+      transition: transform .12s, box-shadow .12s;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+    }
+    .res-card:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 14px var(--shadow);
+    }
+    .res-card-pastille {
+      width: 40px; height: 40px;
+      border-radius: 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+    .res-card-main { flex: 1; min-width: 0; }
+    .res-card-top {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+      flex-wrap: wrap;
+    }
+    .res-nature {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .res-age {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: var(--gold);
+      color: var(--vert-bouteille-deep);
+    }
+    .res-card-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--ink);
+      line-height: 1.25;
+      margin-bottom: 4px;
+    }
+    .res-card-themes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 3px;
+    }
+    .res-theme {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 8px;
+      background: var(--paper-warm);
+      color: var(--ink-soft);
+    }
+    .res-card-chev {
+      color: var(--ink-mute);
+      font-size: 22px;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+
+    /* ===== GROUPES PAR NATURE (sans recherche) ===== */
+    .res-group-h {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 18px 0 10px;
+      padding: 8px 0 8px 2px;
+      border-bottom: 2px solid;
+    }
+    .res-group-icon {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 17px;
+    }
+    .res-group-title {
+      font-family: 'Oswald', sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+    .res-group-count {
+      margin-left: auto;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 10px;
+    }
+
+    /* ===== VUE PLAN ===== */
+    .res-plan-nat {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      margin-bottom: 10px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px var(--shadow);
+    }
+    .res-plan-nat-h {
+      padding: 14px 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: relative;
+      transition: background .15s;
+    }
+    .res-plan-nat-h::before {
+      content: "";
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 4px;
+      background: var(--nat-color, var(--gold));
+    }
+    .res-plan-nat-h:hover { background: var(--paper); }
+    .res-plan-nat-icon {
+      width: 34px; height: 34px;
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .res-plan-nat-title {
+      flex: 1;
+      font-family: 'Oswald', sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--ink);
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+    .res-plan-nat-count {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 10px;
+    }
+    .res-plan-nat-chev {
+      color: var(--ink-mute);
+      font-size: 14px;
+      transition: transform .2s;
+    }
+    .res-plan-nat.open .res-plan-nat-chev { transform: rotate(180deg); }
+    .res-plan-nat-body {
+      display: none;
+      padding: 6px 14px 14px;
+      border-top: 1px solid var(--line);
+      background: var(--paper);
+    }
+    .res-plan-nat.open .res-plan-nat-body { display: block; }
+    .res-plan-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background .15s;
+      margin-top: 4px;
+      background: #fff;
+      border: 1px solid var(--line);
+    }
+    .res-plan-item:hover { background: var(--paper-warm); }
+    .res-plan-item-t {
+      flex: 1;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--ink);
+    }
+    .res-plan-item-meta {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    /* ===== MESSAGE VIDE ===== */
+    .res-empty {
+      padding: 40px 20px;
+      text-align: center;
+      color: var(--ink-mute);
+      font-size: 14px;
+      background: #fff;
+      border: 1px dashed var(--line);
+      border-radius: 10px;
+      line-height: 1.6;
+    }
+    .res-empty-hint { font-size: 12px; }
+    .res-empty-error {
+      background: var(--feedback-error-bg);
+      color: var(--feedback-error-fg);
+      border-color: var(--feedback-error-fg);
+    }
+
+    /* ===== MODALE ===== */
+    .res-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.55);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .res-overlay.open { display: flex; }
+    .res-modal {
+      background: #fff;
+      border-radius: 14px;
+      max-width: 680px;
+      width: 100%;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 12px 48px rgba(0,0,0,.3);
+    }
+    .res-modal-head {
+      background: linear-gradient(135deg, var(--vert-bouteille) 0%, var(--vert-bouteille-deep) 100%);
+      color: #fff;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-top: 3px solid var(--gold);
+    }
+    .res-modal-pastille {
+      width: 44px; height: 44px;
+      border-radius: 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+    .res-modal-head-l { flex: 1; min-width: 0; }
+    .res-modal-badge {
+      display: inline-block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: rgba(255,255,255,.15);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+    .res-modal-title {
+      font-family: 'Oswald', sans-serif;
+      font-size: 20px;
+      font-weight: 600;
+      line-height: 1.1;
+    }
+    .res-modal-sub {
+      font-size: 11px;
+      color: rgba(255,255,255,.7);
+      margin-top: 3px;
+    }
+    .res-modal-close {
+      background: rgba(255,255,255,.1);
+      border: none;
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      color: #fff;
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background .15s;
+    }
+    .res-modal-close:hover { background: rgba(255,255,255,.2); }
+    .res-modal-body {
+      padding: 16px;
+      overflow: auto;
+      flex: 1;
+    }
+
+    /* rendu commun */
+    .res-m-lbl {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--ink-mute);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin: 14px 0 6px;
+    }
+    .res-m-lbl:first-child { margin-top: 0; }
+    .res-m-text {
+      font-size: 13.5px;
+      color: var(--ink);
+      line-height: 1.5;
+      margin: 0 0 8px;
+    }
+    .res-m-note {
+      font-size: 12px;
+      color: var(--ink-mute);
+      font-style: italic;
+      padding: 10px 0;
+    }
+
+    /* fiche : clés */
+    .res-cles { display: flex; flex-direction: column; gap: 6px; }
+    .res-cle {
+      background: var(--paper);
+      border-left: 3px solid var(--gold);
+      border-radius: 0 8px 8px 0;
+      padding: 8px 12px;
+    }
+    .res-cle-lbl {
+      font-weight: 700;
+      font-size: 12px;
+      color: #9c7810;
+      margin-bottom: 2px;
+    }
+    .res-cle-c { display: flex; flex-direction: column; gap: 2px; }
+    .res-cle-c span { font-size: 13px; color: var(--ink); }
+
+    /* poste : numéro, attributs, rôles, avis, vigilance */
+    .res-poste-num {
+      display: inline-block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      background: #e8f1fb;
+      color: #1a3a7a;
+      padding: 3px 10px;
+      border-radius: 10px;
+      margin-bottom: 6px;
+    }
+    .res-attrs { display: flex; flex-direction: column; gap: 4px; }
+    .res-attr {
+      display: flex;
+      gap: 8px;
+      font-size: 13px;
+      padding: 5px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .res-attr:last-child { border-bottom: none; }
+    .res-attr-k { color: var(--ink-mute); flex: 0 0 42%; font-weight: 600; }
+    .res-attr-v { color: var(--ink); flex: 1; }
+    .res-roles { display: grid; grid-template-columns: 1fr; gap: 8px; }
+    .res-role {
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+    .res-role p { margin: 0; font-size: 13px; line-height: 1.45; color: var(--ink); }
+    .res-role-h {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 5px;
+    }
+    .res-role-att { background: #fff0ed; }
+    .res-role-att .res-role-h { color: var(--clay); }
+    .res-role-def { background: #eaf1fa; }
+    .res-role-def .res-role-h { color: #1f4a82; }
+    .res-avis {
+      background: var(--paper);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--ink-soft);
+      font-style: italic;
+    }
+    .res-vigilance { display: flex; flex-wrap: wrap; gap: 5px; }
+    .res-vig-chip {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 9px;
+      border-radius: 10px;
+      background: #fdf3d0;
+      color: #7c4200;
+    }
+
+    /* grille : sections, items */
+    .res-grille-sub {
+      font-size: 12px;
+      color: var(--ink-mute);
+      margin-bottom: 10px;
+    }
+    .res-section { margin-bottom: 14px; }
+    .res-section-h {
+      font-family: 'Oswald', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      color: #5a3a00;
+      background: #fdf3d0;
+      padding: 6px 10px;
+      border-radius: 6px;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+    .res-sb-nom {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--ink-soft);
+      margin: 6px 0 3px;
+    }
+    .res-items {
+      margin: 0 0 6px;
+      padding-left: 18px;
+      font-size: 13px;
+      color: var(--ink);
+      line-height: 1.5;
+    }
+    .res-items li { margin-bottom: 3px; }
+
+    /* carte : visuel + nœuds */
+    .res-carte-centre {
+      font-size: 13px;
+      color: var(--ink);
+      margin-bottom: 8px;
+    }
+    .res-carte-visuel {
+      position: relative;
+      width: 100%;
+      padding-bottom: 70%;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #f0e8ff;
+      margin-bottom: 10px;
+    }
+    .res-carte-visuel iframe {
+      position: absolute;
+      inset: 0;
+      width: 100%; height: 100%;
+      border: 0;
+    }
+    .res-noeuds { display: flex; flex-wrap: wrap; gap: 5px; }
+    .res-noeud {
+      font-size: 11px;
+      padding: 3px 9px;
+      border-radius: 10px;
+      background: #f0e8ff;
+      color: #4a1a7a;
+    }
+
+    /* mode dégradé */
+    .res-degrade {
+      background: #fff8e6;
+      border: 1px dashed var(--gold);
+      border-radius: 8px;
+      padding: 14px;
+      font-size: 13px;
+      color: #7c5200;
+      line-height: 1.5;
+    }
+    .res-degrade b { color: #5a3a00; }
+
+    /* pied */
+    .res-modal-foot {
+      padding: 10px 14px;
+      background: var(--paper);
+      border-top: 1px solid var(--line);
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .res-btn {
+      border: none;
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      text-decoration: none;
+      transition: all .15s;
+    }
+    .res-btn-sec {
+      background: var(--paper-warm);
+      color: var(--ink-soft);
+      border: 1px solid var(--line);
+    }
+    .res-btn-sec:hover { background: var(--paper-deep); }
+    .res-btn-pri {
+      background: var(--vert-prairie);
+      color: #fff;
+    }
+    .res-btn-pri:hover { background: var(--vert-bouteille); }
+
+    /* footer */
+    .res-footer {
+      margin-top: 40px;
+      text-align: center;
+      font-size: 11px;
+      color: var(--ink-mute);
+      letter-spacing: 0.3px;
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (min-width: 768px) {
+      .res-layout { padding: 22px 20px 64px; }
+      .res-banner { padding: 26px 28px; }
+      .res-banner-title { font-size: 28px; }
+      .res-stats { gap: 12px; }
+      .res-stat { padding: 14px; }
+      .res-stat-n { font-size: 30px; }
+      .res-results { grid-template-columns: 1fr 1fr; gap: 10px; }
+      .res-roles { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+
+<body class="auth-pending">
+
+  <!-- Topbar Hub standardisée -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo"><img src="assets/logo-m2m.png" alt="MOM Rugby"></div>
+      <div class="brand-text">
+        <h1>MOM Hub</h1>
+        <p>Mutzig Ovalie Molsheim</p>
+      </div>
+    </div>
+
+    <div class="season-pill">SAISON 2025 / 2026</div>
+
+    <nav class="main-nav">
+      <a href="./">Tableau de bord</a>
+      <a href="bibliotheque.html">Bibliothèque</a>
+      <a class="active">Ressources</a>
+      <a>Configuration</a>
+    </nav>
+
+    <div class="icon-row">
+      <button class="icon-btn" title="Recherche" aria-label="Recherche">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      </button>
+      <button class="icon-btn has-notif" title="Notifications" aria-label="Notifications">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+      </button>
+    </div>
+
+    <div class="user-profile">
+      <div class="avatar">EJ</div>
+      <div class="user-info">
+        <div class="user-name">Emmanuel Jung</div>
+        <div class="user-role">Référent M14</div>
+      </div>
+      <a href="./" class="user-action" title="Retour au portail" aria-label="Retour au portail">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/></svg>
+      </a>
+      <button type="button" class="user-action" id="btn-signout" title="Se déconnecter" aria-label="Se déconnecter">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="res-layout">
+
+    <!-- Bannière (accent doré) -->
+    <section class="res-banner">
+      <div class="res-banner-title">Ressources<br><b>pédagogiques</b></div>
+      <div class="res-banner-sub">La boîte à outils de l'éducateur — un mot, la bonne ressource.</div>
+      <div class="res-stats">
+        <div class="res-stat"><div class="res-stat-n gold" id="stat-total">0</div><div class="res-stat-l">Ressources</div></div>
+        <div class="res-stat"><div class="res-stat-n" id="stat-fiches">0</div><div class="res-stat-l">Fiches</div></div>
+        <div class="res-stat"><div class="res-stat-n" id="stat-postes">0</div><div class="res-stat-l">Postes</div></div>
+        <div class="res-stat"><div class="res-stat-n" id="stat-grilles">0</div><div class="res-stat-l">Référentiels</div></div>
+        <div class="res-stat"><div class="res-stat-n" id="stat-cartes">0</div><div class="res-stat-l">Cartes</div></div>
+      </div>
+    </section>
+
+    <!-- Toolbar : recherche transverse en proue + toggle Recherche/Plan -->
+    <section class="res-toolbar" aria-label="Recherche et navigation">
+      <div class="res-search-row">
+        <input type="text" class="res-search-input" id="search"
+               placeholder="🔍 Cherchez un mot : duel, plaquage, soutien, demi d'ouverture…" />
+        <div class="res-view-toggle" role="tablist" aria-label="Mode d'affichage">
+          <button class="on" data-view="search" role="tab" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            Recherche
+          </button>
+          <button data-view="plan" role="tab" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+            Plan
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Zone de contenu (peuplée par RessourcesBrowser) -->
+    <section id="content" aria-live="polite">
+      <div class="res-empty">Chargement des ressources…</div>
+    </section>
+
+    <p class="res-footer">
+      <span class="footer-club">Mutzig Ovalie Molsheim</span><br>
+      MOM Hub · Ressources pédagogiques EDR
+    </p>
+  </main>
+
+  <!-- Modale détail ressource -->
+  <div class="res-overlay" id="overlay" aria-modal="true" role="dialog">
+    <div class="res-modal">
+      <div class="res-modal-head">
+        <div class="res-modal-pastille" id="m-pastille">📄</div>
+        <div class="res-modal-head-l">
+          <div class="res-modal-badge" id="m-badge">Nature</div>
+          <div class="res-modal-title" id="m-title">Titre</div>
+          <div class="res-modal-sub" id="m-sub"></div>
+        </div>
+        <button class="res-modal-close" type="button" aria-label="Fermer">×</button>
+      </div>
+
+      <div class="res-modal-body">
+        <!-- Rendu adapté par nature (peuplé par le moteur) -->
+        <div id="m-body-render"></div>
+        <!-- Mode dégradé (bundle absent) -->
+        <div id="m-degrade" class="res-degrade" style="display:none">
+          <b>Détails non chargés.</b><br>
+          Le bundle <code>data/ressources-all.json</code> n'a pas été trouvé.
+          Ouvrez la ressource dans Drive ci-dessous, ou régénérez le bundle via
+          <code>Build-Ressources-All.gs</code>.
+        </div>
+      </div>
+
+      <div class="res-modal-foot" id="m-foot"></div>
+    </div>
+  </div>
+
+  <!-- Supabase JS (UMD via CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <!-- Wrapper MOM Hub -->
+  <script src="js/supabase-client.js"></script>
+  <!-- Logique du module Ressources -->
+  <script src="js/ressources-browser.js"></script>
+
+  <script>
+    (async function () {
+      'use strict';
+
+      // 1. GARDE D'ACCÈS — rôle coach minimum (admin OK car super-rôle)
+      const session = await SupabaseHub.getSession();
+      if (!session) { window.location.replace('login.html'); return; }
+
+      const roles = await SupabaseHub.getMyRoles();
+      const isAdminOrCoach = roles.indexOf('admin') !== -1 || roles.indexOf('coach') !== -1;
+      if (!isAdminOrCoach) { window.location.replace('./'); return; }
+
+      // 2. AFFICHER LA PAGE
+      document.body.classList.remove('auth-pending');
+      document.body.classList.add('auth-resolved');
+      if (roles.indexOf('admin') !== -1) document.body.classList.add('auth-admin');
+
+      // 3. INTERACTIONS HEADER
+      const signoutBtn = document.getElementById('btn-signout');
+      if (signoutBtn) {
+        signoutBtn.addEventListener('click', async function () {
+          signoutBtn.disabled = true;
+          await SupabaseHub.signOut();
+        });
+      }
+      SupabaseHub.onAuthChange(function (event) {
+        if (event === 'SIGNED_OUT') window.location.replace('login.html');
+      });
+
+      // 4. INITIALISER LE MODULE RESSOURCES
+      await window.RessourcesBrowser.init();
+    })();
+  </script>
+</body>
+</html>
