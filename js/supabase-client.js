@@ -18,6 +18,15 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 1.47 — juin 2026
+ *   v1.47 : getTempsDeJeuRencontre(evt [, evenementEquipeId]) — wrapper
+ *           ADDITIF voie coach garde auth.uid() (backend C12-w,
+ *           SUIVI-COACH-7). Lit le temps de jeu par joueur (calcul
+ *           backend = intersection présence × fenêtres de période C12-v ;
+ *           jamais minute_match). Dégradation honnête : chrono_complet=
+ *           false + minutes_jeu=null si chrono absent/non clôturé →
+ *           l'écran affiche « indisponible », jamais un 0 fabriqué.
+ *           Aucun wrapper existant touché.
  * Version : 1.46 — juin 2026
  *   v1.46 : rapports phase & tournoi — saisi STRUCTURÉ (pt 55). Ajout
  *           ADDITIF : _mapRapport expose `donnees` (jsonb classement +
@@ -5062,6 +5071,44 @@
         return null;
       }
       return Array.isArray(data) ? (data[0] || null) : (data || null);
+    },
+
+    /**
+     * LECTURE — Temps de jeu par joueur d'un match (coach authentifié).
+     * RPC get_temps_de_jeu_rencontre (C12-w, chantier SUIVI-COACH-7).
+     *
+     * Calcul backend = intersection [présence joueur] × [fenêtres de
+     * période archivées C12-v] ; n'utilise JAMAIS minute_match (non
+     * fiable, pt 53). Le front N'A AUCUN calcul à refaire : il affiche
+     * tel quel out_minutes_jeu (ou l'absence si chrono incomplet).
+     *
+     * DÉGRADATION HONNÊTE : si le chrono n'a pas été lancé/clôturé sur
+     * ce match, chaque ligne a chrono_complet=false et minutes_jeu=null.
+     * L'écran doit afficher « temps de jeu indisponible » dans ce cas,
+     * JAMAIS un 0 ni une minute fabriquée (cohérent rapports pt 53).
+     *
+     * @param {string} evenementUuid  le MATCH
+     * @param {string} [evenementEquipeId]  désambiguïse le multi-équipes
+     *   (à fournir seulement si >1 compo active de match ; sinon la RPC
+     *    lève une erreur d'ambiguïté qu'on remonte telle quelle).
+     * @returns {Promise<{ok:boolean, data?:Array, error?:string}>}
+     *   data = 1 ligne / joueur : { out_joueur_id, out_role,
+     *   out_numero_maillot, out_minutes_jeu, out_secondes_jeu,
+     *   out_est_entre, out_chrono_complet }.
+     */
+    async getTempsDeJeuRencontre(evenementUuid, evenementEquipeId) {
+      if (!evenementUuid) {
+        console.error('MOM Hub: getTempsDeJeuRencontre() requiert un evenementUuid');
+        return { ok: false, error: 'evenementUuid manquant' };
+      }
+      const params = { p_evenement_uuid: evenementUuid };
+      if (evenementEquipeId) params.p_evenement_equipe_id = evenementEquipeId;
+      const { data, error } = await client.rpc('get_temps_de_jeu_rencontre', params);
+      if (error) {
+        console.error('MOM Hub: getTempsDeJeuRencontre()', error);
+        return { ok: false, error: error.message || 'Erreur get_temps_de_jeu_rencontre' };
+      }
+      return { ok: true, data: Array.isArray(data) ? data : [] };
     },
 
     // ============================================================
