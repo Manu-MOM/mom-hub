@@ -346,6 +346,28 @@
     });
   }
 
+  // Label terrain : « Prénom N. ». Le prénom est abrégé en « P. » au-delà
+  // de maxLen caractères (évite le débordement sur les maillots voisins du
+  // pack). maxLen = 9 (couvre Agathe, Nathan, Marvin, Gabriel, Benjamin ;
+  // abrège « Sidi Mohamed » → « Sidi M. »… → ici prénom composé : 1er mot + .).
+  function labelTerrain(prenom, nom) {
+    var p = (prenom || '').trim();
+    var n = (nom || '').trim();
+    var initNom = n ? (n.charAt(0).toUpperCase() + '.') : '';
+    if (!p) return initNom;
+    // prénom composé (espace) trop long → 1er mot + initiale du 2e
+    if (p.length > 9) {
+      var mots = p.split(/\s+/);
+      if (mots.length > 1) {
+        p = mots[0] + ' ' + mots[1].charAt(0).toUpperCase() + '.';
+        if (p.length > 11) p = mots[0].slice(0, 8) + '.';
+      } else {
+        p = p.slice(0, 8) + '.';
+      }
+    }
+    return (p + ' ' + initNom).trim();
+  }
+
   // ── Maillot/jersey stylisé (avatar terrain) ──────────────────────────────
   // Dessine une forme de maillot centrée en (cx, cy), hauteur ~h, avec le
   // numéro dessus et les initiales sous le col. avant=true → maillot plein
@@ -381,10 +403,10 @@
     ctx.font = font(Math.round(h * 0.42), 700);
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(String(j.num != null ? j.num : ''), cx, y + h * 0.60);
-    // initiales sous le maillot
+    // label sous le maillot : « Prénom N. » (prénom abrégé si long)
     ctx.fillStyle = rgb(t.blanc);
-    ctx.font = font(Math.round(h * 0.26), 700);
-    ctx.fillText(initiales(j.prenom, j.nom), cx, y + h + h * 0.20);
+    ctx.font = font(Math.round(h * 0.24), 700);
+    ctx.fillText(labelTerrain(j.prenom, j.nom), cx, y + h + h * 0.20);
     ctx.textAlign = 'left'; ctx.textBaseline = 'top';
   }
 
