@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pilotage de saison · MOM Hub</title>
+  <style>
+    :root {
+      --vert: #2D7D46; --vert-fonce: #1f5a32; --gris: #5b6470;
+      --gris-clair: #eef1f4; --bord: #d8dee5; --attente: #8a93a0;
+      --fond: #f7f9fb; --carte: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--fond); color: #1c232b;
+      font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+      line-height: 1.5; padding: 1.5rem 1rem 4rem;
+    }
+    .ss-wrap { max-width: 920px; margin: 0 auto; }
+    .ss-pilot-head { border-bottom: 3px solid var(--vert); padding-bottom: .75rem; margin-bottom: 1.25rem; }
+    .ss-pilot-head h1 { margin: 0; font-size: 1.9rem; color: var(--vert-fonce); }
+    .ss-sub { margin: .25rem 0 0; color: var(--gris); font-size: .95rem; }
+    .ss-bloc {
+      background: var(--carte); border: 1px solid var(--bord); border-radius: 10px;
+      padding: 1rem 1.1rem; margin-bottom: 1.25rem;
+    }
+    .ss-bloc h2 { margin: 0 0 .75rem; font-size: 1.1rem; color: var(--vert-fonce); }
+    .ss-attente { color: var(--attente); font-style: italic; margin: .5rem 0 0; }
+    .ss-note { color: var(--gris); font-size: .85rem; margin: .6rem 0 0; }
+    .ss-load { color: var(--gris); }
+    .ss-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: .6rem; }
+    .ss-kpi { background: var(--gris-clair); border-radius: 8px; padding: .6rem .7rem; text-align: center; }
+    .ss-kpi__v { display: block; font-size: 1.3rem; font-weight: 700; color: var(--vert-fonce); }
+    .ss-kpi__l { display: block; font-size: .75rem; color: var(--gris); text-transform: uppercase; letter-spacing: .03em; margin-top: .15rem; }
+    .ss-table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+    .ss-table th, .ss-table td { text-align: left; padding: .5rem .55rem; border-bottom: 1px solid var(--bord); vertical-align: top; }
+    .ss-table th { color: var(--gris); font-weight: 600; font-size: .82rem; text-transform: uppercase; letter-spacing: .02em; }
+    .ss-table tbody tr:hover { background: var(--gris-clair); }
+    .ss-num { text-align: right; }
+    .ss-table th.ss-num { text-align: right; }
+    /* Ventilation par équipe (pt 63) */
+    .ss-cat-eq { padding: .15rem 0; }
+    .ss-cat-eq + .ss-cat-eq { border-top: 1px dashed var(--bord); margin-top: .35rem; padding-top: .35rem; }
+    .ss-cat-eq__nom { font-weight: 600; color: var(--vert-fonce); }
+    .ss-cat-eq__m { color: var(--gris); font-size: .85rem; }
+    .ss-cat-eq__r { color: var(--gris); font-size: .85rem; }
+    .ss-cat-eq__p { color: #1c232b; font-size: .85rem; margin-top: .1rem; }
+    .ss-cat-dep { color: var(--vert); cursor: help; }
+    footer { max-width: 920px; margin: 2rem auto 0; color: var(--attente); font-size: .8rem; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="ss-wrap">
+    <main id="ss-pilotage"><p class="ss-load">Initialisation…</p></main>
+  </div>
+  <footer>MOM Hub · pilotage de saison — Mutzig Ovalie Molsheim</footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/stats-saison.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var mount = document.getElementById('ss-pilotage');
+
+      if (!window.StatsSaison || !window.SupabaseHub) {
+        mount.innerHTML = '<section class="ss-bloc"><h2>Erreur</h2><p>Module stats-saison indisponible.</p></section>';
+        return;
+      }
+
+      // pt 63 — D-PILOT-CAT-1 : la catégorie est celle du référent connecté,
+      // résolue via mes_categories_autorisees() (RPC B5). Pas de sélecteur.
+      // Un override ?categorie=<uuid> reste possible (debug / multi-cat),
+      // mais la voie normale est la déduction du compte.
+      // NB : forme de retour de la RPC non sondable hors session (gardée) ;
+      // on lit categorie_id avec repli sur d'autres clés plausibles, et on
+      // dégrade honnêtement si rien n'est résolu (tracé pt 63, à confirmer
+      // en recette en-app).
+      var params = new URLSearchParams(window.location.search);
+      var override = params.get('categorie');
+
+      function extraireCategorieId(rows) {
+        if (override) return override;
+        if (!Array.isArray(rows) || rows.length === 0) return null;
+        var r = rows[0];
+        return r.categorie_id || r.id || r.categorie || null;
+      }
+
+      Promise.resolve(SupabaseHub.mesCategoriesAutorisees())
+        .then(function (rows) {
+          var catId = extraireCategorieId(rows);
+          return StatsSaison.renderPilotageCategorie(catId, mount);
+        })
+        .catch(function (e) {
+          if (typeof console !== 'undefined') console.error('pilotage-categorie boot', e);
+          mount.innerHTML = '<section class="ss-bloc"><h2>Erreur</h2>' +
+            '<p>Impossible de déterminer votre catégorie. Le pilotage de saison ' +
+            'est réservé au référent d\'une catégorie.</p></section>';
+        });
+    })();
+  </script>
+</body>
+</html>
