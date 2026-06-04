@@ -5,6 +5,14 @@
  *   - Objet 1 : Fiche stats joueur (restitution famille, un joueur)
  *   - Objet 2 : Vue pilotage (équipe en haut + effectif en lignes triables)
  *
+ * Version : 1.2 — pt 65. EXTENSION STATS du pilotage catégorie : bloc « Niveau
+ *           équipe » (1 carte/équipe via agregerEquipe par lots d'evt disjoints —
+ *           V/N/D, points, essais, mêlées/touches, cartons + note matchs
+ *           renseignés), colonnes Temps de jeu (fmtTempsJeu, « — » honnête) +
+ *           Essais au tableau joueur, bloc Assiduité placeholder (presences vide),
+ *           KPI Équipes = réel catégorie (listEquipes) + mention équipes sans compo,
+ *           fix noms joueurs à 0 match (résolution de l'union vus+collectif).
+ *           agregerEquipe/agregerTempsDeJeu RÉUTILISÉS tels quels (zéro wrapper neuf).
  * Version : 1.1 — pt 63. + renderPilotageCategorie (pilotage catégorie/saison,
  *           collectif M14 toutes équipes, ventilation joueur × équipe × rôle ×
  *           poste, dénominateur N1 best-effort). renderFicheJoueur/renderPilotage
@@ -556,12 +564,17 @@
     var parJoueur = {};
     var equipesSet = {};
     var evtGlobal = {};
+    var evtParEquipe = {}; // equipe_nom -> { evt_id: true } (pt 65, stats équipe)
     (Array.isArray(lignes) ? lignes : []).forEach(function (l) {
       var jid = l.joueur_id;
       if (!jid) return;
       var eq = l.equipe_nom || '—';
       equipesSet[eq] = true;
       if (l.evenement_id) evtGlobal[l.evenement_id] = true;
+      if (l.evenement_id) {
+        if (!evtParEquipe[eq]) evtParEquipe[eq] = {};
+        evtParEquipe[eq][l.evenement_id] = true;
+      }
 
       if (!parJoueur[jid]) parJoueur[jid] = { evts: {}, parEquipe: {}, depannage: false };
       var rec = parJoueur[jid];
@@ -581,7 +594,11 @@
       }
     });
     var equipes = Object.keys(equipesSet).sort();
-    return { parJoueur: parJoueur, equipes: equipes, nbMatchs: Object.keys(evtGlobal).length };
+    return {
+      parJoueur: parJoueur, equipes: equipes,
+      nbMatchs: Object.keys(evtGlobal).length,
+      evtParEquipe: evtParEquipe
+    };
   }
 
   // Charge le collectif N1 (dénominateur) en best-effort. Renvoie une
@@ -633,15 +650,66 @@
       // (joueurs vus en compo + joueurs du collectif à 0 match) — sinon les
       // joueurs à 0 match, absents de agg.parJoueur, n'ont pas de nom résolu
       // et s'affichent en #id (bug pt 64 corrigé).
-      return Promise.resolve(_chargerCollectifN1(categorieId)).then(function (collectifSet) {
+      // En parallèle : nombre RÉEL d'équipes de la catégorie via listEquipes
+      // (pt 65). agg.equipes ne contient que les équipes VUES en compo (2),
+      // alors que la catégorie en a 3 (M14-3 sans compo) ; on affiche le réel.
+      return Promise.all([
+        Promise.resolve(_chargerCollectifN1(categorieId)),
+        (typeof hub.listEquipes === 'function'
+          ? Promise.resolve(hub.listEquipes(categorieId)).catch(function () { return null; })
+          : Promise.resolve(null))
+      ]).then(function (r) {
+        var collectifSet = r[0];
+        var equipesCat = Array.isArray(r[1]) ? r[1] : null;
+        // nb total d'équipes de la catégorie (repli : équipes vues en compo)
+        agg.nbEquipesCategorie = equipesCat ? equipesCat.length : agg.equipes.length;
         var idsSet = {};
         Object.keys(agg.parJoueur).forEach(function (jid) { idsSet[jid] = true; });
         if (collectifSet && collectifSet.size > 0) {
           collectifSet.forEach(function (_v, jid) { idsSet[jid] = true; });
         }
         var tousIds = Object.keys(idsSet);
-        return Promise.resolve(resoudreNoms(tousIds)).then(function (noms) {
-          _peindrePilotageCategorie(el, agg, noms || new Map(), collectifSet);
+        // pt 65 — extension stats : agréger par équipe (V/N/D, points, faits)
+        // + temps de jeu global. agregerEquipe NE distingue pas 2 équipes MOM
+        // dans un même lot → on l'appelle par équipe (lots d'evt disjoints).
+        var evtParEquipe = agg.evtParEquipe || {};
+        var nomsEquipes = Object.keys(evtParEquipe).sort();
+        var evtTous = [];
+        nomsEquipes.forEach(function (eq) {
+          Object.keys(evtParEquipe[eq]).forEach(function (id) { evtTous.push(id); });
+        });
+        var pStatsEquipes = (typeof agregerEquipe === 'function')
+          ? Promise.all(nomsEquipes.map(function (eq) {
+              var evts = Object.keys(evtParEquipe[eq]);
+              return Promise.resolve(agregerEquipe(evts)).then(function (st) {
+                return { equipe: eq, stats: st };
+              }).catch(function () { return { equipe: eq, stats: null }; });
+            }))
+          : Promise.resolve([]);
+        var pTempsJeu = (typeof agregerTempsDeJeu === 'function')
+          ? Promise.resolve(agregerTempsDeJeu(evtTous)).catch(function () { return { parJoueur: {}, auMoinsUnChrono: false }; })
+          : Promise.resolve({ parJoueur: {}, auMoinsUnChrono: false });
+
+        return Promise.all([
+          Promise.resolve(resoudreNoms(tousIds)),
+          pStatsEquipes,
+          pTempsJeu
+        ]).then(function (rr) {
+          var noms = rr[0] || new Map();
+          // fusionner faits de jeu (essais/cartons via parJoueur de chaque équipe)
+          var faitsJoueur = {}; // jid -> { essais, pts }
+          (rr[1] || []).forEach(function (blocEq) {
+            var pj = (blocEq.stats && blocEq.stats.parJoueur) || {};
+            Object.keys(pj).forEach(function (jid) {
+              if (!faitsJoueur[jid]) faitsJoueur[jid] = { essais: 0, pts: 0 };
+              faitsJoueur[jid].essais += (pj[jid].essais || 0);
+              faitsJoueur[jid].pts += (pj[jid].pts || 0);
+            });
+          });
+          agg.statsEquipes = rr[1] || [];
+          agg.tempsJeu = rr[2] || { parJoueur: {}, auMoinsUnChrono: false };
+          agg.faitsJoueur = faitsJoueur;
+          _peindrePilotageCategorie(el, agg, noms, collectifSet);
         });
       });
     }).catch(function (e) {
@@ -719,37 +787,105 @@
     var nbJoues = lignes.filter(function (l) { return l.nbMatchs > 0; }).length;
     var nbZero = lignes.length - nbJoues;
 
+    // Nombre d'équipes : réel de la catégorie (listEquipes, pt 65) ; repli sur
+    // les équipes vues en compo. Mention si certaines n'ont pas encore de compo.
+    var nbEqVues = agg.equipes.length;
+    var nbEq = (typeof agg.nbEquipesCategorie === 'number' && agg.nbEquipesCategorie > 0)
+      ? agg.nbEquipesCategorie : nbEqVues;
+    var ecartEqNote = (nbEq > nbEqVues)
+      ? ' ' + (nbEq - nbEqVues) + ' équipe' + ((nbEq - nbEqVues) > 1 ? 's' : '') +
+        ' sans composition à ce jour.'
+      : '';
+
+    // pt 65 — temps de jeu + faits de jeu par joueur (dégradation honnête)
+    var tj = (agg.tempsJeu && agg.tempsJeu.parJoueur) || {};
+    var faits = agg.faitsJoueur || {};
+    // NB : cartons NON ventilés par joueur (agregerEquipe ne les compte qu'au
+    // niveau équipe) → pas de colonne cartons joueur (éviterait un « — » partout).
+    // Les cartons figurent dans le bloc Niveau équipe.
+
     var corps = lignes.length ? lignes.map(function (l) {
       var detail = (l.nbMatchs > 0)
         ? detailEquipes(l.rec.parEquipe)
         : '<span class="ss-attente">Aucun match disputé</span>';
       var dep = l.rec.depannage ? ' <span class="ss-cat-dep" title="A dépanné hors catégorie">⤴</span>' : '';
+      var recTj = tj[l.joueur_id];
+      var tjTxt = (typeof fmtTempsJeu === 'function') ? fmtTempsJeu(recTj) : '—';
+      var essais = (faits[l.joueur_id] && faits[l.joueur_id].essais) ? faits[l.joueur_id].essais : 0;
+      var essaisTxt = (l.nbMatchs > 0) ? String(essais) : '—';
       return '<tr>' +
         '<td>' + escapeHtml(l.label) + dep + '</td>' +
         '<td class="ss-num">' + l.nbMatchs + '</td>' +
         '<td>' + detail + '</td>' +
+        '<td class="ss-num">' + tjTxt + '</td>' +
+        '<td class="ss-num">' + essaisTxt + '</td>' +
       '</tr>';
-    }).join('') : '<tr><td colspan="3" class="ss-attente">Aucune donnée de compétition sur la catégorie.</td></tr>';
+    }).join('') : '<tr><td colspan="5" class="ss-attente">Aucune donnée de compétition sur la catégorie.</td></tr>';
+
+    // pt 65 — bloc Niveau équipe (1 carte par équipe)
+    function blocEquipeHtml(blocEq) {
+      var s = blocEq.stats;
+      if (!s || s.indispo) {
+        return '<div class="ss-eq-carte"><h3>' + escapeHtml(blocEq.equipe) + '</h3>' +
+          '<p class="ss-attente">Statistiques d\'équipe indisponibles.</p></div>';
+      }
+      if (s.nbRenseignes === 0) {
+        return '<div class="ss-eq-carte"><h3>' + escapeHtml(blocEq.equipe) + '</h3>' +
+          '<p class="ss-attente">Aucun match renseigné pour le moment (' + s.nbMatchs + ' programmé' + (s.nbMatchs > 1 ? 's' : '') + ').</p></div>';
+      }
+      var bilan = s.v + 'V · ' + s.n + 'N · ' + s.d + 'D';
+      return '<div class="ss-eq-carte">' +
+        '<h3>' + escapeHtml(blocEq.equipe) + '</h3>' +
+        '<div class="ss-kpis">' +
+          _kpi('Bilan', bilan) +
+          _kpi('Points', s.momTotal + ' / ' + s.advTotal) +
+          _kpi('Essais', s.essaisNous + ' / ' + s.essaisAdv) +
+          _kpi('Mêlées G/P', s.meleeG + ' / ' + s.meleeP) +
+          _kpi('Touches G/P', s.toucheG + ' / ' + s.toucheP) +
+          _kpi('Cartons', String(s.cartons)) +
+        '</div>' +
+        '<p class="ss-note">' + s.nbRenseignes + ' / ' + s.nbMatchs + ' match' + (s.nbMatchs > 1 ? 's' : '') + ' renseigné' + (s.nbRenseignes > 1 ? 's' : '') + '.</p>' +
+      '</div>';
+    }
+    var statsEquipes = agg.statsEquipes || [];
+    var blocEquipes = statsEquipes.length
+      ? statsEquipes.map(blocEquipeHtml).join('')
+      : '<p class="ss-attente">Aucune équipe avec des matchs sur la catégorie.</p>';
+
+    // pt 65 — note temps de jeu (dégradation honnête globale)
+    var tjGlobalNote = (agg.tempsJeu && agg.tempsJeu.auMoinsUnChrono)
+      ? ''
+      : '<p class="ss-note">Temps de jeu : « — » tant qu\'aucun match n\'est chronométré de bout en bout (la donnée se renseignera au fil des matchs suivis).</p>';
 
     el.innerHTML =
       '<header class="ss-pilot-head"><h1>Pilotage de saison</h1>' +
-        '<p class="ss-sub">Catégorie · collectif complet · ' + agg.equipes.length + ' équipe' + (agg.equipes.length > 1 ? 's' : '') + '</p></header>' +
+        '<p class="ss-sub">Catégorie · collectif complet · ' + nbEq + ' équipe' + (nbEq > 1 ? 's' : '') + '</p></header>' +
       '<section class="ss-bloc">' +
         '<div class="ss-kpis">' +
           _kpi('Joueurs', String(lignes.length)) +
           _kpi('Ont joué', String(nbJoues)) +
           _kpi('À 0 match', String(nbZero)) +
           _kpi('Matchs (cat.)', String(agg.nbMatchs)) +
-          _kpi('Équipes', String(agg.equipes.length)) +
+          _kpi('Équipes', String(nbEq)) +
         '</div>' +
-        '<p class="ss-note">' + escapeHtml(denomNote) + '</p>' +
+        '<p class="ss-note">' + escapeHtml(denomNote) + ecartEqNote + '</p>' +
+      '</section>' +
+      '<section class="ss-bloc">' +
+        '<h2>Niveau équipe</h2>' +
+        '<div class="ss-eq-grid">' + blocEquipes + '</div>' +
       '</section>' +
       '<section class="ss-bloc">' +
         '<h2>Participation par joueur</h2>' +
         '<table class="ss-table"><thead><tr>' +
           '<th>Joueur</th><th class="ss-num">Matchs</th><th>Détail par équipe · rôle · poste</th>' +
+          '<th class="ss-num">Temps de jeu</th><th class="ss-num">Essais</th>' +
         '</tr></thead><tbody>' + corps + '</tbody></table>' +
+        tjGlobalNote +
         '<p class="ss-note">Compétition uniquement (matchs &amp; tournois). Un joueur peut figurer dans plusieurs équipes — chaque ligne d\'équipe détaille rôle et postes occupés.</p>' +
+      '</section>' +
+      '<section class="ss-bloc">' +
+        '<h2>Assiduité</h2>' +
+        '<p class="ss-attente">À constituer : la prise de présence aux entraînements et matchs n\'est pas encore activée. Cet axe se remplira dès que les présences seront saisies.</p>' +
       '</section>';
   }
 
