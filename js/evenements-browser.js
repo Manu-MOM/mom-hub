@@ -21,6 +21,19 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
+ * Version : 1.61 — Vignette « Rapports » câblée (deep-link compositions.html?vue=rapport) (4 juin 2026)
+ *   v1.61 : VIGNETTE #7 RAPPORTS CÂBLÉE. La fonctionnalité Rapports existe
+ *           déjà (onglet « Rapport » de l'éditeur, pt 53-55) ; la vignette
+ *           était restée statut 'a-venir' sans action. Câblage miroir EXACT
+ *           de Vue terrain / Réseaux / Suivi (pt 45/60) : statut adaptatif
+ *           (eqEng.length > 0 ? disponible : a-venir) + action ouvrir-vue-
+ *           rapport + mécanisme multi-équipes EXISTANT de renderFonctionCellule
+ *           (1 équipe → bouton direct, N → « Choisir l'équipe ▼ »). 3 points :
+ *           (a) vignette #7 re-paramétrée ; (b) condition `multi` étendue à
+ *           ouvrir-vue-rapport ; (c) handler neuf miroir de ouvrir-vue-reseaux
+ *           → compositions.html?evenement_equipe=<id>&vue=rapport (capté par
+ *           compositions-editor v3.63 au boot). Ajout pur, aucune fonction
+ *           Suivi/renderFiche/Niveau 0 existante touchée.
  * Version : 1.60 — Vignette « Suivi de la rencontre » supprimée : liens migrés vers l'éditeur (SUIVI-LIEN-COACH-MIGRATION ✅) (3 juin 2026)
  *   v1.60 : LÈVE la dette SUIVI-LIEN-COACH-MIGRATION (passation pt 56).
  *           La génération des liens partageables (bénévole + spectateur)
@@ -3408,12 +3421,22 @@
       sectionId: 'vue-reseaux'
     });
 
-    // Fonction #7 — Rapports (à venir)
+    // Fonction #7 — Rapports (deep-link vers compositions.html?vue=rapport)
+    //   v1.61 — La fonctionnalité Rapports EXISTE déjà : c'est l'onglet
+    //   « Rapport » de l'éditeur (compositions.html, livré pt 53-55). On
+    //   câble la vignette en miroir EXACT de Vue terrain / Réseaux / Suivi :
+    //   statut adaptatif + action ouvrir-vue-rapport + mécanisme multi-équipes.
+    //   Le deep-link &vue=rapport est capté au boot par compositions-editor
+    //   v3.63 (onglet Rapport tabs[3]).
     html += renderFonctionCellule({
       titre: '📝 Rapports',
       sousTitre: 'Compte-rendu de match',
-      statut: 'a-venir',
-      evt: evt
+      statut: eqEng.length > 0 ? 'disponible' : 'a-venir',
+      action: 'ouvrir-vue-rapport',
+      multiEquipes: eqEng,
+      eqNames: eqNames,
+      evt: evt,
+      sectionId: 'vue-rapport'
     });
 
     // Fonction #8 — Statistiques (à venir)
@@ -3642,7 +3665,7 @@
     // Statut disponible → mécanisme adaptatif
     if (statut === 'disponible') {
       // Compositions/Groupes multi-équipes adaptatif (Q4=C)
-      if (multi && (opts.action === 'ouvrir-feuille-equipe' || opts.action === 'ouvrir-groupe-base' || opts.action === 'ouvrir-vue-terrain' || opts.action === 'ouvrir-vue-reseaux' || opts.action === 'ouvrir-vue-suivi')) {
+      if (multi && (opts.action === 'ouvrir-feuille-equipe' || opts.action === 'ouvrir-groupe-base' || opts.action === 'ouvrir-vue-terrain' || opts.action === 'ouvrir-vue-reseaux' || opts.action === 'ouvrir-vue-suivi' || opts.action === 'ouvrir-vue-rapport')) {
         if (multi.length === 1) {
           // 1 équipe → bouton direct (handler Niveau 0 INVARIANT)
           const eq = multi[0];
@@ -3953,6 +3976,21 @@
         const evtEqId = this.getAttribute('data-evenement-equipe-id');
         if (evtEqId) {
           window.location.href = 'compositions.html?evenement_equipe=' + encodeURIComponent(evtEqId) + '&vue=reseaux';
+        }
+      });
+    });
+    // ── v1.61 : Vue Rapport (tuile « 📝 Rapports ») — miroir EXACT de
+    //    ouvrir-vue-reseaux + &vue=rapport. La fonctionnalité Rapports vit
+    //    dans l'onglet « Rapport » de l'éditeur (compositions.html, pt 53-55) ;
+    //    le deep-link &vue=rapport est capté au boot par compositions-editor
+    //    v3.63 (onglet Rapport tabs[3]). Pour une compo de BASE, l'onglet
+    //    Rapport agrège tournoi + phases ; pour une compo de match, le rapport
+    //    de match. L'éditeur choisit selon l'onglet actif (comportement pt 55).
+    document.querySelectorAll('[data-action="ouvrir-vue-rapport"]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        const evtEqId = this.getAttribute('data-evenement-equipe-id');
+        if (evtEqId) {
+          window.location.href = 'compositions.html?evenement_equipe=' + encodeURIComponent(evtEqId) + '&vue=rapport';
         }
       });
     });
