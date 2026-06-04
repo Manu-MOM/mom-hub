@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="assets/logo-m2m.png">
   <title>Pilotage de saison · MOM Hub</title>
   <style>
     :root {
@@ -54,11 +55,48 @@
     (function () {
       var params = new URLSearchParams(window.location.search);
       var baseId = params.get('compo_base');
+      var evtEqId = params.get('evenement_equipe');
       var mount = document.getElementById('ss-pilotage');
       if (!window.StatsSaison) {
         mount.innerHTML = '<section class="ss-bloc"><h2>Erreur</h2><p>Module stats-saison indisponible.</p></section>';
         return;
       }
+
+      // Entrée directe (mes-compos) : ?compo_base=<id> → pilotage immédiat.
+      if (baseId) {
+        StatsSaison.renderPilotage(baseId, mount);
+        return;
+      }
+
+      // Entrée depuis la fiche évènement (pt 65) : ?evenement_equipe=<id>.
+      // pilotage.html n'attend qu'un compo_base → on résout l'evenement_equipe
+      // vers SA compo de BASE (getCompoForEvenementEquipe renvoie un tableau ;
+      // on prend la compo type_compo='base' active). Cohérent avec les autres
+      // tuiles de la fiche qui passent toutes ?evenement_equipe=.
+      if (evtEqId && window.SupabaseHub && typeof SupabaseHub.getCompoForEvenementEquipe === 'function') {
+        mount.innerHTML = '<p class="ss-load">Chargement du pilotage…</p>';
+        Promise.resolve(SupabaseHub.getCompoForEvenementEquipe(evtEqId))
+          .then(function (res) {
+            var arr = Array.isArray(res) ? res : (res && Array.isArray(res.data) ? res.data : []);
+            var base = arr.filter(function (c) { return c && c.type_compo === 'base'; })[0] || arr[0] || null;
+            if (base && base.id) {
+              StatsSaison.renderPilotage(base.id, mount);
+            } else {
+              mount.innerHTML = '<section class="ss-bloc"><h2>Pilotage indisponible</h2>' +
+                '<p>Aucune composition de base n\'a été trouvée pour cette équipe. ' +
+                'Créez-la depuis les Compositions pour activer le pilotage.</p></section>';
+            }
+          })
+          .catch(function (e) {
+            if (typeof console !== 'undefined') console.error('pilotage boot (evenement_equipe)', e);
+            mount.innerHTML = '<section class="ss-bloc"><h2>Erreur</h2>' +
+              '<p>Impossible de charger le pilotage de cette équipe.</p></section>';
+          });
+        return;
+      }
+
+      // Aucun paramètre exploitable : on tente quand même renderPilotage (qui
+      // gère l'absence de baseId par sa propre dégradation honnête).
       StatsSaison.renderPilotage(baseId, mount);
     })();
   </script>
