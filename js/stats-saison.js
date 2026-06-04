@@ -629,12 +629,20 @@
 
     return Promise.resolve(hub.listPilotageCategorie(categorieId)).then(function (lignes) {
       var agg = _agregerCategorie(lignes);
-      var joueurIds = Object.keys(agg.parJoueur);
-      return Promise.all([
-        resoudreNoms(joueurIds),
-        _chargerCollectifN1(categorieId)
-      ]).then(function (r) {
-        _peindrePilotageCategorie(el, agg, r[0] || new Map(), r[1]);
+      // Charger le collectif N1 D'ABORD, puis résoudre les noms de l'UNION
+      // (joueurs vus en compo + joueurs du collectif à 0 match) — sinon les
+      // joueurs à 0 match, absents de agg.parJoueur, n'ont pas de nom résolu
+      // et s'affichent en #id (bug pt 64 corrigé).
+      return Promise.resolve(_chargerCollectifN1(categorieId)).then(function (collectifSet) {
+        var idsSet = {};
+        Object.keys(agg.parJoueur).forEach(function (jid) { idsSet[jid] = true; });
+        if (collectifSet && collectifSet.size > 0) {
+          collectifSet.forEach(function (_v, jid) { idsSet[jid] = true; });
+        }
+        var tousIds = Object.keys(idsSet);
+        return Promise.resolve(resoudreNoms(tousIds)).then(function (noms) {
+          _peindrePilotageCategorie(el, agg, noms || new Map(), collectifSet);
+        });
       });
     }).catch(function (e) {
       if (typeof console !== 'undefined') console.error('StatsSaison.renderPilotageCategorie', e);
