@@ -980,9 +980,18 @@ window.JoueursBrowser = (function () {
 
   function renderFicheActions(d) {
     // S2.4 : boutons câblés vers les modales J3/J4/J5
+    // pt 62 (câblage accès) : + accès « Stats de saison » → page autonome
+    //   fiche-joueur-stats.html?joueur_id=<id>. C'est une CONSULTATION
+    //   (lecture seule), distincte de l'édition métier → ligne séparée.
+    //   L'id vient de currentEditPersonneId (posé par openFiche), pas d'un
+    //   champ de `d` (évite toute hypothèse sur le nom de colonne du détail).
     return `
       <div class="joueur-fiche-section joueur-fiche-actions">
-        <div class="joueur-fiche-section-title">✏️ Édition métier</div>
+        <div class="joueur-fiche-section-title">📊 Suivi</div>
+        <div class="joueur-fiche-actions-row">
+          <button type="button" class="joueur-btn joueur-btn-stats" data-stats="saison">Stats de saison</button>
+        </div>
+        <div class="joueur-fiche-section-title" style="margin-top:14px;">✏️ Édition métier</div>
         <div class="joueur-fiche-actions-row">
           <button type="button" class="joueur-btn joueur-btn-edit" data-edit="profil">Modifier profil sportif</button>
           <button type="button" class="joueur-btn joueur-btn-edit" data-edit="etat">Modifier état</button>
@@ -994,6 +1003,14 @@ window.JoueursBrowser = (function () {
 
   /** Branche les 3 boutons d'édition de la fiche (à appeler après renderFiche). */
   function bindFicheActions() {
+    // pt 62 — accès « Stats de saison » (consultation, page autonome).
+    //   joueur_id = currentEditPersonneId (l'id passé à openFiche).
+    document.querySelectorAll('.joueur-btn-stats[data-stats="saison"]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        if (!currentEditPersonneId) return;
+        window.location.href = 'fiche-joueur-stats.html?joueur_id=' + encodeURIComponent(currentEditPersonneId);
+      });
+    });
     document.querySelectorAll('.joueur-btn-edit[data-edit]').forEach(btn => {
       btn.addEventListener('click', function () {
         if (!currentEditDetail) return;
@@ -1422,7 +1439,7 @@ window.JoueursBrowser = (function () {
     _byId: () => JOUEURS_BY_ID,
     _postesById: () => POSTES_BY_ID,
     _aptitudesById: () => APTITUDES_BY_ID,
-    _version: 'v1.3'
+    _version: 'v1.4'  /* pt 62 : bouton « Stats de saison » dans la fiche joueur */
   };
 
 })();
