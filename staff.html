@@ -169,15 +169,12 @@
   <section id="panel-vivier" style="display:none">
     <div class="st-note">Maille : entente / saison. Le vivier staff est club-wide (pas attaché à une catégorie). La sortie est datée — la ligne est conservée, jamais supprimée.</div>
 
-    <div class="st-entente-row">
-      <label for="viEntente" style="margin-bottom:0">Catégorie / saison :</label>
-      <select id="viEntente" aria-label="Choisir la catégorie et la saison"><option value="">Chargement…</option></select>
-    </div>
+    <div id="viGrid"><div class="st-empty">Chargement des catégories / saisons…</div></div>
 
-    <div id="viPanel" style="display:none">
+    <div class="st-fn-zone" id="viPanel">
       <section class="st-col" aria-label="Staff du vivier">
         <div class="st-col__head">
-          <span class="st-col__title">Staff du vivier</span>
+          <span class="st-col__title" id="viColTitle">Staff du vivier</span>
           <span class="st-col__count"><span id="viCount">0</span></span>
         </div>
         <div class="st-add-row">
