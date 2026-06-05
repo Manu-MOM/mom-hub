@@ -221,25 +221,41 @@
   // ==========================================================
   // ONGLET VIVIER (ex-bloc staff de u-admin)
   // ==========================================================
-  const VI = { ententes: [], ententeId: null, membres: [], pioche: [], busy: false, loaded: false };
+  const VI = { ententes: [], ententeId: null, ententeLib: '', membres: [], pioche: [], busy: false, loaded: false };
 
-  async function viLoadEntentes() {
+  // Libellé d'une entente : « catégorie · saison ». Champs réels (vérifiés à
+  // la source) : e.categories.code et e.saisons.code (objets imbriqués),
+  // PAS de e.categorie_libelle / e.saison_libelle (inexistants).
+  function viEntenteLib(e) {
+    const cat = (e.categories && (e.categories.code)) || '';
+    const sai = (e.saisons && (e.saisons.code)) || '';
+    const txt = [cat, sai].filter(Boolean).join(' · ');
+    return txt || e.libelle_court || e.libelle_moyen || e.code || 'entente';
+  }
+
+  async function viLoadGrid() {
     VI.ententes = await SupabaseHub.listEntentes() || [];
-    const sel = $('viEntente');
+    const host = $('viGrid');
     if (!VI.ententes.length) {
-      sel.innerHTML = '<option value="">(aucune entente)</option>';
-      flash('Aucune entente trouvée. La création d\'entente se fait hors de cet écran (administration transverse).', 'err');
+      host.innerHTML = '<div class="st-empty">Aucune entente trouvée. La création d\'entente se fait hors de cet écran (administration transverse).</div>';
       return;
     }
-    let html = '<option value="">&mdash; Choisir une catégorie / saison… &mdash;</option>';
-    VI.ententes.forEach(function (e) {
-      const cat = e.categorie_libelle || e.categorie_code || '';
-      const sai = e.saison_libelle || e.saison_code || '';
-      const lib = e.libelle_court || e.libelle_moyen || e.code || 'entente';
-      const txt = [cat, sai].filter(Boolean).join(' · ') || lib;
-      html += '<option value="' + escapeHtml(e.id) + '">' + escapeHtml(txt) + '</option>';
+    host.innerHTML =
+      '<div class="st-cat-grid">' +
+      VI.ententes.map(function (e) {
+        const lib = viEntenteLib(e);
+        return '<button type="button" class="st-cat" data-ent="' + escapeHtml(e.id) +
+          '" data-lib="' + escapeHtml(lib) + '">' +
+          '<div class="st-cat__head"><span class="st-cat__name">' + escapeHtml(lib) + '</span></div>' +
+          '<div class="st-cat__foot">Voir le vivier &rarr;</div>' +
+        '</button>';
+      }).join('') +
+      '</div>';
+    host.querySelectorAll('.st-cat').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        viSelectEntente(btn.getAttribute('data-ent'), btn.getAttribute('data-lib'), btn);
+      });
     });
-    sel.innerHTML = html;
   }
 
   async function viLoadMembres() {
@@ -304,9 +320,13 @@
     $('viAddBtn').disabled = false;
   }
 
-  async function viSelectEntente(ententeId) {
+  async function viSelectEntente(ententeId, lib, btn) {
     VI.ententeId = ententeId || null;
+    VI.ententeLib = lib || '';
+    $('viGrid').querySelectorAll('.st-cat').forEach(function (b) { b.classList.remove('active'); });
+    if (btn) btn.classList.add('active');
     if (!VI.ententeId) { $('viPanel').style.display = 'none'; return; }
+    $('viColTitle').textContent = 'Staff du vivier — ' + (VI.ententeLib || '');
     $('viPanel').style.display = 'block';
     try {
       await viLoadMembres();
@@ -361,7 +381,7 @@
     }
     if (!onFn && !VI.loaded) {
       VI.loaded = true;
-      viLoadEntentes().catch(function (e) { flash('Chargement vivier impossible : ' + errMsg(e), 'err'); });
+      viLoadGrid().catch(function (e) { flash('Chargement vivier impossible : ' + errMsg(e), 'err'); });
     }
   }
 
@@ -373,8 +393,8 @@
   $('fnAddBtn').addEventListener('click', fnAdd);
   $('fnHistChk').addEventListener('change', fnRenderList);
 
-  // Listeners Vivier
-  $('viEntente').addEventListener('change', function (e) { viSelectEntente(e.target.value); });
+  // Listeners Vivier (la sélection d'entente se fait par clic sur une vignette,
+  // câblé dans viLoadGrid)
   $('viAddBtn').addEventListener('click', viAdd);
 
   // Déconnexion
