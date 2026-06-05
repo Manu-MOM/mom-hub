@@ -623,8 +623,16 @@
         if (res && res.ok && Array.isArray(res.data)) {
           const active = res.data.find(function (s) { return s.est_active === true; });
           if (active && active.date_debut && active.date_fin) {
-            min = new Date(active.date_debut + 'T00:00:00');
-            max = new Date(active.date_fin + 'T23:59:59');
+            // Fenêtre de chargement ÉLARGIE autour de la saison active
+            // (−6 mois / +18 mois) : une réservation peut chevaucher la
+            // saison suivante (stage d'été, pré-rentrée). La navigation est
+            // libre (flèches non bornées) ; cette fenêtre dit seulement
+            // jusqu'où les données sont préchargées. Hors fenêtre = mois
+            // affiché vide (honnête), pas une erreur.
+            const d = new Date(active.date_debut + 'T00:00:00');
+            const f = new Date(active.date_fin + 'T23:59:59');
+            min = new Date(d.getFullYear(), d.getMonth() - 6, 1);
+            max = new Date(f.getFullYear(), f.getMonth() + 18, 0);
           }
         }
       }
@@ -769,19 +777,15 @@
       });
     });
 
-    // Bornage des flèches sur la saison
+    // Navigation LIBRE (décision Manu pt 69) : les flèches ne sont jamais
+    // désactivées — une réservation peut chevaucher d'une saison à l'autre.
+    // Le bornage strict à la saison (D-Temporel pt 68) est levé : hypothèse
+    // inversée par le fait métier. Les mois hors fenêtre préchargée
+    // s'affichent vides (honnête), sans erreur.
     const prev = el('logi-cal-prev');
     const next = el('logi-cal-next');
-    if (prev && state.cal.minDate) {
-      const minMo = new Date(state.cal.minDate.getFullYear(), state.cal.minDate.getMonth(), 1);
-      const curMo = new Date(yr, mo, 1);
-      prev.disabled = curMo <= minMo;
-    }
-    if (next && state.cal.maxDate) {
-      const maxMo = new Date(state.cal.maxDate.getFullYear(), state.cal.maxDate.getMonth(), 1);
-      const curMo = new Date(yr, mo, 1);
-      next.disabled = curMo >= maxMo;
-    }
+    if (prev) prev.disabled = false;
+    if (next) next.disabled = false;
   }
 
   // Détail du jour sélectionné (D-Détail) : liste des créneaux occupés,
