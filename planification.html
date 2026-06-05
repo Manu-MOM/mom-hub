@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="assets/logo-m2m.png">
+  <title>Planification annuelle · MOM Hub</title>
+  <style>
+    :root {
+      --vert: #2d7a3e; --vert-fonce: #0c3d24; --vert-light: rgba(45,122,62,.1);
+      --gris: #6b7a6f; --bord: #cabe9f; --attente: #8a93a0;
+      --paper: #f8f5ec; --paper-warm: #efe9d6; --carte: #ffffff;
+      --gold: #d4a93a; --clay: #b8451f; --ink: #0c3d24;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--paper); color: var(--ink);
+      font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+      line-height: 1.5; padding: 1.5rem 1rem 4rem;
+    }
+    .pa-wrap { max-width: 980px; margin: 0 auto; }
+    .pa-retour {
+      display: inline-flex; align-items: center; gap: .35rem; margin-bottom: 1rem;
+      padding: .4rem .8rem; border: 1px solid var(--bord); border-radius: 8px;
+      background: var(--carte); color: var(--vert-fonce); font-size: .9rem;
+      font-weight: 600; cursor: pointer; text-decoration: none;
+    }
+    .pa-retour:hover { background: var(--paper-warm); }
+
+    .pa-load { color: var(--gris); }
+    .pa-attente { color: var(--attente); font-style: italic; margin: .4rem 0 0; }
+
+    .pa-head { border-bottom: 3px solid var(--vert); padding-bottom: .75rem; margin-bottom: 1.25rem; }
+    .pa-head h1 { margin: 0; font-size: 1.9rem; color: var(--vert-fonce); }
+    .pa-sub { margin: .25rem 0 0; color: var(--gris); font-size: .95rem; }
+    .pa-readonly { margin: .5rem 0 0; color: var(--clay); font-size: .9rem; font-weight: 600; }
+
+    .pa-card {
+      background: var(--carte); border: 1px solid var(--bord); border-radius: 12px;
+      padding: 1rem 1.1rem; margin-bottom: 1.25rem;
+    }
+    .pa-card h2 { margin: 0 0 .9rem; font-size: 1.15rem; color: var(--vert-fonce); }
+
+    /* ---- Bloc éditable ---- */
+    .pa-bloc {
+      border: 1px solid var(--bord); border-radius: 10px; padding: .9rem 1rem;
+      margin-bottom: 1rem; background: var(--paper);
+    }
+    .pa-bloc__bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: .7rem; }
+    .pa-bloc__rang { font-weight: 700; color: var(--vert-fonce); letter-spacing: .02em; }
+    .pa-bloc__actions { display: flex; gap: .35rem; }
+    .pa-mini {
+      border: 1px solid var(--bord); background: var(--carte); color: var(--vert-fonce);
+      border-radius: 6px; padding: .25rem .5rem; font-size: .82rem; cursor: pointer;
+    }
+    .pa-mini:hover { background: var(--paper-warm); }
+    .pa-mini--del { color: var(--clay); border-color: #e3b3a4; }
+
+    .pa-row { display: flex; gap: .7rem; flex-wrap: wrap; margin-bottom: .6rem; }
+    .pa-field { display: flex; flex-direction: column; gap: .25rem; font-size: .85rem; color: var(--gris); }
+    .pa-field--grow { flex: 1 1 220px; }
+    .pa-field--full { width: 100%; }
+    .pa-field span { font-weight: 600; }
+    .pa-field input, .pa-field textarea, .pa-select, .pa-axe__custom {
+      font: inherit; padding: .4rem .55rem; border: 1px solid var(--bord);
+      border-radius: 6px; background: #fff; color: var(--ink);
+    }
+    .pa-field textarea { resize: vertical; }
+
+    .pa-axe { margin: .6rem 0; }
+    .pa-axe__lbl { font-size: .85rem; font-weight: 700; color: var(--vert); text-transform: uppercase; letter-spacing: .02em; margin-bottom: .35rem; }
+    .pa-axe__lbl em { font-weight: 400; font-style: italic; text-transform: none; color: var(--gris); }
+    .pa-select { width: 100%; }
+    .pa-axe__custom { width: 100%; margin-top: .4rem; }
+
+    .pa-indiv { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: .35rem .8rem; }
+    .pa-check { display: inline-flex; align-items: center; gap: .4rem; font-size: .9rem; color: var(--ink); cursor: pointer; }
+    .pa-check--inline { margin: .5rem 0; }
+
+    .pa-btn {
+      border: none; background: var(--vert); color: #fff; border-radius: 8px;
+      padding: .5rem .9rem; font-size: .92rem; font-weight: 600; cursor: pointer;
+    }
+    .pa-btn:hover { background: var(--vert-fonce); }
+    .pa-btn--add { margin-top: .4rem; background: var(--carte); color: var(--vert-fonce); border: 1px dashed var(--vert); }
+    .pa-btn--add:hover { background: var(--vert-light); }
+    .pa-bloc__save { display: flex; align-items: center; gap: .6rem; margin-top: .6rem; }
+    .pa-bloc__state { font-size: .85rem; color: var(--gris); }
+    .pa-bloc__state--ok { color: var(--vert); }
+    .pa-bloc__state--err { color: var(--clay); }
+
+    /* ---- Frise emboîtée (lecture) ---- */
+    .pa-frise { display: flex; flex-wrap: wrap; gap: 0; }
+    .pa-frise__bloc {
+      position: relative; flex: 1 1 200px; min-width: 180px;
+      background: var(--vert); color: #fff; padding: .9rem 1.4rem .9rem 1.6rem;
+      margin-right: -14px; /* chevauchement pour l'emboîtement */
+      clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%, 14px 50%);
+      box-shadow: 0 2px 6px var(--vert-light);
+    }
+    .pa-frise__bloc:first-child {
+      clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%);
+      padding-left: 1.2rem;
+    }
+    .pa-frise__bloc:nth-child(odd) { background: var(--vert-fonce); }
+    .pa-frise__bloc--inter { background: var(--gold); color: var(--ink); }
+    .pa-frise__num {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 22px; height: 22px; border-radius: 50%; background: rgba(255,255,255,.25);
+      font-size: .8rem; font-weight: 700; margin-bottom: .35rem;
+    }
+    .pa-frise__bloc--inter .pa-frise__num { background: rgba(12,61,36,.18); }
+    .pa-frise__titre { font-weight: 700; font-size: .98rem; margin-bottom: .25rem; }
+    .pa-frise__date { font-size: .76rem; opacity: .85; margin-bottom: .3rem; }
+    .pa-frise__axes { margin: .2rem 0 0; padding-left: 1rem; font-size: .78rem; opacity: .92; }
+    .pa-frise__axes li { margin: .1rem 0; }
+    .pa-frise__comm { font-size: .76rem; opacity: .8; margin-top: .35rem; font-style: italic; }
+
+    /* ---- Écran de choix transverse ---- */
+    .pa-choix { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; }
+    .pa-choix__col h3 { margin: 0 0 .6rem; font-size: 1rem; color: var(--vert-fonce); }
+    .pa-choix__item {
+      display: block; width: 100%; text-align: left; margin-bottom: .4rem;
+      border: 1px solid var(--bord); background: var(--paper); color: var(--ink);
+      border-radius: 8px; padding: .6rem .8rem; font-size: .95rem; font-weight: 600; cursor: pointer;
+    }
+    .pa-choix__item:hover { background: var(--vert-light); border-color: var(--vert); }
+
+    footer { max-width: 980px; margin: 2rem auto 0; color: var(--attente); font-size: .8rem; text-align: center; }
+
+    @media (max-width: 640px) {
+      .pa-frise__bloc { flex: 1 1 100%; margin-right: 0; margin-bottom: 6px;
+        clip-path: none; border-radius: 8px; }
+      .pa-frise__bloc:first-child { clip-path: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="pa-wrap">
+    <button type="button" class="pa-retour" onclick="if(history.length>1){history.back()}else{location.href='index.html'}">← Retour</button>
+    <main id="pa-mount"><p class="pa-load">Initialisation…</p></main>
+  </div>
+  <footer>MOM Hub · planification annuelle — Mutzig Ovalie Molsheim</footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/planification-editor.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var mount = document.getElementById('pa-mount');
+      if (!window.PlanificationEditor || !window.SupabaseHub) {
+        mount.innerHTML = '<section class="pa-card"><h2>Erreur</h2>' +
+          '<p>Module de planification indisponible.</p></section>';
+        return;
+      }
+      window.PlanificationEditor.start(mount);
+    })();
+  </script>
+</body>
+</html>
