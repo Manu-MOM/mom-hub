@@ -109,7 +109,20 @@
     isTransverse: false,   // admin|bureau → toutes catégories
     canValidate: false,    // bureau|admin → section validation
     recurOn: false,
-    recurJours: []
+    recurJours: [],
+    // --- Calendrier d'occupation (v1) -----------------------------
+    // Vue unifiée TOUTES ressources (≠ state.ressources qui est filtré
+    // au type courant). Chargé une fois au boot, indexé par jour,
+    // navigation sans re-fetch (D-Chargement).
+    cal: {
+      ressById: {},        // ressource_id -> libellé (toutes ressources)
+      occByDay: {},        // 'YYYY-MM-DD' -> [ {creneau, res, motif, recur} ]
+      viewYear: 0,         // mois affiché (année)
+      viewMonth: 0,        // mois affiché (0-based)
+      selectedKey: null,   // jour sélectionné 'YYYY-MM-DD'
+      minDate: null,       // borne saison début (Date)
+      maxDate: null        // borne saison fin (Date)
+    }
   };
 
   // ============================================================
@@ -155,6 +168,7 @@
       await refreshRecurrences();
     }
     await refreshAgenda();
+    await refreshCalendar();
 
     console.log('%c🏉 Logistique chargé', 'color:#2D7D46;font-weight:bold;',
       { type: state.type, ressources: state.ressources.length, validation: state.canValidate });
@@ -574,6 +588,289 @@
       row.appendChild(btn);
       host.appendChild(row);
     });
+  }
+
+  // ============================================================
+  // CALENDRIER D'OCCUPATION (v1)
+  // Conception-Calendrier-Logistique-v1.md
+  //   D-Forme       : mini-calendrier latéral + détail du jour
+  //   D-Occupation  : approved seulement
+  //   D-Temporel    : saison entière (navigation mois par mois)
+  //   D-Chargement  : saison chargée 1× au boot, indexée par jour,
+  //                   navigation sans re-fetch, ZÉRO nouveau SQL
+  //   D-Périmètre   : vue unifiée TOUTES ressources, 3 pages
+  //   D-Récurrences : projetées via getOccurrences
+  //   D-Détail      : liste créneaux du jour, tri heure+ressource,
+  //                   ressource toujours nommée (vue unifiée)
+  // ============================================================
+
+  function dayKey(yr, mo /* 0-based */, d) {
+    return yr + '-' + String(mo + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+  }
+
+  // Résout les bornes de la saison via listSaisons() (wrapper Hub
+  // existant v1.50, lecture). On n'utilise QUE date_debut/date_fin de
+  // la saison active — jamais le `code` parsé (format non fiable, cf.
+  // dette DATA-SAISON-CODE-FORMAT). Repli honnête : 12 mois glissants
+  // autour d'aujourd'hui si aucune saison active résolue.
+  async function resolveSaisonBornes() {
+    const now = new Date();
+    let min = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+    let max = new Date(now.getFullYear(), now.getMonth() + 6, 0);
+    try {
+      if (SupabaseHub && typeof SupabaseHub.listSaisons === 'function') {
+        const res = await SupabaseHub.listSaisons();
+        if (res && res.ok && Array.isArray(res.data)) {
+          const active = res.data.find(function (s) { return s.est_active === true; });
+          if (active && active.date_debut && active.date_fin) {
+            min = new Date(active.date_debut + 'T00:00:00');
+            max = new Date(active.date_fin + 'T23:59:59');
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Logistique calendrier : bornes saison non résolues, repli 12 mois', e);
+    }
+    state.cal.minDate = min;
+    state.cal.maxDate = max;
+  }
+
+  // Itère les mois (year, month 0-based) de la saison, du début à la fin.
+  function moisDeLaSaison() {
+    const out = [];
+    if (!state.cal.minDate || !state.cal.maxDate) return out;
+    const cur = new Date(state.cal.minDate.getFullYear(), state.cal.minDate.getMonth(), 1);
+    const fin = new Date(state.cal.maxDate.getFullYear(), state.cal.maxDate.getMonth(), 1);
+    while (cur <= fin) {
+      out.push({ year: cur.getFullYear(), month: cur.getMonth() });
+      cur.setMonth(cur.getMonth() + 1);
+    }
+    return out;
+  }
+
+  function pushOcc(key, occ) {
+    if (!state.cal.occByDay[key]) state.cal.occByDay[key] = [];
+    state.cal.occByDay[key].push(occ);
+  }
+
+  // Chargement unique de la saison (D-Chargement) : TOUTES ressources
+  // (D-Périmètre), réservations simples approved + occurrences
+  // récurrentes projetées (D-Récurrences). Indexé par jour.
+  async function loadCalendarData() {
+    state.cal.occByDay = {};
+    state.cal.ressById = {};
+
+    // 1) Toutes les ressources, tous types (vue unifiée) — appel SANS
+    //    filtre, ≠ loadRessources() qui est filtré au type courant.
+    let toutesRess = [];
+    try {
+      toutesRess = await SupabaseHub.listRessourcesLogistiques() || [];
+    } catch (e) {
+      console.warn('Logistique calendrier : ressources non chargées', e);
+      return;
+    }
+    toutesRess.forEach(function (r) { state.cal.ressById[r.id] = r.libelle; });
+
+    const mois = moisDeLaSaison();
+
+    // 2) Par ressource : simples approved + récurrences approuvées
+    for (let i = 0; i < toutesRess.length; i++) {
+      const r = toutesRess[i];
+      const label = state.cal.ressById[r.id] || '—';
+
+      // Réservations simples approuvées (indexées sur leur date)
+      let simples = [];
+      try {
+        simples = await SupabaseHub.listReservations({ ressourceId: r.id, statut: 'approved' }) || [];
+      } catch (e) { simples = []; }
+      simples.forEach(function (s) {
+        if (!s.date) return;
+        pushOcc(s.date, {
+          creneau: (s.heure_debut || '').slice(0, 5) + '–' + (s.heure_fin || '').slice(0, 5),
+          res: label,
+          motif: s.motif || '',
+          recur: false,
+          hd: (s.heure_debut || '')
+        });
+      });
+
+      // Règles récurrentes approuvées/actives → projection mois par mois
+      let regles = [];
+      try {
+        regles = await SupabaseHub.listRecurrences({ ressourceId: r.id, statut: 'approved', activeOnly: true }) || [];
+      } catch (e) { regles = []; }
+      regles.forEach(function (rule) {
+        mois.forEach(function (m) {
+          const occ = getOccurrences(rule, m.year, m.month); // jours 1..31
+          occ.forEach(function (d) {
+            const key = dayKey(m.year, m.month, d);
+            pushOcc(key, {
+              creneau: (rule.heure_debut || '').slice(0, 5) + '–' + (rule.heure_fin || '').slice(0, 5),
+              res: label,
+              motif: rule.motif || '',
+              recur: true,
+              hd: (rule.heure_debut || '')
+            });
+          });
+        });
+      });
+    }
+  }
+
+  // Rendu de la grille mensuelle (esprit renderMiniCal d'Évènements :
+  // grille L→D, pastille sur jours occupés, is-today). Interaction
+  // neuve : clic = sélection du jour → met à jour le détail.
+  function renderCalendarGrid() {
+    const grid = el('logi-cal-grid');
+    const title = el('logi-cal-title');
+    if (!grid) return;
+
+    const yr = state.cal.viewYear;
+    const mo = state.cal.viewMonth;
+
+    if (title) {
+      title.textContent = (MOIS[mo] || '') + ' ' + yr;
+    }
+
+    const today = new Date();
+    const firstDay = new Date(yr, mo, 1);
+    const daysInMonth = new Date(yr, mo + 1, 0).getDate();
+    let startCol = firstDay.getDay() - 1; // 0=Lun
+    if (startCol < 0) startCol = 6;
+
+    let html = '';
+    ['L', 'M', 'M', 'J', 'V', 'S', 'D'].forEach(function (w) {
+      html += '<div class="logi-cal__wday">' + w + '</div>';
+    });
+    for (let i = 0; i < startCol; i++) {
+      html += '<div class="logi-cal__day logi-cal__day--empty"></div>';
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+      const key = dayKey(yr, mo, d);
+      const has = !!(state.cal.occByDay[key] && state.cal.occByDay[key].length);
+      const isToday = today.getFullYear() === yr && today.getMonth() === mo && today.getDate() === d;
+      const isSel = state.cal.selectedKey === key;
+      const cls = ['logi-cal__day',
+        has ? 'logi-cal__day--has' : '',
+        isToday ? 'logi-cal__day--today' : '',
+        isSel ? 'logi-cal__day--selected' : ''
+      ].filter(Boolean).join(' ');
+      let titleAttr = '';
+      if (has) titleAttr = ' title="' + state.cal.occByDay[key].length + ' occupation(s)"';
+      html += '<div class="' + cls + '" data-day-key="' + key + '"' + titleAttr + '>' + d + '</div>';
+    }
+    grid.innerHTML = html;
+
+    grid.querySelectorAll('.logi-cal__day[data-day-key]').forEach(function (cell) {
+      cell.addEventListener('click', function () {
+        state.cal.selectedKey = this.getAttribute('data-day-key');
+        renderCalendarGrid();      // re-peint pour le surlignage
+        renderCalendarDetail();
+      });
+    });
+
+    // Bornage des flèches sur la saison
+    const prev = el('logi-cal-prev');
+    const next = el('logi-cal-next');
+    if (prev && state.cal.minDate) {
+      const minMo = new Date(state.cal.minDate.getFullYear(), state.cal.minDate.getMonth(), 1);
+      const curMo = new Date(yr, mo, 1);
+      prev.disabled = curMo <= minMo;
+    }
+    if (next && state.cal.maxDate) {
+      const maxMo = new Date(state.cal.maxDate.getFullYear(), state.cal.maxDate.getMonth(), 1);
+      const curMo = new Date(yr, mo, 1);
+      next.disabled = curMo >= maxMo;
+    }
+  }
+
+  // Détail du jour sélectionné (D-Détail) : liste des créneaux occupés,
+  // tri heure_debut puis ressource ; ressource TOUJOURS nommée (vue
+  // unifiée → sinon ambigu sur une page de type donné).
+  function renderCalendarDetail() {
+    const body = el('logi-cal-detail-body');
+    const title = el('logi-cal-detail-title');
+    if (!body) return;
+
+    const key = state.cal.selectedKey;
+    if (!key) {
+      body.innerHTML = '<div class="logi-cal__detail-empty">Sélectionnez un jour.</div>';
+      if (title) title.textContent = 'Détail du jour';
+      return;
+    }
+
+    if (title) title.textContent = formatDateLong(key);
+
+    const occ = (state.cal.occByDay[key] || []).slice();
+    occ.sort(function (a, b) {
+      if (a.hd !== b.hd) return a.hd < b.hd ? -1 : 1;
+      return a.res < b.res ? -1 : (a.res > b.res ? 1 : 0);
+    });
+
+    if (occ.length === 0) {
+      body.innerHTML = '<div class="logi-cal__detail-empty">Aucune occupation ce jour.</div>';
+      return;
+    }
+
+    body.innerHTML = occ.map(function (it) {
+      return '<div class="logi-cal__detail-row">' +
+        '<div class="logi-cal__detail-line1">' +
+          '<span class="logi-cal__detail-creneau">' + escapeHtml(it.creneau) + '</span>' +
+          '<span class="logi-cal__detail-res">' + (it.recur ? '↻ ' : '') + escapeHtml(it.res) + '</span>' +
+        '</div>' +
+        (it.motif ? '<div class="logi-cal__detail-motif">' + escapeHtml(it.motif) + '</div>' : '') +
+      '</div>';
+    }).join('');
+  }
+
+  function wireCalendarNav() {
+    const prev = el('logi-cal-prev');
+    const next = el('logi-cal-next');
+    if (prev) prev.addEventListener('click', function () {
+      if (prev.disabled) return;
+      let yr = state.cal.viewYear, mo = state.cal.viewMonth - 1;
+      if (mo < 0) { mo = 11; yr--; }
+      state.cal.viewYear = yr; state.cal.viewMonth = mo;
+      renderCalendarGrid();
+    });
+    if (next) next.addEventListener('click', function () {
+      if (next.disabled) return;
+      let yr = state.cal.viewYear, mo = state.cal.viewMonth + 1;
+      if (mo > 11) { mo = 0; yr++; }
+      state.cal.viewYear = yr; state.cal.viewMonth = mo;
+      renderCalendarGrid();
+    });
+  }
+
+  // Orchestration : bornes → données → mois courant (borné saison) →
+  // sélection du jour courant par défaut → rendu.
+  async function refreshCalendar() {
+    if (!el('logi-cal-grid')) return;
+    await resolveSaisonBornes();
+    await loadCalendarData();
+
+    // Mois affiché = mois courant, mais borné à la saison.
+    const now = new Date();
+    let viewY = now.getFullYear(), viewM = now.getMonth();
+    if (state.cal.minDate && now < state.cal.minDate) {
+      viewY = state.cal.minDate.getFullYear(); viewM = state.cal.minDate.getMonth();
+    } else if (state.cal.maxDate && now > state.cal.maxDate) {
+      viewY = state.cal.maxDate.getFullYear(); viewM = state.cal.maxDate.getMonth();
+    }
+    state.cal.viewYear = viewY;
+    state.cal.viewMonth = viewM;
+
+    // Jour sélectionné par défaut = aujourd'hui s'il est dans la fenêtre
+    // affichée, sinon aucun (détail invite à sélectionner).
+    if (now.getFullYear() === viewY && now.getMonth() === viewM) {
+      state.cal.selectedKey = dayKey(viewY, viewM, now.getDate());
+    } else {
+      state.cal.selectedKey = null;
+    }
+
+    wireCalendarNav();
+    renderCalendarGrid();
+    renderCalendarDetail();
   }
 
   // ============================================================
