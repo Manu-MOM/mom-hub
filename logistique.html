@@ -12,7 +12,7 @@
   <style>
     body.auth-pending { visibility: hidden; }
 
-    .logi-layout { max-width: 1000px; margin: 0 auto; padding: 28px 22px 60px; }
+    .logi-layout { max-width: 1180px; margin: 0 auto; padding: 28px 22px 60px; }
 
     .logi-back {
       display: inline-block; margin-bottom: 16px;
@@ -148,6 +148,113 @@
     }
     .logi-toast.is-show { opacity: 1; transform: translateX(-50%) translateY(0); }
     .logi-toast.is-err { background: var(--rouge-alerte, #b23); }
+
+    /* ========================================================== */
+    /* CALENDRIER D'OCCUPATION (v1) — panneau latéral + détail jour */
+    /* Conception-Calendrier-Logistique-v1.md (D-Forme : mini-cal   */
+    /* latéral + détail du jour sélectionné à côté).                */
+    /* ========================================================== */
+
+    /* Layout 2 colonnes : sections existantes à gauche, calendrier  */
+    /* à droite. Les sections existantes ne changent pas — elles     */
+    /* sont seulement enveloppées par .logi-cols / .logi-col-main.   */
+    .logi-cols {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 320px;
+      gap: 32px;
+      align-items: start;
+    }
+    .logi-col-main { min-width: 0; }
+    .logi-col-side { min-width: 0; }
+
+    .logi-cal {
+      position: sticky; top: 18px;
+      background: #fff; border: 1px solid var(--line); border-radius: 12px;
+      padding: 16px 16px 18px;
+    }
+    .logi-cal__head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .logi-cal__title {
+      font-family: 'Oswald', sans-serif; font-size: 14px; font-weight: 600;
+      letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink);
+    }
+    .logi-cal__nav { display: flex; align-items: center; gap: 6px; }
+    .logi-cal__nav button {
+      width: 26px; height: 26px; border: 1px solid var(--line); border-radius: 7px;
+      background: #fff; color: var(--ink-soft); cursor: pointer; font-size: 14px;
+      line-height: 1; display: flex; align-items: center; justify-content: center;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .logi-cal__nav button:hover:not(:disabled) {
+      border-color: var(--vert-prairie); color: var(--vert-prairie);
+    }
+    .logi-cal__nav button:disabled { opacity: 0.35; cursor: default; }
+
+    .logi-cal__grid {
+      display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px;
+    }
+    .logi-cal__wday {
+      text-align: center; font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; color: var(--ink-mute); padding: 2px 0 4px;
+    }
+    .logi-cal__day {
+      position: relative; aspect-ratio: 1 / 1;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink-soft);
+      border: 1px solid transparent; border-radius: 7px; cursor: pointer;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .logi-cal__day:hover { background: var(--paper, #f6f4ef); }
+    .logi-cal__day--empty { cursor: default; }
+    .logi-cal__day--today { font-weight: 700; color: var(--ink); }
+    .logi-cal__day--has::after {
+      content: ''; position: absolute; bottom: 4px; left: 50%;
+      transform: translateX(-50%);
+      width: 5px; height: 5px; border-radius: 50%; background: var(--vert-prairie);
+    }
+    .logi-cal__day--selected {
+      background: var(--vert-prairie); color: #fff; border-color: var(--vert-prairie);
+    }
+    .logi-cal__day--selected.logi-cal__day--has::after { background: #fff; }
+
+    .logi-cal__detail {
+      margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line);
+    }
+    .logi-cal__detail-title {
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-mute);
+      margin-bottom: 10px;
+    }
+    .logi-cal__detail-row {
+      display: flex; flex-direction: column; gap: 2px;
+      padding: 8px 0; border-bottom: 1px solid var(--line);
+    }
+    .logi-cal__detail-row:last-child { border-bottom: none; }
+    .logi-cal__detail-line1 {
+      display: flex; align-items: baseline; gap: 8px;
+    }
+    .logi-cal__detail-creneau {
+      font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--vert-prairie);
+      white-space: nowrap;
+    }
+    .logi-cal__detail-res {
+      font-family: 'Oswald', sans-serif; font-size: 14px; color: var(--ink); flex: 1;
+    }
+    .logi-cal__detail-motif {
+      font-size: 11px; color: var(--ink-mute); padding-left: 2px;
+    }
+    .logi-cal__detail-empty {
+      font-size: 12px; color: var(--ink-mute); font-style: italic; padding: 6px 0;
+    }
+
+    /* Responsive : sous 860px, le calendrier repasse sous les       */
+    /* sections (empilement) et perd le sticky.                      */
+    @media (max-width: 860px) {
+      .logi-cols { grid-template-columns: 1fr; }
+      .logi-cal { position: static; }
+    }
   </style>
 </head>
 <body class="auth-pending">
@@ -191,6 +298,12 @@
       <h2 class="logi-title" id="logi-title">Logistique</h2>
       <p class="logi-subtitle" id="logi-subtitle">Réservation</p>
     </div>
+
+    <!-- v1 calendrier : layout 2 colonnes. Les sections existantes  -->
+    <!-- (gauche) sont inchangées ; le calendrier d'occupation est   -->
+    <!-- ajouté en colonne latérale droite (D-Forme).                -->
+    <div class="logi-cols">
+      <div class="logi-col-main">
 
     <!-- DEMANDE -->
     <section class="logi-section">
@@ -278,6 +391,33 @@
       <h3 class="logi-section__title">Règles récurrentes</h3>
       <div id="logi-recurrents"><div class="logi-empty">—</div></div>
     </section>
+
+      </div><!-- /.logi-col-main -->
+
+      <!-- COLONNE LATÉRALE — Calendrier d'occupation (v1) -->
+      <!-- Vue unifiée TOUTES ressources (D-Périmètre), identique    -->
+      <!-- sur les 3 pages. Saison entière (D-Temporel), approved     -->
+      <!-- seulement (D-Occupation), récurrences projetées via        -->
+      <!-- getOccurrences (D-Récurrences).                            -->
+      <aside class="logi-col-side">
+        <div class="logi-cal" id="logi-cal">
+          <div class="logi-cal__head">
+            <div class="logi-cal__title" id="logi-cal-title">Calendrier</div>
+            <div class="logi-cal__nav">
+              <button type="button" id="logi-cal-prev" title="Mois précédent">‹</button>
+              <button type="button" id="logi-cal-next" title="Mois suivant">›</button>
+            </div>
+          </div>
+          <div class="logi-cal__grid" id="logi-cal-grid"></div>
+          <div class="logi-cal__detail" id="logi-cal-detail">
+            <div class="logi-cal__detail-title" id="logi-cal-detail-title">Détail du jour</div>
+            <div id="logi-cal-detail-body">
+              <div class="logi-cal__detail-empty">Chargement…</div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div><!-- /.logi-cols -->
   </main>
 
   <div id="logi-toast" class="logi-toast"></div>
