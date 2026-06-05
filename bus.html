@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Demande de bus · MOM Hub</title>
+  <link rel="icon" type="image/png" href="assets/logo-m2m.png">
+  <meta name="description" content="Demande de bus — déplacements avec car affrété, MOM Hub." />
+
+  <link rel="stylesheet" href="css/hub.css">
+
+  <style>
+    body.auth-pending { visibility: hidden; }
+
+    .bus-layout { max-width: 880px; margin: 0 auto; padding: 28px 22px 60px; }
+    .bus-head { margin-bottom: 8px; }
+    .bus-title {
+      font-family: 'Oswald', sans-serif; font-size: 24px; font-weight: 500;
+      color: var(--ink); letter-spacing: 0.3px; margin: 0 0 4px;
+    }
+    .bus-subtitle {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      letter-spacing: 0.12em; color: var(--ink-mute); text-transform: uppercase;
+    }
+    .bus-info {
+      background: var(--vert-light); border: 1px solid var(--line);
+      border-radius: 10px; padding: 12px 16px; margin: 16px 0 22px;
+      font-size: 13px; color: var(--ink-soft);
+    }
+
+    .bus-card {
+      background: #fff; border: 1px solid var(--line); border-radius: 12px;
+      padding: 18px 20px; margin-bottom: 16px;
+    }
+    .bus-card__title {
+      font-family: 'Oswald', sans-serif; font-size: 14px; font-weight: 600;
+      letter-spacing: 0.05em; text-transform: uppercase; color: var(--vert-prairie);
+      margin: 0 0 14px;
+    }
+    .bus-card__hint { font-size: 12px; color: var(--ink-mute); margin-bottom: 12px; }
+
+    .bus-field { margin-bottom: 12px; flex: 1; min-width: 0; }
+    .bus-field label {
+      display: block; font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-mute);
+      margin-bottom: 4px;
+    }
+    .bus-field input, .bus-field select, .bus-field textarea {
+      width: 100%; box-sizing: border-box; font-family: inherit; font-size: 14px;
+      padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px;
+      background: #fff; color: var(--ink);
+    }
+    .bus-field--sm { flex: 0 0 120px; }
+    .bus-row { display: flex; gap: 12px; }
+
+    .bus-arret-row, .bus-deleg-row {
+      display: flex; gap: 10px; align-items: flex-end; margin-bottom: 10px;
+    }
+    .bus-del-btn {
+      flex: 0 0 auto; width: 38px; height: 38px; border-radius: 8px;
+      border: 1px solid var(--line); background: #fff; color: var(--rouge-alerte, #b23);
+      font-size: 20px; line-height: 1; cursor: pointer;
+    }
+    .bus-add-btn {
+      font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 500;
+      background: #fff; color: var(--vert-prairie); border: 1px solid var(--line);
+      border-radius: 8px; padding: 7px 14px; cursor: pointer; display: inline-flex;
+    }
+
+    .bus-total {
+      background: var(--paper-warm, #f7f5f0); border: 1px solid var(--line);
+      border-radius: 8px; padding: 10px 16px; display: flex; align-items: center;
+      justify-content: space-between; margin-top: 8px;
+    }
+    .bus-total__label { font-size: 13px; color: var(--ink-soft); font-weight: 600; }
+    .bus-total__value {
+      font-family: 'Oswald', sans-serif; font-size: 22px; font-weight: 700;
+      color: var(--vert-prairie);
+    }
+    #recap-passagers { margin-top: 14px; }
+    .bus-recap {
+      background: var(--ink); color: #fff; border-radius: 8px; padding: 14px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .bus-recap__value {
+      font-family: 'Oswald', sans-serif; font-size: 24px; font-weight: 700;
+      color: var(--or-cuivre, #d4a820);
+    }
+
+    .bus-submit {
+      font-family: 'Oswald', sans-serif; font-size: 15px; font-weight: 500;
+      letter-spacing: 0.04em; background: var(--vert-prairie); color: #fff;
+      border: none; border-radius: 8px; padding: 12px 24px; cursor: pointer;
+    }
+    .bus-submit:disabled { opacity: 0.5; cursor: default; }
+
+    /* Validation admin */
+    .bus-admin-only { display: none; }
+    body.show-admin .bus-admin-only { display: block; }
+    .bus-valid-row {
+      display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+      background: #fff; border: 1px solid var(--line); border-radius: 10px;
+      padding: 12px 16px; margin-bottom: 8px;
+    }
+    .bus-valid-dest { font-family: 'Oswald', sans-serif; font-size: 15px; color: var(--ink); flex: 1; }
+    .bus-valid-meta { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-mute); }
+    .bus-valid-actions { display: flex; gap: 8px; }
+    .bus-btn-ok, .bus-btn-no {
+      font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 500;
+      border-radius: 6px; padding: 7px 14px; cursor: pointer; border: 1px solid var(--line);
+    }
+    .bus-btn-ok { background: var(--vert-prairie); color: #fff; border-color: var(--vert-prairie); }
+    .bus-btn-no { background: #fff; color: var(--rouge-alerte, #b23); }
+
+    .bus-badge {
+      font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600;
+      background: var(--vert-prairie); color: #fff; border-radius: 10px;
+      padding: 1px 7px; min-width: 16px; text-align: center;
+    }
+    .bus-badge:empty { display: none; }
+    .bus-empty { text-align: center; padding: 24px; color: var(--ink-mute); font-size: 14px; }
+
+    .bus-toast {
+      position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(20px);
+      background: var(--ink); color: #fff; padding: 11px 20px; border-radius: 8px;
+      font-size: 14px; opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s;
+      z-index: 50;
+    }
+    .bus-toast.is-show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .bus-toast.is-err { background: var(--rouge-alerte, #b23); }
+  </style>
+</head>
+<body class="auth-pending">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo"><img src="assets/logo-m2m.png" alt="MOM Rugby"></div>
+      <div class="brand-text">
+        <h1>MOM Hub</h1>
+        <p>Mutzig Ovalie Molsheim</p>
+      </div>
+    </div>
+
+    <div class="season-pill">SAISON 2025 / 2026</div>
+
+    <nav class="main-nav">
+      <a href="./">Tableau de bord</a>
+      <a class="active">Logistique</a>
+      <a>Annuaire</a>
+      <a>Configuration</a>
+    </nav>
+
+    <div class="user-profile">
+      <div class="avatar">EJ</div>
+      <div class="user-info">
+        <div class="user-name">Emmanuel Jung</div>
+        <div class="user-role">Référent M14</div>
+      </div>
+      <a href="./" class="user-action" title="Retour au portail" aria-label="Retour au portail">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/></svg>
+      </a>
+      <button type="button" class="user-action" id="btn-signout" title="Se déconnecter" aria-label="Se déconnecter">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="bus-layout">
+    <div class="bus-head">
+      <h2 class="bus-title">Demande de bus</h2>
+      <p class="bus-subtitle">Déplacements avec car affrété — aller / retour / délégations</p>
+    </div>
+    <div class="bus-info">
+      🚌 Ce formulaire prépare le bon de commande transport et la répartition
+      des coûts entre le MOM et les clubs invités.
+    </div>
+
+    <!-- BLOC 1 : Infos générales -->
+    <div class="bus-card">
+      <h3 class="bus-card__title">Informations générales</h3>
+      <div class="bus-row">
+        <div class="bus-field">
+          <label for="b-cat">Catégorie MOM *</label>
+          <select id="b-cat"></select>
+        </div>
+        <div class="bus-field">
+          <label for="b-resp">Responsable MOM *</label>
+          <select id="b-resp"><option value="">—</option></select>
+        </div>
+      </div>
+      <div class="bus-row">
+        <div class="bus-field">
+          <label for="b-date">Date du déplacement *</label>
+          <input type="date" id="b-date">
+        </div>
+        <div class="bus-field">
+          <label for="b-comp">Type de compétition</label>
+          <select id="b-comp">
+            <option value="">— Sélectionner —</option>
+            <option>Championnat</option><option>Coupe</option>
+            <option>Tournoi</option><option>Amical</option><option>Stage</option>
+          </select>
+        </div>
+      </div>
+      <div class="bus-row">
+        <div class="bus-field">
+          <label for="b-to">Destination finale *</label>
+          <input type="text" id="b-to" placeholder="Ex : Stade de la Robertsau, Strasbourg">
+        </div>
+        <div class="bus-field">
+          <label for="b-arrival">Heure d'arrivée souhaitée *</label>
+          <input type="time" id="b-arrival">
+        </div>
+      </div>
+    </div>
+
+    <!-- BLOC 2 : Ramassage aller -->
+    <div class="bus-card">
+      <h3 class="bus-card__title">Points de ramassage — Aller</h3>
+      <div class="bus-card__hint">Jusqu'à 3 sites de départ, dans l'ordre de passage du bus.</div>
+      <div id="arrets-aller-list"></div>
+      <button type="button" class="bus-add-btn" id="btn-add-aller">+ Ajouter un point</button>
+    </div>
+
+    <!-- BLOC 3 : Dépôt retour -->
+    <div class="bus-card">
+      <h3 class="bus-card__title">Points de dépôt — Retour</h3>
+      <div class="bus-card__hint">Lieux de dépose au retour (peuvent différer de l'aller).</div>
+      <div class="bus-row">
+        <div class="bus-field">
+          <label for="b-retour-depart">Heure de départ retour estimée</label>
+          <input type="time" id="b-retour-depart">
+        </div>
+        <div class="bus-field">
+          <label for="b-retour-arrival">Heure d'arrivée retour estimée</label>
+          <input type="time" id="b-retour-arrival">
+        </div>
+      </div>
+      <div id="arrets-retour-list"></div>
+      <button type="button" class="bus-add-btn" id="btn-add-retour">+ Ajouter un point</button>
+    </div>
+
+    <!-- BLOC 4 : Passagers MOM -->
+    <div class="bus-card">
+      <h3 class="bus-card__title">Passagers MOM</h3>
+      <div class="bus-row">
+        <div class="bus-field">
+          <label for="b-pax-joueurs">Joueurs MOM</label>
+          <input type="number" id="b-pax-joueurs" min="0" max="60" placeholder="Ex : 18">
+        </div>
+        <div class="bus-field">
+          <label for="b-pax-staff">Staff / accompagnateurs</label>
+          <input type="number" id="b-pax-staff" min="0" max="20" placeholder="Ex : 4">
+        </div>
+      </div>
+      <div class="bus-total">
+        <span class="bus-total__label">Total MOM</span>
+        <span class="bus-total__value" id="total-mom-display">0</span>
+      </div>
+      <div class="bus-card__hint" style="margin-top:8px;margin-bottom:0;">
+        Si tu renseignes le « Nb MOM » par point de ramassage, ce total prime
+        sur le champ « Joueurs ».
+      </div>
+    </div>
+
+    <!-- BLOC 5 : Délégations -->
+    <div class="bus-card">
+      <h3 class="bus-card__title">Délégations extérieures (clubs invités)</h3>
+      <div class="bus-card__hint">Clubs qui montent aussi dans le bus. Coût réparti au prorata des passagers.</div>
+      <div id="delegations-list"></div>
+      <button type="button" class="bus-add-btn" id="btn-add-deleg">+ Ajouter un club</button>
+
+      <div id="recap-passagers" style="display:none;">
+        <div class="bus-recap">
+          <span class="bus-total__label" style="color:#fff;">Total bus</span>
+          <span class="bus-recap__value" id="total-bus-display">0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- BLOC 6 : Notes -->
+    <div class="bus-card">
+      <h3 class="bus-card__title">Notes complémentaires</h3>
+      <textarea id="b-notes" placeholder="Bagages, équipements, contraintes, repas…" style="height:80px;"></textarea>
+      <div style="margin-top:14px;">
+        <button type="button" id="b-submit" class="bus-submit">Envoyer la demande →</button>
+      </div>
+    </div>
+
+    <!-- VALIDATION (bureau|admin) -->
+    <div class="bus-card bus-admin-only">
+      <h3 class="bus-card__title">
+        Validation <span id="bus-validation-badge" class="bus-badge"></span>
+      </h3>
+      <div id="bus-validation"><div class="bus-empty">—</div></div>
+    </div>
+  </main>
+
+  <div id="bus-toast" class="bus-toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/bus-browser.js"></script>
+</body>
+</html>
