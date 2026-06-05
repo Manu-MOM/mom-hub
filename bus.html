@@ -13,6 +13,13 @@
     body.auth-pending { visibility: hidden; }
 
     .bus-layout { max-width: 880px; margin: 0 auto; padding: 28px 22px 60px; }
+
+    .bus-back {
+      display: inline-block; margin-bottom: 16px;
+      font-family: 'JetBrains Mono', monospace; font-size: 12px;
+      letter-spacing: 0.06em; color: var(--ink-mute); text-decoration: none;
+    }
+    .bus-back:hover { color: var(--vert-prairie); }
     .bus-head { margin-bottom: 8px; }
     .bus-title {
       font-family: 'Oswald', sans-serif; font-size: 24px; font-weight: 500;
@@ -166,6 +173,7 @@
   </header>
 
   <main class="bus-layout">
+    <a href="./" class="bus-back" title="Retour à l'accueil">← Retour à l'accueil</a>
     <div class="bus-head">
       <h2 class="bus-title">Demande de bus</h2>
       <p class="bus-subtitle">Déplacements avec car affrété — aller / retour / délégations</p>
