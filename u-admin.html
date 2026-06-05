@@ -34,8 +34,7 @@
       background: var(--paper-warm, #faf6ef); color: var(--ink, #222); font-size: 14px;
     }
 
-    .ua-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
-    @media (max-width: 880px) { .ua-grid { grid-template-columns: 1fr; } }
+    .ua-grid { display: grid; grid-template-columns: 1fr; gap: 20px; align-items: start; max-width: 560px; }
 
     .ua-col { border: 1px solid var(--paper-warm, #ece6da); border-radius: 10px; background: #fff; }
     .ua-col__head {
@@ -165,25 +164,6 @@
           </div>
           <div class="ua-col__body">
             <ul class="ua-list" id="ua-joueurs">
-              <li class="ua-empty">Sélectionnez une catégorie / saison.</li>
-            </ul>
-          </div>
-        </section>
-
-        <!-- Bloc Staff -->
-        <section class="ua-col" aria-label="Staff du collectif">
-          <div class="ua-col__head">
-            <span class="ua-col__title ua-col__title--staff">Staff</span>
-            <span class="ua-col__count"><span id="ua-cnt-staff">0</span></span>
-          </div>
-          <div class="ua-add-row" id="ua-add-staff-wrap">
-            <select id="ua-pioche-staff" aria-label="Choisir un staff à enrôler">
-              <option value="">— Choisir un staff… —</option>
-            </select>
-            <button type="button" class="ua-btn" id="ua-add-staff" disabled>+ Enrôler</button>
-          </div>
-          <div class="ua-col__body">
-            <ul class="ua-list" id="ua-staff">
               <li class="ua-empty">Sélectionnez une catégorie / saison.</li>
             </ul>
           </div>
