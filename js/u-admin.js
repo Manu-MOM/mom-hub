@@ -71,7 +71,7 @@
 
   const DOM = {
     badge:        () => document.getElementById('ua-badge'),
-    ententeSel:   () => document.getElementById('ua-entente'),
+    entGrid:      () => document.getElementById('ua-ent-grid'),
     ententeMeta:  () => document.getElementById('ua-entente-meta'),
     error:        () => document.getElementById('ua-error'),
     panel:        () => document.getElementById('ua-panel'),
@@ -119,23 +119,32 @@
   // ----------------------------------------------------------
   // Chargements
   // ----------------------------------------------------------
+  function ententeLib(e) {
+    const cat = (e.categories && e.categories.code) ? e.categories.code : '';
+    const sai = (e.saisons && e.saisons.code) ? e.saisons.code : '';
+    const txt = [cat, sai].filter(Boolean).join(' · ');
+    return txt || e.libelle_moyen || e.libelle_court || e.code || e.id;
+  }
+
   async function loadEntentes() {
     State.ententes = await SupabaseHub.listEntentes() || [];
-    const sel = DOM.ententeSel();
+    const host = DOM.entGrid();
     if (State.ententes.length === 0) {
-      sel.innerHTML = '<option value="">(aucune entente)</option>';
+      host.innerHTML = '<div class="ua-empty">(aucune entente)</div>';
       showError('Aucune entente trouvée. La création d’entente se fait hors de cet écran (chantier d’administration transverse).');
       return;
     }
-    let html = '<option value="">— Choisir une catégorie / saison… —</option>';
-    State.ententes.forEach(function (e) {
-      const cat = (e.categories && e.categories.code) ? e.categories.code : '';
-      const sai = (e.saisons && e.saisons.code) ? e.saisons.code : '';
-      const lib = (e.libelle_moyen || e.libelle_court || e.code || e.id);
-      const txt = [cat, sai].filter(Boolean).join(' · ') || lib;
-      html += '<option value="' + escapeHtml(e.id) + '">' + escapeHtml(txt) + '</option>';
+    host.className = 'ua-ent-grid';
+    host.innerHTML = State.ententes.map(function (e) {
+      const lib = ententeLib(e);
+      return '<button type="button" class="ua-ent" data-ent="' + escapeHtml(e.id) + '">' +
+        '<div class="ua-ent__head"><span class="ua-ent__name">' + escapeHtml(lib) + '</span></div>' +
+        '<div class="ua-ent__foot">Voir le collectif &rarr;</div>' +
+      '</button>';
+    }).join('');
+    host.querySelectorAll('.ua-ent').forEach(function (btn) {
+      btn.addEventListener('click', function () { onSelectEntente(btn.getAttribute('data-ent'), btn); });
     });
-    sel.innerHTML = html;
   }
 
   async function loadMembres() {
@@ -221,9 +230,11 @@
   // ----------------------------------------------------------
   // Actions
   // ----------------------------------------------------------
-  async function onSelectEntente(ententeId) {
+  async function onSelectEntente(ententeId, btn) {
     State.ententeId = ententeId || null;
     clearError();
+    DOM.entGrid().querySelectorAll('.ua-ent').forEach(function (b) { b.classList.remove('active'); });
+    if (btn) btn.classList.add('active');
     if (!State.ententeId) {
       DOM.panel().style.display = 'none';
       return;
@@ -292,9 +303,7 @@
 
     await loadEntentes();
 
-    DOM.ententeSel().addEventListener('change', function () {
-      onSelectEntente(this.value);
-    });
+    // La sélection d'entente se fait par clic sur une vignette (câblé dans loadEntentes).
     DOM.addJoueurBtn().addEventListener('click', onAddJoueur);
 
     DOM.panel().style.display = 'none';   // tant qu'aucune entente choisie
