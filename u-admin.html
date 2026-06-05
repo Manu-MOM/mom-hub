@@ -28,6 +28,18 @@
     }
     .ua-entente-meta { font-size: 12px; color: var(--ink-mute); font-style: italic; margin-bottom: 14px; }
 
+    .ua-ent-intro { font-size: 13px; color: var(--ink-mute); margin: 14px 0 8px; }
+    .ua-ent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-bottom: 6px; }
+    .ua-ent {
+      border: 1px solid var(--paper-warm, #ece6da); border-radius: 10px; background: #fff; overflow: hidden;
+      cursor: pointer; text-align: left; padding: 0; font: inherit;
+    }
+    .ua-ent.active { border-color: var(--vert-mom, #1b6b4c); border-width: 2px; }
+    .ua-ent__head { padding: 10px 13px; border-bottom: 1px solid var(--paper-warm, #ece6da); }
+    .ua-ent__name { font-size: 14px; font-weight: 600; color: var(--ink, #222); }
+    .ua-ent.active .ua-ent__name { color: var(--vert-mom, #1b6b4c); }
+    .ua-ent__foot { padding: 9px 13px; font-size: 12px; color: var(--vert-mom, #1b6b4c); }
+
     .ua-error {
       display: none; margin: 14px 0; padding: 14px 16px;
       border: 1px solid var(--rouge-blesse, #c0392b); border-radius: 8px;
@@ -136,12 +148,8 @@
       <h2>Administration du collectif</h2>
     </div>
 
-    <div class="ua-entente-row">
-      <label for="ua-entente" style="font-size:13px;color:var(--ink-mute);">Catégorie / saison :</label>
-      <select id="ua-entente" aria-label="Choisir la catégorie et la saison">
-        <option value="">Chargement…</option>
-      </select>
-    </div>
+    <div class="ua-ent-intro">Choisis une catégorie / saison :</div>
+    <div id="ua-ent-grid"><div class="ua-empty">Chargement…</div></div>
     <div class="ua-entente-meta" id="ua-entente-meta"></div>
 
     <div class="ua-error" id="ua-error"></div>
