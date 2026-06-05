@@ -18,7 +18,19 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.50 — juin 2026
+ * Version : 1.51 — juin 2026
+ *   v1.51 : PLANIFICATION ANNUELLE (sql/73). 5 wrappers ADDITIFS :
+ *           mesPolesAutorises() — RPC jumelle de mes_categories_autorisees
+ *           (transverse ⇒ [{pole_id:null,est_transverse:true}], référent ⇒
+ *           pôles dérivés de fonction_staff active) ; listPlanificationAxes()
+ *           — référentiel des pioches collectif/physique/poste (actifs,
+ *           triés type+ordre) ; listPlanificationBlocs({saisonId,categorieId|
+ *           poleId}) — blocs d'une portée, RLS fait foi ; savePlanificationBloc
+ *           (upsert) / deletePlanificationBloc(id) — écritures soumises RLS
+ *           (pôle ⇒ admin|bureau ; catégorie ⇒ puis_je_ecrire_categorie).
+ *           Aucun wrapper existant touché ; insertion en fin d'objet ;
+ *           node --check OK. NB : forme de retour de mes_poles_autorises non
+ *           sondable hors session (gardée) → à confirmer en recette en-app.
  *   v1.50 : MODULE LOGISTIQUE (Production). 11 wrappers ADDITIFS pour les
  *           4 tables neuves : lectures listRessourcesLogistiques /
  *           listReservations / listRecurrences / listDemandesBus ;
@@ -6140,6 +6152,136 @@
       }
       const r = Array.isArray(data) ? (data[0] || null) : data;
       return { ok: true, data: r };
+    },
+
+    // ========================================================
+    // PLANIFICATION ANNUELLE (sql/73) — 5 wrappers ADDITIFS
+    // ========================================================
+
+    /**
+     * Pôles autorisés pour la personne connectée, via la RPC
+     * mes_poles_autorises() (sql/73, jumelle de mes_categories_
+     * autorisees). transverse admin|bureau ⇒ [{pole_id:null,
+     * est_transverse:true}] ; référent ⇒ N {pole_id, est_transverse:
+     * false} dérivés de fonction_staff active ; sinon ⇒ [].
+     * Forme de retour non sondable hors session (RPC gardée) →
+     * champs confirmés en recette en-app.
+     *
+     * @returns {Promise<Array>} [{pole_id, est_transverse}] ; [] si
+     *   erreur / hors session (dégradation honnête).
+     */
+    async mesPolesAutorises() {
+      const { data, error } = await client.rpc('mes_poles_autorises');
+      if (error) {
+        console.error('MOM Hub: mesPolesAutorises() / mes_poles_autorises', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * Référentiel des axes de planification (sql/73). Lecture ouverte
+     * aux authentifiés (RLS planification_axes_select). Renvoie les
+     * axes actifs, communs (categorie_id NULL) en v1, triés par type
+     * puis ordre. Le client regroupe par type_axe pour les pioches.
+     *
+     * @returns {Promise<Array>} [{id,type_axe,libelle,ordre,categorie_id,actif}]
+     *   ; [] si erreur (dégradation honnête).
+     */
+    async listPlanificationAxes() {
+      const { data, error } = await client
+        .from('planification_axes')
+        .select('*')
+        .eq('actif', true)
+        .order('type_axe', { ascending: true })
+        .order('ordre', { ascending: true });
+      if (error) {
+        console.error('MOM Hub: listPlanificationAxes()', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * Blocs de planification d'une saison, filtrés par portée :
+     * soit une catégorie (categorieId), soit un pôle (poleId).
+     * La RLS planification_blocs_select fait foi sur ce que la
+     * personne a le droit de voir (catégorie autorisée / pôle de
+     * son périmètre ou transverse). Triés par ordre.
+     *
+     * @param {{saisonId:string, categorieId?:string, poleId?:string}} opts
+     * @returns {Promise<Array>} blocs ; [] si erreur ou paramètres absents.
+     */
+    async listPlanificationBlocs(opts) {
+      const o = opts || {};
+      if (!o.saisonId || (!o.categorieId && !o.poleId)) {
+        console.error('MOM Hub: listPlanificationBlocs() requiert saisonId + (categorieId | poleId)');
+        return [];
+      }
+      let q = client
+        .from('planification_blocs')
+        .select('*')
+        .eq('saison_id', o.saisonId);
+      if (o.poleId) {
+        q = q.eq('pole_id', o.poleId);
+      } else {
+        q = q.eq('categorie_id', o.categorieId);
+      }
+      const { data, error } = await q.order('ordre', { ascending: true });
+      if (error) {
+        console.error('MOM Hub: listPlanificationBlocs()', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * Crée ou met à jour un bloc de planification (upsert par id).
+     * L'écriture est soumise aux policies RLS planification_blocs
+     * (pôle ⇒ admin|bureau ; catégorie ⇒ puis_je_ecrire_categorie).
+     * Le payload doit porter EXACTEMENT une portée (categorie_id XOR
+     * pole_id) — la CHECK planification_blocs_portee_chk le garantit
+     * côté base. Renvoie le bloc persisté.
+     *
+     * @param {object} payload champs de planification_blocs
+     * @returns {Promise<{ok:boolean, data?:object, error?:string}>}
+     */
+    async savePlanificationBloc(payload) {
+      if (!payload || !payload.saison_id) {
+        return { ok: false, error: 'saison_id requis' };
+      }
+      const { data, error } = await client
+        .from('planification_blocs')
+        .upsert(payload)
+        .select()
+        .single();
+      if (error) {
+        console.error('MOM Hub: savePlanificationBloc()', error);
+        return { ok: false, error: error.message || 'Erreur enregistrement bloc' };
+      }
+      return { ok: true, data: data };
+    },
+
+    /**
+     * Supprime un bloc de planification par id. Soumis à la policy
+     * RLS planification_blocs_delete (même garde que l'écriture).
+     *
+     * @param {string} id UUID du bloc
+     * @returns {Promise<{ok:boolean, error?:string}>}
+     */
+    async deletePlanificationBloc(id) {
+      if (!id) {
+        return { ok: false, error: 'id requis' };
+      }
+      const { error } = await client
+        .from('planification_blocs')
+        .delete()
+        .eq('id', id);
+      if (error) {
+        console.error('MOM Hub: deletePlanificationBloc()', error);
+        return { ok: false, error: error.message || 'Erreur suppression bloc' };
+      }
+      return { ok: true };
     }
 
   };
@@ -6167,7 +6309,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.50 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.51 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
