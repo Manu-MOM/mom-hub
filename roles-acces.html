@@ -169,9 +169,36 @@
     </div>
     <div class="ra-magiclink">
       Seules les personnes qui se sont déjà connectées une fois (via Magic Link) apparaissent dans cette liste.
-      Pour donner un rôle à quelqu'un d'absent : il doit d'abord se connecter au Hub une première fois.
+      Pour donner un rôle à quelqu'un d'absent : utilisez la pré-attribution ci-dessous.
     </div>
   </div>
+
+  <div class="ra-section-title" style="margin-top:26px;">Pré-attribuer un rôle (avant 1ʳᵉ connexion)</div>
+  <div class="ra-note">
+    Pour préparer un futur encadrant qui ne s'est pas encore connecté : le rôle est mis <strong>en attente</strong> et
+    s'appliquera automatiquement dès qu'il reliera son compte au Hub. Le périmètre catégorie d'un <em>referent</em> se
+    définit dès maintenant dans <a href="staff.html">Staff</a>, sans attendre sa connexion.
+  </div>
+  <div class="ra-attrib">
+    <div class="ra-attrib-row">
+      <div>
+        <label for="raPrePersonne">Personne (pas encore connectée)</label>
+        <select id="raPrePersonne"><option value="">&mdash; choisir une personne &mdash;</option></select>
+      </div>
+      <div>
+        <label for="raPreRole">Rôle</label>
+        <select id="raPreRole">
+          <option value="referent">referent</option>
+          <option value="bureau">bureau</option>
+          <option value="admin">admin</option>
+        </select>
+      </div>
+      <div><button id="raPreAddBtn" class="ra-btn">Pré-attribuer</button></div>
+    </div>
+  </div>
+
+  <div class="ra-section-title" style="margin-top:22px;">Rôles en attente de 1ʳᵉ connexion</div>
+  <div class="ra-card" id="raPreList"><div class="ra-empty">Chargement…</div></div>
 
 </div>
 
@@ -247,15 +274,20 @@
   }
 
   // État : liste des rôles attribués + index des fonctions actives par personne.
-  const ST = { roles: [], connectees: [], fonctionsByPersonne: new Map(), nbAdmins: 0 };
+  const ST = { roles: [], connectees: [], fonctionsByPersonne: new Map(), nbAdmins: 0,
+               preattente: [], preattribuables: [] };
 
   async function loadAll() {
-    const [roles, connectees] = await Promise.all([
+    const [roles, connectees, preattente, preattribuables] = await Promise.all([
       rpc('list_roles_attribues'),
-      rpc('list_personnes_connectees')
+      rpc('list_personnes_connectees'),
+      rpc('list_roles_en_attente'),
+      rpc('list_personnes_preattribuables')
     ]);
     ST.roles = Array.isArray(roles) ? roles : [];
     ST.connectees = Array.isArray(connectees) ? connectees : [];
+    ST.preattente = Array.isArray(preattente) ? preattente : [];
+    ST.preattribuables = Array.isArray(preattribuables) ? preattribuables : [];
     ST.nbAdmins = ST.roles.filter(r => (r.roles || []).indexOf('admin') !== -1).length;
 
     // Encart intelligent : pour chaque référent AYANT une fiche personne,
@@ -342,6 +374,72 @@
     sel.innerHTML = html;
   }
 
+  function renderPrePioche() {
+    const sel = $('raPrePersonne');
+    let html = '<option value="">&mdash; choisir une personne &mdash;</option>';
+    ST.preattribuables.forEach(function (p) {
+      const lib = [p.prenom, p.nom].filter(Boolean).join(' ').trim() || shortId(p.personne_id);
+      const cat = p.categorie_personne ? ' (' + escapeHtml(p.categorie_personne) + ')' : '';
+      html += '<option value="' + escapeHtml(p.personne_id) + '">' + escapeHtml(lib) + cat + '</option>';
+    });
+    sel.innerHTML = html;
+  }
+
+  function renderPreList() {
+    const host = $('raPreList');
+    if (!ST.preattente.length) {
+      host.innerHTML = '<div class="ra-empty">Aucun rôle en attente.</div>';
+      return;
+    }
+    host.innerHTML = ST.preattente.map(function (r) {
+      const nom = nomComplet(r) || '<em>Sans nom</em>';
+      const chips = (r.roles || []).map(function (role) {
+        return '<span class="ra-chip">' + escapeHtml(role) +
+          '<span class="ra-chip-x" title="Annuler la pré-attribution ' + escapeHtml(role) + '"' +
+          ' data-pid="' + escapeHtml(r.personne_id) + '" data-role="' + escapeHtml(role) + '">&times;</span></span>';
+      }).join('');
+      return '<div class="ra-person">' +
+        '<div class="ra-avatar">' + escapeHtml(initiales(r).toUpperCase()) + '</div>' +
+        '<div class="ra-person-body">' +
+          '<div class="ra-person-name">' + nom + ' <span class="ra-me">en attente de 1ʳᵉ connexion</span></div>' +
+          '<div class="ra-chips">' + chips + '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+    host.querySelectorAll('.ra-chip-x[data-pid]').forEach(function (x) {
+      x.addEventListener('click', function () {
+        onRetirerPre(x.getAttribute('data-pid'), x.getAttribute('data-role'));
+      });
+    });
+  }
+
+  async function onPreattribuer() {
+    const pid = $('raPrePersonne').value;
+    const role = $('raPreRole').value;
+    if (!pid) return flash('Choisis une personne.', 'err');
+    if (!role) return flash('Choisis un rôle.', 'err');
+    $('raPreAddBtn').disabled = true;
+    try {
+      await rpc('preattribuer_role', { p_personne_id: pid, p_role: role });
+      flash('Rôle « ' + role + ' » pré-attribué (en attente de connexion).', 'ok');
+      await loadAll();
+      renderPreList(); renderPrePioche();
+    } catch (e) { flash(errMsg(e), 'err'); }
+    finally { $('raPreAddBtn').disabled = false; }
+  }
+
+  async function onRetirerPre(pid, role) {
+    if (!pid || !role) return;
+    if (!confirm('Annuler la pré-attribution « ' + role + ' » ?')) return;
+    try {
+      await rpc('retirer_preattribution', { p_personne_id: pid, p_role: role });
+      flash('Pré-attribution « ' + role + ' » annulée.', 'ok');
+      await loadAll();
+      renderPreList(); renderPrePioche();
+    } catch (e) { flash(errMsg(e), 'err'); }
+  }
+
   async function onAttribuer() {
     const uid = $('raPersonne').value;
     const role = $('raRole').value;
@@ -369,6 +467,7 @@
   }
 
   $('raAddBtn').addEventListener('click', onAttribuer);
+  $('raPreAddBtn').addEventListener('click', onPreattribuer);
 
   SupabaseHub.onAuthChange(function (event) {
     if (event === 'SIGNED_OUT') window.location.replace('login.html');
@@ -378,6 +477,8 @@
     await loadAll();
     renderList();
     renderPioche();
+    renderPreList();
+    renderPrePioche();
   } catch (e) {
     flash('Chargement impossible : ' + errMsg(e), 'err');
   }
