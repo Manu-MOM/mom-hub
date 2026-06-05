@@ -97,6 +97,17 @@
     }
     .ua-bascule h3 { margin: 0 0 6px; font-size: 13px; }
     .ua-bascule p { margin: 4px 0; color: var(--ink-mute); }
+
+    /* Bouton « Retour au tableau de bord » dédié (harmonisé sur tous les écrans) */
+    .hub-back-row { max-width: 1100px; margin: 0 auto; padding: 18px 24px 0; }
+    .hub-back-btn { display: inline-flex; align-items: center; gap: 8px;
+                    padding: 8px 16px; border: 1px solid var(--line, #cabe9f); border-radius: 999px;
+                    background: #fff; color: var(--ink, #0c3d24); font: inherit; font-size: 13px;
+                    font-weight: 600; text-decoration: none; cursor: pointer;
+                    transition: border-color .15s, color .15s, background-color .15s; }
+    .hub-back-btn:hover { border-color: var(--vert-prairie, #2d7a3e); color: var(--vert-prairie, #2d7a3e);
+                          background: var(--vert-light, rgba(45,122,62,0.06)); }
+    .hub-back-btn svg { width: 15px; height: 15px; }
   </style>
 </head>
 <body class="auth-pending">
@@ -139,6 +150,13 @@
       </button>
     </div>
   </header>
+
+  <div class="hub-back-row">
+    <a class="hub-back-btn" href="dashboard.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 18l-6-6 6-6"/></svg>
+      Retour au tableau de bord
+    </a>
+  </div>
 
   <main class="ua-layout">
 
