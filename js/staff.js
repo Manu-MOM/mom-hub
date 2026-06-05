@@ -71,14 +71,21 @@
 
   async function fnLoadGrid() {
     const host = $('fnGrid');
-    let poles;
+    let res;
     try {
-      poles = await SupabaseHub.getPolesAvecCategories();
+      res = await SupabaseHub.getPolesAvecCategories();
     } catch (e) {
       host.innerHTML = '<div class="st-empty">Chargement des catégories impossible : ' + escapeHtml(errMsg(e)) + '</div>';
       return;
     }
-    FN.poles = Array.isArray(poles) ? poles : [];
+    // getPolesAvecCategories renvoie { ok, data:[...] } (vérifié à la source) :
+    // on déballe .data, jamais l'objet brut.
+    if (!res || !res.ok) {
+      host.innerHTML = '<div class="st-empty">Chargement des catégories impossible : ' +
+        escapeHtml((res && res.error) || 'erreur inconnue') + '</div>';
+      return;
+    }
+    FN.poles = Array.isArray(res.data) ? res.data : [];
     if (!FN.poles.length) { host.innerHTML = '<div class="st-empty">Aucun pôle.</div>'; return; }
 
     host.innerHTML = FN.poles.map(function (p) {
