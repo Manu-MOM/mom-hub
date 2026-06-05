@@ -151,13 +151,10 @@
       </div>
     </div>
 
-    <div class="season-pill">SAISON 2025 / 2026</div>
+    <div class="season-pill" id="season-pill">SAISON 2025 / 2026</div>
 
     <nav class="main-nav">
       <a href="./">Tableau de bord</a>
-      <a>Mes outils</a>
-      <a>Annuaire</a>
-      <a>Configuration</a>
     </nav>
 
     <div class="icon-row">
@@ -192,13 +189,13 @@
 
     <section class="admin-grid" aria-label="Écrans d'administration">
 
-      <!-- Collectif & staff (admin (i)) -->
+      <!-- Collectif joueurs (admin (i)) — le staff a sa propre tuile -->
       <a class="admin-tile" href="u-admin.html">
         <div class="admin-tile-icon">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         </div>
-        <p class="admin-tile-title">Collectif &amp; staff</p>
-        <p class="admin-tile-desc">Vivier des joueurs et du staff par entente et par saison (collectif de catégorie).</p>
+        <p class="admin-tile-title">Collectif joueurs</p>
+        <p class="admin-tile-desc">Vivier des joueurs par entente et par saison (collectif de catégorie).</p>
       </a>
 
       <!-- Équipes par catégorie (ADMIN-(ii) sous-chantier 1) -->
@@ -228,13 +225,22 @@
         <p class="admin-tile-desc">Création de saison et bascule des catégories par millésime.</p>
       </a>
 
-      <!-- Fonctions staff (chantier B · Identité & rôles staff) -->
-      <a class="admin-tile" href="fonctions-staff.html">
+      <!-- Staff (vivier + fonctions, volet A refonte admin) -->
+      <a class="admin-tile" href="staff.html">
         <div class="admin-tile-icon">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="m8.5 13.5-2 6 5.5-3 5.5 3-2-6"/></svg>
         </div>
-        <p class="admin-tile-title">Fonctions staff</p>
-        <p class="admin-tile-desc">Qui occupe quelle fonction (entraîneur, logisticien, référent…) dans le staff d'une catégorie.</p>
+        <p class="admin-tile-title">Staff</p>
+        <p class="admin-tile-desc">Le vivier (qui fait partie du staff) et les fonctions (entraîneur, logisticien, référent…) par catégorie.</p>
+      </a>
+
+      <!-- Rôles & accès (volet B refonte admin) -->
+      <a class="admin-tile" href="roles-acces.html">
+        <div class="admin-tile-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg>
+        </div>
+        <p class="admin-tile-title">Rôles &amp; accès</p>
+        <p class="admin-tile-desc">Qui peut faire quoi dans le Hub : attribuer admin, bureau ou référent aux personnes connectées.</p>
       </a>
 
     </section>
@@ -267,6 +273,17 @@
 
       document.body.classList.remove('auth-pending');
       document.body.classList.add('auth-resolved', 'auth-admin');
+
+      // Season-pill dynamique : lit la saison active (getSaisonActive,
+      // wrapper existant). Dégradation honnête : si indisponible, on
+      // laisse le libellé statique en place plutôt qu'afficher une erreur.
+      try {
+        const saison = await SupabaseHub.getSaisonActive();
+        if (saison && saison.libelle) {
+          const pill = document.getElementById('season-pill');
+          if (pill) pill.textContent = 'SAISON ' + saison.libelle;
+        }
+      } catch (_) { /* on conserve le libellé statique */ }
 
       // ----------------------------------------------------------
       // Bouton « Se déconnecter » (dans la topbar)
