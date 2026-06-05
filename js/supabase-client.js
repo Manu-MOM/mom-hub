@@ -18,7 +18,18 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.49 — juin 2026
+ * Version : 1.50 — juin 2026
+ *   v1.50 : MODULE LOGISTIQUE (Production). 11 wrappers ADDITIFS pour les
+ *           4 tables neuves : lectures listRessourcesLogistiques /
+ *           listReservations / listRecurrences / listDemandesBus ;
+ *           écritures createReservation / createRecurrence / createDemandeBus
+ *           (soumises RLS B5-saisie WITH CHECK puis_je_ecrire_categorie) ;
+ *           validation validerReservation / validerRecurrence /
+ *           setRecurrenceActive / validerBus (RPC SECURITY DEFINER gardées
+ *           bureau|admin, D1). Écart gouvernance assumé (Manu, 5 juin 2026) :
+ *           SAISIE adossée B5, VALIDATION hors-B5. Aucun wrapper existant
+ *           touché ; insertion en fin d'objet ; node --check OK. (Corrige au
+ *           passage le log v1.48 ↔ en-tête v1.49 → v1.50 unifié.)
  *   v1.49 : PILOTAGE CATÉGORIE (pt 63). 2 wrappers ADDITIFS de LECTURE :
  *           listPilotageCategorie(categorieId) — lignes joueur × équipe ×
  *           rôle × poste × match pour toute la catégorie (collectif M14,
@@ -5857,6 +5868,278 @@
       }
       const r = Array.isArray(data) ? (data[0] || null) : data;
       return { ok: true, data: r ? _mapRapport(r) : null };
+    },
+
+    // ============================================================
+    // MODULE LOGISTIQUE — wrappers ADDITIFS v1.50.
+    //   Backend : 4 tables neuves (ressources_logistiques,
+    //   reservations_logistiques, reservations_recurrentes,
+    //   demandes_bus) + 4 RPC validation gardées bureau|admin.
+    //   SAISIE adossée B5 (RLS WITH CHECK puis_je_ecrire_categorie) :
+    //   un référent ne réserve que pour sa catégorie. VALIDATION
+    //   hors-B5, gardée bureau|admin (D1). Aucun wrapper existant
+    //   touché ; lecture dégradée honnête ([] / {ok:false}).
+    // ============================================================
+
+    /**
+     * Catalogue des ressources réservables (tuiles). Filtre optionnel
+     * par type ('site'|'materiel') et sous_type ('minibus'|'veo'|'autre').
+     * Lecture RLS : tout authentifié.
+     * @param {string} [type]      'site' | 'materiel'
+     * @param {string} [sousType]  'minibus' | 'veo' | 'autre'
+     * @returns {Promise<Array>} ressources actives ; [] si erreur.
+     */
+    async listRessourcesLogistiques(type, sousType) {
+      let q = client
+        .from('ressources_logistiques')
+        .select('id, code, type, site_id, libelle, sous_type, conducteur_requis, actif')
+        .eq('actif', true);
+      if (type)     q = q.eq('type', type);
+      if (sousType) q = q.eq('sous_type', sousType);
+      q = q.order('libelle', { ascending: true });
+      const { data, error } = await q;
+      if (error) {
+        console.error('MOM Hub: listRessourcesLogistiques()', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * Réservations simples. Filtres optionnels : ressourceId, statut,
+     * date (exacte). Lecture RLS : tout authentifié.
+     * @param {Object} [filtre] { ressourceId, statut, date }
+     * @returns {Promise<Array>} réservations ; [] si erreur.
+     */
+    async listReservations(filtre) {
+      const f = filtre || {};
+      let q = client
+        .from('reservations_logistiques')
+        .select('*');
+      if (f.ressourceId) q = q.eq('ressource_id', f.ressourceId);
+      if (f.statut)      q = q.eq('statut', f.statut);
+      if (f.date)        q = q.eq('date', f.date);
+      q = q.order('date', { ascending: true })
+           .order('heure_debut', { ascending: true });
+      const { data, error } = await q;
+      if (error) {
+        console.error('MOM Hub: listReservations()', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * Règles récurrentes. Filtres optionnels : ressourceId, statut,
+     * activeOnly (true → active=true). Lecture RLS : tout authentifié.
+     * @param {Object} [filtre] { ressourceId, statut, activeOnly }
+     * @returns {Promise<Array>} règles ; [] si erreur.
+     */
+    async listRecurrences(filtre) {
+      const f = filtre || {};
+      let q = client
+        .from('reservations_recurrentes')
+        .select('*');
+      if (f.ressourceId)  q = q.eq('ressource_id', f.ressourceId);
+      if (f.statut)       q = q.eq('statut', f.statut);
+      if (f.activeOnly)   q = q.eq('active', true);
+      q = q.order('created_at', { ascending: false });
+      const { data, error } = await q;
+      if (error) {
+        console.error('MOM Hub: listRecurrences()', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * Demandes de bus. Filtres optionnels : statut, date. Lecture RLS :
+     * tout authentifié.
+     * @param {Object} [filtre] { statut, date }
+     * @returns {Promise<Array>} demandes ; [] si erreur.
+     */
+    async listDemandesBus(filtre) {
+      const f = filtre || {};
+      let q = client
+        .from('demandes_bus')
+        .select('*');
+      if (f.statut) q = q.eq('statut', f.statut);
+      if (f.date)   q = q.eq('date', f.date);
+      q = q.order('date', { ascending: true });
+      const { data, error } = await q;
+      if (error) {
+        console.error('MOM Hub: listDemandesBus()', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * Crée une réservation simple (statut 'pending' par défaut côté SQL).
+     * Soumis RLS B5-saisie : échoue si le référent n'est pas habilité
+     * sur la catégorie (ou categorie_id null hors transverse).
+     * @param {Object} payload { ressource_id, categorie_id?, responsable_personne_id,
+     *   date, heure_debut, heure_fin, motif? }
+     * @returns {Promise<{ok:boolean, data?:object, error?:string}>}
+     */
+    async createReservation(payload) {
+      if (!payload || !payload.ressource_id || !payload.responsable_personne_id
+          || !payload.date || !payload.heure_debut || !payload.heure_fin) {
+        return { ok: false, error: 'Champs requis manquants : ressource_id, responsable_personne_id, date, heure_debut, heure_fin' };
+      }
+      const { data, error } = await client
+        .from('reservations_logistiques')
+        .insert(payload)
+        .select()
+        .single();
+      if (error) {
+        console.error('MOM Hub: createReservation()', error);
+        return { ok: false, error: error.message || 'Erreur INSERT reservations_logistiques' };
+      }
+      return { ok: true, data: data };
+    },
+
+    /**
+     * Crée une règle récurrente (statut 'pending' par défaut côté SQL).
+     * Soumis RLS B5-saisie. jours : int[] (0=Lundi .. 6=Dimanche).
+     * @param {Object} payload { ressource_id, categorie_id?, responsable_personne_id,
+     *   freq, jours, heure_debut, heure_fin, date_fin, motif? }
+     * @returns {Promise<{ok:boolean, data?:object, error?:string}>}
+     */
+    async createRecurrence(payload) {
+      if (!payload || !payload.ressource_id || !payload.responsable_personne_id
+          || !payload.freq || !payload.heure_debut || !payload.heure_fin
+          || !payload.date_fin) {
+        return { ok: false, error: 'Champs requis manquants : ressource_id, responsable_personne_id, freq, heure_debut, heure_fin, date_fin' };
+      }
+      const { data, error } = await client
+        .from('reservations_recurrentes')
+        .insert(payload)
+        .select()
+        .single();
+      if (error) {
+        console.error('MOM Hub: createRecurrence()', error);
+        return { ok: false, error: error.message || 'Erreur INSERT reservations_recurrentes' };
+      }
+      return { ok: true, data: data };
+    },
+
+    /**
+     * Crée une demande de bus (statut 'pending' par défaut côté SQL).
+     * Soumis RLS B5-saisie. arrets aller/retour et delegations : tableaux JSON.
+     * @param {Object} payload { categorie_id?, responsable_personne_id, date,
+     *   destination, ... arrets_aller, arrets_retour, delegations, totaux }
+     * @returns {Promise<{ok:boolean, data?:object, error?:string}>}
+     */
+    async createDemandeBus(payload) {
+      if (!payload || !payload.responsable_personne_id || !payload.date
+          || !payload.destination) {
+        return { ok: false, error: 'Champs requis manquants : responsable_personne_id, date, destination' };
+      }
+      const { data, error } = await client
+        .from('demandes_bus')
+        .insert(payload)
+        .select()
+        .single();
+      if (error) {
+        console.error('MOM Hub: createDemandeBus()', error);
+        return { ok: false, error: error.message || 'Erreur INSERT demandes_bus' };
+      }
+      return { ok: true, data: data };
+    },
+
+    /**
+     * Valide/refuse une réservation simple. RPC gardée bureau|admin.
+     * @param {string} id  reservation_id
+     * @param {string} decision  'approved' | 'rejected'
+     * @param {string} [motifRefus]  conservé si rejected
+     * @returns {Promise<{ok:boolean, data?:object, error?:string}>}
+     */
+    async validerReservation(id, decision, motifRefus) {
+      if (!id || !decision) {
+        return { ok: false, error: 'id et decision requis' };
+      }
+      const { data, error } = await client.rpc('valider_reservation', {
+        p_reservation_id: id,
+        p_decision: decision,
+        p_motif_refus: motifRefus || null
+      });
+      if (error) {
+        console.error('MOM Hub: validerReservation()', error);
+        return { ok: false, error: error.message || 'Erreur valider_reservation' };
+      }
+      const r = Array.isArray(data) ? (data[0] || null) : data;
+      return { ok: true, data: r };
+    },
+
+    /**
+     * Valide/refuse une règle récurrente. RPC gardée bureau|admin.
+     * @param {string} id  recurrence_id
+     * @param {string} decision  'approved' | 'rejected'
+     * @param {string} [motifRefus]
+     * @returns {Promise<{ok:boolean, data?:object, error?:string}>}
+     */
+    async validerRecurrence(id, decision, motifRefus) {
+      if (!id || !decision) {
+        return { ok: false, error: 'id et decision requis' };
+      }
+      const { data, error } = await client.rpc('valider_recurrence', {
+        p_recurrence_id: id,
+        p_decision: decision,
+        p_motif_refus: motifRefus || null
+      });
+      if (error) {
+        console.error('MOM Hub: validerRecurrence()', error);
+        return { ok: false, error: error.message || 'Erreur valider_recurrence' };
+      }
+      const r = Array.isArray(data) ? (data[0] || null) : data;
+      return { ok: true, data: r };
+    },
+
+    /**
+     * Suspend/réactive une règle récurrente. RPC gardée bureau|admin.
+     * @param {string} id  recurrence_id
+     * @param {boolean} active  true = réactiver, false = suspendre
+     * @returns {Promise<{ok:boolean, data?:object, error?:string}>}
+     */
+    async setRecurrenceActive(id, active) {
+      if (!id || typeof active !== 'boolean') {
+        return { ok: false, error: 'id et active (boolean) requis' };
+      }
+      const { data, error } = await client.rpc('set_recurrence_active', {
+        p_recurrence_id: id,
+        p_active: active
+      });
+      if (error) {
+        console.error('MOM Hub: setRecurrenceActive()', error);
+        return { ok: false, error: error.message || 'Erreur set_recurrence_active' };
+      }
+      const r = Array.isArray(data) ? (data[0] || null) : data;
+      return { ok: true, data: r };
+    },
+
+    /**
+     * Valide/refuse une demande de bus. RPC gardée bureau|admin.
+     * @param {string} id  demande_id
+     * @param {string} decision  'approved' | 'rejected'
+     * @param {string} [motifRefus]
+     * @returns {Promise<{ok:boolean, data?:object, error?:string}>}
+     */
+    async validerBus(id, decision, motifRefus) {
+      if (!id || !decision) {
+        return { ok: false, error: 'id et decision requis' };
+      }
+      const { data, error } = await client.rpc('valider_bus', {
+        p_demande_id: id,
+        p_decision: decision,
+        p_motif_refus: motifRefus || null
+      });
+      if (error) {
+        console.error('MOM Hub: validerBus()', error);
+        return { ok: false, error: error.message || 'Erreur valider_bus' };
+      }
+      const r = Array.isArray(data) ? (data[0] || null) : data;
+      return { ok: true, data: r };
     }
 
   };
@@ -5884,7 +6167,7 @@
   global.SupabaseHub = SupabaseHub;
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.48 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.50 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
