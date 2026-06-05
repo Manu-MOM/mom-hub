@@ -30,6 +30,24 @@
   const roles = await SupabaseHub.getMyRoles();
   if (roles.indexOf('admin') === -1) { window.location.replace('./'); return; }
   document.body.classList.remove('auth-pending');
+  document.body.classList.add('auth-resolved', 'auth-admin');
+
+  // Topbar : déconnexion (onAuthChange existant en fin de fichier gère SIGNED_OUT)
+  var _signout = document.getElementById('btn-signout');
+  if (_signout) {
+    _signout.addEventListener('click', async function () {
+      _signout.disabled = true;
+      await SupabaseHub.signOut();
+    });
+  }
+  // Topbar : season-pill dynamique (dégradation honnête sur libellé statique)
+  try {
+    const _saison = await SupabaseHub.getSaisonActive();
+    if (_saison && _saison.libelle) {
+      const _pill = document.getElementById('season-pill');
+      if (_pill) _pill.textContent = 'SAISON ' + _saison.libelle;
+    }
+  } catch (_) { /* libellé statique conservé */ }
 
   const client = SupabaseHub.client;
   const $ = (id) => document.getElementById(id);
