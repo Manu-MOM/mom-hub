@@ -66,7 +66,6 @@
     ententeId: null,
     membres:  [],     // listCollectifMembres(ententeId)
     pioche:   [],     // listJoueursCategorieEntente(ententeId)
-    piocheStaff: [],  // listStaffDisponibles() — non filtré par entente
     busy:     false
   };
 
@@ -77,14 +76,9 @@
     error:        () => document.getElementById('ua-error'),
     panel:        () => document.getElementById('ua-panel'),
     joueursList:  () => document.getElementById('ua-joueurs'),
-    staffList:    () => document.getElementById('ua-staff'),
     cntJoueurs:   () => document.getElementById('ua-cnt-joueurs'),
-    cntStaff:     () => document.getElementById('ua-cnt-staff'),
     piocheSel:    () => document.getElementById('ua-pioche'),
-    addJoueurBtn: () => document.getElementById('ua-add-joueur'),
-    piocheStaffSel: () => document.getElementById('ua-pioche-staff'),
-    addStaffBtn:    () => document.getElementById('ua-add-staff'),
-    addStaffWrap: () => document.getElementById('ua-add-staff-wrap')
+    addJoueurBtn: () => document.getElementById('ua-add-joueur')
   };
 
   function escapeHtml(s) {
@@ -145,20 +139,11 @@
   }
 
   async function loadMembres() {
-    State.membres = await SupabaseHub.listCollectifMembres(State.ententeId) || [];
+    State.membres = await SupabaseHub.listCollectifMembres(State.ententeId, { role: 'joueur' }) || [];
   }
 
   async function loadPioche() {
     State.pioche = await SupabaseHub.listJoueursCategorieEntente(State.ententeId) || [];
-  }
-
-  async function loadPiocheStaff() {
-    // Source NON filtrée par entente (sonde 3a : pas de table
-    // d'affectation staff par catégorie). Liste club-wide des staff,
-    // l'admin rattache explicitement (Q1). Indépendant de l'entente
-    // -> chargeable une fois, mais on suit le même cycle que la pioche
-    // joueurs par simplicité (P1, une seule logique de rafraîchissement).
-    State.piocheStaff = await SupabaseHub.listStaffDisponibles() || [];
   }
 
   // ----------------------------------------------------------
@@ -176,9 +161,7 @@
 
   function renderMembres() {
     const joueurs = State.membres.filter(m => m.role === 'joueur');
-    const staff   = State.membres.filter(m => m.role === 'staff');
     DOM.cntJoueurs().textContent = String(joueurs.length);
-    DOM.cntStaff().textContent   = String(staff.length);
 
     function rows(arr, vide) {
       if (arr.length === 0) return '<li class="ua-empty">' + vide + '</li>';
@@ -201,12 +184,9 @@
     }
 
     DOM.joueursList().innerHTML = rows(joueurs, 'Aucun joueur dans le collectif pour cette saison.');
-    DOM.staffList().innerHTML   = rows(staff, 'Aucun staff dans le collectif pour cette saison.');
 
-    [DOM.joueursList(), DOM.staffList()].forEach(function (host) {
-      host.querySelectorAll('[data-out]').forEach(function (b) {
-        b.addEventListener('click', function () { onMarkOut(b.getAttribute('data-out')); });
-      });
+    DOM.joueursList().querySelectorAll('[data-out]').forEach(function (b) {
+      b.addEventListener('click', function () { onMarkOut(b.getAttribute('data-out')); });
     });
   }
 
@@ -233,35 +213,9 @@
     DOM.addJoueurBtn().disabled = false;
   }
 
-  function renderPiocheStaff() {
-    const sel = DOM.piocheStaffSel();
-    if (!sel) return;
-    // Exclut les personnes DÉJÀ membres staff actifs (date_fin NULL),
-    // miroir exact de renderPioche côté joueurs.
-    const dejaActifs = new Set(
-      State.membres
-        .filter(m => m.role === 'staff' && !m.date_fin)
-        .map(m => m.personne_id)
-    );
-    const dispo = State.piocheStaff.filter(p => !dejaActifs.has(p.personne_id));
-    if (dispo.length === 0) {
-      sel.innerHTML = '<option value="">(aucun staff disponible — tous déjà dans le collectif)</option>';
-      DOM.addStaffBtn().disabled = true;
-      return;
-    }
-    let html = '<option value="">— Choisir un staff à enrôler… —</option>';
-    dispo.forEach(function (p) {
-      const lib = [p.prenom, p.nom].filter(Boolean).join(' ') || '(sans nom)';
-      html += '<option value="' + escapeHtml(p.personne_id) + '">' + escapeHtml(lib) + '</option>';
-    });
-    sel.innerHTML = html;
-    DOM.addStaffBtn().disabled = false;
-  }
-
   function renderAll() {
     renderMembres();
     renderPioche();
-    renderPiocheStaff();
   }
 
   // ----------------------------------------------------------
@@ -276,7 +230,7 @@
     }
     DOM.panel().style.display = '';
     renderEntenteMeta();
-    await Promise.all([ loadMembres(), loadPioche(), loadPiocheStaff() ]);
+    await Promise.all([ loadMembres(), loadPioche() ]);
     renderAll();
   }
 
@@ -297,35 +251,6 @@
     if (!r || !r.ok) {
       alert('Enrôlement impossible : ' + ((r && r.error) || 'erreur inconnue'));
       DOM.addJoueurBtn().disabled = false;
-      return;
-    }
-    await loadMembres();
-    renderAll();
-  }
-
-  async function onAddStaff() {
-    if (State.busy) return;
-    const pid = DOM.piocheStaffSel().value;
-    if (!pid) return;
-    State.busy = true;
-    DOM.addStaffBtn().disabled = true;
-    // Miroir exact d'onAddJoueur, role='staff'. Écriture via
-    // addCollectifMembre (v1.24, role:'staff' supporté ; RLS write
-    // collectif_membre admin|coach OK — patron addEquipeEngagee). On
-    // n'invente AUCUNE personne : pid provient de la pioche staff
-    // (personnes existantes, RPC sql/56). statut 'regulier' par défaut
-    // comme les joueurs (qualification fine = hors périmètre v1).
-    const r = await SupabaseHub.addCollectifMembre({
-      personne_id: pid,
-      entente_id:  State.ententeId,
-      role:        'staff',
-      statut:      'regulier',
-      date_debut:  today()
-    });
-    State.busy = false;
-    if (!r || !r.ok) {
-      alert('Enrôlement staff impossible : ' + ((r && r.error) || 'erreur inconnue'));
-      DOM.addStaffBtn().disabled = false;
       return;
     }
     await loadMembres();
@@ -371,8 +296,6 @@
       onSelectEntente(this.value);
     });
     DOM.addJoueurBtn().addEventListener('click', onAddJoueur);
-    const staffBtn = document.getElementById('ua-add-staff');
-    if (staffBtn) staffBtn.addEventListener('click', onAddStaff);
 
     DOM.panel().style.display = 'none';   // tant qu'aucune entente choisie
   }
