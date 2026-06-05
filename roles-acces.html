@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rôles &amp; accès · MOM Hub</title>
+<link rel="icon" type="image/png" href="assets/logo-m2m.png">
+<!--
+  MOM Hub · Écran Rôles & accès (Refonte tableau de bord admin, volet B).
+  Attribution / retrait des rôles applicatifs (admin | bureau | referent).
+
+  ARCHITECTURE (calque staff.html / fonctions-staff, vérifié à la source 05/06) :
+    - charge supabase.min.js (CDN) puis js/supabase-client.js (SupabaseHub).
+    - garde d'auth admin standard : getSession()->login.html, getMyRoles()->./
+    - tous les appels passent par SupabaseHub.client.rpc(...).
+  RPC consommées (toutes vérifiées à la source) :
+    - list_roles_attribues()      -> (user_id, personne_id, nom, prenom, roles[])
+    - list_personnes_connectees() -> (user_id, personne_id, nom, prenom)
+    - attribuer_role(p_user_id, p_role) / retirer_role(p_user_id, p_role)
+    - list_fonctions_de_personne(p_personne_id) -> fonctions actives (encart référent).
+  Dépendance Magic Link : on n'attribue un rôle qu'à une personne déjà connectée
+  (présente dans auth_personne, via list_personnes_connectees). Les personnes
+  jamais connectées ne sont PAS listables (auth_personne RLS sans policy) :
+  on l'explique honnêtement, sans prétendre les afficher.
+  Anti-lockout (garde SQL retirer_role) : la croix du rôle admin est désactivée
+  s'il ne reste qu'un seul admin.
+-->
+<link rel="stylesheet" href="css/hub.css">
+<style>
+  body.auth-pending { visibility: hidden; }
+  .ra-wrap { max-width: 880px; margin: 0 auto; padding: 24px 24px 48px; }
+  .ra-wrap h1 { font-size: 20px; margin: 0 0 4px; }
+  .ra-sub { color: var(--ink-mute, #6b7a6f); margin: 0 0 18px; font-size: 13px; }
+  .ra-msg { padding: 10px 14px; border-radius: 8px; font-size: 14px; margin-bottom: 14px; display: none; }
+  .ra-msg.ok { background: #e8f1ec; color: var(--vert-mom, #1b6b4c); display: block; }
+  .ra-msg.err { background: #f7e6e2; color: var(--rouge-blesse, #C73E3E); display: block; }
+
+  .ra-note { background: #eef4f1; border-radius: 8px; padding: 9px 13px; margin-bottom: 16px;
+             font-size: 12px; color: var(--ink-soft, #2a4836); line-height: 1.5; }
+
+  .ra-section-title { font-size: 14px; font-weight: 700; margin: 0 0 10px; color: var(--ink, #0c3d24); }
+
+  .ra-card { background: #fff; border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 10px; overflow: hidden; margin-bottom: 22px; }
+  .ra-person { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border-top: 1px solid var(--paper-warm, #f1ece1); }
+  .ra-person:first-child { border-top: 0; }
+  .ra-avatar { width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+               display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px;
+               background: var(--paper-warm, #f1ece1); color: var(--ink-mute, #6b7a6f); }
+  .ra-avatar--me { background: #e8f1ec; color: var(--vert-mom, #1b6b4c); }
+  .ra-person-body { flex: 1; min-width: 0; }
+  .ra-person-name { font-size: 14px; color: var(--ink, #0c3d24); }
+  .ra-person-name .ra-me { font-size: 11px; color: var(--ink-mute, #6b7a6f); }
+  .ra-person-sub { font-size: 11px; color: var(--ink-mute, #6b7a6f); font-family: 'JetBrains Mono', monospace; }
+  .ra-chips { margin-top: 5px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .ra-chip { font-size: 11px; padding: 2px 6px 2px 9px; border-radius: 999px;
+             background: var(--paper-warm, #f1ece1); color: var(--ink-soft, #2a4836);
+             display: inline-flex; align-items: center; gap: 5px; }
+  .ra-chip-x { cursor: pointer; font-size: 14px; line-height: 1; color: var(--ink-mute, #6b7a6f); }
+  .ra-chip-x:hover { color: var(--rouge-blesse, #C73E3E); }
+  .ra-chip-x--off { opacity: 0.35; cursor: not-allowed; }
+  .ra-chip-x--off:hover { color: var(--ink-mute, #6b7a6f); }
+  .ra-warn { margin-top: 7px; background: #fdf3e3; border-radius: 6px; padding: 5px 9px;
+             font-size: 11px; color: #8a5a16; line-height: 1.45; }
+  .ra-warn a { color: #8a5a16; }
+  .ra-empty { font-size: 12px; color: var(--ink-mute, #6b7a6f); font-style: italic; padding: 14px; }
+
+  .ra-attrib { background: #fff; border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 10px; padding: 14px; }
+  .ra-attrib-row { display: grid; grid-template-columns: 1fr 160px auto; gap: 10px; align-items: end; }
+  @media (max-width: 640px) { .ra-attrib-row { grid-template-columns: 1fr; } }
+  .ra-attrib label { display: block; font-size: 12px; color: var(--ink-mute, #6b7a6f); margin-bottom: 4px; }
+  .ra-attrib select { width: 100%; padding: 9px 11px; border: 1px solid var(--paper-warm, #d9d2c4);
+                      border-radius: 8px; font: inherit; background: #fff; color: var(--ink, #0c3d24); }
+  .ra-btn { padding: 9px 16px; border: 0; border-radius: 8px; font: inherit; font-weight: 600;
+            cursor: pointer; background: var(--vert-mom, #1b6b4c); color: #fff; }
+  .ra-btn:disabled { opacity: .5; cursor: default; }
+  .ra-magiclink { margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--paper-warm, #f1ece1);
+                  font-size: 12px; color: var(--ink-mute, #6b7a6f); line-height: 1.5; }
+</style>
+</head>
+<body class="auth-pending">
+<div class="ra-wrap">
+  <p><a href="./">&larr; Retour au tableau de bord</a></p>
+  <h1>Rôles &amp; accès</h1>
+  <p class="ra-sub">Qui peut faire quoi dans le Hub. Un rôle ouvre des droits ; il se donne à une personne qui s'est déjà connectée.</p>
+
+  <div id="raMsg" class="ra-msg"></div>
+
+  <div class="ra-note">
+    Trois rôles possibles : <strong>admin</strong> (tout gérer), <strong>bureau</strong>, <strong>referent</strong> (encadrant d'une catégorie).
+    Le rôle <em>referent</em> demande aussi une fonction par catégorie, définie dans <a href="staff.html">Staff</a>.
+  </div>
+
+  <div class="ra-section-title">Personnes avec un rôle</div>
+  <div class="ra-card" id="raList"><div class="ra-empty">Chargement…</div></div>
+
+  <div class="ra-section-title">Attribuer un rôle</div>
+  <div class="ra-attrib">
+    <div class="ra-attrib-row">
+      <div>
+        <label for="raPersonne">Personne (déjà connectée)</label>
+        <select id="raPersonne"><option value="">&mdash; choisir une personne connectée &mdash;</option></select>
+      </div>
+      <div>
+        <label for="raRole">Rôle</label>
+        <select id="raRole">
+          <option value="admin">admin</option>
+          <option value="bureau">bureau</option>
+          <option value="referent">referent</option>
+        </select>
+      </div>
+      <div><button id="raAddBtn" class="ra-btn">Attribuer</button></div>
+    </div>
+    <div class="ra-magiclink">
+      Seules les personnes qui se sont déjà connectées une fois (via Magic Link) apparaissent dans cette liste.
+      Pour donner un rôle à quelqu'un d'absent : il doit d'abord se connecter au Hub une première fois.
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/supabase-client.js"></script>
+<script>
+(async function () {
+  'use strict';
+
+  // --- Garde d'auth admin (motif staff / u-admin) ---
+  const session = await SupabaseHub.getSession();
+  if (!session) { window.location.replace('login.html'); return; }
+  const myRoles = await SupabaseHub.getMyRoles();
+  if (myRoles.indexOf('admin') === -1) { window.location.replace('./'); return; }
+  document.body.classList.remove('auth-pending');
+
+  const client = SupabaseHub.client;
+  const $ = (id) => document.getElementById(id);
+
+  // user_id du compte courant (pour le marqueur « vous »).
+  const myUserId = (session.user && session.user.id) || null;
+
+  function flash(text, kind) {
+    const m = $('raMsg');
+    m.textContent = text; m.className = 'ra-msg ' + kind;
+    if (kind === 'ok') setTimeout(() => { m.className = 'ra-msg'; }, 3500);
+  }
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+      ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  }
+  function errMsg(e) {
+    const m = (e && (e.message || e.error_description || e.hint)) || 'Erreur inconnue.';
+    return /admin/i.test(m) ? "Action réservée à l'administrateur." : m;
+  }
+  async function rpc(name, params) {
+    const { data, error } = await client.rpc(name, params || {});
+    if (error) throw error;
+    return data;
+  }
+
+  function nomComplet(r) {
+    const n = [r.prenom, r.nom].filter(Boolean).join(' ').trim();
+    return n || null;
+  }
+  function initiales(r) {
+    const n = nomComplet(r);
+    if (!n) return '?';
+    const parts = n.split(/\s+/);
+    return ((parts[0] || '')[0] || '' ) + ((parts[1] || '')[0] || '');
+  }
+  function shortId(uuid) {
+    return uuid ? (String(uuid).slice(0, 8) + '…') : '';
+  }
+
+  // État : liste des rôles attribués + index des fonctions actives par personne.
+  const ST = { roles: [], connectees: [], fonctionsByPersonne: new Map(), nbAdmins: 0 };
+
+  async function loadAll() {
+    const [roles, connectees] = await Promise.all([
+      rpc('list_roles_attribues'),
+      rpc('list_personnes_connectees')
+    ]);
+    ST.roles = Array.isArray(roles) ? roles : [];
+    ST.connectees = Array.isArray(connectees) ? connectees : [];
+    ST.nbAdmins = ST.roles.filter(r => (r.roles || []).indexOf('admin') !== -1).length;
+
+    // Encart intelligent : pour chaque référent AYANT une fiche personne,
+    // on regarde s'il a au moins une fonction active.
+    ST.fonctionsByPersonne = new Map();
+    const referentsAvecFiche = ST.roles.filter(r =>
+      (r.roles || []).indexOf('referent') !== -1 && r.personne_id
+    );
+    await Promise.all(referentsAvecFiche.map(async function (r) {
+      try {
+        const fns = await rpc('list_fonctions_de_personne', { p_personne_id: r.personne_id });
+        ST.fonctionsByPersonne.set(r.personne_id, Array.isArray(fns) ? fns : []);
+      } catch (_) {
+        ST.fonctionsByPersonne.set(r.personne_id, null); // inconnu -> pas d'encart
+      }
+    }));
+  }
+
+  function renderList() {
+    const host = $('raList');
+    if (!ST.roles.length) {
+      host.innerHTML = '<div class="ra-empty">Aucun rôle attribué pour l\'instant.</div>';
+      return;
+    }
+    host.innerHTML = ST.roles.map(function (r) {
+      const nom = nomComplet(r);
+      const isMe = myUserId && r.user_id === myUserId;
+      const avatarCls = isMe ? 'ra-avatar ra-avatar--me' : 'ra-avatar';
+
+      const nameLine = nom
+        ? escapeHtml(nom) + (isMe ? ' <span class="ra-me">(vous)</span>' : '')
+        : '<em>Compte sans fiche</em>' + (isMe ? ' <span class="ra-me">(vous)</span>' : '');
+      const subLine = nom ? '' : '<div class="ra-person-sub">' + escapeHtml(shortId(r.user_id)) + '</div>';
+
+      const chips = (r.roles || []).map(function (role) {
+        // Anti-lockout : la croix du rôle admin est désactivée s'il ne reste qu'un admin.
+        const lockAdmin = (role === 'admin' && ST.nbAdmins <= 1);
+        const xCls = lockAdmin ? 'ra-chip-x ra-chip-x--off' : 'ra-chip-x';
+        const xTitle = lockAdmin
+          ? 'Dernier administrateur — retrait impossible'
+          : 'Retirer le rôle ' + role;
+        const xAttr = lockAdmin
+          ? ''
+          : ' data-uid="' + escapeHtml(r.user_id) + '" data-role="' + escapeHtml(role) + '"';
+        return '<span class="ra-chip">' + escapeHtml(role) +
+          '<span class="' + xCls + '" title="' + escapeHtml(xTitle) + '"' + xAttr + '>&times;</span></span>';
+      }).join('');
+
+      // Encart intelligent référent-sans-fonction.
+      let warn = '';
+      if ((r.roles || []).indexOf('referent') !== -1 && r.personne_id) {
+        const fns = ST.fonctionsByPersonne.get(r.personne_id);
+        if (Array.isArray(fns) && fns.length === 0) {
+          warn = '<div class="ra-warn">Rôle <strong>referent</strong> mais aucune fonction définie. ' +
+            '<a href="staff.html">Définir sa catégorie dans Staff &rarr;</a></div>';
+        }
+      }
+
+      return '<div class="ra-person">' +
+        '<div class="' + avatarCls + '">' + escapeHtml(initiales(r).toUpperCase()) + '</div>' +
+        '<div class="ra-person-body">' +
+          '<div class="ra-person-name">' + nameLine + '</div>' +
+          subLine +
+          '<div class="ra-chips">' + chips + '</div>' +
+          warn +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+    host.querySelectorAll('.ra-chip-x[data-uid]').forEach(function (x) {
+      x.addEventListener('click', function () {
+        onRetirer(x.getAttribute('data-uid'), x.getAttribute('data-role'));
+      });
+    });
+  }
+
+  function renderPioche() {
+    const sel = $('raPersonne');
+    let html = '<option value="">&mdash; choisir une personne connectée &mdash;</option>';
+    ST.connectees.forEach(function (p) {
+      const lib = [p.prenom, p.nom].filter(Boolean).join(' ').trim() || shortId(p.user_id);
+      html += '<option value="' + escapeHtml(p.user_id) + '">' + escapeHtml(lib) + '</option>';
+    });
+    sel.innerHTML = html;
+  }
+
+  async function onAttribuer() {
+    const uid = $('raPersonne').value;
+    const role = $('raRole').value;
+    if (!uid) return flash('Choisis une personne.', 'err');
+    if (!role) return flash('Choisis un rôle.', 'err');
+    $('raAddBtn').disabled = true;
+    try {
+      await rpc('attribuer_role', { p_user_id: uid, p_role: role });
+      flash('Rôle « ' + role + ' » attribué.', 'ok');
+      await loadAll();
+      renderList(); renderPioche();
+    } catch (e) { flash(errMsg(e), 'err'); }
+    finally { $('raAddBtn').disabled = false; }
+  }
+
+  async function onRetirer(uid, role) {
+    if (!uid || !role) return;
+    if (!confirm('Retirer le rôle « ' + role +' » à cette personne ?')) return;
+    try {
+      await rpc('retirer_role', { p_user_id: uid, p_role: role });
+      flash('Rôle « ' + role + ' » retiré.', 'ok');
+      await loadAll();
+      renderList(); renderPioche();
+    } catch (e) { flash(errMsg(e), 'err'); }
+  }
+
+  $('raAddBtn').addEventListener('click', onAttribuer);
+
+  SupabaseHub.onAuthChange(function (event) {
+    if (event === 'SIGNED_OUT') window.location.replace('login.html');
+  });
+
+  try {
+    await loadAll();
+    renderList();
+    renderPioche();
+  } catch (e) {
+    flash('Chargement impossible : ' + errMsg(e), 'err');
+  }
+})();
+</script>
+</body>
+</html>
