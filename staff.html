@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Staff · MOM Hub</title>
+<!--
+  MOM Hub · Écran Staff unifié (Refonte tableau de bord admin, volet A).
+  Regroupe sous UNE page à onglets les deux portes « staff » historiques :
+    - onglet VIVIER   : ex-bloc staff de u-admin (collectif_membre, role='staff').
+                        Maille entente/saison, club-wide. Enrôlement + sortie datée.
+    - onglet FONCTIONS: ex-fonctions-staff.html (fonction_staff). Maille catégorie,
+                        historisée. Entrée par grille de vignettes catégorie (façon
+                        admin-equipes), PAS de <select> de catégorie.
+  Onglet par défaut : FONCTIONS (usage dominant : consulter/gérer qui occupe quel
+  rôle ; voir conception). VIVIER ensuite.
+
+  ARCHITECTURE (calque fonctions-staff / u-admin, vérifié à la source 05/06) :
+    - charge supabase.min.js (CDN) puis js/supabase-client.js (SupabaseHub).
+    - garde d'auth admin standard : getSession()->login.html, getMyRoles()->./
+    - logique en js/staff.js (motif admin-equipes : HTML + JS externe).
+  RPC / wrappers consommés (tous EXISTANTS, vérifiés à la source) :
+    - Vivier   : SupabaseHub.listEntentes / listCollectifMembres(ententeId,{role}) /
+                 listStaffDisponibles / addCollectifMembre / updateCollectifMembre.
+    - Fonctions: SupabaseHub.getPolesAvecCategories ; client.rpc list_fonctions_staff
+                 / definir_ / cloturer_ / supprimer_fonction_staff ; list_staff_disponibles.
+  Datalist fonctions alimentée par data/fonctions-staff.json (référentiel suggéré).
+-->
+<link rel="stylesheet" href="css/hub.css">
+<style>
+  body.auth-pending { visibility: hidden; }
+  .st-wrap { max-width: 980px; margin: 0 auto; padding: 24px 24px 48px; }
+  .st-wrap h1 { font-size: 20px; margin: 0 0 4px; }
+  .st-sub { color: var(--ink-mute, #6b7a6f); margin: 0 0 18px; font-size: 13px; }
+  .st-msg { padding: 10px 14px; border-radius: 8px; font-size: 14px; margin-bottom: 14px; display: none; }
+  .st-msg.ok { background: #e8f1ec; color: var(--vert-mom, #1b6b4c); display: block; }
+  .st-msg.err { background: #f7e6e2; color: var(--rouge-blesse, #C73E3E); display: block; }
+
+  .st-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--paper-warm, #e3e0d8); margin-bottom: 18px; }
+  .st-tab { padding: 9px 18px; font-size: 14px; cursor: pointer; color: var(--ink-mute, #6b7a6f);
+            border-bottom: 2px solid transparent; background: transparent; border-top: 0; border-left: 0; border-right: 0;
+            font: inherit; }
+  .st-tab.active { color: var(--vert-mom, #1b6b4c); border-bottom-color: var(--vert-mom, #1b6b4c); font-weight: 600; }
+
+  .st-note { background: #eef4f1; border-radius: 8px; padding: 9px 13px; margin-bottom: 14px;
+             font-size: 12px; color: var(--ink-soft, #2a4836); }
+
+  .st-card { background: #fff; border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  .st-card label { display: block; font-size: 13px; color: var(--ink-mute, #6b7a6f); margin-bottom: 4px; }
+  .st-card select, .st-card input {
+    width: 100%; padding: 9px 11px; border: 1px solid var(--paper-warm, #d9d2c4);
+    border-radius: 8px; font: inherit; background: #fff; color: var(--ink, #0c3d24); }
+  .st-btn { padding: 9px 16px; border: 0; border-radius: 8px; font: inherit; font-weight: 600;
+            cursor: pointer; background: var(--vert-mom, #1b6b4c); color: #fff; }
+  .st-btn:disabled { opacity: .5; cursor: default; }
+  .st-link { background: transparent; border: 0; font: inherit; cursor: pointer; color: var(--ink-mute, #6b7a6f); padding: 4px 8px; }
+  .st-link.danger { color: var(--rouge-blesse, #C73E3E); }
+
+  /* --- Vivier --- */
+  .st-entente-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+  .st-entente-row select { min-width: 280px; }
+  .st-col { border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 10px; background: #fff; }
+  .st-col__head { display: flex; align-items: center; justify-content: space-between; padding: 11px 14px;
+                  border-bottom: 1px solid var(--paper-warm, #e3e0d8); }
+  .st-col__title { font-size: 14px; font-weight: 700; color: var(--vert-mom, #1b6b4c); }
+  .st-col__count { font-size: 12px; background: var(--paper-warm, #f1ece1); color: var(--ink-mute, #6b7a6f);
+                   border-radius: 12px; padding: 1px 9px; }
+  .st-add-row { display: flex; gap: 8px; padding: 11px 14px; border-bottom: 1px solid var(--paper-warm, #e3e0d8); }
+  .st-add-row select { flex: 1; padding: 8px 10px; border: 1px solid var(--paper-warm, #d9d2c4); border-radius: 6px; font: inherit; }
+  .st-list { list-style: none; padding: 6px 14px 12px; margin: 0; }
+  .st-item { padding: 8px 0; border-bottom: 1px solid var(--paper-warm, #f1ece1); }
+  .st-item:last-child { border-bottom: 0; }
+  .st-item--out .st-item-name { color: var(--ink-mute, #6b7a6f); }
+  .st-item-name { font-size: 13px; color: var(--ink, #0c3d24); }
+  .st-item-dates { font-size: 11px; color: var(--ink-mute, #6b7a6f); margin-top: 2px; }
+  .st-chip { display: inline-block; padding: 1px 8px; border-radius: 12px; font-size: 11px;
+             background: var(--paper-warm, #f1ece1); color: var(--ink-mute, #6b7a6f); margin-left: 6px; }
+  .st-empty { font-size: 12px; color: var(--ink-mute, #6b7a6f); font-style: italic; padding: 10px 0; }
+
+  /* --- Fonctions : grille vignettes par pôle (façon admin-equipes) --- */
+  .st-pole { margin-bottom: 18px; }
+  .st-pole__head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+  .st-pole__title { font-size: 14px; font-weight: 700; color: var(--ink, #0c3d24); }
+  .st-pole__sub { font-size: 12px; color: var(--ink-mute, #6b7a6f); }
+  .st-cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+  .st-cat { border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 10px; background: #fff; overflow: hidden;
+            cursor: pointer; text-align: left; padding: 0; font: inherit; }
+  .st-cat.active { border-color: var(--vert-mom, #1b6b4c); border-width: 2px; }
+  .st-cat__head { padding: 10px 13px; border-bottom: 1px solid var(--paper-warm, #e3e0d8); }
+  .st-cat__name { font-size: 14px; font-weight: 600; color: var(--ink, #0c3d24); }
+  .st-cat.active .st-cat__name { color: var(--vert-mom, #1b6b4c); }
+  .st-cat__foot { padding: 9px 13px; font-size: 12px; color: var(--vert-mom, #1b6b4c); }
+
+  .st-fn-zone { background: var(--paper-warm, #faf6ef); border-radius: 10px; padding: 14px; margin-top: 6px; display: none; }
+  .st-row3 { display: grid; gap: 12px; grid-template-columns: 1.4fr 1.4fr 1fr auto; align-items: end; }
+  @media (max-width: 720px) { .st-row3 { grid-template-columns: 1fr; } }
+  .st-hint { font-size: 12px; color: var(--ink-mute, #6b7a6f); margin-top: 6px; }
+  .st-toolbar { display: flex; align-items: center; gap: 12px; margin: 4px 0 6px; }
+  .st-toolbar .sp { flex: 1; }
+  .st-toggle { font-size: 13px; color: var(--ink-mute, #6b7a6f); display: flex; align-items: center; gap: 6px; }
+  .st-toggle input { width: auto; }
+  table.st-tbl { width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 14px; }
+  table.st-tbl th { text-align: left; color: var(--ink-mute, #6b7a6f); font-weight: 600; font-size: 12px;
+                    text-transform: uppercase; letter-spacing: .03em; padding: 6px 8px;
+                    border-bottom: 1px solid var(--paper-warm, #e3e0d8); }
+  table.st-tbl td { padding: 9px 8px; border-bottom: 1px solid var(--paper-warm, #e3e0d8); }
+  tr.st-ended td { color: var(--ink-mute, #6b7a6f); }
+  .st-badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+  .st-badge.active { background: #e8f1ec; color: var(--vert-mom, #1b6b4c); }
+  .st-badge.ended { background: #f0ede6; color: var(--ink-mute, #6b7a6f); }
+</style>
+</head>
+<body class="auth-pending">
+<div class="st-wrap">
+  <p><a href="./">&larr; Retour au tableau de bord</a></p>
+  <h1>Staff</h1>
+  <p class="st-sub">Le vivier (qui fait partie du staff) et les fonctions (qui occupe quel rôle par catégorie) réunis ici.</p>
+
+  <div id="stMsg" class="st-msg"></div>
+
+  <div class="st-tabs" role="tablist">
+    <button class="st-tab active" id="tab-fonctions" role="tab" aria-selected="true">Fonctions</button>
+    <button class="st-tab" id="tab-vivier" role="tab" aria-selected="false">Vivier</button>
+  </div>
+
+  <!-- ======================= ONGLET FONCTIONS ======================= -->
+  <section id="panel-fonctions">
+    <div class="st-note">Choisis une catégorie dans la grille pour voir et gérer ses fonctions. La maille est la catégorie ; les fonctions sont historisées.</div>
+
+    <div id="fnGrid"><div class="st-empty">Chargement des catégories…</div></div>
+
+    <div class="st-fn-zone" id="fnZone">
+      <div class="st-card">
+        <div class="st-row3">
+          <div>
+            <label for="fnStaff">Personne (staff)</label>
+            <select id="fnStaff"><option value="">&mdash; choisir &mdash;</option></select>
+          </div>
+          <div>
+            <label for="fnFonction">Fonction</label>
+            <input id="fnFonction" list="fnFonctionsList" placeholder="ex. Référent de catégorie" autocomplete="off">
+            <datalist id="fnFonctionsList"></datalist>
+          </div>
+          <div>
+            <label for="fnDebut">Début</label>
+            <input id="fnDebut" type="date">
+          </div>
+          <div><button id="fnAddBtn" class="st-btn">Ajouter</button></div>
+        </div>
+        <p class="st-hint">Rouvrir la même fonction pour la même personne clôt automatiquement la précédente (historisation).</p>
+      </div>
+
+      <div class="st-card">
+        <div class="st-toolbar">
+          <strong id="fnListTitle">Staff de la catégorie</strong>
+          <div class="sp"></div>
+          <label class="st-toggle"><input type="checkbox" id="fnHistChk"> Afficher l'historique</label>
+        </div>
+        <table class="st-tbl">
+          <thead><tr><th>Personne</th><th>Fonction</th><th>Début</th><th>Statut</th><th></th></tr></thead>
+          <tbody id="fnRows"></tbody>
+        </table>
+        <div id="fnEmpty" class="st-empty" style="display:none">Aucune fonction staff pour cette catégorie.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= ONGLET VIVIER ======================= -->
+  <section id="panel-vivier" style="display:none">
+    <div class="st-note">Maille : entente / saison. Le vivier staff est club-wide (pas attaché à une catégorie). La sortie est datée — la ligne est conservée, jamais supprimée.</div>
+
+    <div class="st-entente-row">
+      <label for="viEntente" style="margin-bottom:0">Catégorie / saison :</label>
+      <select id="viEntente" aria-label="Choisir la catégorie et la saison"><option value="">Chargement…</option></select>
+    </div>
+
+    <div id="viPanel" style="display:none">
+      <section class="st-col" aria-label="Staff du vivier">
+        <div class="st-col__head">
+          <span class="st-col__title">Staff du vivier</span>
+          <span class="st-col__count"><span id="viCount">0</span></span>
+        </div>
+        <div class="st-add-row">
+          <select id="viPioche" aria-label="Choisir un staff à enrôler"><option value="">&mdash; Choisir un staff à enrôler… &mdash;</option></select>
+          <button type="button" class="st-btn" id="viAddBtn" disabled>+ Enrôler</button>
+        </div>
+        <ul class="st-list" id="viList"><li class="st-empty">Sélectionnez une catégorie / saison.</li></ul>
+      </section>
+    </div>
+  </section>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/staff.js"></script>
+</body>
+</html>
