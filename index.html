@@ -31,9 +31,12 @@
     padding: 18px 24px;
     overflow: hidden;
     height: 100%;
+    min-width: 0; /* UX-MOBILE-RESPONSIVE pt 75 : autorise la compression */
   }
 
-  .main-col { overflow-y: auto; padding-right: 4px; }
+  /* min-width:0 : sans ça, la piste 1fr a min-width:auto et s'étire au-delà
+     de l'écran si un enfant est intrinsèquement large (titre, tuile). */
+  .main-col { overflow-y: auto; padding-right: 4px; min-width: 0; }
   .sidebar { overflow-y: auto; }
 
   /* ========== GREETING ========== */
@@ -500,7 +503,7 @@
   }
   @media (max-width: 700px) {
     .tool-grid { grid-template-columns: repeat(2, 1fr); }
-    .greeting { grid-template-columns: 1fr; }
+    .greeting { grid-template-columns: 1fr; min-width: 0; }
     .kpi-row { width: 100%; overflow-x: auto; }
   }
 
