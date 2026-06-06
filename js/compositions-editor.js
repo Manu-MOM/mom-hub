@@ -7,6 +7,11 @@
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
  * Version : 3.63 — Boot : deep-link ?vue=rapport (onglet Rapport via la vignette de la fiche évènement) (4 juin 2026)
+ *   v3.65 : UX-SUIVI-TERRAIN-IMMERSIF — mode plein écran pour TOUS les onglets.
+ *           bindFullscreen() : bouton « ⛶ Plein écran » (barre view-tabs,
+ *           hors comptage) → body.editor-immersif (CSS masque topbar/parcours/
+ *           onglets compos/effectif, #editor-area pleine largeur, view-tabs
+ *           conservée). Sortie : ✕ flottant, toggle, ou Échap. Front pur.
  *   v3.64 : Terrain — libellé des pastilles passe au PRÉNOM (nomTerrain),
  *           désambiguïsé par l'initiale du nom si doublon de prénom dans
  *           la compo. Réservé au terrain ; l'export réseaux garde X.NOM
@@ -4101,6 +4106,34 @@
     initialTab.classList.add('is-active');
   }
 
+  // v3.65 — UX-SUIVI-TERRAIN-IMMERSIF : mode plein écran pour TOUS les onglets.
+  // Toggle d'une classe body.editor-immersif (le CSS fait tout le masquage :
+  // topbar/parcours/onglets compos/effectif cachés, #editor-area pleine largeur,
+  // la barre view-tabs reste pour naviguer entre vues). Sortie : ✕ flottant,
+  // re-clic sur le bouton (toggle) ou touche Échap. Aucune autre logique touchée.
+  function bindFullscreen() {
+    var btn = document.getElementById('btn-fullscreen');
+    var exitBtn = document.getElementById('btn-immersif-exit');
+    if (!btn) return;
+    function setImmersif(on) {
+      document.body.classList.toggle('editor-immersif', on);
+      btn.classList.toggle('is-on', on);
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      btn.textContent = on ? '⛶ Réduire' : '⛶ Plein écran';
+    }
+    btn.addEventListener('click', function () {
+      setImmersif(!document.body.classList.contains('editor-immersif'));
+    });
+    if (exitBtn) {
+      exitBtn.addEventListener('click', function () { setImmersif(false); });
+    }
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && document.body.classList.contains('editor-immersif')) {
+        setImmersif(false);
+      }
+    });
+  }
+
   // ════════════════════════════════════════════════════════════
   // v3.23 — EXPORT IMAGE (réseaux sociaux). Bouton « Image » à côté
   // des onglets. Collecte la compo COURANTE (titulaires + remplaçants)
@@ -5723,6 +5756,7 @@
     renderPopover();
     bindViewTabs(); // v3.15 — câble les onglets Liste/Terrain (statiques, 1 fois)
     bindExportImage(); // v3.23 — câble le bouton « Image » (export réseaux sociaux)
+    bindFullscreen(); // v3.65 — câble le mode plein écran (immersif, tous onglets)
 
     // v3.25 — Deep-link de mode depuis la fiche évènement : ?vue=terrain
     // ouvre directement la vue Terrain ; ?vue=reseaux ouvre la modale
@@ -5806,7 +5840,7 @@
     bindPopoverOutsideClick();
 
     console.log(
-      '%c🏉 Compositions Editor v3.64 chargé',
+      '%c🏉 Compositions Editor v3.65 chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         evenements: State.evenements.length,
