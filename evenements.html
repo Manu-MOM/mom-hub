@@ -30,8 +30,11 @@
     padding: 18px 24px;
     overflow: hidden;
     height: 100%;
+    min-width: 0; /* UX-MOBILE-RESPONSIVE pt 75 : autorise la compression */
   }
-  .evt-main-col { overflow-y: auto; padding-right: 4px; }
+  /* min-width:0 : sans ça, la piste 1fr a min-width:auto et s'étire au-delà
+     de l'écran si un enfant est intrinsèquement large (titre, carte). */
+  .evt-main-col { overflow-y: auto; padding-right: 4px; min-width: 0; }
   .evt-side-col { overflow-y: auto; }
 
   /* Responsive : sidebar masquée sous 1024px (cf. doc Conception §5.5 Q4-a) */
@@ -79,6 +82,16 @@
   .evt-header-kpis {
     display: flex;
     gap: 6px;
+  }
+  /* UX-MOBILE-RESPONSIVE pt 75 : sous 768px, le header (1fr auto) ne tient
+     plus côte à côte → on empile titre puis KPIs, et on autorise la
+     compression du titre (min-width:0 sur la grille). */
+  @media (max-width: 768px) {
+    .evt-header {
+      grid-template-columns: 1fr;
+      min-width: 0;
+    }
+    .evt-header-kpis { flex-wrap: wrap; }
   }
   .evt-kpi {
     background: var(--paper-warm);
