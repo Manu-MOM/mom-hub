@@ -218,10 +218,32 @@
     body.editor-immersif .compo-parcours,
     body.editor-immersif .compo-tabs,
     body.editor-immersif .effectif-panel { display: none !important; }
-    body.editor-immersif .compo-layout { padding: 8px !important; max-width: none; }
+    body.editor-immersif .compo-layout { padding: 0 !important; max-width: none; }
     body.editor-immersif .compo-grid { grid-template-columns: 1fr; gap: 0; }
-    body.editor-immersif .editor-area { min-width: 0; }
-    body.editor-immersif .view-tabs { margin-bottom: 10px; }
+    /* Bord à bord : on neutralise le cadre blanc de .editor-area (fond/bordure/
+       rayon/padding) et les marges, comme le patron d'impression. Le terrain
+       remplit alors toute la largeur regagnée. */
+    body.editor-immersif .editor-area {
+      min-width: 0; background: transparent !important; border: none !important;
+      border-radius: 0 !important; padding: 0 !important;
+    }
+    body.editor-immersif .view-tabs { margin: 8px 8px 8px; }
+    /* La carte verte du terrain colle aux bords (plus de rayon ni de bordure
+       qui laisse voir le fond de page). */
+    body.editor-immersif .view-terrain { border-radius: 0; border-left: none; border-right: none; }
+    /* Fond de page au vert foncé pour qu'aucune bande crème ne dépasse. */
+    body.editor-immersif { background: #143726 !important; }
+    /* Neutralise le voile de texture (body::before de hub.css) sur le vert. */
+    body.editor-immersif::before { display: none !important; }
+    /* On gagne enfin de la LARGEUR → pastilles ré-agrandies en immersif mobile
+       (annule la réduction de la media query ≤480px qui n'a plus lieu d'être). */
+    @media (max-width: 480px) {
+      body.editor-immersif .vt-mark { width: 84px; }
+      body.editor-immersif .vt-mark__disc { width: 46px; height: 46px; border-width: 3px; }
+      body.editor-immersif .vt-mark__num { font-size: 20px; }
+      body.editor-immersif .vt-mark__poste { font-size: 8px; }
+      body.editor-immersif .vt-mark__nom { font-size: 9px; max-width: 72px; }
+    }
 
     .immersif-exit {
       display: none; position: absolute; top: 10px; right: 12px; z-index: 50;
