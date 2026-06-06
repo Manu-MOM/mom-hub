@@ -7,6 +7,10 @@
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
  * Version : 3.63 — Boot : deep-link ?vue=rapport (onglet Rapport via la vignette de la fiche évènement) (4 juin 2026)
+ *   v3.64 : Terrain — libellé des pastilles passe au PRÉNOM (nomTerrain),
+ *           désambiguïsé par l'initiale du nom si doublon de prénom dans
+ *           la compo. Réservé au terrain ; l'export réseaux garde X.NOM
+ *           (nomJoueurCompact inchangé). Décision Manu (option b, pt 75).
  *   v3.63 : DEEP-LINK ?vue=rapport. Le boot captait terrain/suivi/reseaux
  *           mais PAS rapport → un lien ...&vue=rapport ouvrait l'onglet Liste.
  *           Ajout du cas 'rapport' (miroir exact de 'suivi', tabs[3], ordre
@@ -4403,7 +4407,7 @@
                 escapeHtml(libellePoste + ' · ' + nomJoueurComplet(cj) + ' (glisser pour déplacer)') + '">' +
                 '<span class="vt-mark__poste">' + escapeHtml(poste.libelle_court || poste.code) + '</span>' +
                 '<span class="vt-mark__disc"><span class="vt-mark__num">' + escapeHtml(num) + '</span></span>' +
-                '<span class="vt-mark__nom">' + escapeHtml(nomJoueurCompact(cj)) + '</span>' +
+                '<span class="vt-mark__nom">' + escapeHtml(nomTerrain(cj)) + '</span>' +
               '</div>';
     }
 
@@ -4422,7 +4426,7 @@
         html += '<span class="vt-bench-item vt-drag" draggable="true" data-joueur-id="' + escapeHtml(cj.joueur_id) + '" title="' +
                   escapeHtml(nomJoueurComplet(cj) + ' (glisser sur un poste ou hors du banc)') + '">' +
                   '<span class="vt-bench-item__num">' + escapeHtml(cj.numero_maillot != null ? cj.numero_maillot : (16 + i)) + '</span>' +
-                  escapeHtml(nomJoueurCompact(cj)) +
+                  escapeHtml(nomTerrain(cj)) +
                 '</span>';
       }
     }
@@ -4509,6 +4513,30 @@
     if (!cj) return '';
     const j = getJoueurVivier(cj.joueur_id) || {};
     return ((j.prenom || '') + ' ' + (j.nom || '')).trim();
+  }
+
+  // Libellé PRÉNOM pour les pastilles du terrain (décision Manu : plus lisible
+  // sur le terrain qu'« initiale + NOM », surtout sur mobile). Réservé au TERRAIN
+  // (renderEditorTerrain) ; nomJoueurCompact reste « X.NOM » pour l'export réseaux.
+  // Anti-ambiguïté : si le prénom est partagé par ≥2 joueurs de la compo courante,
+  // on désambiguïse avec l'initiale du nom (« FLORIAN S. » vs « FLORIAN B. »).
+  function nomTerrain(cj) {
+    if (!cj) return '';
+    const j = getJoueurVivier(cj.joueur_id) || {};
+    const prenom = (j.prenom || '').trim();
+    const nom = (j.nom || '').trim();
+    if (!prenom && !nom) return '';
+    if (!prenom) return nom.toUpperCase();
+    // Doublon de prénom dans la compo courante ?
+    let homonymes = 0;
+    (State.compoJoueurs || []).forEach(function (autre) {
+      const ja = getJoueurVivier(autre.joueur_id) || {};
+      if ((ja.prenom || '').trim().toLowerCase() === prenom.toLowerCase()) homonymes++;
+    });
+    if (homonymes > 1 && nom) {
+      return (prenom + ' ' + nom.charAt(0) + '.').toUpperCase();
+    }
+    return prenom.toUpperCase();
   }
 
   // ════════════════════════════════════════════════════════════
@@ -5778,7 +5806,7 @@
     bindPopoverOutsideClick();
 
     console.log(
-      '%c🏉 Compositions Editor v3.63 chargé',
+      '%c🏉 Compositions Editor v3.64 chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         evenements: State.evenements.length,
