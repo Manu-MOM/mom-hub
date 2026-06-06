@@ -786,6 +786,13 @@
       .vt-mark__num { font-size: 15px; }
       .vt-mark__poste { font-size: 7px; padding: 1px 3px; }
       .vt-mark__nom { font-size: 8px; max-width: 52px; margin-top: 2px; line-height: 1.1; }
+
+      /* Barre d'onglets LISTE/TERRAIN/RÉSEAUX/SUIVI : sur 380px elle déborde
+         à droite (flex sans wrap) → on la rend défilable horizontalement
+         (pattern onglets mobile). Onglets non rétractables + scroll tactile. */
+      .view-tabs { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
+      .view-tabs__tab, .view-tabs__reseaux, .view-tabs__action { flex-shrink: 0; padding-left: 16px; padding-right: 16px; }
+      .view-tabs__action { margin-left: 0; }
     }
     .view-terrain__bench {
       display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
