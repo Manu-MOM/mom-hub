@@ -774,6 +774,19 @@
     .vt-mark.etat-modifie     .vt-mark__disc { border-color: var(--clay); }
     .vt-mark.etat-independant .vt-mark__disc { border-color: var(--vert-prairie); }
     .vt-mark.etat-blesse      .vt-mark__disc { border-color: var(--rouge-blesse); }
+
+    /* UX-MOBILE-RESPONSIVE pt 75 (passe terrain mobile) : sous 480px, le
+       terrain ratio 100/140 dans une colonne étroite tasse les pastilles
+       (taille desktop) → on réduit marques/disques/polices pour les aérer.
+       La table de coordonnées (en %) est INCHANGÉE : seules les tailles
+       rétrécissent, les pastilles s'espacent naturellement. */
+    @media (max-width: 480px) {
+      .vt-mark { width: 64px; }
+      .vt-mark__disc { width: 34px; height: 34px; border-width: 2px; }
+      .vt-mark__num { font-size: 15px; }
+      .vt-mark__poste { font-size: 7px; padding: 1px 3px; }
+      .vt-mark__nom { font-size: 8px; max-width: 64px; }
+    }
     .view-terrain__bench {
       display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
       padding: 10px 12px; background: var(--paper-warm, #f4f1e8);
