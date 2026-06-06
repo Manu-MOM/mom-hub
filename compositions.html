@@ -218,6 +218,15 @@
     body.editor-immersif .compo-parcours,
     body.editor-immersif .compo-tabs,
     body.editor-immersif .effectif-panel { display: none !important; }
+    /* L'indicateur de remplissage (15/15 postes…) devient illisible sur le
+       fond vert et n'a pas d'intérêt en plein écran → masqué (patron impression). */
+    body.editor-immersif .fill-indicator { display: none !important; }
+    /* Bandeau d'en-tête du terrain/suivi réduit en immersif : on gagne de la
+       hauteur tout en gardant le contexte équipe/adversaire. */
+    body.editor-immersif .view-suivi__bandeau { padding: 8px 12px; border-bottom-width: 3px; }
+    body.editor-immersif .view-suivi__logo { width: 28px; height: 28px; }
+    body.editor-immersif .view-suivi__brand-eq { font-size: 15px; }
+    body.editor-immersif .view-suivi__brand-sub { font-size: 11px; }
     body.editor-immersif .compo-layout { padding: 0 !important; max-width: none; }
     body.editor-immersif .compo-grid { grid-template-columns: 1fr; gap: 0; }
     /* Bord à bord : on neutralise le cadre blanc de .editor-area (fond/bordure/
