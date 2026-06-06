@@ -417,6 +417,31 @@ body:not(.auth-admin) .user-action {
   }
 }
 
+/* UX-MOBILE-RESPONSIVE pt 75 : sous 768px, la grille rigide de la topbar
+   (auto auto 1fr auto auto, hauteur fixe 56px) ne tient plus → on passe en
+   flex-wrap, hauteur auto, et la carte profil (ou la pilule login) descend
+   sur une 2e ligne pleine largeur au lieu de déborder à droite. */
+@media (max-width: 768px) {
+  .topbar {
+    display: flex;
+    flex-wrap: wrap;
+    height: auto;
+    gap: 10px 16px;
+    padding: 8px 16px;
+    align-items: center;
+  }
+  .brand { flex: 1 1 auto; min-width: 0; }
+  .icon-row { flex: 0 0 auto; }
+  .user-profile,
+  .login-pill {
+    flex: 1 0 100%;       /* 2e ligne pleine largeur */
+    justify-content: flex-start;
+  }
+  /* Le calc(100vh - 56px) de .page-centered devient faux si la topbar
+     grandit → on neutralise la contrainte sous ce palier. */
+  .page-centered { min-height: auto; }
+}
+
 
 /* ============================================================
  * 7. CLASSES UTILITAIRES PARTAGÉES (login + dashboard)
