@@ -91,6 +91,13 @@
 
 html, body { height: 100%; }
 
+/* Verrou anti-débordement horizontal transverse (UX-MOBILE-RESPONSIVE, pt 75).
+   Garde-fou : clippe tout dépassement latéral d'un composant trop large
+   plutôt que de laisser scroller la page entière. N'affecte pas le scroll
+   vertical. Les composants larges (terrain, onglets) restent à traiter à
+   la source. fullscreen-app a déjà overflow:hidden → non impacté. */
+html, body { max-width: 100%; overflow-x: hidden; }
+
 body {
   font-family: 'Manrope', sans-serif;
   background: var(--paper);
