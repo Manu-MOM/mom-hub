@@ -198,6 +198,39 @@
       cursor: pointer; transition: all 0.15s;
     }
     .view-tabs__reseaux:hover { background: var(--vert-bouteille); color: #fff; border-color: var(--vert-bouteille); }
+
+    /* ═══ UX-SUIVI-TERRAIN-IMMERSIF — mode plein écran (tous onglets) ═══
+       Bouton dans la barre view-tabs (hors comptage bindViewTabs, comme
+       __reseaux). body.editor-immersif masque topbar/parcours/onglets compos
+       /effectif et fait remplir l'écran à #editor-area ; la barre view-tabs
+       RESTE visible (navigation entre vues sans sortir). Sortie : ✕ flottant
+       OU re-clic sur le bouton (toggle). Front pur, aucune logique touchée. */
+    .view-tabs__fullscreen {
+      margin-left: auto; padding: 8px 16px; border: 1px solid var(--line);
+      border-radius: 8px; background: #fff; color: var(--ink); cursor: pointer;
+      font-size: 13px; font-family: 'Oswald', sans-serif; letter-spacing: 0.04em;
+      text-transform: uppercase; transition: all 0.15s; white-space: nowrap;
+    }
+    .view-tabs__fullscreen:hover { background: var(--vert-prairie); color: #fff; border-color: var(--vert-prairie); }
+    .view-tabs__fullscreen.is-on { background: var(--vert-prairie); color: #fff; border-color: var(--vert-prairie); }
+
+    body.editor-immersif .topbar,
+    body.editor-immersif .compo-parcours,
+    body.editor-immersif .compo-tabs,
+    body.editor-immersif .effectif-panel { display: none !important; }
+    body.editor-immersif .compo-layout { padding: 8px !important; max-width: none; }
+    body.editor-immersif .compo-grid { grid-template-columns: 1fr; gap: 0; }
+    body.editor-immersif .editor-area { min-width: 0; }
+    body.editor-immersif .view-tabs { margin-bottom: 10px; }
+
+    .immersif-exit {
+      display: none; position: absolute; top: 10px; right: 12px; z-index: 50;
+      width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line);
+      background: var(--vert-bouteille); color: #fff; font-size: 20px; line-height: 1;
+      cursor: pointer; align-items: center; justify-content: center; padding: 0;
+    }
+    .immersif-exit:hover { background: var(--vert-prairie); }
+    body.editor-immersif .immersif-exit { display: flex; }
     /* ── Vue Suivi (écran live éducateur seul) — L1 squelette ── */
     .view-suivi { display: flex; flex-direction: column; gap: 16px; }
     .view-suivi__inert {
@@ -1350,6 +1383,7 @@
   </header>
 
   <main class="compo-layout">
+    <button class="immersif-exit" id="btn-immersif-exit" type="button" title="Quitter le plein écran (Échap)" aria-label="Quitter le plein écran">✕</button>
 
     <nav class="compo-parcours" id="compo-parcours" aria-label="Navigation du parcours" style="display:none; gap:10px; align-items:center; margin-bottom:14px;">
       <a id="compo-nav-fiche" class="compo-parcours__link" href="#" title="Retour à la fiche de l'évènement">← Fiche évènement</a>
@@ -1384,6 +1418,7 @@
       <button class="view-tabs__reseaux" id="btn-export-image" type="button" title="Exporter la composition pour les réseaux sociaux (image PNG)">Réseaux</button>
       <button class="view-tabs__tab" type="button" title="Suivi du match en direct">Suivi</button>
       <button class="view-tabs__tab" type="button" title="Rapport de match (déduit du suivi)">Rapport</button>
+      <button class="view-tabs__fullscreen" id="btn-fullscreen" type="button" title="Afficher la vue en plein écran" aria-pressed="false">⛶ Plein écran</button>
     </nav>
 
     <div class="compo-grid">
