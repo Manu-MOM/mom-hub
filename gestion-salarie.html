@@ -17,9 +17,11 @@
   RPC consommées (sql/sql_78_socle_gestion_salarie) :
     list_entites / upsert_entite ;
     list_missions / upsert_mission / supprimer_mission ;
-    list_mission_seances / upsert_mission_seance / supprimer_mission_seance.
+    list_mission_seances / upsert_mission_seance / supprimer_mission_seance ;
+    list_salaries (picker salarié, sql/83 — substitue listStaffDisponibles).
   Voies déjà déployées réutilisées : SupabaseHub.getSaisonActive(),
-    listSitesActifs(), listStaffDisponibles().
+    listSitesActifs(). [Le picker Missions NE liste plus le staff : il liste
+    les salariés via list_salaries() — corrigé pt 83.]
   Décisions actées (conv pt 79) : 2 onglets ; séances inline ;
     code entité auto-dérivé (slug majuscule + suffixe base36) ;
     champ refacturable mission visible (héritage entité par défaut).
@@ -434,8 +436,13 @@
     $('entSite').innerHTML = opts;
     $('misLieu').innerHTML = opts;
   }
-  async function loadStaff() {
-    staff = await SupabaseHub.listStaffDisponibles();
+  async function loadSalaries() {
+    // Picker Missions : ne lister QUE les salariés (contrat courant), via
+    // list_salaries() (sql/83). Substitue list_staff_disponibles, qui listait
+    // les ~63 encadrants staff — un opérateur aurait choisi un staff en croyant
+    // choisir un salarié. Même signature (personne_id, nom, prenom) -> le reste
+    // du rendu est inchangé.
+    staff = await rpc('list_salaries');
     staffLabel.clear();
     const filterSel = $('misSalarie');
     const modalSel = $('misSalarieSel');
@@ -748,7 +755,7 @@
 
   // ---------- Boot ----------
   try {
-    await Promise.all([loadSites(), loadStaff()]);
+    await Promise.all([loadSites(), loadSalaries()]);
     await loadEntites();   // remplit aussi entitesAll + la pioche bénéficiaire
     await loadMissions();
   } catch (e) {
