@@ -41,7 +41,8 @@
               transition: border-color .15s, background-color .15s; cursor: pointer; }
   .imp-drop:hover, .imp-drop.drag { border-color: var(--vert-prairie, #2d7a3e);
               background: var(--vert-light, rgba(45,122,62,0.06)); }
-  .imp-drop input { display: none; }
+  .imp-drop input { position: absolute; width: 1px; height: 1px;
+                    opacity: 0; overflow: hidden; clip: rect(0 0 0 0); pointer-events: none; }
   .imp-drop .ic { font-size: 28px; line-height: 1; margin-bottom: 8px; }
   .imp-drop .hint { color: var(--ink-mute, #6b7a74); font-size: 13px; margin-top: 6px; }
   .imp-file { font-weight: 600; color: var(--ink, #0c3d24); }
