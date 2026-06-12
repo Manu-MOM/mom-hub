@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Import OVAL-E · MOM Hub</title>
+<link rel="icon" type="image/png" href="assets/logo-m2m.png">
+<!--
+  MOM Hub · Import OVAL-E — alimente personnes.qualites_ffr depuis un export OVAL-E (pt 82).
+  Calque gestion-salarie.html (topbar, hub-back, boot auth, season-pill) vérifié à la source 12/06.
+
+  CANAL retenu (kit passation) : import INTÉGRÉ au Hub, pas d'outil local.
+    1. Manu dépose l'export .xlsx OVAL-E.
+    2. SheetJS (CDN) lit le fichier côté navigateur, agrège les codes Qualité par licence.
+    3. Aperçu (licences lues, codes vus, codes inconnus éventuels).
+    4. Appel RPC import_qualites_ffr(jsonb) — SECURITY DEFINER, garde admin, UPDATE non-destructif.
+    5. Affichage du rapport de réconciliation : matchées / cas 2 (sans fiche) / cas 3 (hors export)
+       + alerte codes inconnus.
+
+  DOCTRINE (faits vérifiés) :
+    - qualites_ffr text[] ; jointure base = numero_licence_ffr (col "Numéro Licence").
+    - colonnes export OVAL-E : "Numéro Licence" (clé), "Qualité" (code FFR brut).
+      Le format réel peut varier ; on détecte les colonnes par libellé (insensible accents/casse).
+    - 12 codes connus : A,DC4,RLSP,EDU,SOI,AM,ECF,B,RLO,PAR,RF2,ACF. Hors-liste = signalé.
+    - JAMAIS de création de fiche (cas 2 = signalé). RPC n'écrit QUE qualites_ffr.
+-->
+<link rel="stylesheet" href="css/hub.css">
+<style>
+  body.auth-pending { visibility: hidden; }
+  .imp-wrap { max-width: 980px; margin: 0 auto; padding: 24px 24px 48px; }
+  .imp-wrap h1 { font-size: 20px; margin: 0 0 4px; }
+  .imp-sub { color: var(--ink-mute, #6b7a74); margin: 0 0 20px; font-size: 13px; }
+
+  .imp-card { background: #fff; border: 1px solid var(--paper-warm, #e3e0d8);
+              border-radius: 10px; padding: 20px 22px; margin-bottom: 18px; }
+  .imp-card h2 { font-size: 15px; margin: 0 0 12px; }
+  .imp-step { color: var(--ink-mute, #6b7a74); font-size: 13px; margin: 0 0 16px; }
+
+  .imp-drop { border: 2px dashed var(--line, #cabe9f); border-radius: 12px;
+              padding: 28px 20px; text-align: center; background: var(--paper, #f8f5ec);
+              transition: border-color .15s, background-color .15s; cursor: pointer; }
+  .imp-drop:hover, .imp-drop.drag { border-color: var(--vert-prairie, #2d7a3e);
+              background: var(--vert-light, rgba(45,122,62,0.06)); }
+  .imp-drop input { display: none; }
+  .imp-drop .ic { font-size: 28px; line-height: 1; margin-bottom: 8px; }
+  .imp-drop .hint { color: var(--ink-mute, #6b7a74); font-size: 13px; margin-top: 6px; }
+  .imp-file { font-weight: 600; color: var(--ink, #0c3d24); }
+
+  .imp-btn { padding: 10px 18px; border: 0; border-radius: 8px; font: inherit; font-weight: 600;
+             cursor: pointer; background: var(--vert-prairie, #2d7a3e); color: #fff; }
+  .imp-btn:disabled { opacity: .5; cursor: default; }
+  .imp-btn.secondary { background: #fff; border: 1px solid var(--line, #cabe9f); color: var(--ink, #0c3d24); }
+  .imp-actions { display: flex; gap: 10px; align-items: center; margin-top: 16px; flex-wrap: wrap; }
+
+  .imp-msg { padding: 10px 14px; border-radius: 8px; font-size: 14px; margin-bottom: 14px; display: none; }
+  .imp-msg.ok { background: #e8f1ec; color: var(--vert-prairie, #1b6b4c); display: block; }
+  .imp-msg.err { background: #f7e6e2; color: var(--rouge-blesse, #c0392b); display: block; }
+  .imp-msg.warn { background: #fbf3e0; color: #8a6d1f; display: block; }
+
+  .imp-preview { display: none; }
+  .imp-preview.show { display: block; }
+  .imp-stats { display: flex; gap: 18px; flex-wrap: wrap; margin: 0 0 14px; }
+  .imp-stat { background: var(--paper, #f8f5ec); border-radius: 10px; padding: 12px 16px; min-width: 120px; }
+  .imp-stat .num { font-size: 24px; font-weight: 700; color: var(--ink, #0c3d24); }
+  .imp-stat .lbl { font-size: 12px; color: var(--ink-mute, #6b7a74); text-transform: uppercase; letter-spacing: .03em; }
+
+  .imp-codes { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 0; }
+  .imp-chip { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 12px; font-weight: 600;
+              background: #e8f1ec; color: var(--vert-prairie, #1b6b4c); }
+  .imp-chip.staff { background: #dcefe0; color: #16703a; }
+  .imp-chip.unknown { background: #f7e6e2; color: var(--rouge-blesse, #c0392b); }
+
+  .imp-report { display: none; }
+  .imp-report.show { display: block; }
+  table.imp-tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
+  table.imp-tbl th { text-align: left; color: var(--ink-mute, #6b7a74); font-weight: 600; font-size: 12px;
+                     text-transform: uppercase; letter-spacing: .03em; padding: 8px 12px;
+                     border-bottom: 1px solid var(--paper-warm, #e3e0d8); }
+  table.imp-tbl td { padding: 9px 12px; border-bottom: 1px solid var(--paper-warm, #e3e0d8); }
+  table.imp-tbl tr:last-child td { border-bottom: 0; }
+  .imp-section-title { font-size: 13px; font-weight: 700; margin: 18px 0 8px; color: var(--ink, #0c3d24); }
+  .imp-empty { color: var(--ink-mute, #6b7a74); font-size: 14px; padding: 6px 0; }
+
+  .hub-back-row { max-width: 980px; margin: 0 auto; padding: 18px 24px 0; }
+  .hub-back-btn { display: inline-flex; align-items: center; gap: 8px;
+                  padding: 8px 16px; border: 1px solid var(--line, #cabe9f); border-radius: 999px;
+                  background: #fff; color: var(--ink, #0c3d24); font: inherit; font-size: 13px;
+                  font-weight: 600; text-decoration: none; cursor: pointer;
+                  transition: border-color .15s, color .15s, background-color .15s; }
+  .hub-back-btn:hover { border-color: var(--vert-prairie, #2d7a3e); color: var(--vert-prairie, #2d7a3e);
+                        background: var(--vert-light, rgba(45,122,62,0.06)); }
+  .hub-back-btn svg { width: 15px; height: 15px; }
+</style>
+</head>
+<body class="auth-pending">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo"><img src="assets/logo-m2m.png" alt="MOM Rugby"></div>
+      <div class="brand-text">
+        <h1>MOM Hub</h1>
+        <p>Mutzig Ovalie Molsheim</p>
+      </div>
+    </div>
+
+    <div class="season-pill" id="season-pill">SAISON 2025 / 2026</div>
+
+    <nav class="main-nav">
+      <a href="dashboard.html">Tableau de bord</a>
+      <a href="evenements.html">Évènements</a>
+      <a href="u-admin.html">Collectif (admin)</a>
+      <a href="compositions.html">Compositions</a>
+    </nav>
+
+    <div class="icon-row">
+      <button class="icon-btn" title="Recherche" aria-label="Recherche">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      </button>
+    </div>
+
+    <div class="user-profile">
+      <div class="avatar">EJ</div>
+      <div class="user-info">
+        <div class="user-name">Emmanuel Jung</div>
+        <div class="user-role">Administrateur</div>
+      </div>
+      <a href="./" class="user-action" title="Retour au portail" aria-label="Retour au portail">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/></svg>
+      </a>
+      <button type="button" class="user-action" id="btn-signout" title="Se déconnecter" aria-label="Se déconnecter">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="hub-back-row">
+    <a class="hub-back-btn" href="dashboard.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 18l-6-6 6-6"/></svg>
+      Retour au tableau de bord
+    </a>
+  </div>
+
+  <main class="imp-wrap">
+    <h1>Import OVAL-E</h1>
+    <p class="imp-sub">
+      Mettre à jour les qualités FFR des licenciés (entraîneur, éducateur, soigneur…) à partir d'un
+      export OVAL-E. L'import ne touche QUE les qualités FFR — il ne crée jamais de fiche et ne
+      modifie ni les catégories, ni les rôles, ni le statut salarié.
+    </p>
+
+    <div class="imp-msg" id="impMsg"></div>
+
+    <!-- Étape 1 : dépôt du fichier -->
+    <div class="imp-card">
+      <h2>1 · Déposer l'export OVAL-E</h2>
+      <p class="imp-step">
+        Format attendu : le fichier .xlsx « Liste des affiliés » exporté depuis OVAL-E,
+        contenant au moins les colonnes <strong>Numéro Licence</strong> et <strong>Qualité</strong>.
+      </p>
+      <label class="imp-drop" id="impDrop">
+        <div class="ic">⬆️</div>
+        <div><span class="imp-file" id="impFileName">Choisir un fichier .xlsx</span></div>
+        <div class="hint">ou glisser-déposer le fichier ici</div>
+        <input type="file" id="impFile" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+      </label>
+    </div>
+
+    <!-- Étape 2 : aperçu -->
+    <div class="imp-card imp-preview" id="impPreview">
+      <h2>2 · Aperçu avant import</h2>
+      <div class="imp-stats">
+        <div class="imp-stat"><div class="num" id="stLicences">0</div><div class="lbl">Licences lues</div></div>
+        <div class="imp-stat"><div class="num" id="stLignes">0</div><div class="lbl">Lignes de l'export</div></div>
+        <div class="imp-stat"><div class="num" id="stCodes">0</div><div class="lbl">Codes distincts</div></div>
+      </div>
+
+      <div class="imp-section-title">Codes vus dans l'export</div>
+      <div class="imp-codes" id="impCodeChips"></div>
+
+      <div id="impUnknownWrap" style="display:none;">
+        <div class="imp-section-title" style="color:var(--rouge-blesse,#c0392b);">⚠️ Codes inconnus (hors vocabulaire FFR)</div>
+        <p class="imp-step">Ces codes n'appartiennent pas aux 12 qualités connues. L'import est possible,
+          mais ils ne rendront personne « staff » tant que le socle FFR n'est pas élargi (décision à acter).</p>
+        <div class="imp-codes" id="impUnknownChips"></div>
+      </div>
+
+      <div class="imp-actions">
+        <button class="imp-btn" id="impRun">Lancer l'import</button>
+        <button class="imp-btn secondary" id="impReset">Annuler</button>
+      </div>
+    </div>
+
+    <!-- Étape 3 : rapport -->
+    <div class="imp-card imp-report" id="impReport">
+      <h2>3 · Rapport de réconciliation</h2>
+      <div class="imp-stats">
+        <div class="imp-stat"><div class="num" id="rpMatch">0</div><div class="lbl">Fiches mises à jour</div></div>
+        <div class="imp-stat"><div class="num" id="rpCas2">0</div><div class="lbl">Sans fiche (cas 2)</div></div>
+        <div class="imp-stat"><div class="num" id="rpCas3">0</div><div class="lbl">Hors export (cas 3)</div></div>
+      </div>
+
+      <div class="imp-section-title">Cas 2 — licences de l'export sans fiche en base</div>
+      <p class="imp-step">Signalées, jamais créées automatiquement. À traiter à la main si besoin.</p>
+      <div id="rpCas2List"></div>
+
+      <div class="imp-section-title">Cas 3 — fiches licenciées en base absentes de l'export</div>
+      <p class="imp-step">Aucune action : leurs qualités restent inchangées (souvent des joueurs d'un autre club).</p>
+      <div id="rpCas3List"></div>
+
+      <div id="rpUnknownWrap" style="display:none;">
+        <div class="imp-section-title" style="color:var(--rouge-blesse,#c0392b);">Codes inconnus rencontrés</div>
+        <div id="rpUnknownList"></div>
+      </div>
+
+      <div class="imp-actions">
+        <button class="imp-btn secondary" id="impAgain">Nouvel import</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- SheetJS (xlsx) — non présent ailleurs dans le Hub, chargé par CDN ici -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <!-- Bibliothèque officielle Supabase JS (UMD via CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <!-- Wrapper MOM Hub -->
+  <script src="js/supabase-client.js"></script>
+
+  <script>
+  (async function () {
+    'use strict';
+
+    // ---- Garde d'auth : admin STRICT (import de données licences sensibles) ----
+    const session = await SupabaseHub.getSession();
+    if (!session) { window.location.replace('login.html'); return; }
+    const roles = await SupabaseHub.getMyRoles();
+    if (roles.indexOf('admin') === -1) { window.location.replace('./'); return; }
+    document.body.classList.remove('auth-pending');
+    document.body.classList.add('auth-resolved');
+
+    const _signout = document.getElementById('btn-signout');
+    if (_signout) {
+      _signout.addEventListener('click', async function () {
+        _signout.disabled = true;
+        await SupabaseHub.signOut();
+      });
+    }
+
+    // Season-pill dynamique (dégradation honnête).
+    try {
+      const saison = await SupabaseHub.getSaisonActive();
+      if (saison && saison.libelle) {
+        const pill = document.getElementById('season-pill');
+        if (pill) pill.textContent = 'SAISON ' + saison.libelle;
+      }
+    } catch (_) { /* libellé statique conservé */ }
+
+    const client = SupabaseHub.client;
+    const $ = (id) => document.getElementById(id);
+
+    // Vocabulaire FFR connu (aligné sur la fonction SQL vocabulaire_ffr_connu).
+    const CODES_CONNUS = ['A','DC4','RLSP','EDU','SOI','AM','ECF','B','RLO','PAR','RF2','ACF'];
+    const CODES_STAFF  = ['DC4','EDU','ECF','SOI','B','ACF'];
+
+    // État courant de l'aperçu (payload prêt à envoyer).
+    let payload = [];   // [{ lic, codes:[...] }]
+
+    function flash(text, kind) {
+      const m = $('impMsg');
+      m.textContent = text; m.className = 'imp-msg ' + kind;
+      if (kind === 'ok') setTimeout(() => { m.className = 'imp-msg'; }, 4000);
+      if (kind === 'err' || kind === 'warn') window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    function clearFlash() { $('impMsg').className = 'imp-msg'; }
+    function escapeHtml(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+        ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+    }
+    function errMsg(e) {
+      const m = (e && (e.message || e.error_description || e.hint)) || 'Erreur inconnue.';
+      return /admin|réserv/i.test(m) ? "Action réservée à l'administration (admin)." : m;
+    }
+    // Normalise un libellé de colonne : minuscules, sans accents, sans espaces multiples.
+    function normHdr(s) {
+      return String(s == null ? '' : s).normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase().replace(/\s+/g, ' ').trim();
+    }
+
+    // ---------- Lecture + agrégation de l'export ----------
+    async function handleFile(file) {
+      clearFlash();
+      resetPreview();
+      $('impFileName').textContent = file.name;
+
+      let rows;
+      try {
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        // header:1 -> tableau de tableaux, on détecte les colonnes par libellé.
+        rows = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: '' });
+      } catch (e) {
+        flash('Lecture du fichier impossible : ' + errMsg(e), 'err');
+        return;
+      }
+      if (!rows || rows.length < 2) {
+        flash("L'export semble vide ou sans données.", 'err');
+        return;
+      }
+
+      // Repérage des colonnes clés sur la ligne d'en-tête.
+      const headers = rows[0].map(normHdr);
+      const idxLic = headers.findIndex(h => h.includes('licence'));
+      const idxQual = headers.findIndex(h => h === 'qualite' || h.includes('qualite'));
+      if (idxLic === -1 || idxQual === -1) {
+        flash("Colonnes introuvables : il faut au moins « Numéro Licence » et « Qualité ». "
+          + "Colonnes détectées : " + rows[0].join(' · '), 'err');
+        return;
+      }
+
+      // Agrégation : { licence -> Set(codes) }.
+      const map = new Map();
+      let nbLignes = 0;
+      for (let i = 1; i < rows.length; i++) {
+        const lic = String(rows[i][idxLic] == null ? '' : rows[i][idxLic]).trim();
+        const code = String(rows[i][idxQual] == null ? '' : rows[i][idxQual]).trim().toUpperCase();
+        if (!lic || !code) continue;
+        nbLignes++;
+        if (!map.has(lic)) map.set(lic, new Set());
+        map.get(lic).add(code);
+      }
+      if (map.size === 0) {
+        flash("Aucune ligne exploitable (licence + qualité) dans l'export.", 'err');
+        return;
+      }
+
+      // Construction du payload trié + collecte des codes vus.
+      const tousCodes = new Set();
+      payload = [];
+      for (const [lic, set] of map) {
+        const codes = Array.from(set).sort();
+        codes.forEach(c => tousCodes.add(c));
+        payload.push({ lic, codes });
+      }
+      payload.sort((a, b) => a.lic.localeCompare(b.lic));
+
+      renderPreview(nbLignes, Array.from(tousCodes).sort());
+    }
+
+    function renderPreview(nbLignes, codesVus) {
+      $('stLicences').textContent = payload.length;
+      $('stLignes').textContent = nbLignes;
+      $('stCodes').textContent = codesVus.length;
+
+      const chips = $('impCodeChips');
+      chips.innerHTML = codesVus.map(c => {
+        const cls = CODES_STAFF.indexOf(c) !== -1 ? 'imp-chip staff'
+                  : (CODES_CONNUS.indexOf(c) !== -1 ? 'imp-chip' : 'imp-chip unknown');
+        return '<span class="' + cls + '">' + escapeHtml(c) + '</span>';
+      }).join('');
+
+      const inconnus = codesVus.filter(c => CODES_CONNUS.indexOf(c) === -1);
+      const uw = $('impUnknownWrap');
+      if (inconnus.length) {
+        uw.style.display = 'block';
+        $('impUnknownChips').innerHTML = inconnus.map(c =>
+          '<span class="imp-chip unknown">' + escapeHtml(c) + '</span>').join('');
+      } else {
+        uw.style.display = 'none';
+      }
+
+      $('impPreview').classList.add('show');
+      $('impReport').classList.remove('show');
+    }
+
+    function resetPreview() {
+      payload = [];
+      $('impPreview').classList.remove('show');
+      $('impReport').classList.remove('show');
+    }
+
+    // ---------- Import (appel RPC) ----------
+    async function runImport() {
+      if (!payload.length) { flash('Aucun fichier chargé.', 'err'); return; }
+      const btn = $('impRun');
+      btn.disabled = true; btn.textContent = 'Import en cours…';
+      try {
+        const { data, error } = await client.rpc('import_qualites_ffr', { p_payload: payload });
+        if (error) throw error;
+        // La RPC renvoie une seule ligne-rapport.
+        const r = Array.isArray(data) ? data[0] : data;
+        renderReport(r);
+        flash('Import terminé : ' + (r.out_matchees || 0) + ' fiche(s) mise(s) à jour.', 'ok');
+      } catch (e) {
+        flash("Échec de l'import : " + errMsg(e), 'err');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Lancer l\'import';
+      }
+    }
+
+    function asArray(v) {
+      if (Array.isArray(v)) return v;
+      if (typeof v === 'string') { try { return JSON.parse(v); } catch (_) { return []; } }
+      return v || [];
+    }
+
+    function renderReport(r) {
+      const cas2 = asArray(r.out_cas2);
+      const cas3 = asArray(r.out_cas3);
+      const inconnus = asArray(r.out_codes_inconnus);
+
+      $('rpMatch').textContent = r.out_matchees || 0;
+      $('rpCas2').textContent = cas2.length;
+      $('rpCas3').textContent = cas3.length;
+
+      // Cas 2
+      if (cas2.length) {
+        $('rpCas2List').innerHTML =
+          '<table class="imp-tbl"><thead><tr><th>Numéro de licence</th></tr></thead><tbody>' +
+          cas2.map(x => '<tr><td>' + escapeHtml(x.lic) + '</td></tr>').join('') +
+          '</tbody></table>';
+      } else {
+        $('rpCas2List').innerHTML = '<p class="imp-empty">Aucune — toutes les licences de l\'export ont une fiche.</p>';
+      }
+
+      // Cas 3
+      if (cas3.length) {
+        $('rpCas3List').innerHTML =
+          '<table class="imp-tbl"><thead><tr><th>Nom</th><th>Prénom</th><th>Licence</th></tr></thead><tbody>' +
+          cas3.map(x => '<tr><td>' + escapeHtml(x.nom) + '</td><td>' + escapeHtml(x.prenom) +
+            '</td><td>' + escapeHtml(x.lic) + '</td></tr>').join('') +
+          '</tbody></table>';
+      } else {
+        $('rpCas3List').innerHTML = '<p class="imp-empty">Aucune.</p>';
+      }
+
+      // Codes inconnus
+      const uw = $('rpUnknownWrap');
+      if (inconnus.length) {
+        uw.style.display = 'block';
+        $('rpUnknownList').innerHTML =
+          '<table class="imp-tbl"><thead><tr><th>Code</th><th>Licence</th></tr></thead><tbody>' +
+          inconnus.map(x => '<tr><td>' + escapeHtml(x.code) + '</td><td>' + escapeHtml(x.lic) +
+            '</td></tr>').join('') + '</tbody></table>';
+      } else {
+        uw.style.display = 'none';
+      }
+
+      $('impPreview').classList.remove('show');
+      $('impReport').classList.add('show');
+    }
+
+    // ---------- Branchements UI ----------
+    const fileInput = $('impFile');
+    const drop = $('impDrop');
+
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files && fileInput.files[0]) handleFile(fileInput.files[0]);
+    });
+    ['dragenter', 'dragover'].forEach(ev =>
+      drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('drag'); }));
+    ['dragleave', 'drop'].forEach(ev =>
+      drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('drag'); }));
+    drop.addEventListener('drop', e => {
+      const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f) handleFile(f);
+    });
+
+    $('impRun').addEventListener('click', runImport);
+    $('impReset').addEventListener('click', () => {
+      resetPreview(); clearFlash();
+      $('impFileName').textContent = 'Choisir un fichier .xlsx';
+      fileInput.value = '';
+    });
+    $('impAgain').addEventListener('click', () => {
+      resetPreview(); clearFlash();
+      $('impFileName').textContent = 'Choisir un fichier .xlsx';
+      fileInput.value = '';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  })();
+  </script>
+</body>
+</html>
