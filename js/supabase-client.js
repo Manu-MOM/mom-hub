@@ -18,7 +18,14 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.52 — juin 2026
+ * Version : 1.53 — juin 2026
+ *   v1.53 : GREETING SELF-ONLY (ENROLEMENT-FRONT, pt 85→86). 1 wrapper
+ *           ADDITIF : monPrenom() — RPC mon_prenom() (RETURNS text,
+ *           self-only via auth.uid(), EXECUTE authenticated). Résout le
+ *           prénom d'un compte relié SANS rôle pour le greeting, là où
+ *           get_noms_personnes() (gardée admin|coach, RGPD) renvoyait une
+ *           erreur. Aucune méthode existante touchée ; corps + droits lus
+ *           à la source. node --check OK.
  *   v1.52 : ENRÔLEMENT FRONT (ENROLEMENT-FRONT-MANQUANT, pt 84). 2 wrappers
  *           ADDITIFS au bloc auth : quiSuisJe() — lit la personne_id reliée
  *           au compte via qui_suis_je() (RETURNS TABLE, null si orphelin) ;
@@ -1340,6 +1347,30 @@
       const row = Array.isArray(data) ? data[0] : data;
       const linked = row && row.personne_id ? row.personne_id : personneId;
       return { ok: true, personneId: linked };
+    },
+
+    /**
+     * (v1.53) Renvoie le prénom de la fiche reliée au compte connecté,
+     * ou null. Voie self-only pour le greeting d'un compte SANS rôle.
+     *
+     * S'appuie sur la RPC `mon_prenom()` (RETURNS text, SECURITY
+     * DEFINER, EXECUTE authenticated, sans paramètre : résout la
+     * fiche via auth_personne sur auth.uid()). Nécessaire parce que
+     * get_noms_personnes() est gardée admin|coach (RGPD) → inappelable
+     * par un compte relié sans rôle (cause du « Bonjour Manu »
+     * résiduel, pt 84/front). mon_prenom() ne lit JAMAIS la fiche
+     * d'autrui (aucun paramètre) → pas de risque RGPD.
+     *
+     * @returns {Promise<string|null>} prénom, ou null (orphelin/erreur).
+     */
+    async monPrenom() {
+      const { data, error } = await client.rpc('mon_prenom');
+      if (error) {
+        console.error('MOM Hub: monPrenom() error', error);
+        return null;
+      }
+      // RETURNS text → data est la valeur directe (ou null).
+      return (typeof data === 'string' && data) ? data : null;
     },
 
     // ============================================================
