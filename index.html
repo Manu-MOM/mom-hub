@@ -626,9 +626,87 @@
   .sb-shortcuts li:last-child a { border-bottom: none; }
   .sb-shortcuts a:hover { color: var(--gold); }
 
+  /* ============ ENRÔLEMENT — modale « Qui êtes-vous ? » (v1 front) ============ */
+  .enrol-overlay {
+    position: fixed; inset: 0; z-index: 9999;
+    background: rgba(20, 28, 24, 0.72);
+    display: none; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .enrol-overlay.is-open { display: flex; }
+  .enrol-card {
+    background: var(--paper); color: var(--ink);
+    width: 100%; max-width: 460px; max-height: 88vh;
+    display: flex; flex-direction: column;
+    border-radius: 14px; box-shadow: 0 24px 60px var(--shadow);
+    border: 1px solid var(--line); overflow: hidden;
+  }
+  .enrol-head { padding: 22px 24px 14px; border-bottom: 1px solid var(--line); }
+  .enrol-head h3 { margin: 0 0 6px; font-size: 1.25rem; color: var(--vert-bouteille); }
+  .enrol-head p { margin: 0; font-size: 0.9rem; color: var(--ink-mute); line-height: 1.45; }
+  .enrol-search {
+    margin: 14px 24px 0; padding: 10px 12px;
+    border: 1px solid var(--line); border-radius: 9px;
+    font-size: 0.95rem; color: var(--ink); background: var(--paper-warm);
+    width: calc(100% - 48px);
+  }
+  .enrol-search:focus { outline: none; border-color: var(--gold); }
+  .enrol-list {
+    margin: 12px 0 0; padding: 0 12px 12px; list-style: none;
+    overflow-y: auto; flex: 1;
+  }
+  .enrol-list li { margin: 0; }
+  .enrol-list button {
+    width: 100%; text-align: left; cursor: pointer;
+    padding: 11px 12px; margin: 2px 0;
+    background: transparent; border: 1px solid transparent;
+    border-radius: 8px; font-size: 0.97rem; color: var(--ink);
+    transition: background 0.12s, border-color 0.12s;
+  }
+  .enrol-list button:hover { background: var(--paper-deep); border-color: var(--line); }
+  .enrol-list button .nom { font-weight: 600; }
+  .enrol-empty { padding: 22px 24px; color: var(--ink-mute); font-size: 0.9rem; }
+  .enrol-foot { padding: 12px 24px 18px; border-top: 1px solid var(--line); font-size: 0.82rem; color: var(--ink-soft); }
+  .enrol-confirm { padding: 24px; }
+  .enrol-confirm p { margin: 0 0 18px; font-size: 1.02rem; color: var(--ink); line-height: 1.5; }
+  .enrol-confirm strong { color: var(--vert-bouteille); }
+  .enrol-actions { display: flex; gap: 10px; }
+  .enrol-actions button {
+    flex: 1; padding: 11px 14px; border-radius: 9px; cursor: pointer;
+    font-size: 0.95rem; border: 1px solid var(--line); transition: opacity 0.12s;
+  }
+  .enrol-actions button:disabled { opacity: 0.5; cursor: default; }
+  .enrol-btn-yes { background: var(--vert-bouteille); color: var(--paper); border-color: var(--vert-bouteille); }
+  .enrol-btn-no { background: var(--paper); color: var(--ink-mute); }
+  .enrol-error { margin: 10px 24px 0; color: var(--clay); font-size: 0.86rem; }
+
 </style>
 </head>
 <body class="fullscreen-app">
+
+  <!-- ============ ENRÔLEMENT — modale d'auto-identification (v1 front) ============ -->
+  <!-- Affichée par le boot UNIQUEMENT si le compte connecté n'est pas relié
+       à une fiche (qui_suis_je() vide) ET n'est pas admin. -->
+  <div class="enrol-overlay" id="enrol-overlay" role="dialog" aria-modal="true" aria-labelledby="enrol-title">
+    <div class="enrol-card">
+      <div class="enrol-head">
+        <h3 id="enrol-title">Qui êtes-vous ?</h3>
+        <p>Pour accéder au Hub, choisissez votre fiche dans la liste. Cette étape n'est demandée qu'une seule fois.</p>
+      </div>
+      <input type="text" class="enrol-search" id="enrol-search" placeholder="Rechercher votre nom…" autocomplete="off">
+      <div class="enrol-error" id="enrol-error" hidden></div>
+      <ul class="enrol-list" id="enrol-list"></ul>
+      <div class="enrol-confirm" id="enrol-confirm" hidden>
+        <p>C'est bien vous : <strong id="enrol-confirm-nom"></strong> ?</p>
+        <div class="enrol-actions">
+          <button type="button" class="enrol-btn-no" id="enrol-cancel">Non, retour</button>
+          <button type="button" class="enrol-btn-yes" id="enrol-validate">Oui, c'est moi</button>
+        </div>
+      </div>
+      <div class="enrol-foot">Une question ? Contactez l'administrateur du club.</div>
+    </div>
+  </div>
+
 <div class="app">
 
   <!-- ============ TOPBAR ============ -->
@@ -1083,6 +1161,10 @@
         }
         const admin = await SupabaseHub.isAdmin();
         applyState(admin);
+        // Enrôlement (v1 front) : résout l'identité du compte connecté.
+        // Si la fiche est reliée → greeting dynamique ; sinon, et si non-admin,
+        // → modale d'auto-identification. L'admin n'est jamais bloqué.
+        resolveIdentity(admin);
       } catch (err) {
         console.error('MOM Hub portail: erreur résolution auth', err);
         applyState(false);
@@ -1126,6 +1208,190 @@
     } catch (err) {
       console.warn('MOM Hub portail: maj greeting-meta échouée', err);
     }
+
+    // ==========================================================
+    // ENRÔLEMENT (v1 front) — résolution d'identité + modale
+    // ==========================================================
+    // Faits (lus à la source, pt 84) :
+    //   - qui_suis_je() RETURNS TABLE(personne_id) → wrapper quiSuisJe()
+    //     renvoie la personne_id reliée, ou null si compte orphelin.
+    //   - relier_ma_fiche(p_personne_id) → wrapper relierMaFiche() : seul
+    //     écrivain de auth_personne, matérialise les rôles pré-attribués.
+    //   - listStaffDisponibles() : pioche RGPD-safe (~46 staff), EXECUTE
+    //     authenticated confirmé → peuple la liste pour un compte orphelin.
+    //   - get_noms_personnes() (via greeting) : prénom réel post-liaison.
+    //   - Admin Manu n'a pas de pont auth_personne (déjà fonctionnel via
+    //     son rôle) → jamais bloqué par la modale.
+
+    let _enrolPick = null;
+
+    function setGreeting(prenom) {
+      const el = document.getElementById('greeting-prenom');
+      if (el && prenom) el.textContent = prenom;
+    }
+
+    async function resolveIdentity(isAdmin) {
+      let personneId = null;
+      try {
+        personneId = await SupabaseHub.quiSuisJe();
+      } catch (err) {
+        console.error('MOM Hub portail: quiSuisJe() échouée', err);
+      }
+
+      if (personneId) {
+        // Compte relié → greeting dynamique, pas de modale.
+        // _resolveNoms(uuids) est la méthode réelle (lue à la source) :
+        // résout {nom,prenom} via get_noms_personnes, renvoie une Map.
+        try {
+          const map = await SupabaseHub._resolveNoms([personneId]);
+          if (map && typeof map.get === 'function') {
+            const p = map.get(personneId);
+            if (p && p.prenom) setGreeting(p.prenom);
+          }
+        } catch (err) {
+          console.warn('MOM Hub portail: greeting dynamique échoué', err);
+        }
+        return;
+      }
+
+      // Orphelin. L'admin n'est jamais bloqué (greeting reste « Manu »).
+      if (isAdmin) return;
+      openEnrolModal();
+    }
+
+    async function openEnrolModal() {
+      const overlay = document.getElementById('enrol-overlay');
+      const list = document.getElementById('enrol-list');
+      const errEl = document.getElementById('enrol-error');
+      if (!overlay || !list) return;
+
+      overlay.classList.add('is-open');
+      list.innerHTML = '<li class="enrol-empty">Chargement des fiches…</li>';
+
+      let staff = [];
+      try {
+        staff = await SupabaseHub.listStaffDisponibles();
+      } catch (err) {
+        console.error('MOM Hub portail: listStaffDisponibles() échouée', err);
+      }
+
+      if (!Array.isArray(staff) || staff.length === 0) {
+        list.innerHTML =
+          '<li class="enrol-empty">Aucune fiche disponible. ' +
+          'Contactez l\'administrateur du club pour être rattaché.</li>';
+        return;
+      }
+
+      renderEnrolList(staff);
+      wireEnrolEvents(staff);
+      if (errEl) { errEl.hidden = true; errEl.textContent = ''; }
+    }
+
+    function renderEnrolList(rows) {
+      const list = document.getElementById('enrol-list');
+      if (!list) return;
+      if (rows.length === 0) {
+        list.innerHTML = '<li class="enrol-empty">Aucune fiche ne correspond.</li>';
+        return;
+      }
+      const frag = document.createDocumentFragment();
+      rows.forEach(function (r) {
+        const li = document.createElement('li');
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.dataset.id = r.personne_id;
+        const nom = (r.nom || '').toUpperCase();
+        const prenom = r.prenom || '';
+        btn.innerHTML = '<span class="nom">' + nom + '</span> ' + prenom;
+        btn.addEventListener('click', function () {
+          askEnrolConfirm(r);
+        });
+        li.appendChild(btn);
+        frag.appendChild(li);
+      });
+      list.innerHTML = '';
+      list.appendChild(frag);
+    }
+
+    function wireEnrolEvents(allRows) {
+      const search = document.getElementById('enrol-search');
+      if (search && !search.dataset.wired) {
+        search.dataset.wired = '1';
+        search.addEventListener('input', function () {
+          const q = search.value.trim().toLowerCase();
+          const filtered = !q ? allRows : allRows.filter(function (r) {
+            return ((r.nom || '') + ' ' + (r.prenom || ''))
+              .toLowerCase().indexOf(q) !== -1;
+          });
+          renderEnrolList(filtered);
+        });
+      }
+      const cancel = document.getElementById('enrol-cancel');
+      if (cancel && !cancel.dataset.wired) {
+        cancel.dataset.wired = '1';
+        cancel.addEventListener('click', closeEnrolConfirm);
+      }
+      const validate = document.getElementById('enrol-validate');
+      if (validate && !validate.dataset.wired) {
+        validate.dataset.wired = '1';
+        validate.addEventListener('click', confirmEnrol);
+      }
+    }
+
+    function askEnrolConfirm(row) {
+      _enrolPick = row;
+      const confirm = document.getElementById('enrol-confirm');
+      const nomEl = document.getElementById('enrol-confirm-nom');
+      const list = document.getElementById('enrol-list');
+      const search = document.getElementById('enrol-search');
+      if (nomEl) nomEl.textContent =
+        (row.prenom || '') + ' ' + (row.nom || '').toUpperCase();
+      if (confirm) confirm.hidden = false;
+      if (list) list.style.display = 'none';
+      if (search) search.style.display = 'none';
+    }
+
+    function closeEnrolConfirm() {
+      _enrolPick = null;
+      const confirm = document.getElementById('enrol-confirm');
+      const list = document.getElementById('enrol-list');
+      const search = document.getElementById('enrol-search');
+      if (confirm) confirm.hidden = true;
+      if (list) list.style.display = '';
+      if (search) search.style.display = '';
+    }
+
+    async function confirmEnrol() {
+      if (!_enrolPick) return;
+      const validate = document.getElementById('enrol-validate');
+      const cancel = document.getElementById('enrol-cancel');
+      const errEl = document.getElementById('enrol-error');
+      if (validate) { validate.disabled = true; validate.textContent = 'Liaison…'; }
+      if (cancel) cancel.disabled = true;
+
+      let res = null;
+      try {
+        res = await SupabaseHub.relierMaFiche(_enrolPick.personne_id);
+      } catch (err) {
+        console.error('MOM Hub portail: relierMaFiche() échouée', err);
+      }
+
+      if (res && res.ok) {
+        // Au rechargement, quiSuisJe() renverra la fiche → contenu + greeting.
+        window.location.reload();
+        return;
+      }
+
+      // Échec : on rouvre la liste et on signale, sans bloquer.
+      if (validate) { validate.disabled = false; validate.textContent = 'Oui, c\'est moi'; }
+      if (cancel) cancel.disabled = false;
+      closeEnrolConfirm();
+      if (errEl) {
+        errEl.hidden = false;
+        errEl.textContent = 'La liaison a échoué. Réessayez ou contactez l\'administrateur.';
+      }
+    }
+
   })();
 </script>
 
