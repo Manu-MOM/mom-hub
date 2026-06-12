@@ -1240,14 +1240,13 @@
 
       if (personneId) {
         // Compte relié → greeting dynamique, pas de modale.
-        // _resolveNoms(uuids) est la méthode réelle (lue à la source) :
-        // résout {nom,prenom} via get_noms_personnes, renvoie une Map.
+        // monPrenom() est self-only (RPC mon_prenom via auth.uid()),
+        // appelable sans rôle — contrairement à get_noms_personnes()
+        // gardée admin|coach (RGPD), qui échouait pour un compte relié
+        // sans rôle (cause du « Bonjour Manu » résiduel, pt 85→86).
         try {
-          const map = await SupabaseHub._resolveNoms([personneId]);
-          if (map && typeof map.get === 'function') {
-            const p = map.get(personneId);
-            if (p && p.prenom) setGreeting(p.prenom);
-          }
+          const prenom = await SupabaseHub.monPrenom();
+          if (prenom) setGreeting(prenom);
         } catch (err) {
           console.warn('MOM Hub portail: greeting dynamique échoué', err);
         }
