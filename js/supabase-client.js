@@ -18,7 +18,14 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.51 — juin 2026
+ * Version : 1.52 — juin 2026
+ *   v1.52 : ENRÔLEMENT FRONT (ENROLEMENT-FRONT-MANQUANT, pt 84). 2 wrappers
+ *           ADDITIFS au bloc auth : quiSuisJe() — lit la personne_id reliée
+ *           au compte via qui_suis_je() (RETURNS TABLE, null si orphelin) ;
+ *           relierMaFiche(personneId) — pose le pont auth_personne via
+ *           relier_ma_fiche(p_personne_id) (seul écrivain, matérialise les
+ *           rôles pré-attribués, invalide _rolesCache). Aucune méthode
+ *           existante touchée ; signatures + droits EXECUTE lus à la source.
  *   v1.51 : PLANIFICATION ANNUELLE (sql/73). 5 wrappers ADDITIFS :
  *           mesPolesAutorises() — RPC jumelle de mes_categories_autorisees
  *           (transverse ⇒ [{pole_id:null,est_transverse:true}], référent ⇒
@@ -1273,6 +1280,66 @@
       if (error) console.error('MOM Hub: signOut() error', error);
       if (redirect) window.location.replace(loginUrl);
       return !error;
+    },
+
+    // ----------------------------------------------------------
+    // ENRÔLEMENT — liaison compte ↔ fiche (v1.52)
+    // ----------------------------------------------------------
+    /**
+     * (v1.52) Renvoie la personne_id reliée au compte connecté, ou null.
+     *
+     * S'appuie sur la RPC `qui_suis_je()` (lue à la source :
+     * RETURNS TABLE(personne_id uuid), EXECUTE accordé à
+     * authenticated). Elle lit UNIQUEMENT `auth_personne` via
+     * auth.uid() et ne renvoie AUCUNE ligne tant que le compte n'a
+     * pas été relié (pas de fallback en base — le « Bonjour Manu »
+     * de l'index était un défaut purement front, cf. pt 84).
+     *
+     * @returns {Promise<string|null>} personne_id si reliée, sinon null.
+     *   null aussi en cas d'erreur (dégradation honnête : l'appelant
+     *   bascule alors sur l'écran d'auto-identification).
+     */
+    async quiSuisJe() {
+      const { data, error } = await client.rpc('qui_suis_je');
+      if (error) {
+        console.error('MOM Hub: quiSuisJe() error', error);
+        return null;
+      }
+      // RETURNS TABLE → data est un tableau (0 ou 1 ligne).
+      const row = Array.isArray(data) ? data[0] : data;
+      return (row && row.personne_id) ? row.personne_id : null;
+    },
+
+    /**
+     * (v1.52) Relie le compte connecté à une fiche `personnes`.
+     *
+     * Appelle la RPC `relier_ma_fiche(p_personne_id uuid)` (lue à la
+     * source : SECURITY DEFINER, garde auth.uid() IS NOT NULL,
+     * RETURNS TABLE(user_id, personne_id), EXECUTE accordé à
+     * authenticated). Elle (1) pose le pont `auth_personne`
+     * (ON CONFLICT user_id DO UPDATE), (2) matérialise les rôles
+     * pré-attribués (roles_en_attente → auth_roles), (3) purge
+     * l'attente. C'est le SEUL écrivain de `auth_personne`.
+     *
+     * @param {string} personneId UUID de la fiche choisie.
+     * @returns {Promise<{ok:boolean, personneId?:string, error?:string}>}
+     */
+    async relierMaFiche(personneId) {
+      if (!personneId || typeof personneId !== 'string') {
+        return { ok: false, error: 'personne_id manquant' };
+      }
+      // Le rôle a pu changer (matérialisation) : on invalide le cache.
+      _rolesCache = null;
+      const { data, error } = await client.rpc('relier_ma_fiche', {
+        p_personne_id: personneId
+      });
+      if (error) {
+        console.error('MOM Hub: relierMaFiche() error', error);
+        return { ok: false, error: error.message };
+      }
+      const row = Array.isArray(data) ? data[0] : data;
+      const linked = row && row.personne_id ? row.personne_id : personneId;
+      return { ok: true, personneId: linked };
     },
 
     // ============================================================
