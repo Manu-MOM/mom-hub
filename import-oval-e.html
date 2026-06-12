@@ -36,13 +36,13 @@
   .imp-card h2 { font-size: 15px; margin: 0 0 12px; }
   .imp-step { color: var(--ink-mute, #6b7a74); font-size: 13px; margin: 0 0 16px; }
 
-  .imp-drop { border: 2px dashed var(--line, #cabe9f); border-radius: 12px;
+  .imp-drop { box-sizing: border-box; width: 100%;
+              border: 2px dashed var(--line, #cabe9f); border-radius: 12px;
               padding: 28px 20px; text-align: center; background: var(--paper, #f8f5ec);
               transition: border-color .15s, background-color .15s; cursor: pointer; }
   .imp-drop:hover, .imp-drop.drag { border-color: var(--vert-prairie, #2d7a3e);
               background: var(--vert-light, rgba(45,122,62,0.06)); }
-  .imp-drop input { position: absolute; width: 1px; height: 1px;
-                    opacity: 0; overflow: hidden; clip: rect(0 0 0 0); pointer-events: none; }
+  .imp-drop:focus-visible { outline: 2px solid var(--vert-prairie, #2d7a3e); outline-offset: 2px; }
   .imp-drop .ic { font-size: 28px; line-height: 1; margin-bottom: 8px; }
   .imp-drop .hint { color: var(--ink-mute, #6b7a74); font-size: 13px; margin-top: 6px; }
   .imp-file { font-weight: 600; color: var(--ink, #0c3d24); }
@@ -158,12 +158,12 @@
         Format attendu : le fichier .xlsx « Liste des affiliés » exporté depuis OVAL-E,
         contenant au moins les colonnes <strong>Numéro Licence</strong> et <strong>Qualité</strong>.
       </p>
-      <label class="imp-drop" id="impDrop">
+      <div class="imp-drop" id="impDrop" role="button" tabindex="0" aria-label="Choisir un fichier xlsx">
         <div class="ic">⬆️</div>
         <div><span class="imp-file" id="impFileName">Choisir un fichier .xlsx</span></div>
         <div class="hint">ou glisser-déposer le fichier ici</div>
-        <input type="file" id="impFile" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
-      </label>
+      </div>
+      <input type="file" id="impFile" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
     </div>
 
     <!-- Étape 2 : aperçu -->
@@ -453,6 +453,12 @@
     // ---------- Branchements UI ----------
     const fileInput = $('impFile');
     const drop = $('impDrop');
+
+    // La zone n'est plus un <label> : on déclenche le sélecteur au clic et au clavier.
+    drop.addEventListener('click', () => fileInput.click());
+    drop.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
+    });
 
     fileInput.addEventListener('change', () => {
       if (fileInput.files && fileInput.files[0]) handleFile(fileInput.files[0]);
