@@ -127,6 +127,21 @@
   .hub-back-btn:hover { border-color: var(--vert-prairie, #2d7a3e); color: var(--vert-prairie, #2d7a3e);
                         background: var(--vert-light, rgba(45,122,62,0.06)); }
   .hub-back-btn svg { width: 15px; height: 15px; }
+
+  /* ----- Compteur d'heures / annualisation (pt 86) ----- */
+  .cp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .cp-stat { background: #fff; border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 10px; padding: 14px 16px; }
+  .cp-stat .k { font-size: 12px; color: var(--ink-mute, #6b7a74); margin: 0 0 4px; }
+  .cp-stat .v { font-size: 22px; font-weight: 700; color: var(--ink, #0c3d24); line-height: 1.1; }
+  .cp-stat .u { font-size: 13px; font-weight: 600; color: var(--ink-mute, #6b7a74); margin-left: 2px; }
+  .cp-stat.cp-sup .v { color: var(--rouge-blesse, #c0392b); }
+  .cp-bar { height: 12px; border-radius: 999px; background: var(--paper-warm, #e3e0d8); overflow: hidden; margin: 4px 0 18px; }
+  .cp-bar > span { display: block; height: 100%; background: var(--vert-prairie, #1b6b4c); transition: width .25s; }
+  .cp-bar.cp-over > span { background: var(--rouge-blesse, #c0392b); }
+  .cp-repos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
+  .cp-repos .cp-stat .k { display: flex; align-items: baseline; gap: 6px; }
+  .cp-repos .cp-stat .k small { font-weight: 400; }
+  .cp-period { font-size: 13px; color: var(--ink-mute, #6b7a74); margin: -4px 0 14px; }
 </style>
 </head>
 <body class="auth-pending">
@@ -186,6 +201,7 @@
   <div class="gs-tabs">
     <button class="gs-tab active" data-tab="entites">Entités</button>
     <button class="gs-tab" data-tab="missions">Missions</button>
+    <button class="gs-tab" data-tab="compteur">Compteur</button>
   </div>
 
   <!-- ============ ONGLET ENTITÉS ============ -->
@@ -226,6 +242,72 @@
       <div id="misEmpty" class="gs-empty" style="display:none">Aucune mission pour ce filtre.</div>
     </div>
   </section>
+
+  <!-- ============ ONGLET COMPTEUR ============ -->
+  <section class="gs-panel" id="panel-compteur">
+    <div class="gs-toolbar">
+      <strong>Compteur d'heures — annualisation</strong>
+      <span class="sp"></span>
+      <button class="gs-btn gs-btn-sm" id="cpAddBtn">+ Saisir des heures</button>
+    </div>
+    <p class="gs-sub" id="cpSalarieHint" style="margin-top:-6px;">Salarié.</p>
+
+    <div id="cpSynthese" style="display:none">
+      <p class="cp-period" id="cpPeriode"></p>
+      <div class="cp-grid">
+        <div class="cp-stat"><p class="k">Cible</p><p class="v"><span id="cpCible">—</span><span class="u">h</span></p></div>
+        <div class="cp-stat"><p class="k">Réalisé</p><p class="v"><span id="cpRealise">—</span><span class="u">h</span></p></div>
+        <div class="cp-stat"><p class="k">Solde</p><p class="v"><span id="cpSolde">—</span><span class="u">h</span></p></div>
+        <div class="cp-stat cp-sup"><p class="k">Au-delà</p><p class="v"><span id="cpSup">—</span><span class="u">h</span></p></div>
+      </div>
+      <div class="cp-bar" id="cpBar"><span style="width:0%"></span></div>
+      <div class="cp-repos">
+        <div class="cp-stat"><p class="k">Repos compensateur <small>(si remplacement, ×1,25)</small></p><p class="v"><span id="cpRepos125">—</span><span class="u">h</span></p></div>
+        <div class="cp-stat"><p class="k">Repos compensateur <small>(majoration seule, ×0,25)</small></p><p class="v"><span id="cpRepos025">—</span><span class="u">h</span></p></div>
+      </div>
+    </div>
+    <div id="cpNoPeriode" class="gs-empty" style="display:none">Aucune période d'annualisation ne couvre aujourd'hui pour ce salarié.</div>
+
+    <div class="gs-card">
+      <table class="gs-tbl">
+        <thead><tr><th>Date</th><th>Heures</th><th>Début</th><th>Catégorie</th><th>Mission</th><th></th></tr></thead>
+        <tbody id="cpRows"></tbody>
+      </table>
+      <div id="cpEmpty" class="gs-empty" style="display:none">Aucune ligne de relevé sur la période.</div>
+    </div>
+  </section>
+</div>
+
+<!-- ============ MODALE COMPTEUR (relevé) ============ -->
+<div class="gs-overlay" id="cpOverlay">
+  <div class="gs-modal">
+    <div class="gs-modal-head"><h2 id="cpModalTitle">Saisir des heures</h2><button class="gs-x" id="cpClose" aria-label="Fermer">&times;</button></div>
+    <div class="gs-grid2">
+      <div class="gs-field"><label for="cpDate">Date *</label><input id="cpDate" type="date"></div>
+      <div class="gs-field"><label for="cpHeures">Heures *</label><input id="cpHeures" type="number" step="0.25" min="0" placeholder="ex. 3.5"></div>
+    </div>
+    <div class="gs-grid2">
+      <div class="gs-field"><label for="cpHeureDebut">Heure de début</label><input id="cpHeureDebut" type="time"></div>
+      <div class="gs-field"><label for="cpCategorie">Catégorie</label>
+        <select id="cpCategorie">
+          <option value="seance">Séance</option>
+          <option value="reunion">Réunion</option>
+          <option value="deplacement">Déplacement</option>
+          <option value="formation">Formation</option>
+          <option value="administratif">Administratif</option>
+          <option value="autre" selected>Autre</option>
+        </select>
+      </div>
+    </div>
+    <div class="gs-field"><label for="cpMission">Mission (facultatif)</label>
+      <select id="cpMission"><option value="">— aucune —</option></select>
+    </div>
+    <div class="gs-field"><label for="cpNotes">Notes</label><textarea id="cpNotes" placeholder="optionnel"></textarea></div>
+    <div class="gs-modal-actions">
+      <button class="gs-cancel" id="cpCancel">Annuler</button>
+      <button class="gs-btn" id="cpSave">Enregistrer</button>
+    </div>
+  </div>
 </div>
 
 <!-- ============ MODALE ENTITÉ ============ -->
@@ -747,17 +829,203 @@
   $('seAddBtn').addEventListener('click', addSeance);
 
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { closeEntite(); closeMission(); }
+    if (e.key === 'Escape') { closeEntite(); closeMission(); closeReleve(); }
   });
   [$('entOverlay'), $('misOverlay')].forEach(ov => {
     ov.addEventListener('click', (e) => { if (e.target === ov) ov.classList.remove('open'); });
   });
+
+  // ---------- Compteur d'heures / annualisation (pt 86) ----------
+  // v1 : un seul salarié actif (le picker list_salaries ne renvoie que Lohann),
+  // période courante auto-résolue (celle qui couvre aujourd'hui). Sélecteur de
+  // période + multi-salariés -> v2 (dette tracée).
+  let cpContratId = null;     // contrat actif du salarié v1
+  let cpPeriode = null;       // ligne de synthèse de la période courante
+  let cpMissionsSal = [];     // missions du salarié (pour le select facultatif)
+  let editingReleveId = null;
+
+  const CP_CAT_LBL = {
+    seance: 'Séance', reunion: 'Réunion', deplacement: 'Déplacement',
+    formation: 'Formation', administratif: 'Administratif', autre: 'Autre'
+  };
+  function fmtH(n) {
+    const v = Number(n || 0);
+    return (Math.round(v * 100) / 100).toString().replace('.', ',');
+  }
+
+  async function loadCompteur() {
+    // 1) Résoudre le salarié v1 + son contrat actif.
+    let salId = (staff && staff[0]) ? staff[0].personne_id : null;
+    if (!salId) {
+      $('cpSalarieHint').textContent = 'Aucun salarié actif.';
+      $('cpSynthese').style.display = 'none';
+      $('cpNoPeriode').style.display = 'none';
+      renderReleve([]);
+      return;
+    }
+    $('cpSalarieHint').textContent = 'Salarié : ' + staffName(salId) + '.';
+
+    const contrats = await rpc('list_contrats_salaries', { p_inclure_inactifs: false }) || [];
+    const contrat = contrats.find(c => c.personne_id === salId) || null;
+    cpContratId = contrat ? contrat.id : null;
+    if (!cpContratId) {
+      $('cpSynthese').style.display = 'none';
+      $('cpNoPeriode').textContent = 'Aucun contrat actif pour ce salarié.';
+      $('cpNoPeriode').style.display = 'block';
+      renderReleve([]);
+      return;
+    }
+
+    // 2) Synthèse : toutes les périodes du contrat -> retenir celle qui couvre aujourd'hui.
+    const synth = await rpc('list_compteur_annualisation', { p_contrat_id: cpContratId }) || [];
+    const today = new Date().toISOString().slice(0, 10);
+    cpPeriode = synth.find(p => p.date_debut <= today && today <= p.date_fin) || synth[0] || null;
+
+    // 3) Missions du salarié pour le select facultatif (réutilise la saison active).
+    if (saisonActive && saisonActive.id) {
+      cpMissionsSal = await rpc('list_missions', {
+        p_saison_id: saisonActive.id, p_salarie_id: salId, p_entite_id: null
+      }) || [];
+    } else {
+      cpMissionsSal = [];
+    }
+    let mOpts = '<option value="">— aucune —</option>';
+    cpMissionsSal.forEach(m => {
+      mOpts += '<option value="' + m.id + '">' + escapeHtml(m.libelle) + '</option>';
+    });
+    $('cpMission').innerHTML = mOpts;
+
+    renderSynthese();
+
+    // 4) Lignes de relevé de la période.
+    if (cpPeriode) {
+      const lignes = await rpc('list_releve_heures', {
+        p_contrat_id: cpContratId,
+        p_date_debut: cpPeriode.date_debut,
+        p_date_fin: cpPeriode.date_fin
+      }) || [];
+      renderReleve(lignes);
+    } else {
+      renderReleve([]);
+    }
+  }
+
+  function renderSynthese() {
+    if (!cpPeriode) {
+      $('cpSynthese').style.display = 'none';
+      $('cpNoPeriode').textContent = "Aucune période d'annualisation ne couvre aujourd'hui pour ce salarié.";
+      $('cpNoPeriode').style.display = 'block';
+      return;
+    }
+    $('cpNoPeriode').style.display = 'none';
+    $('cpSynthese').style.display = 'block';
+    const p = cpPeriode;
+    $('cpPeriode').textContent = 'Période : ' + p.date_debut + ' → ' + p.date_fin;
+    $('cpCible').textContent = fmtH(p.cible_heures);
+    $('cpRealise').textContent = fmtH(p.realise_heures);
+    $('cpSolde').textContent = fmtH(p.solde_heures);
+    $('cpSup').textContent = fmtH(p.heures_sup);
+    $('cpRepos125').textContent = fmtH(p.repos_si_remplacement);
+    $('cpRepos025').textContent = fmtH(p.repos_si_majoration_seule);
+    const cible = Number(p.cible_heures || 0);
+    const realise = Number(p.realise_heures || 0);
+    const pct = cible > 0 ? Math.min(100, Math.round((realise / cible) * 100)) : 0;
+    const bar = $('cpBar');
+    bar.firstElementChild.style.width = pct + '%';
+    bar.classList.toggle('cp-over', realise > cible);
+  }
+
+  function renderReleve(rows) {
+    const tb = $('cpRows'); tb.innerHTML = '';
+    $('cpEmpty').style.display = rows.length ? 'none' : 'block';
+    rows.forEach(r => {
+      const tr = document.createElement('tr');
+      const misLbl = r.mission_id
+        ? escapeHtml((cpMissionsSal.find(m => m.id === r.mission_id) || {}).libelle || '—')
+        : '—';
+      tr.innerHTML =
+        '<td>' + (r.date_jour || '') + '</td>' +
+        '<td>' + fmtH(r.heures) + ' h</td>' +
+        '<td>' + escapeHtml(r.heure_debut ? String(r.heure_debut).slice(0, 5) : '—') + '</td>' +
+        '<td>' + escapeHtml(CP_CAT_LBL[r.categorie] || r.categorie || '—') + '</td>' +
+        '<td>' + misLbl + '</td>' +
+        '<td style="text-align:right"></td>';
+      const actions = tr.lastElementChild;
+      const b = document.createElement('button');
+      b.className = 'gs-link edit'; b.textContent = 'Éditer';
+      b.onclick = () => openReleve(r);
+      actions.appendChild(b);
+      const d = document.createElement('button');
+      d.className = 'gs-link danger'; d.textContent = 'Supprimer';
+      d.onclick = () => delReleve(r.id, r.date_jour);
+      actions.appendChild(d);
+      tb.appendChild(tr);
+    });
+  }
+
+  function openReleve(r) {
+    if (!cpContratId) { flash('Aucun contrat actif : saisie impossible.', 'err'); return; }
+    editingReleveId = r ? r.id : null;
+    $('cpModalTitle').textContent = r ? 'Modifier le relevé' : 'Saisir des heures';
+    $('cpDate').value = r ? (r.date_jour || '') : (new Date().toISOString().slice(0, 10));
+    $('cpHeures').value = r ? (r.heures != null ? r.heures : '') : '';
+    $('cpHeureDebut').value = r && r.heure_debut ? String(r.heure_debut).slice(0, 5) : '';
+    $('cpCategorie').value = r ? (r.categorie || 'autre') : 'autre';
+    $('cpMission').value = r ? (r.mission_id || '') : '';
+    $('cpNotes').value = r ? (r.notes || '') : '';
+    $('cpOverlay').classList.add('open');
+  }
+  function closeReleve() { $('cpOverlay').classList.remove('open'); }
+
+  async function saveReleve() {
+    const dateJour = $('cpDate').value || null;
+    const heuresRaw = $('cpHeures').value;
+    if (!dateJour) { flash('La date est obligatoire.', 'err'); return; }
+    if (heuresRaw === '' || isNaN(Number(heuresRaw))) { flash('Les heures sont obligatoires.', 'err'); return; }
+    // Champs optionnels : null explicite (l'upsert les écrit tels quels en édition).
+    const params = {
+      p_id: editingReleveId,
+      p_contrat_id: cpContratId,
+      p_date_jour: dateJour,
+      p_heures: Number(heuresRaw),
+      p_heure_debut: $('cpHeureDebut').value || null,
+      p_categorie: $('cpCategorie').value || 'autre',
+      p_mission_id: $('cpMission').value || null,
+      p_notes: $('cpNotes').value.trim() || null
+    };
+    try {
+      await rpc('upsert_releve_heures', params);
+      flash(editingReleveId ? 'Relevé mis à jour.' : 'Heures enregistrées.', 'ok');
+      closeReleve();
+      await loadCompteur();
+    } catch (e) {
+      flash(errMsg(e), 'err');
+    }
+  }
+
+  async function delReleve(id, dateJour) {
+    if (!confirm('Supprimer le relevé du ' + (dateJour || '') + ' ?')) return;
+    try {
+      await rpc('supprimer_releve_heures', { p_id: id });
+      flash('Relevé supprimé.', 'ok');
+      await loadCompteur();
+    } catch (e) {
+      flash(errMsg(e), 'err');
+    }
+  }
+
+  $('cpAddBtn').addEventListener('click', () => openReleve(null));
+  $('cpClose').addEventListener('click', closeReleve);
+  $('cpCancel').addEventListener('click', closeReleve);
+  $('cpSave').addEventListener('click', saveReleve);
+  $('cpOverlay').addEventListener('click', (e) => { if (e.target === $('cpOverlay')) closeReleve(); });
 
   // ---------- Boot ----------
   try {
     await Promise.all([loadSites(), loadSalaries()]);
     await loadEntites();   // remplit aussi entitesAll + la pioche bénéficiaire
     await loadMissions();
+    await loadCompteur();  // pt 86 : synthèse + relevé du salarié actif
   } catch (e) {
     flash('Chargement impossible : ' + errMsg(e), 'err');
   }
