@@ -1141,13 +1141,18 @@
     const body = document.body;
     const btnSignout = document.getElementById('btn-signout');
 
-    function applyState(isAdmin) {
+    function applyState(isAdmin, isAnon) {
+      // 3 états (pt 86) : 'admin' (rôle admin), 'user' (connecté sans
+      // rôle admin), 'anon' (aucune session). Avant l'enrôlement, seuls
+      // 'admin'/'anon' existaient ; un connecté sans rôle tombait dans
+      // 'anon' → bouton « Se connecter » affiché à tort (corrigé ici).
+      body.classList.remove('auth-admin', 'auth-user', 'auth-anon');
       if (isAdmin) {
         body.classList.add('auth-admin');
-        body.classList.remove('auth-anon');
-      } else {
+      } else if (isAnon) {
         body.classList.add('auth-anon');
-        body.classList.remove('auth-admin');
+      } else {
+        body.classList.add('auth-user');
       }
       body.classList.add('auth-resolved');
     }
@@ -1156,18 +1161,18 @@
       try {
         const session = await SupabaseHub.getSession();
         if (!session) {
-          applyState(false);
+          applyState(false, true);   // aucune session → anonyme
           return;
         }
         const admin = await SupabaseHub.isAdmin();
-        applyState(admin);
+        applyState(admin, false);    // session active → admin ou user
         // Enrôlement (v1 front) : résout l'identité du compte connecté.
         // Si la fiche est reliée → greeting dynamique ; sinon, et si non-admin,
         // → modale d'auto-identification. L'admin n'est jamais bloqué.
         resolveIdentity(admin);
       } catch (err) {
         console.error('MOM Hub portail: erreur résolution auth', err);
-        applyState(false);
+        applyState(false, true);    // erreur → repli anonyme (sûr)
       }
     }
 
