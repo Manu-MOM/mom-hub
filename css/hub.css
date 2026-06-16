@@ -383,6 +383,8 @@ body.fullscreen-app {
  *   (évite tout flash de contenu avant la résolution de la session)
  * - Anonyme : on cache user-profile, on montre login-pill
  * - Admin : on garde user-profile (avec ses boutons), on cache login-pill
+ * - User (connecté sans rôle, pt 86) : on cache login-pill ET user-profile
+ *   (pas de boutons admin) — un connecté non-admin n'est PAS anonyme.
  *
  * Pour les pages sécurisées (dashboard.html, compositions.html) qui
  * veulent masquer tout le contenu pendant la vérification de session,
@@ -398,6 +400,11 @@ body.auth-resolved.auth-anon .user-profile {
 }
 body.auth-resolved.auth-anon .login-pill {
   display: inline-flex;
+}
+/* User connecté sans rôle (pt 86) : ni pilule login, ni carte profil. */
+body.auth-resolved.auth-user .login-pill,
+body.auth-resolved.auth-user .user-profile {
+  display: none;
 }
 body:not(.auth-admin) .user-action {
   display: none;
