@@ -131,7 +131,63 @@ create policy capabilities_fonction_write_admin
   with check (has_role('admin'));
 
 -- -------------------------------------------------------------
--- 4. FAIL-LOUD : la table doit refléter EXACTEMENT la matrice
+-- 4. GARDE ANTI-VIDAGE DU RÉFÉRENT (pendant de l'anti-lockout
+--    admin sur attribuer_role).
+--    Invariant : après toute écriture, 'referent de categorie'
+--    conserve AU MOINS une capability autorise=true. On interdit
+--    le VIDAGE INTÉGRAL (sinon plus personne n'écrit sur sa
+--    catégorie), pas l'ajustement à la marge. Trigger BEFORE :
+--    explicite, fail-loud, indépendant du chemin d'écriture
+--    (console future, UPSERT, ou SQL direct).
+-- -------------------------------------------------------------
+
+create or replace function public._capabilities_referent_non_vide()
+returns trigger
+language plpgsql
+as $fn$
+declare
+  v_referent_actives int;
+begin
+  -- État de la table APRÈS l'opération en cours (la ligne modifiée
+  -- est déjà visible dans la table pour un trigger AFTER ; en BEFORE
+  -- on recompte hors ligne courante puis on réintègre NEW/OLD).
+  select count(*) into v_referent_actives
+  from public.capabilities_fonction
+  where fonction_normalisee = 'referent de categorie'
+    and autorise is true
+    and not (
+      tg_op in ('UPDATE','DELETE')
+      and fonction_normalisee = old.fonction_normalisee
+      and action = old.action
+    );
+
+  -- Réintègre l'effet de NEW pour INSERT/UPDATE.
+  if tg_op in ('INSERT','UPDATE')
+     and new.fonction_normalisee = 'referent de categorie'
+     and new.autorise is true then
+    v_referent_actives := v_referent_actives + 1;
+  end if;
+
+  if v_referent_actives < 1 then
+    raise exception
+      'ANTI-VIDAGE : refus — le référent doit conserver au moins une capability active.';
+  end if;
+
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  return new;
+end;
+$fn$;
+
+drop trigger if exists trg_capabilities_referent_non_vide on public.capabilities_fonction;
+create trigger trg_capabilities_referent_non_vide
+  before insert or update or delete on public.capabilities_fonction
+  for each row
+  execute function public._capabilities_referent_non_vide();
+
+-- -------------------------------------------------------------
+-- 5. FAIL-LOUD : la table doit refléter EXACTEMENT la matrice
 --    24 lignes (4 fonctions × 6 actions), 15 autorisées.
 -- -------------------------------------------------------------
 do $verif$
