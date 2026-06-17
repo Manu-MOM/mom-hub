@@ -2252,7 +2252,9 @@
       }
 
       const roles = await SupabaseHub.getMyRoles();
-      const isAdminOrCoach = roles.indexOf('admin') !== -1 || roles.indexOf('coach') !== -1;
+      // [pt 86] Garde élargie coach → admin|bureau|referent (migration B5 ;
+      // le rôle 'coach' n'est plus utilisé, les encadrants ont referent|bureau).
+      const isAdminOrCoach = roles.indexOf('admin') !== -1 || roles.indexOf('bureau') !== -1 || roles.indexOf('referent') !== -1;
       if (!isAdminOrCoach) {
         window.location.replace('./');
         return;
