@@ -18,7 +18,13 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.53 — juin 2026
+ * Version : 1.54 — juin 2026
+ *   v1.54 : PROFIL TOPBAR DYNAMIQUE (pt 88). Helper central auto-exécutant
+ *           au DOMContentLoaded : remplit `.user-profile .user-name`/`.user-role`
+ *           depuis la session (monPrenom + getMyRoles mappé) sur les 14 pages
+ *           portant ce markup, 0 édition HTML. Dégradation honnête (pas de
+ *           session ou prénom null → texte en dur conservé). Corrige aussi le
+ *           log boot qui affichait encore v1.51.
  *   v1.53 : GREETING SELF-ONLY (ENROLEMENT-FRONT, pt 85→86). 1 wrapper
  *           ADDITIF : monPrenom() — RPC mon_prenom() (RETURNS text,
  *           self-only via auth.uid(), EXECUTE authenticated). Résout le
@@ -6406,8 +6412,69 @@
   // ============================================================
   global.SupabaseHub = SupabaseHub;
 
+  // ============================================================
+  // PROFIL TOPBAR DYNAMIQUE (v1.54) — helper central, 0 édition HTML
+  // ------------------------------------------------------------
+  // Les topbars des pages secondaires affichaient un profil EN DUR
+  // (« Emmanuel Jung · Référent M14 » / « Administrateur »), visible à
+  // tort pour un autre encadrant connecté (retour terrain Vivien, pt 88).
+  // Ce helper remplit `.user-profile .user-name` / `.user-role` depuis la
+  // session, sur TOUTE page chargeant ce client et portant ce markup
+  // homogène — un seul mécanisme couvre les 14 pages.
+  //
+  // Affichage : « Prénom · Rôle » (rôle brut mappé). Dégradation honnête :
+  //   - pas de session → on ne touche à rien (texte en dur conservé) ;
+  //   - monPrenom() null (compte admin sans pont, ou non relié) → on
+  //     conserve le nom en dur plutôt que d'afficher « null ».
+  // ============================================================
+  const _ROLE_LABELS = {
+    admin:    'Administrateur',
+    bureau:   'Bureau',
+    referent: 'Référent'
+    // coach : à ajouter ici si le rôle est créé (conv MODELE-ROLES-ENCADRANTS)
+  };
+  // Priorité d'affichage si plusieurs rôles (le plus « élevé » d'abord).
+  const _ROLE_PRIORITE = ['admin', 'bureau', 'referent'];
+
+  async function _remplirProfilTopbar() {
+    try {
+      const profile = (typeof document !== 'undefined')
+        ? document.querySelector('.user-profile')
+        : null;
+      if (!profile) return;
+      const elNom  = profile.querySelector('.user-name');
+      const elRole = profile.querySelector('.user-role');
+      if (!elNom && !elRole) return;
+
+      // Pas de session → ne rien changer (la topbar gère déjà l'anonyme).
+      const session = await SupabaseHub.getSession();
+      if (!session) return;
+
+      // Prénom réel (self-only). Null si compte sans fiche → on garde le dur.
+      let prenom = null;
+      try { prenom = await SupabaseHub.monPrenom(); } catch (e) { /* honnête */ }
+      if (prenom && elNom) elNom.textContent = prenom;
+
+      // Rôle le plus élevé, mappé en libellé lisible.
+      let roles = [];
+      try { roles = await SupabaseHub.getMyRoles(); } catch (e) { roles = []; }
+      const roleCle = _ROLE_PRIORITE.find(r => Array.isArray(roles) && roles.indexOf(r) !== -1);
+      if (roleCle && elRole) elRole.textContent = _ROLE_LABELS[roleCle] || elRole.textContent;
+    } catch (err) {
+      console.warn('MOM Hub: remplissage profil topbar échoué', err);
+    }
+  }
+
+  if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', _remplirProfilTopbar);
+    } else {
+      _remplirProfilTopbar();
+    }
+  }
+
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.51 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.54 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
