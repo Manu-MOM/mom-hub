@@ -2472,25 +2472,31 @@
 
     // Gestion classe auth-* sur body pour bouton signout
     const body = document.body;
-    function applyState(isAdmin) {
+    // Voie 2 (lot 6b) — modèle d'auth à 3 états aligné sur index.html (pt 86) :
+    // auth-admin / auth-user (connecté non-admin) / auth-anon. Avant, le modèle
+    // binaire faisait tomber un référent/adjoint connecté dans auth-anon → il
+    // voyait « Se connecter ». Le profil topbar (nom/fonction) est rempli en
+    // parallèle par le helper central de supabase-client.js (v1.56).
+    function applyState(isAdmin, isAnon) {
+      body.classList.remove('auth-admin', 'auth-user', 'auth-anon');
       if (isAdmin) {
         body.classList.add('auth-admin');
-        body.classList.remove('auth-anon');
-      } else {
+      } else if (isAnon) {
         body.classList.add('auth-anon');
-        body.classList.remove('auth-admin');
+      } else {
+        body.classList.add('auth-user');
       }
       body.classList.add('auth-resolved');
     }
     async function refreshAuthState() {
       try {
         const session = await SupabaseHub.getSession();
-        if (!session) { applyState(false); return; }
+        if (!session) { applyState(false, true); return; }  // aucune session → anonyme
         const admin = await SupabaseHub.isAdmin();
-        applyState(admin);
+        applyState(admin, false);                            // session → admin ou user
       } catch (err) {
         console.error('Évènements: erreur résolution auth', err);
-        applyState(false);
+        applyState(false, true);                             // erreur → repli anonyme (sûr)
       }
     }
     const btnSignout = document.getElementById('btn-signout');
