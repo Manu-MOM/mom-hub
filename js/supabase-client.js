@@ -18,7 +18,13 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.55 — juin 2026
+ * Version : 1.57 — juin 2026
+ *   v1.57 : VOIE 2 — renommage de la porte de rôle `referent` -> `encadrant`
+ *           (côté front, étape 4/7 de la migration). _ROLE_LABELS : clé
+ *           `referent` -> `encadrant` ; _ROLE_PRIORITE : idem. Ces deux-là
+ *           ne servent qu'au REPLI d'affichage topbar (admin/bureau sans
+ *           fonction) ; un encadrant réel passe par _FONCTION_LABELS via
+ *           ma_fonction_staff (inchangé). ADDITIF ; aucune méthode touchée.
  *   v1.56 : VOIE 2 (lot 6b) — wrapper maFonctionStaff() (RPC self-only
  *           ma_fonction_staff, sql_92) + topbar : `.user-role` dérive de la
  *           FONCTION réelle (repli rôle), corrige l'affichage « Référent »
@@ -6518,11 +6524,12 @@
   const _ROLE_LABELS = {
     admin:    'Administrateur',
     bureau:   'Bureau',
-    referent: 'Référent'
-    // coach : à ajouter ici si le rôle est créé (conv MODELE-ROLES-ENCADRANTS)
+    encadrant: 'Encadrant'
+    // Repli d'affichage seulement (admin/bureau sans fonction). Un encadrant
+    // réel a une fonction_staff -> topbar via _FONCTION_LABELS (ma_fonction_staff).
   };
   // Priorité d'affichage si plusieurs rôles (le plus « élevé » d'abord).
-  const _ROLE_PRIORITE = ['admin', 'bureau', 'referent'];
+  const _ROLE_PRIORITE = ['admin', 'bureau', 'encadrant'];
   // Voie 2 (lot 6b) — mapping libellé BRUT fonction_staff -> affichage court topbar.
   // Libellés bruts réels (sonde 6b-3). Libellé inattendu -> affiché tel quel.
   const _FONCTION_LABELS = {
@@ -6583,7 +6590,7 @@
   }
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.56 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.57 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
