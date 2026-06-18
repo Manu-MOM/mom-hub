@@ -7,6 +7,10 @@
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
  * Version : 3.63 — Boot : deep-link ?vue=rapport (onglet Rapport via la vignette de la fiche évènement) (4 juin 2026)
+ *   v3.66 : VOIE 2 (lots 5/6) — validation via RPC valider_composition
+ *           (capability valider_compo, remplace l'UPDATE direct validateCompo)
+ *           + masquage fail-safe du bouton « Valider » par puisJeFaire.
+ *           Dé-validation inchangée (unvalidateCompo). ADDITIF.
  *   v3.65 : UX-SUIVI-TERRAIN-IMMERSIF — mode plein écran pour TOUS les onglets.
  *           bindFullscreen() : bouton « ⛶ Plein écran » (barre view-tabs,
  *           hors comptage) → body.editor-immersif (CSS masque topbar/parcours/
@@ -1116,11 +1120,23 @@
     renderCompoValidation();
   }
 
+  // Voie 2 (lot 6) — catégorie de la compo courante, pour le masquage
+  // par capability (puisJeFaire). En mode U-N3 : ctx.entente.categorie_id
+  // (voie déjà utilisée par loadVivier). En legacy mono-catégorie : la
+  // constante M14 (cohérent avec tout le reste du fichier, pas une
+  // invention). null si rien de résolu → le masquage est fail-safe.
+  function _categorieCourante() {
+    const ctx = State.evenementEquipeContext;
+    if (ctx && ctx.entente && ctx.entente.categorie_id) return ctx.entente.categorie_id;
+    if (State.evenementEquipeId) return null; // U-N3 sans entente résolue : prudence
+    return M14_CATEGORIE_ID;                  // legacy : M14 partout (comme l'existant)
+  }
+
   // Contrôle de validation de la compo (bannière).
   // Cible = compo de base : c'est la compo que le pill d'état ci-dessus
   // reflète déjà (compoBase), pill et bouton restent donc cohérents.
-  // Aucune règle métier dupliquée ici : le garde-fou d'état vit côté
-  // serveur dans validateCompo/unvalidateCompo (.eq('etat',...)).
+  // La validation passe par valider_composition (RPC capability-gardée,
+  // lot 5) ; la dé-validation reste sur unvalidateCompo (hors périmètre lot 5).
   function renderCompoValidation() {
     const host = DOM.compoValidateHost();
     if (!host) return;
@@ -1136,6 +1152,20 @@
       b.textContent = 'Valider la compo';
       b.addEventListener('click', function () { onValidateCompoClick(base.id); });
       host.appendChild(b);
+      // Voie 2 (lot 6) — masquage par capability : seul qui détient
+      // valider_compo sur la catégorie de la compo voit le bouton. Le clic
+      // passe de toute façon par valider_composition (RPC capability-gardée,
+      // lot 5), donc ce masquage est cosmétique et fail-safe : en cas de
+      // doute (catégorie non résolue, erreur, pas de droit) on RETIRE le
+      // bouton plutôt que de le laisser à tort.
+      const _catValid = _categorieCourante();
+      if (!_catValid) {
+        b.remove();
+      } else {
+        SupabaseHub.puisJeFaire('valider_compo', _catValid).then(function (ok) {
+          if (!ok && b.parentNode) b.remove();
+        });
+      }
     } else if (base.etat === 'validee') {
       const b = document.createElement('button');
       b.type = 'button';
@@ -5501,7 +5531,12 @@
   // unvalidateCompo : .eq('etat',...)), on remonte juste son message.
   async function onValidateCompoClick(compoId) {
     if (!compoId) return;
-    const r = await SupabaseHub.validateCompo(compoId);
+    // Voie 2 (lot 5) — validation via la RPC dédiée valider_composition :
+    // transition brouillon→validee gardée par la capability valider_compo
+    // (seul le référent valide ; entr. principal / adjoint refusés en base).
+    // Remplace l'UPDATE direct validateCompo, qui ne vérifiait que le droit
+    // d'écriture RLS et laissait donc valider quiconque pouvait écrire.
+    const r = await SupabaseHub.validerComposition(compoId);
     if (!r.ok) { alert('Validation impossible : ' + r.error); return; }
     await loadComposForCurrentEvent();
     if (State.selectedCompoId) await loadCompoJoueurs();
