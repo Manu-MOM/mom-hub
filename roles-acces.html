@@ -7,7 +7,7 @@
 <link rel="icon" type="image/png" href="assets/logo-m2m.png">
 <!--
   MOM Hub · Écran Rôles & accès (Refonte tableau de bord admin, volet B).
-  Attribution / retrait des rôles applicatifs (admin | bureau | referent).
+  Attribution / retrait des rôles applicatifs (admin | bureau | encadrant).
 
   ARCHITECTURE (calque staff.html / fonctions-staff, vérifié à la source 05/06) :
     - charge supabase.min.js (CDN) puis js/supabase-client.js (SupabaseHub).
@@ -143,8 +143,8 @@
   <div id="raMsg" class="ra-msg"></div>
 
   <div class="ra-note">
-    Trois rôles possibles : <strong>admin</strong> (tout gérer), <strong>bureau</strong>, <strong>referent</strong> (encadrant d'une catégorie).
-    Le rôle <em>referent</em> demande aussi une fonction par catégorie, définie dans <a href="staff.html">Staff</a>.
+    Trois rôles possibles : <strong>admin</strong> (tout gérer), <strong>bureau</strong>, <strong>encadrant</strong> (encadrant d'une catégorie).
+    Le rôle <em>encadrant</em> demande aussi une fonction par catégorie, définie dans <a href="staff.html">Staff</a>.
   </div>
 
   <div class="ra-section-title">Personnes avec un rôle</div>
@@ -162,7 +162,7 @@
         <select id="raRole">
           <option value="admin">admin</option>
           <option value="bureau">bureau</option>
-          <option value="referent">referent</option>
+          <option value="encadrant">encadrant</option>
         </select>
       </div>
       <div><button id="raAddBtn" class="ra-btn">Attribuer</button></div>
@@ -176,7 +176,7 @@
   <div class="ra-section-title" style="margin-top:26px;">Pré-attribuer un rôle (avant 1ʳᵉ connexion)</div>
   <div class="ra-note">
     Pour préparer un futur encadrant qui ne s'est pas encore connecté : le rôle est mis <strong>en attente</strong> et
-    s'appliquera automatiquement dès qu'il reliera son compte au Hub. Le périmètre catégorie d'un <em>referent</em> se
+    s'appliquera automatiquement dès qu'il reliera son compte au Hub. Le périmètre catégorie d'un <em>encadrant</em> se
     définit dès maintenant dans <a href="staff.html">Staff</a>, sans attendre sa connexion.
   </div>
   <div class="ra-attrib">
@@ -188,7 +188,7 @@
       <div>
         <label for="raPreRole">Rôle</label>
         <select id="raPreRole">
-          <option value="referent">referent</option>
+          <option value="encadrant">encadrant</option>
           <option value="bureau">bureau</option>
           <option value="admin">admin</option>
         </select>
@@ -290,11 +290,11 @@
     ST.preattribuables = Array.isArray(preattribuables) ? preattribuables : [];
     ST.nbAdmins = ST.roles.filter(r => (r.roles || []).indexOf('admin') !== -1).length;
 
-    // Encart intelligent : pour chaque référent AYANT une fiche personne,
+    // Encart intelligent : pour chaque encadrant AYANT une fiche personne,
     // on regarde s'il a au moins une fonction active.
     ST.fonctionsByPersonne = new Map();
     const referentsAvecFiche = ST.roles.filter(r =>
-      (r.roles || []).indexOf('referent') !== -1 && r.personne_id
+      (r.roles || []).indexOf('encadrant') !== -1 && r.personne_id
     );
     await Promise.all(referentsAvecFiche.map(async function (r) {
       try {
@@ -336,12 +336,12 @@
           '<span class="' + xCls + '" title="' + escapeHtml(xTitle) + '"' + xAttr + '>&times;</span></span>';
       }).join('');
 
-      // Encart intelligent référent-sans-fonction.
+      // Encart intelligent encadrant-sans-fonction.
       let warn = '';
-      if ((r.roles || []).indexOf('referent') !== -1 && r.personne_id) {
+      if ((r.roles || []).indexOf('encadrant') !== -1 && r.personne_id) {
         const fns = ST.fonctionsByPersonne.get(r.personne_id);
         if (Array.isArray(fns) && fns.length === 0) {
-          warn = '<div class="ra-warn">Rôle <strong>referent</strong> mais aucune fonction définie. ' +
+          warn = '<div class="ra-warn">Rôle <strong>encadrant</strong> mais aucune fonction définie. ' +
             '<a href="staff.html">Définir sa catégorie dans Staff &rarr;</a></div>';
         }
       }
