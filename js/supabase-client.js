@@ -19,6 +19,10 @@
  *   via Magic Link (Phase 2.5).
  *
  * Version : 1.55 — juin 2026
+ *   v1.56 : VOIE 2 (lot 6b) — wrapper maFonctionStaff() (RPC self-only
+ *           ma_fonction_staff, sql_92) + topbar : `.user-role` dérive de la
+ *           FONCTION réelle (repli rôle), corrige l'affichage « Référent »
+ *           pour un adjoint (bug pt 88). ADDITIF.
  *   v1.55 : VOIE 2 — 2 wrappers (lots 5/6). puisJeFaire(action, cat) :
  *           prédicat d'affichage délégant à puis_je_faire (sql_88), fail-safe
  *           false. validerComposition(id) : valide via la RPC dédiée
@@ -6451,6 +6455,25 @@
       // RPC RETURNS TABLE(out_id, out_etat) → tableau d'1 ligne.
       const row = Array.isArray(data) ? data[0] : data;
       return { ok: true, data: row ? { id: row.out_id, etat: row.out_etat } : null };
+    },
+
+    /**
+     * Voie 2 — modèle rôles encadrants S1 (lot 6b). Renvoie le LIBELLÉ
+     * BRUT de la fonction_staff active la plus élevée de la personne
+     * connectée (RPC self-only ma_fonction_staff, sql_92). Sert à la
+     * topbar : afficher la vraie fonction (« Entraîneur adjoint ») plutôt
+     * que le rôle brut « referent » (bug pt 88).
+     *
+     * @returns {Promise<?string>} libellé brut ; null si aucune fonction
+     *   active, compte non relié, hors session ou erreur (dégradation honnête).
+     */
+    async maFonctionStaff() {
+      const { data, error } = await client.rpc('ma_fonction_staff');
+      if (error) {
+        console.error('MOM Hub: maFonctionStaff() / ma_fonction_staff', error);
+        return null;
+      }
+      return (typeof data === 'string' && data) ? data : null;
     }
 
   };
@@ -6500,6 +6523,14 @@
   };
   // Priorité d'affichage si plusieurs rôles (le plus « élevé » d'abord).
   const _ROLE_PRIORITE = ['admin', 'bureau', 'referent'];
+  // Voie 2 (lot 6b) — mapping libellé BRUT fonction_staff -> affichage court topbar.
+  // Libellés bruts réels (sonde 6b-3). Libellé inattendu -> affiché tel quel.
+  const _FONCTION_LABELS = {
+    'Référent de catégorie': 'Référent',
+    'Manager':               'Manager',
+    'Entraîneur principal':  'Entr. principal',
+    'Entraîneur adjoint':    'Adjoint'
+  };
 
   async function _remplirProfilTopbar() {
     try {
@@ -6520,11 +6551,24 @@
       try { prenom = await SupabaseHub.monPrenom(); } catch (e) { /* honnête */ }
       if (prenom && elNom) elNom.textContent = prenom;
 
-      // Rôle le plus élevé, mappé en libellé lisible.
-      let roles = [];
-      try { roles = await SupabaseHub.getMyRoles(); } catch (e) { roles = []; }
-      const roleCle = _ROLE_PRIORITE.find(r => Array.isArray(roles) && roles.indexOf(r) !== -1);
-      if (roleCle && elRole) elRole.textContent = _ROLE_LABELS[roleCle] || elRole.textContent;
+      // Libellé de fonction/rôle. Voie 2 (lot 6b) : on privilégie la
+      // FONCTION réelle (ma_fonction_staff) quand elle existe — c'est elle
+      // qui corrige le bug pt 88 (un adjoint a le rôle `referent` comme
+      // jeton de voie, mais doit afficher « Adjoint », pas « Référent »).
+      // Repli sur le rôle mappé si aucune fonction (admin/bureau sans
+      // fonction, ou erreur) — comportement v1.54 conservé.
+      let libelleRole = null;
+      let fonctionBrute = null;
+      try { fonctionBrute = await SupabaseHub.maFonctionStaff(); } catch (e) { /* honnête */ }
+      if (fonctionBrute) {
+        libelleRole = _FONCTION_LABELS[fonctionBrute] || fonctionBrute;
+      } else {
+        let roles = [];
+        try { roles = await SupabaseHub.getMyRoles(); } catch (e) { roles = []; }
+        const roleCle = _ROLE_PRIORITE.find(r => Array.isArray(roles) && roles.indexOf(r) !== -1);
+        if (roleCle) libelleRole = _ROLE_LABELS[roleCle];
+      }
+      if (libelleRole && elRole) elRole.textContent = libelleRole;
     } catch (err) {
       console.warn('MOM Hub: remplissage profil topbar échoué', err);
     }
@@ -6539,7 +6583,7 @@
   }
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.55 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.56 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
