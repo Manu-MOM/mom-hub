@@ -18,7 +18,12 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.54 — juin 2026
+ * Version : 1.55 — juin 2026
+ *   v1.55 : VOIE 2 — 2 wrappers (lots 5/6). puisJeFaire(action, cat) :
+ *           prédicat d'affichage délégant à puis_je_faire (sql_88), fail-safe
+ *           false. validerComposition(id) : valide via la RPC dédiée
+ *           valider_composition (sql_91, capability valider_compo) — seule
+ *           voie conforme S1. ADDITIF ; aucune méthode existante touchée.
  *   v1.54 : PROFIL TOPBAR DYNAMIQUE (pt 88). Helper central auto-exécutant
  *           au DOMContentLoaded : remplit `.user-profile .user-name`/`.user-role`
  *           depuis la session (monPrenom + getMyRoles mappé) sur les 14 pages
@@ -6386,6 +6391,66 @@
         return { ok: false, error: error.message || 'Erreur suppression bloc' };
       }
       return { ok: true };
+    },
+
+    /**
+     * Voie 2 — modèle rôles encadrants S1 (lot 6). Prédicat d'affichage :
+     * la personne connectée peut-elle réaliser <action> sur la catégorie
+     * <categorieId> ? Délègue à la RPC B5 puis_je_faire(action, cat) (sql_88,
+     * déjà en base) qui applique transverse admin/bureau + porte referent +
+     * Union des capabilities de fonction. Sert à masquer les boutons d'action
+     * (ex. cacher « valider » à l'adjoint sur compositions.html).
+     *
+     * Dégradation honnête / fail-safe : toute erreur, valeur non booléenne ou
+     * absence de session renvoie false (on CACHE l'action plutôt que de la
+     * montrer à tort — c'est un contrôle d'autorisation côté UI, l'écriture
+     * reste de toute façon bornée par les policies RLS en base).
+     *
+     * @param {string} action  une des 6 actions de la matrice (ex. 'valider_compo',
+     *   'ecrire_seance', 'ecrire_compo', 'gerer_presences', 'gerer_evenements',
+     *   'composer_effectif')
+     * @param {string} categorieId UUID de la catégorie concernée
+     * @returns {Promise<boolean>} true ssi autorisé ; false sinon (fail-safe)
+     */
+    async puisJeFaire(action, categorieId) {
+      if (!action || !categorieId) {
+        return false;
+      }
+      const { data, error } = await client.rpc('puis_je_faire', {
+        p_action: action,
+        p_categorie_id: categorieId
+      });
+      if (error) {
+        console.error('MOM Hub: puisJeFaire() / puis_je_faire', error);
+        return false;
+      }
+      return data === true;
+    },
+
+    /**
+     * Voie 2 — modèle rôles encadrants S1 (lot 5/6). Valide une
+     * composition via la RPC dédiée valider_composition(p_id) (sql_91) :
+     * transition brouillon→validee gardée par la capability valider_compo.
+     * SEULE voie d'écriture du statut conforme au modèle S1 — remplace
+     * l'UPDATE direct validateCompo pour la validation (FAITFOI §4.4).
+     *
+     * @param {string} compoId UUID de la composition
+     * @returns {Promise<{ok:boolean, data?:Object, error?:string}>}
+     *   data = {id, etat} de la compo mutée ; error = message serveur
+     *   (droit insuffisant / transition illégale / introuvable).
+     */
+    async validerComposition(compoId) {
+      if (!compoId) return { ok: false, error: 'compoId requis' };
+      const { data, error } = await client.rpc('valider_composition', {
+        p_id: compoId
+      });
+      if (error) {
+        console.error('MOM Hub: validerComposition() / valider_composition', error);
+        return { ok: false, error: error.message || 'Erreur validation' };
+      }
+      // RPC RETURNS TABLE(out_id, out_etat) → tableau d'1 ligne.
+      const row = Array.isArray(data) ? data[0] : data;
+      return { ok: true, data: row ? { id: row.out_id, etat: row.out_etat } : null };
     }
 
   };
@@ -6474,7 +6539,7 @@
   }
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.54 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.55 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
