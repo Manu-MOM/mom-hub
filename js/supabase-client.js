@@ -18,7 +18,17 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.57 — juin 2026
+ * Version : 1.58 — juin 2026
+ *   v1.58 : PASTILLE TOPBAR — initiales dynamiques (bug (a) recette Vivien).
+ *           La pastille `.avatar` était figée « EJ » EN DUR dans le HTML des
+ *           21 pages -> tout utilisateur (ex. Vivien Rulfo) voyait « EJ »
+ *           (Emmanuel Jung) au lieu de SES initiales. _remplirProfilTopbar
+ *           remplit désormais aussi `.avatar` : initiales dérivées de la
+ *           fiche reliée via quiSuisJe() -> _resolveNoms([id]) (get_noms_personnes,
+ *           ouverte à tout authentifié depuis sql_93 ; self-only, 1 seul UUID =
+ *           le sien). « VR » = prénom[0]+nom[0]. Dégradation honnête : pas de
+ *           fiche reliée / Map vide -> avatar en dur conservé (pas de « ?? »).
+ *           ADDITIF ; aucune RPC nouvelle ; aucune méthode existante touchée.
  *   v1.57 : VOIE 2 — renommage de la porte de rôle `referent` -> `encadrant`
  *           (côté front, étape 4/7 de la migration). _ROLE_LABELS : clé
  *           `referent` -> `encadrant` ; _ROLE_PRIORITE : idem. Ces deux-là
@@ -6539,6 +6549,25 @@
     'Entraîneur adjoint':    'Adjoint'
   };
 
+  // ------------------------------------------------------------
+  // Initiales de la pastille (v1.58) — self-only, sans RPC nouvelle.
+  // quiSuisJe() donne MON personne_id ; _resolveNoms([id]) renvoie
+  // {nom, prenom} via get_noms_personnes (ouverte à tout authentifié
+  // depuis sql_93). On compose prénom[0]+nom[0]. Renvoie null si non
+  // résolu (compte non relié, Map vide) → l'appelant garde l'avatar en dur.
+  // ------------------------------------------------------------
+  async function _initialesDepuisProfil() {
+    const pid = await SupabaseHub.quiSuisJe();
+    if (!pid) return null;
+    const map = await SupabaseHub._resolveNoms([pid]);
+    const fiche = map && map.get ? map.get(pid) : null;
+    if (!fiche) return null;
+    const p = (fiche.prenom || '').trim();
+    const n = (fiche.nom || '').trim();
+    const ini = ((p ? p[0] : '') + (n ? n[0] : '')).toUpperCase();
+    return ini || null;
+  }
+
   async function _remplirProfilTopbar() {
     try {
       const profile = (typeof document !== 'undefined')
@@ -6557,6 +6586,21 @@
       let prenom = null;
       try { prenom = await SupabaseHub.monPrenom(); } catch (e) { /* honnête */ }
       if (prenom && elNom) elNom.textContent = prenom;
+
+      // Pastille initiales (v1.58). La `.avatar` était figée « EJ » en dur
+      // dans les 21 HTML → un autre encadrant voyait les initiales de Manu.
+      // On dérive prénom[0]+nom[0] de la fiche reliée, self-only :
+      // quiSuisJe() (mon personne_id) → _resolveNoms([id]) (get_noms_personnes,
+      // ouverte à tout authentifié depuis sql_93). Dégradation honnête :
+      // pas de fiche reliée / Map vide / aucune initiale → on NE touche PAS
+      // l'avatar (le « EJ » en dur reste, pas de « ?? »).
+      const elAvatar = profile.querySelector('.avatar');
+      if (elAvatar) {
+        try {
+          const initiales = await _initialesDepuisProfil();
+          if (initiales) elAvatar.textContent = initiales;
+        } catch (e) { /* honnête : avatar en dur conservé */ }
+      }
 
       // Libellé de fonction/rôle. Voie 2 (lot 6b) : on privilégie la
       // FONCTION réelle (ma_fonction_staff) quand elle existe — c'est elle
@@ -6590,7 +6634,7 @@
   }
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.57 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.58 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
