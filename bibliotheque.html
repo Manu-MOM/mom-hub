@@ -1221,7 +1221,10 @@
       const roles = await SupabaseHub.getMyRoles();
       // [pt 86] Garde élargie coach → admin|bureau|referent (migration B5 ;
       // le rôle 'coach' n'est plus utilisé, les encadrants ont referent|bureau).
-      const isAdminOrCoach = roles.indexOf('admin') !== -1 || roles.indexOf('bureau') !== -1 || roles.indexOf('referent') !== -1;
+      // [renommage porte pt 94 — alignement sur compositions.html] Valeur de
+      // rôle 'referent' renommée 'encadrant' en base (auth_roles). La garde
+      // testait encore 'referent' (disparu) → bloquait les encadrants.
+      const isAdminOrCoach = roles.indexOf('admin') !== -1 || roles.indexOf('bureau') !== -1 || roles.indexOf('encadrant') !== -1;
       if (!isAdminOrCoach) { window.location.replace('./'); return; }
 
       // ----------------------------------------------------------
