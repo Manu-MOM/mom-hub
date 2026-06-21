@@ -241,7 +241,11 @@
       const session = await SupabaseHub.getSession();
       if (!session) { window.location.replace('login.html'); return; }
       const roles = await SupabaseHub.getMyRoles();
-      const isAdminOrCoach = roles.indexOf('admin') !== -1 || roles.indexOf('coach') !== -1;
+      // [renommage porte pt 94 — alignement sur compositions.html] Garde
+      // élargie : admin|bureau|encadrant. Le rôle 'coach' n'est plus utilisé ;
+      // la porte voie 2 'referent' a été renommée 'encadrant'. Les encadrants
+      // portent encadrant|bureau. (groupe-base.html oublié à l'audit grep pt 94.)
+      const isAdminOrCoach = roles.indexOf('admin') !== -1 || roles.indexOf('bureau') !== -1 || roles.indexOf('encadrant') !== -1;
       if (!isAdminOrCoach) { window.location.replace('./'); return; }
 
       document.body.classList.remove('auth-pending');
