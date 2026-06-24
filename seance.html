@@ -2130,6 +2130,236 @@
         grid-template-columns: 1fr;
       }
     }
+
+    /* ============================================================
+     * v1.10 (sql_108) — BLOCS PARALLÈLES (voies) + COACH + EXPORT PDF
+     * Styles écran. Alignés sur les tokens charte (--vert-*, --ink-*,
+     * --line, --paper-warm) et le pattern .seance-trame__* existant.
+     * ============================================================ */
+
+    /* Conteneur des voies dans une cellule « Bloc ». Par défaut (1 voie) :
+       comportement inline normal. En parallèle : colonnes côte à côte. */
+    .seance-trame__voies {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .seance-trame__voies--parallele {
+      flex-direction: row;
+      gap: 10px;
+      align-items: stretch;
+    }
+    .seance-trame__voie {
+      flex: 1 1 0;
+      min-width: 0;
+    }
+    /* En parallèle, chaque voie devient une mini-carte délimitée pour bien
+       montrer qu'il s'agit de deux ateliers distincts simultanés. */
+    .seance-trame__voies--parallele .seance-trame__voie {
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--vert-prairie);
+      border-radius: 6px;
+      background: var(--paper);
+    }
+    .seance-trame__voies--parallele .seance-trame__voie:nth-child(2) {
+      border-left-color: var(--gold);
+    }
+    .seance-trame__voies--parallele .seance-trame__voie:nth-child(3) {
+      border-left-color: var(--clay);
+    }
+    .seance-trame__voies--parallele .seance-trame__voie:nth-child(n+4) {
+      border-left-color: var(--ink-mute);
+    }
+
+    /* Pastille coach sous le libellé du bloc. */
+    .seance-trame__coach {
+      display: block;
+      margin-top: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--vert-prairie);
+    }
+    /* Durée propre d'une voie quand elle diffère de la durée d'étage. */
+    .seance-trame__voie-duree {
+      display: block;
+      margin-top: 2px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--ink-mute);
+    }
+    /* Marqueur « ∥ » signalant un étage parallèle (colonne Durée). */
+    .seance-trame__par-tag {
+      color: var(--vert-prairie);
+      font-weight: 700;
+      cursor: help;
+    }
+    .seance-trame__row--parallele {
+      background: rgba(45, 122, 62, 0.03);
+    }
+
+    /* Groupe de boutons dans le header de trame (PDF + Ajouter). */
+    .seance-trame__header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .seance-trame__pdf-btn {
+      padding: 8px 16px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--ink-soft);
+      cursor: pointer;
+      transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+    }
+    .seance-trame__pdf-btn:hover {
+      background: var(--vert-light);
+      border-color: var(--vert-prairie);
+      color: var(--vert-prairie);
+    }
+
+    /* Bouton supprimer (déplacé dans le détail du bloc). */
+    .seance-bloc-detail__btn-supprimer {
+      padding: 6px 12px;
+      font-family: inherit;
+      font-size: 12.5px;
+      font-weight: 600;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--clay);
+      cursor: pointer;
+      transition: background-color 0.15s, border-color 0.15s;
+      margin-left: 8px;
+    }
+    .seance-bloc-detail__btn-supprimer:hover {
+      background: var(--feedback-error-bg);
+      border-color: var(--clay);
+    }
+
+    /* Sur petits écrans (PWA mobile) : les voies parallèles repassent en
+       pile verticale pour rester lisibles. */
+    @media (max-width: 640px) {
+      .seance-trame__voies--parallele {
+        flex-direction: column;
+        gap: 6px;
+      }
+    }
+
+    /* Vue print masquée à l'écran (visible seulement à l'impression). */
+    #seance-print-root { display: none; }
+
+    /* ============================================================
+     * v1.10 — FEUILLE D'IMPRESSION (export PDF via window.print()).
+     * Charte hub en valeurs fixes (l'impression ignore certaines
+     * variables / coupe les fonds). Objectif : trame simplifiée,
+     * 1–3 pages, lisible en N&B comme en couleur.
+     * ============================================================ */
+    @media print {
+      /* On masque toute l'application et on ne montre que la vue print. */
+      body * { visibility: hidden !important; }
+      #seance-print-root,
+      #seance-print-root * { visibility: visible !important; }
+      #seance-print-root {
+        display: block !important;
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        padding: 0;
+        margin: 0;
+      }
+
+      @page { margin: 14mm 12mm; }
+
+      .seance-print {
+        font-family: Georgia, 'Times New Roman', serif;
+        color: #0c3d24;
+        font-size: 11pt;
+        line-height: 1.4;
+      }
+      .seance-print__header {
+        border-bottom: 2.5pt solid #2d7a3e;
+        padding-bottom: 8pt;
+        margin-bottom: 12pt;
+      }
+      .seance-print__titre {
+        font-family: 'Oswald', Arial, sans-serif;
+        font-size: 18pt;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+        color: #0c3d24;
+        margin: 0 0 6pt;
+      }
+      .seance-print__meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 18pt;
+        font-size: 10.5pt;
+        color: #2a4836;
+      }
+      .seance-print__objectifs {
+        margin: 8pt 0 0;
+        font-style: italic;
+        color: #2a4836;
+      }
+      .seance-print__table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 6pt;
+      }
+      .seance-print__table thead th {
+        text-align: left;
+        font-family: 'Oswald', Arial, sans-serif;
+        font-size: 9.5pt;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: #fff;
+        background: #2d7a3e !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        padding: 5pt 8pt;
+      }
+      .seance-print__table td {
+        padding: 6pt 8pt;
+        border-bottom: 0.5pt solid #cabe9f;
+        vertical-align: top;
+      }
+      .seance-print__table tbody tr {
+        page-break-inside: avoid;
+      }
+      .seance-print__horaire {
+        font-family: 'Courier New', monospace;
+        font-size: 10pt;
+        white-space: nowrap;
+        color: #0c3d24;
+      }
+      .seance-print__duree {
+        font-family: 'Courier New', monospace;
+        font-size: 10pt;
+        white-space: nowrap;
+      }
+      .seance-print__vide {
+        font-style: italic;
+        color: #6b7a6f;
+        padding: 12pt 0;
+      }
+      .seance-print__footer {
+        margin-top: 14pt;
+        padding-top: 6pt;
+        border-top: 0.5pt solid #cabe9f;
+        font-size: 8.5pt;
+        color: #6b7a6f;
+        text-align: center;
+      }
+    }
+
   </style>
 </head>
 
