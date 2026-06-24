@@ -11,6 +11,46 @@
  *   - 5.5.A : éditeur méta + sauvegarde manuelle (CETTE VERSION)
  *   - 5.5.B : autosave 30s + dropdowns lieu/événement + champs secondaires
  *
+ * Version : 1.10 — SEANCE-BLOCS-PARALLELES (juin 2026, retours terrain)
+ *   v1.10 : Trois améliorations « terrain » au module Préparation de séance,
+ *           adossées à la migration sql_108 (voie + encadrant_id sur
+ *           seances_blocs) et au wrapper supabase-client v1.63.
+ *
+ *           (1) BLOCS PARALLÈLES (voies). renderTrame regroupe désormais
+ *               les blocs par ÉTAGE (= même `ordre`). Un étage à 1 bloc =
+ *               ligne pleine largeur (inchangé) ; un étage à ≥2 blocs =
+ *               voies côte à côte. Durée de l'étage = MAX des voies (les
+ *               blocs tournent en simultané) ; le cumul horaire avance du
+ *               max. Helpers _grouperBlocsParEtage / _nomCoachBloc.
+ *               Bouton ⇄ « dédoubler » par étage (ajoute une voie via le
+ *               picker, voie = max+1, ordre identique). Création directe en
+ *               voie aussi possible (State.dedoublerOrdre consommé par
+ *               onAddBloc). Les actions ↑/↓ opèrent sur l'ÉTAGE entier
+ *               (onMoveEtageUp/Down -> _swapEtages, qui échange les `ordre`
+ *               via updateBloc en préservant `voie` — PAS reorderBlocs, qui
+ *               réaffecte 1..N à plat et casserait le parallélisme).
+ *
+ *           (2) COACH PAR BLOC. <select> « Coach encadrant (ce bloc) » dans
+ *               renderBlocDetail, data-bloc-field="encadrant_id" (collecte
+ *               générique existante -> updateBloc ; option vide => null).
+ *               Source : State.staffDisponible via loadStaffDisponibles()
+ *               (RPC list_staff_disponibles, UUID réels personnes.id). Le
+ *               miroir encadrants-par-categorie.json a des uuid factices,
+ *               inutilisables pour la FK : source distincte assumée.
+ *               buildSelectCoach gère l'affectation orpheline (coach retiré
+ *               du staff mais encore en base) sans la masquer.
+ *
+ *           (3) EXPORT PDF. Bouton « 🖨 Exporter PDF » dans le header de la
+ *               trame. onExportPdf injecte une vue simplifiée (_buildPrintHtml)
+ *               dans #seance-print-root puis window.print(). Mise en page
+ *               portée par une feuille @media print à la charte (livrée à
+ *               part). Aucune dépendance externe.
+ *
+ *           DÉTAIL : le 🗑 de suppression a quitté la trame (place au ⇄) et
+ *           rejoint le détail du bloc (#seance-bloc-btn-supprimer), de sorte
+ *           que chaque bloc — voie comprise — reste supprimable. Fonctions
+ *           onMoveBlocUp/Down/onRemoveBloc conservées (additif). node --check OK.
+ *           console.log boot v1.5 -> v1.10.
  * Version : 1.9 — Phase 5.12 (15 mai 2026)
  *   v1.0 : squelette IIFE, sidebar liste séances, bouton "+ Nouvelle séance",
  *          formulaire 6 champs méta (date, heure, durée, effectif, thème,
@@ -218,6 +258,8 @@
     autosaveTimer: null,    // handle setInterval (5.5.B2)
     autosaveStatus: 'idle', // 'idle' | 'saving' | 'error' (5.5.B2)
     blocs: [],              // blocs de la séance courante, triés par ordre (5.6.A)
+    staffDisponible: [],    // [{personne_id,nom,prenom}] coachs assignables par bloc (v1.10, sql_108)
+    dedoublerOrdre: null,   // étage cible quand on ajoute une voie parallèle (v1.10)
     typesBlocsRef: null,    // référentiel des 11 types (data/types-blocs.json, 5.6.A)
     picker: null,           // état du popover "+ Ajouter un bloc" ({open: bool}, 5.6.A)
     formCollapsed: false,   // true : form méta replié en résumé compact (5.6.B)
@@ -1576,6 +1618,44 @@
    * Phase 5.7 : si State.view === 'bloc-detail', la trame est cachée et
    * le détail du bloc en édition prend sa place (à la fin de la fonction).
    */
+  /**
+   * Regroupe les blocs (triés par ordre) en ÉTAGES (v1.10, sql_108).
+   * Un étage = tous les blocs partageant le même `ordre` (voies parallèles),
+   * triés par `voie` croissante. dureeMax = la plus longue durée de l'étage
+   * (les voies tournent en simultané → l'étage dure le max). Renvoie un
+   * tableau ordonné d'objets { ordre, blocs:[...], dureeMax }.
+   */
+  function _grouperBlocsParEtage(blocs) {
+    const map = new Map();
+    (blocs || []).forEach(function (b) {
+      const ord = (b.ordre === undefined || b.ordre === null) ? 0 : b.ordre;
+      if (!map.has(ord)) map.set(ord, []);
+      map.get(ord).push(b);
+    });
+    const ordres = Array.from(map.keys()).sort(function (a, b) { return a - b; });
+    return ordres.map(function (ord) {
+      const lot = map.get(ord).slice().sort(function (a, b) {
+        return ((a.voie || 0) - (b.voie || 0));
+      });
+      const dureeMax = lot.reduce(function (m, b) {
+        return Math.max(m, b.duree_min || 0);
+      }, 0);
+      return { ordre: ord, blocs: lot, dureeMax: dureeMax };
+    });
+  }
+
+  /**
+   * Nom court d'un coach à partir de son encadrant_id (v1.10).
+   * Cherche dans State.staffDisponible. Renvoie '' si introuvable ou null.
+   */
+  function _nomCoachBloc(encadrantId) {
+    if (!encadrantId) return '';
+    const liste = Array.isArray(State.staffDisponible) ? State.staffDisponible : [];
+    const p = liste.find(function (x) { return x.personne_id === encadrantId; });
+    if (!p) return '';
+    return ((p.prenom || '') + ' ' + (p.nom || '')).trim();
+  }
+
   function renderTrame() {
     const area = DOM.editorArea();
     if (!area || !State.currentSeance) return;
@@ -1598,9 +1678,16 @@
     let html =
       '<header class="seance-trame__header">' +
         '<h3 class="seance-trame__title">Trame chronologique</h3>' +
-        '<button type="button" id="seance-btn-add-bloc" class="seance-trame__add-btn">' +
-          '+ Ajouter un bloc' +
-        '</button>' +
+        '<div class="seance-trame__header-actions">' +
+          // v1.10 — export PDF via impression navigateur (feuille @media print
+          // à la charte du hub, livrée séparément). Rien à installer.
+          '<button type="button" id="seance-btn-export-pdf" class="seance-trame__pdf-btn" title="Exporter la trame en PDF (impression navigateur)">' +
+            '🖨 Exporter PDF' +
+          '</button>' +
+          '<button type="button" id="seance-btn-add-bloc" class="seance-trame__add-btn">' +
+            '+ Ajouter un bloc' +
+          '</button>' +
+        '</div>' +
       '</header>';
 
     if (!heureDebut) {
@@ -1632,42 +1719,66 @@
           '<tbody>';
 
       let curHeure = heureDebut;
-      State.blocs.forEach(function (b, i) {
-        const t = lookupTypeBloc(b.type_bloc);
-        const emoji = (t && t.emoji) || '·';
-        const libType = (t && t.libelle) || b.type_bloc;
-        const titreCompl = b.titre_precision ? ' — ' + escapeHtml(b.titre_precision) : '';
-        const heureCell = curHeure || '—';
-        const heureFin = curHeure ? addMinutesToHeure(curHeure, b.duree_min) : '';
 
-        // Phase 5.6.B : actions ↑ ↓ 🗑
-        const isFirst = (i === 0);
-        const isLast  = (i === State.blocs.length - 1);
+      // v1.10 (sql_108) — Rendu groupé par ÉTAGE (ordre). Un étage à 1 bloc
+      // = ligne classique pleine largeur (voie 0). Un étage à ≥2 blocs =
+      // voies parallèles côte à côte. Durée de l'étage = MAX des voies
+      // (les blocs tournent en simultané) ; le curseur horaire avance du max.
+      const etages = _grouperBlocsParEtage(State.blocs);
+      etages.forEach(function (etage, idxEtage) {
+        const blocsEtage = etage.blocs;       // ≥1 bloc, triés par voie
+        const dureeEtage = etage.dureeMax;    // max des durées de voie
+        const heureCell = curHeure || '—';
+        const heureFin = curHeure ? addMinutesToHeure(curHeure, dureeEtage) : '';
+
+        const isFirst = (idxEtage === 0);
+        const isLast  = (idxEtage === etages.length - 1);
         const disUp   = isFirst ? ' disabled' : '';
         const disDown = isLast  ? ' disabled' : '';
+        const parallele = blocsEtage.length > 1;
 
-        html +=
-          '<tr class="seance-trame__row" data-bloc-id="' + escapeHtml(b.id) + '">' +
-            '<td class="seance-trame__td-horaire">' +
-              '<span class="seance-trame__horaire-start">' + heureCell + '</span>' +
-              (heureFin ? '<span class="seance-trame__horaire-end">→ ' + heureFin + '</span>' : '') +
-            '</td>' +
-            '<td class="seance-trame__td-bloc seance-trame__td-bloc--clickable" ' +
+        // Cellule « Bloc » : une mini-carte par voie. En parallèle, elles
+        // s'affichent en colonnes (classe --parallele pilote la CSS flex).
+        let cellBlocs = '<div class="seance-trame__voies' + (parallele ? ' seance-trame__voies--parallele' : '') + '">';
+        blocsEtage.forEach(function (b) {
+          const t = lookupTypeBloc(b.type_bloc);
+          const emoji = (t && t.emoji) || '·';
+          const libType = (t && t.libelle) || b.type_bloc;
+          const titreCompl = b.titre_precision ? ' — ' + escapeHtml(b.titre_precision) : '';
+          const coachNom = _nomCoachBloc(b.encadrant_id);
+          const dureeVoie = (parallele && b.duree_min !== dureeEtage)
+            ? '<span class="seance-trame__voie-duree">' + b.duree_min + ' min</span>' : '';
+          cellBlocs +=
+            '<div class="seance-trame__voie seance-trame__td-bloc--clickable" ' +
                  'data-action="open-detail" data-bloc-id="' + escapeHtml(b.id) + '" ' +
                  'title="Cliquer pour éditer ce bloc en détail">' +
               '<span class="seance-trame__emoji">' + emoji + '</span> ' +
               '<span class="seance-trame__type">' + escapeHtml(libType) + '</span>' +
               '<span class="seance-trame__precision">' + titreCompl + '</span>' +
+              (coachNom ? '<span class="seance-trame__coach">👤 ' + escapeHtml(coachNom) + '</span>' : '') +
+              dureeVoie +
+            '</div>';
+        });
+        cellBlocs += '</div>';
+
+        // Durée affichée de l'étage (max), avec marqueur « ∥ » si parallèle.
+        const dureeAffichee = dureeEtage + ' min' + (parallele ? ' <span class="seance-trame__par-tag" title="Voies parallèles : durée = la plus longue">∥</span>' : '');
+
+        html +=
+          '<tr class="seance-trame__row' + (parallele ? ' seance-trame__row--parallele' : '') + '" data-etage-ordre="' + escapeHtml(etage.ordre) + '">' +
+            '<td class="seance-trame__td-horaire">' +
+              '<span class="seance-trame__horaire-start">' + heureCell + '</span>' +
+              (heureFin ? '<span class="seance-trame__horaire-end">→ ' + heureFin + '</span>' : '') +
             '</td>' +
-            '<td class="seance-trame__td-duree">' + b.duree_min + ' min</td>' +
+            '<td class="seance-trame__td-bloc">' + cellBlocs + '</td>' +
+            '<td class="seance-trame__td-duree">' + dureeAffichee + '</td>' +
             '<td class="seance-trame__td-actions">' +
-              '<button type="button" class="seance-trame__action-btn" data-action="up"     data-bloc-id="' + escapeHtml(b.id) + '" title="Monter d\'une place"' + disUp + '>↑</button>' +
-              '<button type="button" class="seance-trame__action-btn" data-action="down"   data-bloc-id="' + escapeHtml(b.id) + '" title="Descendre d\'une place"' + disDown + '>↓</button>' +
-              '<button type="button" class="seance-trame__action-btn seance-trame__action-btn--danger" data-action="remove" data-bloc-id="' + escapeHtml(b.id) + '" title="Supprimer ce bloc">🗑</button>' +
+              '<button type="button" class="seance-trame__action-btn" data-action="up"        data-etage-ordre="' + escapeHtml(etage.ordre) + '" title="Monter cet étage"' + disUp + '>↑</button>' +
+              '<button type="button" class="seance-trame__action-btn" data-action="down"      data-etage-ordre="' + escapeHtml(etage.ordre) + '" title="Descendre cet étage"' + disDown + '>↓</button>' +
+              '<button type="button" class="seance-trame__action-btn" data-action="dedoubler" data-etage-ordre="' + escapeHtml(etage.ordre) + '" title="Ajouter une voie parallèle à cet étage">⇄</button>' +
             '</td>' +
           '</tr>';
 
-        // Avance le curseur horaire pour le prochain bloc
         if (curHeure) curHeure = heureFin;
       });
 
@@ -1675,8 +1786,8 @@
           '</tbody>' +
         '</table>';
 
-      // Footer récap : durée totale des blocs vs durée prévue
-      const dureeBlocs = State.blocs.reduce(function (sum, b) { return sum + (b.duree_min || 0); }, 0);
+      // Footer récap : durée totale (somme des MAX par étage) vs durée prévue.
+      const dureeBlocs = etages.reduce(function (sum, e) { return sum + (e.dureeMax || 0); }, 0);
       const dureePrevue = State.currentSeance.duree_totale_min || 0;
       const ecart = dureeBlocs - dureePrevue;
       let recapClass = 'is-ok';
@@ -1701,7 +1812,20 @@
     if (btn) {
       btn.addEventListener('click', function (e) {
         e.stopPropagation();
+        // v1.10 — clic « + Ajouter un bloc » hors dédoublement : on ajoute
+        // en fin de trame (pas sur un étage existant). On purge toute cible
+        // de dédoublement résiduelle pour éviter un effet de bord.
+        State.dedoublerOrdre = null;
         togglePicker();
+      });
+    }
+
+    // v1.10 — bind du bouton « Exporter PDF »
+    const btnPdf = document.getElementById('seance-btn-export-pdf');
+    if (btnPdf) {
+      btnPdf.addEventListener('click', function (e) {
+        e.stopPropagation();
+        onExportPdf();
       });
     }
 
@@ -1711,10 +1835,13 @@
         e.stopPropagation();
         if (btnEl.disabled) return;
         const action = btnEl.getAttribute('data-action');
-        const blocId = btnEl.getAttribute('data-bloc-id');
-        if (action === 'up')     onMoveBlocUp(blocId);
-        if (action === 'down')   onMoveBlocDown(blocId);
-        if (action === 'remove') onRemoveBloc(blocId);
+        // v1.10 — les actions opèrent désormais sur l'ÉTAGE (data-etage-ordre),
+        // plus sur un bloc individuel. up/down déplacent tout l'étage ;
+        // dedoubler ajoute une voie parallèle au même ordre.
+        const ordre = parseInt(btnEl.getAttribute('data-etage-ordre'), 10);
+        if (action === 'up')        onMoveEtageUp(ordre);
+        if (action === 'down')      onMoveEtageDown(ordre);
+        if (action === 'dedoubler') onDedoublerEtage(ordre);
       });
     });
 
@@ -1892,6 +2019,38 @@
   }
 
   /**
+   * Construit les <option> du sélecteur de coach d'un bloc (v1.10, sql_108).
+   * Source : State.staffDisponible = [{personne_id, nom, prenom}] (UUID réels
+   * personnes.id, fournis par la RPC list_staff_disponibles).
+   * Option vide (value="") => encadrant_id NULL (collecte: val.trim()||null).
+   * Si selectedId n'est plus présent dans la liste (coach retiré du staff
+   * catégorie mais encore référencé en base), on l'affiche quand même en
+   * tête avec une mention, pour ne jamais masquer silencieusement une
+   * affectation existante (honest degradation).
+   *
+   * @param {string|null} selectedId encadrant_id courant du bloc
+   */
+  function buildSelectCoach(selectedId) {
+    const liste = Array.isArray(State.staffDisponible) ? State.staffDisponible : [];
+    let html = '<option value="">— Aucun coach désigné —</option>';
+    let trouve = false;
+    liste.forEach(function (p) {
+      const id = p.personne_id;
+      const nom = ((p.prenom || '') + ' ' + (p.nom || '')).trim() || id;
+      const sel = (id === selectedId) ? ' selected' : '';
+      if (id === selectedId) trouve = true;
+      html += '<option value="' + escapeHtml(id) + '"' + sel + '>' + escapeHtml(nom) + '</option>';
+    });
+    // Affectation orpheline : selectedId non listé mais bien présent en base.
+    if (selectedId && !trouve) {
+      html += '<option value="' + escapeHtml(selectedId) + '" selected>' +
+                '⚠️ Coach hors liste (conservé)' +
+              '</option>';
+    }
+    return html;
+  }
+
+  /**
    * Rend l'éditeur détail d'un bloc dans la zone éditeur (sous le résumé
    * méta replié). Remplace la trame chronologique tant qu'on est en vue
    * 'bloc-detail'. Phase 5.7.
@@ -1946,6 +2105,10 @@
         '</h3>' +
         '<div class="seance-bloc-detail__header-right">' +
           '<span id="seance-bloc-autosave-pill" class="seance-autosave-pill is-idle" title="Sauvegarde automatique du bloc (30s si modifications)">● Sauvé</span>' +
+          // v1.10 — suppression du bloc déplacée ici (le 🗑 de la trame a
+          // cédé sa place au ⇄ « dédoubler »). Chaque bloc, voie comprise,
+          // reste supprimable depuis son détail.
+          '<button type="button" id="seance-bloc-btn-supprimer" class="seance-bloc-detail__btn-supprimer" title="Supprimer ce bloc">🗑 Supprimer</button>' +
         '</div>' +
       '</header>' +
 
@@ -1987,6 +2150,15 @@
                  'maxlength="200" ' +
                  'placeholder="Ex : Mobilisation articulaire avec ballon" ' +
                  'value="' + escapeHtml(b.titre_precision || '') + '">' +
+        '</label>' +
+
+        // v1.10 (sql_108) — Coach encadrant de CE bloc (FK personnes via encadrant_id).
+        // Source : State.staffDisponible (UUID réels). Option vide = aucun coach (null).
+        '<label class="seance-field seance-field--full">' +
+          '<span class="seance-field__label">Coach encadrant (ce bloc)</span>' +
+          '<select class="seance-field__input" data-bloc-field="encadrant_id">' +
+            buildSelectCoach(b.encadrant_id) +
+          '</select>' +
         '</label>' +
 
       '</div>';
@@ -2122,6 +2294,20 @@
     // ----- Binds -----
     const btnRetour = DOM.blocBtnRetour();
     if (btnRetour) btnRetour.addEventListener('click', onCloseBlocDetail);
+
+    // v1.10 — bouton supprimer le bloc courant (confirmation dans onRemoveBloc),
+    // puis retour à la trame.
+    const btnSupprBloc = document.getElementById('seance-bloc-btn-supprimer');
+    if (btnSupprBloc) {
+      btnSupprBloc.addEventListener('click', async function () {
+        const id = State.currentBloc && State.currentBloc.id;
+        if (!id) return;
+        await onRemoveBloc(id);
+        // Si la suppression a réussi, le bloc n'est plus dans State.blocs.
+        const encore = State.blocs.some(function (b) { return b.id === id; });
+        if (!encore) onCloseBlocDetail();
+      });
+    }
 
     const btnSave = DOM.blocBtnSave();
     if (btnSave) {
@@ -3554,6 +3740,18 @@
       params.intensite = typeDef.intensite_defaut;
     }
 
+    // v1.10 (sql_108) — DÉDOUBLEMENT : si un étage cible est mémorisé,
+    // le nouveau bloc rejoint cet `ordre` sur une voie parallèle libre
+    // (max voie de l'étage + 1) au lieu d'être ajouté en fin de trame.
+    const ordreCible = State.dedoublerOrdre;
+    State.dedoublerOrdre = null; // consommé (ne persiste pas entre ajouts)
+    if (ordreCible !== undefined && ordreCible !== null) {
+      const blocsEtage = State.blocs.filter(function (b) { return (b.ordre || 0) === ordreCible; });
+      const voieMax = blocsEtage.reduce(function (m, b) { return Math.max(m, b.voie || 0); }, 0);
+      params.ordre = ordreCible;
+      params.voie = voieMax + 1;
+    }
+
     // Phase 5.9 : héritage auto des groupes du bloc précédent.
     // Si la trame contient déjà au moins un bloc avec des groupes non vides,
     // on copie ces groupes dans le nouveau bloc (commodité doctrinale).
@@ -3656,6 +3854,183 @@
     // pour un ORDER BY ordre côté DB)
     State.blocs = State.blocs.filter(function (b) { return b.id !== blocId; });
     renderTrame();
+  }
+
+  // ----------------------------------------------------------
+  // v1.10 (sql_108) — Actions au niveau ÉTAGE (voies parallèles)
+  // ----------------------------------------------------------
+
+  /**
+   * Échange les `ordre` de deux étages adjacents (tous les blocs concernés).
+   *
+   * ⚠️ Ne PAS utiliser reorderBlocs ici : il réaffecte ordre=1,2,3… à plat
+   * et écraserait le parallélisme (deux blocs au même ordre récupéreraient
+   * des ordres distincts). On échange donc directement les valeurs `ordre`
+   * via updateBloc, en préservant `voie`. Danse anti-collision : on parque
+   * d'abord l'étage source sur un ordre temporaire haut (max+1000) pour ne
+   * jamais violer l'unique (seance_id, ordre, voie) pendant la bascule.
+   *
+   * @param {number} ordreA étage à déplacer
+   * @param {number} ordreB étage cible (adjacent)
+   */
+  async function _swapEtages(ordreA, ordreB) {
+    const blocsA = State.blocs.filter(function (b) { return (b.ordre || 0) === ordreA; });
+    const blocsB = State.blocs.filter(function (b) { return (b.ordre || 0) === ordreB; });
+    if (blocsA.length === 0 || blocsB.length === 0) return;
+
+    const maxOrdre = State.blocs.reduce(function (m, b) { return Math.max(m, b.ordre || 0); }, 0);
+    const parking = maxOrdre + 1000;
+
+    // Mise à jour optimiste en mémoire d'abord (render immédiat)
+    blocsA.forEach(function (b) { b.ordre = ordreB; });
+    blocsB.forEach(function (b) { b.ordre = ordreA; });
+    renderTrame();
+
+    try {
+      // Passe 1 : parquer A (ordre source -> parking, voie préservée)
+      for (let i = 0; i < blocsA.length; i++) {
+        const r = await SupabaseHub.updateBloc(blocsA[i].id, { ordre: parking + i });
+        if (!r.ok) throw new Error(r.error);
+      }
+      // Passe 2 : B prend l'ancien ordre de A
+      for (const b of blocsB) {
+        const r = await SupabaseHub.updateBloc(b.id, { ordre: ordreA });
+        if (!r.ok) throw new Error(r.error);
+      }
+      // Passe 3 : A prend l'ordre de B (sort du parking)
+      for (const b of blocsA) {
+        const r = await SupabaseHub.updateBloc(b.id, { ordre: ordreB });
+        if (!r.ok) throw new Error(r.error);
+      }
+    } catch (e) {
+      console.error('SeanceEditor: _swapEtages() KO', e);
+      alert('Erreur réordonnancement des étages : ' + e.message + '\n\nRechargement…');
+      await loadBlocs();
+      renderTrame();
+    }
+  }
+
+  /** Monte un étage entier d'une position. */
+  async function onMoveEtageUp(ordre) {
+    const etages = _grouperBlocsParEtage(State.blocs);
+    const idx = etages.findIndex(function (e) { return e.ordre === ordre; });
+    if (idx <= 0) return; // premier étage ou introuvable
+    await _swapEtages(ordre, etages[idx - 1].ordre);
+  }
+
+  /** Descend un étage entier d'une position. */
+  async function onMoveEtageDown(ordre) {
+    const etages = _grouperBlocsParEtage(State.blocs);
+    const idx = etages.findIndex(function (e) { return e.ordre === ordre; });
+    if (idx < 0 || idx >= etages.length - 1) return; // dernier ou introuvable
+    await _swapEtages(ordre, etages[idx + 1].ordre);
+  }
+
+  /**
+   * Dédouble un étage : ajoute une voie parallèle au même `ordre`.
+   * Ouvre le picker de type ; le bloc choisi sera créé sur cet étage en
+   * voie = (max voie de l'étage) + 1. On mémorise l'étage cible dans
+   * State.dedoublerOrdre, consommé par onAddBloc.
+   */
+  function onDedoublerEtage(ordre) {
+    State.dedoublerOrdre = ordre;
+    // Réutilise le picker existant ; onAddBloc lira State.dedoublerOrdre.
+    togglePicker();
+  }
+
+  /**
+   * Export PDF (v1.10) — construit une vue d'impression simplifiée de la
+   * trame puis déclenche window.print(). La mise en page (charte hub,
+   * 1–3 pages, masquage de l'app) est portée par la feuille @media print
+   * livrée à part. Aucune dépendance externe.
+   *
+   * La vue print est injectée dans #seance-print-root (créé à la volée),
+   * visible uniquement à l'impression. On la régénère à chaque export pour
+   * refléter l'état courant, puis on la vide après impression.
+   */
+  function onExportPdf() {
+    if (!State.currentSeance) return;
+    let root = document.getElementById('seance-print-root');
+    if (!root) {
+      root = document.createElement('div');
+      root.id = 'seance-print-root';
+      document.body.appendChild(root);
+    }
+    root.innerHTML = _buildPrintHtml();
+    // Laisse le DOM se peindre avant l'impression.
+    window.setTimeout(function () {
+      window.print();
+    }, 50);
+  }
+
+  /**
+   * Construit le HTML simplifié de la trame pour l'impression (v1.10).
+   * Reprend les données de State (séance + étages) sans les contrôles
+   * d'édition. Les voies parallèles d'un étage sont listées ensemble.
+   */
+  function _buildPrintHtml() {
+    const s = State.currentSeance;
+    const heureDebut = s.heure_debut ? normalizeHeureForInput(s.heure_debut) : null;
+    const dateStr = s.date_seance ? formatDateShort(s.date_seance) : '';
+
+    // En-tête séance
+    let html =
+      '<div class="seance-print">' +
+        '<header class="seance-print__header">' +
+          '<h1 class="seance-print__titre">Trame de séance' +
+            (s.theme_principal ? ' — ' + escapeHtml(s.theme_principal) : '') +
+          '</h1>' +
+          '<div class="seance-print__meta">' +
+            (dateStr ? '<span>📅 ' + escapeHtml(dateStr) + '</span>' : '') +
+            (heureDebut ? '<span>🕒 ' + escapeHtml(heureDebut) + '</span>' : '') +
+            (s.duree_totale_min ? '<span>⏱ ' + s.duree_totale_min + ' min prévues</span>' : '') +
+            (s.lieu_id && s.meteo_text ? '' : '') +
+          '</div>' +
+          (s.objectifs_text ? '<p class="seance-print__objectifs">🎯 ' + escapeHtml(s.objectifs_text) + '</p>' : '') +
+        '</header>';
+
+    const etages = _grouperBlocsParEtage(State.blocs);
+    if (etages.length === 0) {
+      html += '<p class="seance-print__vide">Aucun bloc dans cette trame.</p>';
+    } else {
+      html += '<table class="seance-print__table"><thead><tr>' +
+                '<th>Horaire</th><th>Bloc(s)</th><th>Durée</th><th>Coach</th>' +
+              '</tr></thead><tbody>';
+      let cur = heureDebut;
+      etages.forEach(function (etage) {
+        const fin = cur ? addMinutesToHeure(cur, etage.dureeMax) : '';
+        const horaire = cur ? (cur + (fin ? ' → ' + fin : '')) : '—';
+        const parallele = etage.blocs.length > 1;
+        let cellBlocs = '';
+        let cellCoach = '';
+        etage.blocs.forEach(function (b, k) {
+          const t = lookupTypeBloc(b.type_bloc);
+          const emoji = (t && t.emoji) || '·';
+          const libType = (t && t.libelle) || b.type_bloc;
+          const titre = b.titre_precision ? ' — ' + escapeHtml(b.titre_precision) : '';
+          const sep = (k > 0) ? '<br>' : '';
+          cellBlocs += sep + (parallele ? '<strong>∥</strong> ' : '') + emoji + ' ' + escapeHtml(libType) + titre;
+          const coach = _nomCoachBloc(b.encadrant_id);
+          cellCoach += (k > 0 ? '<br>' : '') + (coach ? escapeHtml(coach) : '—');
+        });
+        html +=
+          '<tr>' +
+            '<td class="seance-print__horaire">' + horaire + '</td>' +
+            '<td>' + cellBlocs + '</td>' +
+            '<td class="seance-print__duree">' + etage.dureeMax + ' min' + (parallele ? ' ∥' : '') + '</td>' +
+            '<td>' + cellCoach + '</td>' +
+          '</tr>';
+        if (cur) cur = fin;
+      });
+      html += '</tbody></table>';
+    }
+
+    html +=
+        '<footer class="seance-print__footer">' +
+          'MOM Hub · Préparation de séance' +
+        '</footer>' +
+      '</div>';
+    return html;
   }
 
   // ----------------------------------------------------------
@@ -3961,6 +4336,33 @@
     }
   }
 
+  /**
+   * Charge le staff assignable comme ENCADRANT D'UN BLOC (v1.10, sql_108).
+   *
+   * ⚠️ Source distincte du picker encadrants de la séance : ce dernier
+   * s'alimente du miroir data/encadrants-par-categorie.json, dont les
+   * `uuid` sont factices (enc-m14-1…) et NE correspondent PAS à
+   * personnes.id. Or encadrant_id est une vraie FK -> personnes(id) :
+   * on a donc besoin des UUID réels, fournis uniquement par la RPC
+   * list_staff_disponibles (wrapper listStaffDisponibles).
+   *
+   * Sortie stockée : State.staffDisponible = [{personne_id, nom, prenom}].
+   * Échec → tableau vide → le <select> coach n'affiche que « — Aucun ».
+   */
+  async function loadStaffDisponibles() {
+    try {
+      const categorie = window.momSeanceContext && window.momSeanceContext.categorie_uuid
+                        ? window.momSeanceContext.categorie_uuid
+                        : null;
+      const liste = await SupabaseHub.listStaffDisponibles(categorie);
+      State.staffDisponible = Array.isArray(liste) ? liste : [];
+      console.log('SeanceEditor: staff disponible chargé (' + State.staffDisponible.length + ' personnes assignables par bloc)');
+    } catch (e) {
+      console.warn('SeanceEditor: loadStaffDisponibles() KO, sélecteur coach vide', e);
+      State.staffDisponible = [];
+    }
+  }
+
   async function loadVivierM14() {
     try {
       State.vivier = await SupabaseHub.getVivierCompo(_equipeActive());
@@ -4025,7 +4427,8 @@
       loadGroupesRef(),
       loadVivierM14(),
       loadPropositionsRef(),
-      loadEncadrantsForCategorie()
+      loadEncadrantsForCategorie(),
+      loadStaffDisponibles()
     ]);
 
     renderSidebar();
@@ -4078,7 +4481,7 @@
     });
 
     console.log(
-      '%c🏉 Seance Editor v1.5 (Phase 5.7) chargé',
+      '%c🏉 Seance Editor v1.10 (blocs parallèles + coach + PDF) chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         seances: State.seances.length,
