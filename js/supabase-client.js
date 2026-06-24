@@ -18,6 +18,13 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 1.64 — juin 2026
+ *   v1.64 : FIX réordonnancement d'étages parallèles (recette terrain).
+ *           updateBloc : 'ordre' ajouté à allowedKeys. Le déplacement
+ *           up/down d'un étage (seance-editor v1.10 _swapEtages) pilote
+ *           le réordonnancement via updateBloc({ordre}) ; or 'ordre' était
+ *           hors whitelist → patch vidé → « Aucun champ modifiable ».
+ *           1 ligne ajoutée. node --check OK. boot v1.63 → v1.64.
  * Version : 1.63 — juin 2026
  *   v1.63 : SEANCE-BLOCS-PARALLELES (retours terrain). Migration sql_108
  *           ayant doté seances_blocs de `voie` (smallint, 0=pleine largeur,
@@ -3751,7 +3758,12 @@
         'groupes_jsonb', 'materiel_jsonb', 'contenu_pedagogique_axe4',
         'notes_bloc',
         // v1.63 — blocs parallèles + coach par bloc (sql_108)
-        'voie', 'encadrant_id'
+        'voie', 'encadrant_id',
+        // v1.64 — réordonnancement d'étages parallèles : le déplacement
+        // up/down d'un étage passe par updateBloc({ordre}). 'ordre' doit
+        // donc être modifiable ici (il l'était déjà via reorderBlocs, mais
+        // par un chemin distinct). Sans cela : « Aucun champ modifiable ».
+        'ordre'
       ];
       const cleanPatch = {};
       for (const k of allowedKeys) {
@@ -6887,7 +6899,7 @@
   }
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.63 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.64 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
