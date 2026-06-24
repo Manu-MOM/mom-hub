@@ -36,8 +36,81 @@ window.JoueursBrowser = (function () {
   // CONSTANTES
   // ============================================================
 
-  /** UUID équipe M14 EQ1 (entente SAR×MOM) — seule constante autorisée */
+  /** UUID équipe M14 EQ1 (entente SAR×MOM) — REPLI de dégradation honnête.
+   * Conservé : si le périmètre de catégories est indisponible (socle
+   * ancien, droits vides, catégorie sans équipe), on retombe sur M14
+   * = comportement d'origine. */
   const M14_TEAM_UUID = 'bfb83b83-83ef-4dde-b526-48ff87313044';
+
+  // ------------------------------------------------------------
+  // Propagation multi-catégories (catégorie active partagée)
+  // ------------------------------------------------------------
+  // Le périmètre de catégorie active est partagé entre écrans via le
+  // socle (clé localStorage mom_hub.categorie_active). L'écran Joueurs
+  // affiche TOUS les joueurs de TOUTES les équipes de la catégorie
+  // active (agrégation légitime : « voir mon effectif de catégorie »
+  // — ≠ compo/séance qui sont par équipe). Le sélecteur de catégorie
+  // (helper UXSelecteurCategorie) n'apparaît que si l'encadrant a > 1
+  // catégorie ; mono-cat → UX inchangée.
+
+  // Périmètre courant (résolu au boot), pour le sélecteur + repli.
+  let CTX_PERIMETRE = null;
+
+  /**
+   * Équipes de la catégorie active → [equipeId, …].
+   * Repli [M14_TEAM_UUID] : socle absent, périmètre vide, aucune
+   * équipe (jamais de liste muette par construction).
+   */
+  async function _joueursResoudreEquipesActives() {
+    if (typeof SupabaseHub === 'undefined'
+        || typeof SupabaseHub.listEquipes !== 'function') {
+      return [M14_TEAM_UUID];
+    }
+    const catId = CTX_PERIMETRE && CTX_PERIMETRE.active;
+    if (!catId) return [M14_TEAM_UUID];
+    let equipes;
+    try {
+      equipes = await SupabaseHub.listEquipes(catId);
+    } catch (e) {
+      console.warn('Joueurs: listEquipes indisponible, repli M14.', e);
+      return [M14_TEAM_UUID];
+    }
+    const ids = (Array.isArray(equipes) ? equipes : [])
+      .map(function (eq) { return eq && eq.id; })
+      .filter(Boolean);
+    return ids.length > 0 ? ids : [M14_TEAM_UUID];
+  }
+
+  /**
+   * Charge les joueurs de la catégorie active : 1 appel
+   * getJoueursEquipe par équipe → fusion dédoublonnée par j.id.
+   * N=1 équipe (cas réel actuel) → strictement équivalent à
+   * l'appel unique d'origine getJoueursEquipe(M14) (garde-fou
+   * non-régression mono-catégorie).
+   * @returns {Promise<Array|null>} null si TOUTES les équipes
+   *   échouent (préserve la branche d'erreur d'origine).
+   */
+  async function _chargerJoueursCategorieActive() {
+    const equipes = await _joueursResoudreEquipesActives();
+    const listes = await Promise.all(
+      equipes.map(function (eqId) {
+        return SupabaseHub.getJoueursEquipe(eqId);
+      })
+    );
+    // Si toutes les équipes renvoient null → échec global (null,
+    // comportement d'origine : message d'erreur honnête).
+    if (listes.every(function (l) { return l === null; })) return null;
+    // Fusion dédoublonnée par identité joueur (j.id) : un joueur
+    // présent dans 2 équipes de la catégorie n'apparaît qu'une fois.
+    const parId = new Map();
+    listes.forEach(function (liste) {
+      if (!Array.isArray(liste)) return;
+      liste.forEach(function (j) {
+        if (j && j.id && !parId.has(j.id)) parId.set(j.id, j);
+      });
+    });
+    return Array.from(parId.values());
+  }
 
   /** Clé localStorage pour persister les préférences de filtres */
   const PREFS_KEY = 'mom-hub.joueurs.prefs.v1';
@@ -1057,7 +1130,7 @@ window.JoueursBrowser = (function () {
    * Appelé après save modale pour refresh UI complet.
    */
   async function reloadJoueurs() {
-    const joueurs = await SupabaseHub.getJoueursEquipe(M14_TEAM_UUID);
+    const joueurs = await _chargerJoueursCategorieActive();
     if (joueurs) {
       ALL_JOUEURS = joueurs;
       buildIndexes();
@@ -1401,11 +1474,40 @@ window.JoueursBrowser = (function () {
     bindSearch();
     bindModalClosers();
 
+    // 1bis. Périmètre de catégorie active + sélecteur (multi-cat).
+    // Résolu AVANT le chargement pour que _chargerJoueursCategorieActive
+    // lise la bonne catégorie. Le sélecteur n'apparaît que si > 1
+    // catégorie (helper UXSelecteurCategorie). Repli silencieux si le
+    // socle ou le helper sont absents (UX d'origine, repli M14).
+    if (typeof UXSelecteurCategorie !== 'undefined'
+        && typeof UXSelecteurCategorie.resoudre === 'function') {
+      try {
+        const ctxCat = await UXSelecteurCategorie.resoudre();
+        if (ctxCat && ctxCat.perimetre) {
+          CTX_PERIMETRE = ctxCat.perimetre;
+          UXSelecteurCategorie.monter({
+            perimetre: CTX_PERIMETRE,
+            ancreSelector: '.joueur-header',
+            teamSpanSelector: '.joueur-header h2 .joueur-team',
+            titreDocument: 'MOM Hub · Joueurs',
+            wrapId: 'joueur-cat-selecteur-wrap',
+            selectId: 'joueur-cat-selecteur',
+            onChange: async function () {
+              // Recharge la liste sur la nouvelle catégorie active.
+              await reloadJoueurs();
+            }
+          });
+        }
+      } catch (e) {
+        console.warn('Joueurs: résolution périmètre catégorie échouée, repli M14.', e);
+      }
+    }
+
     // 2. Référentiels JSON (en parallèle de la liste joueurs)
     const refPromise = loadReferentiels();
 
-    // 3. Liste joueurs M14
-    const joueurs = await SupabaseHub.getJoueursEquipe(M14_TEAM_UUID);
+    // 3. Liste joueurs de la catégorie active (agrégée multi-équipes)
+    const joueurs = await _chargerJoueursCategorieActive();
     if (!joueurs) {
       const listEl = document.getElementById('joueur-list');
       if (listEl) {
