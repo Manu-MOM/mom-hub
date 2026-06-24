@@ -130,7 +130,23 @@
           escapeHtml(c.libelle_court || c.code || c.libelle_long || c.id) + '</option>';
       });
     sel.innerHTML = html;
-    sel.onchange = function () { loadResponsables(sel.value || null); };
+    // Synchro inter-écrans : pré-sélectionne la catégorie active
+    // mémorisée (clé partagée mom_hub.categorie_active via le socle)
+    // si elle figure dans la liste, et mémorise tout nouveau choix.
+    try {
+      if (typeof SupabaseHub.lireCategorieActiveMemorisee === 'function') {
+        const memo = SupabaseHub.lireCategorieActiveMemorisee();
+        if (memo && state.categories.some(function (c) { return c.id === memo; })) {
+          sel.value = memo;
+        }
+      }
+    } catch (e) { /* honnête : pas de synchro, choix manuel */ }
+    sel.onchange = function () {
+      if (sel.value && typeof SupabaseHub.memoriserCategorieActive === 'function') {
+        SupabaseHub.memoriserCategorieActive(sel.value);
+      }
+      loadResponsables(sel.value || null);
+    };
     loadResponsables(sel.value || null);
   }
 
