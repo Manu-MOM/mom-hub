@@ -20,8 +20,18 @@
  *    non-admins (cf. admin-equipes.html). La RLS base est admin|coach
  *    sur equipes (filet permissif dormant, supabase-client v1.31).
  *
- * Version : 1.1 — 28/05/2026 (Production ADMIN-(ii), pt 21).
+ * Version : 1.2 — 24/06/2026 (ADMIN-RESPONSABLE-POLE, pt 106).
  *   v1.0 : écran (1) Équipes (grille pôle→catégorie, modales équipe + entente).
+ *   v1.2 : désignation des responsables de pôle. Sous chaque en-tête de
+ *          pôle (ae-pole__head), une ligne « Responsable / Co-responsable »
+ *          (selects peuplés par listStaffDisponibles, valeurs initiales
+ *          lues dans State.poles[i].responsable_principal_id /
+ *          co_responsable_id — déjà présentes via getPolesAvecCategories
+ *          select('*')). Enregistrement -> Hub.definirResponsablesPole
+ *          (RPC sql_107, garde admin). Co-responsable optionnel ; même
+ *          personne autorisée sur plusieurs pôles (permissif, validé Manu).
+ *          Dégradation honnête : responsable hors pioche staff résolu via
+ *          _resolveNoms (jamais d'UUID nu). Additif (node --check OK).
  *   v1.1 : correctif recette terrain — (a) l'édition de cadre charge le cadre
  *          COMPLET via getEntenteCadre (la grille listEntentes ne projette pas
  *          régime/club/partenaires/convention → modale vide sinon) ; (b) badge
@@ -62,7 +72,15 @@
     championnats: [],            // suggestions datalist (distinct)
     // contextes de modale
     eqCtx: null,                 // { mode, cat, saison, entente, equipe? }
-    entCtx: null                 // { mode, cat, saison, entente?, partenaires:[] }
+    entCtx: null,                // { mode, cat, saison, entente?, partenaires:[] }
+    // ADMIN-RESPONSABLE-POLE (v1.2) — pioche staff pour désigner les
+    // responsables de pôle. listStaffDisponibles() (sans catégorie) =
+    // tout le staff du club {personne_id, nom, prenom}.
+    staffPourSelect: [],
+    staffById: new Map(),
+    // Noms résolus en complément (cas d'un responsable déjà désigné mais
+    // absent de la pioche staff -> on n'affiche jamais un UUID nu).
+    nomsResponsables: new Map()  // personne_id -> "Prénom Nom"
   };
 
   // ----------------------------------------------------------------
@@ -206,6 +224,128 @@
     '</div>';
   }
 
+  // ----------------------------------------------------------------
+  // RESPONSABLES DE PÔLE (ADMIN-RESPONSABLE-POLE, v1.2)
+  // ----------------------------------------------------------------
+  // Désignation responsable principal (+ co-responsable optionnel) d'un
+  // pôle, écrite via Hub.definirResponsablesPole (RPC sql_107, garde admin).
+  // Lecture : responsable_principal_id / co_responsable_id sont DÉJÀ sur
+  // State.poles[i] (getPolesAvecCategories fait select('*')). Pioche =
+  // tout le staff du club (listStaffDisponibles sans catégorie).
+
+  // Libellé d'affichage d'une personne (pioche staff, sinon noms résolus).
+  function nomPersonne(personneId) {
+    if (!personneId) return '';
+    const st = State.staffById.get(personneId);
+    if (st) return ((st.prenom || '') + ' ' + (st.nom || '')).trim() || personneId;
+    const resolu = State.nomsResponsables.get(personneId);
+    return resolu || personneId; // dégradation honnête : jamais d'UUID muet sans repli
+  }
+
+  // <option> de la pioche staff (+ option vide). `selected` = uuid courant.
+  // Si l'uuid courant n'est pas dans la pioche, on l'ajoute en tête pour
+  // ne pas le perdre silencieusement (responsable hors staff).
+  function optionsStaff(selected, avecVide) {
+    let html = avecVide ? '<option value="">— Aucun —</option>' : '';
+    const dansListe = State.staffPourSelect.some(function (p) { return p.personne_id === selected; });
+    if (selected && !dansListe) {
+      html += '<option value="' + esc(selected) + '" selected>' + esc(nomPersonne(selected)) + ' (hors staff)</option>';
+    }
+    html += State.staffPourSelect.map(function (p) {
+      const lbl = ((p.prenom || '') + ' ' + (p.nom || '')).trim() || p.personne_id;
+      const sel = (p.personne_id === selected) ? ' selected' : '';
+      return '<option value="' + esc(p.personne_id) + '"' + sel + '>' + esc(lbl) + '</option>';
+    }).join('');
+    return html;
+  }
+
+  // Bloc « Responsable / Co-responsable » sous l'en-tête d'un pôle.
+  // editable = saison éditable (mêmes règles que la grille). Hors édition,
+  // on affiche les responsables en lecture seule (pas de selects).
+  function renderResponsablesPole(p, editable) {
+    const principal = p.responsable_principal_id || '';
+    const co = p.co_responsable_id || '';
+    if (!editable) {
+      const pTxt = principal ? esc(nomPersonne(principal)) : '<span class="ae-ro">non désigné</span>';
+      const cTxt = co ? ' · Co-responsable : ' + esc(nomPersonne(co)) : '';
+      return '<div class="ae-pole__resp ae-pole__resp--ro">' +
+        'Responsable : ' + pTxt + cTxt +
+      '</div>';
+    }
+    return '<div class="ae-pole__resp" data-pole="' + esc(p.id) + '">' +
+      '<label class="ae-pole__resp-field">Responsable&nbsp;: ' +
+        '<select class="ae-pole-resp-principal" data-pole="' + esc(p.id) + '">' +
+          optionsStaff(principal, true) +
+        '</select>' +
+      '</label>' +
+      '<label class="ae-pole__resp-field">Co-responsable&nbsp;: ' +
+        '<select class="ae-pole-resp-co" data-pole="' + esc(p.id) + '">' +
+          optionsStaff(co, true) +
+        '</select>' +
+      '</label>' +
+      '<button type="button" class="ae-btn ae-btn--save-resp" data-action="save-responsables" data-pole="' + esc(p.id) + '">Enregistrer</button>' +
+      '<span class="ae-pole__resp-msg" data-pole-msg="' + esc(p.id) + '"></span>' +
+    '</div>';
+  }
+
+  // Résout les noms des responsables actuellement désignés mais absents de
+  // la pioche staff (via Hub._resolveNoms), pour un affichage propre.
+  async function resoudreNomsResponsables() {
+    const manquants = [];
+    State.poles.forEach(function (p) {
+      [p.responsable_principal_id, p.co_responsable_id].forEach(function (id) {
+        if (id && !State.staffById.has(id) && !State.nomsResponsables.has(id)
+            && manquants.indexOf(id) === -1) {
+          manquants.push(id);
+        }
+      });
+    });
+    if (!manquants.length) return;
+    try {
+      const map = await Hub._resolveNoms(manquants);
+      if (map && typeof map.forEach === 'function') {
+        map.forEach(function (v, k) {
+          const lbl = ((v.prenom || '') + ' ' + (v.nom || '')).trim();
+          if (lbl) State.nomsResponsables.set(k, lbl);
+        });
+      }
+    } catch (e) {
+      console.error('AdminEquipes.resoudreNomsResponsables()', e);
+      // honnête : sans résolution, optionsStaff retombe sur l'UUID + « hors staff »
+    }
+  }
+
+  // Sauvegarde la désignation d'un pôle (lecture des 2 selects -> RPC).
+  async function saveResponsables(poleId) {
+    const wrap = document.querySelector('.ae-pole__resp[data-pole="' + poleId + '"]');
+    if (!wrap) return;
+    const selP = wrap.querySelector('.ae-pole-resp-principal');
+    const selC = wrap.querySelector('.ae-pole-resp-co');
+    const msg = wrap.querySelector('[data-pole-msg]');
+    const principalId = selP ? (selP.value || null) : null;
+    const coId = selC ? (selC.value || null) : null;
+
+    if (!principalId) {
+      if (msg) { msg.textContent = 'Choisir un responsable principal.'; msg.className = 'ae-pole__resp-msg ae-pole__resp-msg--err'; }
+      return;
+    }
+    if (msg) { msg.textContent = 'Enregistrement…'; msg.className = 'ae-pole__resp-msg'; }
+
+    const res = await Hub.definirResponsablesPole(poleId, principalId, coId);
+    if (!res || !res.ok) {
+      if (msg) { msg.textContent = 'Échec : ' + ((res && res.error) || 'erreur inconnue'); msg.className = 'ae-pole__resp-msg ae-pole__resp-msg--err'; }
+      return;
+    }
+    // Maj locale de State.poles (évite un rechargement complet).
+    const p = State.poles.find(function (x) { return x.id === poleId; });
+    if (p) {
+      p.responsable_principal_id = principalId;
+      p.co_responsable_id = coId;
+    }
+    await resoudreNomsResponsables();
+    if (msg) { msg.textContent = '✓ Enregistré.'; msg.className = 'ae-pole__resp-msg ae-pole__resp-msg--ok'; }
+  }
+
   function renderGrid() {
     const s = getSelectedSaison();
     const editable = saisonEditable(s);
@@ -223,6 +363,7 @@
       return '<section class="ae-pole">' +
         '<div class="ae-pole__head"><span class="ae-pole__title">' + esc(p.libelle_court || p.libelle_long || p.code) + '</span>' +
         '<span class="ae-pole__sub">' + cats.length + ' catégorie' + (cats.length > 1 ? 's' : '') + '</span></div>' +
+        renderResponsablesPole(p, editable) +
         '<div class="ae-cat-grid">' + cards + '</div>' +
       '</section>';
     }).join('');
@@ -634,6 +775,7 @@
       if (action === 'open-equipe-create') openEquipeCreate(catId);
       else if (action === 'open-cadre') openCadre(catId);
       else if (action === 'open-equipe-edit') openEquipeEdit(t.getAttribute('data-equipe'), t.getAttribute('data-cat'));
+      else if (action === 'save-responsables') saveResponsables(t.getAttribute('data-pole'));
     });
 
     // modale équipe
@@ -679,11 +821,13 @@
 
     try {
       const safeClubs = (async function () { try { return await Hub.getClubs(); } catch (e) { console.error(e); return []; } })();
-      const [saisonsR, polesR, sitesR, clubs] = await Promise.all([
+      const safeStaff = (async function () { try { return await Hub.listStaffDisponibles(); } catch (e) { console.error(e); return []; } })();
+      const [saisonsR, polesR, sitesR, clubs, staff] = await Promise.all([
         Hub.listSaisons(),
         Hub.getPolesAvecCategories(),
         Hub.listSitesActifs(),
-        safeClubs
+        safeClubs,
+        safeStaff
       ]);
 
       State.saisons = (saisonsR && saisonsR.ok && Array.isArray(saisonsR.data)) ? saisonsR.data : [];
@@ -691,6 +835,10 @@
       State.sites = Array.isArray(sitesR) ? sitesR : [];
       State.clubs = Array.isArray(clubs) ? clubs : [];
       State.clubsById = new Map(State.clubs.map(function (c) { return [c.id, c]; }));
+      // Pioche staff pour les responsables de pôle (ADMIN-RESPONSABLE-POLE).
+      State.staffPourSelect = Array.isArray(staff) ? staff : [];
+      State.staffById = new Map(State.staffPourSelect.map(function (p) { return [p.personne_id, p]; }));
+      await resoudreNomsResponsables();
 
       if (polesR && !polesR.ok) showError('Lecture des pôles/catégories impossible : ' + (polesR.error || ''));
 
@@ -709,6 +857,6 @@
 
   global.AdminEquipes = { init: init };
 
-  console.log('%c🏉 MOM Hub · admin-equipes.js v1.1 chargé', 'color: #2D7D46; font-weight: bold;');
+  console.log('%c🏉 MOM Hub · admin-equipes.js v1.2 chargé', 'color: #2D7D46; font-weight: bold;');
 
 })(typeof window !== 'undefined' ? window : globalThis);
