@@ -5179,7 +5179,7 @@
           evenements ( id, code, libelle, date_debut, type_evenement ),
           evenement_equipes_engagees (
             id, equipe_id,
-            equipes ( id, code, libelle_court, nom_officiel )
+            equipes ( id, code, libelle_court, nom_officiel, ententes ( categorie_id ) )
           )
         `)
         .eq('type_compo', 'base')
@@ -5199,6 +5199,14 @@
         const equipeLibelle = team
           ? (team.nom_officiel || team.libelle_court || team.code || '')
           : '';
+        // Catégorie de l'équipe engagée, dérivée via ententes.categorie_id
+        // (chemin prouvé : equipes → ententes → categorie_id). Exposée pour
+        // permettre le filtrage par catégorie active dans mes-compos.html.
+        // PostgREST peut renvoyer l'embed ententes en objet OU en tableau
+        // selon la cardinalité résolue → on gère les deux (repli null honnête).
+        let ente = team ? team.ententes : null;
+        if (Array.isArray(ente)) ente = ente[0] || null;
+        const categorieId = (ente && ente.categorie_id) ? ente.categorie_id : null;
         return {
           compo_id: c.id,
           etat: c.etat,
@@ -5209,7 +5217,7 @@
             date_debut:     evt.date_debut,
             type_evenement: evt.type_evenement
           } : null,
-          equipe: team ? { id: team.id, libelle: equipeLibelle } : null
+          equipe: team ? { id: team.id, libelle: equipeLibelle, categorie_id: categorieId } : null
         };
       });
       out.sort(function (a, b) {
@@ -6772,7 +6780,7 @@
   }
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.59 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.60 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
