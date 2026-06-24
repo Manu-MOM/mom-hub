@@ -11,6 +11,25 @@
  *   - 5.5.A : éditeur méta + sauvegarde manuelle (CETTE VERSION)
  *   - 5.5.B : autosave 30s + dropdowns lieu/événement + champs secondaires
  *
+ * Version : 1.12 — PDF enrichi (recette terrain, juin 2026)
+ *   v1.12 : Export PDF enrichi par bloc (demande recette). _buildPrintHtml
+ *           passe d'un tableau 4 colonnes à un format « fiche par étage » :
+ *           pour chaque bloc (voie comprise) : titre/précision, intensité,
+ *           coach encadrant, étiquettes (axes 2/3), résumé du contenu
+ *           pédagogique (axe 4 FFR) et notes. Helpers _libelleSlugAxe /
+ *           _libelleIntensite / _resumeAxe4 (traduction slug -> libellé via
+ *           le vocabulaire chargé). Styles print associés dans seance.html.
+ * Version : 1.11 — FIX recette terrain (juin 2026)
+ *   v1.11 : Corrections post-recette du module Préparation de séance.
+ *           (a) Pioche coach vide : loadStaffDisponibles envoyait la
+ *               chaîne factice 'cat-m14' à la RPC au lieu d'un vrai
+ *               categorie_id (uuid). Résolution désormais via
+ *               getCategorieEquipe(_equipeActive()) -> ententes.categorie_id ;
+ *               repli sur null (tout le staff) si échec. Va de pair avec
+ *               sql_109 (garde RPC élargie admin|bureau|encadrant) et
+ *               supabase-client v1.64 (ordre modifiable dans updateBloc).
+ *           (Le réordonnancement d'étages — bug « Aucun champ modifiable »
+ *            — est corrigé côté wrapper v1.64, pas ici.)
  * Version : 1.10 — SEANCE-BLOCS-PARALLELES (juin 2026, retours terrain)
  *   v1.10 : Trois améliorations « terrain » au module Préparation de séance,
  *           adossées à la migration sql_108 (voie + encadrant_id sur
@@ -3968,6 +3987,43 @@
    * Reprend les données de State (séance + étages) sans les contrôles
    * d'édition. Les voies parallèles d'un étage sont listées ensemble.
    */
+  /**
+   * Traduit un slug en libellé lisible via le vocabulaire d'un axe (v1.12).
+   * Renvoie le slug brut si non trouvé (jamais vide).
+   */
+  function _libelleSlugAxe(axeKey, slug) {
+    if (!slug) return '';
+    const vals = lookupVocabAxe(axeKey);
+    const found = vals.find(function (v) { return v.slug === slug; });
+    return found ? found.libelle : slug;
+  }
+
+  /** Libellé lisible d'une intensité (slug -> libellé, v1.12). */
+  function _libelleIntensite(slug) {
+    if (!slug) return '';
+    const vals = (State.typesBlocsRef && State.typesBlocsRef.intensites && State.typesBlocsRef.intensites.valeurs) || [];
+    const found = vals.find(function (v) { return v.slug === slug; });
+    return found ? ((found.emoji ? found.emoji + ' ' : '') + found.libelle) : slug;
+  }
+
+  /**
+   * Résumé lisible du contenu pédagogique axe 4 d'un bloc (v1.12).
+   * contenu_pedagogique_axe4 = { slug_champ_ffr: texte }. On traduit les
+   * slugs en libellés (axe_4_champs_ffr) et on rend « Libellé : texte ».
+   * Renvoie '' si vide.
+   */
+  function _resumeAxe4(axe4) {
+    if (!axe4 || typeof axe4 !== 'object') return '';
+    const lignes = [];
+    Object.keys(axe4).forEach(function (slug) {
+      const v = axe4[slug];
+      if (v && String(v).trim()) {
+        lignes.push('<strong>' + escapeHtml(_libelleSlugAxe('axe_4_champs_ffr', slug)) + '</strong> : ' + escapeHtml(String(v).trim()));
+      }
+    });
+    return lignes.join('<br>');
+  }
+
   function _buildPrintHtml() {
     const s = State.currentSeance;
     const heureDebut = s.heure_debut ? normalizeHeureForInput(s.heure_debut) : null;
@@ -3984,7 +4040,7 @@
             (dateStr ? '<span>📅 ' + escapeHtml(dateStr) + '</span>' : '') +
             (heureDebut ? '<span>🕒 ' + escapeHtml(heureDebut) + '</span>' : '') +
             (s.duree_totale_min ? '<span>⏱ ' + s.duree_totale_min + ' min prévues</span>' : '') +
-            (s.lieu_id && s.meteo_text ? '' : '') +
+            (s.encadrants_text ? '<span>👥 ' + escapeHtml(s.encadrants_text) + '</span>' : '') +
           '</div>' +
           (s.objectifs_text ? '<p class="seance-print__objectifs">🎯 ' + escapeHtml(s.objectifs_text) + '</p>' : '') +
         '</header>';
@@ -3993,36 +4049,52 @@
     if (etages.length === 0) {
       html += '<p class="seance-print__vide">Aucun bloc dans cette trame.</p>';
     } else {
-      html += '<table class="seance-print__table"><thead><tr>' +
-                '<th>Horaire</th><th>Bloc(s)</th><th>Durée</th><th>Coach</th>' +
-              '</tr></thead><tbody>';
       let cur = heureDebut;
       etages.forEach(function (etage) {
         const fin = cur ? addMinutesToHeure(cur, etage.dureeMax) : '';
         const horaire = cur ? (cur + (fin ? ' → ' + fin : '')) : '—';
         const parallele = etage.blocs.length > 1;
-        let cellBlocs = '';
-        let cellCoach = '';
-        etage.blocs.forEach(function (b, k) {
+
+        html +=
+          '<section class="seance-print__etage' + (parallele ? ' seance-print__etage--parallele' : '') + '">' +
+            '<div class="seance-print__etage-head">' +
+              '<span class="seance-print__etage-horaire">' + horaire + '</span>' +
+              '<span class="seance-print__etage-duree">' + etage.dureeMax + ' min' +
+                (parallele ? ' · ∥ ' + etage.blocs.length + ' voies parallèles' : '') +
+              '</span>' +
+            '</div>' +
+            '<div class="seance-print__voies' + (parallele ? ' seance-print__voies--par' : '') + '">';
+
+        etage.blocs.forEach(function (b) {
           const t = lookupTypeBloc(b.type_bloc);
           const emoji = (t && t.emoji) || '·';
           const libType = (t && t.libelle) || b.type_bloc;
-          const titre = b.titre_precision ? ' — ' + escapeHtml(b.titre_precision) : '';
-          const sep = (k > 0) ? '<br>' : '';
-          cellBlocs += sep + (parallele ? '<strong>∥</strong> ' : '') + emoji + ' ' + escapeHtml(libType) + titre;
           const coach = _nomCoachBloc(b.encadrant_id);
-          cellCoach += (k > 0 ? '<br>' : '') + (coach ? escapeHtml(coach) : '—');
+          const intensite = _libelleIntensite(b.intensite);
+          const axe2 = _libelleSlugAxe('axe_2_types_unites', b.etiquette_axe2);
+          const axe3 = _libelleSlugAxe('axe_3_composants_echauffement', b.etiquette_axe3);
+          const resumeAxe4 = _resumeAxe4(b.contenu_pedagogique_axe4);
+
+          html +=
+            '<div class="seance-print__bloc">' +
+              '<div class="seance-print__bloc-titre">' +
+                emoji + ' <strong>' + escapeHtml(libType) + '</strong>' +
+                (b.titre_precision ? ' — ' + escapeHtml(b.titre_precision) : '') +
+              '</div>' +
+              '<div class="seance-print__bloc-tags">' +
+                (coach ? '<span class="seance-print__tag">👤 ' + escapeHtml(coach) + '</span>' : '') +
+                (intensite ? '<span class="seance-print__tag">💥 ' + escapeHtml(intensite) + '</span>' : '') +
+                (axe2 ? '<span class="seance-print__tag">🏷 ' + escapeHtml(axe2) + '</span>' : '') +
+                (axe3 ? '<span class="seance-print__tag">🏷 ' + escapeHtml(axe3) + '</span>' : '') +
+              '</div>' +
+              (resumeAxe4 ? '<div class="seance-print__bloc-axe4">' + resumeAxe4 + '</div>' : '') +
+              (b.notes_bloc ? '<div class="seance-print__bloc-notes">📝 ' + escapeHtml(b.notes_bloc) + '</div>' : '') +
+            '</div>';
         });
-        html +=
-          '<tr>' +
-            '<td class="seance-print__horaire">' + horaire + '</td>' +
-            '<td>' + cellBlocs + '</td>' +
-            '<td class="seance-print__duree">' + etage.dureeMax + ' min' + (parallele ? ' ∥' : '') + '</td>' +
-            '<td>' + cellCoach + '</td>' +
-          '</tr>';
+
+        html += '</div></section>';
         if (cur) cur = fin;
       });
-      html += '</tbody></table>';
     }
 
     html +=
@@ -4351,12 +4423,27 @@
    */
   async function loadStaffDisponibles() {
     try {
-      const categorie = window.momSeanceContext && window.momSeanceContext.categorie_uuid
-                        ? window.momSeanceContext.categorie_uuid
-                        : null;
-      const liste = await SupabaseHub.listStaffDisponibles(categorie);
+      // v1.11 (recette terrain) — la pioche coach exige le VRAI categorie_id
+      // (uuid), pas la chaîne factice window.momSeanceContext.categorie_uuid
+      // ('cat-m14'). On le résout depuis l'équipe active via getCategorieEquipe
+      // (pont equipes -> ententes.categorie_id). Échec de résolution -> on
+      // retombe sur null = tout le staff du club (la RPC sql_109 l'accepte).
+      let categorieId = null;
+      try {
+        const eqId = _equipeActive();
+        if (eqId && typeof SupabaseHub.getCategorieEquipe === 'function') {
+          const catRes = await SupabaseHub.getCategorieEquipe(eqId);
+          if (catRes && catRes.ok && catRes.data && catRes.data.categorie_id) {
+            categorieId = catRes.data.categorie_id;
+          }
+        }
+      } catch (eCat) {
+        console.warn('SeanceEditor: résolution catégorie pour pioche coach KO, repli sur tout le staff', eCat);
+      }
+
+      const liste = await SupabaseHub.listStaffDisponibles(categorieId);
       State.staffDisponible = Array.isArray(liste) ? liste : [];
-      console.log('SeanceEditor: staff disponible chargé (' + State.staffDisponible.length + ' personnes assignables par bloc)');
+      console.log('SeanceEditor: staff disponible chargé (' + State.staffDisponible.length + ' personnes assignables par bloc, categorie=' + (categorieId || 'tout le staff') + ')');
     } catch (e) {
       console.warn('SeanceEditor: loadStaffDisponibles() KO, sélecteur coach vide', e);
       State.staffDisponible = [];
@@ -4481,7 +4568,7 @@
     });
 
     console.log(
-      '%c🏉 Seance Editor v1.10 (blocs parallèles + coach + PDF) chargé',
+      '%c🏉 Seance Editor v1.12 (blocs parallèles + coach + PDF enrichi) chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         seances: State.seances.length,
