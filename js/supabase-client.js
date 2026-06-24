@@ -18,7 +18,18 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.59 — juin 2026
+ * Version : 1.61 — juin 2026
+ *   v1.61 : PLANIF-ECRITURE-POLE (front, temps 2). 1 ajout ADDITIF :
+ *           wrapper mesPolesResponsable() (RPC mes_poles_responsable
+ *           préexistante) exposant les pôles dont le connecté est
+ *           responsable DÉSIGNÉ (principal|co-responsable). Sert au front
+ *           de planification à calculer peutEditer sur les trames de pôle
+ *           (adossé à la RLS d'écriture sql_106). DISTINCT de
+ *           mesPolesAutorises (qui remonte les pôles dérivés des catégories
+ *           d'encadrement). Aucun wrapper existant touché. node --check OK.
+ *           console.log boot v1.60 → v1.61.
+ *           (NB : le déployé v1.60 affichait encore l'entête « 1.59 » —
+ *           seul le boot avait été bumpé pt 104 ; entête réalignée ici.)
  *   v1.59 : SOCLE MULTI-CATÉGORIES (UX-MULTI-CATEGORIES Lot 2). 3 ajouts
  *           ADDITIFS pour le sélecteur de catégorie active des écrans
  *           catégorie-portés (un encadrant multi-catégories comme Lohann
@@ -6335,6 +6346,30 @@
     },
 
     /**
+     * Pôles dont la personne connectée est RESPONSABLE DÉSIGNÉ (responsable
+     * principal OU co-responsable), via la RPC mes_poles_responsable()
+     * (préexistante : qui_suis_je → personne_id confronté à
+     * poles.responsable_principal_id / co_responsable_id). DISTINCT de
+     * mesPolesAutorises() : ne remonte PAS les pôles dérivés des catégories
+     * d'encadrement, seulement la responsabilité désignée (critère (a)).
+     * Adossé à la RLS d'écriture pôle de planification_blocs (sql_106) :
+     * c'est le périmètre d'ÉDITION réel d'une trame de pôle pour un
+     * non-admin/bureau. La RLS reste l'arbitre ; ce wrapper sert au front
+     * à refléter le droit (jamais à l'accorder).
+     *
+     * @returns {Promise<Array>} [{pole_id}] ; [] si erreur / hors session
+     *   (dégradation honnête).
+     */
+    async mesPolesResponsable() {
+      const { data, error } = await client.rpc('mes_poles_responsable');
+      if (error) {
+        console.error('MOM Hub: mesPolesResponsable() / mes_poles_responsable', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
      * Référentiel des axes de planification (sql/73). Lecture ouverte
      * aux authentifiés (RLS planification_axes_select). Renvoie les
      * axes actifs, communs (categorie_id NULL) en v1, triés par type
@@ -6780,7 +6815,7 @@
   }
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.60 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.61 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
