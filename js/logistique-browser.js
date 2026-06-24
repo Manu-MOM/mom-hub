@@ -278,8 +278,24 @@
           '</option>';
       });
     sel.innerHTML = html;
-    // Au changement de catégorie → recharger la pioche responsable filtrée
-    sel.onchange = function () { loadResponsables(sel.value || null); };
+    // Synchro inter-écrans : pré-sélectionne la catégorie active
+    // mémorisée (clé partagée mom_hub.categorie_active via le socle)
+    // si elle figure dans la liste, et mémorise tout nouveau choix.
+    try {
+      if (typeof SupabaseHub.lireCategorieActiveMemorisee === 'function') {
+        const memo = SupabaseHub.lireCategorieActiveMemorisee();
+        if (memo && state.categories.some(function (c) { return c.id === memo; })) {
+          sel.value = memo;
+        }
+      }
+    } catch (e) { /* honnête : pas de synchro, choix manuel */ }
+    // Au changement de catégorie → mémoriser + recharger la pioche responsable
+    sel.onchange = function () {
+      if (sel.value && typeof SupabaseHub.memoriserCategorieActive === 'function') {
+        SupabaseHub.memoriserCategorieActive(sel.value);
+      }
+      loadResponsables(sel.value || null);
+    };
     // Premier chargement responsable
     loadResponsables(sel.value || null);
   }
