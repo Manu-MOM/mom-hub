@@ -38,7 +38,10 @@
     cibleLabel: '',
     peutEditer: false,   // droit d'écriture sur la cible courante
     axes: { collectif: [], physique: [], poste: [] },
-    blocs: []            // blocs chargés (objets DB) + brouillons locaux
+    blocs: [],           // blocs chargés (objets DB) + brouillons locaux
+    // Multi-catégories (portée catégorie d'un encadrant N>1) : liste des
+    // catégories de son périmètre, pour le sélecteur intégré au header.
+    categoriesPerimetre: []
   };
 
   // ---- Helpers ----
@@ -123,10 +126,28 @@
     var lecture = State.peutEditer ? '' :
       '<p class="pa-readonly">Lecture seule — vous n\'avez pas les droits d\'édition sur cette ' +
       (State.portee === 'pole' ? 'trame de pôle.' : 'catégorie.') + '</p>';
+    // Sélecteur de catégorie : uniquement en portée catégorie ET si
+    // l'encadrant a > 1 catégorie dans son périmètre (multi-cat). En
+    // portée pôle ou mono-catégorie → pas de sélecteur (UX inchangée).
+    var selecteur = '';
+    if (State.portee === 'categorie'
+        && Array.isArray(State.categoriesPerimetre)
+        && State.categoriesPerimetre.length > 1) {
+      var opts = State.categoriesPerimetre.map(function (c) {
+        var sel = (c.id === State.cibleId) ? ' selected' : '';
+        return '<option value="' + esc(c.id) + '"' + sel + '>' +
+          esc(c.libelle_court || c.code || c.id) + '</option>';
+      }).join('');
+      selecteur = '<p class="pa-sub" style="margin-top:8px;">' +
+        '<label for="pa-cat-selecteur" style="font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink-mute); margin-right:8px;">Catégorie :</label>' +
+        '<select id="pa-cat-selecteur" style="padding:5px 9px; border:1px solid var(--line); border-radius:6px; background:var(--paper-warm); color:var(--ink); font-family:inherit; font-size:12px; cursor:pointer;">' +
+        opts + '</select></p>';
+    }
     return '<header class="pa-head">' +
       '<h1>Planification annuelle</h1>' +
       '<p class="pa-sub">' + esc(pp) + ' : <strong>' + esc(State.cibleLabel) + '</strong>' +
       ' · Saison ' + esc(s.libelle || s.code || '') + '</p>' +
+      selecteur +
       lecture +
       '</header>';
   }
@@ -271,6 +292,20 @@
   // ---- Évènements (délégation) ----
   function bindEvents() {
     var root = State.mount;
+
+    // Sélecteur de catégorie (multi-cat) : mémorise + rebascule la cible.
+    var selCat = root.querySelector('#pa-cat-selecteur');
+    if (selCat) {
+      selCat.addEventListener('change', function () {
+        var nouvelle = selCat.value;
+        if (!nouvelle || nouvelle === State.cibleId) return;
+        var h = hub();
+        if (h && typeof h.memoriserCategorieActive === 'function') {
+          h.memoriserCategorieActive(nouvelle);
+        }
+        demarrerCategorie(nouvelle, State.peutEditer);
+      });
+    }
 
     // Champs simples (input/textarea texte + dates + checkbox intercale)
     root.querySelectorAll('[data-f]').forEach(function (el) {
@@ -438,6 +473,39 @@
     if (pole) { return demarrerPole(pole); }
     if (cat) { return demarrerCategorie(cat, true); }
 
+    // Résolution du périmètre via le socle (lève l'angle mort rows[0] :
+    // un encadrant multi-catégories n'est plus figé sur la 1re).
+    //   - transverse (admin/bureau) → écran de choix pôles + catégories
+    //     INCHANGÉ (dualité préservée, décision Manu) ;
+    //   - encadrant : démarre sur la catégorie active mémorisée (sinon
+    //     1re) ; le sélecteur intégré (render) permet de basculer si N>1 ;
+    //   - aucun droit → message indéterminé.
+    var h = hub();
+    if (h && typeof h.resoudrePerimetreCategories === 'function') {
+      return Promise.resolve(h.resoudrePerimetreCategories())
+        .then(function (perimetre) {
+          if (!perimetre || perimetre.vide
+              || !Array.isArray(perimetre.categories)
+              || perimetre.categories.length === 0) {
+            return messageIndetermine();
+          }
+          // Admin/bureau : on garde l'écran de choix (pôles + catégories).
+          if (perimetre.transverse) {
+            return ecranChoixTransverse();
+          }
+          // Encadrant : mémorise la liste pour le sélecteur, démarre sur
+          // la catégorie active (mémorisée via le socle, sinon 1re).
+          State.categoriesPerimetre = perimetre.categories;
+          var active = perimetre.active || perimetre.categories[0].id;
+          return demarrerCategorie(active, true);
+        })
+        .catch(function (e) {
+          if (global.console) global.console.error('planification boot', e);
+          return messageIndetermine();
+        });
+    }
+
+    // Repli : socle ancien → ancien chemin mes_categories_autorisees.
     Promise.resolve(hub().mesCategoriesAutorisees())
       .then(function (rows) {
         if (!Array.isArray(rows) || rows.length === 0) { return messageIndetermine(); }
