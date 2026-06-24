@@ -18,13 +18,15 @@
  * forme générique. Évènements n'est PAS recâblé (son sélecteur reste
  * inline) — ce module est le standard pour les écrans suivants.
  *
- * RÈGLE D'AFFICHAGE (cohérente Évènements) :
- *   - périmètre non résolu / vide / transverse (admin/bureau) → PAS
- *     de sélecteur (l'écran reste centré sur la catégorie/équipe
- *     par défaut, dégradation honnête).
+ * RÈGLE D'AFFICHAGE :
+ *   - périmètre non résolu / vide → PAS de sélecteur (dégradation
+ *     honnête, l'écran reste sur son repli).
  *   - 1 seule catégorie (encadrant mono-cat) → PAS de sélecteur
  *     (UX inchangée).
- *   - > 1 catégorie → sélecteur monté.
+ *   - > 1 catégorie OU transverse (admin/bureau, toutes catégories
+ *     de tous les pôles) → sélecteur monté. En transverse, le défaut
+ *     d'ouverture (sans choix mémorisé) vise M16 si elle existe,
+ *     sinon M14, sinon le défaut socle.
  *
  * USAGE depuis un écran :
  *
@@ -65,6 +67,38 @@
       return null;
     }
     if (!perimetre) return null;
+
+    // Défaut transverse (admin/bureau) : à la 1re ouverture sans choix
+    // mémorisé, le socle a posé la 1re catégorie (ordre_tri). On préfère
+    // atterrir sur M16 (catégorie de terrain de l'admin) si elle existe,
+    // sinon M14, sinon on garde le défaut socle. Le choix mémorisé prime
+    // toujours (le socle l'a déjà respecté avant d'arriver ici) : on ne
+    // ré-applique le défaut QUE s'il n'y a aucune mémorisation valide.
+    // Aucun UUID en dur (match par libellé) → s'allume tout seul quand
+    // M16 apparaît en base, repli honnête tant qu'elle n'existe pas.
+    if (perimetre.transverse && Array.isArray(perimetre.categories)) {
+      let memorisee = null;
+      if (typeof SupabaseHub.lireCategorieActiveMemorisee === 'function') {
+        try { memorisee = SupabaseHub.lireCategorieActiveMemorisee(); } catch (e) { memorisee = null; }
+      }
+      const memoriseeValide = memorisee
+        && perimetre.categories.some(function (c) { return c.id === memorisee; });
+      if (memoriseeValide) {
+        // Le choix mémorisé prime toujours (auto-cohérent, sans dépendre
+        // de l'ordre de calcul du socle).
+        perimetre.active = memorisee;
+      } else {
+        const parLibelle = function (motif) {
+          return perimetre.categories.find(function (c) {
+            const lib = String(c.libelle_court || c.code || '').toUpperCase();
+            return lib === motif;
+          });
+        };
+        const defaut = parLibelle('M16') || parLibelle('M14') || null;
+        if (defaut) perimetre.active = defaut.id;
+      }
+    }
+
     return { perimetre: perimetre, active: perimetre.active };
   }
 
@@ -74,7 +108,8 @@
    */
   function libelleActif(perimetre) {
     if (!perimetre || !Array.isArray(perimetre.categories)) return null;
-    if (perimetre.transverse) return null;
+    // En transverse (admin/bureau), le titre suit désormais la catégorie
+    // active choisie (le sélecteur est monté pour ce profil).
     const c = perimetre.categories.find(function (x) { return x.id === perimetre.active; });
     return c ? (c.libelle_court || c.code || null) : null;
   }
@@ -96,8 +131,8 @@
   }
 
   /**
-   * Monte le sélecteur SI le périmètre compte > 1 catégorie.
-   * Mono-catégorie / transverse / non résolu → rien (UX inchangée).
+   * Monte le sélecteur SI > 1 catégorie OU transverse (admin/bureau).
+   * Mono-catégorie encadrant / non résolu / vide → rien (UX inchangée).
    *
    * @param {Object} opts
    * @param {Object} opts.perimetre        — {categories, transverse, active, vide}
@@ -113,8 +148,10 @@
     opts = opts || {};
     const perimetre = opts.perimetre;
     if (!perimetre || !Array.isArray(perimetre.categories)) return false;
-    if (perimetre.transverse) return false;
-    if (perimetre.categories.length <= 1) return false;
+    // Monte le sélecteur si transverse (admin/bureau → toutes catégories,
+    // tous pôles) OU si l'encadrant/responsable a > 1 catégorie. Un
+    // encadrant mono-catégorie n'a pas de sélecteur (UX inchangée).
+    if (!perimetre.transverse && perimetre.categories.length <= 1) return false;
 
     const ancre = document.querySelector(opts.ancreSelector);
     if (!ancre || !ancre.parentNode) return false;
@@ -184,5 +221,5 @@
     monter: monter
   };
 
-  console.log('🏉 MOM Hub · UX Sélecteur Catégorie v1.0 chargé');
+  console.log('🏉 MOM Hub · UX Sélecteur Catégorie v1.1 chargé');
 })();
