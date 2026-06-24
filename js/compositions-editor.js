@@ -841,10 +841,17 @@
   // 1. CONSTANTES + ÉTAT
   // ============================================================
 
+  // REPLI de dégradation honnête (mode legacy) : si le périmètre de
+  // catégories est indisponible, l'équipe active retombe sur M14.
   const M14_TEAM_UUID = 'bfb83b83-83ef-4dde-b526-48ff87313044';
   const M14_CATEGORIE_ID = '312ebb88-25e8-40c5-8a37-9dd2e3927e2e'; // UUID réel catégorie M14
   const NB_TITULAIRES_XV = 15;
   const NB_REMPLACANTS = 8;
+
+  // Clé localStorage de l'équipe active de Compositions (mode legacy
+  // multi-équipes). En mode U-N3 (?evenement_equipe=) l'équipe est
+  // imposée par l'URL → cette mécanique ne s'active PAS.
+  const CLE_EQUIPE_COMPO = 'mom_hub.compos.equipe_active';
 
   const State = {
     evenements: [],
@@ -890,8 +897,156 @@
     // refléter (aucune édition en étape A).
     // ────────────────────────────────────────────────────────
     viewMode: 'liste',
-    baseJoueurs: []
+    baseJoueurs: [],
+    // Propagation multi-catégories (mode legacy uniquement — voir init)
+    perimetreCat: null,           // {categories, transverse, active, vide} | null
+    equipesCategorieActive: [],   // équipes de la catégorie active (objets)
+    equipeActive: null            // UUID de l'équipe legacy courante (repli M14)
   };
+
+  // ------------------------------------------------------------
+  // Propagation multi-catégories — équipe active (MODE LEGACY seul)
+  // ------------------------------------------------------------
+  // En mode U-N3 (?evenement_equipe=), l'équipe est imposée par
+  // l'URL et les 3 appels M14 (legacy) ne s'exécutent pas (branches
+  // gardées par State.evenementEquipeId). La propagation catégorie
+  // ne concerne donc QUE le mode legacy (sélecteur d'évènement) :
+  // les 3 appels legacy lisent _equipeActive() au lieu de M14.
+  // Point dur 1, option (b) : sélecteur d'équipe si la catégorie
+  // active a > 1 équipe ; mono-équipe (cas réel actuel) → rien.
+
+  /** UUID de l'équipe legacy courante (repli M14 honnête). */
+  function _equipeActive() {
+    return State.equipeActive || M14_TEAM_UUID;
+  }
+
+  /** true si on est en mode legacy (pas de deep-link ?evenement_equipe=). */
+  function _estModeLegacy() {
+    return !State.evenementEquipeId;
+  }
+
+  /** Équipes de la catégorie active → objets [{id,…}]. [] si indispo. */
+  async function _composResoudreEquipesCategorieActive() {
+    if (typeof SupabaseHub === 'undefined'
+        || typeof SupabaseHub.listEquipes !== 'function') {
+      return [];
+    }
+    const catId = State.perimetreCat && State.perimetreCat.active;
+    if (!catId) return [];
+    try {
+      const eqs = await SupabaseHub.listEquipes(catId);
+      return Array.isArray(eqs) ? eqs : [];
+    } catch (e) {
+      console.warn('CompositionsEditor: listEquipes indisponible.', e);
+      return [];
+    }
+  }
+
+  /** Pose State.equipeActive : mémorisée si valide, sinon 1re ; repli M14. */
+  function _composChoisirEquipeActive() {
+    const liste = State.equipesCategorieActive || [];
+    if (liste.length === 0) { State.equipeActive = M14_TEAM_UUID; return; }
+    let memorisee = null;
+    try { memorisee = localStorage.getItem(CLE_EQUIPE_COMPO) || null; } catch (e) { /* honnête */ }
+    const ok = memorisee && liste.some(function (eq) { return eq && eq.id === memorisee; });
+    State.equipeActive = ok ? memorisee : liste[0].id;
+  }
+
+  function _memoriserEquipeCompo(equipeId) {
+    if (!equipeId) return;
+    try { localStorage.setItem(CLE_EQUIPE_COMPO, String(equipeId)); } catch (e) { /* honnête */ }
+  }
+
+  /** Recharge les données legacy dépendantes de l'équipe + re-render. */
+  async function _composRechargerDonnees() {
+    await loadEvenements();
+    if (State.evenements.length > 0) {
+      State.selectedEvenementId = State.evenements[0].id;
+      await loadComposForCurrentEvent();
+      if (State.selectedCompoId) await loadCompoJoueurs();
+    } else {
+      State.selectedEvenementId = null;
+      State.compos = [];
+      State.selectedCompoId = null;
+    }
+    await loadVivier();
+    renderEventBanner();
+    renderEventSelector();
+    renderCompoTabs();
+    renderFillIndicator();
+    renderEditorArea();
+    renderEffectifPanel();
+    renderPopover();
+  }
+
+  /** Monte un sélecteur d'ÉQUIPE (mode legacy, > 1 équipe). */
+  function _monterSelecteurEquipeCompo() {
+    if (!_estModeLegacy()) return;
+    const liste = State.equipesCategorieActive || [];
+    if (liste.length <= 1) return;
+
+    const ancre = document.querySelector('.event-banner');
+    if (!ancre || !ancre.parentNode) return;
+    if (document.getElementById('compo-equipe-selecteur-wrap')) return;
+
+    const wrap = document.createElement('div');
+    wrap.id = 'compo-equipe-selecteur-wrap';
+    wrap.style.cssText = 'display:flex; align-items:center; gap:8px; margin:0 0 14px 0; ' +
+      'font-family:\'JetBrains Mono\',monospace; font-size:10px; letter-spacing:0.10em; ' +
+      'text-transform:uppercase; color:var(--ink-mute);';
+
+    const label = document.createElement('label');
+    label.setAttribute('for', 'compo-equipe-selecteur');
+    label.textContent = 'Équipe :';
+    label.style.cssText = 'flex-shrink:0;';
+
+    const select = document.createElement('select');
+    select.id = 'compo-equipe-selecteur';
+    select.style.cssText = 'padding:6px 10px; border:1px solid var(--line); border-radius:6px; ' +
+      'background:var(--paper-warm); color:var(--ink); font-family:inherit; font-size:11px; ' +
+      'letter-spacing:0.06em; cursor:pointer;';
+
+    liste.forEach(function (eq) {
+      const opt = document.createElement('option');
+      opt.value = eq.id;
+      opt.textContent = eq.libelle_court || eq.nom_officiel || eq.code || eq.id;
+      if (eq.id === State.equipeActive) opt.selected = true;
+      select.appendChild(opt);
+    });
+
+    select.addEventListener('change', async function () {
+      const nouvelle = this.value;
+      if (!nouvelle || nouvelle === State.equipeActive) return;
+      State.equipeActive = nouvelle;
+      _memoriserEquipeCompo(nouvelle);
+      select.disabled = true;
+      try {
+        await _composRechargerDonnees();
+      } catch (e) {
+        console.error('CompositionsEditor: rechargement après changement d\'équipe échoué', e);
+      } finally {
+        select.disabled = false;
+      }
+    });
+
+    wrap.appendChild(label);
+    wrap.appendChild(select);
+    ancre.parentNode.insertBefore(wrap, ancre);
+  }
+
+  function _retirerSelecteurEquipeCompo() {
+    const w = document.getElementById('compo-equipe-selecteur-wrap');
+    if (w && w.parentNode) w.parentNode.removeChild(w);
+  }
+
+  /** Au changement de CATÉGORIE (mode legacy) : re-résout + recharge. */
+  async function _composOnChangementCategorie() {
+    State.equipesCategorieActive = await _composResoudreEquipesCategorieActive();
+    _composChoisirEquipeActive();
+    _retirerSelecteurEquipeCompo();
+    _monterSelecteurEquipeCompo();
+    await _composRechargerDonnees();
+  }
 
   // ============================================================
   // 2. SÉLECTEURS DOM
@@ -5588,7 +5743,7 @@
       }] : [];
       return State.evenements;
     }
-    State.evenements = await SupabaseHub.getEvenementsAVenir(M14_TEAM_UUID, 60);
+    State.evenements = await SupabaseHub.getEvenementsAVenir(_equipeActive(), 60);
     return State.evenements;
   }
   async function loadComposForCurrentEvent() {
@@ -5636,7 +5791,7 @@
       State.selectedCompoId = base.id;
       return;
     }
-    const all = await SupabaseHub.listCompositionsByEquipe(M14_TEAM_UUID);
+    const all = await SupabaseHub.listCompositionsByEquipe(_equipeActive());
     State.compos = all.filter(c => c.evenement_id === State.selectedEvenementId);
     const compoBase = State.compos.find(c => c.type_compo === 'base');
     if (compoBase)                       State.selectedCompoId = compoBase.id;
@@ -5720,7 +5875,7 @@
       for (const j of State.vivier) State.vivierById.set(j.joueur_id, j);
       return State.vivier;
     }
-    State.vivier = await SupabaseHub.getVivierCompo(M14_TEAM_UUID);
+    State.vivier = await SupabaseHub.getVivierCompo(_equipeActive());
     State.vivierById = new Map();
     for (const j of State.vivier) State.vivierById.set(j.joueur_id, j);
     return State.vivier;
@@ -5755,6 +5910,24 @@
       const raw = params.get('evenement_equipe');
       if (raw && raw.trim()) State.evenementEquipeId = raw.trim();
     } catch (_) { /* SSR ou contexte sans window — laisser null */ }
+
+    // Multi-cat — MODE LEGACY UNIQUEMENT : en U-N3 l'équipe est imposée
+    // par l'URL, on ne propage rien. En legacy, on résout la catégorie
+    // active + son équipe AVANT les chargements (les 3 appels legacy
+    // liront _equipeActive()). Repli M14 si socle absent.
+    if (_estModeLegacy()) {
+      if (typeof SupabaseHub !== 'undefined'
+          && typeof SupabaseHub.resoudrePerimetreCategories === 'function') {
+        try {
+          State.perimetreCat = await SupabaseHub.resoudrePerimetreCategories();
+        } catch (e) {
+          console.warn('CompositionsEditor: périmètre catégories indisponible, repli M14.', e);
+          State.perimetreCat = null;
+        }
+      }
+      State.equipesCategorieActive = await _composResoudreEquipesCategorieActive();
+      _composChoisirEquipeActive(); // pose State.equipeActive (repli M14)
+    }
 
     await Promise.all([ loadEvenements(), loadVivier(), loadPostes() ]);
 
@@ -5792,6 +5965,28 @@
     bindViewTabs(); // v3.15 — câble les onglets Liste/Terrain (statiques, 1 fois)
     bindExportImage(); // v3.23 — câble le bouton « Image » (export réseaux sociaux)
     bindFullscreen(); // v3.65 — câble le mode plein écran (immersif, tous onglets)
+
+    // Sélecteurs multi-cat — MODE LEGACY UNIQUEMENT (en U-N3 l'équipe
+    // est imposée par l'URL). Catégorie (helper UI, si > 1 cat) +
+    // équipe (inline, si la catégorie active a > 1 équipe). Mono-cat
+    // mono-équipe (cas réel actuel) → aucun sélecteur, UX inchangée.
+    if (_estModeLegacy()) {
+      if (typeof UXSelecteurCategorie !== 'undefined'
+          && typeof UXSelecteurCategorie.monter === 'function'
+          && State.perimetreCat) {
+        UXSelecteurCategorie.monter({
+          perimetre: State.perimetreCat,
+          ancreSelector: '.event-banner',
+          titreDocument: 'MOM Hub · Compositions',
+          wrapId: 'compo-cat-selecteur-wrap',
+          selectId: 'compo-cat-selecteur',
+          onChange: async function () {
+            await _composOnChangementCategorie();
+          }
+        });
+      }
+      _monterSelecteurEquipeCompo();
+    }
 
     // v3.25 — Deep-link de mode depuis la fiche évènement : ?vue=terrain
     // ouvre directement la vue Terrain ; ?vue=reseaux ouvre la modale
