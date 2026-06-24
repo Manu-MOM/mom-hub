@@ -18,7 +18,25 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.58 — juin 2026
+ * Version : 1.59 — juin 2026
+ *   v1.59 : SOCLE MULTI-CATÉGORIES (UX-MULTI-CATEGORIES Lot 2). 3 ajouts
+ *           ADDITIFS pour le sélecteur de catégorie active des écrans
+ *           catégorie-portés (un encadrant multi-catégories comme Lohann
+ *           ne voyait que M14, les écrans étant verrouillés sur
+ *           M14_TEAM_UUID en dur) :
+ *           - resoudrePerimetreCategories() : résout le périmètre via la
+ *             RPC mes_categories_autorisees() (forme sondée à la source :
+ *             (categorie_id uuid, est_transverse boolean)), dédoublonne
+ *             par id (doublon pôle+fonction_staff possible), résout les
+ *             libellés via getCategories(), trie par ordre_tri, calcule
+ *             la catégorie active (mémorisée ou 1re). admin/bureau
+ *             (est_transverse) → toutes les catégories. Dégradation
+ *             honnête : aucun droit / référentiel KO → {vide:true}.
+ *           - lireCategorieActiveMemorisee() / memoriserCategorieActive()
+ *             : persistance localStorage (clé partagée mom_hub.categorie_
+ *             active), repli silencieux si localStorage indisponible.
+ *           Aucun wrapper existant touché ; node --check OK ; additivité
+ *           prouvée Python. ZÉRO SQL (la RPC B5 existe déjà).
  *   v1.58 : PASTILLE TOPBAR — initiales dynamiques (bug (a) recette Vivien).
  *           La pastille `.avatar` était figée « EJ » EN DUR dans le HTML des
  *           21 pages -> tout utilisateur (ex. Vivien Rulfo) voyait « EJ »
@@ -6490,6 +6508,126 @@
         return null;
       }
       return (typeof data === 'string' && data) ? data : null;
+    },
+
+    // ============================================================
+    // SOCLE MULTI-CATÉGORIES (v1.59) — UX-MULTI-CATEGORIES Lot 2
+    // ============================================================
+    // Résout, pour le compte connecté, le PÉRIMÈTRE de catégories sur
+    // lequel il a le droit d'agir, prêt à alimenter un sélecteur de
+    // catégorie active dans les écrans catégorie-portés (Évènements,
+    // Séance, Compositions, Joueurs, Dashboard, Pilotage).
+    //
+    // Pourquoi ce helper central : les écrans étaient verrouillés sur
+    // une équipe M14 EN DUR (M14_TEAM_UUID) → un encadrant multi-
+    // catégories (ex. Lohann : EDR + SENIORS = 8 catégories) ne voyait
+    // que M14. La RPC mes_categories_autorisees() renvoyait DÉJÀ le bon
+    // périmètre ; aucun écran ne l'interrogeait. Ce socle factorise la
+    // résolution une seule fois (DRY) pour les 6 écrans à recâbler.
+    //
+    // Forme de retour de mes_categories_autorisees() (sondée à la source,
+    // pg_get_functiondef) : RETURNS TABLE(categorie_id uuid, est_transverse
+    // boolean). Donc :
+    //   - admin/bureau → 1 ligne {categorie_id:null, est_transverse:true}
+    //     = laissez-passer transverse → on charge TOUTES les catégories ;
+    //   - encadrant / responsable de pôle → N lignes {categorie_id:<uuid>,
+    //     est_transverse:false}, DOUBLONS possibles (Lohann : SR-M présent
+    //     via pôle SENIORS ET via fonction_staff) → on dédoublonne par id ;
+    //   - aucun droit → [] → périmètre vide (dégradation honnête côté UI).
+    //
+    // Les libellés (« M14 ») viennent de getCategories() (lecture directe
+    // de la table, policy SELECT ouverte à tout authentifié) — PAS d'UUID
+    // affiché à l'écran.
+    //
+    // Catégorie active : mémorisée dans localStorage (clé partagée entre
+    // écrans, convention mom_hub.*). Au boot, si la valeur mémorisée est
+    // hors du périmètre courant (périmètre changé, autre compte), on
+    // retombe sur la 1re catégorie par ordre_tri. Persistance via
+    // memoriserCategorieActive().
+    //
+    // @returns {Promise<{
+    //   categories: Array<{id, code, libelle_court, ordre_tri}>,  // dédoublonné, trié
+    //   transverse: boolean,        // true = admin/bureau (toutes catégories)
+    //   active: string|null,        // id de la catégorie active (ou null si périmètre vide)
+    //   vide: boolean               // true = aucun droit (UI : message honnête)
+    // }>}
+    async resoudrePerimetreCategories() {
+      const VIDE = { categories: [], transverse: false, active: null, vide: true };
+      let rows = [];
+      try {
+        rows = await this.mesCategoriesAutorisees();
+      } catch (e) {
+        console.error('MOM Hub: resoudrePerimetreCategories() / mesCategoriesAutorisees', e);
+        return VIDE;
+      }
+      if (!Array.isArray(rows) || rows.length === 0) return VIDE;
+
+      const transverse = rows.some(r => r && r.est_transverse === true);
+
+      // Référentiel des catégories (libellés). Lecture directe de table,
+      // déjà exposée par getCategories() (tri ordre_tri). Échec → on
+      // dégrade honnêtement sur le périmètre vide plutôt que d'afficher
+      // des UUID nus.
+      let toutes = [];
+      try {
+        toutes = await this.getCategories();
+      } catch (e) {
+        console.error('MOM Hub: resoudrePerimetreCategories() / getCategories', e);
+        return VIDE;
+      }
+      if (!Array.isArray(toutes) || toutes.length === 0) return VIDE;
+
+      let categories;
+      if (transverse) {
+        // admin/bureau : toutes les catégories.
+        categories = toutes.slice();
+      } else {
+        // encadrant / responsable de pôle : on garde les categorie_id du
+        // périmètre, DÉDOUBLONNÉS, puis on résout leurs libellés.
+        const idsPerimetre = new Set(
+          rows.map(r => r && r.categorie_id).filter(Boolean)
+        );
+        categories = toutes.filter(c => idsPerimetre.has(c.id));
+      }
+
+      if (categories.length === 0) return VIDE;
+
+      // Tri stable par ordre_tri (puis libellé), cohérent list_categories.
+      categories.sort((a, b) => {
+        const oa = (a.ordre_tri == null) ? 9999 : a.ordre_tri;
+        const ob = (b.ordre_tri == null) ? 9999 : b.ordre_tri;
+        if (oa !== ob) return oa - ob;
+        return String(a.libelle_court || a.code || '').localeCompare(String(b.libelle_court || b.code || ''));
+      });
+
+      // Catégorie active : mémorisée si elle est dans le périmètre,
+      // sinon la 1re par ordre_tri.
+      const memorisee = this.lireCategorieActiveMemorisee();
+      const active = (memorisee && categories.some(c => c.id === memorisee))
+        ? memorisee
+        : categories[0].id;
+
+      return { categories, transverse, active, vide: false };
+    },
+
+    // Clé localStorage partagée entre écrans pour la catégorie active.
+    _CLE_CATEGORIE_ACTIVE: 'mom_hub.categorie_active',
+
+    lireCategorieActiveMemorisee() {
+      try {
+        return localStorage.getItem(this._CLE_CATEGORIE_ACTIVE) || null;
+      } catch (e) {
+        return null; // localStorage indisponible → pas de mémoire, repli 1re catégorie
+      }
+    },
+
+    memoriserCategorieActive(categorieId) {
+      if (!categorieId) return;
+      try {
+        localStorage.setItem(this._CLE_CATEGORIE_ACTIVE, String(categorieId));
+      } catch (e) {
+        /* honnête : pas de persistance, le choix vaut pour la session courante */
+      }
     }
 
   };
@@ -6634,7 +6772,7 @@
   }
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.58 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.59 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
