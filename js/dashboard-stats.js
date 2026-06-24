@@ -204,9 +204,85 @@
   // ============================================================
 
   // UUID de l'équipe pilote M14 (résolu en base le 13/05/2026).
-  // Plus tard : paramétrer par rôle utilisateur quand l'auth multi-équipe
-  // sera en place.
+  // Conservé comme REPLI de dégradation honnête : si le périmètre de
+  // catégories est indisponible (socle ancien, droits vides, aucune
+  // équipe), la carte 3 retombe sur l'équipe M14 — comportement d'origine.
   const M14_TEAM_UUID = 'bfb83b83-83ef-4dde-b526-48ff87313044';
+
+  // ------------------------------------------------------------
+  // Périmètre catégorie active → équipes (propagation multi-cat)
+  // ------------------------------------------------------------
+  // Le Dashboard ne PORTE pas de sélecteur de catégorie (c'est un
+  // tableau de bord, pas un écran de travail catégorie-porté) : il
+  // REFLÈTE la catégorie active mémorisée (clé localStorage partagée
+  // mom_hub.categorie_active, alimentée par les écrans qui ont le
+  // sélecteur). Cohérence inter-écrans gratuite.
+  //
+  // La carte 3 (« prochain événement ») est un SINGLETON temporel :
+  // l'agrégation de toutes les équipes de la catégorie active a un
+  // sens ici (≠ compo/séance qui sont par équipe). On garde le
+  // prochain événement le plus proche dans le futur, toutes équipes
+  // de la catégorie active confondues.
+  //
+  // Garde-fou non-régression : catégorie mono-équipe (cas réel
+  // actuel : M14 = 1 équipe) → 1 appel → résultat identique à avant.
+  async function _dashResoudreEquipesActives() {
+    // Socle absent / ancien → repli M14 (dégradation honnête).
+    if (typeof SupabaseHub === 'undefined'
+        || typeof SupabaseHub.resoudrePerimetreCategories !== 'function'
+        || typeof SupabaseHub.listEquipes !== 'function') {
+      return [M14_TEAM_UUID];
+    }
+    let perimetre;
+    try {
+      perimetre = await SupabaseHub.resoudrePerimetreCategories();
+    } catch (e) {
+      console.warn('MOM Hub Dashboard: périmètre catégories indisponible, repli M14.', e);
+      return [M14_TEAM_UUID];
+    }
+    // Aucun droit / pas de catégorie active → repli M14.
+    if (!perimetre || perimetre.vide || !perimetre.active) {
+      return [M14_TEAM_UUID];
+    }
+    let equipes;
+    try {
+      equipes = await SupabaseHub.listEquipes(perimetre.active);
+    } catch (e) {
+      console.warn('MOM Hub Dashboard: listEquipes indisponible, repli M14.', e);
+      return [M14_TEAM_UUID];
+    }
+    const ids = (Array.isArray(equipes) ? equipes : [])
+      .map(function (eq) { return eq && eq.id; })
+      .filter(Boolean);
+    // Catégorie active sans équipe en base → repli M14 (jamais de
+    // carte 3 muette par construction).
+    return ids.length > 0 ? ids : [M14_TEAM_UUID];
+  }
+
+  // Prochain événement parmi N équipes de la catégorie active :
+  // 1 appel getProchainEvenementParEquipe par équipe → on garde le
+  // plus proche (date_debut min). N=1 → strictement équivalent à
+  // l'appel unique d'origine (garde-fou mono-catégorie).
+  async function _dashProchainEvtCategorieActive() {
+    const equipes = await _dashResoudreEquipesActives();
+    const listes = await Promise.all(
+      equipes.map(function (eqId) {
+        return SupabaseHub.getProchainEvenementParEquipe(eqId)
+          .catch(function () { return null; });
+      })
+    );
+    var meilleur = null;
+    for (var i = 0; i < listes.length; i++) {
+      var evt = listes[i];
+      if (!evt || !evt.date_debut) continue;
+      if (meilleur === null) { meilleur = evt; continue; }
+      // Plus proche dans le temps = date_debut la plus petite.
+      if (new Date(evt.date_debut) < new Date(meilleur.date_debut)) {
+        meilleur = evt;
+      }
+    }
+    return meilleur;
+  }
 
   // ============================================================
   // 3. PEUPLEMENT IMMÉDIAT (sans attendre Supabase)
@@ -243,7 +319,7 @@
         SupabaseHub.countPersonnesAffiliationExpiringWithin90Days(),
         SupabaseHub.getLastOvalESyncDate(),
         SupabaseHub.client.rpc('count_equipes_actives').then(function (r) { return r.data; }).catch(function () { return null; }),
-        SupabaseHub.getProchainEvenementParEquipe(M14_TEAM_UUID)
+        _dashProchainEvtCategorieActive()
       ]);
 
       const dashboardStats  = results[0];
