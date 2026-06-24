@@ -18,7 +18,22 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.62 — juin 2026
+ * Version : 1.63 — juin 2026
+ *   v1.63 : SEANCE-BLOCS-PARALLELES (retours terrain). Migration sql_108
+ *           ayant doté seances_blocs de `voie` (smallint, 0=pleine largeur,
+ *           1..N=couloirs simultanés) et `encadrant_id` (FK personnes,
+ *           coach par bloc), 3 retouches ADDITIVES aux wrappers blocs :
+ *           (a) addBlocToSeance : `voie` + `encadrant_id` ajoutés à
+ *               optionalKeys (insérés seulement si fournis ; défaut DB
+ *               voie=0 / encadrant_id=null sinon).
+ *           (b) updateBloc : `voie` + `encadrant_id` ajoutés à allowedKeys.
+ *           (c) reorderBlocs : INCHANGÉ fonctionnellement — la danse 2
+ *               passes ne touche QUE `ordre`, jamais `voie`, donc
+ *               l'unicité élargie (seance_id, ordre, voie) est respectée.
+ *               Seul un commentaire de garde est ajouté (le parallélisme
+ *               se pilote via updateBloc({ordre,voie}), pas via reorderBlocs).
+ *           Aucune signature existante cassée. node --check OK.
+ *           console.log boot v1.62 → v1.63.
  *   v1.62 : ADMIN-RESPONSABLE-POLE (pt 106). 1 ajout ADDITIF :
  *           wrapper definirResponsablesPole(poleId, principalId, coId)
  *           adossé à la RPC SECURITY DEFINER definir_responsables_pole
@@ -3700,7 +3715,9 @@
         'etiquette_axe2', 'etiquette_axe3',
         'comportements_attendus', 'organisation_spatio_temporelle',
         'groupes_jsonb', 'materiel_jsonb', 'contenu_pedagogique_axe4',
-        'notes_bloc'
+        'notes_bloc',
+        // v1.63 — blocs parallèles + coach par bloc (sql_108)
+        'voie', 'encadrant_id'
       ];
       for (const k of optionalKeys) {
         if (params[k] !== undefined) payload[k] = params[k];
@@ -3732,7 +3749,9 @@
         'etiquette_axe2', 'etiquette_axe3',
         'comportements_attendus', 'organisation_spatio_temporelle',
         'groupes_jsonb', 'materiel_jsonb', 'contenu_pedagogique_axe4',
-        'notes_bloc'
+        'notes_bloc',
+        // v1.63 — blocs parallèles + coach par bloc (sql_108)
+        'voie', 'encadrant_id'
       ];
       const cleanPatch = {};
       for (const k of allowedKeys) {
@@ -3792,6 +3811,13 @@
      * ⚠️ Limite V1 : pas atomique. Si la passe 2 échoue, certains blocs
      * restent avec un ordre négatif → état incohérent jusqu'au prochain
      * appel réussi. À terme : RPC SQL transactionnelle (dette technique).
+     *
+     * v1.63 — blocs parallèles : cette fonction ne touche QUE `ordre`,
+     * jamais `voie`. L'unicité élargie (seance_id, ordre, voie) est donc
+     * respectée même pendant la passe négative (deux blocs au même ordre
+     * négatif mais en voies distinctes restent uniques). Le pilotage du
+     * parallélisme (dédoubler un étage, déplacer un bloc vers une voie)
+     * passe par updateBloc({ ordre, voie }), PAS par reorderBlocs.
      *
      * @param {string} seanceId
      * @param {string[]} blocIdsInOrder Tableau d'UUIDs dans l'ordre souhaité
@@ -6861,7 +6887,7 @@
   }
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.62 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.63 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
