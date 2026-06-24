@@ -178,13 +178,15 @@
 
       var M14_ID = '312ebb88-25e8-40c5-8a37-9dd2e3927e2e';
 
-      // pt 63/64 — D-PILOT-CAT-1 + cas transverse. La catégorie vient de
-      // mes_categories_autorisees() (RPC B5) qui renvoie soit :
-      //   - referent mono-catégorie : [{categorie_id:<uuid>, est_transverse:false}]
-      //     → pilotage DIRECT, pas de sélecteur ;
-      //   - compte transverse (admin/bureau) : [{categorie_id:null, est_transverse:true}]
-      //     → SÉLECTEUR de catégories (toutes actives), pré-réglé sur M14 ;
-      //   - aucun droit : [] → message « indéterminé ».
+      // pt 63/64 + multi-cat — La catégorie pilotée vient du socle
+      // resoudrePerimetreCategories() (v1.59+), qui gère :
+      //   - encadrant mono-catégorie → pilotage DIRECT, pas de sélecteur ;
+      //   - encadrant MULTI-catégories (N>1) → SÉLECTEUR intégré,
+      //     pré-réglé sur la catégorie active mémorisée (cohérence
+      //     inter-écrans) — angle mort rows[0] levé ;
+      //   - compte transverse (admin/bureau) → SÉLECTEUR de toutes
+      //     les catégories actives, pré-réglé sur active ;
+      //   - aucun droit → message « indéterminé ».
       // Override ?categorie=<uuid> = court-circuit (debug / lien direct).
       var params = new URLSearchParams(window.location.search);
       var override = params.get('categorie');
@@ -224,7 +226,15 @@
           zone.innerHTML = '<p class="ss-load">Chargement du pilotage de saison…</p>';
           StatsSaison.renderPilotageCategorie(catId, zone);
         }
-        sel.addEventListener('change', function () { peindre(this.value); });
+        sel.addEventListener('change', function () {
+          // Mémorise le choix → cohérence inter-écrans (clé partagée
+          // mom_hub.categorie_active via le socle).
+          if (typeof SupabaseHub !== 'undefined'
+              && typeof SupabaseHub.memoriserCategorieActive === 'function') {
+            SupabaseHub.memoriserCategorieActive(this.value);
+          }
+          peindre(this.value);
+        });
         peindre(catParDefaut);
       }
 
@@ -234,53 +244,49 @@
         return;
       }
 
-      Promise.resolve(SupabaseHub.mesCategoriesAutorisees())
-        .then(function (rows) {
-          if (!Array.isArray(rows) || rows.length === 0) {
+      // Résolution du périmètre via le socle (v1.59+) :
+      // resoudrePerimetreCategories() dédoublonne, résout les libellés
+      // et calcule la catégorie active mémorisée. Gère NATIVEMENT le
+      // cas encadrant MULTI-catégories (N>1, est_transverse=false) —
+      // que l'ancienne logique rows[0] ignorait (angle mort levé).
+      //   - vide        → message indéterminé ;
+      //   - 1 catégorie → pilotage direct, pas de sélecteur ;
+      //   - > 1 cat ou transverse → sélecteur, pré-réglé sur active.
+      // Repli honnête si le socle est absent/ancien : M14 direct.
+      if (typeof SupabaseHub === 'undefined'
+          || typeof SupabaseHub.resoudrePerimetreCategories !== 'function') {
+        StatsSaison.renderPilotageCategorie(M14_ID, mount);
+        return;
+      }
+
+      Promise.resolve(SupabaseHub.resoudrePerimetreCategories())
+        .then(function (perimetre) {
+          if (!perimetre || perimetre.vide
+              || !Array.isArray(perimetre.categories)
+              || perimetre.categories.length === 0) {
             messageIndetermine();
             return;
           }
-          var r = rows[0];
 
-          // Referent mono-catégorie : id résolu → pilotage direct.
-          var catId = r.categorie_id || r.id || r.categorie || null;
-          if (catId && !r.est_transverse) {
-            return StatsSaison.renderPilotageCategorie(catId, mount);
+          var cats = perimetre.categories;
+          var active = perimetre.active || cats[0].id;
+
+          // Mono-catégorie (encadrant d'une seule catégorie) :
+          // pilotage direct, aucun sélecteur (UX inchangée).
+          if (!perimetre.transverse && cats.length === 1) {
+            StatsSaison.renderPilotageCategorie(cats[0].id, mount);
+            return;
           }
 
-          // Compte transverse : sélecteur de toutes les catégories, pré-réglé M14.
-          if (r.est_transverse) {
-            return Promise.resolve(SupabaseHub.client.rpc('list_categories'))
-              .then(function (res) {
-                var payload = (res && res.data) ? res.data : null;
-                // list_categories renvoie {success,error,data:[...]} ; selon le
-                // client, res peut être déjà l'enveloppe ou {data:<enveloppe>}.
-                var liste = null;
-                if (Array.isArray(payload)) liste = payload;                       // res = enveloppe
-                else if (payload && Array.isArray(payload.data)) liste = payload.data; // res.data = enveloppe
-                else if (res && Array.isArray(res)) liste = res;
-                if (!liste || liste.length === 0) {
-                  // Pas de liste → repli honnête sur M14 direct.
-                  return StatsSaison.renderPilotageCategorie(M14_ID, mount);
-                }
-                liste.sort(function (a, b) {
-                  return (a.ordre_tri || 0) - (b.ordre_tri || 0);
-                });
-                var defaut = liste.some(function (c) { return c.id === M14_ID; }) ? M14_ID : liste[0].id;
-                rendreAvecSelecteur(liste, defaut);
-              })
-              .catch(function () {
-                // RPC liste KO → repli M14 direct (dégradation honnête).
-                StatsSaison.renderPilotageCategorie(M14_ID, mount);
-              });
-          }
-
-          // Ni id ni transverse → indéterminé.
-          messageIndetermine();
+          // Multi-catégories (encadrant N>1) OU transverse
+          // (admin/bureau, toutes catégories) : sélecteur intégré,
+          // pré-réglé sur la catégorie active mémorisée.
+          rendreAvecSelecteur(cats, active);
         })
         .catch(function (e) {
           if (typeof console !== 'undefined') console.error('pilotage-categorie boot', e);
-          messageIndetermine();
+          // Repli honnête : M14 direct plutôt qu'un écran muet.
+          StatsSaison.renderPilotageCategorie(M14_ID, mount);
         });
     })();
   </script>
