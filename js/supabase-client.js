@@ -18,7 +18,17 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.61 — juin 2026
+ * Version : 1.62 — juin 2026
+ *   v1.62 : ADMIN-RESPONSABLE-POLE (pt 106). 1 ajout ADDITIF :
+ *           wrapper definirResponsablesPole(poleId, principalId, coId)
+ *           adossé à la RPC SECURITY DEFINER definir_responsables_pole
+ *           (sql_107, gardée has_role('admin')). Écrit les deux colonnes
+ *           existantes poles.responsable_principal_id / co_responsable_id
+ *           (FK -> personnes(id)) ; le pôle reste une DONNÉE, aucun rôle
+ *           auth_roles créé. C'est la surface admin qui manquait pour
+ *           (re)jouer la désignation faite jusqu'ici par UPDATE direct
+ *           (Lohann EDR/SENIORS). Aucun wrapper existant touché.
+ *           node --check OK. console.log boot v1.61 → v1.62.
  *   v1.61 : PLANIF-ECRITURE-POLE (front, temps 2). 1 ajout ADDITIF :
  *           wrapper mesPolesResponsable() (RPC mes_poles_responsable
  *           préexistante) exposant les pôles dont le connecté est
@@ -6671,6 +6681,42 @@
       } catch (e) {
         /* honnête : pas de persistance, le choix vaut pour la session courante */
       }
+    },
+
+    /**
+     * ÉCRITURE (admin) — Désigne le responsable principal (+ co-responsable
+     * optionnel) d'un pôle. Adosse la RPC SECURITY DEFINER
+     * definir_responsables_pole(p_pole_id, p_principal_id, p_co_id)
+     * (sql_107), gardée has_role('admin') côté base — la RLS/garde fait
+     * foi, ce wrapper ne fait que transmettre.
+     *
+     * Écrit poles.responsable_principal_id / poles.co_responsable_id (deux
+     * colonnes existantes FK -> personnes(id)). Le pôle reste une DONNÉE :
+     * AUCUN rôle auth_roles créé (décision D-A). C'est la surface admin qui
+     * manquait pour (re)jouer la désignation faite jusqu'ici par UPDATE
+     * direct (Lohann EDR/SENIORS, pts 95/102/104).
+     *
+     * @param {string}  poleId      UUID poles.id (requis)
+     * @param {string}  principalId UUID personnes.id du responsable principal (requis)
+     * @param {?string} coId        UUID personnes.id du co-responsable (optionnel ; null = aucun)
+     * @returns {Promise<{ok:boolean, data?:Object, error?:string}>}
+     *   data = la ligne `poles` mise à jour. Dégradation honnête : ok:false
+     *   + message si la RPC lève (garde admin, paramètre invalide, etc.).
+     */
+    async definirResponsablesPole(poleId, principalId, coId) {
+      if (!poleId || !principalId) {
+        return { ok: false, error: 'poleId et principalId requis' };
+      }
+      const { data, error } = await client.rpc('definir_responsables_pole', {
+        p_pole_id:      poleId,
+        p_principal_id: principalId,
+        p_co_id:        coId || null
+      });
+      if (error) {
+        console.error('MOM Hub: definirResponsablesPole() / definir_responsables_pole', error);
+        return { ok: false, error: error.message || 'Erreur écriture responsables de pôle' };
+      }
+      return { ok: true, data: data };
     }
 
   };
@@ -6815,7 +6861,7 @@
   }
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.61 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.62 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
