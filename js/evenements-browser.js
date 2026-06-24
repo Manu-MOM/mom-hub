@@ -135,6 +135,32 @@
  *           Cellule + redéclaration vignette #2 ; handler voir-suivi
  *           conservé (inerte, protégé null). Actions suivi câblées en
  *           délégation = fonctionnent dans la vignette. node --check OK.
+ * Version : 1.56 — Sélecteur multi-catégories (UX-MULTI-CATEGORIES Lot 2, 24 juin 2026)
+ *   v1.56 : Le module n'était plus mono-équipe figé. La constante
+ *           M14_TEAM_UUID verrouillait l'affichage sur M14 → un encadrant
+ *           multi-catégories (Lohann : EDR + SENIORS = 8 catégories) ne
+ *           voyait que M14, ses 7 autres catégories inaccessibles (dette
+ *           🔴 UX-MULTI-CATEGORIES, pt 102).
+ *           FAMILLE A (lecture/affichage) recâblée sur le périmètre réel :
+ *           - périmètre via le socle SupabaseHub.resoudrePerimetreCategories()
+ *             (client v1.59) ; catégorie active mémorisée (localStorage,
+ *             clé partagée mom_hub.categorie_active) ;
+ *           - équipes de la catégorie active via listEquipes(catId) ; la
+ *             RPC get_evenements_a_venir filtre par ÉQUIPE (sondé source,
+ *             pas de filtre catégorie) → 1 appel par équipe + fusion par id
+ *             (_fusionnerEvenements). 1 équipe = strictement équivalent à
+ *             l'appel mono-équipe historique (non-régression) ;
+ *           - sélecteur de catégorie injecté en JS dans le header SI > 1
+ *             catégorie (mono-catégorie / transverse → aucun sélecteur,
+ *             UX inchangée) ; titre h2 + <title> alignés sur la catégorie
+ *             active (remplace « M14 » figé), repli en dur si non résolu.
+ *           Dégradation honnête : périmètre indisponible / aucune équipe →
+ *           repli sur [M14_TEAM_UUID] (comportement d'origine).
+ *           FAMILLE B (création : payload.equipe_id, contexte modal de
+ *           création) NON touchée — décision métier distincte (« sur quelle
+ *           équipe créer quand N catégories »), tracée pour un lot suivant.
+ *           M14_TEAM_UUID conservée comme constante de repli. Additivité
+ *           prouvée Python ; node --check OK ; ZÉRO SQL.
  * Version : 1.55 — Vignettes « Vue terrain » et « Vue réseaux sociaux » câblées (1 juin 2026)
  *   v1.55 : Les 2 vignettes de la grille fonctionnalités (fiche évènement)
  *           passent de en-cours/à-venir à DISPONIBLE (statut adaptatif
@@ -1784,20 +1810,75 @@
   // 2. CHARGEMENT DES DONNÉES
   // ============================================================
 
+  // ------------------------------------------------------------
+  // PÉRIMÈTRE MULTI-CATÉGORIES (UX-MULTI-CATEGORIES Lot 2)
+  // ------------------------------------------------------------
+  // Avant : le module était verrouillé sur M14_TEAM_UUID en dur → un
+  // encadrant multi-catégories (Lohann : EDR + SENIORS = 8 catégories)
+  // ne voyait que M14. Désormais le périmètre vient du socle central
+  // SupabaseHub.resoudrePerimetreCategories() (v1.59), la catégorie
+  // active pilote les équipes interrogées.
+  //
+  // La RPC get_evenements_a_venir filtre par ÉQUIPE (sondé à la source :
+  // pas de filtre catégorie). « Tous les évènements de la catégorie » =
+  // résoudre ses équipes via listEquipes(categorieId) puis charger
+  // chaque équipe et fusionner par id (la RPC gère déjà le multi-équipes
+  // d'un tournoi par équipe). 1 équipe → strictement équivalent à
+  // l'appel mono-équipe historique (garde-fou de non-régression).
+  //
+  // Dégradation honnête : périmètre non résolu / aucune équipe → repli
+  // sur M14_TEAM_UUID (comportement d'origine, jamais d'écran vide par
+  // accident).
+  let CTX_PERIMETRE       = null;   // {categories, transverse, active, vide} | null
+  let CTX_EQUIPES_ACTIVES = null;   // [equipeId, …] de la catégorie active | null
+
+  // Résout les équipes de la catégorie active courante. Repli M14.
+  async function _resoudreEquipesCategorieActive() {
+    const catId = CTX_PERIMETRE && CTX_PERIMETRE.active;
+    if (!catId) return [M14_TEAM_UUID];
+    try {
+      const eqs = await SupabaseHub.listEquipes(catId);
+      const ids = Array.isArray(eqs) ? eqs.map(e => e && e.id).filter(Boolean) : [];
+      return ids.length > 0 ? ids : [M14_TEAM_UUID];
+    } catch (e) {
+      console.warn('Évènements : listEquipes(catégorie active) échouée, repli M14', e);
+      return [M14_TEAM_UUID];
+    }
+  }
+
+  // Fusionne des listes d'évènements en dédoublonnant par id (un même
+  // évènement-racine peut remonter pour plusieurs équipes engagées).
+  function _fusionnerEvenements(listes) {
+    const vus = new Set();
+    const out = [];
+    listes.forEach(liste => {
+      (Array.isArray(liste) ? liste : []).forEach(e => {
+        if (e && e.id && !vus.has(e.id)) { vus.add(e.id); out.push(e); }
+      });
+    });
+    return out;
+  }
+
   async function loadEvenementsAVenir() {
     if (!window.SupabaseHub || typeof SupabaseHub.getEvenementsAVenir !== 'function') {
       throw new Error('SupabaseHub.getEvenementsAVenir indisponible (v1.10+ requis)');
     }
-    const events = await SupabaseHub.getEvenementsAVenir(M14_TEAM_UUID, FENETRE_JOURS_AVENIR);
-    return Array.isArray(events) ? events : [];
+    const equipes = CTX_EQUIPES_ACTIVES || [M14_TEAM_UUID];
+    const listes = await Promise.all(
+      equipes.map(eqId => SupabaseHub.getEvenementsAVenir(eqId, FENETRE_JOURS_AVENIR))
+    );
+    return _fusionnerEvenements(listes);
   }
 
   async function loadEvenementsPasses() {
     if (!window.SupabaseHub || typeof SupabaseHub.getEvenementsPasses !== 'function') {
       throw new Error('SupabaseHub.getEvenementsPasses indisponible (v1.10+ requis)');
     }
-    const events = await SupabaseHub.getEvenementsPasses(M14_TEAM_UUID, FENETRE_JOURS_PASSES, PASSES_LIMIT);
-    return Array.isArray(events) ? events : [];
+    const equipes = CTX_EQUIPES_ACTIVES || [M14_TEAM_UUID];
+    const listes = await Promise.all(
+      equipes.map(eqId => SupabaseHub.getEvenementsPasses(eqId, FENETRE_JOURS_PASSES, PASSES_LIMIT))
+    );
+    return _fusionnerEvenements(listes);
   }
 
   function buildIndexes() {
@@ -6521,6 +6602,89 @@
     }
   }
 
+  // ------------------------------------------------------------
+  // SÉLECTEUR DE CATÉGORIE (UX-MULTI-CATEGORIES Lot 2)
+  // ------------------------------------------------------------
+  // Met à jour le titre de page + le <title> du document avec le code
+  // de la catégorie active (remplace le « M14 » figé). Repli silencieux
+  // si la catégorie active est introuvable (on garde le libellé en dur).
+  function _libelleCategorieActive() {
+    if (!CTX_PERIMETRE || !Array.isArray(CTX_PERIMETRE.categories)) return null;
+    if (CTX_PERIMETRE.transverse) return null; // admin/bureau : pas de cat unique
+    const c = CTX_PERIMETRE.categories.find(x => x.id === CTX_PERIMETRE.active);
+    return c ? (c.libelle_court || c.code || null) : null;
+  }
+
+  function _majTitreCategorie() {
+    const lib = _libelleCategorieActive();
+    if (!lib) return; // périmètre transverse ou non résolu → titre en dur conservé
+    const teamSpan = document.querySelector('.evt-header h2 .evt-team');
+    if (teamSpan) teamSpan.textContent = lib;
+    try { document.title = 'MOM Hub · Évènements ' + lib; } catch (e) { /* honnête */ }
+  }
+
+  // Monte le sélecteur dans le header SI le périmètre compte > 1 catégorie.
+  // Un encadrant mono-catégorie (1 entrée) n'a pas de sélecteur (UX
+  // inchangée). Un compte transverse (admin/bureau) n'en a pas non plus
+  // ici : le module reste centré sur l'équipe par défaut (le filtrage
+  // transverse relève d'un autre chantier). Insertion APRÈS .evt-header,
+  // dans la colonne principale ; aucune édition du HTML de la page.
+  function _monterSelecteurCategorie() {
+    if (!CTX_PERIMETRE || !Array.isArray(CTX_PERIMETRE.categories)) return;
+    if (CTX_PERIMETRE.transverse) return;
+    if (CTX_PERIMETRE.categories.length <= 1) return;
+
+    const header = document.querySelector('.evt-header');
+    if (!header || !header.parentNode) return;
+    if (document.getElementById('evt-cat-selecteur-wrap')) return; // anti-doublon
+
+    const wrap = document.createElement('div');
+    wrap.id = 'evt-cat-selecteur-wrap';
+    wrap.style.cssText = 'display:flex; align-items:center; gap:8px; margin:0 0 14px 0; ' +
+      'font-family:\'JetBrains Mono\',monospace; font-size:10px; letter-spacing:0.10em; ' +
+      'text-transform:uppercase; color:var(--ink-mute);';
+
+    const label = document.createElement('label');
+    label.setAttribute('for', 'evt-cat-selecteur');
+    label.textContent = 'Catégorie :';
+    label.style.cssText = 'flex-shrink:0;';
+
+    const select = document.createElement('select');
+    select.id = 'evt-cat-selecteur';
+    select.style.cssText = 'padding:6px 10px; border:1px solid var(--line); border-radius:6px; ' +
+      'background:var(--paper-warm); color:var(--ink); font-family:inherit; font-size:11px; ' +
+      'letter-spacing:0.06em; cursor:pointer;';
+
+    CTX_PERIMETRE.categories.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.libelle_court || c.code || c.id;
+      if (c.id === CTX_PERIMETRE.active) opt.selected = true;
+      select.appendChild(opt);
+    });
+
+    select.addEventListener('change', async function () {
+      const nouvelleCat = this.value;
+      if (!nouvelleCat || nouvelleCat === CTX_PERIMETRE.active) return;
+      CTX_PERIMETRE.active = nouvelleCat;
+      SupabaseHub.memoriserCategorieActive(nouvelleCat);
+      select.disabled = true;
+      try {
+        CTX_EQUIPES_ACTIVES = await _resoudreEquipesCategorieActive();
+        _majTitreCategorie();
+        await reloadEvents();
+      } catch (e) {
+        console.error('Évènements : changement de catégorie échoué', e);
+      } finally {
+        select.disabled = false;
+      }
+    });
+
+    wrap.appendChild(label);
+    wrap.appendChild(select);
+    header.parentNode.insertBefore(wrap, header.nextSibling);
+  }
+
   // ============================================================
   // 8. ÉVÉNEMENTS DOM
   // ============================================================
@@ -6851,7 +7015,7 @@
   // ============================================================
 
   async function init() {
-    console.log('🏉 MOM Hub · Évènements Browser — init v1.55 (S3 · deep-link fiche)');
+    console.log('🏉 MOM Hub · Évènements Browser — init v1.56 (S4 · sélecteur multi-catégories)');
 
     const list = document.getElementById('evt-list');
 
@@ -6867,6 +7031,23 @@
       document.querySelectorAll('.evt-chip[data-compet]').forEach(c => {
         c.classList.toggle('active', state.competsActifs.has(c.getAttribute('data-compet')));
       });
+    }
+
+    // UX-MULTI-CATEGORIES Lot 2 — résolution du périmètre AVANT le 1er
+    // chargement. Le socle central (v1.59) donne les catégories autorisées
+    // + la catégorie active (mémorisée ou 1re). On en dérive les équipes
+    // à interroger. Dégradation honnête : périmètre indisponible (client
+    // ancien, erreur) → CTX_EQUIPES_ACTIVES reste null → loadEvenements*
+    // retombe sur [M14_TEAM_UUID] (comportement d'origine).
+    try {
+      if (window.SupabaseHub && typeof SupabaseHub.resoudrePerimetreCategories === 'function') {
+        CTX_PERIMETRE = await SupabaseHub.resoudrePerimetreCategories();
+        CTX_EQUIPES_ACTIVES = await _resoudreEquipesCategorieActive();
+      }
+    } catch (e) {
+      console.warn('Évènements : résolution du périmètre catégories échouée, repli M14', e);
+      CTX_PERIMETRE = null;
+      CTX_EQUIPES_ACTIVES = null;
     }
 
     try {
@@ -6894,7 +7075,12 @@
       renderListe();
       renderMiniCal();
 
-      // v1.54 — Deep-link fiche : si l'URL porte ?fiche=<id>, ouvrir
+      // UX-MULTI-CATEGORIES Lot 2 — sélecteur de catégorie (si > 1) +
+      // titre de page aligné sur la catégorie active (remplace « M14 »
+      // figé). Mono-catégorie / transverse → pas de sélecteur, titre
+      // mis à jour seulement si une catégorie active est résolue.
+      _monterSelecteurCategorie();
+      _majTitreCategorie();
       // directement la fiche de cet évènement au chargement (permet à la
       // page Groupe de base / Compositions de revenir SUR la fiche, pas
       // seulement sur la liste). Ouverture après le rendu (EVENTS_BY_ID prêt,
@@ -6939,7 +7125,7 @@
     closeFiche:        closeFiche
   };
 
-  console.log('%c🏉 MOM Hub · Évènements Browser v1.55 (S3 · deep-link fiche) chargé',
+  console.log('%c🏉 MOM Hub · Évènements Browser v1.56 (S4 · sélecteur multi-catégories) chargé',
     'color: #2D7D46; font-weight: bold;');
 
 })();
