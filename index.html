@@ -1214,6 +1214,89 @@
       console.warn('MOM Hub portail: maj greeting-meta échouée', err);
     }
 
+    // ----------------------------------------------------------
+    // Contexte greeting (UX-MULTI-CATEGORIES, Lot 1) — saison active
+    // + sous-titre de fonction réels, en remplacement des valeurs EN DUR
+    // « SAISON 2025 / 2026 » (pastille) et « Référent M14 · saison
+    // 2025-2026 » (greeting-sub), toutes deux figées et désormais
+    // périmées (la saison active en base est 2026-2027).
+    //
+    // Sources (wrappers déjà déployés, ZÉRO SQL neuf) :
+    //   - listSaisons() → {ok, data:[{libelle, code, est_active, …}]}
+    //     (v1.31) : la saison active = data.find(s => s.est_active).
+    //   - maFonctionStaff() → libellé BRUT de la fonction_staff la plus
+    //     élevée du connecté (RPC self-only ma_fonction_staff, v1.56),
+    //     mappé en libellé court par _FONCTION_LABELS_GREETING.
+    //
+    // Dégradation honnête (jamais « null » à l'écran) :
+    //   - saison non résolue → on NE touche PAS la pastille ni le
+    //     suffixe saison du sous-titre (texte en dur conservé) ;
+    //   - fonction null (admin/bureau sans fonction_staff, ou compte
+    //     non relié) → on conserve le préfixe en dur du sous-titre.
+    //
+    // NB Lohann : sa seule fonction_staff est « Référent de catégorie »
+    // (SR-M) → affiche « Référent ». Son statut de RESPONSABLE DE PÔLE
+    // (EDR + SENIORS) n'est pas une fonction_staff et n'apparaît donc
+    // pas ici — limite connue, hors périmètre Lot 1 (affichage seul).
+    // ----------------------------------------------------------
+    var _FONCTION_LABELS_GREETING = {
+      'Référent de catégorie': 'Référent',
+      'Manager':               'Manager',
+      'Entraîneur principal':  'Entr. principal',
+      'Entraîneur adjoint':    'Adjoint'
+    };
+
+    async function _remplirContexteGreeting() {
+      // (1) Saison active → pastille topbar + suffixe du sous-titre.
+      var libelleSaison = null;
+      try {
+        var res = await SupabaseHub.listSaisons();
+        if (res && res.ok && Array.isArray(res.data)) {
+          var active = res.data.find(function (s) { return s && s.est_active; });
+          if (active) libelleSaison = active.libelle || active.code || null;
+        }
+      } catch (err) {
+        console.warn('MOM Hub portail: listSaisons() échouée (contexte greeting)', err);
+      }
+      if (libelleSaison) {
+        var pill = document.querySelector('.season-pill');
+        if (pill) pill.textContent = 'SAISON ' + String(libelleSaison).replace('-', ' / ').replace('/', ' / ');
+      }
+
+      // (2) Fonction réelle → préfixe du sous-titre (greeting-sub).
+      //     Pas de session / pas de fonction → on garde le dur.
+      var session = null;
+      try { session = await SupabaseHub.getSession(); } catch (e) { /* honnête */ }
+      if (!session) return;
+
+      var fonctionBrute = null;
+      try { fonctionBrute = await SupabaseHub.maFonctionStaff(); } catch (e) { /* honnête */ }
+
+      var sub = document.getElementById('greeting-sub');
+      if (!sub) return;
+      var libelleFonction = fonctionBrute
+        ? (_FONCTION_LABELS_GREETING[fonctionBrute] || fonctionBrute)
+        : null;
+
+      // Reconstruit le sous-titre : « <Fonction> · saison <libellé> ».
+      // Si la fonction manque, on garde le préfixe en dur existant ;
+      // si la saison manque, on garde le suffixe en dur existant.
+      if (libelleFonction || libelleSaison) {
+        var prefixe = libelleFonction || 'Encadrant';
+        var suffixe = libelleSaison ? ('saison ' + libelleSaison) : 'saison en cours';
+        // On n'écrase que si on a au moins une vraie donnée.
+        if (libelleFonction && libelleSaison) {
+          sub.textContent = prefixe + ' · ' + suffixe;
+        } else if (libelleFonction) {
+          sub.textContent = prefixe + ' · saison en cours';
+        } else if (libelleSaison) {
+          sub.textContent = 'Encadrant · ' + suffixe;
+        }
+      }
+    }
+
+    _remplirContexteGreeting();
+
     // ==========================================================
     // ENRÔLEMENT (v1 front) — résolution d'identité + modale
     // ==========================================================
