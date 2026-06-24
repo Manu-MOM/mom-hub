@@ -196,10 +196,18 @@
   // 1. CONSTANTES + ÉTAT
   // ============================================================
 
+  // REPLI de dégradation honnête : si le périmètre de catégories est
+  // indisponible (socle ancien, droits vides, catégorie sans équipe),
+  // l'équipe active retombe sur M14 = comportement d'origine.
   const M14_TEAM_UUID = 'bfb83b83-83ef-4dde-b526-48ff87313044';
   const NB_SEANCES_RECENTES = 10;
   const DUREE_DEFAULT_MIN = 75;
   const AUTOSAVE_INTERVAL_MS = 30000; // 30 secondes (Phase 5.5.B2)
+
+  // Clé localStorage de l'équipe de séance active (distincte de la
+  // catégorie active, gérée par le socle). Mémorise le choix d'équipe
+  // quand la catégorie active a > 1 équipe (point dur 1, option b).
+  const CLE_EQUIPE_SEANCE = 'mom_hub.seance.equipe_active';
 
   const State = {
     seances: [],            // liste pour la sidebar
@@ -235,8 +243,155 @@
     propositionsRef: null,        // miroir data/propositions-seance.json
     // Phase 5.12 BIS : mode sélection multiple pour suppression en lot
     selectionMode: false,         // bascule mode "Sélectionner" en sidebar
-    selectionIds: new Set()       // UUIDs des séances cochées dans la sidebar
+    selectionIds: new Set(),      // UUIDs des séances cochées dans la sidebar
+    // Propagation multi-catégories (catégorie active partagée)
+    perimetreCat: null,           // {categories, transverse, active, vide} | null
+    equipesCategorieActive: [],   // équipes de la catégorie active (objets)
+    equipeActive: null            // UUID de l'équipe de séance courante (repli M14)
   };
+
+  // ------------------------------------------------------------
+  // Propagation multi-catégories — résolution équipe active
+  // ------------------------------------------------------------
+  // L'écran Séance travaille à UNE équipe à la fois (créer/lister
+  // séances, vivier, évènements d'une équipe). Point dur 1, option
+  // (b) : la catégorie active vient du socle (clé partagée) ; si elle
+  // a > 1 équipe, un 2e sélecteur d'équipe apparaît ; mono-équipe
+  // (cas réel actuel M14) → résolution directe, aucun sélecteur.
+
+  /** UUID de l'équipe de séance courante (repli M14 honnête). */
+  function _equipeActive() {
+    return State.equipeActive || M14_TEAM_UUID;
+  }
+
+  /** Équipes de la catégorie active → objets [{id,…}]. [] si indispo. */
+  async function _seanceResoudreEquipesCategorieActive() {
+    if (typeof SupabaseHub === 'undefined'
+        || typeof SupabaseHub.listEquipes !== 'function') {
+      return [];
+    }
+    const catId = State.perimetreCat && State.perimetreCat.active;
+    if (!catId) return [];
+    try {
+      const eqs = await SupabaseHub.listEquipes(catId);
+      return Array.isArray(eqs) ? eqs : [];
+    } catch (e) {
+      console.warn('SeanceEditor: listEquipes indisponible.', e);
+      return [];
+    }
+  }
+
+  /**
+   * Choisit l'équipe active dans la liste des équipes de la catégorie
+   * active : équipe mémorisée si elle est dans la liste, sinon la 1re ;
+   * repli M14 si la liste est vide. Pose State.equipeActive.
+   */
+  function _seanceChoisirEquipeActive() {
+    const liste = State.equipesCategorieActive || [];
+    if (liste.length === 0) {
+      State.equipeActive = M14_TEAM_UUID; // repli honnête
+      return;
+    }
+    let memorisee = null;
+    try { memorisee = localStorage.getItem(CLE_EQUIPE_SEANCE) || null; } catch (e) { /* honnête */ }
+    const ok = memorisee && liste.some(function (eq) { return eq && eq.id === memorisee; });
+    State.equipeActive = ok ? memorisee : liste[0].id;
+  }
+
+  function _memoriserEquipeSeance(equipeId) {
+    if (!equipeId) return;
+    try { localStorage.setItem(CLE_EQUIPE_SEANCE, String(equipeId)); } catch (e) { /* honnête */ }
+  }
+
+  /**
+   * Monte un sélecteur d'ÉQUIPE dans le header SI la catégorie active
+   * a > 1 équipe. Mono-équipe → rien (UX inchangée). Au changement :
+   * mémorise + recharge les données de l'écran.
+   */
+  function _monterSelecteurEquipe() {
+    const liste = State.equipesCategorieActive || [];
+    if (liste.length <= 1) return; // mono-équipe : pas de sélecteur
+
+    const header = document.querySelector('.seance-header');
+    if (!header || !header.parentNode) return;
+    if (document.getElementById('seance-equipe-selecteur-wrap')) return; // anti-doublon
+
+    const wrap = document.createElement('div');
+    wrap.id = 'seance-equipe-selecteur-wrap';
+    wrap.style.cssText = 'display:flex; align-items:center; gap:8px; margin:0 0 14px 0; ' +
+      'font-family:\'JetBrains Mono\',monospace; font-size:10px; letter-spacing:0.10em; ' +
+      'text-transform:uppercase; color:var(--ink-mute);';
+
+    const label = document.createElement('label');
+    label.setAttribute('for', 'seance-equipe-selecteur');
+    label.textContent = 'Équipe :';
+    label.style.cssText = 'flex-shrink:0;';
+
+    const select = document.createElement('select');
+    select.id = 'seance-equipe-selecteur';
+    select.style.cssText = 'padding:6px 10px; border:1px solid var(--line); border-radius:6px; ' +
+      'background:var(--paper-warm); color:var(--ink); font-family:inherit; font-size:11px; ' +
+      'letter-spacing:0.06em; cursor:pointer;';
+
+    liste.forEach(function (eq) {
+      const opt = document.createElement('option');
+      opt.value = eq.id;
+      opt.textContent = eq.libelle_court || eq.nom_officiel || eq.code || eq.id;
+      if (eq.id === State.equipeActive) opt.selected = true;
+      select.appendChild(opt);
+    });
+
+    select.addEventListener('change', async function () {
+      const nouvelle = this.value;
+      if (!nouvelle || nouvelle === State.equipeActive) return;
+      State.equipeActive = nouvelle;
+      _memoriserEquipeSeance(nouvelle);
+      select.disabled = true;
+      try {
+        await _seanceRechargerDonnees();
+      } catch (e) {
+        console.error('SeanceEditor: rechargement après changement d\'équipe échoué', e);
+      } finally {
+        select.disabled = false;
+      }
+    });
+
+    wrap.appendChild(label);
+    wrap.appendChild(select);
+    header.parentNode.insertBefore(wrap, header.nextSibling);
+  }
+
+  /** Retire le sélecteur d'équipe (avant remontage après changement de catégorie). */
+  function _retirerSelecteurEquipe() {
+    const w = document.getElementById('seance-equipe-selecteur-wrap');
+    if (w && w.parentNode) w.parentNode.removeChild(w);
+  }
+
+  /**
+   * Recharge les données dépendantes de l'équipe active + re-render.
+   * Appelé au changement d'équipe ou de catégorie.
+   */
+  async function _seanceRechargerDonnees() {
+    await Promise.all([
+      loadSeances(),
+      loadEvenements(),
+      loadVivierM14()
+    ]);
+    renderSidebar();
+    renderEmptyEditor();
+  }
+
+  /**
+   * Au changement de CATÉGORIE active : re-résout les équipes,
+   * re-choisit l'équipe active, remonte le sélecteur d'équipe, recharge.
+   */
+  async function _seanceOnChangementCategorie() {
+    State.equipesCategorieActive = await _seanceResoudreEquipesCategorieActive();
+    _seanceChoisirEquipeActive();
+    _retirerSelecteurEquipe();
+    _monterSelecteurEquipe();
+    await _seanceRechargerDonnees();
+  }
 
   // ============================================================
   // 2. SÉLECTEURS DOM
@@ -3155,7 +3310,7 @@
     if (centerBtn)  centerBtn.disabled  = true;
 
     const res = await SupabaseHub.createSeance({
-      equipe_id: M14_TEAM_UUID,
+      equipe_id: _equipeActive(),
       duree_totale_min: DUREE_DEFAULT_MIN,
       etat: 'brouillon'
       // Pas de date_seance par défaut : laisse le coach saisir
@@ -3652,7 +3807,7 @@
     // Phase 5.10 : respecte le toggle "Afficher les archivées" et
     // rafraîchit en parallèle le compteur de brouillons vides
     const [seances] = await Promise.all([
-      SupabaseHub.listSeancesByEquipe(M14_TEAM_UUID, {
+      SupabaseHub.listSeancesByEquipe(_equipeActive(), {
         limit: NB_SEANCES_RECENTES,
         excludeArchivees: !State.showArchivees
       }),
@@ -3667,7 +3822,7 @@
    * en bas de sidebar par renderSidebar.
    */
   async function loadBrouillonsVides() {
-    State.brouillonsVides = await SupabaseHub.listBrouillonsVides(M14_TEAM_UUID);
+    State.brouillonsVides = await SupabaseHub.listBrouillonsVides(_equipeActive());
   }
 
   async function loadSites() {
@@ -3677,7 +3832,7 @@
   async function loadEvenements() {
     // Fenêtre de 60 jours par défaut, élargie à l'usage : on couvre la
     // prochaine demi-saison sans submerger le dropdown.
-    State.evenements = await SupabaseHub.getEvenementsAVenir(M14_TEAM_UUID, 60);
+    State.evenements = await SupabaseHub.getEvenementsAVenir(_equipeActive(), 60);
   }
 
   /**
@@ -3808,7 +3963,7 @@
 
   async function loadVivierM14() {
     try {
-      State.vivier = await SupabaseHub.getVivierCompo(M14_TEAM_UUID);
+      State.vivier = await SupabaseHub.getVivierCompo(_equipeActive());
       State.vivierById = new Map();
       (State.vivier || []).forEach(function (j) {
         if (j && j.joueur_id) State.vivierById.set(j.joueur_id, j);
@@ -3837,6 +3992,22 @@
   // ============================================================
 
   async function init() {
+    // Périmètre de catégorie active + équipe active (multi-cat).
+    // Résolu AVANT les chargements pour que les 5 appels lisent la
+    // bonne équipe via _equipeActive(). Repli silencieux si le socle
+    // est absent (équipe active = M14, comportement d'origine).
+    if (typeof SupabaseHub !== 'undefined'
+        && typeof SupabaseHub.resoudrePerimetreCategories === 'function') {
+      try {
+        State.perimetreCat = await SupabaseHub.resoudrePerimetreCategories();
+      } catch (e) {
+        console.warn('SeanceEditor: périmètre catégories indisponible, repli M14.', e);
+        State.perimetreCat = null;
+      }
+    }
+    State.equipesCategorieActive = await _seanceResoudreEquipesCategorieActive();
+    _seanceChoisirEquipeActive(); // pose State.equipeActive (repli M14 si vide)
+
     // Chargements parallèles : séances pour la sidebar (couple aussi le
     // compteur de brouillons vides Phase 5.10), sites et événements pour
     // les dropdowns du formulaire, types-blocs.json pour la trame (5.6.A),
@@ -3860,7 +4031,25 @@
     renderSidebar();
     renderEmptyEditor();
 
-    // Activation des 2 CTA "+ Nouvelle séance"
+    // Sélecteurs multi-cat : catégorie (helper UI, si > 1 catégorie)
+    // + équipe (inline, si la catégorie active a > 1 équipe). Mono-cat
+    // mono-équipe (cas réel actuel) → aucun sélecteur, UX inchangée.
+    if (typeof UXSelecteurCategorie !== 'undefined'
+        && typeof UXSelecteurCategorie.monter === 'function'
+        && State.perimetreCat) {
+      UXSelecteurCategorie.monter({
+        perimetre: State.perimetreCat,
+        ancreSelector: '.seance-header',
+        teamSpanSelector: '.seance-header__title',
+        titreDocument: 'MOM Hub · Séance',
+        wrapId: 'seance-cat-selecteur-wrap',
+        selectId: 'seance-cat-selecteur',
+        onChange: async function () {
+          await _seanceOnChangementCategorie();
+        }
+      });
+    }
+    _monterSelecteurEquipe();
     const sidebarCta = DOM.sidebarCta();
     if (sidebarCta) {
       sidebarCta.disabled = false;
