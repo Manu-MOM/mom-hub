@@ -163,6 +163,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="js/supabase-client.js"></script>
+  <script src="js/ux-selecteur-categorie.js"></script>
 
   <script>
     (async function () {
@@ -239,61 +240,104 @@
         return r && r.evenement && r.evenement_equipe_id;
       });
 
-      if (usable.length === 0) {
-        host.innerHTML =
-          '<div class="mc-empty">' +
-            'Aucune composition pour le moment.' +
-            '<div class="mc-empty__hint">Crée une feuille depuis la fiche d\'un évènement.</div>' +
-          '</div>';
-        return;
+      // Catégorie active courante (null = toutes). Filtre client : on ne
+      // recharge pas la liste au changement, on la re-rend filtrée.
+      let categorieActiveId = null;
+
+      function lignesFiltrees() {
+        if (!categorieActiveId) return usable;
+        return usable.filter(function (r) {
+          return r && r.equipe && r.equipe.categorie_id === categorieActiveId;
+        });
       }
 
-      host.innerHTML = '';
-      usable.forEach(function (r) {
-        const evt = r.evenement;
-        const equipe = r.equipe && r.equipe.libelle ? r.equipe.libelle : '';
-        const meta = formatDateLong(evt.date_debut) + (equipe ? '  ·  ' + equipe : '');
-
-        // pt 62 (câblage accès) — la rangée porte désormais DEUX accès :
-        //   (1) zone principale → ouvre la feuille (compositions.html, inchangé) ;
-        //   (2) bouton « Pilotage » → pilotage.html?compo_base=<compo_id>.
-        // r.compo_id EST l'id de la compo de base (la page liste des
-        // type_compo='base'), = exactement le compo_base attendu par le
-        // pilotage (renderPilotage agrège les compos match dont
-        // compo_base_origine_id === ce baseId). Aucun wrapper à adapter.
-        // La rangée passe de <a> à <div> pour éviter un lien imbriqué.
-        const row = document.createElement('div');
-        row.className = 'mc-row';
-
-        const main = document.createElement('a');
-        main.className = 'mc-row__open';
-        main.href = 'compositions.html?evenement_equipe=' + encodeURIComponent(r.evenement_equipe_id);
-        main.innerHTML =
-          '<span class="mc-row__type">' + escapeHtml(libelleType(evt.type_evenement)) + '</span>' +
-          '<span class="mc-row__main">' +
-            '<span class="mc-row__label">' + escapeHtml(evt.libelle || 'Évènement') + '</span>' +
-            '<span class="mc-row__meta">' + escapeHtml(meta) + '</span>' +
-          '</span>' +
-          '<span class="mc-row__state state-' + escapeHtml(r.etat || '') + '">' + escapeHtml(libelleEtat(r.etat)) + '</span>' +
-          '<span class="mc-row__chev" aria-hidden="true">›</span>';
-        row.appendChild(main);
-
-        if (r.compo_id) {
-          const pilot = document.createElement('a');
-          pilot.className = 'mc-row__pilot';
-          pilot.href = 'pilotage.html?compo_base=' + encodeURIComponent(r.compo_id);
-          pilot.title = 'Statistiques de saison (pilotage d\'équipe)';
-          pilot.innerHTML = '📊 Pilotage';
-          row.appendChild(pilot);
+      function rendreLignes() {
+        const liste = lignesFiltrees();
+        if (usable.length === 0) {
+          host.innerHTML =
+            '<div class="mc-empty">' +
+              'Aucune composition pour le moment.' +
+              '<div class="mc-empty__hint">Crée une feuille depuis la fiche d\'un évènement.</div>' +
+            '</div>';
+          return;
         }
+        if (liste.length === 0) {
+          host.innerHTML =
+            '<div class="mc-empty">' +
+              'Aucune composition pour cette catégorie.' +
+              '<div class="mc-empty__hint">Change de catégorie ou crée une feuille depuis la fiche d\'un évènement.</div>' +
+            '</div>';
+          return;
+        }
+        host.innerHTML = '';
+        liste.forEach(function (r) {
+          const evt = r.evenement;
+          const equipe = r.equipe && r.equipe.libelle ? r.equipe.libelle : '';
+          const meta = formatDateLong(evt.date_debut) + (equipe ? '  ·  ' + equipe : '');
 
-        host.appendChild(row);
-      });
+          // pt 62 (câblage accès) — la rangée porte DEUX accès :
+          //   (1) zone principale → ouvre la feuille (compositions.html, inchangé) ;
+          //   (2) bouton « Pilotage » → pilotage.html?compo_base=<compo_id>.
+          const row = document.createElement('div');
+          row.className = 'mc-row';
+
+          const main = document.createElement('a');
+          main.className = 'mc-row__open';
+          main.href = 'compositions.html?evenement_equipe=' + encodeURIComponent(r.evenement_equipe_id);
+          main.innerHTML =
+            '<span class="mc-row__type">' + escapeHtml(libelleType(evt.type_evenement)) + '</span>' +
+            '<span class="mc-row__main">' +
+              '<span class="mc-row__label">' + escapeHtml(evt.libelle || 'Évènement') + '</span>' +
+              '<span class="mc-row__meta">' + escapeHtml(meta) + '</span>' +
+            '</span>' +
+            '<span class="mc-row__state state-' + escapeHtml(r.etat || '') + '">' + escapeHtml(libelleEtat(r.etat)) + '</span>' +
+            '<span class="mc-row__chev" aria-hidden="true">›</span>';
+          row.appendChild(main);
+
+          if (r.compo_id) {
+            const pilot = document.createElement('a');
+            pilot.className = 'mc-row__pilot';
+            pilot.href = 'pilotage.html?compo_base=' + encodeURIComponent(r.compo_id);
+            pilot.title = 'Statistiques de saison (pilotage d\'équipe)';
+            pilot.innerHTML = '📊 Pilotage';
+            row.appendChild(pilot);
+          }
+
+          host.appendChild(row);
+        });
+      }
+
+      // Sélecteur de catégorie (filtre la liste). Monté via le helper
+      // partagé si dispo : périmètre + mémorisation cohérents avec les
+      // autres écrans. onChange = re-filtrage client (pas de rechargement).
+      try {
+        if (typeof UXSelecteurCategorie !== 'undefined'
+            && typeof UXSelecteurCategorie.resoudre === 'function') {
+          const ctx = await UXSelecteurCategorie.resoudre();
+          if (ctx && ctx.perimetre) {
+            categorieActiveId = ctx.active || null;
+            UXSelecteurCategorie.monter({
+              perimetre: ctx.perimetre,
+              ancreSelector: '.mc-head',
+              wrapId: 'mc-cat-selecteur-wrap',
+              selectId: 'mc-cat-selecteur',
+              onChange: function (nouvelleCatId) {
+                categorieActiveId = nouvelleCatId || null;
+                rendreLignes();
+              }
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('MOM Hub: mes-compos sélecteur catégorie indisponible', e);
+      }
+
+      rendreLignes();
 
       console.log(
         '%c🏉 Mes compositions chargé',
         'color: #2D7D46; font-weight: bold;',
-        { lignes: usable.length }
+        { lignes: usable.length, categorie_active: categorieActiveId }
       );
     })();
   </script>
