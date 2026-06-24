@@ -2,6 +2,17 @@
  * js/planification-editor.js — Module « Planification annuelle » (MOM Hub)
  * ----------------------------------------------------------------------------
  * Version : 1.0 — juin 2026
+ *   [PLANIF-ECRITURE-POLE — juin 2026] Écriture des trames de pôle ouverte
+ *   au responsable DÉSIGNÉ (sql_106). Le boot charge les droits réels une
+ *   fois (_chargerDroits : transverse / pôles responsables via
+ *   mesPolesResponsable / catégories du périmètre) ; le responsable de pôle
+ *   non-transverse accède à l'écran de choix COMPLET (tous pôles +
+ *   catégories), édite ses cibles, lit le reste (peutEditer calculé par
+ *   cible = reflet RLS, jamais accordé par le front). demarrerPole/
+ *   demarrerCategorie et deep links ?pole=/?categorie= reflètent ce droit ;
+ *   ecranChoixTransverse renommé ecranChoixComplet ; libellés « EDR »
+ *   généralisés. Requiert supabase-client ≥ v1.61 (wrapper
+ *   mesPolesResponsable) ; dégradation honnête si absent (droits vides).
  *   Éditeur de blocs (modèle repris de MOM Ateliers) + frise emboîtée à l'écran.
  *   Portée CATÉGORIE (référent / transverse) OU PÔLE (transverse uniquement).
  *   Backend : sql/73 (planification_blocs, planification_axes,
@@ -41,7 +52,13 @@
     blocs: [],           // blocs chargés (objets DB) + brouillons locaux
     // Multi-catégories (portée catégorie d'un encadrant N>1) : liste des
     // catégories de son périmètre, pour le sélecteur intégré au header.
-    categoriesPerimetre: []
+    categoriesPerimetre: [],
+    // PLANIF-ECRITURE-POLE (front) : cache des droits d'écriture réels,
+    // résolu une fois au boot pour refléter la RLS (sql_106) sans la
+    // dupliquer. Sets d'UUID éditables ; transverseGlobal = admin/bureau.
+    droitsPolesEditables: null,   // Set<pole_id> | null (non résolu)
+    droitsCatsEditables: null,    // Set<categorie_id> | null (non résolu)
+    transverseGlobal: false       // admin/bureau (édite partout)
   };
 
   // ---- Helpers ----
@@ -460,6 +477,67 @@
   //       référent mono-cat : catégorie directe ;
   //       transverse : écran de choix (catégories + pôles) ;
   //       aucun : message indéterminé.
+  // PLANIF-ECRITURE-POLE (front) : résout UNE FOIS les droits d'écriture
+  // réels du connecté, pour que le front reflète la RLS (sql_106) sans la
+  // dupliquer. Renseigne State.transverseGlobal / droitsPolesEditables /
+  // droitsCatsEditables. Dégradation honnête : en cas d'échec, Sets vides
+  // (aucune édition affichée) plutôt qu'un faux « éditable ». La RLS reste
+  // l'arbitre réel — ce cache ne sert qu'à l'affichage.
+  function _chargerDroits() {
+    var h = hub();
+    if (!h) {
+      State.transverseGlobal = false;
+      State.droitsPolesEditables = new Set();
+      State.droitsCatsEditables = new Set();
+      return Promise.resolve();
+    }
+    var pPerim = (typeof h.resoudrePerimetreCategories === 'function')
+      ? Promise.resolve(h.resoudrePerimetreCategories()).catch(function () { return null; })
+      : Promise.resolve(null);
+    var pPolesResp = (typeof h.mesPolesResponsable === 'function')
+      ? Promise.resolve(h.mesPolesResponsable()).catch(function () { return []; })
+      : Promise.resolve([]);
+    return Promise.all([pPerim, pPolesResp]).then(function (res) {
+      var perim = res[0];
+      var polesResp = Array.isArray(res[1]) ? res[1] : [];
+      State.transverseGlobal = !!(perim && perim.transverse);
+      // Catégories éditables = celles du périmètre (mes_categories_autorisees).
+      var cats = new Set();
+      if (perim && Array.isArray(perim.categories)) {
+        perim.categories.forEach(function (c) {
+          var id = c.id || c.categorie_id;
+          if (id) cats.add(id);
+        });
+      }
+      State.droitsCatsEditables = cats;
+      // Pôles éditables = pôles dont on est responsable désigné (sql_106).
+      var poles = new Set();
+      polesResp.forEach(function (p) {
+        var id = (p && (p.pole_id || p.id)) || null;
+        if (id) poles.add(id);
+      });
+      State.droitsPolesEditables = poles;
+    }).catch(function () {
+      State.transverseGlobal = false;
+      State.droitsPolesEditables = new Set();
+      State.droitsCatsEditables = new Set();
+    });
+  }
+
+  // Vrai si le connecté peut ÉDITER le pôle donné (transverse OU responsable
+  // désigné). Reflète la RLS d'écriture pôle (sql_106).
+  function _peutEditerPole(poleId) {
+    if (State.transverseGlobal) return true;
+    return !!(State.droitsPolesEditables && State.droitsPolesEditables.has(poleId));
+  }
+
+  // Vrai si le connecté peut ÉDITER la catégorie donnée (transverse OU
+  // catégorie de son périmètre d'encadrement).
+  function _peutEditerCategorie(catId) {
+    if (State.transverseGlobal) return true;
+    return !!(State.droitsCatsEditables && State.droitsCatsEditables.has(catId));
+  }
+
   function start(mountEl) {
     State.mount = mountEl;
     if (!hub()) {
@@ -471,7 +549,16 @@
     var cat = params.get('categorie');
 
     if (pole) { return demarrerPole(pole); }
-    if (cat) { return demarrerCategorie(cat, true); }
+    if (cat) {
+      // Deep link catégorie : peutEditer reflète le droit réel (RLS), pas un
+      // « true » présumé. Charge le cache de droits si nécessaire.
+      var pretCat = (State.droitsCatsEditables !== null)
+        ? Promise.resolve()
+        : _chargerDroits();
+      return pretCat.then(function () {
+        return demarrerCategorie(cat, _peutEditerCategorie(cat));
+      });
+    }
 
     // Résolution du périmètre via le socle (lève l'angle mort rows[0] :
     // un encadrant multi-catégories n'est plus figé sur la 1re).
@@ -482,22 +569,37 @@
     //   - aucun droit → message indéterminé.
     var h = hub();
     if (h && typeof h.resoudrePerimetreCategories === 'function') {
-      return Promise.resolve(h.resoudrePerimetreCategories())
+      // Résout d'abord les droits réels (transverse / pôles responsables /
+      // catégories), puis route. Le cache sert ensuite à demarrerPole /
+      // demarrerCategorie pour refléter la RLS au lieu de forcer peutEditer.
+      return _chargerDroits()
+        .then(function () { return Promise.resolve(h.resoudrePerimetreCategories()); })
         .then(function (perimetre) {
           if (!perimetre || perimetre.vide
               || !Array.isArray(perimetre.categories)
               || perimetre.categories.length === 0) {
+            // Pas de catégorie d'encadrement : un responsable de pôle SANS
+            // catégorie doit tout de même accéder à l'écran de choix complet.
+            if (State.droitsPolesEditables && State.droitsPolesEditables.size > 0) {
+              return ecranChoixComplet();
+            }
             return messageIndetermine();
           }
-          // Admin/bureau : on garde l'écran de choix (pôles + catégories).
+          // Admin/bureau : écran de choix complet (pôles + catégories) INCHANGÉ.
           if (perimetre.transverse) {
-            return ecranChoixTransverse();
+            return ecranChoixComplet();
           }
-          // Encadrant : mémorise la liste pour le sélecteur, démarre sur
-          // la catégorie active (mémorisée via le socle, sinon 1re).
+          // Responsable de pôle (non-transverse) : décision Manu = voir
+          // l'écran de choix COMPLET (tous pôles + toutes catégories), édite
+          // ses cibles, lit le reste. peutEditer est calculé par cible.
+          if (State.droitsPolesEditables && State.droitsPolesEditables.size > 0) {
+            return ecranChoixComplet();
+          }
+          // Encadrant simple : mémorise la liste pour le sélecteur, démarre
+          // sur la catégorie active (mémorisée via le socle, sinon 1re).
           State.categoriesPerimetre = perimetre.categories;
           var active = perimetre.active || perimetre.categories[0].id;
-          return demarrerCategorie(active, true);
+          return demarrerCategorie(active, _peutEditerCategorie(active));
         })
         .catch(function (e) {
           if (global.console) global.console.error('planification boot', e);
@@ -506,16 +608,25 @@
     }
 
     // Repli : socle ancien → ancien chemin mes_categories_autorisees.
-    Promise.resolve(hub().mesCategoriesAutorisees())
+    Promise.resolve(_chargerDroits())
+      .then(function () { return hub().mesCategoriesAutorisees(); })
       .then(function (rows) {
-        if (!Array.isArray(rows) || rows.length === 0) { return messageIndetermine(); }
+        if (!Array.isArray(rows) || rows.length === 0) {
+          if (State.droitsPolesEditables && State.droitsPolesEditables.size > 0) {
+            return ecranChoixComplet();
+          }
+          return messageIndetermine();
+        }
         var r = rows[0];
         var catId = r.categorie_id || r.id || null;
         if (catId && !r.est_transverse) {
-          return demarrerCategorie(catId, true);
+          if (State.droitsPolesEditables && State.droitsPolesEditables.size > 0) {
+            return ecranChoixComplet();
+          }
+          return demarrerCategorie(catId, _peutEditerCategorie(catId));
         }
         if (r.est_transverse) {
-          return ecranChoixTransverse();
+          return ecranChoixComplet();
         }
         messageIndetermine();
       })
@@ -528,8 +639,8 @@
   function messageIndetermine() {
     State.mount.innerHTML = bloc('Périmètre indéterminé',
       '<p>Aucune catégorie ni pôle n\'a pu être déterminé pour votre compte. ' +
-      'La planification annuelle est réservée aux référents (leur catégorie) ' +
-      'et au responsable EDR (trames de pôle).</p>');
+      'La planification annuelle est réservée aux encadrants (leur catégorie) ' +
+      'et aux responsables de pôle (trames de leur pôle).</p>');
   }
 
   // Référent / lien direct : on connaît la catégorie, droit d'écriture présumé
@@ -547,10 +658,15 @@
   function demarrerPole(poleId) {
     State.portee = 'pole';
     State.cibleId = poleId;
-    // Droit d'édition pôle = transverse (admin/bureau) ; on le déduit de
-    // mes_poles_autorises() (est_transverse). La RLS reste l'arbitre réel.
-    return Promise.resolve(hub().mesPolesAutorises()).then(function (rows) {
-      State.peutEditer = Array.isArray(rows) && rows.some(function (p) { return p.est_transverse; });
+    // Droit d'édition pôle (reflet RLS sql_106) = transverse (admin/bureau)
+    // OU responsable DÉSIGNÉ du pôle (mes_poles_responsable). La RLS reste
+    // l'arbitre réel. Si le cache de droits n'est pas encore résolu (cas
+    // deep link ?pole=<uuid> avant boot), on le charge d'abord.
+    var pretDroits = (State.droitsPolesEditables !== null)
+      ? Promise.resolve()
+      : _chargerDroits();
+    return pretDroits.then(function () {
+      State.peutEditer = _peutEditerPole(poleId);
       return resoudreLibellePole(poleId).then(function (lib) {
         State.cibleLabel = lib || poleId;
         return loadContext();
@@ -558,8 +674,12 @@
     });
   }
 
-  // Écran transverse : choix entre catégories et pôles.
-  function ecranChoixTransverse() {
+  // Écran de choix COMPLET : tous les pôles + toutes les catégories.
+  // Atteint par admin/bureau (transverse) ET par le responsable de pôle
+  // (décision Manu). peutEditer est calculé PAR CIBLE au clic (reflet RLS) :
+  // l'utilisateur édite ses pôles/catégories, lit le reste (« lecture seule »
+  // annoncée à l'entrée de la trame via State.peutEditer=false).
+  function ecranChoixComplet() {
     State.mount.innerHTML = '<p class="pa-load">Chargement des périmètres…</p>';
     Promise.all([
       Promise.resolve(hub().client.rpc('list_categories')).catch(function () { return null; }),
@@ -577,8 +697,10 @@
         h += '<p class="pa-attente">Aucun pôle.</p>';
       } else {
         poles.forEach(function (p) {
+
           h += '<button type="button" class="pa-choix__item" data-pole="' + esc(p.id) + '">' +
-            esc(p.libelle_court || p.libelle_long || p.code || p.id) + '</button>';
+            esc(p.libelle_court || p.libelle_long || p.code || p.id) +
+            (_peutEditerPole(p.id) ? '' : ' <span style="font-size:.78em;opacity:.6;font-weight:400;">👁 lecture</span>') + '</button>';
         });
       }
       h += '</div>';
@@ -588,24 +710,30 @@
       } else {
         cats.forEach(function (c) {
           h += '<button type="button" class="pa-choix__item" data-cat="' + esc(c.id) + '">' +
-            esc(c.libelle_court || c.code || c.id) + '</button>';
+            esc(c.libelle_court || c.code || c.id) +
+            (_peutEditerCategorie(c.id) ? '' : ' <span style="font-size:.78em;opacity:.6;font-weight:400;">👁 lecture</span>') + '</button>';
         });
       }
       h += '</div></div></section>';
       State.mount.innerHTML = h;
 
+      // Tout cliquable (décision Manu) : on ouvre la trame en lecture seule
+      // si la cible n'est pas éditable. peutEditer calculé par cible.
       State.mount.querySelectorAll('[data-pole]').forEach(function (el) {
         el.addEventListener('click', function () { demarrerPole(el.getAttribute('data-pole')); });
       });
       State.mount.querySelectorAll('[data-cat]').forEach(function (el) {
-        el.addEventListener('click', function () { demarrerCategorie(el.getAttribute('data-cat'), true); });
+        el.addEventListener('click', function () {
+          var id = el.getAttribute('data-cat');
+          demarrerCategorie(id, _peutEditerCategorie(id));
+        });
       });
     });
   }
 
   function enteteChoix() {
     return '<header class="pa-head"><h1>Planification annuelle</h1>' +
-      '<p class="pa-sub">Responsable EDR — choisissez une trame de pôle ou une catégorie à planifier.</p></header>';
+      '<p class="pa-sub">Choisissez une trame de pôle ou une catégorie à planifier.</p></header>';
   }
 
   function extraireListe(res) {
