@@ -69,6 +69,27 @@
     return (typeof window !== 'undefined' && window.SupabaseHub) ? window.SupabaseHub : null;
   }
 
+  // Résout le libellé court d'une catégorie (« M14 ») à partir de son
+  // UUID, via getCategories() du socle. Cache simple (la liste ne
+  // change pas dans une session). Repli : null → l'appelant met un
+  // texte neutre plutôt qu'un « M14 » en dur potentiellement faux.
+  var _catLibCache = null;
+  function _libelleCategorie(categorieId) {
+    if (!categorieId) return Promise.resolve(null);
+    var hub = _hub();
+    if (!hub || typeof hub.getCategories !== 'function') return Promise.resolve(null);
+    var p = _catLibCache
+      ? Promise.resolve(_catLibCache)
+      : Promise.resolve(hub.getCategories()).then(function (cats) {
+          _catLibCache = Array.isArray(cats) ? cats : [];
+          return _catLibCache;
+        }).catch(function () { return []; });
+    return p.then(function (cats) {
+      var c = (cats || []).find(function (x) { return x && x.id === categorieId; });
+      return c ? (c.libelle_court || c.code || null) : null;
+    });
+  }
+
   function escapeHtml(s) {
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -379,7 +400,7 @@
       el.innerHTML =
         '<header class="ss-fiche-head">' +
           '<h1>' + escapeHtml(label) + '</h1>' +
-          '<p class="ss-sub">M14 · Saison en cours</p>' +
+          '<p class="ss-sub">Saison en cours</p>' +
         '</header>' +
         '<div id="ss-fiche-body"><p class="ss-load">Calcul du temps de jeu…</p></div>';
 
@@ -534,9 +555,20 @@
       (auMoinsUnChrono ? '' : '<p class="ss-note">Le tri par temps de jeu s\'activera dès le 1ᵉʳ match chronométré ; tri actuel = matchs en compo.</p>');
 
     el.innerHTML =
-      '<header class="ss-pilot-head"><h1>Pilotage de saison</h1><p class="ss-sub">M14 · vue staff + équipe</p></header>' +
+      '<header class="ss-pilot-head"><h1>Pilotage de saison</h1><p class="ss-sub" id="ss-pilot-soustitre">vue staff + équipe</p></header>' +
       '<section class="ss-bloc ss-bloc--equipe"><h2>Niveau équipe</h2>' + equipeHtml + '</section>' +
       '<section class="ss-bloc ss-bloc--effectif"><h2>Effectif</h2>' + effectifHtml + '</section>';
+
+    // Résout le vrai libellé de la catégorie pilotée et préfixe le
+    // sous-titre (« M14 · vue staff + équipe »). Post-render async,
+    // dégradation honnête : si le libellé est introuvable, le
+    // sous-titre reste neutre (« vue staff + équipe »), jamais un
+    // « M14 » faux quand on pilote une autre catégorie.
+    _libelleCategorie(categorieId).then(function (lib) {
+      if (!lib) return;
+      var st = document.getElementById('ss-pilot-soustitre');
+      if (st) st.textContent = lib + ' · vue staff + équipe';
+    });
   }
 
   function _kpi(label, valeur) {
