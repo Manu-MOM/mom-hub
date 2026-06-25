@@ -11,6 +11,15 @@
  *   - 5.5.A : éditeur méta + sauvegarde manuelle (CETTE VERSION)
  *   - 5.5.B : autosave 30s + dropdowns lieu/événement + champs secondaires
  *
+ * Version : 1.16 — FIX pioche encadrants méta (recette Lohann, juin 2026)
+ *   v1.16 : La pioche « encadrants » de la méta séance proposait les coachs
+ *           M14 pour TOUTES les catégories. Cause : ses propositions venaient
+ *           de State.encadrantsRef (miroir data/encadrants-par-categorie.json
+ *           figé, ne contenant que la clé cat-m14). Corrigé : propositions
+ *           depuis State.staffDisponible (vrai staff de la catégorie, même
+ *           source que la pioche coachs des blocs, résolue via getCategorieEquipe).
+ *           Le champ libre du menu reste pour un intervenant hors staff.
+ *           Stockage encadrants_text inchangé. node --check OK. boot v1.15 → v1.16.
  * Version : 1.15 — PDF : nom de fichier daté + logo + Joueurs aéré (juin 2026)
  *   v1.15 : Finitions PDF (recette). (1) Nom de fichier distinct par export,
  *           préfixé date AAAA-MM-JJ : « <date> - MOM Hub · Séance <CAT>
@@ -753,8 +762,15 @@
     if (!hidden) return;
     const tagsActuels = new Set(stringToTags(hidden.value));
 
-    // Propositions depuis State.encadrantsRef (chargé par loadEncadrantsForCategorie)
-    const propose = (State.encadrantsRef || []).map(e => e.nom);
+    // Propositions depuis le VRAI staff de la catégorie (State.staffDisponible,
+    // même source que la pioche coachs des blocs, résolue via la vraie
+    // catégorie de l'équipe). v1.16 : remplace State.encadrantsRef, qui venait
+    // du miroir data/encadrants-par-categorie.json figé sur M14 (bug : proposait
+    // les coachs M14 pour toutes les catégories). Le champ libre ci-dessous
+    // reste disponible pour un intervenant hors staff.
+    const propose = (State.staffDisponible || [])
+      .map(function (p) { return ((p.prenom || '') + ' ' + (p.nom || '')).trim(); })
+      .filter(Boolean);
 
     let html =
       '<div id="seance-encadrants-menu" class="seance-encadrants-menu">' +
@@ -4854,7 +4870,7 @@
     });
 
     console.log(
-      '%c🏉 Seance Editor v1.15 (parallèles + multi-coachs + PDF Coach/Joueurs) chargé',
+      '%c🏉 Seance Editor v1.16 (parallèles + multi-coachs + PDF Coach/Joueurs) chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         seances: State.seances.length,
