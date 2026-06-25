@@ -2320,25 +2320,42 @@
         line-height: 1.4;
       }
       .seance-print__header {
-        border-bottom: 2.5pt solid #2d7a3e;
-        padding-bottom: 8pt;
+        background: #0c3d24 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        border-bottom: 3pt solid #2d7a3e;
+        padding: 10pt 12pt;
         margin-bottom: 12pt;
+        border-radius: 4pt 4pt 0 0;
       }
+      .seance-print__brand {
+        display: flex;
+        align-items: center;
+        gap: 12pt;
+      }
+      .seance-print__logo {
+        width: 46pt;
+        height: 46pt;
+        object-fit: contain;
+        flex: 0 0 auto;
+      }
+      .seance-print__brand-text { flex: 1 1 auto; }
       .seance-print__titre {
         font-family: 'Oswald', Arial, sans-serif;
-        font-size: 18pt;
+        font-size: 17pt;
         font-weight: 600;
         letter-spacing: 0.02em;
         text-transform: uppercase;
-        color: #0c3d24;
-        margin: 0 0 6pt;
+        color: #fff;
+        margin: 0 0 4pt;
       }
+      .seance-print__public { color: #d4a93a; }
       .seance-print__meta {
         display: flex;
         flex-wrap: wrap;
-        gap: 18pt;
-        font-size: 10.5pt;
-        color: #2a4836;
+        gap: 16pt;
+        font-size: 10pt;
+        color: #efe9d6;
       }
       .seance-print__objectifs {
         margin: 8pt 0 0;
@@ -2433,23 +2450,24 @@
         text-align: center;
       }
 
-      /* v1.14 — badge public (Coachs / Joueurs) dans le titre. */
-      .seance-print__public {
-        font-size: 11pt;
-        font-weight: 400;
-        color: #2d7a3e;
-      }
+      /* v1.15 — badge public : voir .seance-print__public dans le header (or). */
 
-      /* v1.14 — MODE JOUEURS : tableau compact 5 colonnes. */
+      /* v1.14/v1.15 — MODE JOUEURS : tableau compact 5 colonnes, aéré. */
       .seance-print__jtable {
         width: 100%;
         border-collapse: collapse;
-        margin-top: 8pt;
+        margin-top: 10pt;
+        table-layout: fixed;
       }
+      .seance-print__jtable col.c-horaire  { width: 17%; }
+      .seance-print__jtable col.c-bloc     { width: 40%; }
+      .seance-print__jtable col.c-duree    { width: 11%; }
+      .seance-print__jtable col.c-intensite{ width: 16%; }
+      .seance-print__jtable col.c-coachs   { width: 16%; }
       .seance-print__jtable thead th {
         text-align: left;
         font-family: 'Oswald', Arial, sans-serif;
-        font-size: 9.5pt;
+        font-size: 10.5pt;
         font-weight: 600;
         letter-spacing: 0.04em;
         text-transform: uppercase;
@@ -2457,13 +2475,14 @@
         background: #2d7a3e !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
-        padding: 5pt 8pt;
+        padding: 8pt 10pt;
       }
       .seance-print__jtable td {
-        padding: 5pt 8pt;
-        border-bottom: 0.5pt solid #cabe9f;
+        padding: 10pt 10pt;
+        border-bottom: 0.75pt solid #cabe9f;
         vertical-align: top;
-        font-size: 10.5pt;
+        font-size: 12pt;
+        line-height: 1.35;
       }
       .seance-print__jtable tbody tr { page-break-inside: avoid; }
       .seance-print__horaire {
