@@ -11,6 +11,17 @@
  *   - 5.5.A : éditeur méta + sauvegarde manuelle (CETTE VERSION)
  *   - 5.5.B : autosave 30s + dropdowns lieu/événement + champs secondaires
  *
+ * Version : 1.13 — MULTI-COACHS par bloc (recette terrain, juin 2026)
+ *   v1.13 : Un bloc peut être encadré par PLUSIEURS coachs (liste plate
+ *           égalitaire, sql_110 encadrants_ids uuid[]). Le <select> coach
+ *           unique devient une PIOCHE À CASES À COCHER (buildCheckboxesCoachs,
+ *           data-coach-id). Collecte custom : cases cochées agrégées en
+ *           patch.encadrants_ids au save (hors collecte générique
+ *           data-bloc-field). Dirty tracking sur les cases. Lecture multi :
+ *           _nomsCoachsBloc (pluriel) pour la trame ET le PDF (un tag par
+ *           coach), avec repli sur encadrant_id déprécié si encadrants_ids
+ *           vide. buildSelectCoach / _nomCoachBloc conservés (rétro-compat).
+ *           node --check OK. boot v1.12 → v1.13.
  * Version : 1.12 — PDF enrichi (recette terrain, juin 2026)
  *   v1.12 : Export PDF enrichi par bloc (demande recette). _buildPrintHtml
  *           passe d'un tableau 4 colonnes à un format « fiche par étage » :
@@ -1675,6 +1686,24 @@
     return ((p.prenom || '') + ' ' + (p.nom || '')).trim();
   }
 
+  /**
+   * Noms des coachs d'un bloc à partir de sa liste encadrants_ids (v1.13).
+   * Multi-coachs : renvoie un tableau de noms (ordre de la liste). Replie
+   * sur encadrant_id (déprécié) si encadrants_ids est vide mais que
+   * l'ancien champ est encore renseigné (rétro-compat lecture). Un id non
+   * résolu dans State.staffDisponible est rendu '⚠️ hors liste' plutôt que
+   * masqué (honest degradation).
+   */
+  function _nomsCoachsBloc(b) {
+    const liste = Array.isArray(State.staffDisponible) ? State.staffDisponible : [];
+    let ids = Array.isArray(b.encadrants_ids) ? b.encadrants_ids.slice() : [];
+    if (ids.length === 0 && b.encadrant_id) ids = [b.encadrant_id]; // repli déprécié
+    return ids.map(function (id) {
+      const p = liste.find(function (x) { return x.personne_id === id; });
+      return p ? (((p.prenom || '') + ' ' + (p.nom || '')).trim() || id) : '⚠️ hors liste';
+    }).filter(Boolean);
+  }
+
   function renderTrame() {
     const area = DOM.editorArea();
     if (!area || !State.currentSeance) return;
@@ -1764,7 +1793,8 @@
           const emoji = (t && t.emoji) || '·';
           const libType = (t && t.libelle) || b.type_bloc;
           const titreCompl = b.titre_precision ? ' — ' + escapeHtml(b.titre_precision) : '';
-          const coachNom = _nomCoachBloc(b.encadrant_id);
+          const coachsNoms = _nomsCoachsBloc(b);
+          const coachLabel = coachsNoms.length ? coachsNoms.join(', ') : '';
           const dureeVoie = (parallele && b.duree_min !== dureeEtage)
             ? '<span class="seance-trame__voie-duree">' + b.duree_min + ' min</span>' : '';
           cellBlocs +=
@@ -1774,7 +1804,7 @@
               '<span class="seance-trame__emoji">' + emoji + '</span> ' +
               '<span class="seance-trame__type">' + escapeHtml(libType) + '</span>' +
               '<span class="seance-trame__precision">' + titreCompl + '</span>' +
-              (coachNom ? '<span class="seance-trame__coach">👤 ' + escapeHtml(coachNom) + '</span>' : '') +
+              (coachLabel ? '<span class="seance-trame__coach">👤 ' + escapeHtml(coachLabel) + '</span>' : '') +
               dureeVoie +
             '</div>';
         });
@@ -2049,23 +2079,53 @@
    *
    * @param {string|null} selectedId encadrant_id courant du bloc
    */
-  function buildSelectCoach(selectedId) {
+  /**
+   * Construit la pioche à cases à cocher des coachs d'un bloc (v1.13).
+   * Multi-coachs (liste plate égalitaire, encadrants_ids uuid[]).
+   * Source : State.staffDisponible. Coche les ids déjà présents dans
+   * selectedIds. Un id sélectionné absent de la liste (coach retiré du
+   * staff mais encore en base) est rendu coché avec mention « hors liste »
+   * pour ne pas le perdre silencieusement (honest degradation).
+   *
+   * Chaque case porte data-coach-id (PAS data-bloc-field) : la collecte
+   * générique ignore donc ces cases ; elles sont agrégées séparément en
+   * encadrants_ids lors du save.
+   *
+   * @param {string[]} selectedIds liste courante encadrants_ids du bloc
+   */
+  function buildCheckboxesCoachs(selectedIds) {
+    const sel = Array.isArray(selectedIds) ? selectedIds : [];
     const liste = Array.isArray(State.staffDisponible) ? State.staffDisponible : [];
-    let html = '<option value="">— Aucun coach désigné —</option>';
-    let trouve = false;
-    liste.forEach(function (p) {
-      const id = p.personne_id;
-      const nom = ((p.prenom || '') + ' ' + (p.nom || '')).trim() || id;
-      const sel = (id === selectedId) ? ' selected' : '';
-      if (id === selectedId) trouve = true;
-      html += '<option value="' + escapeHtml(id) + '"' + sel + '>' + escapeHtml(nom) + '</option>';
-    });
-    // Affectation orpheline : selectedId non listé mais bien présent en base.
-    if (selectedId && !trouve) {
-      html += '<option value="' + escapeHtml(selectedId) + '" selected>' +
-                '⚠️ Coach hors liste (conservé)' +
-              '</option>';
+    let html = '<div class="seance-coachs-pioche" id="seance-coachs-pioche">';
+
+    if (liste.length === 0) {
+      html += '<p class="seance-coachs-pioche__vide">Aucun coach disponible (pioche vide).</p>';
+    } else {
+      liste.forEach(function (p) {
+        const id = p.personne_id;
+        const nom = ((p.prenom || '') + ' ' + (p.nom || '')).trim() || id;
+        const checked = sel.indexOf(id) !== -1 ? ' checked' : '';
+        html +=
+          '<label class="seance-coachs-pioche__item">' +
+            '<input type="checkbox" class="seance-coachs-pioche__cb" data-coach-id="' + escapeHtml(id) + '"' + checked + '>' +
+            '<span>' + escapeHtml(nom) + '</span>' +
+          '</label>';
+      });
     }
+
+    // Coachs sélectionnés mais hors liste (conservés, cochés, signalés).
+    sel.forEach(function (id) {
+      const present = liste.some(function (p) { return p.personne_id === id; });
+      if (!present) {
+        html +=
+          '<label class="seance-coachs-pioche__item seance-coachs-pioche__item--orphelin">' +
+            '<input type="checkbox" class="seance-coachs-pioche__cb" data-coach-id="' + escapeHtml(id) + '" checked>' +
+            '<span>⚠️ Coach hors liste (conservé)</span>' +
+          '</label>';
+      }
+    });
+
+    html += '</div>';
     return html;
   }
 
@@ -2171,14 +2231,18 @@
                  'value="' + escapeHtml(b.titre_precision || '') + '">' +
         '</label>' +
 
-        // v1.10 (sql_108) — Coach encadrant de CE bloc (FK personnes via encadrant_id).
-        // Source : State.staffDisponible (UUID réels). Option vide = aucun coach (null).
-        '<label class="seance-field seance-field--full">' +
-          '<span class="seance-field__label">Coach encadrant (ce bloc)</span>' +
-          '<select class="seance-field__input" data-bloc-field="encadrant_id">' +
-            buildSelectCoach(b.encadrant_id) +
-          '</select>' +
-        '</label>' +
+        // v1.13 (sql_110) — Coachs encadrant CE bloc : MULTI (liste plate
+        // encadrants_ids). Pioche à cases à cocher. data-coach-id (pas
+        // data-bloc-field) -> agrégé séparément au save. Repli lecture sur
+        // encadrant_id déprécié si encadrants_ids vide.
+        '<div class="seance-field seance-field--full">' +
+          '<span class="seance-field__label">Coachs encadrant (ce bloc)</span>' +
+          buildCheckboxesCoachs(
+            (Array.isArray(b.encadrants_ids) && b.encadrants_ids.length)
+              ? b.encadrants_ids
+              : (b.encadrant_id ? [b.encadrant_id] : [])
+          ) +
+        '</div>' +
 
       '</div>';
 
@@ -2338,6 +2402,11 @@
     DOM.blocInputs().forEach(function (el) {
       el.addEventListener('input',  function () { setBlocDirty(true); });
       el.addEventListener('change', function () { setBlocDirty(true); });
+    });
+
+    // v1.13 — dirty sur les cases à cocher coachs (hors data-bloc-field)
+    document.querySelectorAll('.seance-coachs-pioche__cb').forEach(function (cb) {
+      cb.addEventListener('change', function () { setBlocDirty(true); });
     });
 
     // Phase 5.8 : binds section ateliers
@@ -4069,11 +4138,14 @@
           const t = lookupTypeBloc(b.type_bloc);
           const emoji = (t && t.emoji) || '·';
           const libType = (t && t.libelle) || b.type_bloc;
-          const coach = _nomCoachBloc(b.encadrant_id);
+          const coachs = _nomsCoachsBloc(b);
           const intensite = _libelleIntensite(b.intensite);
           const axe2 = _libelleSlugAxe('axe_2_types_unites', b.etiquette_axe2);
           const axe3 = _libelleSlugAxe('axe_3_composants_echauffement', b.etiquette_axe3);
           const resumeAxe4 = _resumeAxe4(b.contenu_pedagogique_axe4);
+          const coachsTags = coachs.map(function (nom) {
+            return '<span class="seance-print__tag">👤 ' + escapeHtml(nom) + '</span>';
+          }).join('');
 
           html +=
             '<div class="seance-print__bloc">' +
@@ -4082,7 +4154,7 @@
                 (b.titre_precision ? ' — ' + escapeHtml(b.titre_precision) : '') +
               '</div>' +
               '<div class="seance-print__bloc-tags">' +
-                (coach ? '<span class="seance-print__tag">👤 ' + escapeHtml(coach) + '</span>' : '') +
+                coachsTags +
                 (intensite ? '<span class="seance-print__tag">💥 ' + escapeHtml(intensite) + '</span>' : '') +
                 (axe2 ? '<span class="seance-print__tag">🏷 ' + escapeHtml(axe2) + '</span>' : '') +
                 (axe3 ? '<span class="seance-print__tag">🏷 ' + escapeHtml(axe3) + '</span>' : '') +
@@ -4198,6 +4270,18 @@
       if (v) axe4Patch[slug] = v;
     });
     patch.contenu_pedagogique_axe4 = axe4Patch;
+
+    // v1.13 — Multi-coachs : agrège les cases cochées de la pioche en
+    // encadrants_ids (uuid[]). Ces cases portent data-coach-id (hors
+    // collecte générique data-bloc-field). Liste vide = aucun coach.
+    const encadrantsIds = [];
+    document.querySelectorAll('.seance-coachs-pioche__cb').forEach(function (cb) {
+      if (cb.checked) {
+        const id = cb.getAttribute('data-coach-id');
+        if (id && encadrantsIds.indexOf(id) === -1) encadrantsIds.push(id);
+      }
+    });
+    patch.encadrants_ids = encadrantsIds;
 
     const res = await SupabaseHub.updateBloc(State.currentBloc.id, patch);
 
@@ -4568,7 +4652,7 @@
     });
 
     console.log(
-      '%c🏉 Seance Editor v1.12 (blocs parallèles + coach + PDF enrichi) chargé',
+      '%c🏉 Seance Editor v1.13 (blocs parallèles + multi-coachs + PDF) chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         seances: State.seances.length,
