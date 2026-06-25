@@ -4,6 +4,17 @@
  *
  * Module IIFE — initialise l'UI de la page joueurs.html.
  *
+ * Version : v1.6 — 25 juin 2026
+ *   v1.6 : JOUEURS-AFFICHAGE-PAR-CATEGORIE (pt 110). Aiguillage élargi :
+ *          toute catégorie autre que F15 est chargée via
+ *          SupabaseHub.getJoueursCategorie() (RPC get_joueurs_categorie /
+ *          sql_112), par personnes.categorie_id. Corrige l'effectif vide
+ *          sur 13 catégories sur 14 (seule M14 passait par equipe_joueurs ;
+ *          les autres ont leurs joueurs rattachés à la catégorie sans
+ *          ligne d'équipe → ~239 joueurs invisibles). M14 bascule aussi
+ *          (voie unique). F15 garde son aiguillage flag (v1.5). La boucle
+ *          équipes devient le repli (socle < v1.68 ou cat non résolue).
+ *          node --check OK.
  * Version : v1.5 — 25 juin 2026
  *   v1.5 : JOUEURS-PERIMETRE-F15 (pt 109). Aiguillage de chargement :
  *          si la catégorie active est F15 (F15_CAT_UUID), l'effectif
@@ -124,6 +135,22 @@ window.JoueursBrowser = (function () {
         && typeof SupabaseHub !== 'undefined'
         && typeof SupabaseHub.getJoueursF15 === 'function') {
       return await SupabaseHub.getJoueursF15();
+    }
+
+    // Aiguillage CATÉGORIE (pt 110) : toute catégorie autre que F15 est
+    // chargée par personnes.categorie_id via get_joueurs_categorie()
+    // (wrapper getJoueursCategorie) — même shape de sortie. C'est la voie
+    // nominale : 13 catégories sur 14 ont leurs joueurs rattachés à la
+    // catégorie SANS ligne equipe_joueurs (seule M14 passait par équipe),
+    // donc la boucle équipes les affichait vides. M14 bascule aussi (voie
+    // unique ; sonde : 0 joueur perdu, +1 = Auriane sans équipe).
+    // Dégradation honnête : si le wrapper est absent (socle < v1.68) ou
+    // la catégorie active non résolue, on retombe sur la boucle équipes
+    // ci-dessous (comportement d'origine).
+    if (catActive
+        && typeof SupabaseHub !== 'undefined'
+        && typeof SupabaseHub.getJoueursCategorie === 'function') {
+      return await SupabaseHub.getJoueursCategorie(catActive);
     }
 
     const equipes = await _joueursResoudreEquipesActives();
@@ -1576,7 +1603,7 @@ window.JoueursBrowser = (function () {
     _byId: () => JOUEURS_BY_ID,
     _postesById: () => POSTES_BY_ID,
     _aptitudesById: () => APTITUDES_BY_ID,
-    _version: 'v1.5'  /* pt 109 : aiguillage F15 (RPC get_joueurs_f15, périmètre par flag) */
+    _version: 'v1.6'  /* pt 110 : aiguillage par catégorie (RPC get_joueurs_categorie) */
   };
 
 })();
