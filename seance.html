@@ -2432,6 +2432,73 @@
         color: #6b7a6f;
         text-align: center;
       }
+
+      /* v1.14 — badge public (Coachs / Joueurs) dans le titre. */
+      .seance-print__public {
+        font-size: 11pt;
+        font-weight: 400;
+        color: #2d7a3e;
+      }
+
+      /* v1.14 — MODE JOUEURS : tableau compact 5 colonnes. */
+      .seance-print__jtable {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 8pt;
+      }
+      .seance-print__jtable thead th {
+        text-align: left;
+        font-family: 'Oswald', Arial, sans-serif;
+        font-size: 9.5pt;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #fff;
+        background: #2d7a3e !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        padding: 5pt 8pt;
+      }
+      .seance-print__jtable td {
+        padding: 5pt 8pt;
+        border-bottom: 0.5pt solid #cabe9f;
+        vertical-align: top;
+        font-size: 10.5pt;
+      }
+      .seance-print__jtable tbody tr { page-break-inside: avoid; }
+      .seance-print__horaire {
+        font-family: 'Courier New', monospace;
+        font-size: 9.5pt;
+        white-space: nowrap;
+        color: #0c3d24;
+      }
+      .seance-print__duree {
+        font-family: 'Courier New', monospace;
+        font-size: 9.5pt;
+        white-space: nowrap;
+      }
+
+      /* v1.14 — MODE COACH : ateliers rattachés (lien Drive). */
+      .seance-print__ateliers {
+        margin-top: 4pt;
+        padding-top: 3pt;
+        border-top: 0.5pt dotted #cabe9f;
+        font-size: 9.5pt;
+        color: #2a4836;
+      }
+      .seance-print__atelier {
+        margin: 2pt 0;
+        word-break: break-all;
+      }
+      .seance-print__atelier-lien {
+        color: #2d7a3e;
+        text-decoration: underline;
+        font-size: 8.5pt;
+      }
+      .seance-print__atelier-note {
+        font-style: italic;
+        color: #6b7a6f;
+      }
     }
 
   </style>
