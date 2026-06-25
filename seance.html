@@ -2259,6 +2259,43 @@
      * variables / coupe les fonds). Objectif : trame simplifiée,
      * 1–3 pages, lisible en N&B comme en couleur.
      * ============================================================ */
+
+    /* v1.13 (sql_110) — Pioche multi-coachs (cases à cocher) dans le détail bloc. */
+    .seance-coachs-pioche {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 14px;
+      margin-top: 4px;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--paper);
+    }
+    .seance-coachs-pioche__item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: var(--ink-soft);
+      cursor: pointer;
+      user-select: none;
+    }
+    .seance-coachs-pioche__cb {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--vert-prairie);
+      cursor: pointer;
+    }
+    .seance-coachs-pioche__item--orphelin {
+      color: var(--clay);
+    }
+    .seance-coachs-pioche__vide {
+      font-style: italic;
+      color: var(--ink-mute);
+      font-size: 12.5px;
+      margin: 0;
+    }
+
     @media print {
       /* On masque toute l'application et on ne montre que la vue print. */
       body * { visibility: hidden !important; }
