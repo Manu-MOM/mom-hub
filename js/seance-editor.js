@@ -11,6 +11,27 @@
  *   - 5.5.A : éditeur méta + sauvegarde manuelle (CETTE VERSION)
  *   - 5.5.B : autosave 30s + dropdowns lieu/événement + champs secondaires
  *
+ * Version : 1.18 — SEANCE-SOFT-DELETE : durcissement du brouillon (juin 2026)
+ *   v1.18 : Incident pt 107 (RUGBY PP+SKILLS perdue) : un brouillon offrait
+ *           DEUX boutons côte à côte — « 🗑 Supprimer » (DELETE physique
+ *           irréversible) et « 📦 Archiver » (récupérable). Le confirm()
+ *           n'a pas suffi. Durcissement (décision Manu, scénario b) :
+ *           (1) Le bouton « 🗑 Supprimer » du brouillon DISPARAÎT du
+ *               formulaire méta (déplié ET replié). Plus aucun DELETE
+ *               physique à un clic dans l'éditeur. Il ne reste que
+ *               « 📦 Archiver » → tout passe par la corbeille (récupérable).
+ *           (2) Le mode sélection en sidebar agit selon le toggle archivées :
+ *               - vue normale (archivées masquées) → coche les BROUILLONS,
+ *                 bouton « 📦 Archiver N » (archiveSeancesEnLot v1.66) ;
+ *               - vue archivées (toggle ON) → coche les ARCHIVÉES, bouton
+ *                 « 🗑 Supprimer N définitivement » (purge bornée v1.66).
+ *           (3) Purge définitive AUSSI par-ligne : sur chaque ligne archivée
+ *               (toggle ON), un bouton 🗑 → purgerSeanceArchivee v1.66, borné
+ *               serveur .eq('etat','archivee') : impossible de purger sans
+ *               passer d'abord par l'archivage.
+ *           onDeleteSeance / onDeleteSeancesEnLot CONSERVÉS dans le module
+ *           (filet) mais PLUS câblés (chemins morts assumés, tracés).
+ *           node --check OK. boot v1.17 → v1.18.
  * Version : 1.17 — FIX staff non rechargé au changement de catégorie (juin 2026)
  *   v1.17 : Bug recette (Manu) : après changement de catégorie via le
  *           sélecteur (ex. M14 → M10), les pioches coachs (blocs ET méta)
@@ -571,7 +592,10 @@
     btnDeleteCollapsed:   () => document.getElementById('seance-btn-delete-collapsed'),
     btnSidebarSelect:     () => document.getElementById('seance-btn-sidebar-select'),
     btnSidebarSelectExit: () => document.getElementById('seance-btn-sidebar-select-exit'),
-    btnSidebarDelete:     () => document.getElementById('seance-btn-sidebar-delete')
+    btnSidebarDelete:     () => document.getElementById('seance-btn-sidebar-delete'),
+    // Phase 5.13 : actions en lot contextuelles (archivage vs purge)
+    btnSidebarArchive:    () => document.getElementById('seance-btn-sidebar-archive'),
+    btnSidebarPurge:      () => document.getElementById('seance-btn-sidebar-purge')
   };
 
   // ============================================================
@@ -1178,26 +1202,42 @@
         const titre = s.axe_travail_general
           ? escapeHtml(s.axe_travail_general).substring(0, 60)
           : (s.theme_principal ? escapeHtml(s.theme_principal).substring(0, 60) : 'Séance sans thème');
-        // Phase 5.12 BIS : case à cocher si mode sélection ET séance brouillon
-        const peutEtreSupprimee = (s.etat === 'brouillon');
+        // Phase 5.12 BIS + 5.13 : case à cocher en mode sélection. La cible
+        // dépend du toggle archivées :
+        //   - vue normale (archivées masquées) → on coche les BROUILLONS
+        //     (pour archivage en lot, récupérable) ;
+        //   - vue archivées (toggle ON) → on coche les ARCHIVÉES
+        //     (pour purge définitive en lot, irréversible).
+        const peutEtreCochee = State.showArchivees
+          ? (s.etat === 'archivee')
+          : (s.etat === 'brouillon');
         const estCochee = State.selectionIds.has(s.id);
-        const checkboxHtml = (State.selectionMode && peutEtreSupprimee)
+        const checkboxHtml = (State.selectionMode && peutEtreCochee)
           ? '<input type="checkbox" class="seance-list-item__checkbox" ' +
                    'data-seance-id="' + escapeHtml(s.id) + '"' +
                    (estCochee ? ' checked' : '') + '>'
           : '';
-        const isSelectionRowClass = (State.selectionMode && peutEtreSupprimee && estCochee)
+        const isSelectionRowClass = (State.selectionMode && peutEtreCochee && estCochee)
           ? ' is-selection-checked' : '';
-        const isProtectedClass = (State.selectionMode && !peutEtreSupprimee)
+        const isProtectedClass = (State.selectionMode && !peutEtreCochee)
           ? ' is-selection-protected' : '';
+        // Phase 5.13 : bouton purge par-ligne, UNIQUEMENT en vue archivées,
+        // hors mode sélection, sur une séance réellement archivée.
+        const purgeBtnHtml = (State.showArchivees && !State.selectionMode && s.etat === 'archivee')
+          ? '<button type="button" class="seance-list-item__purge-btn" ' +
+                    'data-purge-id="' + escapeHtml(s.id) + '" ' +
+                    'title="Supprimer définitivement cette séance archivée">🗑</button>'
+          : '';
         return (
           '<li class="seance-list-item' + (isSelected ? ' is-selected' : '') +
               isSelectionRowClass + isProtectedClass + '" ' +
               'data-seance-id="' + escapeHtml(s.id) + '" ' +
               (State.selectionMode
-                ? (peutEtreSupprimee
-                    ? 'title="Cocher pour ajouter à la sélection"'
-                    : 'title="Protégée : seuls les brouillons sont supprimables"')
+                ? (peutEtreCochee
+                    ? (State.showArchivees
+                        ? 'title="Cocher pour purger définitivement"'
+                        : 'title="Cocher pour archiver (corbeille)"')
+                    : 'title="Protégée : non cochable dans ce mode"')
                 : 'title="Cliquer pour ouvrir cette séance"') + '>' +
             checkboxHtml +
             '<div class="seance-list-item__main">' +
@@ -1207,6 +1247,7 @@
               '</div>' +
               '<div class="seance-list-item__title">' + titre + '</div>' +
             '</div>' +
+            purgeBtnHtml +
           '</li>'
         );
       }).join('');
@@ -1216,7 +1257,10 @@
     // Footer : 2 cas selon le mode
     let footerHtml = '';
     if (State.selectionMode) {
-      // Phase 5.12 BIS : footer mode sélection — bouton "Supprimer N séance(s)"
+      // Phase 5.12 BIS + 5.13 : footer mode sélection, contextuel au toggle.
+      //   - vue archivées (toggle ON) → purge définitive en lot ;
+      //   - vue normale → archivage en lot (corbeille, récupérable).
+      const enModePurge = State.showArchivees;
       const nbCochees = State.selectionIds.size;
       if (nbCochees > 0) {
         footerHtml =
@@ -1224,16 +1268,24 @@
             '<span class="seance-sidebar__selection-label">' +
               nbCochees + ' s\u00e9lectionn\u00e9' + (nbCochees > 1 ? 'es' : 'e') +
             '</span>' +
-            '<button type="button" id="seance-btn-sidebar-delete" ' +
-                    'class="seance-sidebar__delete-btn" ' +
-                    'title="Supprimer définitivement les séances cochées">' +
-              '🗑 Supprimer' +
-            '</button>' +
+            (enModePurge
+              ? '<button type="button" id="seance-btn-sidebar-purge" ' +
+                        'class="seance-sidebar__delete-btn" ' +
+                        'title="Supprimer définitivement les séances archivées cochées">' +
+                  '🗑 Supprimer' +
+                '</button>'
+              : '<button type="button" id="seance-btn-sidebar-archive" ' +
+                        'class="seance-sidebar__archive-btn" ' +
+                        'title="Archiver les brouillons cochés (corbeille, récupérable)">' +
+                  '📦 Archiver' +
+                '</button>') +
           '</div>';
       } else {
         footerHtml =
           '<div class="seance-sidebar__selection-hint">' +
-            '💡 Coche les brouillons à supprimer' +
+            (enModePurge
+              ? '💡 Coche les archivées à supprimer définitivement'
+              : '💡 Coche les brouillons à archiver') +
           '</div>';
       }
     } else {
@@ -1284,6 +1336,14 @@
       });
     }
 
+    // Phase 5.13 : binds purge par-ligne (vue archivées, hors mode sélection)
+    body.querySelectorAll('.seance-list-item__purge-btn').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation(); // évite d'ouvrir la séance
+        onPurgerSeanceArchivee(btn.getAttribute('data-purge-id'));
+      });
+    });
+
     // Phase 5.10 : câbles toggle archivées et bouton nettoyage
     const toggle = DOM.toggleArchivees();
     if (toggle) toggle.addEventListener('change', onToggleArchivees);
@@ -1295,8 +1355,11 @@
     if (btnSelect) btnSelect.addEventListener('click', enterSelectionMode);
     const btnSelectExit = DOM.btnSidebarSelectExit();
     if (btnSelectExit) btnSelectExit.addEventListener('click', exitSelectionMode);
-    const btnSidebarDelete = DOM.btnSidebarDelete();
-    if (btnSidebarDelete) btnSidebarDelete.addEventListener('click', onDeleteSeancesEnLot);
+    // Phase 5.13 : le bouton d'action en lot dépend du toggle archivées.
+    const btnSidebarArchive = DOM.btnSidebarArchive();
+    if (btnSidebarArchive) btnSidebarArchive.addEventListener('click', onArchiveSeancesEnLot);
+    const btnSidebarPurge = DOM.btnSidebarPurge();
+    if (btnSidebarPurge) btnSidebarPurge.addEventListener('click', onPurgerSeancesArchiveesEnLot);
   }
 
   // ============================================================
@@ -1382,14 +1445,9 @@
                 '↩ Brouillon' +
               '</button>'
             : '') +
-          // Phase 5.12 BIS : bouton 🗑 Supprimer dans le résumé replié
-          (s.etat === 'brouillon'
-            ? '<button type="button" id="seance-btn-delete-collapsed" ' +
-                      'class="seance-form__delete-btn" ' +
-                      'title="Supprimer définitivement ce brouillon">' +
-                '🗑 Supprimer' +
-              '</button>'
-            : '') +
+          // Phase 5.13 SEANCE-SOFT-DELETE : bouton « 🗑 Supprimer » du
+          // brouillon RETIRÉ aussi dans le résumé replié (durcissement).
+          '' +
           // Phase 5.10 : bouton Archiver dans le résumé replié
           '<button type="button" id="seance-btn-archive-collapsed" ' +
                   'class="seance-form__archive-btn" ' +
@@ -1479,14 +1537,11 @@
                   '↩ Brouillon' +
                 '</button>'
               : '') +
-            // Phase 5.12 BIS : bouton 🗑 Supprimer (uniquement si brouillon)
-            (s.etat === 'brouillon'
-              ? '<button type="button" id="seance-btn-delete-expanded" ' +
-                        'class="seance-form__delete-btn" ' +
-                        'title="Supprimer définitivement ce brouillon">' +
-                  '🗑 Supprimer' +
-                '</button>'
-              : '') +
+            // Phase 5.13 SEANCE-SOFT-DELETE : bouton « 🗑 Supprimer » du
+            // brouillon RETIRÉ (durcissement). Le brouillon se met à la
+            // corbeille via « 📦 Archiver » (récupérable). Purge définitive
+            // uniquement dans la vue archivées (toggle ON).
+            '' +
             // Phase 5.10 : bouton Archiver (désactivé si déjà archivée)
             '<button type="button" id="seance-btn-archive-expanded" ' +
                     'class="seance-form__archive-btn" ' +
@@ -3323,6 +3378,10 @@
     const toggle = DOM.toggleArchivees();
     if (!toggle) return;
     State.showArchivees = toggle.checked;
+    // Phase 5.13 : la cible cochable change avec le toggle (brouillons en vue
+    // normale, archivées en vue archivées) → on vide la sélection courante
+    // pour éviter de garder cochés des items devenus non cochables.
+    if (State.selectionMode) State.selectionIds.clear();
     await loadSeances();
     renderSidebar();
   }
@@ -3604,10 +3663,146 @@
     showFeedback(res.deleted_count + ' brouillon' + (res.deleted_count > 1 ? 's supprimés' : ' supprimé') + ' ✓', 'success');
   }
 
+  // ------------------------------------------------------------
+  // Phase 5.13 — Durcissement soft-delete (SEANCE-SOFT-DELETE)
+  // ------------------------------------------------------------
+
   /**
-   * Bascule le mode "Sélectionner" : cases à cocher apparaissent sur les
-   * brouillons en sidebar, le clic sur un item ne charge plus la séance.
+   * Archive en lot les brouillons cochés (vue normale, mode sélection).
+   * Remplace l'usage UI de onDeleteSeancesEnLot : « mettre à la corbeille »
+   * au lieu de supprimer. Récupérable via le toggle « Afficher les archivées ».
    */
+  async function onArchiveSeancesEnLot() {
+    if (State.selectionIds.size === 0) return;
+
+    const nb = State.selectionIds.size;
+    const ok = window.confirm(
+      'Archiver ' + nb + ' brouillon' + (nb > 1 ? 's' : '') + ' ?\n\n' +
+      '📦 Les séances seront mises à la corbeille (état « archivée »).\n' +
+      'Elles restent récupérables via « Afficher les archivées ».'
+    );
+    if (!ok) return;
+
+    const ids = Array.from(State.selectionIds);
+    const res = await SupabaseHub.archiveSeancesEnLot(ids);
+    if (!res.ok) {
+      window.alert('Échec de l\'archivage en lot :\n' + (res.error || 'erreur inconnue'));
+      return;
+    }
+
+    // Si la séance courante est dans la liste archivée, reset l'éditeur
+    if (State.currentSeance && ids.indexOf(State.currentSeance.id) !== -1) {
+      State.currentSeance = null;
+      State.blocs = [];
+      State.currentBloc = null;
+      State.view = 'trame';
+      State.isDirty = false;
+      State.blocIsDirty = false;
+      stopAutosave();
+      stopBlocAutosave();
+      renderEmptyEditor();
+    }
+
+    // Sort du mode sélection puis recharge la liste (les archivées sont
+    // désormais filtrées de la vue normale par loadSeances).
+    State.selectionMode = false;
+    State.selectionIds.clear();
+    await loadSeances();
+    renderSidebar();
+
+    const n = res.archived_count;
+    showFeedback(n + ' brouillon' + (n > 1 ? 's archivés' : ' archivé') + ' 📦', 'success');
+  }
+
+  /**
+   * Purge DÉFINITIVE d'UNE séance archivée (bouton 🗑 par-ligne, vue archivées).
+   * Borné serveur par le wrapper purgerSeanceArchivee (.eq('etat','archivee')).
+   */
+  async function onPurgerSeanceArchivee(seanceId) {
+    if (!seanceId) return;
+    const s = State.seances.find(function (x) { return x.id === seanceId; });
+    const dateLib = (s && s.date_seance) ? formatDateShort(s.date_seance) : 'sans date';
+    const titreLib = s ? (s.axe_travail_general || s.theme_principal || 'sans thème') : '';
+
+    const ok = window.confirm(
+      'Supprimer DÉFINITIVEMENT cette séance archivée ?\n\n' +
+      '🗓  ' + dateLib + '\n' +
+      (titreLib ? '📋 ' + titreLib + '\n' : '') + '\n' +
+      '⚠️ Cette action est IRRÉVERSIBLE. La séance et tous ses blocs ' +
+      'seront définitivement supprimés. Il n\'y a pas de récupération possible.'
+    );
+    if (!ok) return;
+
+    const res = await SupabaseHub.purgerSeanceArchivee(seanceId);
+    if (!res.ok) {
+      window.alert('Échec de la suppression définitive :\n' + (res.error || 'erreur inconnue'));
+      return;
+    }
+
+    // Si la séance purgée est la courante, reset l'éditeur
+    if (State.currentSeance && State.currentSeance.id === seanceId) {
+      State.currentSeance = null;
+      State.blocs = [];
+      State.currentBloc = null;
+      State.view = 'trame';
+      State.isDirty = false;
+      State.blocIsDirty = false;
+      stopAutosave();
+      stopBlocAutosave();
+      renderEmptyEditor();
+    }
+
+    State.seances = State.seances.filter(function (x) { return x.id !== seanceId; });
+    renderSidebar();
+    showFeedback('Séance supprimée définitivement ✓', 'success');
+  }
+
+  /**
+   * Purge DÉFINITIVE en lot des séances archivées cochées (vue archivées,
+   * mode sélection). Borné serveur par purgerSeancesArchiveesEnLot.
+   */
+  async function onPurgerSeancesArchiveesEnLot() {
+    if (State.selectionIds.size === 0) return;
+
+    const nb = State.selectionIds.size;
+    const ok = window.confirm(
+      'Supprimer DÉFINITIVEMENT ' + nb + ' séance' + (nb > 1 ? 's' : '') + ' archivée' + (nb > 1 ? 's' : '') + ' ?\n\n' +
+      '⚠️ Cette action est IRRÉVERSIBLE. Les séances et tous leurs blocs ' +
+      'seront définitivement supprimés, sans récupération possible.'
+    );
+    if (!ok) return;
+
+    const ids = Array.from(State.selectionIds);
+    const res = await SupabaseHub.purgerSeancesArchiveesEnLot(ids);
+    if (!res.ok) {
+      window.alert('Échec de la suppression définitive en lot :\n' + (res.error || 'erreur inconnue'));
+      return;
+    }
+
+    if (State.currentSeance && ids.indexOf(State.currentSeance.id) !== -1) {
+      State.currentSeance = null;
+      State.blocs = [];
+      State.currentBloc = null;
+      State.view = 'trame';
+      State.isDirty = false;
+      State.blocIsDirty = false;
+      stopAutosave();
+      stopBlocAutosave();
+      renderEmptyEditor();
+    }
+
+    const idsSet = new Set(ids);
+    State.seances = State.seances.filter(function (s) { return !idsSet.has(s.id); });
+
+    State.selectionMode = false;
+    State.selectionIds.clear();
+    renderSidebar();
+
+    const n = res.purged_count;
+    showFeedback(n + ' séance' + (n > 1 ? 's supprimées' : ' supprimée') + ' définitivement ✓', 'success');
+  }
+
+  /**
   function enterSelectionMode() {
     State.selectionMode = true;
     State.selectionIds = new Set();
@@ -4885,7 +5080,7 @@
     });
 
     console.log(
-      '%c🏉 Seance Editor v1.17 (parallèles + multi-coachs + PDF Coach/Joueurs) chargé',
+      '%c🏉 Seance Editor v1.18 (parallèles + multi-coachs + PDF + soft-delete durci) chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         seances: State.seances.length,
