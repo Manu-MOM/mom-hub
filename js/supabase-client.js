@@ -18,6 +18,15 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 1.67 — juin 2026
+ *   v1.67 : JOUEURS-PERIMETRE-F15 (pt 109). 1 wrapper ADDITIF
+ *           getJoueursF15() adossé à la RPC get_joueurs_f15 (sql_111),
+ *           jumelle de get_joueurs_equipe (même shape de sortie). Ferme
+ *           le bug recette : la catégorie F15 (sans équipe rattachée)
+ *           affichait l'effectif M14 par repli. F15 est un périmètre
+ *           transversal par flag personnes.f15_integree ; la RPC le
+ *           charge sans passer par une équipe. Aiguillage côté écran
+ *           (joueurs-browser.js). node --check OK. boot v1.66 → v1.67.
  * Version : 1.66 — juin 2026
  *   v1.66 : SEANCE-SOFT-DELETE (durcissement, Phase 5.13). 3 wrappers
  *           ADDITIFS pour fermer le DELETE physique accidentel d'une séance
@@ -4150,6 +4159,35 @@
     },
 
     /**
+     * Récupère l'effectif F15 via RPC get_joueurs_f15() (sql_111).
+     *
+     * Jumelle de getJoueursEquipe : MÊME shape de sortie (32 colonnes,
+     * mêmes calculés profil/etat_calcule) → les cartes liste et la
+     * fiche slide-in n'ont AUCUNE adaptation à faire. La seule
+     * différence est la SOURCE : F15 n'est pas une catégorie « à
+     * équipe » mais un périmètre transversal porté par le flag
+     * personnes.f15_integree (cf. en-tête sql_111). La RPC part de
+     * personnes (LEFT JOIN equipe_joueurs) et filtre f15_integree=TRUE,
+     * donc une F15 flaggée non rattachée à une équipe apparaît bien.
+     *
+     * Aucun paramètre : le périmètre F15 est global (1 seul groupe F15
+     * au club). L'aiguillage « catégorie active = F15 → cette RPC »
+     * est fait côté écran (joueurs-browser.js).
+     *
+     * @returns {Promise<Array<Object>|null>} Liste des joueuses F15,
+     *   ou null si erreur (même convention que getJoueursEquipe :
+     *   null = échec honnête → message d'erreur côté écran).
+     */
+    async getJoueursF15() {
+      const { data, error } = await client.rpc('get_joueurs_f15', {});
+      if (error) {
+        console.error('MOM Hub: getJoueursF15()', error);
+        return null;
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
      * Récupère la fiche détaillée d'une personne via RPC.
      * (RPC : get_joueur_detail — sql/33-fix v1.1, dette audit C10-J-g)
      *
@@ -7011,7 +7049,7 @@
   }
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.66 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.67 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
