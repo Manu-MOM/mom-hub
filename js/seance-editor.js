@@ -11,6 +11,17 @@
  *   - 5.5.A : éditeur méta + sauvegarde manuelle (CETTE VERSION)
  *   - 5.5.B : autosave 30s + dropdowns lieu/événement + champs secondaires
  *
+ * Version : 1.17 — FIX staff non rechargé au changement de catégorie (juin 2026)
+ *   v1.17 : Bug recette (Manu) : après changement de catégorie via le
+ *           sélecteur (ex. M14 → M10), les pioches coachs (blocs ET méta)
+ *           proposaient toujours les coachs M14. Cause : _seanceRechargerDonnees()
+ *           rechargeait séances/évènements/vivier mais PAS le staff, donc
+ *           State.staffDisponible restait figé sur la catégorie initiale.
+ *           Corrigé : loadStaffDisponibles() ajouté au Promise.all de
+ *           rechargement (equipeActive déjà mis à jour en amont par
+ *           _seanceChoisirEquipeActive, donc la bonne catégorie est résolue).
+ *           Explique pourquoi Lohann (sans changement de cat) voyait juste.
+ *           node --check OK. boot v1.16 → v1.17.
  * Version : 1.16 — FIX pioche encadrants méta (recette Lohann, juin 2026)
  *   v1.16 : La pioche « encadrants » de la méta séance proposait les coachs
  *           M14 pour TOUTES les catégories. Cause : ses propositions venaient
@@ -476,7 +487,11 @@
     await Promise.all([
       loadSeances(),
       loadEvenements(),
-      loadVivierM14()
+      loadVivierM14(),
+      // v1.17 — recharger le staff de la NOUVELLE catégorie (sinon la pioche
+      // coachs des blocs ET la pioche encadrants méta restent figées sur la
+      // catégorie initiale — bug : coachs M14 proposés après passage en M10).
+      loadStaffDisponibles()
     ]);
     renderSidebar();
     renderEmptyEditor();
@@ -4870,7 +4885,7 @@
     });
 
     console.log(
-      '%c🏉 Seance Editor v1.16 (parallèles + multi-coachs + PDF Coach/Joueurs) chargé',
+      '%c🏉 Seance Editor v1.17 (parallèles + multi-coachs + PDF Coach/Joueurs) chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         seances: State.seances.length,
