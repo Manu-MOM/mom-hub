@@ -18,6 +18,21 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 1.66 — juin 2026
+ *   v1.66 : SEANCE-SOFT-DELETE (durcissement, Phase 5.13). 3 wrappers
+ *           ADDITIFS pour fermer le DELETE physique accidentel d'une séance
+ *           (incident pt 107 : RUGBY PP+SKILLS perdue). ZÉRO SQL : le CHECK
+ *           seances_etat_check accepte déjà 'archivee', et archiveSeance
+ *           existait déjà.
+ *           (a) archiveSeancesEnLot(ids)  : UPDATE etat='archivee' en lot,
+ *               depuis n'importe quel état (récupérable). Remplace l'usage
+ *               UI de deleteSeancesEnLot pour les brouillons cochés.
+ *           (b) purgerSeanceArchivee(id)  : DELETE BORNÉ .eq('etat','archivee')
+ *               — purge définitive impossible sans passer par la corbeille.
+ *           (c) purgerSeancesArchiveesEnLot(ids) : variante batch, même borne.
+ *           deleteSeance / deleteSeancesEnLot CONSERVÉS (filet base) mais
+ *           plus appelés par l'UI (cf. seance-editor v1.18).
+ *           node --check OK. boot v1.65 → v1.66.
  * Version : 1.65 — juin 2026
  *   v1.65 : MULTI-COACHS par bloc (sql_110). 'encadrants_ids' (uuid[])
  *           ajouté aux whitelists addBlocToSeance (optionalKeys) et
@@ -3477,6 +3492,93 @@
     },
 
     /**
+     * Archive plusieurs séances par lot (Phase 5.13 — durcissement soft-delete).
+     * UPDATE etat='archivee' sur tous les IDs fournis, depuis n'importe quel
+     * état (l'archivage est récupérable, donc non restreint au brouillon).
+     * Pendant utilisée comme remplaçant récupérable du DELETE en lot des
+     * brouillons : « mettre à la corbeille » plutôt que supprimer.
+     *
+     * @param {string[]} seanceIds Tableau d'UUIDs à archiver
+     * @returns {Promise<{ok:boolean, archived_count?:number, error?:string}>}
+     */
+    async archiveSeancesEnLot(seanceIds) {
+      if (!Array.isArray(seanceIds)) {
+        return { ok: false, error: 'seanceIds (tableau) requis' };
+      }
+      if (seanceIds.length === 0) {
+        return { ok: true, archived_count: 0 };
+      }
+      const { data, error } = await client
+        .from('seances')
+        .update({ etat: 'archivee' })
+        .in('id', seanceIds)
+        .select('id');
+      if (error) {
+        console.error('MOM Hub: archiveSeancesEnLot()', error);
+        return { ok: false, error: error.message };
+      }
+      return { ok: true, archived_count: Array.isArray(data) ? data.length : 0 };
+    },
+
+    /**
+     * Purge DÉFINITIVE d'UNE séance archivée (Phase 5.13 — corbeille).
+     * DELETE physique BORNÉ côté serveur par .eq('etat','archivee') : il est
+     * IMPOSSIBLE de purger une séance brouillon/validée/utilisée — elle doit
+     * d'abord passer par l'archivage (corbeille). Le CASCADE FK supprime les
+     * seances_blocs et seances_blocs_ateliers liés.
+     *
+     * @param {string} seanceId UUID de la séance archivée à purger
+     * @returns {Promise<{ok:boolean, data?:object, error?:string}>}
+     */
+    async purgerSeanceArchivee(seanceId) {
+      if (!seanceId) return { ok: false, error: 'seanceId requis' };
+      const { data, error } = await client
+        .from('seances')
+        .delete()
+        .eq('id', seanceId)
+        .eq('etat', 'archivee')
+        .select('id')
+        .maybeSingle();
+      if (error) {
+        console.error('MOM Hub: purgerSeanceArchivee()', error);
+        return { ok: false, error: error.message };
+      }
+      if (!data) {
+        return { ok: false, error: 'Séance introuvable ou pas archivée (seules les séances archivées sont purgeables)' };
+      }
+      return { ok: true, data };
+    },
+
+    /**
+     * Purge DÉFINITIVE de plusieurs séances archivées par lot (Phase 5.13).
+     * Même garde-fou serveur que purgerSeanceArchivee : DELETE borné par
+     * .eq('etat','archivee'). Toute séance non-archivée dans la liste est
+     * silencieusement ignorée (filtrée côté serveur par PostgREST).
+     *
+     * @param {string[]} seanceIds Tableau d'UUIDs archivés à purger
+     * @returns {Promise<{ok:boolean, purged_count?:number, error?:string}>}
+     */
+    async purgerSeancesArchiveesEnLot(seanceIds) {
+      if (!Array.isArray(seanceIds)) {
+        return { ok: false, error: 'seanceIds (tableau) requis' };
+      }
+      if (seanceIds.length === 0) {
+        return { ok: true, purged_count: 0 };
+      }
+      const { data, error } = await client
+        .from('seances')
+        .delete()
+        .in('id', seanceIds)
+        .eq('etat', 'archivee')
+        .select('id');
+      if (error) {
+        console.error('MOM Hub: purgerSeancesArchiveesEnLot()', error);
+        return { ok: false, error: error.message };
+      }
+      return { ok: true, purged_count: Array.isArray(data) ? data.length : 0 };
+    },
+
+    /**
      * Valide une séance (Phase 5.12) : bascule etat='brouillon' → 'validee'.
      * Garde-fou serveur via .eq('etat','brouillon') : refuse de valider
      * une séance déjà validée, utilisée ou archivée. Renvoie {ok:false}
@@ -6909,7 +7011,7 @@
   }
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.65 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.66 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
