@@ -18,6 +18,12 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 1.65 — juin 2026
+ *   v1.65 : MULTI-COACHS par bloc (sql_110). 'encadrants_ids' (uuid[])
+ *           ajouté aux whitelists addBlocToSeance (optionalKeys) et
+ *           updateBloc (allowedKeys). Liste plate égalitaire des coachs
+ *           d'un bloc ; remplace l'usage de encadrant_id (déprécié, gardé).
+ *           2 lignes ajoutées. node --check OK. boot v1.64 → v1.65.
  * Version : 1.64 — juin 2026
  *   v1.64 : FIX réordonnancement d'étages parallèles (recette terrain).
  *           updateBloc : 'ordre' ajouté à allowedKeys. Le déplacement
@@ -3724,7 +3730,9 @@
         'groupes_jsonb', 'materiel_jsonb', 'contenu_pedagogique_axe4',
         'notes_bloc',
         // v1.63 — blocs parallèles + coach par bloc (sql_108)
-        'voie', 'encadrant_id'
+        'voie', 'encadrant_id',
+        // v1.65 — multi-coachs (sql_110) : liste plate uuid[]
+        'encadrants_ids'
       ];
       for (const k of optionalKeys) {
         if (params[k] !== undefined) payload[k] = params[k];
@@ -3763,7 +3771,9 @@
         // up/down d'un étage passe par updateBloc({ordre}). 'ordre' doit
         // donc être modifiable ici (il l'était déjà via reorderBlocs, mais
         // par un chemin distinct). Sans cela : « Aucun champ modifiable ».
-        'ordre'
+        'ordre',
+        // v1.65 — multi-coachs (sql_110) : liste plate uuid[]
+        'encadrants_ids'
       ];
       const cleanPatch = {};
       for (const k of allowedKeys) {
@@ -6899,7 +6909,7 @@
   }
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.64 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.65 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
