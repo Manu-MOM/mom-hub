@@ -11,6 +11,15 @@
  *   - 5.5.A : éditeur méta + sauvegarde manuelle (CETTE VERSION)
  *   - 5.5.B : autosave 30s + dropdowns lieu/événement + champs secondaires
  *
+ * Version : 1.15 — PDF : nom de fichier daté + logo + Joueurs aéré (juin 2026)
+ *   v1.15 : Finitions PDF (recette). (1) Nom de fichier distinct par export,
+ *           préfixé date AAAA-MM-JJ : « <date> - MOM Hub · Séance <CAT>
+ *           coachs|joueurs » (pilotage document.title dans _imprimerVue,
+ *           restauré après afterprint). Helpers _dateFichierSeance /
+ *           _libelleCategorieCourt. (2) Logo MOM + bandeau vert charte en
+ *           en-tête des deux PDF. (3) Tableau Joueurs aéré (colgroup largeurs,
+ *           police 12pt, padding 10pt). Styles dans seance.html.
+ *           node --check OK. boot v1.14 → v1.15.
  * Version : 1.14 — DEUX EXPORTS PDF (Coach / Joueurs) (juin 2026)
  *   v1.14 : Suite débrief Lohann. Deux exports PDF distincts (2 boutons) :
  *           - PDF Coach (onExportPdfCoach, async) : format complet par bloc
@@ -4059,9 +4068,17 @@
    */
   /**
    * Impression commune : injecte le HTML dans #seance-print-root et
-   * déclenche window.print(). (v1.14)
+   * déclenche window.print(). (v1.14 ; v1.15 : pilote document.title pour
+   * proposer un nom de fichier distinct par export.)
+   *
+   * Le nom de fichier d'un PDF « imprimer vers PDF » est dérivé par le
+   * navigateur du document.title. On le force juste avant l'impression
+   * puis on le restaure (after-print) pour ne pas polluer l'onglet.
+   *
+   * @param {string} htmlContent
+   * @param {string} [titreFichier] titre proposé comme nom de fichier
    */
-  function _imprimerVue(htmlContent) {
+  function _imprimerVue(htmlContent, titreFichier) {
     let root = document.getElementById('seance-print-root');
     if (!root) {
       root = document.createElement('div');
@@ -4069,7 +4086,46 @@
       document.body.appendChild(root);
     }
     root.innerHTML = htmlContent;
-    window.setTimeout(function () { window.print(); }, 50);
+
+    const titreOriginal = document.title;
+    if (titreFichier) document.title = titreFichier;
+
+    // Restauration du titre après la boîte d'impression (ou à la volée).
+    const restore = function () {
+      document.title = titreOriginal;
+      window.removeEventListener('afterprint', restore);
+    };
+    window.addEventListener('afterprint', restore);
+
+    window.setTimeout(function () {
+      window.print();
+      // Filet de sécurité si afterprint ne se déclenche pas (certains envs).
+      window.setTimeout(restore, 1500);
+    }, 50);
+  }
+
+  /** Date de la séance en AAAA-MM-JJ pour préfixer les noms de fichier (v1.15). */
+  function _dateFichierSeance() {
+    const s = State.currentSeance;
+    if (s && s.date_seance) {
+      // date_seance est déjà ISO (AAAA-MM-JJ) ou parsable ; on garde les 10 1ers car.
+      const iso = String(s.date_seance).slice(0, 10);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
+    }
+    // Repli : date du jour.
+    const d = new Date();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const jj = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + mm + '-' + jj;
+  }
+
+  /** Libellé court de la catégorie (ex. « M14 ») pour les noms de fichier (v1.15). */
+  function _libelleCategorieCourt() {
+    const ctx = window.momSeanceContext;
+    const raw = (ctx && ctx.categorie_uuid) ? String(ctx.categorie_uuid) : '';
+    // 'cat-m14' -> 'M14' ; sinon repli 'M14' (module mono-équipe M14).
+    const m = raw.replace(/^cat-/i, '').trim();
+    return m ? m.toUpperCase() : 'M14';
   }
 
   /**
@@ -4104,7 +4160,8 @@
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Préparation…'; }
     try {
       const ateliersParBloc = await _chargerAteliersTousBlocs();
-      _imprimerVue(_buildPrintHtml('coach', ateliersParBloc));
+      const nomFichier = _dateFichierSeance() + ' - MOM Hub · Séance ' + _libelleCategorieCourt() + ' coachs';
+      _imprimerVue(_buildPrintHtml('coach', ateliersParBloc), nomFichier);
     } catch (e) {
       console.error('SeanceEditor: onExportPdfCoach() KO', e);
       alert('Erreur préparation du PDF Coach : ' + (e.message || e));
@@ -4119,7 +4176,8 @@
    */
   function onExportPdfJoueurs() {
     if (!State.currentSeance) return;
-    _imprimerVue(_buildPrintHtml('joueurs', null));
+    const nomFichier = _dateFichierSeance() + ' - MOM Hub · Séance ' + _libelleCategorieCourt() + ' joueurs';
+    _imprimerVue(_buildPrintHtml('joueurs', null), nomFichier);
   }
 
   /**
@@ -4181,15 +4239,20 @@
     let html =
       '<div class="seance-print">' +
         '<header class="seance-print__header">' +
-          '<h1 class="seance-print__titre">Trame de séance' +
-            (s.theme_principal ? ' — ' + escapeHtml(s.theme_principal) : '') +
-            '<span class="seance-print__public"> · ' + (isJoueurs ? 'Joueurs' : 'Coachs') + '</span>' +
-          '</h1>' +
-          '<div class="seance-print__meta">' +
-            (dateStr ? '<span>📅 ' + escapeHtml(dateStr) + '</span>' : '') +
-            (heureDebut ? '<span>🕒 ' + escapeHtml(heureDebut) + '</span>' : '') +
-            (s.duree_totale_min ? '<span>⏱ ' + s.duree_totale_min + ' min prévues</span>' : '') +
-            (s.encadrants_text ? '<span>👥 ' + escapeHtml(s.encadrants_text) + '</span>' : '') +
+          '<div class="seance-print__brand">' +
+            '<img class="seance-print__logo" src="assets/logo-m2m.png" alt="MOM Rugby">' +
+            '<div class="seance-print__brand-text">' +
+              '<h1 class="seance-print__titre">Trame de séance' +
+                (s.theme_principal ? ' — ' + escapeHtml(s.theme_principal) : '') +
+                '<span class="seance-print__public"> · ' + (isJoueurs ? 'Joueurs' : 'Coachs') + '</span>' +
+              '</h1>' +
+              '<div class="seance-print__meta">' +
+                (dateStr ? '<span>📅 ' + escapeHtml(dateStr) + '</span>' : '') +
+                (heureDebut ? '<span>🕒 ' + escapeHtml(heureDebut) + '</span>' : '') +
+                (s.duree_totale_min ? '<span>⏱ ' + s.duree_totale_min + ' min prévues</span>' : '') +
+                (s.encadrants_text ? '<span>👥 ' + escapeHtml(s.encadrants_text) + '</span>' : '') +
+              '</div>' +
+            '</div>' +
           '</div>' +
           (s.objectifs_text ? '<p class="seance-print__objectifs">🎯 ' + escapeHtml(s.objectifs_text) + '</p>' : '') +
         '</header>';
@@ -4201,7 +4264,12 @@
     } else if (isJoueurs) {
       // ----- MODE JOUEURS : tableau compact 5 colonnes -----
       html +=
-        '<table class="seance-print__jtable"><thead><tr>' +
+        '<table class="seance-print__jtable">' +
+          '<colgroup>' +
+            '<col class="c-horaire"><col class="c-bloc"><col class="c-duree">' +
+            '<col class="c-intensite"><col class="c-coachs">' +
+          '</colgroup>' +
+          '<thead><tr>' +
           '<th>Horaire</th><th>Bloc</th><th>Durée</th><th>Intensité</th><th>Coachs</th>' +
         '</tr></thead><tbody>';
       let cur = heureDebut;
@@ -4786,7 +4854,7 @@
     });
 
     console.log(
-      '%c🏉 Seance Editor v1.14 (parallèles + multi-coachs + PDF Coach/Joueurs) chargé',
+      '%c🏉 Seance Editor v1.15 (parallèles + multi-coachs + PDF Coach/Joueurs) chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         seances: State.seances.length,
