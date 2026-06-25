@@ -18,6 +18,15 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 1.68 — juin 2026
+ *   v1.68 : JOUEURS-AFFICHAGE-PAR-CATEGORIE (pt 110). 1 wrapper
+ *           ADDITIF getJoueursCategorie(categorieId) adossé à la RPC
+ *           get_joueurs_categorie (sql_112), jumelle de
+ *           get_joueurs_f15/get_joueurs_equipe (même shape). Permet de
+ *           charger l'effectif PAR CATÉGORIE (personnes.categorie_id)
+ *           au lieu de par équipe — 13 catégories sur 14 avaient leurs
+ *           joueurs rattachés à la catégorie sans ligne equipe_joueurs,
+ *           donc invisibles à l'écran. node --check OK. boot v1.67 → v1.68.
  * Version : 1.67 — juin 2026
  *   v1.67 : JOUEURS-PERIMETRE-F15 (pt 109). 1 wrapper ADDITIF
  *           getJoueursF15() adossé à la RPC get_joueurs_f15 (sql_111),
@@ -4188,6 +4197,40 @@
     },
 
     /**
+     * Récupère l'effectif d'une catégorie via RPC get_joueurs_categorie()
+     * (sql_112). Jumelle de getJoueursEquipe/getJoueursF15 : MÊME shape
+     * de sortie (32 colonnes) → cartes et fiche inchangées.
+     *
+     * Charge par personnes.categorie_id (source de vérité du
+     * rattachement, peuplée pour les 14 catégories), PAS par équipe :
+     * seule M14 a un effectif via equipe_joueurs, les 13 autres ont
+     * leurs joueurs rattachés à la catégorie sans ligne d'équipe. Un
+     * joueur sans équipe (ex. Auriane DECOURCELLE) apparaît bien
+     * (LEFT JOIN equipe_joueurs côté RPC).
+     *
+     * NB : ne couvre PAS F15 (ses joueuses ont categorie_id = M14, pas
+     * F15) → l'écran route F15 vers getJoueursF15() et toute autre
+     * catégorie vers celle-ci.
+     *
+     * @param {string} categorieId UUID de la catégorie (categories.id)
+     * @returns {Promise<Array<Object>|null>} liste, ou null si erreur.
+     */
+    async getJoueursCategorie(categorieId) {
+      if (!categorieId) {
+        console.error('MOM Hub: getJoueursCategorie() requiert un categorieId');
+        return null;
+      }
+      const { data, error } = await client.rpc('get_joueurs_categorie', {
+        p_categorie_id: categorieId
+      });
+      if (error) {
+        console.error('MOM Hub: getJoueursCategorie()', error);
+        return null;
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
      * Récupère la fiche détaillée d'une personne via RPC.
      * (RPC : get_joueur_detail — sql/33-fix v1.1, dette audit C10-J-g)
      *
@@ -7049,7 +7092,7 @@
   }
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.67 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.68 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
