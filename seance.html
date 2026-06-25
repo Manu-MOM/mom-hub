@@ -2297,19 +2297,31 @@
     }
 
     @media print {
-      /* On masque toute l'application et on ne montre que la vue print. */
-      body * { visibility: hidden !important; }
-      #seance-print-root,
-      #seance-print-root * { visibility: visible !important; }
+      /* Masque réellement toute l'app (pas seulement visibility, qui laisse
+         les conteneurs occuper la place AVEC leur scrollbar -> barre + flèches
+         parasites à l'impression). On cache les enfants directs du body, puis
+         on ré-affiche uniquement la vue print. */
+      body > *:not(#seance-print-root) { display: none !important; }
+
+      /* Neutralise tout overflow scrollable résiduel (source des barres). */
+      html, body {
+        overflow: visible !important;
+        height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+      }
+
       #seance-print-root {
         display: block !important;
-        position: absolute;
-        left: 0;
-        top: 0;
+        position: static !important;
         width: 100%;
+        max-height: none !important;
+        overflow: visible !important;
         padding: 0;
         margin: 0;
       }
+      #seance-print-root * { overflow: visible !important; }
 
       @page { margin: 14mm 12mm; }
 
