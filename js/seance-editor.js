@@ -11,6 +11,17 @@
  *   - 5.5.A : éditeur méta + sauvegarde manuelle (CETTE VERSION)
  *   - 5.5.B : autosave 30s + dropdowns lieu/événement + champs secondaires
  *
+ * Version : 1.14 — DEUX EXPORTS PDF (Coach / Joueurs) (juin 2026)
+ *   v1.14 : Suite débrief Lohann. Deux exports PDF distincts (2 boutons) :
+ *           - PDF Coach (onExportPdfCoach, async) : format complet par bloc
+ *             + section ATELIERS rattachés (titre via lookupFiche + lien
+ *             Drive cliquable via urlDriveDossier). Charge les ateliers de
+ *             TOUS les blocs (_chargerAteliersTousBlocs) avant rendu.
+ *           - PDF Joueurs (onExportPdfJoueurs) : tableau compact 5 colonnes
+ *             (horaire, bloc, durée, intensité, coachs). Sans axe4/notes/ateliers.
+ *           _buildPrintHtml(mode, ateliersParBloc) factorise les deux ;
+ *           _imprimerVue commun. Styles print associés dans seance.html.
+ *           node --check OK. boot v1.13 → v1.14.
  * Version : 1.13 — MULTI-COACHS par bloc (recette terrain, juin 2026)
  *   v1.13 : Un bloc peut être encadré par PLUSIEURS coachs (liste plate
  *           égalitaire, sql_110 encadrants_ids uuid[]). Le <select> coach
@@ -1727,10 +1738,13 @@
       '<header class="seance-trame__header">' +
         '<h3 class="seance-trame__title">Trame chronologique</h3>' +
         '<div class="seance-trame__header-actions">' +
-          // v1.10 — export PDF via impression navigateur (feuille @media print
-          // à la charte du hub, livrée séparément). Rien à installer.
-          '<button type="button" id="seance-btn-export-pdf" class="seance-trame__pdf-btn" title="Exporter la trame en PDF (impression navigateur)">' +
-            '🖨 Exporter PDF' +
+          // v1.14 — deux exports distincts (demande recette, débrief Lohann) :
+          // « PDF Coach » (complet + ateliers liés) et « PDF Joueurs » (compact).
+          '<button type="button" id="seance-btn-export-pdf-coach" class="seance-trame__pdf-btn" title="Export complet pour les coachs (détails + fiches ateliers)">' +
+            '🖨 PDF Coach' +
+          '</button>' +
+          '<button type="button" id="seance-btn-export-pdf-joueurs" class="seance-trame__pdf-btn" title="Export compact pour les joueurs">' +
+            '🖨 PDF Joueurs' +
           '</button>' +
           '<button type="button" id="seance-btn-add-bloc" class="seance-trame__add-btn">' +
             '+ Ajouter un bloc' +
@@ -1869,12 +1883,19 @@
       });
     }
 
-    // v1.10 — bind du bouton « Exporter PDF »
-    const btnPdf = document.getElementById('seance-btn-export-pdf');
-    if (btnPdf) {
-      btnPdf.addEventListener('click', function (e) {
+    // v1.14 — binds des deux boutons export
+    const btnPdfCoach = document.getElementById('seance-btn-export-pdf-coach');
+    if (btnPdfCoach) {
+      btnPdfCoach.addEventListener('click', function (e) {
         e.stopPropagation();
-        onExportPdf();
+        onExportPdfCoach();
+      });
+    }
+    const btnPdfJoueurs = document.getElementById('seance-btn-export-pdf-joueurs');
+    if (btnPdfJoueurs) {
+      btnPdfJoueurs.addEventListener('click', function (e) {
+        e.stopPropagation();
+        onExportPdfJoueurs();
       });
     }
 
@@ -4036,19 +4057,69 @@
    * visible uniquement à l'impression. On la régénère à chaque export pour
    * refléter l'état courant, puis on la vide après impression.
    */
-  function onExportPdf() {
-    if (!State.currentSeance) return;
+  /**
+   * Impression commune : injecte le HTML dans #seance-print-root et
+   * déclenche window.print(). (v1.14)
+   */
+  function _imprimerVue(htmlContent) {
     let root = document.getElementById('seance-print-root');
     if (!root) {
       root = document.createElement('div');
       root.id = 'seance-print-root';
       document.body.appendChild(root);
     }
-    root.innerHTML = _buildPrintHtml();
-    // Laisse le DOM se peindre avant l'impression.
-    window.setTimeout(function () {
-      window.print();
-    }, 50);
+    root.innerHTML = htmlContent;
+    window.setTimeout(function () { window.print(); }, 50);
+  }
+
+  /**
+   * Charge les ateliers rattachés de TOUS les blocs de la séance (v1.14).
+   * State.ateliersRattaches ne contient que le bloc courant ; pour le PDF
+   * Coach il faut tous les blocs. Renvoie une Map blocId -> [rattachements].
+   * Échec d'un bloc -> entrée vide (honest degradation, pas de blocage).
+   */
+  async function _chargerAteliersTousBlocs() {
+    const map = {};
+    const blocs = State.blocs || [];
+    await Promise.all(blocs.map(async function (b) {
+      try {
+        const rats = await SupabaseHub.listAteliersRattachesAuBloc(b.id);
+        map[b.id] = Array.isArray(rats) ? rats : [];
+      } catch (e) {
+        console.warn('SeanceEditor: chargement ateliers bloc ' + b.id + ' KO', e);
+        map[b.id] = [];
+      }
+    }));
+    return map;
+  }
+
+  /**
+   * Export PDF COACH (v1.14) — complet : tous les détails par bloc +
+   * section ateliers rattachés (titre + lien Drive cliquable). Asynchrone
+   * car il charge les ateliers de tous les blocs avant de rendre.
+   */
+  async function onExportPdfCoach() {
+    if (!State.currentSeance) return;
+    const btn = document.getElementById('seance-btn-export-pdf-coach');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Préparation…'; }
+    try {
+      const ateliersParBloc = await _chargerAteliersTousBlocs();
+      _imprimerVue(_buildPrintHtml('coach', ateliersParBloc));
+    } catch (e) {
+      console.error('SeanceEditor: onExportPdfCoach() KO', e);
+      alert('Erreur préparation du PDF Coach : ' + (e.message || e));
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = '🖨 PDF Coach'; }
+    }
+  }
+
+  /**
+   * Export PDF JOUEURS (v1.14) — compact : tableau 5 colonnes (type, durée,
+   * intensité, titre/précision, coachs). Pas d'axe4, notes, ni ateliers.
+   */
+  function onExportPdfJoueurs() {
+    if (!State.currentSeance) return;
+    _imprimerVue(_buildPrintHtml('joueurs', null));
   }
 
   /**
@@ -4093,17 +4164,26 @@
     return lignes.join('<br>');
   }
 
-  function _buildPrintHtml() {
+  /**
+   * Construit le HTML d'impression (v1.14). Deux modes :
+   *  - 'coach'   : complet (détails par bloc + ateliers rattachés liés Drive).
+   *  - 'joueurs' : compact (tableau 5 colonnes).
+   * @param {'coach'|'joueurs'} mode
+   * @param {Object|null} ateliersParBloc map blocId -> [rattachements] (mode coach)
+   */
+  function _buildPrintHtml(mode, ateliersParBloc) {
     const s = State.currentSeance;
     const heureDebut = s.heure_debut ? normalizeHeureForInput(s.heure_debut) : null;
     const dateStr = s.date_seance ? formatDateShort(s.date_seance) : '';
+    const isJoueurs = (mode === 'joueurs');
 
-    // En-tête séance
+    // En-tête séance (commun)
     let html =
       '<div class="seance-print">' +
         '<header class="seance-print__header">' +
           '<h1 class="seance-print__titre">Trame de séance' +
             (s.theme_principal ? ' — ' + escapeHtml(s.theme_principal) : '') +
+            '<span class="seance-print__public"> · ' + (isJoueurs ? 'Joueurs' : 'Coachs') + '</span>' +
           '</h1>' +
           '<div class="seance-print__meta">' +
             (dateStr ? '<span>📅 ' + escapeHtml(dateStr) + '</span>' : '') +
@@ -4115,9 +4195,43 @@
         '</header>';
 
     const etages = _grouperBlocsParEtage(State.blocs);
+
     if (etages.length === 0) {
       html += '<p class="seance-print__vide">Aucun bloc dans cette trame.</p>';
+    } else if (isJoueurs) {
+      // ----- MODE JOUEURS : tableau compact 5 colonnes -----
+      html +=
+        '<table class="seance-print__jtable"><thead><tr>' +
+          '<th>Horaire</th><th>Bloc</th><th>Durée</th><th>Intensité</th><th>Coachs</th>' +
+        '</tr></thead><tbody>';
+      let cur = heureDebut;
+      etages.forEach(function (etage) {
+        const fin = cur ? addMinutesToHeure(cur, etage.dureeMax) : '';
+        const horaire = cur ? (cur + (fin ? '→' + fin : '')) : '—';
+        const parallele = etage.blocs.length > 1;
+        etage.blocs.forEach(function (b, k) {
+          const t = lookupTypeBloc(b.type_bloc);
+          const emoji = (t && t.emoji) || '·';
+          const libType = (t && t.libelle) || b.type_bloc;
+          const titre = b.titre_precision ? ' — ' + escapeHtml(b.titre_precision) : '';
+          const intensite = _libelleIntensite(b.intensite) || '—';
+          const coachs = _nomsCoachsBloc(b);
+          const coachLabel = coachs.length ? coachs.join(', ') : '—';
+          // L'horaire n'est affiché que sur la 1re voie de l'étage.
+          html +=
+            '<tr>' +
+              '<td class="seance-print__horaire">' + (k === 0 ? horaire : '') + '</td>' +
+              '<td>' + (parallele ? '∥ ' : '') + emoji + ' ' + escapeHtml(libType) + titre + '</td>' +
+              '<td class="seance-print__duree">' + b.duree_min + ' min</td>' +
+              '<td>' + escapeHtml(intensite) + '</td>' +
+              '<td>' + escapeHtml(coachLabel) + '</td>' +
+            '</tr>';
+        });
+        if (cur) cur = fin;
+      });
+      html += '</tbody></table>';
     } else {
+      // ----- MODE COACH : fiches détaillées par étage + ateliers liés -----
       let cur = heureDebut;
       etages.forEach(function (etage) {
         const fin = cur ? addMinutesToHeure(cur, etage.dureeMax) : '';
@@ -4147,6 +4261,25 @@
             return '<span class="seance-print__tag">👤 ' + escapeHtml(nom) + '</span>';
           }).join('');
 
+          // Ateliers rattachés à ce bloc (lien Drive cliquable).
+          let ateliersHtml = '';
+          const rats = (ateliersParBloc && ateliersParBloc[b.id]) ? ateliersParBloc[b.id] : [];
+          if (rats.length) {
+            ateliersHtml += '<div class="seance-print__ateliers"><strong>📚 Ateliers :</strong>';
+            rats.forEach(function (rat) {
+              const fiche = lookupFiche(rat.atelier_fileid_drive);
+              const lib = fiche ? libelleFicheCourt(fiche) : '(fiche)';
+              const url = urlDriveDossier(rat.atelier_fileid_drive);
+              ateliersHtml +=
+                '<div class="seance-print__atelier">' +
+                  '• ' + escapeHtml(lib) +
+                  ' <a class="seance-print__atelier-lien" href="' + escapeHtml(url) + '">' + escapeHtml(url) + '</a>' +
+                  (rat.notes_atelier ? '<span class="seance-print__atelier-note"> — ' + escapeHtml(rat.notes_atelier) + '</span>' : '') +
+                '</div>';
+            });
+            ateliersHtml += '</div>';
+          }
+
           html +=
             '<div class="seance-print__bloc">' +
               '<div class="seance-print__bloc-titre">' +
@@ -4161,6 +4294,7 @@
               '</div>' +
               (resumeAxe4 ? '<div class="seance-print__bloc-axe4">' + resumeAxe4 + '</div>' : '') +
               (b.notes_bloc ? '<div class="seance-print__bloc-notes">📝 ' + escapeHtml(b.notes_bloc) + '</div>' : '') +
+              ateliersHtml +
             '</div>';
         });
 
@@ -4652,7 +4786,7 @@
     });
 
     console.log(
-      '%c🏉 Seance Editor v1.13 (blocs parallèles + multi-coachs + PDF) chargé',
+      '%c🏉 Seance Editor v1.14 (parallèles + multi-coachs + PDF Coach/Joueurs) chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         seances: State.seances.length,
