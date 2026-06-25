@@ -11,6 +11,12 @@
  *   - 5.5.A : éditeur méta + sauvegarde manuelle (CETTE VERSION)
  *   - 5.5.B : autosave 30s + dropdowns lieu/événement + champs secondaires
  *
+ * Version : 1.18.1 — FIX hotfix : enterSelectionMode happé par un /** orphelin (juin 2026)
+ *   v1.18.1 : Le bloc d'insertion v1.18 avait laissé un commentaire /**
+ *             non fermé juste avant function enterSelectionMode(), qui
+ *             happait sa définition → ReferenceError au boot (renderSidebar
+ *             appelle enterSelectionMode). JSDoc restauré, fonction rendue
+ *             à nouveau définie. Aucun autre changement. node --check OK.
  * Version : 1.18 — SEANCE-SOFT-DELETE : durcissement du brouillon (juin 2026)
  *   v1.18 : Incident pt 107 (RUGBY PP+SKILLS perdue) : un brouillon offrait
  *           DEUX boutons côte à côte — « 🗑 Supprimer » (DELETE physique
@@ -3803,6 +3809,10 @@
   }
 
   /**
+   * Bascule le mode "Sélectionner" : cases à cocher apparaissent sur les
+   * brouillons (vue normale) ou les archivées (vue archivées) en sidebar,
+   * le clic sur un item ne charge plus la séance.
+   */
   function enterSelectionMode() {
     State.selectionMode = true;
     State.selectionIds = new Set();
@@ -5080,7 +5090,7 @@
     });
 
     console.log(
-      '%c🏉 Seance Editor v1.18 (parallèles + multi-coachs + PDF + soft-delete durci) chargé',
+      '%c🏉 Seance Editor v1.18.1 (parallèles + multi-coachs + PDF + soft-delete durci) chargé',
       'color: #2D7D46; font-weight: bold;',
       {
         seances: State.seances.length,
