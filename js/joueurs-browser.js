@@ -4,6 +4,17 @@
  *
  * Module IIFE — initialise l'UI de la page joueurs.html.
  *
+ * Version : v1.5 — 25 juin 2026
+ *   v1.5 : JOUEURS-PERIMETRE-F15 (pt 109). Aiguillage de chargement :
+ *          si la catégorie active est F15 (F15_CAT_UUID), l'effectif
+ *          est chargé via SupabaseHub.getJoueursF15() (RPC
+ *          get_joueurs_f15 / sql_111) au lieu de la boucle par équipe.
+ *          Corrige le bug recette (capture image 4) : F15, n'ayant
+ *          aucune équipe rattachée, retombait sur le repli M14 et
+ *          affichait l'effectif M14. F15 est un périmètre transversal
+ *          par flag personnes.f15_integree. Ajouts ADDITIFS : constante
+ *          F15_CAT_UUID + branche en tête de _chargerJoueursCategorieActive
+ *          + message d'erreur rendu générique. node --check OK.
  * Version : v1.1 — 15 mai 2026
  *   v0 :  Squelette S2.1 (init vide + chips filtres + binders modales)
  *   v1.0 : Phase 5.14 S2.2 + S2.3 lecture (cartes + fiche slide-in)
@@ -41,6 +52,15 @@ window.JoueursBrowser = (function () {
    * ancien, droits vides, catégorie sans équipe), on retombe sur M14
    * = comportement d'origine. */
   const M14_TEAM_UUID = 'bfb83b83-83ef-4dde-b526-48ff87313044';
+
+  /** UUID de la catégorie F15 (categories.id). F15 n'est PAS une
+   * catégorie « à équipe » : ses joueuses sont membres de l'équipe
+   * M14 et le périmètre F15 est porté par le flag personnes.f15_integree
+   * (cf. RPC get_joueurs_f15 / sql_111). Quand cette catégorie est
+   * active, on charge l'effectif via getJoueursF15() au lieu de la
+   * boucle par équipe — sinon la résolution d'équipes renvoie []
+   * et le repli M14 affiche l'effectif M14 (bug recette pt 108). */
+  const F15_CAT_UUID = 'a948997c-255a-430d-88f3-e33cd8782240';
 
   // ------------------------------------------------------------
   // Propagation multi-catégories (catégorie active partagée)
@@ -91,6 +111,21 @@ window.JoueursBrowser = (function () {
    *   échouent (préserve la branche d'erreur d'origine).
    */
   async function _chargerJoueursCategorieActive() {
+    // Aiguillage F15 : catégorie transversale par flag (sans équipe).
+    // Si la catégorie active est F15, on charge l'effectif via la RPC
+    // dédiée get_joueurs_f15() (wrapper getJoueursF15) — même shape de
+    // sortie que get_joueurs_equipe, donc le reste du module (cartes,
+    // KPIs, fiche) est inchangé. On NE passe PAS par la boucle équipes
+    // (qui retomberait sur le repli M14). Dégradation honnête : si le
+    // wrapper est absent (socle ancien), on laisse le flux équipes
+    // d'origine s'exécuter.
+    const catActive = CTX_PERIMETRE && CTX_PERIMETRE.active;
+    if (catActive === F15_CAT_UUID
+        && typeof SupabaseHub !== 'undefined'
+        && typeof SupabaseHub.getJoueursF15 === 'function') {
+      return await SupabaseHub.getJoueursF15();
+    }
+
     const equipes = await _joueursResoudreEquipesActives();
     const listes = await Promise.all(
       equipes.map(function (eqId) {
@@ -1511,7 +1546,7 @@ window.JoueursBrowser = (function () {
     if (!joueurs) {
       const listEl = document.getElementById('joueur-list');
       if (listEl) {
-        listEl.innerHTML = '<div class="joueur-list-error">Échec du chargement (RPC get_joueurs_equipe). Vérifie la console.</div>';
+        listEl.innerHTML = '<div class="joueur-list-error">Échec du chargement de l\'effectif (RPC get_joueurs_equipe / get_joueurs_f15). Vérifie la console.</div>';
       }
       return;
     }
@@ -1541,7 +1576,7 @@ window.JoueursBrowser = (function () {
     _byId: () => JOUEURS_BY_ID,
     _postesById: () => POSTES_BY_ID,
     _aptitudesById: () => APTITUDES_BY_ID,
-    _version: 'v1.4'  /* pt 62 : bouton « Stats de saison » dans la fiche joueur */
+    _version: 'v1.5'  /* pt 109 : aiguillage F15 (RPC get_joueurs_f15, périmètre par flag) */
   };
 
 })();
