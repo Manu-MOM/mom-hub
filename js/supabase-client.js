@@ -18,6 +18,14 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 1.69 — juin 2026
+ *   v1.69 : DASHBOARD-TUILES-PAR-CAPABILITY. 1 wrapper ADDITIF
+ *           suisJeSalarie() adossé à la RPC suis_je_salarie() (sql_122),
+ *           prédicat voie 3 « contrat salarié courant » (contrats_salaries,
+ *           même WHERE que list_salaries() restreint à qui_suis_je()).
+ *           Pilote la PORTE du dashboard élargi (admin|bureau|salarié) et la
+ *           visibilité de la tuile « Suivi du salarié ». Fail-safe false.
+ *           node --check OK. boot v1.68 → v1.69.
  * Version : 1.68 — juin 2026
  *   v1.68 : JOUEURS-AFFICHAGE-PAR-CATEGORIE (pt 110). 1 wrapper
  *           ADDITIF getJoueursCategorie(categorieId) adossé à la RPC
@@ -6744,6 +6752,27 @@
       });
       if (error) {
         console.error('MOM Hub: puisJeFaire() / puis_je_faire', error);
+        return false;
+      }
+      return data === true;
+    },
+
+    /**
+     * (DASHBOARD-TUILES-PAR-CAPABILITY) Le compte courant est-il un salarié
+     * du club AUJOURD'HUI ? Délègue à la RPC suis_je_salarie() (sql_122),
+     * adossée à contrats_salaries (contrat COURANT : actif + fenêtre couvrant
+     * le jour), même logique que list_salaries() restreinte à qui_suis_je().
+     * Sert la PORTE du dashboard élargi + la visibilité de la tuile
+     * « Suivi du salarié ». Fail-safe : false sur erreur (n'ouvre jamais par
+     * défaut). N'accorde aucun droit — la garde SQL des pages-cibles reste la
+     * vérité.
+     *
+     * @returns {Promise<boolean>} true si contrat salarié courant, sinon false.
+     */
+    async suisJeSalarie() {
+      const { data, error } = await client.rpc('suis_je_salarie');
+      if (error) {
+        console.error('MOM Hub: suisJeSalarie() / suis_je_salarie', error);
         return false;
       }
       return data === true;
