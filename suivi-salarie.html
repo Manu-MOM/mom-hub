@@ -295,6 +295,19 @@
 
 </div>
 
+<!-- ============ MODALE CONFIRMATION (annuler / réactiver) ============ -->
+<div class="ss-overlay" id="ssConfirmOverlay">
+  <div class="ss-modal" style="max-width:440px;">
+    <h3 id="ssConfirmTitle">Confirmer</h3>
+    <p class="ss-sub" id="ssConfirmMsg" style="margin-bottom:6px;"></p>
+    <p class="ss-hint" id="ssConfirmHint" style="margin-bottom:14px;"></p>
+    <div class="ss-modal-act">
+      <button class="ss-btn ss-btn-ghost" id="ssConfirmCancel" type="button">Retour</button>
+      <button class="ss-btn" id="ssConfirmOk" type="button">Confirmer</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ MODALE DÉCLARATION ============ -->
 <div class="ss-overlay" id="ssDeclOverlay">
   <div class="ss-modal">
@@ -628,6 +641,14 @@
       if (o.etat === 'validee') {
         out.push(mkBtn('Dévalider', 'ss-btn ss-btn-sm ss-btn-ghost', function () { doDevalider(o); }));
       }
+      // Annuler : admin, sur prevue|realisee SEULEMENT (pas validee → dévalider d'abord).
+      if (o.etat === 'prevue' || o.etat === 'realisee') {
+        out.push(mkBtn('Annuler', 'ss-btn ss-btn-sm ss-btn-ghost', function () { askAnnuler(o); }));
+      }
+      // Réactiver : admin, sur annulee → repasse en prevue (anti-fausse-manip).
+      if (o.etat === 'annulee') {
+        out.push(mkBtn('Réactiver', 'ss-btn ss-btn-sm ss-btn-ghost', function () { askReactiver(o); }));
+      }
     }
     return out;
   }
@@ -711,6 +732,71 @@
       await refreshAll();
       await loadCompteur();
     } catch (e) { flash('Dévalidation impossible : ' + errMsg(e), 'err'); }
+  }
+
+  // ---- Confirmation générique (annuler / réactiver) ----
+  let confirmAction = null;
+  function openConfirm(title, msg, hint, okLabel, action) {
+    $('ssConfirmTitle').textContent = title;
+    $('ssConfirmMsg').textContent = msg;
+    $('ssConfirmHint').textContent = hint || '';
+    $('ssConfirmOk').textContent = okLabel || 'Confirmer';
+    confirmAction = action;
+    $('ssConfirmOverlay').classList.add('open');
+  }
+  function closeConfirm() { $('ssConfirmOverlay').classList.remove('open'); confirmAction = null; }
+
+  function askAnnuler(o) {
+    openConfirm(
+      'Annuler la séance ?',
+      fmtWhen(o) + (lieuLabel(o) ? ' · ' + lieuLabel(o) : ''),
+      'La séance passera en « Annulée » (séance non faite). Réversible : un admin pourra la réactiver depuis le filtre « Annulée ».',
+      'Annuler la séance',
+      function () { return setEtatSeance(o, 'annulee'); }
+    );
+  }
+  function askReactiver(o) {
+    openConfirm(
+      'Réactiver la séance ?',
+      fmtWhen(o) + (lieuLabel(o) ? ' · ' + lieuLabel(o) : ''),
+      'La séance repassera en « Prévue ».',
+      'Réactiver',
+      function () { return setEtatSeance(o, 'prevue'); }
+    );
+  }
+
+  // Ré-UPSERT de la séance COMPLÈTE (tous champs préservés) + nouvel état.
+  // upsert_mission_seance est un UPSERT : tout champ omis serait écrasé à null,
+  // donc on repasse explicitement chaque attribut lu sur l'occurrence.
+  async function setEtatSeance(o, nouvelEtat) {
+    // Garde-fou : jamais d'annulation directe d'une séance validée.
+    if (nouvelEtat === 'annulee' && o.etat === 'validee') {
+      flash('Dévalidez d’abord la séance avant de l’annuler.', 'err');
+      return;
+    }
+    $('ssConfirmOk').disabled = true;
+    try {
+      await rpc('upsert_mission_seance', {
+        p_id: o.id,
+        p_mission_id: o.mission_id || (o._mission && o._mission.id),
+        p_date_seance: o.date_seance,
+        p_heure_debut: o.heure_debut != null ? o.heure_debut : null,
+        p_duree_min: o.duree_min != null ? o.duree_min : null,
+        p_lieu_id: o.lieu_id != null ? o.lieu_id : null,
+        p_lieu_libre: o.lieu_libre != null ? o.lieu_libre : null,
+        p_refacturable: o.refacturable != null ? o.refacturable : null,
+        p_etat: nouvelEtat,
+        p_heures_reelles: o.heures_reelles != null ? o.heures_reelles : null,
+        p_notes: o.notes != null ? o.notes : null
+      });
+      flash(nouvelEtat === 'annulee' ? 'Séance annulée.' : 'Séance réactivée.', 'ok');
+      closeConfirm();
+      await refreshAll();
+    } catch (e) {
+      flash('Action impossible : ' + errMsg(e), 'err');
+    } finally {
+      $('ssConfirmOk').disabled = false;
+    }
   }
 
   async function refreshAll() {
@@ -952,6 +1038,10 @@
     $('ssDeclCancel').addEventListener('click', closeDecl);
     $('ssDeclSave').addEventListener('click', saveDecl);
     $('ssDeclOverlay').addEventListener('click', function (e) { if (e.target === $('ssDeclOverlay')) closeDecl(); });
+    // Confirmation (annuler / réactiver)
+    $('ssConfirmCancel').addEventListener('click', closeConfirm);
+    $('ssConfirmOk').addEventListener('click', function () { if (confirmAction) confirmAction(); });
+    $('ssConfirmOverlay').addEventListener('click', function (e) { if (e.target === $('ssConfirmOverlay')) closeConfirm(); });
     // Mission
     $('ssMisCancel').addEventListener('click', closeMission);
     $('ssMisSave').addEventListener('click', saveMission);
