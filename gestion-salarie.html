@@ -368,12 +368,17 @@
     <div class="gs-grid2">
       <div class="gs-field"><label for="misType">Type *</label>
         <select id="misType">
-          <option value="intervention_ecole">Intervention école</option>
+          <option value="">— choisir —</option>
+          <option value="intervention_scolaire">Intervention scolaire</option>
+          <option value="entrainement_section">Entraînement section</option>
+          <option value="entrainement_sr_m">Entraînement SR/M</option>
+          <option value="autre_entrainement_mom">Autre entraînement MOM</option>
+          <option value="accompagnement_terrain">Accompagnement terrain</option>
           <option value="stage">Stage</option>
           <option value="reunion">Réunion</option>
-          <option value="entrainement_interne">Entraînement interne</option>
-          <option value="prepa">Prépa</option>
-          <option value="autre">Autre</option>
+          <option value="suivi_competition">Suivi compétition</option>
+          <option value="travail_personnel">Travail personnel</option>
+          <option value="divers">Divers</option>
         </select>
       </div>
       <div class="gs-field"><label for="misEtat">État</label>
@@ -666,7 +671,7 @@
     $('misLibelle').value = m ? (m.libelle || '') : '';
     $('misSalarieSel').value = m ? (m.salarie_id || '') : '';
     $('misEntite').value = m ? (m.entite_id || '') : '';
-    $('misType').value = m ? (m.type_mission || 'autre') : 'intervention_ecole';
+    $('misType').value = m ? (m.type_mission || '') : '';
     $('misEtat').value = m ? (m.etat || 'prevue') : 'prevue';
     $('misDateDebut').value = m ? (m.date_debut || '') : '';
     $('misDateFin').value = m ? (m.date_fin || '') : '';
@@ -710,6 +715,7 @@
     if (!libelle) return flash('Le libellé de la mission est obligatoire.', 'err');
     if (!salarie) return flash('Choisis un salarié.', 'err');
     if (!entite) return flash('Choisis un bénéficiaire.', 'err');
+    if (!$('misType').value) return flash('Choisis un type de mission.', 'err');
     if (!dateDebut) return flash('La date de début est obligatoire.', 'err');
     $('misSave').disabled = true;
     try {
