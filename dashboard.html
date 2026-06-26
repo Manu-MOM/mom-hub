@@ -256,25 +256,30 @@
         <p class="admin-tile-desc">Qui peut faire quoi dans le Hub : attribuer admin, bureau ou référent aux personnes connectées.</p>
       </a>
 
-      <!-- Gestion du salarié (socle pt 78 : entités bénéficiaires + missions) -->
-      <a class="admin-tile" data-show="admin" href="gestion-salarie.html">
-        <div class="admin-tile-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        </div>
-        <p class="admin-tile-title">Gestion du salarié</p>
-        <p class="admin-tile-desc">Les bénéficiaires (écoles, clubs, interne) et les missions du salarié, avec leurs séances.</p>
-      </a>
-
-      <!-- Suivi du salarié (DASHBOARD-TUILES-PAR-CAPABILITY) : écran à vignettes
-           suivi-salarie.html. Visible à l'admin ET au salarié relié (data-show
-           combiné admin+salarie). Garde de page = voie 3 (admin|bureau OU salarié
-           relié). C'est la tuile par laquelle Lohann atteint son espace. -->
+      <!-- Activité du salarié — QUOTIDIEN (DASHBOARD-TUILES-PAR-CAPABILITY) : écran
+           à vignettes suivi-salarie.html. Visible à l'admin ET au salarié relié
+           (data-show combiné admin+salarie). Garde de page = voie 3 (admin|bureau
+           OU salarié relié). C'est la tuile par laquelle Lohann atteint son espace.
+           Placée AVANT la tuile administration : usage le plus fréquent en premier
+           (SALARIE-LIBELLES-ET-EDITION, chantier 1). Titre commun « Activité du
+           salarié » = ancrage de groupe ; le sous-titre distingue les deux. -->
       <a class="admin-tile" data-show="admin salarie" href="suivi-salarie.html">
         <div class="admin-tile-icon">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
         </div>
-        <p class="admin-tile-title">Suivi du salarié</p>
-        <p class="admin-tile-desc">Vos séances et missions : déclarer une intervention réalisée, suivre le compteur d'heures.</p>
+        <p class="admin-tile-title">Activité du salarié</p>
+        <p class="admin-tile-desc">Planning hebdomadaire et suivi des séances</p>
+      </a>
+
+      <!-- Activité du salarié — ADMINISTRATION (socle pt 78 : entités bénéficiaires
+           + missions + compteur horaire détaillé). Même titre que la tuile quotidien
+           (ancrage de groupe) ; sous-titre distinct. Usage occasionnel, admin. -->
+      <a class="admin-tile" data-show="admin" href="gestion-salarie.html">
+        <div class="admin-tile-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <p class="admin-tile-title">Activité du salarié</p>
+        <p class="admin-tile-desc">Missions, bénéficiaires et compteur horaire</p>
       </a>
 
       <!-- Import OVAL-E (pt 82 : alimente personnes.qualites_ffr depuis un export OVAL-E) -->
