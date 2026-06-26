@@ -316,7 +316,7 @@
 <!-- ============ MODALE DÉCLARATION ============ -->
 <div class="ss-overlay" id="ssDeclOverlay">
   <div class="ss-modal">
-    <h3>Déclarer la séance</h3>
+    <h3>Marquer la séance réalisée</h3>
     <p class="ss-sub" id="ssDeclCtx" style="margin-bottom:14px;"></p>
     <div class="ss-field">
       <label for="ssDeclHeures">Heures réelles</label>
@@ -325,7 +325,7 @@
     </div>
     <div class="ss-modal-act">
       <button class="ss-btn ss-btn-ghost" id="ssDeclCancel" type="button">Annuler</button>
-      <button class="ss-btn" id="ssDeclSave" type="button">Déclarer</button>
+      <button class="ss-btn" id="ssDeclSave" type="button">Marquer réalisée</button>
     </div>
   </div>
 </div>
@@ -591,7 +591,7 @@
     b.type = 'button';
     b.className = 'ss-tile' + (isDivers ? ' divers' : '');
     const countCls = n > 0 ? 'ss-tile-count has' : 'ss-tile-count';
-    const countTxt = n > 0 ? (n + ' à déclarer') : '—';
+    const countTxt = n > 0 ? (n + ' à faire') : '—';
     b.innerHTML =
       '<span class="ss-tile-ic">' + (ICONS[t.ic] || '') + '</span>' +
       '<span class="ss-tile-lib">' + t.lib + '</span>' +
@@ -688,7 +688,7 @@
     const out = [];
     // Déclarer : prevue|realisee, par Lohann OU admin (garde voie 3 RGPD côté SQL).
     if (o.etat === 'prevue' || o.etat === 'realisee') {
-      out.push(mkBtn('Déclarer', 'ss-btn ss-btn-sm', function () { openDecl(o); }));
+      out.push(mkBtn('Marquer réalisée', 'ss-btn ss-btn-sm', function () { openDecl(o); }));
     }
     if (peutEcrire) {
       if (o.etat === 'realisee') {
@@ -1214,7 +1214,7 @@
     $('ssSub').textContent = 'Missions du salarié et leurs séances, par type. Validez les séances réalisées pour alimenter le compteur.';
     $('ssNewMission').hidden = false;
   } else {
-    $('ssSub').textContent = 'Vos séances à déclarer, par type, et votre compteur d’heures.';
+    $('ssSub').textContent = 'Vos séances à traiter, par type, et votre compteur d’heures.';
   }
   $('ssCompteur').hidden = false;
   $('ssMisBenefCreate').hidden = false;
