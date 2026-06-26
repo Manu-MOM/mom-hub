@@ -129,6 +129,7 @@
                      padding: 11px 16px; background: var(--paper, #f8f5ec); border-bottom: 1px solid var(--line, #cabe9f); }
   .ss-mission-title { margin: 0; font-size: 14px; font-weight: 700; color: var(--vert-bouteille, #0c3d24); }
   .ss-mission-count { font-size: 12px; color: var(--ink-mute, #6b7a74); white-space: nowrap; }
+  .ss-mission-head-right { display: flex; align-items: center; gap: 12px; }
   .ss-mission-empty { padding: 16px; text-align: center; color: var(--ink-mute, #6b7a74); font-size: 13px; }
 
   /* ----- Agenda semaine ----- */
@@ -488,6 +489,14 @@
   let missions = [];               // missions du salarié, saison active
   let occByMission = {};           // mission_id -> [occurrences]
   let editingMissionId = null;
+  // État d'édition d'une mission (renvoyé au save pour ne rien écraser — upsert_mission
+  // UPDATE réécrit toutes les colonnes en dur, cf. champs non présents dans la modale).
+  let editingMissionCode = null;
+  let editingMissionEtat = null;
+  let editingMissionRecurrence = null;
+  let editingMissionBilan = null;
+  let editingMissionQuestFait = false;
+  let editingMissionLieuLibre = null;
   let currentType = null;          // code type affiché dans la vue-type
   let currentView = 'liste';       // 'liste' | 'agenda'
   let weekStart = null;            // Date (lundi) de la semaine affichée en agenda
@@ -700,7 +709,17 @@
       ? (occ.length + (occ.length > 1 ? ' séances' : ' séance'))
       : '—';
     head.appendChild(title);
-    head.appendChild(count);
+    // Groupe de droite : compte + bouton éditer (préserve le space-between du head).
+    const headRight = document.createElement('div');
+    headRight.className = 'ss-mission-head-right';
+    headRight.appendChild(count);
+    // Bouton « ✎ Éditer » réservé à l'administration (peutEcrire) ; masqué pour Lohann.
+    if (peutEcrire) {
+      headRight.appendChild(mkBtn('✎ Éditer', 'ss-btn ss-btn-sm ss-btn-ghost', function () {
+        openMission(m);
+      }));
+    }
+    head.appendChild(headRight);
     block.appendChild(head);
 
     if (!occ.length) {
@@ -1026,27 +1045,60 @@
     const suffix = Date.now().toString(36).slice(-4).toUpperCase();
     return (slug || 'ITEM') + '-' + suffix;
   }
-  function openMission() {
+  function openMission(mission) {
     if (!peutEcrire) return;
-    editingMissionId = null;
-    $('ssMisTitle').textContent = 'Nouvelle mission';
-    $('ssMisLibelle').value = '';
-    $('ssMisDateDebut').value = isoDate(new Date());
-    $('ssMisDateFin').value = '';
-    $('ssMisNotes').value = '';
-    $('ssMisRefac').checked = false;
-    $('ssMisCadre').checked = false;
+    // Édition si une mission réelle est fournie ; sinon création (le listener du
+    // bouton « + Nouvelle mission » passe un MouseEvent → garde sur mission.id pour
+    // ne JAMAIS confondre un Event avec une mission).
+    const edit = !!(mission && mission.id);
+    editingMissionId = edit ? mission.id : null;
+    // Code conservé en édition (upsert_mission impose un code non vide ET réécrit la
+    // ligne en dur ; on garde m.code, pas de re-dérivation = pas de collision UNIQUE).
+    editingMissionCode = edit ? (mission.code || null) : null;
+    // Champs « invisibles » de la modale mais réécrits sec par l'UPDATE de
+    // upsert_mission (etat/bilan/recurrence/questionnaire/lieu_libre). On les
+    // mémorise pour les RENVOYER au save, sinon l'édition les écraserait à leur
+    // DEFAULT (etat→'prevue', les autres→null/false). list_missions fait select *
+    // donc ces colonnes sont présentes sur la ligne.
+    editingMissionEtat        = edit ? (mission.etat || 'prevue') : null;
+    editingMissionRecurrence  = edit ? (mission.recurrence != null ? mission.recurrence : null) : null;
+    editingMissionBilan       = edit ? (mission.bilan_text != null ? mission.bilan_text : null) : null;
+    editingMissionQuestFait   = edit ? !!mission.questionnaire_fait : false;
+    editingMissionLieuLibre   = edit ? (mission.lieu_libre != null ? mission.lieu_libre : null) : null;
+    $('ssMisTitle').textContent = edit ? 'Modifier la mission' : 'Nouvelle mission';
+    $('ssMisLibelle').value = edit ? (mission.libelle || '') : '';
+    $('ssMisDateDebut').value = edit ? (mission.date_debut || isoDate(new Date())) : isoDate(new Date());
+    $('ssMisDateFin').value = edit ? (mission.date_fin || '') : '';
+    $('ssMisNotes').value = edit ? (mission.notes || '') : '';
+    $('ssMisRefac').checked = edit ? !!mission.refacturable : false;
+    $('ssMisCadre').checked = edit ? !!mission.est_cadre : false;
     $('ssEntCreate').classList.remove('open');
     const t = TYPE_BY_CODE[currentType];
     // Bénéficiaire affiché SEULEMENT pour les types externes (doctrine §3.4).
+    // En édition on reste dans la vue-type courante (le bouton vit dans
+    // buildMissionBlock rendu sous currentType), donc externe/interne reste cohérent.
     const externe = !!(t && t.externe);
     $('ssMisBenefWrap').style.display = externe ? '' : 'none';
-    if (externe) { $('ssMisRefac').checked = true; }
+    if (externe && !edit) { $('ssMisRefac').checked = true; }
     fillBenefSelect();
     fillLieuSelect();
+    // Présélection des selects APRÈS leur (re)construction.
+    if (edit) {
+      $('ssMisBenef').value = mission.entite_id || '';
+      $('ssMisLieu').value = mission.lieu_id || '';
+    }
     $('ssMisOverlay').classList.add('open');
   }
-  function closeMission() { $('ssMisOverlay').classList.remove('open'); editingMissionId = null; }
+  function closeMission() {
+    $('ssMisOverlay').classList.remove('open');
+    editingMissionId = null;
+    editingMissionCode = null;
+    editingMissionEtat = null;
+    editingMissionRecurrence = null;
+    editingMissionBilan = null;
+    editingMissionQuestFait = false;
+    editingMissionLieuLibre = null;
+  }
   function fillLieuSelect() {
     const sel = $('ssMisLieu');
     sel.innerHTML = '<option value="">— aucun —</option>';
@@ -1103,9 +1155,13 @@
     if (!dateDebut) { flash('La date de début est obligatoire.', 'err'); return; }
     $('ssMisSave').disabled = true;
     try {
+      const enEdition = editingMissionId != null;
       const params = {
-        p_id: null,
-        p_code: deriveCode(libelle),
+        p_id: editingMissionId,
+        // Code : en édition on conserve celui de la mission (upsert_mission réécrit la
+        // ligne en dur ; re-dériver depuis un libellé modifié risquerait une collision
+        // UNIQUE). En création, dérivation depuis le libellé comme avant.
+        p_code: enEdition && editingMissionCode ? editingMissionCode : deriveCode(libelle),
         p_libelle: libelle,
         p_type_mission: currentType,
         p_salarie_id: salarieId,
@@ -1114,12 +1170,20 @@
         p_date_debut: dateDebut,
         p_date_fin: $('ssMisDateFin').value || null,
         p_lieu_id: $('ssMisLieu').value || null,
+        // Champs absents de la modale mais réécrits SEC par l'UPDATE de upsert_mission.
+        // En édition on RENVOIE les valeurs d'origine (mémorisées par openMission),
+        // sinon elles seraient écrasées à leur DEFAULT. En création, valeurs neutres.
+        p_lieu_libre: enEdition ? editingMissionLieuLibre : null,
+        p_recurrence: enEdition ? editingMissionRecurrence : null,
+        p_etat: enEdition ? editingMissionEtat : 'prevue',
+        p_bilan_text: enEdition ? editingMissionBilan : null,
+        p_questionnaire_fait: enEdition ? editingMissionQuestFait : false,
         p_est_cadre: $('ssMisCadre').checked,
         p_refacturable: $('ssMisRefac').checked,
         p_notes: $('ssMisNotes').value.trim() || null
       };
       await rpc('upsert_mission', params);
-      flash('Mission enregistrée.', 'ok');
+      flash(enEdition ? 'Mission modifiée.' : 'Mission enregistrée.', 'ok');
       closeMission();
       await refreshAll();
     } catch (e) {
