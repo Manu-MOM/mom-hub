@@ -8,6 +8,10 @@
 <!--
   MOM Hub · Suivi du salarié — écran à VIGNETTES (MISSION-TO-COUNTER-FRONT, pt 115).
   Surface NEUVE (ne remplace pas gestion-salarie.html, conservée comme surface admin).
+  MAJ : SEANCE-PONCTUELLE-SUIVI-SALARIE — bouton « + Séance ponctuelle » (admin ET
+  salarié) appelant la RPC voie 3 creer_seance_ponctuelle() (sql_123). Le salarié
+  crée sur SES missions, état forcé 'realisee' (garde serveur) ; l'admin choisit
+  prevue|realisee. Appel par nom via le helper rpc() inline (zéro wrapper client).
 
   ARCHITECTURE (calque gestion-salarie.html, vérifié à la source 26/06) :
     - charge supabase.min.js (CDN jsDelivr) puis js/supabase-client.js (SupabaseHub).
@@ -265,6 +269,7 @@
       <span class="sp"></span>
       <button class="ss-btn ss-btn-sm ss-btn-ghost" id="ssGenWeek" type="button" hidden>Générer la semaine</button>
       <button class="ss-btn ss-btn-sm" id="ssNewMission" type="button" hidden>+ Nouvelle mission</button>
+      <button class="ss-btn ss-btn-sm" id="ssNewPonctuelle" type="button" hidden>+ Séance ponctuelle</button>
     </div>
 
     <div id="ssListWrap">
@@ -321,6 +326,51 @@
     <div class="ss-modal-act">
       <button class="ss-btn ss-btn-ghost" id="ssDeclCancel" type="button">Annuler</button>
       <button class="ss-btn" id="ssDeclSave" type="button">Déclarer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODALE SÉANCE PONCTUELLE (salarié OU admin) ============ -->
+<div class="ss-overlay" id="ssPonctOverlay">
+  <div class="ss-modal">
+    <h3>Nouvelle séance ponctuelle</h3>
+    <p class="ss-sub" style="margin-bottom:14px;">Une séance isolée (hors génération récurrente), rattachée à l'une de vos missions.</p>
+    <div class="ss-field">
+      <label for="ssPonctMission">Mission *</label>
+      <select id="ssPonctMission"><option value="">— choisir —</option></select>
+    </div>
+    <div class="ss-field">
+      <label for="ssPonctDate">Date *</label>
+      <input type="date" id="ssPonctDate">
+    </div>
+    <div class="ss-field">
+      <label for="ssPonctDuree">Durée (minutes)</label>
+      <input type="number" id="ssPonctDuree" step="5" min="0" inputmode="numeric" placeholder="ex. 90">
+    </div>
+    <div class="ss-field">
+      <label for="ssPonctHeures">Heures réelles</label>
+      <input type="number" id="ssPonctHeures" step="0.25" min="0" inputmode="decimal">
+      <p class="ss-hint">Pré-rempli depuis la durée. Ajustez si besoin.</p>
+    </div>
+    <div class="ss-field">
+      <label for="ssPonctLieu">Lieu (texte libre)</label>
+      <input type="text" id="ssPonctLieu" placeholder="ex. École Jean Macé">
+    </div>
+    <!-- État : visible admin seulement (le salarié crée toujours en realisee). -->
+    <div class="ss-field" id="ssPonctEtatWrap" hidden>
+      <label for="ssPonctEtat">État</label>
+      <select id="ssPonctEtat">
+        <option value="realisee">Réalisée</option>
+        <option value="prevue">Prévue</option>
+      </select>
+    </div>
+    <div class="ss-field">
+      <label for="ssPonctNotes">Notes</label>
+      <textarea id="ssPonctNotes" rows="2"></textarea>
+    </div>
+    <div class="ss-modal-act">
+      <button class="ss-btn ss-btn-ghost" id="ssPonctCancel" type="button">Annuler</button>
+      <button class="ss-btn" id="ssPonctSave" type="button">Créer la séance</button>
     </div>
   </div>
 </div>
@@ -562,6 +612,11 @@
     // Boutons admin (génération + nouvelle mission) masqués pour Lohann.
     $('ssGenWeek').hidden = !peutEcrire;
     $('ssNewMission').hidden = !peutEcrire;
+    // Séance ponctuelle : visible à TOUS (admin ET salarié), mais seulement
+    // s'il existe au moins une mission de ce type à laquelle la rattacher.
+    $('ssNewPonctuelle').hidden = !missions.some(function (m) {
+      return m.type_mission === typeCode;
+    });
     weekStart = mondayOf(new Date());
     setView(currentView);
   }
@@ -569,6 +624,7 @@
     currentType = null;
     $('ssTypeView').classList.remove('active');
     $('ssGridView').hidden = false;
+    $('ssNewPonctuelle').hidden = true;
   }
   function setView(mode) {
     currentView = mode;
@@ -717,6 +773,75 @@
       $('ssDeclSave').disabled = false;
     }
   }
+
+  // ---- Séance ponctuelle (création voie 3 : salarié OU admin) ----
+  // Ouvre la modale en peuplant le sélecteur de mission avec les missions du
+  // TYPE courant (déjà filtrées au salarié par list_missions p_salarie_id).
+  // L'état n'est proposé qu'à l'admin ; le salarié crée toujours en 'realisee'
+  // (la RPC sql_123 le force côté serveur — le front ne fait que refléter).
+  function openPonctuelle() {
+    const sel = $('ssPonctMission');
+    sel.innerHTML = '<option value="">— choisir —</option>';
+    const mis = missions.filter(function (m) {
+      return !currentType || m.type_mission === currentType;
+    });
+    mis.forEach(function (m) {
+      const opt = document.createElement('option');
+      opt.value = m.id;
+      opt.textContent = m.libelle || '(sans libellé)';
+      sel.appendChild(opt);
+    });
+    // Pré-sélection si une seule mission candidate (confort).
+    if (mis.length === 1) sel.value = mis[0].id;
+
+    $('ssPonctDate').value = isoDate(new Date());
+    $('ssPonctDuree').value = '';
+    $('ssPonctHeures').value = '';
+    $('ssPonctLieu').value = '';
+    $('ssPonctNotes').value = '';
+    $('ssPonctEtatWrap').hidden = !peutEcrire;   // sélecteur d'état : admin seul
+    if (peutEcrire) $('ssPonctEtat').value = 'realisee';
+    $('ssPonctOverlay').classList.add('open');
+  }
+  function closePonctuelle() { $('ssPonctOverlay').classList.remove('open'); }
+
+  async function savePonctuelle() {
+    const missionId = $('ssPonctMission').value;
+    const date = $('ssPonctDate').value || null;
+    if (!missionId) return flash('Choisis une mission.', 'err');
+    if (!date) return flash('La date est obligatoire.', 'err');
+
+    const dureeRaw = $('ssPonctDuree').value;
+    const duree = (dureeRaw === '' || dureeRaw == null) ? null : Number(dureeRaw);
+    const heuresRaw = $('ssPonctHeures').value;
+    const heures = (heuresRaw === '' || heuresRaw == null) ? null : Number(heuresRaw);
+    // État : admin choisit (prevue|realisee) ; salarié -> realisee (forcé serveur).
+    const etat = peutEcrire ? ($('ssPonctEtat').value || 'realisee') : 'realisee';
+
+    $('ssPonctSave').disabled = true;
+    try {
+      await rpc('creer_seance_ponctuelle', {
+        p_mission_id: missionId,
+        p_date_seance: date,
+        p_heure_debut: null,
+        p_duree_min: duree,
+        p_lieu_id: null,
+        p_lieu_libre: $('ssPonctLieu').value.trim() || null,
+        p_refacturable: null,
+        p_heures_reelles: heures,
+        p_notes: $('ssPonctNotes').value.trim() || null,
+        p_etat: etat
+      });
+      flash('Séance ponctuelle créée.', 'ok');
+      closePonctuelle();
+      await refreshAll();
+    } catch (e) {
+      flash('Création impossible : ' + errMsg(e), 'err');
+    } finally {
+      $('ssPonctSave').disabled = false;
+    }
+  }
+
   async function doValider(o) {
     try {
       await rpc('valider_occurrence', { p_id: o.id });
@@ -1038,6 +1163,18 @@
     $('ssDeclCancel').addEventListener('click', closeDecl);
     $('ssDeclSave').addEventListener('click', saveDecl);
     $('ssDeclOverlay').addEventListener('click', function (e) { if (e.target === $('ssDeclOverlay')) closeDecl(); });
+    // Séance ponctuelle
+    $('ssNewPonctuelle').addEventListener('click', openPonctuelle);
+    $('ssPonctCancel').addEventListener('click', closePonctuelle);
+    $('ssPonctSave').addEventListener('click', savePonctuelle);
+    $('ssPonctOverlay').addEventListener('click', function (e) { if (e.target === $('ssPonctOverlay')) closePonctuelle(); });
+    // Auto-remplissage des heures depuis la durée saisie (confort, ajustable).
+    $('ssPonctDuree').addEventListener('input', function () {
+      const d = $('ssPonctDuree').value;
+      if (d !== '' && d != null && $('ssPonctHeures').value === '') {
+        $('ssPonctHeures').value = Math.round((Number(d) / 60) * 100) / 100;
+      }
+    });
     // Confirmation (annuler / réactiver)
     $('ssConfirmCancel').addEventListener('click', closeConfirm);
     $('ssConfirmOk').addEventListener('click', function () { if (confirmAction) confirmAction(); });
