@@ -1,11 +1,14 @@
 -- sql_120 — cycle de vie de l'occurrence : declarer / valider / devalider
 -- Chantier MISSION-TO-COUNTER-FRONT-VIGNETTES (conception pt 113 → production).
 -- 3 RPC de transition d'état sur mission_seances, voie 3 RGPD pour la déclaration.
--- Réutilise : _gs_peut_ecrire() (admin|bureau, sondé PD1b), qui_suis_je() (personne_id).
--- ⚠️ sync_releve_depuis_occurrence (sql_116c) n'est PAS appelée ici : à confirmer
---    par sonde SYNC si un trigger sur mission_seances la déclenche. Si AUCUN trigger,
---    ajouter l'appel sync_releve_depuis_occurrence(p_id) dans valider/devalider AVANT
---    exécution (sinon l'état change mais le compteur ne bouge pas).
+-- Réutilise : _gs_peut_ecrire() (admin|bureau, sondé PD1b), qui_suis_je() (personne_id),
+--   sync_releve_depuis_occurrence(uuid) (sql_116c, sondé SYNC2).
+-- Sonde SYNC : AUCUN trigger sur mission_seances n'appelle sync_releve_depuis_occurrence
+--   (seul set_updated_at existe) → valider_occurrence et devalider_occurrence appellent
+--   sync_releve_depuis_occurrence(p_id) EXPLICITEMENT après le UPDATE d'état. La sync est
+--   idempotente, relit l'état courant et fait UPSERT (validee) ou DELETE (autre).
+--   declarer_occurrence n'appelle PAS la sync (une realisee n'est jamais au compteur, §4
+--   du kit ; de plus Lohann n'est pas admin|bureau et la sync planterait sur sa garde).
 
 begin;
 
@@ -89,6 +92,10 @@ begin
   where id = p_id
   returning * into v_row;
 
+  -- Alimente le compteur : sync relit l'état fraîchement écrit (validee → UPSERT
+  -- de la ligne releve_heures_salarie). Garde admin|bureau déjà franchie ci-dessus.
+  perform public.sync_releve_depuis_occurrence(p_id);
+
   return v_row;
 end;
 $valider_occurrence$;
@@ -123,6 +130,10 @@ begin
   update public.mission_seances set etat = 'realisee'
   where id = p_id
   returning * into v_row;
+
+  -- Retire du compteur : sync relit l'état (realisee ≠ validee → DELETE de la ligne
+  -- releve_heures_salarie). Garde admin|bureau déjà franchie ci-dessus.
+  perform public.sync_releve_depuis_occurrence(p_id);
 
   return v_row;
 end;
@@ -159,6 +170,9 @@ begin
   end if;
   if to_regprocedure('public.qui_suis_je()') is null then
     raise exception 'VERIF: dépendance qui_suis_je() absente';
+  end if;
+  if to_regprocedure('public.sync_releve_depuis_occurrence(uuid)') is null then
+    raise exception 'VERIF: dépendance sync_releve_depuis_occurrence(uuid) absente';
   end if;
   if has_function_privilege('anon', 'public.declarer_occurrence(uuid, numeric)', 'execute') then
     raise exception 'VERIF: anon peut EXECUTE declarer_occurrence (REVOKE manquant)';
