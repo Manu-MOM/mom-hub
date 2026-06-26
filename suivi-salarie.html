@@ -121,6 +121,16 @@
 
   .ss-empty { padding: 28px 16px; text-align: center; color: var(--ink-mute, #6b7a74); font-size: 14px; }
 
+  /* ----- Vue missions -> séances (JOUEURS… non : SALARIE-VUE-MISSIONS-SEANCES, chantier 2) ----- */
+  /* Chaque mission du type devient un sous-chapitre : en-tête mission + ses séances. */
+  .ss-mission { border: 1px solid var(--line, #cabe9f); border-radius: 10px; overflow: hidden; margin-bottom: 14px; background: #fff; }
+  .ss-mission:last-child { margin-bottom: 0; }
+  .ss-mission-head { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+                     padding: 11px 16px; background: var(--paper, #f8f5ec); border-bottom: 1px solid var(--line, #cabe9f); }
+  .ss-mission-title { margin: 0; font-size: 14px; font-weight: 700; color: var(--vert-bouteille, #0c3d24); }
+  .ss-mission-count { font-size: 12px; color: var(--ink-mute, #6b7a74); white-space: nowrap; }
+  .ss-mission-empty { padding: 16px; text-align: center; color: var(--ink-mute, #6b7a74); font-size: 13px; }
+
   /* ----- Agenda semaine ----- */
   .ss-agenda { background: #fff; border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 12px; padding: 14px; }
   .ss-weeknav { display: flex; align-items: center; justify-content: space-between; margin: 0 0 12px; }
@@ -643,15 +653,65 @@
     return rows;
   }
 
+  // Les missions du type courant (objets de plein droit, cf. SALARIE-VUE-MISSIONS-SEANCES).
+  function missionsDuType(typeCode) {
+    return missions.filter(function (m) { return m.type_mission === typeCode; });
+  }
+  // Les séances d'une mission, filtrées par l'état courant et triées par date.
+  function occurrencesDeMission(m) {
+    const f = $('ssFilter').value;
+    let rows = (occByMission[m.id] || []).slice();
+    if (f !== '__all') rows = rows.filter(function (o) { return o.etat === f; });
+    rows.sort(function (a, b) { return String(a.date_seance).localeCompare(String(b.date_seance)); });
+    return rows.map(function (o) { return Object.assign({}, o, { _mission: m }); });
+  }
+
+  // Vue LISTE : missions -> séances en sous-chapitre (chantier 2).
+  // Toutes les missions du type restent visibles ; le filtre d'état s'applique
+  // AUX SÉANCES de chaque mission (D1) ; une mission sans séance pour le filtre
+  // affiche un sous-message dédié. Tout déplié en v1 (D3).
   function renderListe() {
     const wrap = $('ssList');
-    const rows = filteredOccurrences();
-    if (!rows.length) {
-      wrap.innerHTML = '<div class="ss-empty">Aucune séance pour ce filtre.</div>';
+    const mis = missionsDuType(currentType);
+    if (!mis.length) {
+      wrap.innerHTML = '<div class="ss-empty">Aucune mission de ce type.</div>';
       return;
     }
     wrap.innerHTML = '';
-    rows.forEach(function (o) { wrap.appendChild(buildRow(o)); });
+    mis.forEach(function (m) {
+      wrap.appendChild(buildMissionBlock(m));
+    });
+  }
+
+  // Un bloc = en-tête mission + ses séances filtrées (ou sous-message si aucune).
+  function buildMissionBlock(m) {
+    const occ = occurrencesDeMission(m);
+    const block = document.createElement('div');
+    block.className = 'ss-mission';
+
+    const head = document.createElement('div');
+    head.className = 'ss-mission-head';
+    const title = document.createElement('p');
+    title.className = 'ss-mission-title';
+    title.textContent = m.libelle || '(sans libellé)';
+    const count = document.createElement('span');
+    count.className = 'ss-mission-count';
+    count.textContent = occ.length > 0
+      ? (occ.length + (occ.length > 1 ? ' séances' : ' séance'))
+      : '—';
+    head.appendChild(title);
+    head.appendChild(count);
+    block.appendChild(head);
+
+    if (!occ.length) {
+      const empty = document.createElement('div');
+      empty.className = 'ss-mission-empty';
+      empty.textContent = 'Aucune séance pour ce filtre.';
+      block.appendChild(empty);
+    } else {
+      occ.forEach(function (o) { block.appendChild(buildRow(o)); });
+    }
+    return block;
   }
 
   function buildRow(o) {
