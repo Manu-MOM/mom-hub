@@ -3,22 +3,30 @@
 -- Chantier : MISSION-TO-COUNTER (D5 — typologie verrouillee a 10 types)
 -- Objet    : aligner le CHECK missions.type_mission sur les 10 types
 --            metier du memo Manu (26/06), jetons snake_case definitifs.
--- Methode  : bac a sable (1 ligne de test) -> UPDATE de la ligne de test
---            (intervention_ecole -> intervention_scolaire) PUIS resserrage
---            du CHECK aux 10 nouveaux jetons. Non destructif (1 ligne migree).
+-- Methode  : bac a sable (1 ligne de test). ORDRE CRITIQUE :
+--            (1) DROP de l'ancien CHECK — sinon il rejette la valeur cible
+--                pendant l'UPDATE de migration ;
+--            (2) UPDATE de la ligne de test (intervention_ecole ->
+--                intervention_scolaire) ;
+--            (3) ADD du nouveau CHECK aux 10 jetons.
+--            Non destructif (1 ligne migree).
 -- Sonde    : S5 (CHECK actuel = 6 valeurs heritees, a remplacer).
 -- =====================================================================
 
 begin;
 
--- 1) Migrer la seule ligne de test vers le nouveau jeton (bac a sable).
---    intervention_ecole -> intervention_scolaire. Idempotent (IS DISTINCT FROM).
+-- 1) DROP de l'ancien CHECK D'ABORD (il interdirait sinon la valeur cible).
+alter table public.missions
+  drop constraint if exists missions_type_mission_check;
+
+-- 2) Migrer la seule ligne de test vers le nouveau jeton (bac a sable).
+--    intervention_ecole -> intervention_scolaire. Idempotent (pas de match si deja migre).
 update public.missions
 set type_mission = 'intervention_scolaire'
 where type_mission = 'intervention_ecole';
 
--- 2) Filet anti-resserrage : refuser de continuer s'il reste une valeur
---    hors des 10 nouveaux jetons (sinon le CHECK echouerait a la creation).
+-- 3) Filet anti-resserrage : refuser de continuer s'il reste une valeur
+--    hors des 10 nouveaux jetons (sinon le nouveau CHECK echouerait a la creation).
 do $guard$
 declare
   v_orphelins int;
@@ -36,10 +44,7 @@ begin
 end
 $guard$;
 
--- 3) Remplacer le CHECK (DROP ancien + ADD nouveau aux 10 jetons).
-alter table public.missions
-  drop constraint if exists missions_type_mission_check;
-
+-- 4) ADD du nouveau CHECK aux 10 jetons.
 alter table public.missions
   add constraint missions_type_mission_check
   check (type_mission = any (array[
@@ -55,7 +60,7 @@ alter table public.missions
     'divers'::text
   ]));
 
--- 4) Garde-fou fail-loud : le CHECK existe et porte bien les 10 jetons.
+-- 5) Garde-fou fail-loud : le CHECK existe et porte bien les 10 jetons.
 do $verif$
 declare
   v_def text;
