@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Suivi du salarié · MOM Hub</title>
+<link rel="icon" type="image/png" href="assets/logo-m2m.png">
+<!--
+  MOM Hub · Suivi du salarié — écran à VIGNETTES (MISSION-TO-COUNTER-FRONT, pt 115).
+  Surface NEUVE (ne remplace pas gestion-salarie.html, conservée comme surface admin).
+
+  ARCHITECTURE (calque gestion-salarie.html, vérifié à la source 26/06) :
+    - charge supabase.min.js (CDN jsDelivr) puis js/supabase-client.js (SupabaseHub).
+    - GARDE DE PAGE ÉLARGIE (voie 3) : admin|bureau OU salarié relié
+      (qui_suis_je() correspond à un missions.salarie_id). Sinon -> ./
+    - tous les appels passent par le helper inline rpc(name, params) = client.rpc(...).
+      ZÉRO wrapper ajouté à supabase-client.js (le client est en v1.68, intact).
+
+  AFFICHAGE CONDITIONNEL PAR RÔLE (point dur B) :
+    - peutEcrire (= _gs_peut_ecrire côté SQL : admin|bureau) calculé une fois au boot,
+      fail-safe false. Lohann (salarié non-admin) : Déclarer + compteur seulement.
+      Admin/bureau : Valider/Dévalider/Annuler + création mission + accès entités.
+    - Le front MASQUE pour l'ergonomie ; la garde SQL reste la vérité (jamais accorder
+      par le front ce que la RPC refusera).
+
+  RPC consommées (par nom, sql_113 socle + sql_120/sql_121 pt 114) :
+    list_missions / list_mission_seances / list_entites ;
+    declarer_occurrence(p_id, p_heures_reelles) [Lohann OU admin] ;
+    valider_occurrence(p_id) / devalider_occurrence(p_id) [admin SEUL] ;
+    upsert_mission(...) / upsert_entite(...) [admin SEUL] ;
+    generer_occurrences_recurrentes(p_mission_id, p_from, p_to) ;
+    list_contrats_salaries / list_compteur_annualisation / list_releve_heures ;
+    qui_suis_je().
+  Helpers SupabaseHub réutilisés : client, getSession, getMyRoles, getSaisonActive,
+    listSitesActifs, onAuthChange.
+
+  DÉCISIONS ACTÉES (conv pt 115) :
+    - 10 types en dur, « divers » en retrait ; badge « N à déclarer » par type (occurrences prévues).
+    - vue-type : bascule Liste / Agenda-semaine ; filtre 'prevue' par défaut (anti-noyade).
+    - bénéficiaire (entité) affiché SEULEMENT pour types externes (intervention_scolaire,
+      suivi_competition) ; nullable pour les internes. ÉCART VOLONTAIRE vs gestion-salarie.html
+      qui force entite obligatoire pour tout type.
+    - états réels prevue|realisee|validee|annulee. Le vestige 'terminee' de l'ancienne page
+      N'EST PAS propagé.
+    - chargerOccurrences() = point de bascule unique vers une future RPC élargie (voie β) si
+      la mesure terrain le justifie. Aujourd'hui : boucle list_mission_seances par mission (voie α).
+-->
+<link rel="stylesheet" href="css/hub.css">
+<style>
+  body.auth-pending { visibility: hidden; }
+  .ss-wrap { max-width: 980px; margin: 0 auto; padding: 24px 24px 48px; }
+  .ss-wrap h1 { font-size: 20px; margin: 0 0 4px; }
+  .ss-sub { color: var(--ink-mute, #6b7a74); margin: 0 0 20px; font-size: 13px; }
+
+  .ss-msg { margin: 0 0 16px; }
+  .ss-flash { padding: 10px 14px; border-radius: 8px; font-size: 14px; margin-bottom: 10px; }
+  .ss-flash.ok  { background: var(--feedback-success-bg, #e7f3ec); color: var(--feedback-success-fg, #1f5a32); }
+  .ss-flash.err { background: var(--feedback-error-bg, #fdecea);   color: var(--feedback-error-fg, #8a1b14); }
+
+  /* ----- Grille de vignettes ----- */
+  .ss-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin: 0 0 22px; }
+  .ss-tile { background: #fff; border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 12px;
+             padding: 16px 18px; cursor: pointer; text-align: left; font: inherit;
+             transition: border-color .12s, box-shadow .12s; display: flex; flex-direction: column; gap: 6px; }
+  .ss-tile:hover { border-color: var(--gold, #d4a93a); box-shadow: 0 2px 8px var(--shadow, rgba(12,61,36,.1)); }
+  .ss-tile .ss-tile-ic { color: var(--vert-prairie, #2d7a3e); }
+  .ss-tile .ss-tile-ic svg { width: 22px; height: 22px; }
+  .ss-tile .ss-tile-lib { font-size: 14px; font-weight: 600; color: var(--ink, #0c3d24); }
+  .ss-tile .ss-tile-count { font-size: 12px; color: var(--ink-mute, #6b7a74); }
+  .ss-tile .ss-tile-count.has { color: var(--vert-prairie, #2d7a3e); font-weight: 600; }
+  .ss-tile.divers { background: var(--paper, #f8f5ec); }
+  .ss-tile.divers .ss-tile-ic { color: var(--ink-mute, #6b7a74); }
+  .ss-divers-row { display: flex; margin: 0 0 22px; }
+  .ss-divers-row .ss-tile { min-width: 200px; flex: 0 0 auto; }
+
+  /* ----- Vue type ----- */
+  .ss-typeview { display: none; }
+  .ss-typeview.active { display: block; }
+  .ss-typehead { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0 0 14px; }
+  .ss-typehead h2 { font-size: 17px; margin: 0; color: var(--ink, #0c3d24); }
+  .ss-back { background: transparent; border: 0; font: inherit; cursor: pointer; color: var(--ink-mute, #6b7a74);
+             display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px; }
+  .ss-back svg { width: 16px; height: 16px; }
+
+  .ss-controls { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 0 0 16px; }
+  .ss-seg { display: inline-flex; border: 1px solid var(--line, #cabe9f); border-radius: 8px; overflow: hidden; }
+  .ss-seg button { background: transparent; border: 0; font: inherit; font-size: 13px; padding: 7px 14px; cursor: pointer;
+                   color: var(--ink-mute, #6b7a74); display: inline-flex; align-items: center; gap: 5px; }
+  .ss-seg button.active { background: var(--vert-prairie, #2d7a3e); color: #fff; }
+  .ss-seg button svg { width: 15px; height: 15px; }
+  .ss-filter { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-mute, #6b7a74); }
+  .ss-filter select { font: inherit; padding: 6px 10px; border: 1px solid var(--line, #cabe9f); border-radius: 8px; background: #fff; }
+  .ss-controls .sp { flex: 1; }
+
+  .ss-btn { padding: 9px 16px; border: 0; border-radius: 8px; font: inherit; font-weight: 600; cursor: pointer;
+            background: var(--vert-prairie, #2d7a3e); color: #fff; }
+  .ss-btn:disabled { opacity: .5; cursor: default; }
+  .ss-btn-sm { padding: 6px 12px; font-size: 13px; }
+  .ss-btn-ghost { background: transparent; color: var(--ink, #0c3d24); border: 1px solid var(--line, #cabe9f); }
+
+  /* ----- Liste des occurrences ----- */
+  .ss-list { background: #fff; border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 12px; overflow: hidden; }
+  .ss-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 16px;
+            border-bottom: 1px solid var(--paper-warm, #e3e0d8); }
+  .ss-row:last-child { border-bottom: 0; }
+  .ss-row.off { opacity: .55; }
+  .ss-row-main p { margin: 0; }
+  .ss-row-when { font-size: 14px; font-weight: 600; color: var(--ink, #0c3d24); }
+  .ss-row-meta { font-size: 12px; color: var(--ink-mute, #6b7a74); margin-top: 2px !important; }
+  .ss-row-act { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+  .ss-badge { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 6px; white-space: nowrap; }
+  .ss-badge.prevue   { background: var(--feedback-info-bg, #eaf1fa);    color: var(--feedback-info-fg, #1f4a82); }
+  .ss-badge.realisee { background: var(--feedback-warning-bg, #fbf1dd); color: #8a5a0b; }
+  .ss-badge.validee  { background: var(--feedback-success-bg, #e7f3ec); color: var(--feedback-success-fg, #1f5a32); }
+  .ss-badge.annulee  { background: #f7e6e2;                             color: var(--rouge-blesse, #c0392b); }
+
+  .ss-empty { padding: 28px 16px; text-align: center; color: var(--ink-mute, #6b7a74); font-size: 14px; }
+
+  /* ----- Agenda semaine ----- */
+  .ss-agenda { background: #fff; border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 12px; padding: 14px; }
+  .ss-weeknav { display: flex; align-items: center; justify-content: space-between; margin: 0 0 12px; }
+  .ss-weeknav button { background: transparent; border: 1px solid var(--line, #cabe9f); border-radius: 8px;
+                       cursor: pointer; padding: 6px 10px; font: inherit; color: var(--ink, #0c3d24); }
+  .ss-weeknav .ss-weeklabel { font-size: 13px; font-weight: 600; color: var(--ink, #0c3d24); }
+  .ss-weekgrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  .ss-daycol { border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 8px; min-height: 90px; padding: 6px; }
+  .ss-daycol .ss-dayhd { font-size: 11px; font-weight: 600; color: var(--ink-mute, #6b7a74); text-align: center; margin-bottom: 6px; }
+  .ss-daycol.today .ss-dayhd { color: var(--vert-prairie, #2d7a3e); }
+  .ss-chip { font-size: 11px; padding: 4px 6px; border-radius: 6px; margin-bottom: 4px; cursor: pointer;
+             background: var(--feedback-info-bg, #eaf1fa); color: var(--feedback-info-fg, #1f4a82); line-height: 1.25; }
+  .ss-chip.realisee { background: var(--feedback-warning-bg, #fbf1dd); color: #8a5a0b; }
+  .ss-chip.validee  { background: var(--feedback-success-bg, #e7f3ec); color: var(--feedback-success-fg, #1f5a32); }
+  .ss-chip.annulee  { background: #f7e6e2; color: var(--rouge-blesse, #c0392b); text-decoration: line-through; }
+
+  /* ----- Compteur (panneau Lohann) ----- */
+  .ss-compteur { margin: 26px 0 0; padding: 18px 0 0; border-top: 1px solid var(--line, #cabe9f); }
+  .ss-compteur h2 { font-size: 16px; margin: 0 0 12px; color: var(--ink, #0c3d24); }
+  .ss-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin: 0 0 16px; }
+  .ss-card { background: var(--paper, #f8f5ec); border-radius: 10px; padding: 14px; }
+  .ss-card .ss-card-lbl { font-size: 12px; color: var(--ink-mute, #6b7a74); margin: 0 0 4px; }
+  .ss-card .ss-card-val { font-size: 22px; font-weight: 700; color: var(--ink, #0c3d24); }
+  .ss-releve { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .ss-releve th, .ss-releve td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--paper-warm, #e3e0d8); }
+  .ss-releve th { color: var(--ink-mute, #6b7a74); font-weight: 600; }
+
+  /* ----- Overlays (modales) ----- */
+  .ss-overlay { display: none; position: fixed; inset: 0; background: rgba(12,40,23,.45); z-index: 60;
+                align-items: flex-start; justify-content: center; padding: 40px 16px; overflow-y: auto; }
+  .ss-overlay.open { display: flex; }
+  .ss-modal { background: #fff; border-radius: 14px; width: 100%; max-width: 520px; padding: 22px 24px;
+              box-shadow: 0 12px 40px rgba(12,40,23,.28); }
+  .ss-modal h3 { margin: 0 0 16px; font-size: 17px; color: var(--ink, #0c3d24); }
+  .ss-field { margin: 0 0 14px; }
+  .ss-field label { display: block; font-size: 13px; font-weight: 600; color: var(--ink-soft, #2a4836); margin: 0 0 5px; }
+  .ss-field input, .ss-field select, .ss-field textarea {
+    width: 100%; font: inherit; padding: 9px 11px; border: 1px solid var(--line, #cabe9f);
+    border-radius: 8px; background: #fff; box-sizing: border-box; }
+  .ss-field textarea { min-height: 64px; resize: vertical; }
+  .ss-field .ss-hint { font-size: 12px; color: var(--ink-mute, #6b7a74); margin: 4px 0 0; }
+  .ss-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .ss-modal-act { display: flex; justify-content: flex-end; gap: 10px; margin: 18px 0 0; }
+  .ss-chk { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-soft, #2a4836); }
+  .ss-chk input { width: auto; }
+  .ss-ent-create { display: none; padding: 12px; background: var(--paper, #f8f5ec); border-radius: 8px; margin: 8px 0 0; }
+  .ss-ent-create.open { display: block; }
+  .ss-link { background: transparent; border: 0; font: inherit; cursor: pointer; color: var(--bleu-base, #1f4a82); padding: 2px 4px; }
+</style>
+</head>
+<body class="auth-pending">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo"><img src="assets/logo-m2m.png" alt="MOM Rugby"></div>
+      <div class="brand-text">
+        <h1>MOM Hub</h1>
+        <p>Mutzig Ovalie Molsheim</p>
+      </div>
+    </div>
+
+    <div class="season-pill" id="season-pill">SAISON</div>
+
+    <nav class="main-nav">
+      <a href="dashboard.html">Tableau de bord</a>
+      <a href="evenements.html">Évènements</a>
+      <a href="u-admin.html">Collectif (admin)</a>
+      <a href="compositions.html">Compositions</a>
+    </nav>
+
+    <div class="icon-row">
+      <button class="icon-btn" title="Recherche" aria-label="Recherche">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      </button>
+    </div>
+
+    <div class="user-profile">
+      <div class="avatar">EJ</div>
+      <div class="user-info">
+        <div class="user-name">Emmanuel Jung</div>
+        <div class="user-role">Administrateur</div>
+      </div>
+      <a href="./" class="user-action" title="Retour au portail" aria-label="Retour au portail">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/></svg>
+      </a>
+      <button type="button" class="user-action" id="btn-signout" title="Se déconnecter" aria-label="Se déconnecter">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="hub-back-row">
+    <a class="hub-back-btn" href="dashboard.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 18l-6-6 6-6"/></svg>
+      Retour au tableau de bord
+    </a>
+  </div>
+
+<div class="ss-wrap">
+  <h1>Suivi du salarié</h1>
+  <p class="ss-sub" id="ssSub">Vos missions et leurs séances, par type.</p>
+
+  <div id="ssMsg" class="ss-msg"></div>
+
+  <!-- ============ GRILLE DE VIGNETTES ============ -->
+  <section id="ssGridView">
+    <div class="ss-grid" id="ssGrid"></div>
+    <div class="ss-divers-row" id="ssDiversRow"></div>
+  </section>
+
+  <!-- ============ VUE D'UN TYPE ============ -->
+  <section class="ss-typeview" id="ssTypeView">
+    <div class="ss-typehead">
+      <button class="ss-back" id="ssBack" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 18l-6-6 6-6"/></svg>
+        Tous les types
+      </button>
+      <h2 id="ssTypeTitle">Type</h2>
+    </div>
+
+    <div class="ss-controls">
+      <div class="ss-seg" id="ssSeg">
+        <button data-mode="liste" class="active" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          Liste
+        </button>
+        <button data-mode="agenda" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          Agenda
+        </button>
+      </div>
+      <div class="ss-filter">
+        <span>État&nbsp;:</span>
+        <select id="ssFilter">
+          <option value="prevue">Prévue</option>
+          <option value="realisee">Réalisée</option>
+          <option value="validee">Validée</option>
+          <option value="annulee">Annulée</option>
+          <option value="__all">Toutes</option>
+        </select>
+      </div>
+      <span class="sp"></span>
+      <button class="ss-btn ss-btn-sm ss-btn-ghost" id="ssGenWeek" type="button" hidden>Générer la semaine</button>
+      <button class="ss-btn ss-btn-sm" id="ssNewMission" type="button" hidden>+ Nouvelle mission</button>
+    </div>
+
+    <div id="ssListWrap">
+      <div class="ss-list" id="ssList"></div>
+    </div>
+
+    <div id="ssAgendaWrap" hidden>
+      <div class="ss-agenda">
+        <div class="ss-weeknav">
+          <button id="ssWeekPrev" type="button">‹ Semaine préc.</button>
+          <span class="ss-weeklabel" id="ssWeekLabel">—</span>
+          <button id="ssWeekNext" type="button">Semaine suiv. ›</button>
+        </div>
+        <div class="ss-weekgrid" id="ssWeekGrid"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ COMPTEUR (salarié) ============ -->
+  <section class="ss-compteur" id="ssCompteur" hidden>
+    <h2>Mon compteur d'heures</h2>
+    <div class="ss-cards" id="ssCards"></div>
+    <table class="ss-releve">
+      <thead><tr><th>Date</th><th>Mission</th><th>Heures</th></tr></thead>
+      <tbody id="ssReleve"></tbody>
+    </table>
+  </section>
+
+</div>
+
+<!-- ============ MODALE DÉCLARATION ============ -->
+<div class="ss-overlay" id="ssDeclOverlay">
+  <div class="ss-modal">
+    <h3>Déclarer la séance</h3>
+    <p class="ss-sub" id="ssDeclCtx" style="margin-bottom:14px;"></p>
+    <div class="ss-field">
+      <label for="ssDeclHeures">Heures réelles</label>
+      <input type="number" id="ssDeclHeures" step="0.25" min="0" inputmode="decimal">
+      <p class="ss-hint">Pré-rempli depuis la durée prévue. Ajustez si besoin.</p>
+    </div>
+    <div class="ss-modal-act">
+      <button class="ss-btn ss-btn-ghost" id="ssDeclCancel" type="button">Annuler</button>
+      <button class="ss-btn" id="ssDeclSave" type="button">Déclarer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODALE MISSION (admin) ============ -->
+<div class="ss-overlay" id="ssMisOverlay">
+  <div class="ss-modal">
+    <h3 id="ssMisTitle">Nouvelle mission</h3>
+    <div class="ss-field">
+      <label for="ssMisLibelle">Libellé</label>
+      <input type="text" id="ssMisLibelle" placeholder="Intitulé de la mission">
+    </div>
+    <div class="ss-field" id="ssMisBenefWrap">
+      <label for="ssMisBenef">Bénéficiaire</label>
+      <select id="ssMisBenef"></select>
+      <button class="ss-link" id="ssMisBenefCreate" type="button" hidden>+ créer un bénéficiaire</button>
+      <div class="ss-ent-create" id="ssEntCreate">
+        <div class="ss-field"><label for="ssEntLib">Nom</label><input type="text" id="ssEntLib"></div>
+        <div class="ss-field"><label for="ssEntType">Type</label>
+          <select id="ssEntType">
+            <option value="ecole">École</option>
+            <option value="club">Club</option>
+            <option value="institution">Institution</option>
+            <option value="entreprise">Entreprise</option>
+            <option value="autre">Autre</option>
+          </select>
+        </div>
+        <div class="ss-row2">
+          <div class="ss-field"><label for="ssEntContactNom">Contact</label><input type="text" id="ssEntContactNom"></div>
+          <div class="ss-field"><label for="ssEntContactEmail">Email</label><input type="email" id="ssEntContactEmail"></div>
+        </div>
+        <div class="ss-modal-act" style="margin-top:6px;">
+          <button class="ss-btn ss-btn-ghost ss-btn-sm" id="ssEntCancel" type="button">Annuler</button>
+          <button class="ss-btn ss-btn-sm" id="ssEntSave" type="button">Créer</button>
+        </div>
+      </div>
+    </div>
+    <div class="ss-row2">
+      <div class="ss-field"><label for="ssMisDateDebut">Date de début</label><input type="date" id="ssMisDateDebut"></div>
+      <div class="ss-field"><label for="ssMisDateFin">Date de fin</label><input type="date" id="ssMisDateFin"></div>
+    </div>
+    <div class="ss-field">
+      <label for="ssMisLieu">Lieu</label>
+      <select id="ssMisLieu"></select>
+    </div>
+    <label class="ss-chk" style="margin:6px 0 4px;"><input type="checkbox" id="ssMisRefac"> Refacturable</label>
+    <label class="ss-chk" style="margin:0 0 12px;"><input type="checkbox" id="ssMisCadre"> Mission cadre</label>
+    <div class="ss-field"><label for="ssMisNotes">Notes</label><textarea id="ssMisNotes"></textarea></div>
+    <div class="ss-modal-act">
+      <button class="ss-btn ss-btn-ghost" id="ssMisCancel" type="button">Annuler</button>
+      <button class="ss-btn" id="ssMisSave" type="button">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/supabase-client.js"></script>
+<script>
+(async function () {
+  'use strict';
+
+  // ============================================================
+  // Suivi du salarié — écran à vignettes (pt 115)
+  // ============================================================
+  const client = SupabaseHub.client;
+  function $(id) { return document.getElementById(id); }
+
+  // ---- Référentiel des 10 types (ordre + libellés = kit §1) ----
+  const TYPES = [
+    { code: 'intervention_scolaire',   lib: 'Intervention scolaire',  externe: true,  ic: 'school' },
+    { code: 'entrainement_section',    lib: 'Entraînement section',   externe: false, ic: 'ball' },
+    { code: 'entrainement_sr_m',       lib: 'Entraînement SR-M',      externe: false, ic: 'run' },
+    { code: 'autre_entrainement_mom',  lib: 'Autre entraînement MOM', externe: false, ic: 'plus' },
+    { code: 'reunion',                 lib: 'Réunion',                externe: false, ic: 'users' },
+    { code: 'suivi_competition',       lib: 'Suivi compétition',      externe: true,  ic: 'trophy' },
+    { code: 'accompagnement_terrain',  lib: 'Accompagnement terrain', externe: false, ic: 'pin' },
+    { code: 'travail_personnel',       lib: 'Travail personnel',      externe: false, ic: 'pencil' },
+    { code: 'stage',                   lib: 'Stage',                  externe: false, ic: 'tent' }
+  ];
+  const TYPE_DIVERS = { code: 'divers', lib: 'Divers', externe: false, ic: 'dots' };
+  const TYPE_BY_CODE = {};
+  TYPES.concat([TYPE_DIVERS]).forEach(function (t) { TYPE_BY_CODE[t.code] = t; });
+
+  const ICONS = {
+    school:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>',
+    ball:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14 14 0 0 0 0 20M2 12h20"/></svg>',
+    run:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13" cy="4" r="2"/><path d="M6 20l3-5 3 2 2-4M9 10l4-2 3 3 3 1"/></svg>',
+    plus:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
+    users:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+    trophy:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M5 9a2 2 0 0 1-2-2V5h4M19 9a2 2 0 0 0 2-2V5h-4"/></svg>',
+    pin:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>',
+    pencil:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
+    tent:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 20h18L12 4z"/><path d="M12 4v16"/></svg>',
+    dots:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>'
+  };
+
+  const ETAT_LABEL = { prevue: 'Prévue', realisee: 'Réalisée', validee: 'Validée', annulee: 'Annulée' };
+
+  // ---- État applicatif ----
+  let saisonActive = null;
+  let sites = [];
+  let peutEcrire = false;          // admin|bureau (point dur B)
+  let monPersonneId = null;        // qui_suis_je()
+  let salarieId = null;            // salarié dont on affiche les missions (v1 : Lohann si salarié relié, sinon résolu admin)
+  let missions = [];               // missions du salarié, saison active
+  let occByMission = {};           // mission_id -> [occurrences]
+  let editingMissionId = null;
+  let currentType = null;          // code type affiché dans la vue-type
+  let currentView = 'liste';       // 'liste' | 'agenda'
+  let weekStart = null;            // Date (lundi) de la semaine affichée en agenda
+  let declTarget = null;           // occurrence en cours de déclaration
+
+  // ============================================================
+  // Helper RPC (calque gestion-salarie.html : appel par nom)
+  // ============================================================
+  async function rpc(name, params) {
+    const { data, error } = await client.rpc(name, params || {});
+    if (error) throw error;
+    return data;
+  }
+  function errMsg(e) {
+    const m = (e && (e.message || e.error_description || e.error)) || String(e);
+    return /admin|bureau|réserv|permission|denied/i.test(m)
+      ? "Action réservée à l'administration." : m;
+  }
+  function flash(msg, kind) {
+    const box = $('ssMsg');
+    const el = document.createElement('div');
+    el.className = 'ss-flash ' + (kind === 'err' ? 'err' : 'ok');
+    el.textContent = msg;
+    box.innerHTML = '';
+    box.appendChild(el);
+    if (kind !== 'err') setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 4000);
+  }
+
+  // ---- Dates ----
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+  function isoDate(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+  function parseDate(s) { const p = String(s).slice(0, 10).split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  function mondayOf(d) {
+    const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const day = (x.getDay() + 6) % 7; // 0 = lundi
+    x.setDate(x.getDate() - day);
+    return x;
+  }
+  const JOURS = ['lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.', 'dim.'];
+  const MOIS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+  function fmtWhen(occ) {
+    const d = parseDate(occ.date_seance);
+    const j = JOURS[(d.getDay() + 6) % 7];
+    let s = j + ' ' + d.getDate() + ' ' + MOIS[d.getMonth()];
+    if (occ.heure_debut) s += ' · ' + String(occ.heure_debut).slice(0, 5);
+    return s;
+  }
+  function lieuLabel(occ) {
+    if (occ.lieu_libre) return occ.lieu_libre;
+    if (occ.lieu_id) { const s = sites.find(function (x) { return x.id === occ.lieu_id; }); if (s) return s.libelle || s.nom || 'Lieu'; }
+    return null;
+  }
+
+  // ============================================================
+  // CHARGEMENT — point de bascule unique (voie α : boucle ; voie β plus tard)
+  // ============================================================
+  async function chargerMissions() {
+    missions = (await rpc('list_missions', {
+      p_saison_id: saisonActive.id, p_salarie_id: salarieId, p_entite_id: null
+    })) || [];
+  }
+  // chargerOccurrences() : LE point de migration vers une RPC élargie (voie β).
+  // Aujourd'hui : une lecture list_mission_seances par mission (voie α actée pt 115).
+  async function chargerOccurrences() {
+    occByMission = {};
+    for (let i = 0; i < missions.length; i++) {
+      const mid = missions[i].id;
+      const rows = (await rpc('list_mission_seances', { p_mission_id: mid })) || [];
+      occByMission[mid] = rows;
+    }
+  }
+  // Toutes les occurrences d'un type donné (à plat), triées par date.
+  function occurrencesDuType(typeCode) {
+    const out = [];
+    missions.forEach(function (m) {
+      if (m.type_mission !== typeCode) return;
+      (occByMission[m.id] || []).forEach(function (o) {
+        out.push(Object.assign({}, o, { _mission: m }));
+      });
+    });
+    out.sort(function (a, b) { return String(a.date_seance).localeCompare(String(b.date_seance)); });
+    return out;
+  }
+  // Compte des occurrences 'prevue' par type (badge vignette).
+  function comptePrevuesParType() {
+    const c = {};
+    missions.forEach(function (m) {
+      (occByMission[m.id] || []).forEach(function (o) {
+        if (o.etat === 'prevue') c[m.type_mission] = (c[m.type_mission] || 0) + 1;
+      });
+    });
+    return c;
+  }
+
+  // ============================================================
+  // GRILLE DE VIGNETTES
+  // ============================================================
+  function renderGrid() {
+    const counts = comptePrevuesParType();
+    const grid = $('ssGrid');
+    grid.innerHTML = '';
+    TYPES.forEach(function (t) {
+      grid.appendChild(buildTile(t, counts[t.code] || 0));
+    });
+    const dr = $('ssDiversRow');
+    dr.innerHTML = '';
+    dr.appendChild(buildTile(TYPE_DIVERS, counts[TYPE_DIVERS.code] || 0, true));
+  }
+  function buildTile(t, n, isDivers) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'ss-tile' + (isDivers ? ' divers' : '');
+    const countCls = n > 0 ? 'ss-tile-count has' : 'ss-tile-count';
+    const countTxt = n > 0 ? (n + ' à déclarer') : '—';
+    b.innerHTML =
+      '<span class="ss-tile-ic">' + (ICONS[t.ic] || '') + '</span>' +
+      '<span class="ss-tile-lib">' + t.lib + '</span>' +
+      '<span class="' + countCls + '">' + countTxt + '</span>';
+    b.addEventListener('click', function () { openType(t.code); });
+    return b;
+  }
+
+  // ============================================================
+  // VUE D'UN TYPE
+  // ============================================================
+  function openType(typeCode) {
+    currentType = typeCode;
+    const t = TYPE_BY_CODE[typeCode];
+    $('ssTypeTitle').textContent = t ? t.lib : typeCode;
+    $('ssGridView').hidden = true;
+    $('ssTypeView').classList.add('active');
+    // Boutons admin (génération + nouvelle mission) masqués pour Lohann.
+    $('ssGenWeek').hidden = !peutEcrire;
+    $('ssNewMission').hidden = !peutEcrire;
+    weekStart = mondayOf(new Date());
+    setView(currentView);
+  }
+  function closeType() {
+    currentType = null;
+    $('ssTypeView').classList.remove('active');
+    $('ssGridView').hidden = false;
+  }
+  function setView(mode) {
+    currentView = mode;
+    Array.prototype.forEach.call($('ssSeg').querySelectorAll('button'), function (btn) {
+      btn.classList.toggle('active', btn.getAttribute('data-mode') === mode);
+    });
+    $('ssListWrap').hidden = (mode !== 'liste');
+    $('ssAgendaWrap').hidden = (mode !== 'agenda');
+    if (mode === 'liste') renderListe(); else renderAgenda();
+  }
+
+  function filteredOccurrences() {
+    const f = $('ssFilter').value;
+    let rows = occurrencesDuType(currentType);
+    if (f !== '__all') rows = rows.filter(function (o) { return o.etat === f; });
+    return rows;
+  }
+
+  function renderListe() {
+    const wrap = $('ssList');
+    const rows = filteredOccurrences();
+    if (!rows.length) {
+      wrap.innerHTML = '<div class="ss-empty">Aucune séance pour ce filtre.</div>';
+      return;
+    }
+    wrap.innerHTML = '';
+    rows.forEach(function (o) { wrap.appendChild(buildRow(o)); });
+  }
+
+  function buildRow(o) {
+    const row = document.createElement('div');
+    row.className = 'ss-row' + (o.etat === 'annulee' ? ' off' : '');
+    const meta = [];
+    const lieu = lieuLabel(o);
+    if (lieu) meta.push(lieu);
+    if (o.duree_min != null) meta.push('prévu ' + o.duree_min + ' min');
+    if (o.heures_reelles != null) meta.push('réel ' + o.heures_reelles + ' h');
+
+    const main = document.createElement('div');
+    main.className = 'ss-row-main';
+    main.innerHTML =
+      '<p class="ss-row-when">' + fmtWhen(o) + '</p>' +
+      '<p class="ss-row-meta">' + (meta.join(' · ') || '—') + '</p>';
+
+    const act = document.createElement('div');
+    act.className = 'ss-row-act';
+    const badge = document.createElement('span');
+    badge.className = 'ss-badge ' + o.etat;
+    badge.textContent = ETAT_LABEL[o.etat] || o.etat;
+    act.appendChild(badge);
+
+    buildActions(o).forEach(function (btn) { act.appendChild(btn); });
+
+    row.appendChild(main);
+    row.appendChild(act);
+    return row;
+  }
+
+  // Boutons contextuels selon état ET rôle (point dur B).
+  function buildActions(o) {
+    const out = [];
+    // Déclarer : prevue|realisee, par Lohann OU admin (garde voie 3 RGPD côté SQL).
+    if (o.etat === 'prevue' || o.etat === 'realisee') {
+      out.push(mkBtn('Déclarer', 'ss-btn ss-btn-sm', function () { openDecl(o); }));
+    }
+    if (peutEcrire) {
+      if (o.etat === 'realisee') {
+        out.push(mkBtn('Valider', 'ss-btn ss-btn-sm', function () { doValider(o); }));
+      }
+      if (o.etat === 'validee') {
+        out.push(mkBtn('Dévalider', 'ss-btn ss-btn-sm ss-btn-ghost', function () { doDevalider(o); }));
+      }
+    }
+    return out;
+  }
+  function mkBtn(label, cls, fn) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = cls; b.textContent = label;
+    b.addEventListener('click', fn);
+    return b;
+  }
+
+  // ---- Agenda semaine ----
+  function renderAgenda() {
+    const grid = $('ssWeekGrid');
+    const start = weekStart || mondayOf(new Date());
+    const end = new Date(start); end.setDate(end.getDate() + 6);
+    $('ssWeekLabel').textContent = start.getDate() + ' ' + MOIS[start.getMonth()] + ' – ' + end.getDate() + ' ' + MOIS[end.getMonth()];
+    const rows = filteredOccurrences();
+    const todayIso = isoDate(new Date());
+    grid.innerHTML = '';
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(start); d.setDate(start.getDate() + i);
+      const di = isoDate(d);
+      const col = document.createElement('div');
+      col.className = 'ss-daycol' + (di === todayIso ? ' today' : '');
+      let html = '<div class="ss-dayhd">' + JOURS[i] + ' ' + d.getDate() + '</div>';
+      col.innerHTML = html;
+      rows.filter(function (o) { return String(o.date_seance).slice(0, 10) === di; })
+        .forEach(function (o) {
+          const chip = document.createElement('div');
+          chip.className = 'ss-chip ' + o.etat;
+          chip.textContent = (o.heure_debut ? String(o.heure_debut).slice(0, 5) + ' ' : '') + (lieuLabel(o) || ETAT_LABEL[o.etat]);
+          chip.addEventListener('click', function () {
+            if ((o.etat === 'prevue' || o.etat === 'realisee')) openDecl(o);
+          });
+          col.appendChild(chip);
+        });
+      grid.appendChild(col);
+    }
+  }
+
+  // ============================================================
+  // ACTIONS CYCLE DE VIE
+  // ============================================================
+  function openDecl(o) {
+    declTarget = o;
+    $('ssDeclCtx').textContent = fmtWhen(o) + (lieuLabel(o) ? ' · ' + lieuLabel(o) : '');
+    const pre = (o.heures_reelles != null) ? o.heures_reelles
+              : (o.duree_min != null ? Math.round((o.duree_min / 60) * 100) / 100 : '');
+    $('ssDeclHeures').value = pre;
+    $('ssDeclOverlay').classList.add('open');
+  }
+  function closeDecl() { $('ssDeclOverlay').classList.remove('open'); declTarget = null; }
+  async function saveDecl() {
+    if (!declTarget) return;
+    const v = $('ssDeclHeures').value;
+    const heures = (v === '' || v == null) ? null : Number(v);
+    $('ssDeclSave').disabled = true;
+    try {
+      await rpc('declarer_occurrence', { p_id: declTarget.id, p_heures_reelles: heures });
+      flash('Séance déclarée.', 'ok');
+      closeDecl();
+      await refreshAll();
+    } catch (e) {
+      flash('Déclaration impossible : ' + errMsg(e), 'err');
+    } finally {
+      $('ssDeclSave').disabled = false;
+    }
+  }
+  async function doValider(o) {
+    try {
+      await rpc('valider_occurrence', { p_id: o.id });
+      flash('Séance validée. Compteur mis à jour.', 'ok');
+      await refreshAll();
+      await loadCompteur();
+    } catch (e) { flash('Validation impossible : ' + errMsg(e), 'err'); }
+  }
+  async function doDevalider(o) {
+    try {
+      await rpc('devalider_occurrence', { p_id: o.id });
+      flash('Séance dévalidée. Compteur mis à jour.', 'ok');
+      await refreshAll();
+      await loadCompteur();
+    } catch (e) { flash('Dévalidation impossible : ' + errMsg(e), 'err'); }
+  }
+
+  async function refreshAll() {
+    await chargerMissions();
+    await chargerOccurrences();
+    renderGrid();
+    if (currentType) { if (currentView === 'liste') renderListe(); else renderAgenda(); }
+  }
+
+  // ============================================================
+  // GÉNÉRATION D'OCCURRENCES (admin) — workflow hybride
+  // ============================================================
+  async function genWeek() {
+    if (!peutEcrire || !currentType) return;
+    const mis = missions.filter(function (m) { return m.type_mission === currentType; });
+    if (!mis.length) { flash('Aucune mission de ce type à générer.', 'err'); return; }
+    const start = weekStart || mondayOf(new Date());
+    const end = new Date(start); end.setDate(end.getDate() + 6);
+    $('ssGenWeek').disabled = true;
+    try {
+      for (let i = 0; i < mis.length; i++) {
+        await rpc('generer_occurrences_recurrentes', {
+          p_mission_id: mis[i].id, p_from: isoDate(start), p_to: isoDate(end)
+        });
+      }
+      flash('Semaine générée.', 'ok');
+      await refreshAll();
+    } catch (e) {
+      flash('Génération impossible : ' + errMsg(e), 'err');
+    } finally {
+      $('ssGenWeek').disabled = false;
+    }
+  }
+
+  // ============================================================
+  // MODALE MISSION (admin)
+  // ============================================================
+  let entites = [];
+  function deriveCode(libelle) {
+    const slug = String(libelle).normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 24);
+    const suffix = Date.now().toString(36).slice(-4).toUpperCase();
+    return (slug || 'ITEM') + '-' + suffix;
+  }
+  function openMission() {
+    if (!peutEcrire) return;
+    editingMissionId = null;
+    $('ssMisTitle').textContent = 'Nouvelle mission';
+    $('ssMisLibelle').value = '';
+    $('ssMisDateDebut').value = isoDate(new Date());
+    $('ssMisDateFin').value = '';
+    $('ssMisNotes').value = '';
+    $('ssMisRefac').checked = false;
+    $('ssMisCadre').checked = false;
+    $('ssEntCreate').classList.remove('open');
+    const t = TYPE_BY_CODE[currentType];
+    // Bénéficiaire affiché SEULEMENT pour les types externes (doctrine §3.4).
+    const externe = !!(t && t.externe);
+    $('ssMisBenefWrap').style.display = externe ? '' : 'none';
+    if (externe) { $('ssMisRefac').checked = true; }
+    fillBenefSelect();
+    fillLieuSelect();
+    $('ssMisOverlay').classList.add('open');
+  }
+  function closeMission() { $('ssMisOverlay').classList.remove('open'); editingMissionId = null; }
+  function fillLieuSelect() {
+    const sel = $('ssMisLieu');
+    sel.innerHTML = '<option value="">— aucun —</option>';
+    sites.forEach(function (s) {
+      const o = document.createElement('option');
+      o.value = s.id; o.textContent = s.libelle || s.nom || s.id;
+      sel.appendChild(o);
+    });
+  }
+  function fillBenefSelect() {
+    const sel = $('ssMisBenef');
+    sel.innerHTML = '<option value="">— choisir —</option>';
+    entites.forEach(function (e) {
+      const o = document.createElement('option');
+      o.value = e.id; o.textContent = e.libelle || e.code;
+      sel.appendChild(o);
+    });
+  }
+  async function saveEntiteInline() {
+    const lib = $('ssEntLib').value.trim();
+    if (!lib) { flash('Le nom du bénéficiaire est obligatoire.', 'err'); return; }
+    $('ssEntSave').disabled = true;
+    try {
+      const saved = await rpc('upsert_entite', {
+        p_id: null,
+        p_code: deriveCode(lib),
+        p_libelle: lib,
+        p_type_entite: $('ssEntType').value,
+        p_contact_nom: $('ssEntContactNom').value.trim() || null,
+        p_contact_email: $('ssEntContactEmail').value.trim() || null
+      });
+      flash('Bénéficiaire créé.', 'ok');
+      entites = (await rpc('list_entites', {})) || [];
+      fillBenefSelect();
+      const newId = saved && saved.id ? saved.id : null;
+      if (newId) $('ssMisBenef').value = newId;
+      $('ssEntCreate').classList.remove('open');
+      $('ssEntLib').value = ''; $('ssEntContactNom').value = ''; $('ssEntContactEmail').value = '';
+    } catch (e) {
+      flash('Création impossible : ' + errMsg(e), 'err');
+    } finally {
+      $('ssEntSave').disabled = false;
+    }
+  }
+  async function saveMission() {
+    if (!peutEcrire) return;
+    const libelle = $('ssMisLibelle').value.trim();
+    if (!libelle) { flash('Le libellé de la mission est obligatoire.', 'err'); return; }
+    const t = TYPE_BY_CODE[currentType];
+    const externe = !!(t && t.externe);
+    const entite = $('ssMisBenef').value || null;
+    if (externe && !entite) { flash('Choisissez un bénéficiaire (type externe).', 'err'); return; }
+    const dateDebut = $('ssMisDateDebut').value;
+    if (!dateDebut) { flash('La date de début est obligatoire.', 'err'); return; }
+    $('ssMisSave').disabled = true;
+    try {
+      const params = {
+        p_id: null,
+        p_code: deriveCode(libelle),
+        p_libelle: libelle,
+        p_type_mission: currentType,
+        p_salarie_id: salarieId,
+        p_entite_id: externe ? entite : null,
+        p_saison_id: saisonActive.id,
+        p_date_debut: dateDebut,
+        p_date_fin: $('ssMisDateFin').value || null,
+        p_lieu_id: $('ssMisLieu').value || null,
+        p_est_cadre: $('ssMisCadre').checked,
+        p_refacturable: $('ssMisRefac').checked,
+        p_notes: $('ssMisNotes').value.trim() || null
+      };
+      await rpc('upsert_mission', params);
+      flash('Mission enregistrée.', 'ok');
+      closeMission();
+      await refreshAll();
+    } catch (e) {
+      flash('Enregistrement impossible : ' + errMsg(e), 'err');
+    } finally {
+      $('ssMisSave').disabled = false;
+    }
+  }
+
+  // ============================================================
+  // COMPTEUR (panneau salarié) — calque loadCompteur de gestion-salarie.html
+  // ============================================================
+  async function loadCompteur() {
+    try {
+      const contrats = (await rpc('list_contrats_salaries', { p_inclure_inactifs: false })) || [];
+      const contrat = contrats.find(function (c) { return c.personne_id === salarieId; }) || contrats[0];
+      if (!contrat) { renderSynthese(null); renderReleve([]); return; }
+      const synth = (await rpc('list_compteur_annualisation', { p_contrat_id: contrat.id })) || [];
+      renderSynthese(synth[0] || null);
+      const lignes = (await rpc('list_releve_heures', { p_contrat_id: contrat.id })) || [];
+      renderReleve(lignes);
+    } catch (e) {
+      renderSynthese(null); renderReleve([]);
+    }
+  }
+  function renderSynthese(s) {
+    const cards = $('ssCards');
+    cards.innerHTML = '';
+    if (!s) { cards.innerHTML = '<div class="ss-card"><p class="ss-card-lbl">Compteur</p><p class="ss-card-val">—</p></div>'; return; }
+    const items = [
+      { lbl: 'Heures cible', val: s.cible_heures != null ? s.cible_heures : '—' },
+      { lbl: 'Heures réalisées', val: s.realise_heures != null ? s.realise_heures : '—' },
+      { lbl: 'Solde', val: s.solde_heures != null ? s.solde_heures : '—' }
+    ];
+    items.forEach(function (it) {
+      const c = document.createElement('div');
+      c.className = 'ss-card';
+      c.innerHTML = '<p class="ss-card-lbl">' + it.lbl + '</p><p class="ss-card-val">' + it.val + '</p>';
+      cards.appendChild(c);
+    });
+  }
+  function renderReleve(rows) {
+    const tb = $('ssReleve');
+    tb.innerHTML = '';
+    if (!rows || !rows.length) {
+      tb.innerHTML = '<tr><td colspan="3" style="color:var(--ink-mute,#6b7a74);">Aucune ligne au relevé.</td></tr>';
+      return;
+    }
+    rows.forEach(function (r) {
+      const tr = document.createElement('tr');
+      const d = r.date_jour || '';
+      const mis = r.mission_id ? missions.find(function (m) { return m.id === r.mission_id; }) : null;
+      const label = (mis && (mis.libelle || mis.code)) || r.categorie || '—';
+      tr.innerHTML = '<td>' + (d ? d : '—') + '</td>' +
+                     '<td>' + label + '</td>' +
+                     '<td>' + (r.heures != null ? r.heures : '—') + '</td>';
+      tb.appendChild(tr);
+    });
+  }
+
+  // ============================================================
+  // GARDE DE PAGE ÉLARGIE (voie 3) + BOOT
+  // ============================================================
+  async function resoudreAcces() {
+    // qui_suis_je() : personne_id de la session (peut être null pour admin sans pont).
+    try { monPersonneId = await rpc('qui_suis_je', {}); } catch (e) { monPersonneId = null; }
+    const roles = await SupabaseHub.getMyRoles();
+    peutEcrire = (roles.indexOf('admin') !== -1 || roles.indexOf('bureau') !== -1);
+
+    if (peutEcrire) {
+      // Admin/bureau : on affiche le suivi du salarié v1 (Lohann) — résolu via la 1re mission de la saison.
+      const all = (await rpc('list_missions', { p_saison_id: saisonActive.id, p_salarie_id: null, p_entite_id: null })) || [];
+      salarieId = all.length ? all[0].salarie_id : monPersonneId;
+      return true;
+    }
+    // Non-admin : autorisé SEULEMENT si compte relié dont qui_suis_je() est un missions.salarie_id.
+    if (!monPersonneId) return false;
+    const mine = (await rpc('list_missions', { p_saison_id: saisonActive.id, p_salarie_id: monPersonneId, p_entite_id: null })) || [];
+    if (mine.length) { salarieId = monPersonneId; return true; }
+    return false;
+  }
+
+  function wireEvents() {
+    $('ssBack').addEventListener('click', closeType);
+    Array.prototype.forEach.call($('ssSeg').querySelectorAll('button'), function (btn) {
+      btn.addEventListener('click', function () { setView(btn.getAttribute('data-mode')); });
+    });
+    $('ssFilter').addEventListener('change', function () {
+      if (currentView === 'liste') renderListe(); else renderAgenda();
+    });
+    $('ssWeekPrev').addEventListener('click', function () {
+      weekStart = new Date(weekStart); weekStart.setDate(weekStart.getDate() - 7); renderAgenda();
+    });
+    $('ssWeekNext').addEventListener('click', function () {
+      weekStart = new Date(weekStart); weekStart.setDate(weekStart.getDate() + 7); renderAgenda();
+    });
+    $('ssGenWeek').addEventListener('click', genWeek);
+    $('ssNewMission').addEventListener('click', openMission);
+    // Déclaration
+    $('ssDeclCancel').addEventListener('click', closeDecl);
+    $('ssDeclSave').addEventListener('click', saveDecl);
+    $('ssDeclOverlay').addEventListener('click', function (e) { if (e.target === $('ssDeclOverlay')) closeDecl(); });
+    // Mission
+    $('ssMisCancel').addEventListener('click', closeMission);
+    $('ssMisSave').addEventListener('click', saveMission);
+    $('ssMisOverlay').addEventListener('click', function (e) { if (e.target === $('ssMisOverlay')) closeMission(); });
+    $('ssMisBenefCreate').addEventListener('click', function () { $('ssEntCreate').classList.toggle('open'); });
+    $('ssEntCancel').addEventListener('click', function () { $('ssEntCreate').classList.remove('open'); });
+    $('ssEntSave').addEventListener('click', saveEntiteInline);
+    // Signout
+    const so = $('btn-signout');
+    if (so) so.addEventListener('click', async function () { try { await SupabaseHub.signOut(); } catch (e) {} window.location.replace('login.html'); });
+  }
+
+  // ---------- Boot ----------
+  const session = await SupabaseHub.getSession();
+  if (!session) { window.location.replace('login.html'); return; }
+
+  try {
+    saisonActive = await SupabaseHub.getSaisonActive();
+    sites = await SupabaseHub.listSitesActifs();
+  } catch (e) {
+    document.body.classList.remove('auth-pending');
+    flash('Chargement impossible : ' + errMsg(e), 'err');
+    return;
+  }
+
+  const ok = await resoudreAcces();
+  if (!ok) { window.location.replace('./'); return; }
+
+  document.body.classList.remove('auth-pending');
+
+  // Sous-titre + compteur selon le rôle.
+  if (peutEcrire) {
+    $('ssSub').textContent = 'Missions du salarié et leurs séances, par type. Validez les séances réalisées pour alimenter le compteur.';
+    $('ssNewMission').hidden = false;
+  } else {
+    $('ssSub').textContent = 'Vos séances à déclarer, par type, et votre compteur d’heures.';
+  }
+  $('ssCompteur').hidden = false;
+  $('ssMisBenefCreate').hidden = false;
+
+  if ($('season-pill') && saisonActive && saisonActive.libelle) {
+    $('season-pill').textContent = String(saisonActive.libelle).toUpperCase();
+  }
+
+  wireEvents();
+
+  try {
+    entites = (await rpc('list_entites', {})) || [];
+    await chargerMissions();
+    await chargerOccurrences();
+    renderGrid();
+    await loadCompteur();
+  } catch (e) {
+    flash('Chargement impossible : ' + errMsg(e), 'err');
+  }
+
+  SupabaseHub.onAuthChange(function (event) {
+    if (event === 'SIGNED_OUT') window.location.replace('login.html');
+  });
+})();
+
+</script>
+</body>
+</html>
