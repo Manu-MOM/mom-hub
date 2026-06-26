@@ -165,6 +165,10 @@
   .ss-ent-create { display: none; padding: 12px; background: var(--paper, #f8f5ec); border-radius: 8px; margin: 8px 0 0; }
   .ss-ent-create.open { display: block; }
   .ss-link { background: transparent; border: 0; font: inherit; cursor: pointer; color: var(--bleu-base, #1f4a82); padding: 2px 4px; }
+
+  /* Garde-fou : tout SVG non explicitement dimensionné reste petit (évite le chevron géant). */
+  .hub-back-row .hub-back-btn svg { width: 16px; height: 16px; flex: 0 0 auto; }
+  .ss-wrap svg, .ss-typehead svg { max-width: 22px; max-height: 22px; }
 </style>
 </head>
 <body class="auth-pending">
@@ -909,8 +913,9 @@
   // GARDE DE PAGE ÉLARGIE (voie 3) + BOOT
   // ============================================================
   async function resoudreAcces() {
-    // qui_suis_je() : personne_id de la session (peut être null pour admin sans pont).
-    try { monPersonneId = await rpc('qui_suis_je', {}); } catch (e) { monPersonneId = null; }
+    // quiSuisJe() (wrapper client) : extrait personne_id du RETURNS TABLE,
+    // renvoie l'UUID ou null. NE PAS appeler la RPC brute (data = tableau).
+    try { monPersonneId = await SupabaseHub.quiSuisJe(); } catch (e) { monPersonneId = null; }
     const roles = await SupabaseHub.getMyRoles();
     peutEcrire = (roles.indexOf('admin') !== -1 || roles.indexOf('bureau') !== -1);
 
