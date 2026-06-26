@@ -26,6 +26,14 @@
       visibility: hidden;
     }
 
+    /* Non-admin passant la porte (bureau/salarié) : on révèle les boutons
+       du profil (retour portail + déconnexion), cachés par défaut par la
+       règle globale hub.css `body:not(.auth-admin) .user-action{display:none}`.
+       DASHBOARD-TUILES-PAR-CAPABILITY. */
+    body.auth-staff .user-action {
+      display: inline-flex;
+    }
+
     /* Conteneur principal — contenu centré horizontalement,
        aligné en haut sous la topbar (pas centré verticalement). */
     .dashboard-layout {
@@ -188,14 +196,14 @@
 
   <main class="dashboard-layout">
     <div class="page-intro">
-      <h2>Administration</h2>
-      <p>Tout ce qui s'administre dans le Hub. Accès réservé aux administrateurs.</p>
+      <h2>Administration &amp; suivi</h2>
+      <p>Vos écrans du Hub. Chacun ne voit que les tuiles qui le concernent.</p>
     </div>
 
     <section class="admin-grid" aria-label="Écrans d'administration">
 
       <!-- Collectif joueurs (admin (i)) — le staff a sa propre tuile -->
-      <a class="admin-tile" href="u-admin.html">
+      <a class="admin-tile" data-show="admin" href="u-admin.html">
         <div class="admin-tile-icon">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         </div>
@@ -204,7 +212,7 @@
       </a>
 
       <!-- Équipes par catégorie (ADMIN-(ii) sous-chantier 1) -->
-      <a class="admin-tile" href="admin-equipes.html">
+      <a class="admin-tile" data-show="admin" href="admin-equipes.html">
         <div class="admin-tile-icon">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
         </div>
@@ -213,7 +221,7 @@
       </a>
 
       <!-- Sites (ADMIN-(ii) sous-chantier 4) -->
-      <a class="admin-tile" href="admin-sites.html">
+      <a class="admin-tile" data-show="admin" href="admin-sites.html">
         <div class="admin-tile-icon">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
         </div>
@@ -222,7 +230,7 @@
       </a>
 
       <!-- Saisons (ADMIN-(ii) sous-chantier 2) -->
-      <a class="admin-tile" href="admin-saisons.html">
+      <a class="admin-tile" data-show="admin" href="admin-saisons.html">
         <div class="admin-tile-icon">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         </div>
@@ -231,7 +239,7 @@
       </a>
 
       <!-- Staff (vivier + fonctions, volet A refonte admin) -->
-      <a class="admin-tile" href="staff.html">
+      <a class="admin-tile" data-show="admin" href="staff.html">
         <div class="admin-tile-icon">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="m8.5 13.5-2 6 5.5-3 5.5 3-2-6"/></svg>
         </div>
@@ -240,7 +248,7 @@
       </a>
 
       <!-- Rôles & accès (volet B refonte admin) -->
-      <a class="admin-tile" href="roles-acces.html">
+      <a class="admin-tile" data-show="admin" href="roles-acces.html">
         <div class="admin-tile-icon">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg>
         </div>
@@ -249,7 +257,7 @@
       </a>
 
       <!-- Gestion du salarié (socle pt 78 : entités bénéficiaires + missions) -->
-      <a class="admin-tile" href="gestion-salarie.html">
+      <a class="admin-tile" data-show="admin" href="gestion-salarie.html">
         <div class="admin-tile-icon">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         </div>
@@ -257,8 +265,20 @@
         <p class="admin-tile-desc">Les bénéficiaires (écoles, clubs, interne) et les missions du salarié, avec leurs séances.</p>
       </a>
 
+      <!-- Suivi du salarié (DASHBOARD-TUILES-PAR-CAPABILITY) : écran à vignettes
+           suivi-salarie.html. Visible à l'admin ET au salarié relié (data-show
+           combiné admin+salarie). Garde de page = voie 3 (admin|bureau OU salarié
+           relié). C'est la tuile par laquelle Lohann atteint son espace. -->
+      <a class="admin-tile" data-show="admin salarie" href="suivi-salarie.html">
+        <div class="admin-tile-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        </div>
+        <p class="admin-tile-title">Suivi du salarié</p>
+        <p class="admin-tile-desc">Vos séances et missions : déclarer une intervention réalisée, suivre le compteur d'heures.</p>
+      </a>
+
       <!-- Import OVAL-E (pt 82 : alimente personnes.qualites_ffr depuis un export OVAL-E) -->
-      <a class="admin-tile" href="import-oval-e.html">
+      <a class="admin-tile" data-show="admin" href="import-oval-e.html">
         <div class="admin-tile-icon">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         </div>
@@ -284,18 +304,95 @@
       'use strict';
 
       // ----------------------------------------------------------
-      // GARDE D'ACCÈS (requireAuth) — admin strict
+      // GARDE D'ACCÈS — PORTE élargie (DASHBOARD-TUILES-PAR-CAPABILITY)
       // ----------------------------------------------------------
+      // Le dashboard n'est plus admin-strict : il s'ouvre à qui a un rôle
+      // responsable (admin|bureau) OU est un salarié relié (suis_je_salarie,
+      // sql_122 -> contrat courant). Les encadrants « purs » (sans casquette
+      // admin/bureau/salarié) et les comptes anonymes/parents restent dehors.
+      //
       // Tant que le body a la classe auth-pending, le contenu est caché.
-      // Si pas connecté -> redirect login.html.
-      // Si connecté mais pas admin -> redirect racine.
-      // Si OK -> on enlève auth-pending, on ajoute auth-resolved + auth-admin
-      // (pour que la topbar affiche le user-profile et ses boutons admin).
-      const ok = await SupabaseHub.requireAuth({ role: 'admin' });
-      if (!ok) return;
+      // Pas de session -> redirect login.html. Session mais hors porte ->
+      // redirect racine (./). Sinon on révèle + on filtre les tuiles.
+      //
+      // La VÉRITÉ reste la garde SQL de chaque page-cible : ce filtrage ne fait
+      // que masquer pour l'ergonomie, il n'accorde aucun accès.
+      const session = await SupabaseHub.getSession();
+      if (!session) {
+        window.location.replace('login.html');
+        return;
+      }
+
+      const [estAdmin, estBureau, estSalarie] = await Promise.all([
+        SupabaseHub.isAdmin(),
+        SupabaseHub.hasRole('bureau'),
+        SupabaseHub.suisJeSalarie()
+      ]);
+
+      const passePorte = estAdmin || estBureau || estSalarie;
+      if (!passePorte) {
+        window.location.replace('./');
+        return;
+      }
 
       document.body.classList.remove('auth-pending');
-      document.body.classList.add('auth-resolved', 'auth-admin');
+      document.body.classList.add('auth-resolved');
+      if (estAdmin) {
+        document.body.classList.add('auth-admin');
+      } else {
+        // Non-admin qui passe la porte (bureau et/ou salarié) : on garde la
+        // carte profil ET ses boutons (retour portail, déconnexion) via
+        // auth-staff (règle CSS locale), sans usurper auth-admin. Et on
+        // remplace le libellé « Administrateur » (en dur) par le rôle réel.
+        document.body.classList.add('auth-staff');
+        var roleEl = document.querySelector('.user-profile .user-role');
+        if (roleEl) {
+          roleEl.textContent = estBureau ? 'Bureau'
+                             : estSalarie ? 'Salarié'
+                             : 'Membre';
+        }
+      }
+
+      // ----------------------------------------------------------
+      // FILTRAGE DES TUILES (fail-safe : caché par défaut, montré si autorisé)
+      // ----------------------------------------------------------
+      // Chaque tuile porte data-show = liste de jetons (« admin », « salarie »).
+      // Une tuile est visible si AU MOINS UN de ses jetons est satisfait.
+      //   admin   -> isAdmin()
+      //   salarie -> suis_je_salarie()
+      // (bureau ne voit aujourd'hui aucune tuile spécifique : il franchit la
+      //  porte mais ne « voit » que ce que ses jetons autorisent — extensible.)
+      (function filtrerTuiles() {
+        const jetonsActifs = new Set();
+        if (estAdmin)   jetonsActifs.add('admin');
+        if (estSalarie) jetonsActifs.add('salarie');
+
+        const tuiles = document.querySelectorAll('.admin-tile[data-show]');
+        let visibles = 0;
+        tuiles.forEach(function (tuile) {
+          const jetons = (tuile.getAttribute('data-show') || '')
+            .split(/\s+/).filter(Boolean);
+          const ok = jetons.some(function (j) { return jetonsActifs.has(j); });
+          if (ok) {
+            visibles += 1;
+          } else {
+            tuile.hidden = true;            // fail-safe : masqué
+            tuile.setAttribute('aria-hidden', 'true');
+          }
+        });
+
+        // Grille vide -> message honnête plutôt qu'un écran blanc.
+        if (visibles === 0) {
+          const grid = document.querySelector('.admin-grid');
+          if (grid) {
+            const vide = document.createElement('p');
+            vide.className = 'admin-tile-desc';
+            vide.style.gridColumn = '1 / -1';
+            vide.textContent = 'Aucun écran ne vous est ouvert pour le moment.';
+            grid.appendChild(vide);
+          }
+        }
+      })();
 
       // Season-pill dynamique : lit la saison active (getSaisonActive,
       // wrapper existant). Dégradation honnête : si indisponible, on
