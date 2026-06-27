@@ -18,10 +18,9 @@
       mission (reference_commande/montant -> upsert_mission, visibles si statut='facturable').
     - Récurrence : mode « jours consécutifs » (C sql_127, frequence:'consecutif') en plus
       du mode hebdo ; 5 forfaits-raccourcis de durée (60/90/120/180/240 min, aucun comptage neuf).
-    - est_cadre RETIRÉ de l'UI mais PRÉSERVÉ au save par champ-caché (state-var, patron pt 118 :
-      upsert_mission fait un UPDATE dur sans COALESCE) ; colonnes est_cadre/refacturable
-      conservées en base (DROP = mini-chantier futur). Notion « externe » du front retirée
-      au profit du statut. ZÉRO SQL (base A+B+C déjà déployée).
+    - est_cadre DROPPÉ (colonne missions.est_cadre supprimée, sql_129) : plus aucune trace
+      front ni RPC. La colonne refacturable reste en base (miroir du statut, DROP différé).
+      Notion « externe » du front retirée au profit du statut. (Base A+B+C déjà déployée.)
   MAJ : SEANCE-PONCTUELLE-SUIVI-SALARIE — bouton « + Séance ponctuelle » (admin ET
   salarié) appelant la RPC voie 3 creer_seance_ponctuelle() (sql_123). Le salarié
   crée sur SES missions, état forcé 'realisee' (garde serveur) ; l'admin choisit
@@ -602,9 +601,9 @@
       </div>
     </details>
     <!-- Chantier D : bloc facturation PRESTATION (propre à la mission, upsert_mission A).
-         Visible si statut='facturable'. Les ex-cases « Refacturable » / « Mission cadre »
-         sont RETIRÉES de l'UI : le statut pilote refacturable (B) ; est_cadre est préservé
-         au save par champ-caché (state-var pt 118) — colonnes conservées en base. -->
+         Visible si statut='facturable'. L'ex-case « Refacturable » est retirée de l'UI :
+         le statut pilote refacturable (B). L'ex-case « Mission cadre » (est_cadre) a été
+         entièrement supprimée (colonne DROPPÉE, sql_129). -->
     <div class="ss-fact" id="ssMisFact">
       <p class="ss-fact-head">Prestation (cette mission)</p>
       <div class="ss-row2">
@@ -684,7 +683,6 @@
   let editingMissionBilan = null;
   let editingMissionQuestFait = false;
   let editingMissionLieuLibre = null;
-  let editingMissionEstCadre = false;   // Chantier D : est_cadre retiré de l'UI, préservé au save (patron champ-caché pt 118).
   let currentType = null;          // code type affiché dans la vue-type
   let currentView = 'liste';       // 'liste' | 'agenda'
   let weekStart = null;            // Date (lundi) de la semaine affichée en agenda
@@ -1468,9 +1466,6 @@
     editingMissionBilan       = edit ? (mission.bilan_text != null ? mission.bilan_text : null) : null;
     editingMissionQuestFait   = edit ? !!mission.questionnaire_fait : false;
     editingMissionLieuLibre   = edit ? (mission.lieu_libre != null ? mission.lieu_libre : null) : null;
-    // Chantier D : est_cadre n'a plus de case UI -> mémorisé pour ré-émission au save
-    // (sinon l'UPDATE dur de upsert_mission le remettrait à son DEFAULT false).
-    editingMissionEstCadre    = edit ? !!mission.est_cadre : false;
     // Correctif D : rappel du type de mission dans le titre (le message d'erreur ne suffit
     // plus à porter ce contexte ; la modale doit dire SUR QUEL type on travaille).
     const tTitre = TYPE_BY_CODE[currentType];
@@ -1606,10 +1601,9 @@
         p_etat: enEdition ? editingMissionEtat : 'prevue',
         p_bilan_text: enEdition ? editingMissionBilan : null,
         p_questionnaire_fait: enEdition ? editingMissionQuestFait : false,
-        // Chantier D : est_cadre n'a plus de case UI -> ré-émission de la valeur mémorisée
-        // (création : false). p_refacturable N'EST PLUS ENVOYÉ (statut pilote refacturable
-        // côté RPC, B pt 122). p_statut + facturation prestation câblés.
-        p_est_cadre: editingMissionEstCadre,
+        // p_est_cadre SUPPRIMÉ (colonne missions.est_cadre droppée, sql_129).
+        // p_refacturable n'est plus envoyé (statut pilote refacturable côté RPC, B pt 122).
+        // p_statut + facturation prestation câblés.
         p_notes: $('ssMisNotes').value.trim() || null,
         p_reference_commande: (statut === 'facturable')
           ? ($('ssMisRefCommande').value.trim() || null) : null,
