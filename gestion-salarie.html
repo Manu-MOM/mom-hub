@@ -397,7 +397,6 @@
       <div class="gs-field"><label for="misLieu">Lieu</label><select id="misLieu"><option value="">— aucun —</option></select></div>
       <div class="gs-field"><label for="misLieuLibre">Lieu (texte libre)</label><input id="misLieuLibre"></div>
     </div>
-    <div class="gs-field"><label class="gs-check"><input type="checkbox" id="misCadre"> Mission « cadre »</label></div>
     <div class="gs-field"><label class="gs-check"><input type="checkbox" id="misRefac"> Refacturable <span class="gs-seances-hint" id="misRefacHint">(défaut hérité du bénéficiaire)</span></label></div>
     <div class="gs-field"><label for="misNotes">Notes</label><textarea id="misNotes"></textarea></div>
 
@@ -677,7 +676,6 @@
     $('misDateFin').value = m ? (m.date_fin || '') : '';
     $('misLieu').value = m ? (m.lieu_id || '') : '';
     $('misLieuLibre').value = m ? (m.lieu_libre || '') : '';
-    $('misCadre').checked = m ? !!m.est_cadre : false;
     $('misRefac').checked = m ? !!m.refacturable : false;
     syncRefacHint();
     // Séances : seulement pour une mission existante (besoin d'un mission_id)
@@ -731,7 +729,6 @@
         p_lieu_id: $('misLieu').value || null,
         p_lieu_libre: $('misLieuLibre').value.trim() || null,
         p_date_fin: $('misDateFin').value || null,
-        p_est_cadre: $('misCadre').checked,
         p_refacturable: $('misRefac').checked,
         p_etat: $('misEtat').value,
         p_notes: $('misNotes').value.trim() || null
