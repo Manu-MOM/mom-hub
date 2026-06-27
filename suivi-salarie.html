@@ -305,7 +305,7 @@
 
 <div class="ss-wrap">
   <h1>Activité du salarié</h1>
-  <p class="ss-sub" id="ssSub">Vos missions et leurs séances, par type.</p>
+  <p class="ss-sub" id="ssSub">Planning hebdomadaire et suivi des séances</p>
 
   <div id="ssMsg" class="ss-msg"></div>
 
@@ -1783,12 +1783,10 @@
 
   document.body.classList.remove('auth-pending');
 
-  // Sous-titre + compteur selon le rôle.
+  // Sous-titre commun à tous les rôles (cosmétique) ; reste piloté par le HTML.
+  // Seul l'accès écriture conditionne le bouton « + Nouvelle mission ».
   if (peutEcrire) {
-    $('ssSub').textContent = 'Missions du salarié et leurs séances, par type. Validez les séances réalisées pour alimenter le compteur.';
     $('ssNewMission').hidden = false;
-  } else {
-    $('ssSub').textContent = 'Vos séances à traiter, par type, et votre compteur d’heures.';
   }
   $('ssCompteur').hidden = false;
   $('ssMisBenefCreate').hidden = false;
