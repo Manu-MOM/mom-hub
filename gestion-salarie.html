@@ -194,30 +194,30 @@
 
 <div class="gs-wrap">
   <h1>Gestion du salarié</h1>
-  <p class="gs-sub">Les bénéficiaires (entités) et les missions du salarié, avec leurs séances. Accès réservé à l'administration (admin ou bureau).</p>
+  <p class="gs-sub">Les bénéficiaires et les missions du salarié, avec leurs séances. Accès réservé à l'administration (admin ou bureau).</p>
 
   <div id="gsMsg" class="gs-msg"></div>
 
   <div class="gs-tabs">
-    <button class="gs-tab active" data-tab="entites">Entités</button>
+    <button class="gs-tab active" data-tab="entites">Bénéficiaires</button>
     <button class="gs-tab" data-tab="missions">Missions</button>
     <button class="gs-tab" data-tab="compteur">Compteur</button>
   </div>
 
-  <!-- ============ ONGLET ENTITÉS ============ -->
+  <!-- ============ ONGLET BÉNÉFICIAIRES ============ -->
   <section class="gs-panel active" id="panel-entites">
     <div class="gs-toolbar">
       <strong>Bénéficiaires</strong>
       <label class="gs-toggle"><input type="checkbox" id="entInactives"> inclure les inactives</label>
       <span class="sp"></span>
-      <button class="gs-btn gs-btn-sm" id="entAddBtn">+ Nouvelle entité</button>
+      <button class="gs-btn gs-btn-sm" id="entAddBtn">+ Nouveau bénéficiaire</button>
     </div>
     <div class="gs-card">
       <table class="gs-tbl">
         <thead><tr><th>Libellé</th><th>Type</th><th>Refact. déf.</th><th>Statut</th><th></th></tr></thead>
         <tbody id="entRows"></tbody>
       </table>
-      <div id="entEmpty" class="gs-empty" style="display:none">Aucune entité. Crée le premier bénéficiaire.</div>
+      <div id="entEmpty" class="gs-empty" style="display:none">Aucun bénéficiaire. Crée le premier.</div>
     </div>
   </section>
 
@@ -310,10 +310,10 @@
   </div>
 </div>
 
-<!-- ============ MODALE ENTITÉ ============ -->
+<!-- ============ MODALE BÉNÉFICIAIRE ============ -->
 <div class="gs-overlay" id="entOverlay">
   <div class="gs-modal">
-    <div class="gs-modal-head"><h2 id="entModalTitle">Nouvelle entité</h2><button class="gs-x" id="entClose" aria-label="Fermer">&times;</button></div>
+    <div class="gs-modal-head"><h2 id="entModalTitle">Nouveau bénéficiaire</h2><button class="gs-x" id="entClose" aria-label="Fermer">&times;</button></div>
     <div class="gs-field"><label for="entLibelle">Libellé *</label><input id="entLibelle" placeholder="ex. École Jules Ferry"></div>
     <div class="gs-grid2">
       <div class="gs-field"><label for="entType">Type *</label>
@@ -470,6 +470,13 @@
   const staffLabel = new Map();
   let editingEntiteId = null;
   let editingMissionId = null;
+  // Champs absents de la modale, préservés à l'édition (upsert_mission fait un UPDATE
+  // sec sans COALESCE : tout p_* non transmis écrase la base — patron pt 118).
+  let editingMissionBilanText = null;
+  let editingMissionQuestionnaireFait = false;
+  let editingMissionRefCommande = null;
+  let editingMissionMontant = null;
+  let editingMissionStatut = 'interne';
 
   const TYPE_ENTITE_LBL = {
     ecole_elementaire: 'école élémentaire', college: 'collège', lycee: 'lycée',
@@ -554,7 +561,7 @@
     $('misEntite').innerHTML = opts;
   }
 
-  // ---------- ENTITÉS ----------
+  // ---------- BÉNÉFICIAIRES ----------
   async function loadEntites() {
     const inclure = $('entInactives').checked;
     entites = await rpc('list_entites', { p_inclure_inactives: inclure });
@@ -584,7 +591,7 @@
   }
   function openEntite(e) {
     editingEntiteId = e ? e.id : null;
-    $('entModalTitle').textContent = e ? 'Modifier l\'entité' : 'Nouvelle entité';
+    $('entModalTitle').textContent = e ? 'Modifier le bénéficiaire' : 'Nouveau bénéficiaire';
     $('entLibelle').value = e ? (e.libelle || '') : '';
     $('entLibelleCourt').value = e ? (e.libelle_court || '') : '';
     $('entType').value = e ? (e.type_entite || 'autre') : 'ecole_elementaire';
@@ -620,7 +627,7 @@
       };
       await rpc('upsert_entite', params);
       closeEntite();
-      flash('Entité enregistrée.', 'ok');
+      flash('Bénéficiaire enregistré.', 'ok');
       await loadEntites();
     } catch (e) { flash(errMsg(e), 'err'); }
     finally { $('entSave').disabled = false; }
@@ -666,6 +673,12 @@
   }
   function openMission(m) {
     editingMissionId = m ? m.id : null;
+    // Capture des champs hors-modale pour les réémettre intacts au save (préservation).
+    editingMissionBilanText        = m ? (m.bilan_text ?? null) : null;
+    editingMissionQuestionnaireFait = m ? !!m.questionnaire_fait : false;
+    editingMissionRefCommande      = m ? (m.reference_commande ?? null) : null;
+    editingMissionMontant          = m ? (m.montant ?? null) : null;
+    editingMissionStatut           = m ? (m.statut || 'interne') : 'interne';
     $('misModalTitle').textContent = m ? 'Modifier la mission' : 'Nouvelle mission';
     $('misLibelle').value = m ? (m.libelle || '') : '';
     $('misSalarieSel').value = m ? (m.salarie_id || '') : '';
@@ -731,7 +744,13 @@
         p_date_fin: $('misDateFin').value || null,
         p_refacturable: $('misRefac').checked,
         p_etat: $('misEtat').value,
-        p_notes: $('misNotes').value.trim() || null
+        p_notes: $('misNotes').value.trim() || null,
+        // Champs hors-modale réémis tels quels (sinon écrasés par l'UPDATE sec).
+        p_bilan_text: editingMissionBilanText,
+        p_questionnaire_fait: editingMissionQuestionnaireFait,
+        p_reference_commande: editingMissionRefCommande,
+        p_montant: editingMissionMontant,
+        p_statut: editingMissionStatut
       };
       // En édition, le code existant doit être conservé : on le relit depuis la ligne.
       if (editingMissionId) {
