@@ -1232,13 +1232,18 @@
   // ============================================================
   // Génère les séances d'UNE mission sur sa pleine période [date_debut, date_fin].
   // Remplace l'ancien « Générer la semaine » (mauvaise échelle : type + 1 semaine).
-  // Garde UX (P4, alert never block) : si la mission n'a pas de récurrence avec
-  // jours, on n'appelle pas (la fonction lèverait) — message explicite.
+  // Garde UX (P4, alert never block) : si la mission n'a pas de récurrence
+  // GÉNÉRABLE, on n'appelle pas (la fonction lèverait) — message explicite.
+  // Correctif D : une récurrence est générable si elle porte des jours (mode
+  // hebdomadaire) OU si elle est en mode consécutif (C, sql_127 : motif
+  // {frequence:'consecutif'} SANS jours). L'ancienne garde (jours non vide
+  // seulement) bloquait à tort la génération des récurrences consécutives.
   async function genMission(m, btn) {
     if (!peutEcrire || !m || !m.id) return;
     const rec = m.recurrence;
     const aDesJours = !!(rec && Array.isArray(rec.jours) && rec.jours.length);
-    if (!aDesJours) {
+    const estConsecutif = !!(rec && rec.frequence === 'consecutif');
+    if (!aDesJours && !estConsecutif) {
       flash('Définis d\'abord une récurrence sur cette mission (✎ Éditer → Récurrence).', 'err');
       return;
     }
