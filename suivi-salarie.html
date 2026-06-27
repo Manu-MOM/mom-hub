@@ -369,6 +369,11 @@
   <!-- ============ COMPTEUR (salarié) ============ -->
   <section class="ss-compteur" id="ssCompteur" hidden>
     <h2>Mon compteur d'heures</h2>
+    <div class="ss-export-row" style="margin:0 0 12px;">
+      <button type="button" id="ssExportXlsx" class="ss-back" style="cursor:pointer;">
+        Exporter le bilan d'heures (.xlsx)
+      </button>
+    </div>
     <div class="ss-cards" id="ssCards"></div>
     <table class="ss-releve">
       <thead><tr><th>Date</th><th>Mission</th><th>Heures</th></tr></thead>
@@ -617,6 +622,8 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="js/supabase-client.js"></script>
+<!-- EXPORT-BILAN-HEURES (pt 124+) : SheetJS pour generer le .xlsx du bilan d'heures cote navigateur. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 (async function () {
   'use strict';
@@ -666,6 +673,8 @@
   let salarieId = null;            // salarié dont on affiche les missions (v1 : Lohann si salarié relié, sinon résolu admin)
   let missions = [];               // missions du salarié, saison active
   let occByMission = {};           // mission_id -> [occurrences]
+  let exportContrat = null;        // EXPORT-BILAN-HEURES : contrat resolu (loadCompteur)
+  let exportSynth = null;          // EXPORT-BILAN-HEURES : ligne v_compteur_annualisation
   let editingMissionId = null;
   // État d'édition d'une mission (renvoyé au save pour ne rien écraser — upsert_mission
   // UPDATE réécrit toutes les colonnes en dur, cf. champs non présents dans la modale).
@@ -1622,12 +1631,169 @@
   // ============================================================
   // COMPTEUR (panneau salarié) — calque loadCompteur de gestion-salarie.html
   // ============================================================
+  // ============================================================
+  // EXPORT-BILAN-HEURES (pt 124+) : genere un .xlsx du bilan d'heures
+  // du salarie via la RPC rapport_heures_salarie (sql_128), agrege cote
+  // front et rendu SheetJS. Reproduit la maquette validee : 1 onglet
+  // Synthese (recap mensuel) + 1 onglet par mois (detail + ventilations).
+  // Lecture seule, aucun effet de bord.
+  // ============================================================
+  const MOIS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin',
+                   'Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+
+  function fmtDateFR(iso) {
+    if (!iso) return '';
+    const p = String(iso).slice(0, 10).split('-');
+    return p.length === 3 ? (p[2] + '/' + p[1] + '/' + p[0]) : iso;
+  }
+
+  async function exportBilanHeures() {
+    const btn = $('ssExportXlsx');
+    if (typeof XLSX === 'undefined') {
+      flash('Export indisponible : librairie tableur non chargée.', 'err');
+      return;
+    }
+    if (!exportContrat || !exportContrat.id) {
+      flash('Aucun contrat salarié résolu — export impossible.', 'err');
+      return;
+    }
+    if (btn) { btn.disabled = true; }
+    try {
+      const rows = (await rpc('rapport_heures_salarie', { p_contrat_id: exportContrat.id })) || [];
+
+      // Regroupement par mois (clé AAAA-MM), tri chronologique.
+      const parMois = {};
+      rows.forEach(function (r) {
+        const k = String(r.out_date_jour || '').slice(0, 7);
+        if (!k) return;
+        (parMois[k] = parMois[k] || []).push(r);
+      });
+      const moisKeys = Object.keys(parMois).sort();
+
+      const cible = (exportSynth && exportSynth.cible_heures != null)
+        ? Number(exportSynth.cible_heures) : null;
+      const debut = (exportSynth && exportSynth.date_debut) ? fmtDateFR(exportSynth.date_debut) : '—';
+      const fin   = (exportSynth && exportSynth.date_fin)   ? fmtDateFR(exportSynth.date_fin)   : '—';
+      const nomSalarie = (exportContrat && (exportContrat.nom_complet || exportContrat.libelle)) || 'Salarié';
+
+      const wb = XLSX.utils.book_new();
+
+      // ---- Onglet Synthèse ----
+      const synthAOA = [];
+      synthAOA.push(["BILAN D'HEURES — SALARIÉ"]);
+      synthAOA.push([]);
+      synthAOA.push(['Salarié', nomSalarie]);
+      synthAOA.push(['Contrat (annualisation)', debut + ' → ' + fin]);
+      synthAOA.push(['Volume annuel cible (h)', cible != null ? cible : '—']);
+      synthAOA.push(['Rapport édité le', fmtDateFR(new Date().toISOString())]);
+      synthAOA.push([]);
+      synthAOA.push(['Mois', 'Nb saisies', 'Heures réalisées', 'Cumul contrat', '% cible annuelle', 'Reste à la cible']);
+
+      let cumul = 0;
+      let totalN = 0, totalH = 0;
+      moisKeys.forEach(function (k) {
+        const lignes = parMois[k];
+        const h = lignes.reduce(function (a, r) { return a + Number(r.out_heures || 0); }, 0);
+        cumul += h;
+        totalN += lignes.length;
+        totalH += h;
+        const y = k.slice(0, 4), m = parseInt(k.slice(5, 7), 10);
+        synthAOA.push([
+          MOIS_FR[m - 1] + ' ' + y,
+          lignes.length,
+          h,
+          cumul,
+          cible ? (cumul / cible) : '',
+          cible != null ? (cible - cumul) : ''
+        ]);
+      });
+      synthAOA.push([
+        'TOTAL', totalN, totalH, cumul,
+        cible ? (cumul / cible) : '',
+        cible != null ? (cible - cumul) : ''
+      ]);
+      if (!moisKeys.length) {
+        synthAOA.push([]);
+        synthAOA.push(['Aucune heure relevée sur la période du contrat à ce jour.']);
+      }
+      const wsSynth = XLSX.utils.aoa_to_sheet(synthAOA);
+      wsSynth['!cols'] = [{ wch: 22 }, { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }];
+      XLSX.utils.book_append_sheet(wb, wsSynth, 'Synthèse');
+
+      // ---- Un onglet par mois ----
+      moisKeys.forEach(function (k) {
+        const lignes = parMois[k];
+        const y = k.slice(0, 4), m = parseInt(k.slice(5, 7), 10);
+        const titre = MOIS_FR[m - 1] + ' ' + y;
+
+        const aoa = [];
+        aoa.push(['DÉTAIL DES HEURES — ' + titre.toUpperCase()]);
+        aoa.push([nomSalarie + '  ·  Contrat ' + debut + ' → ' + fin]);
+        aoa.push([]);
+        aoa.push(['Date', 'Heures', 'Début', 'Catégorie', 'Type de mission', 'Mission (code)', 'Notes']);
+
+        let tot = 0;
+        const parCat = {}, parType = {};
+        lignes.forEach(function (r) {
+          const h = Number(r.out_heures || 0);
+          tot += h;
+          const cat = r.out_categorie || '—';
+          const typ = r.out_type_mission || '(hors mission)';
+          parCat[cat]  = (parCat[cat]  || 0) + h;
+          parType[typ] = (parType[typ] || 0) + h;
+          aoa.push([
+            fmtDateFR(r.out_date_jour),
+            h,
+            r.out_heure_debut ? String(r.out_heure_debut).slice(0, 5) : '',
+            cat,
+            r.out_type_mission || '(hors mission)',
+            r.out_mission_code || '',
+            r.out_notes || ''
+          ]);
+        });
+        aoa.push(['TOTAL DU MOIS', tot]);
+        aoa.push([]);
+        aoa.push(['VENTILATION']);
+        aoa.push(['Par catégorie', '', '', 'Par type de mission']);
+        const cats = Object.keys(parCat).sort();
+        const typs = Object.keys(parType).sort();
+        const nv = Math.max(cats.length, typs.length);
+        for (let i = 0; i < nv; i++) {
+          aoa.push([
+            cats[i] || '', cats[i] ? parCat[cats[i]] : '',
+            '',
+            typs[i] || '', typs[i] ? parType[typs[i]] : ''
+          ]);
+        }
+
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+        ws['!cols'] = [{ wch: 12 }, { wch: 9 }, { wch: 8 }, { wch: 14 },
+                       { wch: 22 }, { wch: 26 }, { wch: 34 }];
+        // nom d'onglet <= 31 car., sans caracteres interdits
+        const safe = titre.replace(/[\\/?*\[\]:]/g, ' ').slice(0, 31);
+        XLSX.utils.book_append_sheet(wb, ws, safe);
+      });
+
+      const fname = 'bilan-heures-' + String(nomSalarie).replace(/\s+/g, '-').toLowerCase()
+        + '-' + new Date().toISOString().slice(0, 10) + '.xlsx';
+      XLSX.writeFile(wb, fname);
+      flash('Bilan d\'heures exporté (' + (moisKeys.length || 0) + ' mois).', 'ok');
+    } catch (e) {
+      flash('Export impossible : ' + errMsg(e), 'err');
+    } finally {
+      if (btn) { btn.disabled = false; }
+    }
+  }
+
   async function loadCompteur() {
     try {
       const contrats = (await rpc('list_contrats_salaries', { p_inclure_inactifs: false })) || [];
       const contrat = contrats.find(function (c) { return c.personne_id === salarieId; }) || contrats[0];
       if (!contrat) { renderSynthese(null); renderReleve([]); return; }
+      // EXPORT-BILAN-HEURES : on memorise le contrat resolu pour le bouton d'export.
+      exportContrat = contrat;
       const synth = (await rpc('list_compteur_annualisation', { p_contrat_id: contrat.id })) || [];
+      exportSynth = synth[0] || null;
       renderSynthese(synth[0] || null);
       const lignes = (await rpc('list_releve_heures', { p_contrat_id: contrat.id })) || [];
       renderReleve(lignes);
@@ -1719,6 +1885,8 @@
       weekStart = new Date(weekStart); weekStart.setDate(weekStart.getDate() + 7); renderAgenda();
     });
     $('ssNewMission').addEventListener('click', openMission);
+    // EXPORT-BILAN-HEURES : bouton d'export .xlsx (garde d'existence).
+    if ($('ssExportXlsx')) { $('ssExportXlsx').addEventListener('click', exportBilanHeures); }
     // Déclaration
     $('ssDeclCancel').addEventListener('click', closeDecl);
     $('ssDeclSave').addEventListener('click', saveDecl);
