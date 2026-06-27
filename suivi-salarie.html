@@ -215,6 +215,8 @@
   .ss-recur-note { font-size: 12px; color: var(--ink-mute, #6b7a74); margin: 8px 0 0; }
   .ss-recur-preview { font-size: 13px; font-weight: 600; color: var(--vert-prairie, #2d7a3e); margin: 6px 0 0; min-height: 18px; }
   .ss-link { background: transparent; border: 0; font: inherit; cursor: pointer; color: var(--bleu-base, #1f4a82); padding: 2px 4px; }
+  .ss-modal-flash { margin: 0 0 4px; }
+  .ss-modal-flash:empty { display: none; }
 
   /* === Chantier D : pioche statut + facturation hybride + forfaits + mode consécutif === */
   .ss-statut { display: flex; gap: 8px; margin: 0 0 12px; }
@@ -380,6 +382,7 @@
 <div class="ss-overlay" id="ssConfirmOverlay">
   <div class="ss-modal" style="max-width:440px;">
     <h3 id="ssConfirmTitle">Confirmer</h3>
+    <div class="ss-modal-flash" aria-live="polite"></div>
     <p class="ss-sub" id="ssConfirmMsg" style="margin-bottom:6px;"></p>
     <p class="ss-hint" id="ssConfirmHint" style="margin-bottom:14px;"></p>
     <div class="ss-modal-act">
@@ -455,6 +458,7 @@
 <div class="ss-overlay" id="ssMisOverlay">
   <div class="ss-modal">
     <h3 id="ssMisTitle">Nouvelle mission</h3>
+    <div class="ss-modal-flash" aria-live="polite"></div>
     <div class="ss-field">
       <label for="ssMisLibelle">Libellé</label>
       <input type="text" id="ssMisLibelle" placeholder="Intitulé de la mission">
@@ -488,10 +492,12 @@
         <div class="ss-field"><label for="ssEntLib">Nom</label><input type="text" id="ssEntLib"></div>
         <div class="ss-field"><label for="ssEntType">Type</label>
           <select id="ssEntType">
-            <option value="ecole">École</option>
+            <option value="ecole_elementaire">École élémentaire</option>
+            <option value="college">Collège</option>
+            <option value="lycee">Lycée</option>
+            <option value="mjc">MJC</option>
             <option value="club">Club</option>
-            <option value="institution">Institution</option>
-            <option value="entreprise">Entreprise</option>
+            <option value="interne">Interne</option>
             <option value="autre">Autre</option>
           </select>
         </div>
@@ -554,10 +560,6 @@
             <label class="ss-recur-day"><input type="checkbox" value="7"> D</label>
           </div>
         </div>
-        <div class="ss-row2">
-          <div class="ss-field"><label for="ssMisRecurHeure">Heure de début</label><input type="time" id="ssMisRecurHeure"></div>
-          <div class="ss-field"><label for="ssMisRecurDuree">Durée (min)</label><input type="number" id="ssMisRecurDuree" min="0" step="5"></div>
-        </div>
         <div class="ss-field">
           <label for="ssMisRecurInterval">Fréquence</label>
           <select id="ssMisRecurInterval">
@@ -571,14 +573,24 @@
         <div class="ss-recur-consecutif-only">
           <p class="ss-recur-note" style="margin-top:0;">Une séance par jour sur toute la période [Date de début → Date de fin], week-end inclus. Renseigne l'heure et la durée ci-dessous.</p>
         </div>
+        <!-- Correctif D : Heure/Durée COMMUNS aux deux modes (étaient dans hebdo-only, donc
+             cachés en consécutif alors que C les consomme ; les forfaits écrivaient dans un
+             champ invisible). -->
+        <div class="ss-row2">
+          <div class="ss-field"><label for="ssMisRecurHeure">Heure de début</label><input type="time" id="ssMisRecurHeure"></div>
+          <div class="ss-field"><label for="ssMisRecurDuree">Durée (min)</label><input type="number" id="ssMisRecurDuree" min="0" step="5"></div>
+        </div>
         <!-- Forfaits durée (chantier D) : raccourcis remplissant le champ Durée (min).
              Aucune mécanique de comptage neuve. -->
         <div class="ss-forfaits" id="ssMisForfaits" aria-label="Forfaits de durée">
           <button class="ss-forfait" type="button" data-min="60">1 h</button>
-          <button class="ss-forfait" type="button" data-min="90">1 h 30</button>
           <button class="ss-forfait" type="button" data-min="120">2 h</button>
           <button class="ss-forfait" type="button" data-min="180">3 h</button>
           <button class="ss-forfait" type="button" data-min="240">4 h</button>
+          <button class="ss-forfait" type="button" data-min="300">5 h</button>
+          <button class="ss-forfait" type="button" data-min="360">6 h</button>
+          <button class="ss-forfait" type="button" data-min="420">7 h</button>
+          <button class="ss-forfait" type="button" data-min="480">8 h</button>
         </div>
         <p class="ss-recur-note">Coche les jours (ou choisis « jours consécutifs ») pour rendre la mission récurrente. La génération des séances se fait depuis le bouton « Générer les séances » de la mission.</p>
         <p class="ss-recur-preview" id="ssMisRecurPreview" aria-live="polite"></p>
@@ -683,7 +695,12 @@
       ? "Action réservée à l'administration." : m;
   }
   function flash(msg, kind) {
-    const box = $('ssMsg');
+    // Correctif D : si une modale est ouverte, le message s'affiche DANS sa zone flash
+    // interne (sinon il s'inscrit sous la modale, invisible). Repli sur #ssMsg page sinon.
+    let box = null;
+    const openOverlay = document.querySelector('.ss-overlay.open');
+    if (openOverlay) box = openOverlay.querySelector('.ss-modal-flash');
+    if (!box) box = $('ssMsg');
     const el = document.createElement('div');
     el.className = 'ss-flash ' + (kind === 'err' ? 'err' : 'ok');
     el.textContent = msg;
@@ -1440,7 +1457,12 @@
     // Chantier D : est_cadre n'a plus de case UI -> mémorisé pour ré-émission au save
     // (sinon l'UPDATE dur de upsert_mission le remettrait à son DEFAULT false).
     editingMissionEstCadre    = edit ? !!mission.est_cadre : false;
-    $('ssMisTitle').textContent = edit ? 'Modifier la mission' : 'Nouvelle mission';
+    // Correctif D : rappel du type de mission dans le titre (le message d'erreur ne suffit
+    // plus à porter ce contexte ; la modale doit dire SUR QUEL type on travaille).
+    const tTitre = TYPE_BY_CODE[currentType];
+    const libType = tTitre ? tTitre.lib : currentType;
+    $('ssMisTitle').textContent = (edit ? 'Modifier la mission' : 'Nouvelle mission')
+      + (libType ? ' · ' + libType : '');
     $('ssMisLibelle').value = edit ? (mission.libelle || '') : '';
     $('ssMisDateDebut').value = edit ? (mission.date_debut || isoDate(new Date())) : isoDate(new Date());
     $('ssMisDateFin').value = edit ? (mission.date_fin || '') : '';
@@ -1654,9 +1676,20 @@
     peutEcrire = (roles.indexOf('admin') !== -1 || roles.indexOf('bureau') !== -1);
 
     if (peutEcrire) {
-      // Admin/bureau : on affiche le suivi du salarié v1 (Lohann) — résolu via la 1re mission de la saison.
-      const all = (await rpc('list_missions', { p_saison_id: saisonActive.id, p_salarie_id: null, p_entite_id: null })) || [];
-      salarieId = all.length ? all[0].salarie_id : monPersonneId;
+      // Admin/bureau : on affiche le suivi du salarié v1 (Lohann). Correctif D : la source
+      // FIABLE du salarié est le contrat actif (list_contrats_salaries → personne_id), pas la
+      // 1re mission (vide tant qu'aucune mission n'existe → salarie_id NULL au save). Fallback
+      // en cascade : contrat actif → 1re mission existante → monPersonneId.
+      let resolu = null;
+      try {
+        const contrats = (await rpc('list_contrats_salaries', { p_inclure_inactifs: false })) || [];
+        if (contrats.length) resolu = contrats[0].personne_id || null;
+      } catch (e) { resolu = null; }
+      if (!resolu) {
+        const all = (await rpc('list_missions', { p_saison_id: saisonActive.id, p_salarie_id: null, p_entite_id: null })) || [];
+        resolu = all.length ? all[0].salarie_id : monPersonneId;
+      }
+      salarieId = resolu;
       return true;
     }
     // Non-admin : autorisé SEULEMENT si compte relié dont qui_suis_je() est un missions.salarie_id.
