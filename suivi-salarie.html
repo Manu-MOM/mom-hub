@@ -8,6 +8,20 @@
 <!--
   MOM Hub · Suivi du salarié — écran à VIGNETTES (MISSION-TO-COUNTER-FRONT, pt 115).
   Surface NEUVE (ne remplace pas gestion-salarie.html, conservée comme surface admin).
+  CHANTIER D (SALARIE-REFONTE-MODALE-MISSION, dernier du recadrage A→B→C→D, front pur) :
+    - Pioche STATUT en tête de modale (interne|facturable|autre, B sql_126) qui pilote
+      l'affichage conditionnel (bénéficiaire + bloc facturation) et REMPLACE dans l'UI les
+      ex-cases « Refacturable » / « Mission cadre ». saveMission envoie p_statut ; le statut
+      pilote refacturable côté RPC -> p_refacturable N'EST PLUS ENVOYÉ.
+    - Facturation HYBRIDE (A sql_125) : durable sur la fiche bénéficiaire (raison_sociale/
+      siret/email_facturation/adresse_facturation -> upsert_entite) + prestation sur la
+      mission (reference_commande/montant -> upsert_mission, visibles si statut='facturable').
+    - Récurrence : mode « jours consécutifs » (C sql_127, frequence:'consecutif') en plus
+      du mode hebdo ; 5 forfaits-raccourcis de durée (60/90/120/180/240 min, aucun comptage neuf).
+    - est_cadre RETIRÉ de l'UI mais PRÉSERVÉ au save par champ-caché (state-var, patron pt 118 :
+      upsert_mission fait un UPDATE dur sans COALESCE) ; colonnes est_cadre/refacturable
+      conservées en base (DROP = mini-chantier futur). Notion « externe » du front retirée
+      au profit du statut. ZÉRO SQL (base A+B+C déjà déployée).
   MAJ : SEANCE-PONCTUELLE-SUIVI-SALARIE — bouton « + Séance ponctuelle » (admin ET
   salarié) appelant la RPC voie 3 creer_seance_ponctuelle() (sql_123). Le salarié
   crée sur SES missions, état forcé 'realisee' (garde serveur) ; l'admin choisit
@@ -201,6 +215,38 @@
   .ss-recur-note { font-size: 12px; color: var(--ink-mute, #6b7a74); margin: 8px 0 0; }
   .ss-recur-preview { font-size: 13px; font-weight: 600; color: var(--vert-prairie, #2d7a3e); margin: 6px 0 0; min-height: 18px; }
   .ss-link { background: transparent; border: 0; font: inherit; cursor: pointer; color: var(--bleu-base, #1f4a82); padding: 2px 4px; }
+
+  /* === Chantier D : pioche statut + facturation hybride + forfaits + mode consécutif === */
+  .ss-statut { display: flex; gap: 8px; margin: 0 0 12px; }
+  .ss-statut-opt { flex: 1; }
+  .ss-statut-opt input { position: absolute; opacity: 0; pointer-events: none; }
+  .ss-statut-opt label { display: block; text-align: center; cursor: pointer; padding: 8px 6px;
+    border: 1px solid var(--line, #cabe9f); border-radius: 8px; font-size: 13px; font-weight: 600;
+    color: var(--ink-soft, #2a4836); background: var(--paper, #f8f5ec); user-select: none; transition: all .12s; }
+  .ss-statut-opt input:checked + label { border-color: var(--vert-prairie, #2d7a3e);
+    background: var(--vert-prairie, #2d7a3e); color: #fff; }
+  .ss-statut-opt input:focus-visible + label { outline: 2px solid var(--bleu-base, #1f4a82); outline-offset: 2px; }
+  .ss-fact { display: none; padding: 12px; background: var(--paper, #f8f5ec); border: 1px solid var(--line, #cabe9f);
+    border-radius: 8px; margin: 0 0 12px; }
+  .ss-fact.open { display: block; }
+  .ss-fact-head { font-size: 12px; font-weight: 700; color: var(--ink-mute, #6b7a74); text-transform: uppercase;
+    letter-spacing: .04em; margin: 0 0 8px; }
+  .ss-fact-head:not(:first-child) { margin-top: 14px; }
+  .ss-forfaits { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 0; }
+  .ss-forfait { font: inherit; font-size: 12px; cursor: pointer; padding: 4px 10px; border-radius: 6px;
+    border: 1px solid var(--line, #cabe9f); background: #fff; color: var(--ink-soft, #2a4836); }
+  .ss-forfait:hover { border-color: var(--vert-prairie, #2d7a3e); color: var(--vert-prairie, #2d7a3e); }
+  .ss-recur-mode { display: flex; gap: 6px; margin: 0 0 10px; }
+  .ss-recur-mode-opt { flex: 1; }
+  .ss-recur-mode-opt input { position: absolute; opacity: 0; pointer-events: none; }
+  .ss-recur-mode-opt label { display: block; text-align: center; cursor: pointer; padding: 6px;
+    border: 1px solid var(--line, #cabe9f); border-radius: 6px; font-size: 12px; font-weight: 600;
+    color: var(--ink-soft, #2a4836); background: #fff; user-select: none; }
+  .ss-recur-mode-opt input:checked + label { border-color: var(--vert-prairie, #2d7a3e);
+    background: var(--vert-prairie, #2d7a3e); color: #fff; }
+  .ss-recur-consecutif-only { display: none; }
+  .ss-recur[data-mode="consecutif"] .ss-recur-hebdo-only { display: none; }
+  .ss-recur[data-mode="consecutif"] .ss-recur-consecutif-only { display: block; }
 
   /* Garde-fou : tout SVG non explicitement dimensionné reste petit (évite le chevron géant). */
   .hub-back-row .hub-back-btn svg { width: 16px; height: 16px; flex: 0 0 auto; }
@@ -413,6 +459,27 @@
       <label for="ssMisLibelle">Libellé</label>
       <input type="text" id="ssMisLibelle" placeholder="Intitulé de la mission">
     </div>
+    <!-- Chantier D : pioche statut. Pilote l'affichage conditionnel (bénéficiaire +
+         bloc facturation) et REMPLACE les ex-cases « Refacturable » / « Mission cadre ».
+         interne -> rien ; facturable -> bénéficiaire + facturation ; autre -> bénéficiaire seul.
+         saveMission envoie p_statut ; le statut pilote refacturable côté RPC (B, pt 122). -->
+    <div class="ss-field">
+      <label>Statut</label>
+      <div class="ss-statut" id="ssMisStatut" role="radiogroup" aria-label="Statut de la mission">
+        <div class="ss-statut-opt">
+          <input type="radio" name="ssMisStatutR" id="ssMisStatutInterne" value="interne" checked>
+          <label for="ssMisStatutInterne">Interne</label>
+        </div>
+        <div class="ss-statut-opt">
+          <input type="radio" name="ssMisStatutR" id="ssMisStatutFacturable" value="facturable">
+          <label for="ssMisStatutFacturable">Facturable</label>
+        </div>
+        <div class="ss-statut-opt">
+          <input type="radio" name="ssMisStatutR" id="ssMisStatutAutre" value="autre">
+          <label for="ssMisStatutAutre">Autre</label>
+        </div>
+      </div>
+    </div>
     <div class="ss-field" id="ssMisBenefWrap">
       <label for="ssMisBenef">Bénéficiaire</label>
       <select id="ssMisBenef"></select>
@@ -432,6 +499,15 @@
           <div class="ss-field"><label for="ssEntContactNom">Contact</label><input type="text" id="ssEntContactNom"></div>
           <div class="ss-field"><label for="ssEntContactEmail">Email</label><input type="email" id="ssEntContactEmail"></div>
         </div>
+        <!-- Chantier D : facturation DURABLE (fiche bénéficiaire, upsert_entite — A pt 121).
+             Tous optionnels. Distincts de la prestation (réf. commande / montant), portée mission. -->
+        <p class="ss-fact-head">Facturation (durable)</p>
+        <div class="ss-row2">
+          <div class="ss-field"><label for="ssEntRaisonSociale">Raison sociale</label><input type="text" id="ssEntRaisonSociale"></div>
+          <div class="ss-field"><label for="ssEntSiret">SIRET</label><input type="text" id="ssEntSiret"></div>
+        </div>
+        <div class="ss-field"><label for="ssEntEmailFact">Email de facturation</label><input type="email" id="ssEntEmailFact"></div>
+        <div class="ss-field"><label for="ssEntAdresseFact">Adresse de facturation</label><textarea id="ssEntAdresseFact"></textarea></div>
         <div class="ss-modal-act" style="margin-top:6px;">
           <button class="ss-btn ss-btn-ghost ss-btn-sm" id="ssEntCancel" type="button">Annuler</button>
           <button class="ss-btn ss-btn-sm" id="ssEntSave" type="button">Créer</button>
@@ -452,6 +528,20 @@
     <details class="ss-recur" id="ssMisRecurWrap">
       <summary class="ss-recur-summary">Récurrence <span class="ss-recur-hint" id="ssMisRecurHint">— aucune</span></summary>
       <div class="ss-recur-body">
+        <!-- Chantier D : choix du mode. hebdo = motif {frequence:'hebdomadaire', jours,…} ;
+             consécutif = motif {frequence:'consecutif', heure_debut?, duree_min?} (C, sql_127,
+             une séance/jour de [Du,Au] week-end inclus). -->
+        <div class="ss-recur-mode" id="ssMisRecurMode" role="radiogroup" aria-label="Mode de récurrence">
+          <div class="ss-recur-mode-opt">
+            <input type="radio" name="ssMisRecurModeR" id="ssMisRecurModeHebdo" value="hebdomadaire" checked>
+            <label for="ssMisRecurModeHebdo">Jours de la semaine</label>
+          </div>
+          <div class="ss-recur-mode-opt">
+            <input type="radio" name="ssMisRecurModeR" id="ssMisRecurModeConsec" value="consecutif">
+            <label for="ssMisRecurModeConsec">Jours consécutifs</label>
+          </div>
+        </div>
+        <div class="ss-recur-hebdo-only">
         <div class="ss-field">
           <label>Jours</label>
           <div class="ss-recur-days" id="ssMisRecurDays">
@@ -477,12 +567,34 @@
             <option value="4">Toutes les 4 semaines</option>
           </select>
         </div>
-        <p class="ss-recur-note">Coche les jours pour rendre la mission récurrente. La génération des séances se fait depuis le bouton « Générer les séances » de la mission.</p>
+        </div><!-- /ss-recur-hebdo-only -->
+        <div class="ss-recur-consecutif-only">
+          <p class="ss-recur-note" style="margin-top:0;">Une séance par jour sur toute la période [Date de début → Date de fin], week-end inclus. Renseigne l'heure et la durée ci-dessous.</p>
+        </div>
+        <!-- Forfaits durée (chantier D) : raccourcis remplissant le champ Durée (min).
+             Aucune mécanique de comptage neuve. -->
+        <div class="ss-forfaits" id="ssMisForfaits" aria-label="Forfaits de durée">
+          <button class="ss-forfait" type="button" data-min="60">1 h</button>
+          <button class="ss-forfait" type="button" data-min="90">1 h 30</button>
+          <button class="ss-forfait" type="button" data-min="120">2 h</button>
+          <button class="ss-forfait" type="button" data-min="180">3 h</button>
+          <button class="ss-forfait" type="button" data-min="240">4 h</button>
+        </div>
+        <p class="ss-recur-note">Coche les jours (ou choisis « jours consécutifs ») pour rendre la mission récurrente. La génération des séances se fait depuis le bouton « Générer les séances » de la mission.</p>
         <p class="ss-recur-preview" id="ssMisRecurPreview" aria-live="polite"></p>
       </div>
     </details>
-    <label class="ss-chk" style="margin:6px 0 4px;"><input type="checkbox" id="ssMisRefac"> Refacturable</label>
-    <label class="ss-chk" style="margin:0 0 12px;"><input type="checkbox" id="ssMisCadre"> Mission cadre</label>
+    <!-- Chantier D : bloc facturation PRESTATION (propre à la mission, upsert_mission A).
+         Visible si statut='facturable'. Les ex-cases « Refacturable » / « Mission cadre »
+         sont RETIRÉES de l'UI : le statut pilote refacturable (B) ; est_cadre est préservé
+         au save par champ-caché (state-var pt 118) — colonnes conservées en base. -->
+    <div class="ss-fact" id="ssMisFact">
+      <p class="ss-fact-head">Prestation (cette mission)</p>
+      <div class="ss-row2">
+        <div class="ss-field"><label for="ssMisRefCommande">Référence commande</label><input type="text" id="ssMisRefCommande"></div>
+        <div class="ss-field"><label for="ssMisMontant">Montant (€)</label><input type="number" id="ssMisMontant" min="0" step="0.01"></div>
+      </div>
+    </div>
     <div class="ss-field"><label for="ssMisNotes">Notes</label><textarea id="ssMisNotes"></textarea></div>
     <div class="ss-modal-act">
       <button class="ss-btn ss-btn-ghost" id="ssMisCancel" type="button">Annuler</button>
@@ -551,6 +663,7 @@
   let editingMissionBilan = null;
   let editingMissionQuestFait = false;
   let editingMissionLieuLibre = null;
+  let editingMissionEstCadre = false;   // Chantier D : est_cadre retiré de l'UI, préservé au save (patron champ-caché pt 118).
   let currentType = null;          // code type affiché dans la vue-type
   let currentView = 'liste';       // 'liste' | 'agenda'
   let weekStart = null;            // Date (lundi) de la semaine affichée en agenda
@@ -1149,6 +1262,16 @@
   // generer_occurrences_recurrentes. Aucun jour coché -> null (mission non
   // récurrente). Source de vérité du jsonb à CHAQUE save (création ET édition).
   function readRecurInputs() {
+    // Chantier D : mode consécutif (C, sql_127) -> motif sans 'jours', une séance/jour
+    // sur [date_debut, date_fin] week-end inclus. Le mode hebdo conserve la logique pt 118.
+    const heure = $('ssMisRecurHeure').value;
+    const dureeRaw = $('ssMisRecurDuree').value;
+    if (getRecurMode() === 'consecutif') {
+      const rec = { frequence: 'consecutif' };
+      if (heure) rec.heure_debut = heure;
+      if (dureeRaw !== '' && dureeRaw != null) rec.duree_min = parseInt(dureeRaw, 10);
+      return rec;
+    }
     const jours = [];
     $('ssMisRecurDays').querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
       if (cb.checked) jours.push(parseInt(cb.value, 10));
@@ -1158,15 +1281,16 @@
     const rec = { frequence: 'hebdomadaire', jours: jours };
     const interval = parseInt($('ssMisRecurInterval').value, 10);
     if (interval > 1) rec.intervalle_semaines = interval;
-    const heure = $('ssMisRecurHeure').value;
     if (heure) rec.heure_debut = heure;
-    const duree = $('ssMisRecurDuree').value;
-    if (duree !== '' && duree != null) rec.duree_min = parseInt(duree, 10);
+    if (dureeRaw !== '' && dureeRaw != null) rec.duree_min = parseInt(dureeRaw, 10);
     return rec;
   }
   // Pré-remplit le bloc Récurrence depuis un jsonb recurrence (édition) ou le vide
   // (création). Ouvre le details si une récurrence existe, sinon le replie (P1).
   function fillRecurInputs(rec) {
+    // Chantier D : restaure le mode (hebdo/consécutif) depuis le motif mémorisé.
+    const mode = (rec && rec.frequence === 'consecutif') ? 'consecutif' : 'hebdomadaire';
+    setRecurMode(mode);
     const days = $('ssMisRecurDays').querySelectorAll('input[type="checkbox"]');
     const joursSet = {};
     if (rec && Array.isArray(rec.jours)) rec.jours.forEach(function (j) { joursSet[j] = true; });
@@ -1174,12 +1298,17 @@
     $('ssMisRecurInterval').value = (rec && rec.intervalle_semaines) ? String(rec.intervalle_semaines) : '1';
     $('ssMisRecurHeure').value = (rec && rec.heure_debut) ? rec.heure_debut : '';
     $('ssMisRecurDuree').value = (rec && rec.duree_min != null) ? rec.duree_min : '';
-    $('ssMisRecurWrap').open = !!(rec && Array.isArray(rec.jours) && rec.jours.length);
+    // Ouvre le details si une récurrence existe (hebdo : jours cochés ; consécutif : motif présent).
+    $('ssMisRecurWrap').open = !!(rec && (mode === 'consecutif' || (Array.isArray(rec.jours) && rec.jours.length)));
     updateRecurHint();
     updateRecurPreview();
   }
   // Met à jour l'indication du summary (— aucune / N jour(s)).
   function updateRecurHint() {
+    if (getRecurMode() === 'consecutif') {
+      $('ssMisRecurHint').textContent = '— jours consécutifs';
+      return;
+    }
     let n = 0;
     $('ssMisRecurDays').querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
       if (cb.checked) n++;
@@ -1217,6 +1346,15 @@
     const finRaw = parseLocalDate($('ssMisDateFin').value);
     const fin = finRaw || debut; // date_fin vide -> une seule journée (comme la génération)
     if (fin < debut) { el.textContent = 'La date de fin précède la date de début.'; return; }
+    // Chantier D : mode consécutif -> une séance par jour calendaire sur [debut, fin].
+    if (rec.frequence === 'consecutif') {
+      const MS = 86400000;
+      const nc = Math.floor((fin - debut) / MS) + 1;
+      el.textContent = finRaw
+        ? ('≈ ' + nc + (nc > 1 ? ' séances consécutives' : ' séance') + ' sur la période.')
+        : ('≈ ' + nc + ' séance (ajoute une date de fin pour couvrir une période).');
+      return;
+    }
     const interval = rec.intervalle_semaines || 1;
     const debutLundi = mondayISO(debut);
     const joursSet = {};
@@ -1235,6 +1373,48 @@
     el.textContent = finRaw
       ? ('≈ ' + n + (n > 1 ? ' séances' : ' séance') + ' sur la période.')
       : ('≈ ' + n + (n > 1 ? ' séances' : ' séance') + ' (ajoute une date de fin pour couvrir une période).');
+  }
+
+  // ---- Chantier D : pilotage du statut ----
+  // interne -> bénéficiaire masqué, pas de facturation ; facturable -> bénéficiaire +
+  // bloc facturation ; autre -> bénéficiaire visible, pas de facturation.
+  function getStatut() {
+    const r = document.querySelector('input[name="ssMisStatutR"]:checked');
+    return r ? r.value : 'interne';
+  }
+  function setStatut(v) {
+    const val = (v === 'facturable' || v === 'autre') ? v : 'interne';
+    const r = document.getElementById('ssMisStatut' + val.charAt(0).toUpperCase() + val.slice(1));
+    if (r) r.checked = true;
+    applyStatutUI();
+  }
+  function applyStatutUI() {
+    const st = getStatut();
+    const benefVisible = (st !== 'interne');
+    $('ssMisBenefWrap').style.display = benefVisible ? '' : 'none';
+    $('ssMisFact').classList.toggle('open', st === 'facturable');
+  }
+  // Forfaits durée : remplit le champ Durée (min) du bloc Récurrence (aucun comptage neuf).
+  function applyForfait(min) {
+    $('ssMisRecurDuree').value = String(min);
+    updateRecurPreview();
+  }
+  // Mode de récurrence : porte data-mode sur le details pour basculer l'affichage CSS
+  // (hebdo <-> consécutif). updateRecurPreview/readRecurInputs lisent ce mode.
+  function getRecurMode() {
+    const r = document.querySelector('input[name="ssMisRecurModeR"]:checked');
+    return r ? r.value : 'hebdomadaire';
+  }
+  function setRecurMode(mode) {
+    const m = (mode === 'consecutif') ? 'consecutif' : 'hebdomadaire';
+    const r = document.getElementById('ssMisRecurMode' + (m === 'consecutif' ? 'Consec' : 'Hebdo'));
+    if (r) r.checked = true;
+    $('ssMisRecurWrap').setAttribute('data-mode', m);
+  }
+  function applyRecurModeUI() {
+    $('ssMisRecurWrap').setAttribute('data-mode', getRecurMode());
+    updateRecurHint();
+    updateRecurPreview();
   }
 
   function openMission(mission) {
@@ -1257,21 +1437,26 @@
     editingMissionBilan       = edit ? (mission.bilan_text != null ? mission.bilan_text : null) : null;
     editingMissionQuestFait   = edit ? !!mission.questionnaire_fait : false;
     editingMissionLieuLibre   = edit ? (mission.lieu_libre != null ? mission.lieu_libre : null) : null;
+    // Chantier D : est_cadre n'a plus de case UI -> mémorisé pour ré-émission au save
+    // (sinon l'UPDATE dur de upsert_mission le remettrait à son DEFAULT false).
+    editingMissionEstCadre    = edit ? !!mission.est_cadre : false;
     $('ssMisTitle').textContent = edit ? 'Modifier la mission' : 'Nouvelle mission';
     $('ssMisLibelle').value = edit ? (mission.libelle || '') : '';
     $('ssMisDateDebut').value = edit ? (mission.date_debut || isoDate(new Date())) : isoDate(new Date());
     $('ssMisDateFin').value = edit ? (mission.date_fin || '') : '';
     $('ssMisNotes').value = edit ? (mission.notes || '') : '';
-    $('ssMisRefac').checked = edit ? !!mission.refacturable : false;
-    $('ssMisCadre').checked = edit ? !!mission.est_cadre : false;
+    // Chantier D : statut (B, pt 122). interne par défaut en création. Migration de la
+    // logique externe : un type externe pré-positionne 'facturable' en création (ex-comportement
+    // « externe -> refac coché »), sinon 'interne'. En édition : valeur réelle de la mission.
+    $('ssMisRefCommande').value = edit ? (mission.reference_commande || '') : '';
+    $('ssMisMontant').value = edit ? (mission.montant != null ? mission.montant : '') : '';
     $('ssEntCreate').classList.remove('open');
     const t = TYPE_BY_CODE[currentType];
-    // Bénéficiaire affiché SEULEMENT pour les types externes (doctrine §3.4).
-    // En édition on reste dans la vue-type courante (le bouton vit dans
-    // buildMissionBlock rendu sous currentType), donc externe/interne reste cohérent.
     const externe = !!(t && t.externe);
-    $('ssMisBenefWrap').style.display = externe ? '' : 'none';
-    if (externe && !edit) { $('ssMisRefac').checked = true; }
+    const statut = edit
+      ? (mission.statut || 'interne')
+      : (externe ? 'facturable' : 'interne');
+    setStatut(statut);
     fillBenefSelect();
     fillLieuSelect();
     // Présélection des selects APRÈS leur (re)construction.
@@ -1323,7 +1508,12 @@
         p_libelle: lib,
         p_type_entite: $('ssEntType').value,
         p_contact_nom: $('ssEntContactNom').value.trim() || null,
-        p_contact_email: $('ssEntContactEmail').value.trim() || null
+        p_contact_email: $('ssEntContactEmail').value.trim() || null,
+        // Chantier D : facturation durable (A, pt 121). Tous optionnels.
+        p_raison_sociale: $('ssEntRaisonSociale').value.trim() || null,
+        p_siret: $('ssEntSiret').value.trim() || null,
+        p_email_facturation: $('ssEntEmailFact').value.trim() || null,
+        p_adresse_facturation: $('ssEntAdresseFact').value.trim() || null
       });
       flash('Bénéficiaire créé.', 'ok');
       entites = (await rpc('list_entites', {})) || [];
@@ -1332,6 +1522,8 @@
       if (newId) $('ssMisBenef').value = newId;
       $('ssEntCreate').classList.remove('open');
       $('ssEntLib').value = ''; $('ssEntContactNom').value = ''; $('ssEntContactEmail').value = '';
+      $('ssEntRaisonSociale').value = ''; $('ssEntSiret').value = '';
+      $('ssEntEmailFact').value = ''; $('ssEntAdresseFact').value = '';
     } catch (e) {
       flash('Création impossible : ' + errMsg(e), 'err');
     } finally {
@@ -1342,10 +1534,12 @@
     if (!peutEcrire) return;
     const libelle = $('ssMisLibelle').value.trim();
     if (!libelle) { flash('Le libellé de la mission est obligatoire.', 'err'); return; }
-    const t = TYPE_BY_CODE[currentType];
-    const externe = !!(t && t.externe);
+    const statut = getStatut();
+    // Chantier D : le bénéficiaire est requis dès que la mission n'est pas interne
+    // (facturable ou autre). Remplace la garde « type externe » (notion externe retirée du front).
+    const benefRequis = (statut !== 'interne');
     const entite = $('ssMisBenef').value || null;
-    if (externe && !entite) { flash('Choisissez un bénéficiaire (type externe).', 'err'); return; }
+    if (benefRequis && !entite) { flash('Choisissez un bénéficiaire.', 'err'); return; }
     const dateDebut = $('ssMisDateDebut').value;
     if (!dateDebut) { flash('La date de début est obligatoire.', 'err'); return; }
     $('ssMisSave').disabled = true;
@@ -1360,7 +1554,7 @@
         p_libelle: libelle,
         p_type_mission: currentType,
         p_salarie_id: salarieId,
-        p_entite_id: externe ? entite : null,
+        p_entite_id: benefRequis ? entite : null,
         p_saison_id: saisonActive.id,
         p_date_debut: dateDebut,
         p_date_fin: $('ssMisDateFin').value || null,
@@ -1376,9 +1570,16 @@
         p_etat: enEdition ? editingMissionEtat : 'prevue',
         p_bilan_text: enEdition ? editingMissionBilan : null,
         p_questionnaire_fait: enEdition ? editingMissionQuestFait : false,
-        p_est_cadre: $('ssMisCadre').checked,
-        p_refacturable: $('ssMisRefac').checked,
-        p_notes: $('ssMisNotes').value.trim() || null
+        // Chantier D : est_cadre n'a plus de case UI -> ré-émission de la valeur mémorisée
+        // (création : false). p_refacturable N'EST PLUS ENVOYÉ (statut pilote refacturable
+        // côté RPC, B pt 122). p_statut + facturation prestation câblés.
+        p_est_cadre: editingMissionEstCadre,
+        p_notes: $('ssMisNotes').value.trim() || null,
+        p_reference_commande: (statut === 'facturable')
+          ? ($('ssMisRefCommande').value.trim() || null) : null,
+        p_montant: (statut === 'facturable' && $('ssMisMontant').value !== '')
+          ? parseFloat($('ssMisMontant').value) : null,
+        p_statut: statut
       };
       await rpc('upsert_mission', params);
       flash(enEdition ? 'Mission modifiée.' : 'Mission enregistrée.', 'ok');
@@ -1512,6 +1713,13 @@
     $('ssMisDateDebut').addEventListener('change', updateRecurPreview);
     $('ssMisDateFin').addEventListener('change', updateRecurPreview);
     $('ssMisBenefCreate').addEventListener('click', function () { $('ssEntCreate').classList.toggle('open'); });
+    // Chantier D : pilotage statut, forfaits durée, mode récurrence.
+    $('ssMisStatut').addEventListener('change', applyStatutUI);
+    $('ssMisForfaits').addEventListener('click', function (e) {
+      const b = e.target.closest('.ss-forfait');
+      if (b && b.dataset.min) applyForfait(parseInt(b.dataset.min, 10));
+    });
+    $('ssMisRecurMode').addEventListener('change', applyRecurModeUI);
     $('ssEntCancel').addEventListener('click', function () { $('ssEntCreate').classList.remove('open'); });
     $('ssEntSave').addEventListener('click', saveEntiteInline);
     // Signout
