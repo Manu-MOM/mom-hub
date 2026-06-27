@@ -300,7 +300,6 @@
       </div>
       <span class="sp"></span>
       <button class="ss-btn ss-btn-sm" id="ssNewMission" type="button" hidden>+ Nouvelle mission</button>
-      <button class="ss-btn ss-btn-sm" id="ssNewPonctuelle" type="button" hidden>+ Séance ponctuelle</button>
     </div>
 
     <div id="ssListWrap">
@@ -685,11 +684,6 @@
     $('ssTypeView').classList.add('active');
     // Bouton « + Nouvelle mission » masqué pour Lohann.
     $('ssNewMission').hidden = !peutEcrire;
-    // Séance ponctuelle : visible à TOUS (admin ET salarié), mais seulement
-    // s'il existe au moins une mission de ce type à laquelle la rattacher.
-    $('ssNewPonctuelle').hidden = !missions.some(function (m) {
-      return m.type_mission === typeCode;
-    });
     weekStart = mondayOf(new Date());
     setView(currentView);
   }
@@ -697,7 +691,6 @@
     currentType = null;
     $('ssTypeView').classList.remove('active');
     $('ssGridView').hidden = false;
-    $('ssNewPonctuelle').hidden = true;
   }
   function setView(mode) {
     currentView = mode;
@@ -789,6 +782,12 @@
       });
       headRight.appendChild(genBtn);
     }
+    // Bouton « + Ponctuelle » (chantier #2) : ouvre la modale ponctuelle avec
+    // CETTE mission pré-sélectionnée. Ouvert à TOUS (admin ET salarié) — hors du
+    // garde peutEcrire, comme l'ancien toggle global ssNewPonctuelle l'était.
+    headRight.appendChild(mkBtn('+ Ponctuelle', 'ss-btn ss-btn-sm ss-btn-ghost', function () {
+      openPonctuelle(m);
+    }));
     head.appendChild(headRight);
     block.appendChild(head);
 
@@ -940,7 +939,11 @@
   // TYPE courant (déjà filtrées au salarié par list_missions p_salarie_id).
   // L'état n'est proposé qu'à l'admin ; le salarié crée toujours en 'realisee'
   // (la RPC sql_123 le force côté serveur — le front ne fait que refléter).
-  function openPonctuelle() {
+  function openPonctuelle(mission) {
+    // mission optionnelle (chantier #2) : si fournie, on pré-sélectionne CETTE
+    // mission dans le select. Garde MouseEvent : un click listener passerait un
+    // MouseEvent (sans .id) — neutralisé par le test mission && mission.id.
+    const preMission = (mission && mission.id) ? mission : null;
     const sel = $('ssPonctMission');
     sel.innerHTML = '<option value="">— choisir —</option>';
     const mis = missions.filter(function (m) {
@@ -952,8 +955,10 @@
       opt.textContent = m.libelle || '(sans libellé)';
       sel.appendChild(opt);
     });
-    // Pré-sélection si une seule mission candidate (confort).
-    if (mis.length === 1) sel.value = mis[0].id;
+    // Pré-sélection : mission imposée (#2, ouverture depuis la vignette) si fournie,
+    // sinon confort « une seule mission candidate ». Le select reste modifiable.
+    if (preMission) sel.value = preMission.id;
+    else if (mis.length === 1) sel.value = mis[0].id;
 
     $('ssPonctDate').value = isoDate(new Date());
     $('ssPonctDuree').value = '';
@@ -1480,7 +1485,6 @@
     $('ssDeclSave').addEventListener('click', saveDecl);
     $('ssDeclOverlay').addEventListener('click', function (e) { if (e.target === $('ssDeclOverlay')) closeDecl(); });
     // Séance ponctuelle
-    $('ssNewPonctuelle').addEventListener('click', openPonctuelle);
     $('ssPonctCancel').addEventListener('click', closePonctuelle);
     $('ssPonctSave').addEventListener('click', savePonctuelle);
     $('ssPonctOverlay').addEventListener('click', function (e) { if (e.target === $('ssPonctOverlay')) closePonctuelle(); });
