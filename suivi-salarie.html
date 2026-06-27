@@ -128,6 +128,14 @@
   .ss-mission-head { display: flex; align-items: center; justify-content: space-between; gap: 12px;
                      padding: 11px 16px; background: var(--paper, #f8f5ec); border-bottom: 1px solid var(--line, #cabe9f); }
   .ss-mission-title { margin: 0; font-size: 14px; font-weight: 700; color: var(--vert-bouteille, #0c3d24); }
+  /* Titre cliquable = bascule de repli (chantier #1, écart tracé). Neutralise le
+     style natif du bouton ; le head garde border-bottom seulement si déplié. */
+  .ss-mission-toggle { display: inline-flex; align-items: center; gap: 8px; background: transparent;
+                       border: 0; padding: 0; font: inherit; text-align: left; cursor: pointer; }
+  .ss-mission-chevron { font-size: 11px; color: var(--ink-mute, #6b7a74); transition: none; }
+  .ss-mission-body { display: block; }
+  .ss-mission.collapsed .ss-mission-body { display: none; }
+  .ss-mission.collapsed .ss-mission-head { border-bottom: 0; }
   .ss-mission-count { font-size: 12px; color: var(--ink-mute, #6b7a74); white-space: nowrap; }
   .ss-mission-head-right { display: flex; align-items: center; gap: 12px; }
   .ss-mission-empty { padding: 16px; text-align: center; color: var(--ink-mute, #6b7a74); font-size: 13px; }
@@ -191,6 +199,7 @@
   .ss-recur-day { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--ink-soft, #2a4836); padding: 4px 8px; border: 1px solid var(--line, #cabe9f); border-radius: 6px; cursor: pointer; }
   .ss-recur-day input { width: auto; }
   .ss-recur-note { font-size: 12px; color: var(--ink-mute, #6b7a74); margin: 8px 0 0; }
+  .ss-recur-preview { font-size: 13px; font-weight: 600; color: var(--vert-prairie, #2d7a3e); margin: 6px 0 0; min-height: 18px; }
   .ss-link { background: transparent; border: 0; font: inherit; cursor: pointer; color: var(--bleu-base, #1f4a82); padding: 2px 4px; }
 
   /* Garde-fou : tout SVG non explicitement dimensionné reste petit (évite le chevron géant). */
@@ -470,6 +479,7 @@
           </select>
         </div>
         <p class="ss-recur-note">Coche les jours pour rendre la mission récurrente. La génération des séances se fait depuis le bouton « Générer les séances » de la mission.</p>
+        <p class="ss-recur-preview" id="ssMisRecurPreview" aria-live="polite"></p>
       </div>
     </details>
     <label class="ss-chk" style="margin:6px 0 4px;"><input type="checkbox" id="ssMisRefac"> Refacturable</label>
@@ -744,9 +754,19 @@
 
     const head = document.createElement('div');
     head.className = 'ss-mission-head';
-    const title = document.createElement('p');
-    title.className = 'ss-mission-title';
-    title.textContent = m.libelle || '(sans libellé)';
+    // Titre cliquable = bascule repli/déploiement des séances (chevron). Cible le
+    // titre seul, PAS tout le head (les boutons à droite restent indépendants).
+    const title = document.createElement('button');
+    title.type = 'button';
+    title.className = 'ss-mission-title ss-mission-toggle';
+    title.setAttribute('aria-expanded', 'true');
+    const chevron = document.createElement('span');
+    chevron.className = 'ss-mission-chevron';
+    chevron.textContent = '▾';
+    const titleText = document.createElement('span');
+    titleText.textContent = m.libelle || '(sans libellé)';
+    title.appendChild(chevron);
+    title.appendChild(titleText);
     const count = document.createElement('span');
     count.className = 'ss-mission-count';
     count.textContent = occ.length > 0
@@ -772,14 +792,26 @@
     head.appendChild(headRight);
     block.appendChild(head);
 
+    // Corps repliable : contient les séances (ou le message vide). Déplié par
+    // défaut (pt 117). Le titre bascule la classe 'collapsed' sur le block.
+    const body = document.createElement('div');
+    body.className = 'ss-mission-body';
     if (!occ.length) {
       const empty = document.createElement('div');
       empty.className = 'ss-mission-empty';
       empty.textContent = 'Aucune séance pour ce filtre.';
-      block.appendChild(empty);
+      body.appendChild(empty);
     } else {
-      occ.forEach(function (o) { block.appendChild(buildRow(o)); });
+      occ.forEach(function (o) { body.appendChild(buildRow(o)); });
     }
+    block.appendChild(body);
+
+    title.addEventListener('click', function () {
+      const collapsed = block.classList.toggle('collapsed');
+      title.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      chevron.textContent = collapsed ? '▸' : '▾';
+    });
+
     return block;
   }
 
@@ -1139,6 +1171,7 @@
     $('ssMisRecurDuree').value = (rec && rec.duree_min != null) ? rec.duree_min : '';
     $('ssMisRecurWrap').open = !!(rec && Array.isArray(rec.jours) && rec.jours.length);
     updateRecurHint();
+    updateRecurPreview();
   }
   // Met à jour l'indication du summary (— aucune / N jour(s)).
   function updateRecurHint() {
@@ -1149,6 +1182,54 @@
     $('ssMisRecurHint').textContent = n
       ? '— ' + n + (n > 1 ? ' jours' : ' jour')
       : '— aucune';
+  }
+
+  // Lundi ISO d'une date (équivalent de date_trunc('week') en Postgres) : recule
+  // jusqu'au lundi de la semaine. Parse une date 'YYYY-MM-DD' en local (pas UTC,
+  // pour éviter tout décalage de jour).
+  function parseLocalDate(s) {
+    if (!s) return null;
+    const p = String(s).split('-');
+    if (p.length !== 3) return null;
+    return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+  }
+  function mondayISO(d) {
+    const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const dow = x.getDay() === 0 ? 7 : x.getDay(); // 1=lundi..7=dimanche (ISO)
+    x.setDate(x.getDate() - (dow - 1));
+    return x;
+  }
+  // Aperçu : nombre de séances que le motif courant produira sur [date_debut,
+  // date_fin] de la modale. Reproduit la logique de generer_occurrences_recurrentes
+  // (jours ISO + intervalle de semaines, référence = date_debut). AFFICHAGE SEUL :
+  // la génération réelle reste la RPC (source de vérité).
+  function updateRecurPreview() {
+    const el = $('ssMisRecurPreview');
+    const rec = readRecurInputs();
+    if (!rec) { el.textContent = ''; return; }
+    const debut = parseLocalDate($('ssMisDateDebut').value);
+    if (!debut) { el.textContent = 'Renseigne une date de début pour estimer les séances.'; return; }
+    const finRaw = parseLocalDate($('ssMisDateFin').value);
+    const fin = finRaw || debut; // date_fin vide -> une seule journée (comme la génération)
+    if (fin < debut) { el.textContent = 'La date de fin précède la date de début.'; return; }
+    const interval = rec.intervalle_semaines || 1;
+    const debutLundi = mondayISO(debut);
+    const joursSet = {};
+    rec.jours.forEach(function (j) { joursSet[j] = true; });
+    let n = 0;
+    const cur = new Date(debut.getFullYear(), debut.getMonth(), debut.getDate());
+    const MS_DAY = 86400000;
+    while (cur <= fin) {
+      const dow = cur.getDay() === 0 ? 7 : cur.getDay();
+      if (joursSet[dow]) {
+        const sem = Math.floor((mondayISO(cur) - debutLundi) / (7 * MS_DAY));
+        if (sem % interval === 0) n++;
+      }
+      cur.setDate(cur.getDate() + 1);
+    }
+    el.textContent = finRaw
+      ? ('≈ ' + n + (n > 1 ? ' séances' : ' séance') + ' sur la période.')
+      : ('≈ ' + n + (n > 1 ? ' séances' : ' séance') + ' (ajoute une date de fin pour couvrir une période).');
   }
 
   function openMission(mission) {
@@ -1418,8 +1499,14 @@
     $('ssMisCancel').addEventListener('click', closeMission);
     $('ssMisSave').addEventListener('click', saveMission);
     $('ssMisOverlay').addEventListener('click', function (e) { if (e.target === $('ssMisOverlay')) closeMission(); });
-    // Récurrence : maj de l'indication du summary au coche/décoche d'un jour.
-    $('ssMisRecurDays').addEventListener('change', updateRecurHint);
+    // Récurrence : maj de l'indication du summary + aperçu au coche/décoche d'un jour.
+    $('ssMisRecurDays').addEventListener('change', function () { updateRecurHint(); updateRecurPreview(); });
+    // Aperçu recalculé quand l'intervalle, l'heure, la durée ou les dates changent.
+    $('ssMisRecurInterval').addEventListener('change', updateRecurPreview);
+    $('ssMisRecurHeure').addEventListener('input', updateRecurPreview);
+    $('ssMisRecurDuree').addEventListener('input', updateRecurPreview);
+    $('ssMisDateDebut').addEventListener('change', updateRecurPreview);
+    $('ssMisDateFin').addEventListener('change', updateRecurPreview);
     $('ssMisBenefCreate').addEventListener('click', function () { $('ssEntCreate').classList.toggle('open'); });
     $('ssEntCancel').addEventListener('click', function () { $('ssEntCreate').classList.remove('open'); });
     $('ssEntSave').addEventListener('click', saveEntiteInline);
