@@ -179,6 +179,18 @@
   .ss-chk input { width: auto; }
   .ss-ent-create { display: none; padding: 12px; background: var(--paper, #f8f5ec); border-radius: 8px; margin: 8px 0 0; }
   .ss-ent-create.open { display: block; }
+  /* Bloc Récurrence (chantier #1) */
+  .ss-recur { margin: 0 0 12px; border: 1px solid var(--line, #cabe9f); border-radius: 8px; background: var(--paper, #f8f5ec); }
+  .ss-recur-summary { cursor: pointer; padding: 10px 12px; font-size: 13px; font-weight: 600; color: var(--ink-soft, #2a4836); list-style: none; user-select: none; }
+  .ss-recur-summary::-webkit-details-marker { display: none; }
+  .ss-recur-summary::before { content: '▸'; display: inline-block; margin-right: 8px; transition: transform .15s; }
+  .ss-recur[open] .ss-recur-summary::before { transform: rotate(90deg); }
+  .ss-recur-hint { font-weight: 400; color: var(--ink-mute, #6b7a74); }
+  .ss-recur-body { padding: 4px 12px 12px; }
+  .ss-recur-days { display: flex; gap: 6px; flex-wrap: wrap; }
+  .ss-recur-day { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--ink-soft, #2a4836); padding: 4px 8px; border: 1px solid var(--line, #cabe9f); border-radius: 6px; cursor: pointer; }
+  .ss-recur-day input { width: auto; }
+  .ss-recur-note { font-size: 12px; color: var(--ink-mute, #6b7a74); margin: 8px 0 0; }
   .ss-link { background: transparent; border: 0; font: inherit; cursor: pointer; color: var(--bleu-base, #1f4a82); padding: 2px 4px; }
 
   /* Garde-fou : tout SVG non explicitement dimensionné reste petit (évite le chevron géant). */
@@ -278,7 +290,6 @@
         </select>
       </div>
       <span class="sp"></span>
-      <button class="ss-btn ss-btn-sm ss-btn-ghost" id="ssGenWeek" type="button" hidden>Générer la semaine</button>
       <button class="ss-btn ss-btn-sm" id="ssNewMission" type="button" hidden>+ Nouvelle mission</button>
       <button class="ss-btn ss-btn-sm" id="ssNewPonctuelle" type="button" hidden>+ Séance ponctuelle</button>
     </div>
@@ -427,6 +438,40 @@
       <label for="ssMisLieu">Lieu</label>
       <select id="ssMisLieu"></select>
     </div>
+    <!-- Bloc Récurrence (chantier #1). Repliable (details natif, P1) : ouvert si la
+         mission porte déjà une récurrence, replié en création. Produit le jsonb
+         recurrence consommé par saveMission. Aucun jour coché = mission non récurrente. -->
+    <details class="ss-recur" id="ssMisRecurWrap">
+      <summary class="ss-recur-summary">Récurrence <span class="ss-recur-hint" id="ssMisRecurHint">— aucune</span></summary>
+      <div class="ss-recur-body">
+        <div class="ss-field">
+          <label>Jours</label>
+          <div class="ss-recur-days" id="ssMisRecurDays">
+            <label class="ss-recur-day"><input type="checkbox" value="1"> L</label>
+            <label class="ss-recur-day"><input type="checkbox" value="2"> M</label>
+            <label class="ss-recur-day"><input type="checkbox" value="3"> M</label>
+            <label class="ss-recur-day"><input type="checkbox" value="4"> J</label>
+            <label class="ss-recur-day"><input type="checkbox" value="5"> V</label>
+            <label class="ss-recur-day"><input type="checkbox" value="6"> S</label>
+            <label class="ss-recur-day"><input type="checkbox" value="7"> D</label>
+          </div>
+        </div>
+        <div class="ss-row2">
+          <div class="ss-field"><label for="ssMisRecurHeure">Heure de début</label><input type="time" id="ssMisRecurHeure"></div>
+          <div class="ss-field"><label for="ssMisRecurDuree">Durée (min)</label><input type="number" id="ssMisRecurDuree" min="0" step="5"></div>
+        </div>
+        <div class="ss-field">
+          <label for="ssMisRecurInterval">Fréquence</label>
+          <select id="ssMisRecurInterval">
+            <option value="1">Toutes les semaines</option>
+            <option value="2">Toutes les 2 semaines</option>
+            <option value="3">Toutes les 3 semaines</option>
+            <option value="4">Toutes les 4 semaines</option>
+          </select>
+        </div>
+        <p class="ss-recur-note">Coche les jours pour rendre la mission récurrente. La génération des séances se fait depuis le bouton « Générer les séances » de la mission.</p>
+      </div>
+    </details>
     <label class="ss-chk" style="margin:6px 0 4px;"><input type="checkbox" id="ssMisRefac"> Refacturable</label>
     <label class="ss-chk" style="margin:0 0 12px;"><input type="checkbox" id="ssMisCadre"> Mission cadre</label>
     <div class="ss-field"><label for="ssMisNotes">Notes</label><textarea id="ssMisNotes"></textarea></div>
@@ -628,8 +673,7 @@
     $('ssTypeTitle').textContent = t ? t.lib : typeCode;
     $('ssGridView').hidden = true;
     $('ssTypeView').classList.add('active');
-    // Boutons admin (génération + nouvelle mission) masqués pour Lohann.
-    $('ssGenWeek').hidden = !peutEcrire;
+    // Bouton « + Nouvelle mission » masqué pour Lohann.
     $('ssNewMission').hidden = !peutEcrire;
     // Séance ponctuelle : visible à TOUS (admin ET salarié), mais seulement
     // s'il existe au moins une mission de ce type à laquelle la rattacher.
@@ -718,6 +762,12 @@
       headRight.appendChild(mkBtn('✎ Éditer', 'ss-btn ss-btn-sm ss-btn-ghost', function () {
         openMission(m);
       }));
+      // Bouton « Générer les séances » (chantier #1) : génère la pleine période
+      // de CETTE mission. Visible mais alerte si pas de récurrence (P4).
+      const genBtn = mkBtn('Générer les séances', 'ss-btn ss-btn-sm ss-btn-ghost', function () {
+        genMission(m, genBtn);
+      });
+      headRight.appendChild(genBtn);
     }
     head.appendChild(headRight);
     block.appendChild(head);
@@ -1011,27 +1061,38 @@
   }
 
   // ============================================================
-  // GÉNÉRATION D'OCCURRENCES (admin) — workflow hybride
+  // GÉNÉRATION D'OCCURRENCES (admin) — à l'échelle de la mission (chantier #1)
   // ============================================================
-  async function genWeek() {
-    if (!peutEcrire || !currentType) return;
-    const mis = missions.filter(function (m) { return m.type_mission === currentType; });
-    if (!mis.length) { flash('Aucune mission de ce type à générer.', 'err'); return; }
-    const start = weekStart || mondayOf(new Date());
-    const end = new Date(start); end.setDate(end.getDate() + 6);
-    $('ssGenWeek').disabled = true;
+  // Génère les séances d'UNE mission sur sa pleine période [date_debut, date_fin].
+  // Remplace l'ancien « Générer la semaine » (mauvaise échelle : type + 1 semaine).
+  // Garde UX (P4, alert never block) : si la mission n'a pas de récurrence avec
+  // jours, on n'appelle pas (la fonction lèverait) — message explicite.
+  async function genMission(m, btn) {
+    if (!peutEcrire || !m || !m.id) return;
+    const rec = m.recurrence;
+    const aDesJours = !!(rec && Array.isArray(rec.jours) && rec.jours.length);
+    if (!aDesJours) {
+      flash('Définis d\'abord une récurrence sur cette mission (✎ Éditer → Récurrence).', 'err');
+      return;
+    }
+    if (btn) btn.disabled = true;
     try {
-      for (let i = 0; i < mis.length; i++) {
-        await rpc('generer_occurrences_recurrentes', {
-          p_mission_id: mis[i].id, p_from: isoDate(start), p_to: isoDate(end)
-        });
-      }
-      flash('Semaine générée.', 'ok');
+      const r = await rpc('generer_occurrences_recurrentes', {
+        p_mission_id: m.id,
+        p_from: m.date_debut,
+        p_to: m.date_fin || m.date_debut
+      });
+      // La RPC RETURNS TABLE : PostgREST renvoie un tableau d'une ligne.
+      const row = Array.isArray(r) ? r[0] : r;
+      const nbC = row && row.out_nb_creees != null ? row.out_nb_creees : 0;
+      const nbE = row && row.out_nb_existantes != null ? row.out_nb_existantes : 0;
+      flash(nbC + (nbC > 1 ? ' séances créées' : ' séance créée') + ', '
+            + nbE + (nbE > 1 ? ' déjà présentes' : ' déjà présente') + '.', 'ok');
       await refreshAll();
     } catch (e) {
       flash('Génération impossible : ' + errMsg(e), 'err');
     } finally {
-      $('ssGenWeek').disabled = false;
+      if (btn) btn.disabled = false;
     }
   }
 
@@ -1045,6 +1106,51 @@
     const suffix = Date.now().toString(36).slice(-4).toUpperCase();
     return (slug || 'ITEM') + '-' + suffix;
   }
+
+  // ---- Bloc Récurrence (chantier #1) ----
+  // Lit le bloc Récurrence de la modale et construit le jsonb attendu par
+  // generer_occurrences_recurrentes. Aucun jour coché -> null (mission non
+  // récurrente). Source de vérité du jsonb à CHAQUE save (création ET édition).
+  function readRecurInputs() {
+    const jours = [];
+    $('ssMisRecurDays').querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
+      if (cb.checked) jours.push(parseInt(cb.value, 10));
+    });
+    if (!jours.length) return null;
+    jours.sort(function (a, b) { return a - b; });
+    const rec = { frequence: 'hebdomadaire', jours: jours };
+    const interval = parseInt($('ssMisRecurInterval').value, 10);
+    if (interval > 1) rec.intervalle_semaines = interval;
+    const heure = $('ssMisRecurHeure').value;
+    if (heure) rec.heure_debut = heure;
+    const duree = $('ssMisRecurDuree').value;
+    if (duree !== '' && duree != null) rec.duree_min = parseInt(duree, 10);
+    return rec;
+  }
+  // Pré-remplit le bloc Récurrence depuis un jsonb recurrence (édition) ou le vide
+  // (création). Ouvre le details si une récurrence existe, sinon le replie (P1).
+  function fillRecurInputs(rec) {
+    const days = $('ssMisRecurDays').querySelectorAll('input[type="checkbox"]');
+    const joursSet = {};
+    if (rec && Array.isArray(rec.jours)) rec.jours.forEach(function (j) { joursSet[j] = true; });
+    days.forEach(function (cb) { cb.checked = !!joursSet[parseInt(cb.value, 10)]; });
+    $('ssMisRecurInterval').value = (rec && rec.intervalle_semaines) ? String(rec.intervalle_semaines) : '1';
+    $('ssMisRecurHeure').value = (rec && rec.heure_debut) ? rec.heure_debut : '';
+    $('ssMisRecurDuree').value = (rec && rec.duree_min != null) ? rec.duree_min : '';
+    $('ssMisRecurWrap').open = !!(rec && Array.isArray(rec.jours) && rec.jours.length);
+    updateRecurHint();
+  }
+  // Met à jour l'indication du summary (— aucune / N jour(s)).
+  function updateRecurHint() {
+    let n = 0;
+    $('ssMisRecurDays').querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
+      if (cb.checked) n++;
+    });
+    $('ssMisRecurHint').textContent = n
+      ? '— ' + n + (n > 1 ? ' jours' : ' jour')
+      : '— aucune';
+  }
+
   function openMission(mission) {
     if (!peutEcrire) return;
     // Édition si une mission réelle est fournie ; sinon création (le listener du
@@ -1087,6 +1193,9 @@
       $('ssMisBenef').value = mission.entite_id || '';
       $('ssMisLieu').value = mission.lieu_id || '';
     }
+    // Bloc Récurrence : pré-rempli depuis la récurrence mémorisée (édition),
+    // vidé en création. fillRecurInputs gère l'ouverture/repli du details.
+    fillRecurInputs(edit ? editingMissionRecurrence : null);
     $('ssMisOverlay').classList.add('open');
   }
   function closeMission() {
@@ -1174,7 +1283,10 @@
         // En édition on RENVOIE les valeurs d'origine (mémorisées par openMission),
         // sinon elles seraient écrasées à leur DEFAULT. En création, valeurs neutres.
         p_lieu_libre: enEdition ? editingMissionLieuLibre : null,
-        p_recurrence: enEdition ? editingMissionRecurrence : null,
+        // Récurrence : construite depuis le bloc de la modale (source de vérité,
+        // création ET édition). Aucun jour coché -> null (mission non récurrente).
+        // Remplace la simple ré-émission de editingMissionRecurrence du pt 118.
+        p_recurrence: readRecurInputs(),
         p_etat: enEdition ? editingMissionEtat : 'prevue',
         p_bilan_text: enEdition ? editingMissionBilan : null,
         p_questionnaire_fait: enEdition ? editingMissionQuestFait : false,
@@ -1281,7 +1393,6 @@
     $('ssWeekNext').addEventListener('click', function () {
       weekStart = new Date(weekStart); weekStart.setDate(weekStart.getDate() + 7); renderAgenda();
     });
-    $('ssGenWeek').addEventListener('click', genWeek);
     $('ssNewMission').addEventListener('click', openMission);
     // Déclaration
     $('ssDeclCancel').addEventListener('click', closeDecl);
@@ -1307,6 +1418,8 @@
     $('ssMisCancel').addEventListener('click', closeMission);
     $('ssMisSave').addEventListener('click', saveMission);
     $('ssMisOverlay').addEventListener('click', function (e) { if (e.target === $('ssMisOverlay')) closeMission(); });
+    // Récurrence : maj de l'indication du summary au coche/décoche d'un jour.
+    $('ssMisRecurDays').addEventListener('change', updateRecurHint);
     $('ssMisBenefCreate').addEventListener('click', function () { $('ssEntCreate').classList.toggle('open'); });
     $('ssEntCancel').addEventListener('click', function () { $('ssEntCreate').classList.remove('open'); });
     $('ssEntSave').addEventListener('click', saveEntiteInline);
