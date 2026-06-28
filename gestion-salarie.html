@@ -401,7 +401,7 @@
   function renderEntete() {
     const saison = (saisonActive && saisonActive.libelle) ? saisonActive.libelle : '—';
     const nom = salarieNom || '—';
-    $('peSub').textContent = nom + ' · employeur : MOM · saison ' + saison;
+    $('peSub').textContent = nom + ' · employeur : MOM · ' + saison;
   }
 
   // ---------- Boot ----------
