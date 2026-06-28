@@ -154,6 +154,11 @@
   .pe-band-sub { margin: 8px 0 0; font-size: 12.5px; color: var(--ink-mute, #6b7a74); }
   .pe-band-vide { font-size: 13px; color: var(--ink-mute, #6b7a74); padding: 6px 0; }
   .pe-soon { font-style: italic; opacity: .8; }
+  .pe-band-foot { border-top: 1px solid var(--paper-warm, #e3e0d8); margin-top: 8px; padding-top: 8px; font-size: 12px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .pe-cadre-ok { color: var(--vert-prairie, #1b6b4c); font-weight: 600; }
+  .pe-cadre-no { color: #993c1d; font-weight: 600; }
+  .pe-sig { font-size: 12.5px; color: var(--ink-mute, #6b7a74); margin: 4px 0 0; }
+  .pe-sig.alert { color: var(--rouge-blesse, #c0392b); }
   .pe-filters { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 16px; opacity: .5; pointer-events: none; }
   .pe-chip { font-size: 13px; padding: 6px 14px; border-radius: 16px; border: 1px solid var(--line, #cabe9f); color: var(--ink-mute, #6b7a74); }
   .pe-chip.on { background: var(--feedback-info-bg, #eaf1fa); color: var(--feedback-info-fg, #1f4a82); border-color: transparent; }
@@ -242,16 +247,24 @@
       <div id="peAnnuVide" class="pe-band-vide" style="display:none">Aucune période d'annualisation courante.</div>
     </div>
 
-    <!-- Bandeau 2 : A REFACTURER (placeholder etape 2) -->
+    <!-- Bandeau 2 : A REFACTURER (cable etape 2) -->
     <div class="pe-band" id="peBandRefac">
       <p class="pe-band-lbl">À refacturer</p>
-      <p class="pe-band-sub pe-soon">Câblé à l'étape 2.</p>
+      <div id="peRefacBody">
+        <p class="pe-band-big"><span id="peRefacTotal">—</span> <small>€</small></p>
+        <p class="pe-band-sub" id="peRefacCount">—</p>
+        <p class="pe-band-sub" id="peRefacVent" style="color:var(--ink-soft,#2a4836);"></p>
+        <div class="pe-band-foot" id="peRefacCadre"></div>
+      </div>
+      <div id="peRefacVide" class="pe-band-vide" style="display:none">Aucune mission facturable.</div>
     </div>
 
-    <!-- Bandeau 3 : A TRAITER (placeholder etape 2) -->
+    <!-- Bandeau 3 : A TRAITER (cable etape 2) -->
     <div class="pe-band" id="peBandTraiter">
       <p class="pe-band-lbl">À traiter</p>
-      <p class="pe-band-sub pe-soon">Câblé à l'étape 2.</p>
+      <p class="pe-band-big" id="peTraiterTotal">—</p>
+      <div id="peTraiterDetail"></div>
+      <div id="peTraiterVide" class="pe-band-vide" style="display:none">Rien à traiter.</div>
     </div>
 
   </div>
@@ -343,6 +356,9 @@
   let salarieNom = null;   // libelle d'affichage (prenom + nom)
   let contratId = null;    // contrat actif du salarie
   let periode = null;      // ligne d'annualisation couvrant aujourd'hui
+  let missions = [];       // list_missions (saison + salarie)
+  let entites = [];        // list_entites(true) : toutes (actives + inactives)
+  const entiteById = new Map();
 
   // ---------- Resolution du salarie v1 ----------
   // list_salaries() ne renvoie que les salaries (contrat courant) : v1 = staff[0].
@@ -397,6 +413,132 @@
     $('peAnnuSub').textContent = pct + ' % · ' + resteTxt + (Number.isFinite(solde) ? '' : '');
   }
 
+  // ---------- Chargement missions + beneficiaires ----------
+  // list_missions : SETOF missions (statut, montant, reference_commande, bilan_text,
+  //   questionnaire_fait, etat, entite_id...). Filtre saison + salarie v1.
+  // list_entites(true) : SETOF entites, inclut inactives (couvre une entite referencee
+  //   par une mission mais desactivee depuis ; sinon croisement orphelin).
+  async function chargerMissionsEntites() {
+    if (saisonActive && saisonActive.id) {
+      missions = (await rpc('list_missions', {
+        p_saison_id: saisonActive.id, p_salarie_id: salarieId, p_entite_id: null
+      })) || [];
+    } else {
+      missions = [];
+    }
+    entites = (await rpc('list_entites', { p_inclure_inactives: true })) || [];
+    entiteById.clear();
+    entites.forEach(e => entiteById.set(e.id, e));
+  }
+
+  // Format monetaire FR (2 decimales, espace milliers, virgule).
+  function fmtEur(n) {
+    const v = Number(n || 0);
+    return v.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function benefLabel(entiteId) {
+    if (!entiteId) return null;
+    const e = entiteById.get(entiteId);
+    return e ? (e.libelle_court || e.libelle || e.code || '—') : null;
+  }
+
+  // ---------- Bandeau « A refacturer » ----------
+  // Somme les montants des missions statut='facturable'. DS-1 : pas de somme d'heures
+  // (les heures vivent dans les seances/releve, non charges ici ; afficher 0 h serait
+  // trompeur tant que la table releve est vide). Observable cadre/a-cadrer : un montant
+  // adosse a une reference_commande = cadre (emissible) ; sans reference = a cadrer.
+  function renderRefac() {
+    const fact = missions.filter(m => m.statut === 'facturable');
+    if (!fact.length) {
+      $('peRefacBody').style.display = 'none';
+      $('peRefacVide').style.display = 'block';
+      return;
+    }
+    $('peRefacVide').style.display = 'none';
+    $('peRefacBody').style.display = 'block';
+
+    let total = 0, cadre = 0, aCadrer = 0;
+    const parBenef = new Map();
+    fact.forEach(m => {
+      const mt = Number(m.montant || 0);
+      total += mt;
+      const aRef = !!(m.reference_commande && String(m.reference_commande).trim());
+      if (aRef) cadre += mt; else aCadrer += mt;
+      const lbl = benefLabel(m.entite_id) || 'sans bénéficiaire';
+      parBenef.set(lbl, (parBenef.get(lbl) || 0) + mt);
+    });
+
+    $('peRefacTotal').textContent = fmtEur(total);
+    $('peRefacCount').textContent = fact.length + ' mission' + (fact.length > 1 ? 's' : '') + ' facturable' + (fact.length > 1 ? 's' : '');
+
+    // Ventilation par beneficiaire (triee montant decroissant).
+    const vent = Array.prototype.slice.call(parBenef.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(e => escapeHtml(e[0]) + ' : ' + fmtEur(e[1]) + ' €')
+      .join(' · ');
+    $('peRefacVent').textContent = vent;
+
+    // Observable cadre / a-cadrer.
+    const foot = $('peRefacCadre');
+    foot.innerHTML = '';
+    const okSpan = document.createElement('span');
+    okSpan.className = 'pe-cadre-ok';
+    okSpan.textContent = fmtEur(cadre) + ' € cadrés';
+    foot.appendChild(okSpan);
+    if (aCadrer > 0) {
+      const sep = document.createElement('span');
+      sep.textContent = '·'; sep.style.color = 'var(--ink-mute,#6b7a74)';
+      const noSpan = document.createElement('span');
+      noSpan.className = 'pe-cadre-no';
+      noSpan.textContent = fmtEur(aCadrer) + ' € à cadrer';
+      foot.appendChild(sep); foot.appendChild(noSpan);
+    }
+  }
+
+  // ---------- Bandeau « A traiter » ----------
+  // Compteur de signaux, tous lus sur missions (+ croisement entites pour l'obs. 3) :
+  //  - bilan manquant : bilan_text vide ;
+  //  - questionnaire non fait : questionnaire_fait=false ;
+  //  - facturable sans reference_commande ;
+  //  - beneficiaire facturable sans coordonnees (ni raison_sociale ni email_facturation,
+  //    ou entite_id absent) -> refacturation materiellement impossible.
+  function renderTraiter() {
+    let bilans = 0, quest = 0, sansRef = 0, sansCoord = 0;
+    missions.forEach(m => {
+      const bilanVide = !(m.bilan_text && String(m.bilan_text).trim());
+      if (bilanVide) bilans++;
+      if (m.questionnaire_fait === false) quest++;
+      if (m.statut === 'facturable') {
+        const aRef = !!(m.reference_commande && String(m.reference_commande).trim());
+        if (!aRef) sansRef++;
+        const e = m.entite_id ? entiteById.get(m.entite_id) : null;
+        const aCoord = !!(e && ((e.raison_sociale && e.raison_sociale.trim()) || (e.email_facturation && e.email_facturation.trim())));
+        if (!aCoord) sansCoord++;
+      }
+    });
+    const total = bilans + quest + sansRef + sansCoord;
+    $('peTraiterTotal').textContent = String(total);
+
+    const detail = $('peTraiterDetail');
+    detail.innerHTML = '';
+    if (total === 0) {
+      $('peTraiterVide').style.display = 'block';
+      return;
+    }
+    $('peTraiterVide').style.display = 'none';
+    function sig(n, txt, alert) {
+      if (!n) return;
+      const p = document.createElement('p');
+      p.className = 'pe-sig' + (alert ? ' alert' : '');
+      p.textContent = n + ' ' + txt;
+      detail.appendChild(p);
+    }
+    sig(bilans, bilans > 1 ? 'bilans manquants' : 'bilan manquant', false);
+    sig(quest, quest > 1 ? 'questionnaires non faits' : 'questionnaire non fait', false);
+    sig(sansRef, sansRef > 1 ? 'missions sans réf. commande' : 'mission sans réf. commande', true);
+    sig(sansCoord, sansCoord > 1 ? 'bénéficiaires sans coordonnées' : 'bénéficiaire sans coordonnées', true);
+  }
+
   // ---------- En-tete ----------
   function renderEntete() {
     const saison = (saisonActive && saisonActive.libelle) ? saisonActive.libelle : '—';
@@ -409,6 +551,9 @@
     await resoudreSalarie();
     renderEntete();
     await chargerAnnualisation();
+    await chargerMissionsEntites();
+    renderRefac();
+    renderTraiter();
   } catch (e) {
     flash('Chargement impossible : ' + errMsg(e), 'err');
   }
