@@ -157,6 +157,14 @@
   .pe-band-foot { border-top: 1px solid var(--paper-warm, #e3e0d8); margin-top: 8px; padding-top: 8px; font-size: 12px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .pe-cadre-ok { color: var(--vert-prairie, #1b6b4c); font-weight: 600; }
   .pe-cadre-no { color: #993c1d; font-weight: 600; }
+  .pe-emis-row { display: flex; justify-content: space-between; align-items: center; gap: 12px;
+                 padding: 7px 0; border-bottom: 1px solid var(--paper-warm, #e3e0d8); }
+  .pe-emis-row:last-child { border-bottom: none; }
+  .pe-emis-info { font-size: 13px; color: var(--ink, #0c3d24); }
+  .pe-emis-btn { border: 1px solid var(--paper-warm, #d9d2c4); border-radius: 8px; background: #fff;
+                 padding: 6px 12px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+                 color: var(--ink, #0c3d24); white-space: nowrap; }
+  .pe-emis-btn:hover { border-color: var(--gold, #d4a93a); }
   .pe-sig { font-size: 12.5px; color: var(--ink-mute, #6b7a74); margin: 4px 0 0; }
   .pe-sig.alert { color: var(--rouge-blesse, #c0392b); }
   .pe-filters { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 16px; }
@@ -286,6 +294,12 @@
         <div class="pe-band-foot" id="peRefacCadre"></div>
       </div>
       <div id="peRefacVide" class="pe-band-vide" style="display:none">Aucune mission facturable.</div>
+    </div>
+
+    <!-- Bloc EMISSION justificatif (B-facturation v1, greffe additive D6) -->
+    <div class="pe-band" id="peRefacEmission" style="display:none">
+      <p class="pe-band-lbl">Émettre un justificatif</p>
+      <div id="peEmissionListe"></div>
     </div>
 
     <!-- Bandeau 3 : A TRAITER (cable etape 2) -->
@@ -570,6 +584,165 @@
     }
   }
 
+  // ---------- Bloc « Émettre un justificatif » (B-facturation v1) ----------
+  // Greffe additive D6. Lit uniquement la memoire deja chargee (missions + entiteById) ;
+  // aucune ecriture, aucune RPC -> compatible poste lecture seule.
+  // Emissibilite (β) : un beneficiaire apparait s'il a >=1 mission facturable CADREE
+  // (reference_commande non vide). Le document ne reprendra QUE les lignes cadrees ;
+  // les facturables non cadrees sont exclues mais signalees.
+  function lignesCadrees(entiteId) {
+    return missions.filter(m =>
+      m.statut === 'facturable' &&
+      m.entite_id === entiteId &&
+      m.reference_commande && String(m.reference_commande).trim());
+  }
+  function nbACadrer(entiteId) {
+    return missions.filter(m =>
+      m.statut === 'facturable' &&
+      m.entite_id === entiteId &&
+      !(m.reference_commande && String(m.reference_commande).trim())).length;
+  }
+  function renderEmission() {
+    const box = $('peRefacEmission');
+    const liste = $('peEmissionListe');
+    liste.innerHTML = '';
+    // Beneficiaires emissibles : entite_id distinct ayant >=1 mission cadree.
+    const ids = [];
+    const vus = new Set();
+    missions.forEach(m => {
+      if (m.statut !== 'facturable') return;
+      if (!m.entite_id || vus.has(m.entite_id)) return;
+      if (lignesCadrees(m.entite_id).length) { vus.add(m.entite_id); ids.push(m.entite_id); }
+    });
+    if (!ids.length) { box.style.display = 'none'; return; }
+    box.style.display = 'block';
+    // Tri par montant cadre decroissant.
+    ids.sort((a, b) => {
+      const sa = lignesCadrees(a).reduce((s, m) => s + Number(m.montant || 0), 0);
+      const sb = lignesCadrees(b).reduce((s, m) => s + Number(m.montant || 0), 0);
+      return sb - sa;
+    });
+    ids.forEach(id => {
+      const lignes = lignesCadrees(id);
+      const total = lignes.reduce((s, m) => s + Number(m.montant || 0), 0);
+      const aCadrer = nbACadrer(id);
+      const row = document.createElement('div');
+      row.className = 'pe-emis-row';
+      const info = document.createElement('span');
+      info.className = 'pe-emis-info';
+      info.textContent = (benefLabel(id) || 'sans bénéficiaire')
+        + ' · ' + fmtEur(total) + ' € · '
+        + lignes.length + ' ligne' + (lignes.length > 1 ? 's' : '')
+        + (aCadrer > 0 ? ' · ' + aCadrer + ' à cadrer non incluse' + (aCadrer > 1 ? 's' : '') : '');
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'pe-emis-btn';
+      btn.textContent = '📄 Justificatif';
+      btn.addEventListener('click', () => { genererJustificatif(id); });
+      row.appendChild(info); row.appendChild(btn);
+      liste.appendChild(row);
+    });
+  }
+
+  // Genere le document imprimable (D1 = window.print, D2 = groupe par beneficiaire,
+  // D4 = net forfaitaire sans calcul TVA). Document autonome dans une fenetre dediee
+  // (pas de @media print injecte dans la page de pilotage).
+  async function genererJustificatif(entiteId) {
+    let em;
+    try {
+      const r = await fetch('data/emetteur-mom.json?nocache=' + Date.now());
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      em = await r.json();
+    } catch (e) {
+      flash("Émetteur introuvable (data/emetteur-mom.json) : " + (e.message || e), 'err');
+      return;
+    }
+    const e = entiteById.get(entiteId);
+    if (!e) { flash('Bénéficiaire introuvable.', 'err'); return; }
+    const lignes = lignesCadrees(entiteId);
+    if (!lignes.length) { flash('Aucune ligne cadrée à émettre.', 'err'); return; }
+    const total = lignes.reduce((s, m) => s + Number(m.montant || 0), 0);
+    const aCadrer = nbACadrer(entiteId);
+    const emt = (em && em.emetteur) || {};
+    const today = new Date();
+    const dateFR = ('0' + today.getDate()).slice(-2) + '/'
+      + ('0' + (today.getMonth() + 1)).slice(-2) + '/' + today.getFullYear();
+
+    // Helpers de rendu (n'affiche pas les lignes vides).
+    const L = (val) => (val && String(val).trim()) ? escapeHtml(val) : '';
+    const ligneSi = (val, prefix) => (val && String(val).trim())
+      ? ('<div>' + (prefix || '') + escapeHtml(val) + '</div>') : '';
+
+    const emetteurHtml =
+      '<div class="bloc"><div class="bloc-t">Émetteur</div>'
+      + '<div class="bloc-nom">' + L(emt.nom || 'MOM') + '</div>'
+      + ligneSi(emt.adresse)
+      + ((emt.code_postal || emt.ville)
+          ? '<div>' + L([emt.code_postal, emt.ville].filter(x => x && x.trim()).join(' ')) + '</div>' : '')
+      + ligneSi(emt.siret, 'SIRET : ')
+      + ligneSi(emt.numero_tva, 'N° TVA : ')
+      + ligneSi(emt.email)
+      + ligneSi(emt.telephone)
+      + '</div>';
+
+    const benefHtml =
+      '<div class="bloc"><div class="bloc-t">Bénéficiaire</div>'
+      + '<div class="bloc-nom">' + L(e.raison_sociale || e.libelle || benefLabel(entiteId) || '—') + '</div>'
+      + ligneSi(e.adresse_facturation)
+      + ligneSi(e.siret, 'SIRET : ')
+      + ligneSi(e.email_facturation)
+      + '</div>';
+
+    const lignesHtml = lignes.map(m =>
+      '<tr><td>' + escapeHtml(m.reference_commande) + '</td>'
+      + '<td>' + escapeHtml(m.libelle || m.code || '—') + '</td>'
+      + '<td>' + escapeHtml(fmtDateFR(m.date_debut)) + ' → ' + escapeHtml(fmtDateFR(m.date_fin)) + '</td>'
+      + '<td class="num">' + fmtEur(m.montant) + ' €</td></tr>'
+    ).join('');
+
+    const mentionTva = (em && em.mention_tva && em.mention_tva.trim())
+      ? '<p class="mention">' + escapeHtml(em.mention_tva) + '</p>' : '';
+    const mentionsPied = (em && em.mentions_pied && em.mentions_pied.trim())
+      ? '<p class="mention">' + escapeHtml(em.mentions_pied) + '</p>' : '';
+    const noteACadrer = (aCadrer > 0)
+      ? '<p class="mention warn">' + aCadrer + ' mission(s) facturable(s) à cadrer non incluse(s).</p>' : '';
+    const objet = (em && em.objet_defaut && em.objet_defaut.trim())
+      ? escapeHtml(em.objet_defaut) : 'Refacturation interventions scolaires';
+
+    const doc =
+      '<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8">'
+      + '<title>Justificatif ' + L(e.raison_sociale || e.libelle || '') + '</title><style>'
+      + 'body{font:14px/1.5 system-ui,Arial,sans-serif;color:#1a2b22;max-width:760px;margin:24px auto;padding:0 20px;}'
+      + 'h1{font-size:20px;margin:0 0 4px;color:#0c3d24;}'
+      + '.sub{color:#6b7a74;margin:0 0 24px;font-size:13px;}'
+      + '.blocs{display:flex;justify-content:space-between;gap:32px;margin-bottom:28px;}'
+      + '.bloc{font-size:13px;}.bloc-t{font-weight:700;color:#6b7a74;text-transform:uppercase;font-size:11px;letter-spacing:.04em;margin-bottom:6px;}'
+      + '.bloc-nom{font-weight:700;font-size:15px;margin-bottom:3px;}'
+      + 'table{width:100%;border-collapse:collapse;margin-bottom:18px;}'
+      + 'th{text-align:left;font-size:11px;text-transform:uppercase;color:#6b7a74;border-bottom:2px solid #0c3d24;padding:7px 8px;}'
+      + 'td{padding:8px;border-bottom:1px solid #e3e0d8;font-size:13px;}'
+      + '.num{text-align:right;white-space:nowrap;}'
+      + 'tfoot td{font-weight:700;font-size:15px;border-bottom:none;border-top:2px solid #0c3d24;}'
+      + '.mention{font-size:12px;color:#6b7a74;margin:4px 0;}.warn{color:#854f0b;}'
+      + '@media print{body{margin:0;}button{display:none;}}'
+      + '.pbtn{margin:24px 0;padding:9px 18px;border:1px solid #0c3d24;border-radius:8px;background:#fff;'
+      + 'font:inherit;font-weight:600;cursor:pointer;color:#0c3d24;}'
+      + '</style></head><body>'
+      + '<h1>Justificatif de refacturation</h1>'
+      + '<p class="sub">' + objet + ' · Émis le ' + dateFR + '</p>'
+      + '<div class="blocs">' + emetteurHtml + benefHtml + '</div>'
+      + '<table><thead><tr><th>Réf interne</th><th>Cycle</th><th>Période</th><th class="num">Montant</th></tr></thead>'
+      + '<tbody>' + lignesHtml + '</tbody>'
+      + '<tfoot><tr><td colspan="3">Total</td><td class="num">' + fmtEur(total) + ' €</td></tr></tfoot></table>'
+      + mentionTva + mentionsPied + noteACadrer
+      + '<button class="pbtn" onclick="window.print()">Imprimer / PDF</button>'
+      + '</body></html>';
+
+    const w = window.open('', '_blank');
+    if (!w) { flash('Fenêtre bloquée (popup). Autorisez les popups pour émettre.', 'err'); return; }
+    w.document.open(); w.document.write(doc); w.document.close();
+  }
+
   // ---------- Bandeau « A traiter » ----------
   // Compteur de signaux, tous lus sur missions (+ croisement entites pour l'obs. 3) :
   //  - bilan manquant : bilan_text vide ;
@@ -799,6 +972,7 @@
     await chargerAnnualisation();
     await chargerMissionsEntites();
     renderRefac();
+    renderEmission();
     renderTraiter();
     wireFiltres();
     renderListe();
