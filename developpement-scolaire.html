@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Développement scolaire · MOM Hub</title>
+<link rel="icon" type="image/png" href="assets/logo-m2m.png">
+<!--
+  MOM Hub · Développement scolaire — surface PILOTE (bureau) du module B « Prospection ».
+  Brique 3 (FAIT FOI conception module B, pt 129 ; production pt 130+).
+
+  ARCHITECTURE (calque gestion-salarie.html, patron vérifié à la source) :
+    - charge supabase.min.js (CDN) puis js/supabase-client.js (SupabaseHub).
+    - garde d'auth : getSession()->login.html ; rôle admin OU bureau -> sinon ./
+      (aligne la garde base _gs_peut_ecrire() = admin OU bureau).
+    - tous les appels passent par client.rpc(...).
+
+  RPC consommées (signatures lues à la source — DS-1) :
+    list_entites(p_inclure_inactives)            -- liste écoles, inclut inactives.
+    upsert_entite(16 params, UPDATE DUR no COALESCE) -- machine à états CRM via
+        p_statut_prospection (pos.10). VOIE SÛRE : on relit l'état courant de
+        l'école en mémoire (list_entites) et on renvoie LES 16 params, ne modifiant
+        que statut_prospection — sinon contact/siret/actif sont écrasés au DEFAULT.
+    inserer_prospection_contact(6 params)        -- journal de contacts (sql_131).
+    list_prospection_contacts(p_entite_id)       -- historique par école (sql_131).
+    upsert_mission(19 params — p_est_cadre droppé sql_129)  -- passerelle
+        « Programmer le cycle » : pré-remplit une mission avec p_entite_id câblé.
+    list_missions(p_saison_id, p_salarie_id, p_entite_id) -- avancement dérivé.
+    list_salaries()                              -- salarié v1 (pré-remplit la mission).
+
+  DÉCISIONS FIGÉES (FAIT FOI §7) reconduites, NON rouvrables ici :
+    - statut_prospection borne haute = 'client' (CHECK base : a_contacter|contacte|
+      interesse|client|inactif) ; avancement post-client DÉRIVÉ de missions.
+    - mail-type : data/mail-types.json (2 variables {nom_ecole}/{contact_nom}).
+    - compteur d'objectif = dérivé, jamais stocké.
+    - saisie d'historique portée par le BUREAU (cette page), jamais Lohann.
+-->
+<link rel="stylesheet" href="css/hub.css">
+<style>
+  body.auth-pending { visibility: hidden; }
+  .gs-wrap { max-width: 1040px; margin: 0 auto; padding: 24px 24px 48px; }
+  .gs-wrap h1 { font-size: 20px; margin: 0 0 4px; }
+  .gs-sub { color: var(--ink-mute, #6b7a74); margin: 0 0 20px; font-size: 13px; }
+
+  .gs-btn { padding: 9px 16px; border: 0; border-radius: 8px; font: inherit; font-weight: 600;
+            cursor: pointer; background: var(--vert-prairie, #2d7a3e); color: #fff; }
+  .gs-btn:disabled { opacity: .5; cursor: default; }
+  .gs-btn-sm { padding: 6px 12px; font-size: 13px; }
+  .gs-link { background: transparent; border: 0; font: inherit; cursor: pointer;
+             color: var(--ink-mute, #6b7a74); padding: 4px 8px; }
+  .gs-link.edit { color: var(--bleu-base, #1f4a82); }
+
+  .gs-msg { padding: 10px 14px; border-radius: 8px; font-size: 14px; margin-bottom: 14px; display: none; }
+  .gs-msg.ok { background: #e8f1ec; color: var(--vert-prairie, #1b6b4c); display: block; }
+  .gs-msg.err { background: #f7e6e2; color: var(--rouge-blesse, #c0392b); display: block; }
+
+  /* En-tête de page */
+  .ds-hd { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+
+  /* Bandeau objectif (compteur dérivé) */
+  .ds-objectif { background: #fff; border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 12px;
+                 padding: 16px 18px; margin-bottom: 20px; display: flex; gap: 26px; flex-wrap: wrap; align-items: center; }
+  .ds-obj-item { display: flex; flex-direction: column; gap: 2px; }
+  .ds-obj-num { font-size: 26px; font-weight: 700; color: var(--ink, #0c3d24); line-height: 1; }
+  .ds-obj-lbl { font-size: 12px; color: var(--ink-mute, #6b7a74); text-transform: uppercase; letter-spacing: .03em; }
+  .ds-obj-sep { width: 1px; align-self: stretch; background: var(--paper-warm, #e3e0d8); }
+
+  /* Toolbar */
+  .ds-toolbar { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; flex-wrap: wrap; }
+  .ds-toolbar .sp { flex: 1; }
+  .ds-filter { display: flex; gap: 6px; flex-wrap: wrap; }
+  .ds-chip { padding: 6px 12px; font-size: 13px; border-radius: 20px; cursor: pointer;
+             background: #fff; border: 1px solid var(--line, #cabe9f); color: var(--ink-mute, #6b7a74); }
+  .ds-chip.on { background: var(--vert-prairie, #2d7a3e); border-color: var(--vert-prairie, #2d7a3e); color: #fff; }
+
+  /* Cartes-écoles */
+  .ds-list { display: grid; gap: 12px; }
+  .ds-ecole { background: #fff; border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 12px; padding: 16px 18px; }
+  .ds-ecole.off { opacity: .62; }
+  .ds-ec-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .ds-ec-nom { font-size: 16px; font-weight: 700; color: var(--ink, #0c3d24); margin: 0 0 2px; }
+  .ds-ec-meta { font-size: 12.5px; color: var(--ink-mute, #6b7a74); }
+  .ds-ec-acts { display: flex; gap: 6px; flex: 0 0 auto; flex-wrap: wrap; }
+
+  /* Badges statut prospection (machine à états) */
+  .ds-state { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px;
+              font-size: 12px; font-weight: 600; }
+  .ds-state .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .ds-state.a_contacter { background: #f0ede6; color: #6b7a74; }
+  .ds-state.contacte    { background: #eaf1fa; color: #1f4a82; }
+  .ds-state.interesse   { background: #fdf3e0; color: #b07814; }
+  .ds-state.client      { background: #e8f1ec; color: #1b6b4c; }
+  .ds-state.inactif     { background: #f7e6e2; color: #9a5a4e; }
+  .ds-state.none        { background: #f0ede6; color: #8a948f; }
+
+  /* Avancement dérivé (post-client) */
+  .ds-derive { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600;
+               background: #eef6f1; color: var(--vert-prairie, #1b6b4c); border: 1px dashed #b9d8c6; }
+
+  /* Ligne d'actions de transition (machine à états, un tap) */
+  .ds-trans { margin-top: 12px; display: flex; gap: 7px; flex-wrap: wrap; align-items: center; }
+  .ds-trans-lbl { font-size: 12px; color: var(--ink-mute, #6b7a74); margin-right: 2px; }
+  .ds-tbtn { padding: 5px 11px; font-size: 12.5px; border-radius: 7px; cursor: pointer;
+             background: #fff; border: 1px solid var(--line, #cabe9f); color: var(--ink, #0c3d24); font: inherit; font-weight: 600; }
+  .ds-tbtn:hover { border-color: var(--vert-prairie, #2d7a3e); color: var(--vert-prairie, #2d7a3e); }
+  .ds-tbtn:disabled { opacity: .4; cursor: default; }
+  .ds-tbtn.go { background: var(--vert-prairie, #2d7a3e); border-color: var(--vert-prairie, #2d7a3e); color: #fff; }
+
+  .ds-icbtn { width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;
+              border-radius: 8px; background: transparent; border: 1px solid var(--line, #cabe9f);
+              color: var(--ink-mute, #6b7a74); cursor: pointer; }
+  .ds-icbtn:hover { border-color: var(--vert-prairie, #2d7a3e); color: var(--vert-prairie, #2d7a3e); }
+  .ds-icbtn svg { width: 15px; height: 15px; }
+
+  .gs-empty { color: var(--ink-mute, #6b7a74); padding: 28px 12px; text-align: center; font-size: 14px;
+              background: #fff; border: 1px dashed var(--paper-warm, #d9d2c4); border-radius: 12px; }
+
+  /* Modale (calque gestion-salarie) */
+  .gs-overlay { position: fixed; inset: 0; background: rgba(12,61,36,0.45);
+                display: none; align-items: flex-start; justify-content: center;
+                padding: 40px 16px; overflow-y: auto; z-index: 1000; }
+  .gs-overlay.open { display: flex; }
+  .gs-modal { background: #fff; border-radius: 12px; width: 100%; max-width: 580px;
+              padding: 20px 22px; box-shadow: 0 12px 40px rgba(12,61,36,0.25); }
+  .gs-modal.wide { max-width: 640px; }
+  .gs-modal h2 { font-size: 17px; margin: 0 0 4px; }
+  .gs-modal-head { display: flex; align-items: center; justify-content: space-between; }
+  .gs-x { background: transparent; border: 0; font-size: 20px; line-height: 1; cursor: pointer;
+          color: var(--ink-mute, #6b7a74); padding: 2px 6px; }
+  .gs-field { margin-bottom: 12px; }
+  .gs-field label { display: block; font-size: 12px; color: var(--ink-mute, #6b7a74); margin-bottom: 4px; }
+  .gs-field input, .gs-field select, .gs-field textarea {
+    width: 100%; padding: 9px 11px; border: 1px solid var(--paper-warm, #d9d2c4);
+    border-radius: 8px; font: inherit; background: #fff; color: var(--ink, #222); box-sizing: border-box; }
+  .gs-field textarea { resize: vertical; min-height: 60px; }
+  .gs-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 580px) { .gs-grid2 { grid-template-columns: 1fr; } }
+  .gs-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+  .gs-cancel { background: #fff; border: 1px solid var(--line, #cabe9f); border-radius: 8px;
+               padding: 9px 16px; font: inherit; font-weight: 600; cursor: pointer; color: var(--ink, #0c3d24); }
+  .gs-modal-note { font-size: 12px; color: var(--ink-mute, #6b7a74); margin: 0 0 14px; }
+
+  /* Journal de contacts (dans la modale fiche) */
+  .ds-journal { border-top: 1px solid var(--paper-warm, #e3e0d8); margin-top: 16px; padding-top: 14px; }
+  .ds-journal h3 { font-size: 13px; margin: 0 0 10px; text-transform: uppercase; letter-spacing: .03em; color: var(--ink-mute, #6b7a74); }
+  .ds-jrow { font-size: 13px; padding: 9px 0; border-bottom: 1px solid var(--paper-warm, #efe9dd); }
+  .ds-jrow:last-child { border-bottom: 0; }
+  .ds-jmeta { font-size: 12px; color: var(--ink-mute, #6b7a74); display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 2px; }
+  .ds-jcanal { font-weight: 600; }
+  .ds-jrelance { color: #b07814; font-weight: 600; }
+  .ds-jempty { font-size: 13px; color: var(--ink-mute, #6b7a74); padding: 6px 0 2px; }
+</style>
+</head>
+<body class="auth-pending">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo"><img src="assets/logo-m2m.png" alt="MOM Rugby"></div>
+      <div class="brand-text">
+        <h1>MOM Hub</h1>
+        <p>Mutzig Ovalie Molsheim</p>
+      </div>
+    </div>
+
+    <div class="season-pill" id="season-pill">SAISON 2025 / 2026</div>
+
+    <nav class="main-nav">
+      <a href="dashboard.html">Tableau de bord</a>
+      <a href="evenements.html">Évènements</a>
+      <a href="u-admin.html">Collectif (admin)</a>
+      <a href="compositions.html">Compositions</a>
+    </nav>
+
+    <div class="icon-row">
+      <button class="icon-btn" title="Recherche" aria-label="Recherche">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      </button>
+    </div>
+
+    <div class="user-profile">
+      <div class="avatar">EJ</div>
+      <div class="user-info">
+        <div class="user-name">Emmanuel Jung</div>
+        <div class="user-role">Administrateur</div>
+      </div>
+      <a href="./" class="user-action" title="Retour au portail" aria-label="Retour au portail">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/></svg>
+      </a>
+      <button type="button" class="user-action" id="btn-signout" title="Se déconnecter" aria-label="Se déconnecter">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="hub-back-row">
+    <a class="hub-back-btn" href="dashboard.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 18l-6-6 6-6"/></svg>
+      Retour au tableau de bord
+    </a>
+  </div>
+
+<div class="gs-wrap">
+
+  <div class="ds-hd">
+    <div>
+      <h1>Développement scolaire</h1>
+      <p class="gs-sub" id="dsSub" style="margin:4px 0 0;">Chargement…</p>
+    </div>
+    <button class="gs-btn gs-btn-sm" id="dsNewEcole" type="button">+ Ajouter une école</button>
+  </div>
+
+  <div id="gsMsg" class="gs-msg"></div>
+
+  <!-- Compteur d'objectif (dérivé, jamais stocké — FAIT FOI §3.6) -->
+  <div class="ds-objectif" id="dsObjectif" style="display:none">
+    <div class="ds-obj-item">
+      <span class="ds-obj-num" id="dsObjClients">—</span>
+      <span class="ds-obj-lbl">Écoles clientes</span>
+    </div>
+    <div class="ds-obj-sep"></div>
+    <div class="ds-obj-item">
+      <span class="ds-obj-num" id="dsObjCycles">—</span>
+      <span class="ds-obj-lbl">Cycles programmés</span>
+    </div>
+    <div class="ds-obj-sep"></div>
+    <div class="ds-obj-item">
+      <span class="ds-obj-num" id="dsObjEnCours">—</span>
+      <span class="ds-obj-lbl">En démarchage</span>
+    </div>
+  </div>
+
+  <div class="ds-toolbar">
+    <div class="ds-filter" id="dsFilters">
+      <button type="button" class="ds-chip on" data-filter="toutes">Toutes</button>
+      <button type="button" class="ds-chip" data-filter="a_traiter">À traiter</button>
+      <button type="button" class="ds-chip" data-filter="client">Clientes</button>
+      <button type="button" class="ds-chip" data-filter="inactif">En sommeil</button>
+    </div>
+    <span class="sp"></span>
+  </div>
+
+  <div class="ds-list" id="dsListe"></div>
+  <div class="gs-empty" id="dsListeVide" style="display:none">
+    Aucune école pour l'instant. Ajoutez une première école pour lancer le démarchage.
+  </div>
+
+</div>
+
+<!-- ============ Modale FICHE école (édition CRM + journal) ============ -->
+<div class="gs-overlay" id="dsEcoleOverlay">
+  <div class="gs-modal wide">
+    <div class="gs-modal-head">
+      <h2 id="dsEcoleTitre">Nouvelle école</h2>
+      <button class="gs-x" id="dsEcoleClose" type="button" aria-label="Fermer">×</button>
+    </div>
+    <p class="gs-modal-note">Les coordonnées et le statut de démarchage sont gérés ici par le bureau.</p>
+
+    <div class="gs-field">
+      <label for="dsEcoleNom">Nom de l'école *</label>
+      <input type="text" id="dsEcoleNom" placeholder="École élémentaire des Tilleuls">
+    </div>
+
+    <div class="gs-grid2">
+      <div class="gs-field">
+        <label for="dsEcoleType">Type</label>
+        <select id="dsEcoleType">
+          <option value="ecole_elementaire">École élémentaire</option>
+          <option value="college">Collège</option>
+          <option value="lycee">Lycée</option>
+          <option value="mjc">MJC</option>
+          <option value="club">Club</option>
+          <option value="autre">Autre</option>
+        </select>
+      </div>
+      <div class="gs-field">
+        <label for="dsEcoleStatut">Statut de démarchage</label>
+        <select id="dsEcoleStatut">
+          <option value="a_contacter">À contacter</option>
+          <option value="contacte">Contactée</option>
+          <option value="interesse">Intéressée</option>
+          <option value="client">Cliente</option>
+          <option value="inactif">En sommeil</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="gs-grid2">
+      <div class="gs-field">
+        <label for="dsEcoleContactNom">Contact (nom)</label>
+        <input type="text" id="dsEcoleContactNom" placeholder="Mme la Directrice">
+      </div>
+      <div class="gs-field">
+        <label for="dsEcoleContactEmail">Contact (email)</label>
+        <input type="email" id="dsEcoleContactEmail" placeholder="ecole@…">
+      </div>
+    </div>
+
+    <!-- Journal de contacts (visible en édition uniquement) -->
+    <div class="ds-journal" id="dsJournalWrap" style="display:none">
+      <h3>Journal de démarchage</h3>
+      <div id="dsJournalListe"></div>
+      <div style="margin-top:12px;">
+        <button class="gs-btn gs-btn-sm" id="dsAddContact" type="button">+ Noter un contact</button>
+      </div>
+    </div>
+
+    <div class="gs-modal-actions">
+      <button class="gs-cancel" id="dsEcoleCancel" type="button">Annuler</button>
+      <button class="gs-btn" id="dsEcoleSave" type="button">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ Modale NOTER UN CONTACT (journal) ============ -->
+<div class="gs-overlay" id="dsContactOverlay">
+  <div class="gs-modal">
+    <div class="gs-modal-head">
+      <h2>Noter un contact</h2>
+      <button class="gs-x" id="dsContactClose" type="button" aria-label="Fermer">×</button>
+    </div>
+    <div class="gs-grid2">
+      <div class="gs-field">
+        <label for="dsContactDate">Date</label>
+        <input type="date" id="dsContactDate">
+      </div>
+      <div class="gs-field">
+        <label for="dsContactCanal">Canal</label>
+        <select id="dsContactCanal">
+          <option value="">—</option>
+          <option value="mail">Mail</option>
+          <option value="telephone">Téléphone</option>
+          <option value="visite">Visite</option>
+          <option value="autre">Autre</option>
+        </select>
+      </div>
+    </div>
+    <div class="gs-field">
+      <label for="dsContactResume">Ce qui s'est dit</label>
+      <textarea id="dsContactResume" placeholder="Résumé de l'échange…"></textarea>
+    </div>
+    <div class="gs-field">
+      <label for="dsContactSuite">Prochaine étape</label>
+      <input type="text" id="dsContactSuite" placeholder="Relancer après les vacances…">
+    </div>
+    <div class="gs-field">
+      <label for="dsContactRelance">Date de relance prévue</label>
+      <input type="date" id="dsContactRelance">
+    </div>
+    <div class="gs-modal-actions">
+      <button class="gs-cancel" id="dsContactCancel" type="button">Annuler</button>
+      <button class="gs-btn" id="dsContactSave" type="button">Enregistrer le contact</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ Modale PROGRAMMER LE CYCLE (passerelle vers mission) ============ -->
+<div class="gs-overlay" id="dsCycleOverlay">
+  <div class="gs-modal">
+    <div class="gs-modal-head">
+      <h2>Programmer le cycle</h2>
+      <button class="gs-x" id="dsCycleClose" type="button" aria-label="Fermer">×</button>
+    </div>
+    <p class="gs-modal-note" id="dsCycleNote">Crée une mission de cycle scolaire rattachée à cette école.</p>
+    <div class="gs-field">
+      <label for="dsCycleLibelle">Intitulé du cycle *</label>
+      <input type="text" id="dsCycleLibelle" placeholder="Cycle rugby — École des Tilleuls">
+    </div>
+    <div class="gs-grid2">
+      <div class="gs-field">
+        <label for="dsCycleDebut">Début *</label>
+        <input type="date" id="dsCycleDebut">
+      </div>
+      <div class="gs-field">
+        <label for="dsCycleFin">Fin (optionnel)</label>
+        <input type="date" id="dsCycleFin">
+      </div>
+    </div>
+    <div class="gs-modal-actions">
+      <button class="gs-cancel" id="dsCycleCancel" type="button">Annuler</button>
+      <button class="gs-btn" id="dsCycleSave" type="button">Créer la mission</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/supabase-client.js"></script>
+<script>
+
+(async function () {
+  'use strict';
+
+  // --- Garde d'auth : admin OU bureau (aligne la garde base _gs_peut_ecrire) ---
+  const session = await SupabaseHub.getSession();
+  if (!session) { window.location.replace('login.html'); return; }
+  const roles = await SupabaseHub.getMyRoles();
+  if (roles.indexOf('admin') === -1 && roles.indexOf('bureau') === -1) {
+    window.location.replace('./'); return;
+  }
+  document.body.classList.remove('auth-pending');
+  document.body.classList.add('auth-resolved');
+
+  var _signout = document.getElementById('btn-signout');
+  if (_signout) {
+    _signout.addEventListener('click', async function () {
+      _signout.disabled = true;
+      await SupabaseHub.signOut();
+    });
+  }
+
+  let saisonActive = null;
+  try {
+    saisonActive = await SupabaseHub.getSaisonActive();
+    if (saisonActive && saisonActive.libelle) {
+      const _pill = document.getElementById('season-pill');
+      if (_pill) _pill.textContent = 'SAISON ' + saisonActive.libelle;
+    }
+  } catch (_) { /* libellé statique conservé */ }
+
+  const client = SupabaseHub.client;
+  const $ = (id) => document.getElementById(id);
+
+  // ---------- Helpers (repris du patron gestion-salarie) ----------
+  function flash(text, kind) {
+    const m = $('gsMsg');
+    m.textContent = text; m.className = 'gs-msg ' + kind;
+    if (kind === 'ok') setTimeout(() => { m.className = 'gs-msg'; }, 3500);
+    if (kind === 'err') { window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  }
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+      ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  }
+  function errMsg(e) {
+    const m = (e && (e.message || e.error_description || e.hint)) || 'Erreur inconnue.';
+    return /admin|bureau|réserv/i.test(m) ? "Action réservée à l'administration (admin ou bureau)." : m;
+  }
+  async function rpc(name, params) {
+    const { data, error } = await client.rpc(name, params || {});
+    if (error) throw error;
+    return data;
+  }
+  // Dérivation de code entité (calque deriveCode du module salarié : slug majuscule
+  // + suffixe base36 pour unicité, upsert_entite impose un code non vide).
+  function deriveCode(libelle) {
+    const slug = String(libelle || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 18) || 'ECOLE';
+    const suf = Date.now().toString(36).slice(-4).toUpperCase();
+    return slug + '-' + suf;
+  }
+
+  // ---------- Libellés CRM (côté humain, pas côté système) ----------
+  const STATUTS = ['a_contacter', 'contacte', 'interesse', 'client', 'inactif'];
+  const STATUT_LBL = {
+    a_contacter: 'À contacter', contacte: 'Contactée', interesse: 'Intéressée',
+    client: 'Cliente', inactif: 'En sommeil'
+  };
+  const CANAL_LBL = { mail: 'Mail', telephone: 'Téléphone', visite: 'Visite', autre: 'Autre' };
+  // Transitions proposées « d'un tap » selon l'état courant (flux FAIT FOI §3.2).
+  const NEXT = {
+    a_contacter: [['contacte', 'Marquer contactée']],
+    contacte:    [['interesse', 'Marquer intéressée'], ['inactif', 'Mettre en sommeil']],
+    interesse:   [['client', 'Devenue cliente'], ['inactif', 'Mettre en sommeil']],
+    client:      [],
+    inactif:     [['a_contacter', 'Relancer le démarchage']]
+  };
+
+  // ---------- État ----------
+  let ecoles = [];               // list_entites(true), filtré écoles côté front
+  const ecoleById = new Map();
+  let missions = [];             // list_missions saison courante (avancement dérivé)
+  let missionsParEntite = new Map(); // entite_id -> [missions]
+  let salarieId = null;          // salarié v1 (pré-remplit la mission de cycle)
+  let filtreCourant = 'toutes';
+  let ficheId = null;            // école en cours d'édition (null = création)
+  let cycleEcoleId = null;       // école pour laquelle on programme un cycle
+
+  // Types considérés « écoles » pour le démarchage (cible v1 + extensions naturelles).
+  const TYPES_SCOLAIRES = new Set(['ecole_elementaire', 'college', 'lycee']);
+
+  // ---------- Avancement dérivé d'une école cliente (FAIT FOI §3.2) ----------
+  // Jamais stocké : calculé à la volée depuis les missions rattachées par entite_id.
+  function avancementDerive(entiteId) {
+    const ms = missionsParEntite.get(entiteId) || [];
+    if (!ms.length) return { code: 'a_programmer', label: 'Cycle à programmer' };
+    if (ms.some(m => m.etat === 'terminee')) return { code: 'realise', label: 'Cycle réalisé' };
+    if (ms.some(m => m.etat === 'prevue'))   return { code: 'programme', label: 'Cycle programmé' };
+    return { code: 'a_programmer', label: 'Cycle à programmer' };
+  }
+
+  // ---------- Chargement ----------
+  async function chargerTout() {
+    // Salarié v1 (pré-remplissage mission ; tolérant si aucun).
+    try {
+      const staff = (await rpc('list_salaries')) || [];
+      salarieId = staff.length ? (staff[0].personne_id || null) : null;
+    } catch (_) { salarieId = null; }
+
+    // Écoles : list_entites(true) inclut inactives (évite l'orphelin).
+    const all = (await rpc('list_entites', { p_inclure_inactives: true })) || [];
+    ecoles = all.filter(e => TYPES_SCOLAIRES.has(e.type_entite));
+    ecoleById.clear();
+    ecoles.forEach(e => ecoleById.set(e.id, e));
+
+    // Missions de la saison (avancement dérivé). Pas de filtre salarié : un cycle
+    // peut être porté par n'importe qui ; on agrège par entite_id.
+    missions = [];
+    if (saisonActive && saisonActive.id) {
+      missions = (await rpc('list_missions', {
+        p_saison_id: saisonActive.id, p_salarie_id: null, p_entite_id: null
+      })) || [];
+    }
+    missionsParEntite = new Map();
+    missions.forEach(m => {
+      if (!m.entite_id) return;
+      if (!missionsParEntite.has(m.entite_id)) missionsParEntite.set(m.entite_id, []);
+      missionsParEntite.get(m.entite_id).push(m);
+    });
+
+    renderObjectif();
+    renderListe();
+    const n = ecoles.length;
+    $('dsSub').textContent = n === 0
+      ? 'Aucune école enregistrée — commencez par en ajouter une.'
+      : (n + (n > 1 ? ' écoles suivies' : ' école suivie'));
+  }
+
+  // ---------- Compteur d'objectif (dérivé) ----------
+  function renderObjectif() {
+    if (!ecoles.length) { $('dsObjectif').style.display = 'none'; return; }
+    $('dsObjectif').style.display = 'flex';
+    const clientes = ecoles.filter(e => e.statut_prospection === 'client');
+    let cycles = 0;
+    clientes.forEach(e => {
+      const av = avancementDerive(e.id);
+      if (av.code === 'programme' || av.code === 'realise') cycles++;
+    });
+    const enCours = ecoles.filter(e =>
+      ['a_contacter', 'contacte', 'interesse'].indexOf(e.statut_prospection) !== -1
+      || e.statut_prospection == null).length;
+    $('dsObjClients').textContent = clientes.length;
+    $('dsObjCycles').textContent = cycles;
+    $('dsObjEnCours').textContent = enCours;
+  }
+
+  // ---------- Liste des écoles ----------
+  function passeFiltre(e) {
+    const s = e.statut_prospection;
+    if (filtreCourant === 'toutes') return true;
+    if (filtreCourant === 'client') return s === 'client';
+    if (filtreCourant === 'inactif') return s === 'inactif';
+    if (filtreCourant === 'a_traiter') return s == null || ['a_contacter', 'contacte', 'interesse'].indexOf(s) !== -1;
+    return true;
+  }
+
+  function stateBadge(s) {
+    if (s == null) return '<span class="ds-state none"><span class="dot"></span>Non démarchée</span>';
+    const cls = STATUTS.indexOf(s) !== -1 ? s : 'none';
+    const lbl = STATUT_LBL[s] || s;
+    return '<span class="ds-state ' + cls + '"><span class="dot"></span>' + escapeHtml(lbl) + '</span>';
+  }
+
+  function renderListe() {
+    const wrap = $('dsListe');
+    const visibles = ecoles.filter(passeFiltre);
+    if (!ecoles.length) {
+      wrap.innerHTML = '';
+      $('dsListeVide').style.display = 'block';
+      return;
+    }
+    $('dsListeVide').style.display = 'none';
+    if (!visibles.length) {
+      wrap.innerHTML = '<div class="gs-empty">Aucune école pour ce filtre.</div>';
+      return;
+    }
+    wrap.innerHTML = visibles.map(e => {
+      const off = e.actif === false;
+      const contact = [e.contact_nom, e.contact_email].filter(Boolean).join(' · ');
+      const meta = [STATUT_LBL[e.type_entite] || e.type_entite, contact].filter(Boolean).join(' — ');
+      // Badge d'avancement dérivé uniquement pour les clientes.
+      let derive = '';
+      if (e.statut_prospection === 'client') {
+        const av = avancementDerive(e.id);
+        derive = ' <span class="ds-derive">' + escapeHtml(av.label) + '</span>';
+      }
+      // Boutons de transition d'état.
+      const trans = (NEXT[e.statut_prospection || 'a_contacter'] || []).map(([to, lbl]) =>
+        '<button type="button" class="ds-tbtn" data-trans="' + e.id + '" data-to="' + to + '">'
+        + escapeHtml(lbl) + '</button>').join('');
+      // Bouton « Programmer le cycle » exclusif aux clientes sans cycle déjà programmé/réalisé.
+      let cycleBtn = '';
+      if (e.statut_prospection === 'client') {
+        const av = avancementDerive(e.id);
+        if (av.code === 'a_programmer') {
+          cycleBtn = '<button type="button" class="ds-tbtn go" data-cycle="' + e.id + '">Programmer le cycle</button>';
+        }
+      }
+      // Bouton mail-type pour les écoles élémentaires démarchables.
+      let mailBtn = '';
+      if (e.type_entite === 'ecole_elementaire' && e.statut_prospection !== 'client' && e.statut_prospection !== 'inactif') {
+        mailBtn = '<button type="button" class="ds-icbtn" data-mail="' + e.id + '" title="Préparer le mail-type">'
+          + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></button>';
+      }
+      const transLine = (trans || cycleBtn)
+        ? '<div class="ds-trans"><span class="ds-trans-lbl">Faire avancer :</span>' + trans + cycleBtn + '</div>'
+        : '';
+      return ''
+        + '<div class="ds-ecole' + (off ? ' off' : '') + '">'
+        +   '<div class="ds-ec-top">'
+        +     '<div>'
+        +       '<p class="ds-ec-nom">' + escapeHtml(e.libelle) + '</p>'
+        +       '<p class="ds-ec-meta">' + escapeHtml(meta) + '</p>'
+        +     '</div>'
+        +     '<div class="ds-ec-acts">'
+        +       stateBadge(e.statut_prospection) + derive
+        +       mailBtn
+        +       '<button type="button" class="ds-icbtn" data-edit="' + e.id + '" title="Ouvrir la fiche">'
+        +         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>'
+        +     '</div>'
+        +   '</div>'
+        +   transLine
+        + '</div>';
+    }).join('');
+  }
+
+  // ---------- VOIE SÛRE : transition d'état sans perte de données ----------
+  // upsert_entite fait un UPDATE DUR (no COALESCE, sonde S-UEB). On relit l'état
+  // courant de l'école en mémoire et on renvoie LES 16 params, ne changeant que
+  // statut_prospection — sinon contact/siret/actif seraient écrasés au DEFAULT.
+  function paramsEntite(e, overrides) {
+    const base = {
+      p_id: e.id,
+      p_code: e.code,
+      p_libelle: e.libelle,
+      p_type_entite: e.type_entite,
+      p_libelle_court: e.libelle_court != null ? e.libelle_court : null,
+      p_site_id: e.site_id != null ? e.site_id : null,
+      p_refacturable_defaut: e.refacturable_defaut === true,
+      p_contact_nom: e.contact_nom != null ? e.contact_nom : null,
+      p_contact_email: e.contact_email != null ? e.contact_email : null,
+      p_statut_prospection: e.statut_prospection != null ? e.statut_prospection : null,
+      p_actif: e.actif !== false,
+      p_notes: e.notes != null ? e.notes : null,
+      p_adresse_facturation: e.adresse_facturation != null ? e.adresse_facturation : null,
+      p_raison_sociale: e.raison_sociale != null ? e.raison_sociale : null,
+      p_email_facturation: e.email_facturation != null ? e.email_facturation : null,
+      p_siret: e.siret != null ? e.siret : null
+    };
+    return Object.assign(base, overrides || {});
+  }
+
+  async function transition(entiteId, to) {
+    const e = ecoleById.get(entiteId);
+    if (!e) return;
+    try {
+      await rpc('upsert_entite', paramsEntite(e, { p_statut_prospection: to }));
+      flash('Statut mis à jour : ' + (STATUT_LBL[to] || to) + '.', 'ok');
+      await chargerTout();
+    } catch (err) {
+      flash('Mise à jour impossible : ' + errMsg(err), 'err');
+    }
+  }
+
+  // ---------- Modale FICHE école ----------
+  function openEcole(id) {
+    ficheId = id || null;
+    const e = id ? ecoleById.get(id) : null;
+    $('dsEcoleTitre').textContent = e ? e.libelle : 'Nouvelle école';
+    $('dsEcoleNom').value = e ? (e.libelle || '') : '';
+    $('dsEcoleType').value = e ? (e.type_entite || 'ecole_elementaire') : 'ecole_elementaire';
+    $('dsEcoleStatut').value = e ? (e.statut_prospection || 'a_contacter') : 'a_contacter';
+    $('dsEcoleContactNom').value = e ? (e.contact_nom || '') : '';
+    $('dsEcoleContactEmail').value = e ? (e.contact_email || '') : '';
+    // Journal : visible seulement en édition (une école doit exister).
+    if (e) { $('dsJournalWrap').style.display = 'block'; chargerJournal(e.id); }
+    else   { $('dsJournalWrap').style.display = 'none'; $('dsJournalListe').innerHTML = ''; }
+    $('dsEcoleOverlay').classList.add('open');
+  }
+  function closeEcole() { $('dsEcoleOverlay').classList.remove('open'); ficheId = null; }
+
+  async function saveEcole() {
+    const nom = $('dsEcoleNom').value.trim();
+    if (!nom) { flash("Le nom de l'école est obligatoire.", 'err'); return; }
+    $('dsEcoleSave').disabled = true;
+    try {
+      let params;
+      if (ficheId) {
+        // Édition : repartir de l'état courant (voie sûre), surcharger les champs du formulaire.
+        const e = ecoleById.get(ficheId);
+        params = paramsEntite(e, {
+          p_libelle: nom,
+          p_type_entite: $('dsEcoleType').value,
+          p_statut_prospection: $('dsEcoleStatut').value,
+          p_contact_nom: $('dsEcoleContactNom').value.trim() || null,
+          p_contact_email: $('dsEcoleContactEmail').value.trim() || null
+        });
+      } else {
+        // Création : les 16 params, defaults neutres pour les champs non saisis.
+        params = {
+          p_id: null,
+          p_code: deriveCode(nom),
+          p_libelle: nom,
+          p_type_entite: $('dsEcoleType').value,
+          p_libelle_court: null,
+          p_site_id: null,
+          p_refacturable_defaut: false,
+          p_contact_nom: $('dsEcoleContactNom').value.trim() || null,
+          p_contact_email: $('dsEcoleContactEmail').value.trim() || null,
+          p_statut_prospection: $('dsEcoleStatut').value,
+          p_actif: true,
+          p_notes: null,
+          p_adresse_facturation: null,
+          p_raison_sociale: null,
+          p_email_facturation: null,
+          p_siret: null
+        };
+      }
+      await rpc('upsert_entite', params);
+      flash(ficheId ? 'École mise à jour.' : 'École ajoutée.', 'ok');
+      closeEcole();
+      await chargerTout();
+    } catch (err) {
+      flash('Enregistrement impossible : ' + errMsg(err), 'err');
+    } finally {
+      $('dsEcoleSave').disabled = false;
+    }
+  }
+
+  // ---------- Journal de contacts ----------
+  async function chargerJournal(entiteId) {
+    const box = $('dsJournalListe');
+    box.innerHTML = '<div class="ds-jempty">Chargement…</div>';
+    try {
+      const rows = (await rpc('list_prospection_contacts', { p_entite_id: entiteId })) || [];
+      if (!rows.length) {
+        box.innerHTML = '<div class="ds-jempty">Aucun contact noté pour l\'instant.</div>';
+        return;
+      }
+      box.innerHTML = rows.map(c => {
+        const meta = [];
+        if (c.date_contact) meta.push('<span>' + escapeHtml(c.date_contact) + '</span>');
+        if (c.canal) meta.push('<span class="ds-jcanal">' + escapeHtml(CANAL_LBL[c.canal] || c.canal) + '</span>');
+        if (c.date_relance) meta.push('<span class="ds-jrelance">relance ' + escapeHtml(c.date_relance) + '</span>');
+        const corps = [c.resume, c.suite].filter(Boolean).map(escapeHtml).join(' — ');
+        return '<div class="ds-jrow"><div class="ds-jmeta">' + meta.join('') + '</div>'
+          + (corps ? '<div>' + corps + '</div>' : '') + '</div>';
+      }).join('');
+    } catch (err) {
+      box.innerHTML = '<div class="ds-jempty">Lecture impossible : ' + escapeHtml(errMsg(err)) + '</div>';
+    }
+  }
+
+  function openContact() {
+    if (!ficheId) return;
+    $('dsContactDate').value = new Date().toISOString().slice(0, 10);
+    $('dsContactCanal').value = '';
+    $('dsContactResume').value = '';
+    $('dsContactSuite').value = '';
+    $('dsContactRelance').value = '';
+    $('dsContactOverlay').classList.add('open');
+  }
+  function closeContact() { $('dsContactOverlay').classList.remove('open'); }
+
+  async function saveContact() {
+    if (!ficheId) return;
+    $('dsContactSave').disabled = true;
+    try {
+      await rpc('inserer_prospection_contact', {
+        p_entite_id: ficheId,
+        p_date_contact: $('dsContactDate').value || null,
+        p_canal: $('dsContactCanal').value || null,
+        p_resume: $('dsContactResume').value.trim() || null,
+        p_suite: $('dsContactSuite').value.trim() || null,
+        p_date_relance: $('dsContactRelance').value || null
+      });
+      flash('Contact noté.', 'ok');
+      closeContact();
+      await chargerJournal(ficheId);
+    } catch (err) {
+      flash('Enregistrement impossible : ' + errMsg(err), 'err');
+    } finally {
+      $('dsContactSave').disabled = false;
+    }
+  }
+
+  // ---------- Passerelle « Programmer le cycle » (naissance mission côté A) ----------
+  function openCycle(entiteId) {
+    cycleEcoleId = entiteId;
+    const e = ecoleById.get(entiteId);
+    $('dsCycleLibelle').value = e ? ('Cycle rugby — ' + e.libelle) : '';
+    $('dsCycleDebut').value = new Date().toISOString().slice(0, 10);
+    $('dsCycleFin').value = '';
+    $('dsCycleNote').textContent = e
+      ? ('Crée une mission de cycle scolaire rattachée à « ' + e.libelle + ' ».')
+      : 'Crée une mission de cycle scolaire rattachée à cette école.';
+    $('dsCycleOverlay').classList.add('open');
+  }
+  function closeCycle() { $('dsCycleOverlay').classList.remove('open'); cycleEcoleId = null; }
+
+  async function saveCycle() {
+    if (!cycleEcoleId) return;
+    const libelle = $('dsCycleLibelle').value.trim();
+    const debut = $('dsCycleDebut').value;
+    if (!libelle) { flash("L'intitulé du cycle est obligatoire.", 'err'); return; }
+    if (!debut) { flash('La date de début est obligatoire.', 'err'); return; }
+    if (!saisonActive || !saisonActive.id) { flash('Aucune saison active : impossible de créer la mission.', 'err'); return; }
+    $('dsCycleSave').disabled = true;
+    try {
+      // upsert_mission = 19 params (p_est_cadre droppé sql_129). entite_id câblé sur l'école.
+      // Valeurs neutres en création (calque saveMission de suivi-salarie.html).
+      await rpc('upsert_mission', {
+        p_id: null,
+        p_code: deriveCode(libelle),
+        p_libelle: libelle,
+        p_type_mission: 'intervention_scolaire',
+        p_salarie_id: salarieId,
+        p_entite_id: cycleEcoleId,
+        p_saison_id: saisonActive.id,
+        p_date_debut: debut,
+        p_date_fin: $('dsCycleFin').value || null,
+        p_lieu_id: null,
+        p_lieu_libre: null,
+        p_recurrence: null,
+        p_etat: 'prevue',
+        p_bilan_text: null,
+        p_questionnaire_fait: false,
+        p_notes: null,
+        p_reference_commande: null,
+        p_montant: null,
+        p_statut: 'facturable'
+      });
+      flash('Cycle programmé : la mission est créée.', 'ok');
+      closeCycle();
+      await chargerTout();
+    } catch (err) {
+      flash('Création impossible : ' + errMsg(err), 'err');
+    } finally {
+      $('dsCycleSave').disabled = false;
+    }
+  }
+
+  // ---------- Mail-type (data/mail-types.json, 2 variables) ----------
+  let mailTypesCache = null;
+  async function ouvrirMailType(entiteId) {
+    const e = ecoleById.get(entiteId);
+    if (!e) return;
+    try {
+      if (mailTypesCache === null) {
+        const resp = await fetch('data/mail-types.json?nocache=' + Date.now());
+        if (!resp.ok) throw new Error('mail-types.json introuvable');
+        mailTypesCache = await resp.json();
+      }
+      const tpl = mailTypesCache.mails && mailTypesCache.mails[e.type_entite];
+      if (!tpl) { flash('Aucun mail-type pour ce type d\'école.', 'err'); return; }
+      const inject = (s) => String(s || '')
+        .replace(/\{nom_ecole\}/g, e.libelle || '')
+        .replace(/\{contact_nom\}/g, e.contact_nom || 'Madame, Monsieur');
+      const objet = inject(tpl.objet);
+      const corps = inject(tpl.corps);
+      const dest = e.contact_email || '';
+      const mailto = 'mailto:' + encodeURIComponent(dest)
+        + '?subject=' + encodeURIComponent(objet)
+        + '&body=' + encodeURIComponent(corps);
+      window.location.href = mailto;
+      flash('Mail-type préparé dans votre messagerie.', 'ok');
+    } catch (err) {
+      flash('Préparation du mail impossible : ' + errMsg(err), 'err');
+    }
+  }
+
+  // ---------- Délégation d'événements ----------
+  $('dsListe').addEventListener('click', function (ev) {
+    const t = ev.target.closest('button');
+    if (!t) return;
+    if (t.dataset.edit)  { openEcole(t.dataset.edit); return; }
+    if (t.dataset.mail)  { ouvrirMailType(t.dataset.mail); return; }
+    if (t.dataset.cycle) { openCycle(t.dataset.cycle); return; }
+    if (t.dataset.trans) { transition(t.dataset.trans, t.dataset.to); return; }
+  });
+
+  $('dsFilters').addEventListener('click', function (ev) {
+    const b = ev.target.closest('.ds-chip');
+    if (!b) return;
+    filtreCourant = b.dataset.filter;
+    Array.prototype.forEach.call($('dsFilters').children, c => c.classList.toggle('on', c === b));
+    renderListe();
+  });
+
+  $('dsNewEcole').addEventListener('click', () => openEcole(null));
+  $('dsEcoleClose').addEventListener('click', closeEcole);
+  $('dsEcoleCancel').addEventListener('click', closeEcole);
+  $('dsEcoleSave').addEventListener('click', saveEcole);
+  $('dsAddContact').addEventListener('click', openContact);
+  $('dsContactClose').addEventListener('click', closeContact);
+  $('dsContactCancel').addEventListener('click', closeContact);
+  $('dsContactSave').addEventListener('click', saveContact);
+  $('dsCycleClose').addEventListener('click', closeCycle);
+  $('dsCycleCancel').addEventListener('click', closeCycle);
+  $('dsCycleSave').addEventListener('click', saveCycle);
+
+  // Fermeture des modales au clic sur l'overlay.
+  [['dsEcoleOverlay', closeEcole], ['dsContactOverlay', closeContact], ['dsCycleOverlay', closeCycle]]
+    .forEach(([id, fn]) => {
+      $(id).addEventListener('click', function (ev) { if (ev.target === this) fn(); });
+    });
+
+  // ---------- Boot ----------
+  try {
+    await chargerTout();
+  } catch (err) {
+    flash('Chargement impossible : ' + errMsg(err), 'err');
+    $('dsSub').textContent = 'Erreur de chargement.';
+  }
+
+})();
+</script>
+</body>
+</html>
