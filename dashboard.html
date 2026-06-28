@@ -291,6 +291,32 @@
         <p class="admin-tile-desc">Mettre à jour les qualités FFR des licenciés (entraîneur, éducateur, soigneur…) depuis un export OVAL-E.</p>
       </a>
 
+      <!-- Développement scolaire — surface PILOTE du module B « Prospection »
+           (developpement-scolaire.html). Le bureau prépare les écoles, fait avancer
+           le statut de démarchage, journalise les contacts et programme les cycles.
+           Garde de page = admin OU bureau (_gs_peut_ecrire) -> data-show="admin bureau".
+           Le jeton « bureau » est filtré au boot (estBureau déjà résolu). -->
+      <a class="admin-tile" data-show="admin bureau" href="developpement-scolaire.html">
+        <div class="admin-tile-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+        </div>
+        <p class="admin-tile-title">Développement scolaire</p>
+        <p class="admin-tile-desc">Piloter la prospection des écoles : statut de démarchage, contacts, programmation des cycles.</p>
+      </a>
+
+      <!-- Démarchage scolaire — surface EXÉCUTANT du module B (demarchage-scolaire.html).
+           L'écran « une école à la fois » de Lohann : carte unique, geste « C'est fait »,
+           mail-type. Garde de page = salarié OU admin|bureau (sql_132) -> mêmes jetons
+           que la tuile « Activité du salarié » : data-show="admin salarie". C'est la
+           porte par laquelle Lohann atteint son démarchage. -->
+      <a class="admin-tile" data-show="admin salarie" href="demarchage-scolaire.html">
+        <div class="admin-tile-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/><path d="M10 9h.01"/><path d="M14 9h.01"/></svg>
+        </div>
+        <p class="admin-tile-title">Démarchage scolaire</p>
+        <p class="admin-tile-desc">Une école à la fois : la prochaine à contacter, le mail-type, le geste « C'est fait ».</p>
+      </a>
+
     </section>
 
     <p class="footer dashboard-footer">
@@ -364,12 +390,13 @@
       // Chaque tuile porte data-show = liste de jetons (« admin », « salarie »).
       // Une tuile est visible si AU MOINS UN de ses jetons est satisfait.
       //   admin   -> isAdmin()
+      //   bureau  -> hasRole('bureau')   (ex. tuile « Développement scolaire »)
       //   salarie -> suis_je_salarie()
-      // (bureau ne voit aujourd'hui aucune tuile spécifique : il franchit la
-      //  porte mais ne « voit » que ce que ses jetons autorisent — extensible.)
+      // (un rôle ne « voit » que les tuiles dont il satisfait un jeton — extensible.)
       (function filtrerTuiles() {
         const jetonsActifs = new Set();
         if (estAdmin)   jetonsActifs.add('admin');
+        if (estBureau)  jetonsActifs.add('bureau');
         if (estSalarie) jetonsActifs.add('salarie');
 
         const tuiles = document.querySelectorAll('.admin-tile[data-show]');
