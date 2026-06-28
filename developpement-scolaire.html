@@ -149,6 +149,14 @@
   .ds-jcanal { font-weight: 600; }
   .ds-jrelance { color: #b07814; font-weight: 600; }
   .ds-jempty { font-size: 13px; color: var(--ink-mute, #6b7a74); padding: 6px 0 2px; }
+  /* Bouton retour tableau de bord (classe hub-back-* non stylee ailleurs : garde-fou SVG) */
+  .hub-back-row { max-width: 980px; margin: 0 auto; padding: 14px 16px 0; }
+  .hub-back-btn { display: inline-flex; align-items: center; gap: 6px;
+                  font-size: 13px; font-weight: 600; text-decoration: none;
+                  color: var(--ink-mute, #6b7a74); padding: 6px 10px; border-radius: 8px;
+                  border: 1px solid var(--line, #cabe9f); background: #fff; }
+  .hub-back-btn:hover { border-color: var(--vert-prairie, #2d7a3e); color: var(--vert-prairie, #2d7a3e); }
+  .hub-back-btn svg { width: 15px; height: 15px; flex: 0 0 auto; }
 </style>
 </head>
 <body class="auth-pending">
