@@ -1,0 +1,18 @@
+{
+  "emetteur": {
+    "nom": "Mutzig Ovalie Molsheim",
+    "sigle": "MOM",
+    "adresse": "",
+    "code_postal": "",
+    "ville": "Molsheim",
+    "siret": "",
+    "numero_tva": "",
+    "iban": "",
+    "bic": "",
+    "email": "",
+    "telephone": ""
+  },
+  "mention_tva": "TVA non applicable, art. 293 B du CGI",
+  "mentions_pied": "",
+  "objet_defaut": "Refacturation interventions scolaires"
+}
