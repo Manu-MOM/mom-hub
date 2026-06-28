@@ -142,6 +142,22 @@
   .cp-repos .cp-stat .k { display: flex; align-items: baseline; gap: 6px; }
   .cp-repos .cp-stat .k small { font-weight: 400; }
   .cp-period { font-size: 13px; color: var(--ink-mute, #6b7a74); margin: -4px 0 14px; }
+
+  /* ===== Poste de pilotage employeur (refonte pt 128) ===== */
+  .pe-hd { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin: 0 0 18px; }
+  .pe-hd h1 { font-size: 20px; margin: 0; }
+  .pe-bandeaux { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin: 0 0 20px; }
+  .pe-band { background: #fff; border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 12px; padding: 14px 16px; }
+  .pe-band-lbl { margin: 0 0 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-mute, #6b7a74); }
+  .pe-band-big { margin: 0 0 4px; font-size: 24px; font-weight: 700; color: var(--ink, #0c3d24); line-height: 1.1; }
+  .pe-band-big small { font-size: 14px; font-weight: 400; color: var(--ink-mute, #6b7a74); }
+  .pe-band-sub { margin: 8px 0 0; font-size: 12.5px; color: var(--ink-mute, #6b7a74); }
+  .pe-band-vide { font-size: 13px; color: var(--ink-mute, #6b7a74); padding: 6px 0; }
+  .pe-soon { font-style: italic; opacity: .8; }
+  .pe-filters { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 16px; opacity: .5; pointer-events: none; }
+  .pe-chip { font-size: 13px; padding: 6px 14px; border-radius: 16px; border: 1px solid var(--line, #cabe9f); color: var(--ink-mute, #6b7a74); }
+  .pe-chip.on { background: var(--feedback-info-bg, #eaf1fa); color: var(--feedback-info-fg, #1f4a82); border-color: transparent; }
+  .pe-foot { font-size: 12.5px; color: var(--ink-mute, #6b7a74); margin: 18px 0 0; line-height: 1.6; }
 </style>
 </head>
 <body class="auth-pending">
@@ -193,243 +209,80 @@
   </div>
 
 <div class="gs-wrap">
-  <h1>Gestion du salarié</h1>
-  <p class="gs-sub">Les bénéficiaires et les missions du salarié, avec leurs séances. Accès réservé à l'administration (admin ou bureau).</p>
+  <!-- POSTE DE PILOTAGE EMPLOYEUR (refonte pt 128, etape 1 : structure + annualisation).
+       Surface LECTURE SEULE (kit conception 1.2). Creation/edition de mission centralisees
+       dans suivi-salarie.html (kit 1.3) : « Nouvelle mission » y renvoie. Agregation front
+       (Chemin A, kit 1.4) : zero SQL de modele, zero vue d'agregation. Les 3 onglets de saisie
+       (Beneficiaires/Missions/Compteur) et leurs modales sont retires (retrait trace, poste
+       lecture seule). Bandeaux « A refacturer » / « A traiter », filtres et liste centree-mission
+       sont presents en structure et cables aux etapes 2-3. -->
+
+  <div class="pe-hd">
+    <div>
+      <h1>Activité du salarié — gestion</h1>
+      <p class="gs-sub" id="peSub" style="margin:4px 0 0;">Chargement…</p>
+    </div>
+    <a class="gs-btn gs-btn-sm" id="peNewMission" href="suivi-salarie.html"
+       title="La création de mission se fait dans le suivi du salarié">+ Nouvelle mission</a>
+  </div>
 
   <div id="gsMsg" class="gs-msg"></div>
 
-  <div class="gs-tabs">
-    <button class="gs-tab active" data-tab="entites">Bénéficiaires</button>
-    <button class="gs-tab" data-tab="missions">Missions</button>
-    <button class="gs-tab" data-tab="compteur">Compteur</button>
+  <!-- ===== 3 bandeaux d'agregation ===== -->
+  <div class="pe-bandeaux">
+
+    <!-- Bandeau 1 : ANNUALISATION (cable en reel des l'etape 1) -->
+    <div class="pe-band" id="peBandAnnu">
+      <p class="pe-band-lbl">Annualisation</p>
+      <div id="peAnnuBody">
+        <p class="pe-band-big"><span id="peAnnuRealise">—</span> <small>/ <span id="peAnnuCible">—</span> h</small></p>
+        <div class="cp-bar" id="peAnnuBar"><span style="width:0%"></span></div>
+        <p class="pe-band-sub" id="peAnnuSub">—</p>
+      </div>
+      <div id="peAnnuVide" class="pe-band-vide" style="display:none">Aucune période d'annualisation courante.</div>
+    </div>
+
+    <!-- Bandeau 2 : A REFACTURER (placeholder etape 2) -->
+    <div class="pe-band" id="peBandRefac">
+      <p class="pe-band-lbl">À refacturer</p>
+      <p class="pe-band-sub pe-soon">Câblé à l'étape 2.</p>
+    </div>
+
+    <!-- Bandeau 3 : A TRAITER (placeholder etape 2) -->
+    <div class="pe-band" id="peBandTraiter">
+      <p class="pe-band-lbl">À traiter</p>
+      <p class="pe-band-sub pe-soon">Câblé à l'étape 2.</p>
+    </div>
+
   </div>
 
-  <!-- ============ ONGLET BÉNÉFICIAIRES ============ -->
-  <section class="gs-panel active" id="panel-entites">
-    <div class="gs-toolbar">
-      <strong>Bénéficiaires</strong>
-      <label class="gs-toggle"><input type="checkbox" id="entInactives"> inclure les inactives</label>
-      <span class="sp"></span>
-      <button class="gs-btn gs-btn-sm" id="entAddBtn">+ Nouveau bénéficiaire</button>
-    </div>
-    <div class="gs-card">
-      <table class="gs-tbl">
-        <thead><tr><th>Libellé</th><th>Type</th><th>Refact. déf.</th><th>Statut</th><th></th></tr></thead>
-        <tbody id="entRows"></tbody>
-      </table>
-      <div id="entEmpty" class="gs-empty" style="display:none">Aucun bénéficiaire. Crée le premier.</div>
-    </div>
-  </section>
-
-  <!-- ============ ONGLET MISSIONS ============ -->
-  <section class="gs-panel" id="panel-missions">
-    <div class="gs-toolbar">
-      <strong>Missions</strong>
-      <label class="gs-toggle">Salarié
-        <select id="misSalarie" style="padding:6px 9px;border:1px solid var(--paper-warm,#d9d2c4);border-radius:8px;font:inherit;">
-          <option value="">— tous —</option>
-        </select>
-      </label>
-      <span class="sp"></span>
-      <button class="gs-btn gs-btn-sm" id="misAddBtn">+ Nouvelle mission</button>
-    </div>
-    <p class="gs-sub" id="misSaisonHint" style="margin-top:-6px;">Saison active.</p>
-    <div class="gs-card">
-      <table class="gs-tbl">
-        <thead><tr><th>Mission</th><th>Salarié</th><th>Bénéficiaire</th><th>Début</th><th>État</th><th></th></tr></thead>
-        <tbody id="misRows"></tbody>
-      </table>
-      <div id="misEmpty" class="gs-empty" style="display:none">Aucune mission pour ce filtre.</div>
-    </div>
-  </section>
-
-  <!-- ============ ONGLET COMPTEUR ============ -->
-  <section class="gs-panel" id="panel-compteur">
-    <div class="gs-toolbar">
-      <strong>Compteur d'heures — annualisation</strong>
-      <span class="sp"></span>
-      <button class="gs-btn gs-btn-sm" id="cpAddBtn">+ Saisir des heures</button>
-    </div>
-    <p class="gs-sub" id="cpSalarieHint" style="margin-top:-6px;">Salarié.</p>
-
-    <div id="cpSynthese" style="display:none">
-      <p class="cp-period" id="cpPeriode"></p>
-      <div class="cp-grid">
-        <div class="cp-stat"><p class="k">Cible</p><p class="v"><span id="cpCible">—</span><span class="u">h</span></p></div>
-        <div class="cp-stat"><p class="k">Réalisé</p><p class="v"><span id="cpRealise">—</span><span class="u">h</span></p></div>
-        <div class="cp-stat"><p class="k">Solde</p><p class="v"><span id="cpSolde">—</span><span class="u">h</span></p></div>
-        <div class="cp-stat cp-sup"><p class="k">Au-delà</p><p class="v"><span id="cpSup">—</span><span class="u">h</span></p></div>
-      </div>
-      <div class="cp-bar" id="cpBar"><span style="width:0%"></span></div>
-      <div class="cp-repos">
-        <div class="cp-stat"><p class="k">Repos compensateur <small>(si remplacement, ×1,25)</small></p><p class="v"><span id="cpRepos125">—</span><span class="u">h</span></p></div>
-        <div class="cp-stat"><p class="k">Repos compensateur <small>(majoration seule, ×0,25)</small></p><p class="v"><span id="cpRepos025">—</span><span class="u">h</span></p></div>
-      </div>
-    </div>
-    <div id="cpNoPeriode" class="gs-empty" style="display:none">Aucune période d'annualisation ne couvre aujourd'hui pour ce salarié.</div>
-
-    <div class="gs-card">
-      <table class="gs-tbl">
-        <thead><tr><th>Date</th><th>Heures</th><th>Début</th><th>Catégorie</th><th>Mission</th><th></th></tr></thead>
-        <tbody id="cpRows"></tbody>
-      </table>
-      <div id="cpEmpty" class="gs-empty" style="display:none">Aucune ligne de relevé sur la période.</div>
-    </div>
-  </section>
-</div>
-
-<!-- ============ MODALE COMPTEUR (relevé) ============ -->
-<div class="gs-overlay" id="cpOverlay">
-  <div class="gs-modal">
-    <div class="gs-modal-head"><h2 id="cpModalTitle">Saisir des heures</h2><button class="gs-x" id="cpClose" aria-label="Fermer">&times;</button></div>
-    <div class="gs-grid2">
-      <div class="gs-field"><label for="cpDate">Date *</label><input id="cpDate" type="date"></div>
-      <div class="gs-field"><label for="cpHeures">Heures *</label><input id="cpHeures" type="number" step="0.25" min="0" placeholder="ex. 3.5"></div>
-    </div>
-    <div class="gs-grid2">
-      <div class="gs-field"><label for="cpHeureDebut">Heure de début</label><input id="cpHeureDebut" type="time"></div>
-      <div class="gs-field"><label for="cpCategorie">Catégorie</label>
-        <select id="cpCategorie">
-          <option value="seance">Séance</option>
-          <option value="reunion">Réunion</option>
-          <option value="deplacement">Déplacement</option>
-          <option value="formation">Formation</option>
-          <option value="administratif">Administratif</option>
-          <option value="autre" selected>Autre</option>
-        </select>
-      </div>
-    </div>
-    <div class="gs-field"><label for="cpMission">Mission (facultatif)</label>
-      <select id="cpMission"><option value="">— aucune —</option></select>
-    </div>
-    <div class="gs-field"><label for="cpNotes">Notes</label><textarea id="cpNotes" placeholder="optionnel"></textarea></div>
-    <div class="gs-modal-actions">
-      <button class="gs-cancel" id="cpCancel">Annuler</button>
-      <button class="gs-btn" id="cpSave">Enregistrer</button>
-    </div>
+  <!-- ===== Filtres (placeholder etape 3) ===== -->
+  <div class="pe-filters" id="peFilters" aria-hidden="true">
+    <span class="pe-chip on">Toutes</span>
+    <span class="pe-chip">Par bénéficiaire</span>
+    <span class="pe-chip">Facturables</span>
+    <span class="pe-chip">En cours</span>
+    <span class="pe-chip">À clôturer</span>
   </div>
-</div>
 
-<!-- ============ MODALE BÉNÉFICIAIRE ============ -->
-<div class="gs-overlay" id="entOverlay">
-  <div class="gs-modal">
-    <div class="gs-modal-head"><h2 id="entModalTitle">Nouveau bénéficiaire</h2><button class="gs-x" id="entClose" aria-label="Fermer">&times;</button></div>
-    <div class="gs-field"><label for="entLibelle">Libellé *</label><input id="entLibelle" placeholder="ex. École Jules Ferry"></div>
-    <div class="gs-grid2">
-      <div class="gs-field"><label for="entType">Type *</label>
-        <select id="entType">
-          <option value="ecole_elementaire">École élémentaire</option>
-          <option value="college">Collège</option>
-          <option value="lycee">Lycée</option>
-          <option value="mjc">MJC</option>
-          <option value="club">Club</option>
-          <option value="interne">Interne (MOM)</option>
-          <option value="autre">Autre</option>
-        </select>
-      </div>
-      <div class="gs-field"><label for="entLibelleCourt">Libellé court</label><input id="entLibelleCourt" placeholder="ex. Jules Ferry"></div>
-    </div>
-    <div class="gs-grid2">
-      <div class="gs-field"><label for="entSite">Site (lieu)</label><select id="entSite"><option value="">— aucun —</option></select></div>
-      <div class="gs-field"><label for="entStatut">Statut prospection</label>
-        <select id="entStatut">
-          <option value="">— non défini —</option>
-          <option value="a_contacter">À contacter</option>
-          <option value="contacte">Contacté</option>
-          <option value="interesse">Intéressé</option>
-          <option value="client">Client</option>
-          <option value="inactif">Inactif</option>
-        </select>
-      </div>
-    </div>
-    <div class="gs-grid2">
-      <div class="gs-field"><label for="entContactNom">Contact (nom)</label><input id="entContactNom"></div>
-      <div class="gs-field"><label for="entContactEmail">Contact (email)</label><input id="entContactEmail" type="email"></div>
-    </div>
-    <div class="gs-field"><label class="gs-check"><input type="checkbox" id="entRefac"> Refacturable par défaut</label></div>
-    <div class="gs-field"><label class="gs-check"><input type="checkbox" id="entActif" checked> Actif</label></div>
-    <div class="gs-field"><label for="entNotes">Notes</label><textarea id="entNotes"></textarea></div>
-    <div class="gs-modal-actions">
-      <button class="gs-cancel" id="entCancel">Annuler</button>
-      <button class="gs-btn" id="entSave">Enregistrer</button>
-    </div>
+  <!-- ===== Liste centree-mission (placeholder etape 3) ===== -->
+  <div id="peListe">
+    <div class="gs-empty" id="peListeSoon">La liste centrée-mission est câblée à l'étape 3.</div>
   </div>
-</div>
 
-<!-- ============ MODALE MISSION ============ -->
-<div class="gs-overlay" id="misOverlay">
-  <div class="gs-modal">
-    <div class="gs-modal-head"><h2 id="misModalTitle">Nouvelle mission</h2><button class="gs-x" id="misClose" aria-label="Fermer">&times;</button></div>
-    <div class="gs-field"><label for="misLibelle">Libellé *</label><input id="misLibelle" placeholder="ex. Initiation rugby — cycle automne"></div>
-    <div class="gs-grid2">
-      <div class="gs-field"><label for="misSalarieSel">Salarié *</label><select id="misSalarieSel"><option value="">— choisir —</option></select></div>
-      <div class="gs-field"><label for="misEntite">Bénéficiaire *</label><select id="misEntite"><option value="">— choisir —</option></select></div>
-    </div>
-    <div class="gs-grid2">
-      <div class="gs-field"><label for="misType">Type *</label>
-        <select id="misType">
-          <option value="">— choisir —</option>
-          <option value="intervention_scolaire">Intervention scolaire</option>
-          <option value="entrainement_section">Entraînement section</option>
-          <option value="entrainement_sr_m">Entraînement SR/M</option>
-          <option value="autre_entrainement_mom">Autre entraînement MOM</option>
-          <option value="accompagnement_terrain">Accompagnement terrain</option>
-          <option value="stage">Stage</option>
-          <option value="reunion">Réunion</option>
-          <option value="suivi_competition">Suivi compétition</option>
-          <option value="travail_personnel">Travail personnel</option>
-          <option value="divers">Divers</option>
-        </select>
-      </div>
-      <div class="gs-field"><label for="misEtat">État</label>
-        <select id="misEtat">
-          <option value="prevue">Prévue</option>
-          <option value="terminee">Terminée</option>
-          <option value="annulee">Annulée</option>
-        </select>
-      </div>
-    </div>
-    <div class="gs-grid2">
-      <div class="gs-field"><label for="misDateDebut">Début *</label><input id="misDateDebut" type="date"></div>
-      <div class="gs-field"><label for="misDateFin">Fin</label><input id="misDateFin" type="date"></div>
-    </div>
-    <div class="gs-grid2">
-      <div class="gs-field"><label for="misLieu">Lieu</label><select id="misLieu"><option value="">— aucun —</option></select></div>
-      <div class="gs-field"><label for="misLieuLibre">Lieu (texte libre)</label><input id="misLieuLibre"></div>
-    </div>
-    <div class="gs-field"><label class="gs-check"><input type="checkbox" id="misRefac"> Refacturable <span class="gs-seances-hint" id="misRefacHint">(défaut hérité du bénéficiaire)</span></label></div>
-    <div class="gs-field"><label for="misNotes">Notes</label><textarea id="misNotes"></textarea></div>
-
-    <!-- Séances inline (visibles uniquement en édition d'une mission existante) -->
-    <div class="gs-seances" id="misSeancesBlock" style="display:none">
-      <div class="gs-seances-head">
-        <strong>Séances</strong>
-        <span class="gs-seances-hint">héritent du lieu/horaire de la mission si vides</span>
-      </div>
-      <div id="misSeanceRows"></div>
-      <div class="gs-seance-add">
-        <div style="flex:1;min-width:120px;"><label for="seDate">Date</label><input id="seDate" type="date"></div>
-        <div style="width:96px;"><label for="seHeure">Heure</label><input id="seHeure" type="time"></div>
-        <div style="width:84px;"><label for="seDuree">Durée (min)</label><input id="seDuree" type="number" min="0" step="5"></div>
-        <button class="gs-btn gs-btn-sm" id="seAddBtn">+ Ajouter</button>
-      </div>
-      <p class="gs-seance-note">Une séance sans « refacturable » est couverte par le forfait de la mission.</p>
-    </div>
-
-    <div class="gs-modal-actions">
-      <button class="gs-cancel" id="misCancel">Annuler</button>
-      <button class="gs-btn" id="misSave">Enregistrer</button>
-    </div>
-  </div>
+  <p class="pe-foot">Chaque donnée affichée existe déjà en base (chantiers A→D). La page ne fait que
+  les remonter et les agréger côté front — zéro SQL de modèle.</p>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="js/supabase-client.js"></script>
 <script>
+
 (async function () {
   'use strict';
 
   // --- Garde d'auth : admin OU bureau (aligne la garde base _gs_peut_ecrire) ---
+  // Le poste de pilotage employeur s'adresse a l'employeur (Manu) : admin|bureau.
   const session = await SupabaseHub.getSession();
   if (!session) { window.location.replace('login.html'); return; }
   const roles = await SupabaseHub.getMyRoles();
@@ -453,36 +306,13 @@
     if (saisonActive && saisonActive.libelle) {
       const _pill = document.getElementById('season-pill');
       if (_pill) _pill.textContent = 'SAISON ' + saisonActive.libelle;
-      const _h = document.getElementById('misSaisonHint');
-      if (_h) _h.textContent = 'Saison active : ' + saisonActive.libelle + '.';
     }
-  } catch (_) { /* libellé statique conservé */ }
+  } catch (_) { /* libelle statique conserve */ }
 
   const client = SupabaseHub.client;
   const $ = (id) => document.getElementById(id);
 
-  // Caches
-  let entites = [];          // liste courante (onglet entités)
-  let entitesAll = [];       // toutes (pour la pioche bénéficiaire en mission)
-  let sites = [];
-  let staff = [];
-  const entiteLabel = new Map();
-  const staffLabel = new Map();
-  let editingEntiteId = null;
-  let editingMissionId = null;
-  // Champs absents de la modale, préservés à l'édition (upsert_mission fait un UPDATE
-  // sec sans COALESCE : tout p_* non transmis écrase la base — patron pt 118).
-  let editingMissionBilanText = null;
-  let editingMissionQuestionnaireFait = false;
-  let editingMissionRefCommande = null;
-  let editingMissionMontant = null;
-  let editingMissionStatut = 'interne';
-
-  const TYPE_ENTITE_LBL = {
-    ecole_elementaire: 'école élémentaire', college: 'collège', lycee: 'lycée',
-    mjc: 'MJC', club: 'club', interne: 'interne', autre: 'autre'
-  };
-
+  // ---------- Helpers (repris a l'identique de l'ancienne page) ----------
   function flash(text, kind) {
     const m = $('gsMsg');
     m.textContent = text; m.className = 'gs-msg ' + kind;
@@ -495,559 +325,90 @@
   }
   function errMsg(e) {
     const m = (e && (e.message || e.error_description || e.hint)) || 'Erreur inconnue.';
-    return /admin|bureau|réserv/i.test(m) ? "Action réservée à l'administration (admin ou bureau)." : m;
+    return /admin|bureau|r\u00e9serv/i.test(m) ? "Action r\u00e9serv\u00e9e \u00e0 l'administration (admin ou bureau)." : m;
   }
   async function rpc(name, params) {
     const { data, error } = await client.rpc(name, params || {});
     if (error) throw error;
     return data;
   }
-  function staffName(id) { return staffLabel.get(id) || id; }
-  // Code auto-dérivé du libellé : slug majuscule + suffixe base36 anti-collision.
-  function deriveCode(libelle) {
-    const slug = String(libelle || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      .toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 24) || 'ENT';
-    const suffix = Date.now().toString(36).toUpperCase().slice(-4);
-    return slug + '-' + suffix;
-  }
-
-  // ---------- Onglets ----------
-  document.querySelectorAll('.gs-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.gs-tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.gs-panel').forEach(p => p.classList.remove('active'));
-      tab.classList.add('active');
-      $('panel-' + tab.dataset.tab).classList.add('active');
-    });
-  });
-
-  // ---------- Pioches communes ----------
-  async function loadSites() {
-    sites = await SupabaseHub.listSitesActifs();
-    const opts = '<option value="">— aucun —</option>' +
-      sites.map(s => '<option value="' + s.id + '">' + escapeHtml(s.libelle) + '</option>').join('');
-    $('entSite').innerHTML = opts;
-    $('misLieu').innerHTML = opts;
-  }
-  async function loadSalaries() {
-    // Picker Missions : ne lister QUE les salariés (contrat courant), via
-    // list_salaries() (sql/83). Substitue list_staff_disponibles, qui listait
-    // les ~63 encadrants staff — un opérateur aurait choisi un staff en croyant
-    // choisir un salarié. Même signature (personne_id, nom, prenom) -> le reste
-    // du rendu est inchangé.
-    staff = await rpc('list_salaries');
-    staffLabel.clear();
-    const filterSel = $('misSalarie');
-    const modalSel = $('misSalarieSel');
-    let fOpts = '<option value="">— tous —</option>';
-    let mOpts = '<option value="">— choisir —</option>';
-    staff.forEach(s => {
-      const label = [s.prenom, s.nom].filter(Boolean).join(' ').trim() || s.personne_id;
-      staffLabel.set(s.personne_id, label);
-      fOpts += '<option value="' + s.personne_id + '">' + escapeHtml(label) + '</option>';
-      mOpts += '<option value="' + s.personne_id + '">' + escapeHtml(label) + '</option>';
-    });
-    filterSel.innerHTML = fOpts;
-    modalSel.innerHTML = mOpts;
-  }
-  function refreshEntitesPioche() {
-    entiteLabel.clear();
-    let opts = '<option value="">— choisir —</option>';
-    entitesAll.forEach(e => {
-      entiteLabel.set(e.id, e.libelle);
-      opts += '<option value="' + e.id + '"' + (e.actif ? '' : ' data-off="1"') + '>' +
-        escapeHtml(e.libelle) + (e.actif ? '' : ' (inactive)') + '</option>';
-    });
-    $('misEntite').innerHTML = opts;
-  }
-
-  // ---------- BÉNÉFICIAIRES ----------
-  async function loadEntites() {
-    const inclure = $('entInactives').checked;
-    entites = await rpc('list_entites', { p_inclure_inactives: inclure });
-    // Pioche bénéficiaire : toujours toutes (actives + inactives)
-    entitesAll = inclure ? entites : await rpc('list_entites', { p_inclure_inactives: true });
-    refreshEntitesPioche();
-    renderEntites();
-  }
-  function renderEntites() {
-    const tb = $('entRows'); tb.innerHTML = '';
-    $('entEmpty').style.display = (entites && entites.length) ? 'none' : 'block';
-    (entites || []).forEach(e => {
-      const tr = document.createElement('tr');
-      if (!e.actif) tr.className = 'gs-off';
-      tr.innerHTML =
-        '<td>' + escapeHtml(e.libelle) + '</td>' +
-        '<td>' + escapeHtml(TYPE_ENTITE_LBL[e.type_entite] || e.type_entite) + '</td>' +
-        '<td>' + (e.refacturable_defaut ? 'oui' : 'non') + '</td>' +
-        '<td>' + (e.actif ? '<span class="gs-badge ok">actif</span>' : '<span class="gs-badge off">inactif</span>') + '</td>' +
-        '<td style="text-align:right"></td>';
-      const b = document.createElement('button');
-      b.className = 'gs-link edit'; b.textContent = 'Éditer';
-      b.onclick = () => openEntite(e);
-      tr.lastElementChild.appendChild(b);
-      tb.appendChild(tr);
-    });
-  }
-  function openEntite(e) {
-    editingEntiteId = e ? e.id : null;
-    $('entModalTitle').textContent = e ? 'Modifier le bénéficiaire' : 'Nouveau bénéficiaire';
-    $('entLibelle').value = e ? (e.libelle || '') : '';
-    $('entLibelleCourt').value = e ? (e.libelle_court || '') : '';
-    $('entType').value = e ? (e.type_entite || 'autre') : 'ecole_elementaire';
-    $('entSite').value = e ? (e.site_id || '') : '';
-    $('entStatut').value = e ? (e.statut_prospection || '') : '';
-    $('entContactNom').value = e ? (e.contact_nom || '') : '';
-    $('entContactEmail').value = e ? (e.contact_email || '') : '';
-    $('entRefac').checked = e ? !!e.refacturable_defaut : false;
-    $('entActif').checked = e ? !!e.actif : true;
-    $('entNotes').value = e ? (e.notes || '') : '';
-    $('entOverlay').classList.add('open');
-  }
-  function closeEntite() { $('entOverlay').classList.remove('open'); editingEntiteId = null; }
-  async function saveEntite() {
-    const libelle = $('entLibelle').value.trim();
-    if (!libelle) return flash('Le libellé est obligatoire.', 'err');
-    $('entSave').disabled = true;
-    try {
-      const existing = editingEntiteId ? entites.find(x => x.id === editingEntiteId) : null;
-      const params = {
-        p_id: editingEntiteId,
-        p_code: existing ? existing.code : deriveCode(libelle),
-        p_libelle: libelle,
-        p_type_entite: $('entType').value,
-        p_libelle_court: $('entLibelleCourt').value.trim() || null,
-        p_site_id: $('entSite').value || null,
-        p_refacturable_defaut: $('entRefac').checked,
-        p_contact_nom: $('entContactNom').value.trim() || null,
-        p_contact_email: $('entContactEmail').value.trim() || null,
-        p_statut_prospection: $('entStatut').value || null,
-        p_actif: $('entActif').checked,
-        p_notes: $('entNotes').value.trim() || null
-      };
-      await rpc('upsert_entite', params);
-      closeEntite();
-      flash('Bénéficiaire enregistré.', 'ok');
-      await loadEntites();
-    } catch (e) { flash(errMsg(e), 'err'); }
-    finally { $('entSave').disabled = false; }
-  }
-
-  // ---------- MISSIONS ----------
-  async function loadMissions() {
-    if (!saisonActive || !saisonActive.id) { flash('Saison active introuvable.', 'err'); return; }
-    const salId = $('misSalarie').value || null;
-    const rows = await rpc('list_missions', {
-      p_saison_id: saisonActive.id, p_salarie_id: salId, p_entite_id: null
-    });
-    renderMissions(rows || []);
-  }
-  function badgeEtat(etat) {
-    const lbl = { prevue: 'prévue', terminee: 'terminée', annulee: 'annulée' }[etat] || etat;
-    return '<span class="gs-badge ' + escapeHtml(etat) + '">' + escapeHtml(lbl) + '</span>';
-  }
-  function renderMissions(rows) {
-    const tb = $('misRows'); tb.innerHTML = '';
-    $('misEmpty').style.display = rows.length ? 'none' : 'block';
-    rows.forEach(m => {
-      const tr = document.createElement('tr');
-      if (m.etat === 'annulee') tr.className = 'gs-off';
-      tr.innerHTML =
-        '<td>' + escapeHtml(m.libelle) + '</td>' +
-        '<td>' + escapeHtml(staffName(m.salarie_id)) + '</td>' +
-        '<td>' + escapeHtml(entiteLabel.get(m.entite_id) || '—') + '</td>' +
-        '<td>' + (m.date_debut || '') + '</td>' +
-        '<td>' + badgeEtat(m.etat) + '</td>' +
-        '<td style="text-align:right"></td>';
-      const actions = tr.lastElementChild;
-      const b = document.createElement('button');
-      b.className = 'gs-link edit'; b.textContent = 'Éditer';
-      b.onclick = () => openMission(m);
-      actions.appendChild(b);
-      const d = document.createElement('button');
-      d.className = 'gs-link danger'; d.textContent = 'Supprimer';
-      d.onclick = () => delMission(m.id, m.libelle);
-      actions.appendChild(d);
-      tb.appendChild(tr);
-    });
-  }
-  function openMission(m) {
-    editingMissionId = m ? m.id : null;
-    // Capture des champs hors-modale pour les réémettre intacts au save (préservation).
-    editingMissionBilanText        = m ? (m.bilan_text ?? null) : null;
-    editingMissionQuestionnaireFait = m ? !!m.questionnaire_fait : false;
-    editingMissionRefCommande      = m ? (m.reference_commande ?? null) : null;
-    editingMissionMontant          = m ? (m.montant ?? null) : null;
-    editingMissionStatut           = m ? (m.statut || 'interne') : 'interne';
-    $('misModalTitle').textContent = m ? 'Modifier la mission' : 'Nouvelle mission';
-    $('misLibelle').value = m ? (m.libelle || '') : '';
-    $('misSalarieSel').value = m ? (m.salarie_id || '') : '';
-    $('misEntite').value = m ? (m.entite_id || '') : '';
-    $('misType').value = m ? (m.type_mission || '') : '';
-    $('misEtat').value = m ? (m.etat || 'prevue') : 'prevue';
-    $('misDateDebut').value = m ? (m.date_debut || '') : '';
-    $('misDateFin').value = m ? (m.date_fin || '') : '';
-    $('misLieu').value = m ? (m.lieu_id || '') : '';
-    $('misLieuLibre').value = m ? (m.lieu_libre || '') : '';
-    $('misRefac').checked = m ? !!m.refacturable : false;
-    syncRefacHint();
-    // Séances : seulement pour une mission existante (besoin d'un mission_id)
-    if (m) {
-      $('misSeancesBlock').style.display = 'block';
-      loadSeances(m.id);
-    } else {
-      $('misSeancesBlock').style.display = 'none';
-      $('misSeanceRows').innerHTML = '';
-    }
-    $('misOverlay').classList.add('open');
-  }
-  function closeMission() { $('misOverlay').classList.remove('open'); editingMissionId = null; }
-  function syncRefacHint() {
-    const entId = $('misEntite').value;
-    const ent = entitesAll.find(e => e.id === entId);
-    const hint = $('misRefacHint');
-    if (ent) hint.textContent = '(défaut bénéficiaire : ' + (ent.refacturable_defaut ? 'oui' : 'non') + ')';
-    else hint.textContent = '(défaut hérité du bénéficiaire)';
-  }
-  $('misEntite').addEventListener('change', () => {
-    // En création, on aligne la case sur le défaut de l'entité choisie (pratique).
-    if (!editingMissionId) {
-      const ent = entitesAll.find(e => e.id === $('misEntite').value);
-      if (ent) $('misRefac').checked = !!ent.refacturable_defaut;
-    }
-    syncRefacHint();
-  });
-
-  async function saveMission() {
-    const libelle = $('misLibelle').value.trim();
-    const salarie = $('misSalarieSel').value;
-    const entite = $('misEntite').value;
-    const dateDebut = $('misDateDebut').value || null;
-    if (!libelle) return flash('Le libellé de la mission est obligatoire.', 'err');
-    if (!salarie) return flash('Choisis un salarié.', 'err');
-    if (!entite) return flash('Choisis un bénéficiaire.', 'err');
-    if (!$('misType').value) return flash('Choisis un type de mission.', 'err');
-    if (!dateDebut) return flash('La date de début est obligatoire.', 'err');
-    $('misSave').disabled = true;
-    try {
-      const params = {
-        p_id: editingMissionId,
-        p_code: editingMissionId ? undefined : deriveCode(libelle),
-        p_libelle: libelle,
-        p_type_mission: $('misType').value,
-        p_salarie_id: salarie,
-        p_entite_id: entite,
-        p_saison_id: saisonActive.id,
-        p_date_debut: dateDebut,
-        p_lieu_id: $('misLieu').value || null,
-        p_lieu_libre: $('misLieuLibre').value.trim() || null,
-        p_date_fin: $('misDateFin').value || null,
-        p_refacturable: $('misRefac').checked,
-        p_etat: $('misEtat').value,
-        p_notes: $('misNotes').value.trim() || null,
-        // Champs hors-modale réémis tels quels (sinon écrasés par l'UPDATE sec).
-        p_bilan_text: editingMissionBilanText,
-        p_questionnaire_fait: editingMissionQuestionnaireFait,
-        p_reference_commande: editingMissionRefCommande,
-        p_montant: editingMissionMontant,
-        p_statut: editingMissionStatut
-      };
-      // En édition, le code existant doit être conservé : on le relit depuis la ligne.
-      if (editingMissionId) {
-        const cur = (await rpc('list_missions', { p_saison_id: saisonActive.id, p_salarie_id: null, p_entite_id: null }) || [])
-          .find(x => x.id === editingMissionId);
-        params.p_code = cur ? cur.code : deriveCode(libelle);
-      }
-      const saved = await rpc('upsert_mission', params);
-      const newId = saved && saved.id ? saved.id : editingMissionId;
-      flash('Mission enregistrée.', 'ok');
-      // Bascule en mode édition pour permettre la saisie des séances sans rouvrir.
-      if (newId && !editingMissionId) {
-        editingMissionId = newId;
-        $('misModalTitle').textContent = 'Modifier la mission';
-        $('misSeancesBlock').style.display = 'block';
-        await loadSeances(newId);
-      } else {
-        closeMission();
-      }
-      await loadMissions();
-    } catch (e) { flash(errMsg(e), 'err'); }
-    finally { $('misSave').disabled = false; }
-  }
-  async function delMission(id, libelle) {
-    if (!confirm('Supprimer la mission « ' + libelle + ' » et ses séances ? Action définitive.')) return;
-    try { await rpc('supprimer_mission', { p_id: id }); flash('Mission supprimée.', 'ok'); await loadMissions(); }
-    catch (e) { flash(errMsg(e), 'err'); }
-  }
-
-  // ---------- SÉANCES (inline) ----------
-  async function loadSeances(missionId) {
-    const rows = await rpc('list_mission_seances', { p_mission_id: missionId });
-    renderSeances(rows || []);
-  }
-  function renderSeances(rows) {
-    const box = $('misSeanceRows'); box.innerHTML = '';
-    if (!rows.length) {
-      box.innerHTML = '<p class="gs-seances-hint" style="margin:0 0 6px;">Aucune séance. Ajoute-en une ci-dessous.</p>';
-      return;
-    }
-    rows.forEach(s => {
-      const tag = (s.refacturable === null || typeof s.refacturable === 'undefined')
-        ? 'forfait' : (s.refacturable ? 'refacturable' : 'exclue');
-      const heure = s.heure_debut ? s.heure_debut.slice(0,5) : '—';
-      const duree = (s.duree_min || s.duree_min === 0) ? (s.duree_min + ' min') : '';
-      const row = document.createElement('div');
-      row.className = 'gs-seance-row';
-      row.innerHTML =
-        '<span class="lbl">' + (s.date_seance || '') + ' · ' + heure + (duree ? ' · ' + duree : '') + '</span>' +
-        '<span class="tag">' + tag + '</span>';
-      const del = document.createElement('button');
-      del.className = 'gs-link danger'; del.style.padding = '0 4px'; del.textContent = '✕';
-      del.title = 'Supprimer la séance';
-      del.onclick = () => delSeance(s.id);
-      row.appendChild(del);
-      box.appendChild(row);
-    });
-  }
-  async function addSeance() {
-    if (!editingMissionId) return flash('Enregistre d\'abord la mission.', 'err');
-    const date = $('seDate').value;
-    if (!date) return flash('La date de la séance est obligatoire.', 'err');
-    const heure = $('seHeure').value || null;
-    const dureeRaw = $('seDuree').value;
-    const duree = dureeRaw === '' ? null : parseInt(dureeRaw, 10);
-    $('seAddBtn').disabled = true;
-    try {
-      await rpc('upsert_mission_seance', {
-        p_id: null,
-        p_mission_id: editingMissionId,
-        p_date_seance: date,
-        p_heure_debut: heure,
-        p_duree_min: duree
-      });
-      $('seDate').value = ''; $('seHeure').value = ''; $('seDuree').value = '';
-      await loadSeances(editingMissionId);
-      flash('Séance ajoutée.', 'ok');
-    } catch (e) { flash(errMsg(e), 'err'); }
-    finally { $('seAddBtn').disabled = false; }
-  }
-  async function delSeance(id) {
-    try { await rpc('supprimer_mission_seance', { p_id: id }); await loadSeances(editingMissionId); }
-    catch (e) { flash(errMsg(e), 'err'); }
-  }
-
-  // ---------- Liaisons UI ----------
-  $('entInactives').addEventListener('change', loadEntites);
-  $('entAddBtn').addEventListener('click', () => openEntite(null));
-  $('entClose').addEventListener('click', closeEntite);
-  $('entCancel').addEventListener('click', closeEntite);
-  $('entSave').addEventListener('click', saveEntite);
-
-  $('misSalarie').addEventListener('change', loadMissions);
-  $('misAddBtn').addEventListener('click', () => openMission(null));
-  $('misClose').addEventListener('click', closeMission);
-  $('misCancel').addEventListener('click', closeMission);
-  $('misSave').addEventListener('click', saveMission);
-  $('seAddBtn').addEventListener('click', addSeance);
-
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { closeEntite(); closeMission(); closeReleve(); }
-  });
-  [$('entOverlay'), $('misOverlay')].forEach(ov => {
-    ov.addEventListener('click', (e) => { if (e.target === ov) ov.classList.remove('open'); });
-  });
-
-  // ---------- Compteur d'heures / annualisation (pt 86) ----------
-  // v1 : un seul salarié actif (le picker list_salaries ne renvoie que Lohann),
-  // période courante auto-résolue (celle qui couvre aujourd'hui). Sélecteur de
-  // période + multi-salariés -> v2 (dette tracée).
-  let cpContratId = null;     // contrat actif du salarié v1
-  let cpPeriode = null;       // ligne de synthèse de la période courante
-  let cpMissionsSal = [];     // missions du salarié (pour le select facultatif)
-  let editingReleveId = null;
-
-  const CP_CAT_LBL = {
-    seance: 'Séance', reunion: 'Réunion', deplacement: 'Déplacement',
-    formation: 'Formation', administratif: 'Administratif', autre: 'Autre'
-  };
   function fmtH(n) {
     const v = Number(n || 0);
     return (Math.round(v * 100) / 100).toString().replace('.', ',');
   }
 
-  async function loadCompteur() {
-    // 1) Résoudre le salarié v1 + son contrat actif.
-    let salId = (staff && staff[0]) ? staff[0].personne_id : null;
-    if (!salId) {
-      $('cpSalarieHint').textContent = 'Aucun salarié actif.';
-      $('cpSynthese').style.display = 'none';
-      $('cpNoPeriode').style.display = 'none';
-      renderReleve([]);
-      return;
-    }
-    $('cpSalarieHint').textContent = 'Salarié : ' + staffName(salId) + '.';
+  // ---------- Etat ----------
+  let staff = [];          // list_salaries() -> (personne_id, nom, prenom)
+  let salarieId = null;    // salarie v1 (Lohann)
+  let salarieNom = null;   // libelle d'affichage (prenom + nom)
+  let contratId = null;    // contrat actif du salarie
+  let periode = null;      // ligne d'annualisation couvrant aujourd'hui
 
-    const contrats = await rpc('list_contrats_salaries', { p_inclure_inactifs: false }) || [];
-    const contrat = contrats.find(c => c.personne_id === salId) || null;
-    cpContratId = contrat ? contrat.id : null;
-    if (!cpContratId) {
-      $('cpSynthese').style.display = 'none';
-      $('cpNoPeriode').textContent = 'Aucun contrat actif pour ce salarié.';
-      $('cpNoPeriode').style.display = 'block';
-      renderReleve([]);
-      return;
-    }
-
-    // 2) Synthèse : toutes les périodes du contrat -> retenir celle qui couvre aujourd'hui.
-    const synth = await rpc('list_compteur_annualisation', { p_contrat_id: cpContratId }) || [];
-    const today = new Date().toISOString().slice(0, 10);
-    cpPeriode = synth.find(p => p.date_debut <= today && today <= p.date_fin) || synth[0] || null;
-
-    // 3) Missions du salarié pour le select facultatif (réutilise la saison active).
-    if (saisonActive && saisonActive.id) {
-      cpMissionsSal = await rpc('list_missions', {
-        p_saison_id: saisonActive.id, p_salarie_id: salId, p_entite_id: null
-      }) || [];
-    } else {
-      cpMissionsSal = [];
-    }
-    let mOpts = '<option value="">— aucune —</option>';
-    cpMissionsSal.forEach(m => {
-      mOpts += '<option value="' + m.id + '">' + escapeHtml(m.libelle) + '</option>';
-    });
-    $('cpMission').innerHTML = mOpts;
-
-    renderSynthese();
-
-    // 4) Lignes de relevé de la période.
-    if (cpPeriode) {
-      const lignes = await rpc('list_releve_heures', {
-        p_contrat_id: cpContratId,
-        p_date_debut: cpPeriode.date_debut,
-        p_date_fin: cpPeriode.date_fin
-      }) || [];
-      renderReleve(lignes);
-    } else {
-      renderReleve([]);
-    }
+  // ---------- Resolution du salarie v1 ----------
+  // list_salaries() ne renvoie que les salaries (contrat courant) : v1 = staff[0].
+  // DS-1 : list_salaries renvoie nom/prenom (≠ list_contrats_salaries) -> nom dispo ici.
+  async function resoudreSalarie() {
+    staff = (await rpc('list_salaries')) || [];
+    if (!staff.length) { salarieId = null; salarieNom = null; return; }
+    const s0 = staff[0];
+    salarieId = s0.personne_id || null;
+    salarieNom = [s0.prenom, s0.nom].filter(Boolean).join(' ').trim() || '—';
   }
 
-  function renderSynthese() {
-    if (!cpPeriode) {
-      $('cpSynthese').style.display = 'none';
-      $('cpNoPeriode').textContent = "Aucune période d'annualisation ne couvre aujourd'hui pour ce salarié.";
-      $('cpNoPeriode').style.display = 'block';
-      return;
-    }
-    $('cpNoPeriode').style.display = 'none';
-    $('cpSynthese').style.display = 'block';
-    const p = cpPeriode;
-    $('cpPeriode').textContent = 'Période : ' + p.date_debut + ' → ' + p.date_fin;
-    $('cpCible').textContent = fmtH(p.cible_heures);
-    $('cpRealise').textContent = fmtH(p.realise_heures);
-    $('cpSolde').textContent = fmtH(p.solde_heures);
-    $('cpSup').textContent = fmtH(p.heures_sup);
-    $('cpRepos125').textContent = fmtH(p.repos_si_remplacement);
-    $('cpRepos025').textContent = fmtH(p.repos_si_majoration_seule);
+  // ---------- Bandeau Annualisation ----------
+  // Voie reelle reprise de l'ancien loadCompteur (pt 86), inchangee :
+  // list_contrats_salaries -> contrat du salarie -> list_compteur_annualisation -> periode du jour.
+  async function chargerAnnualisation() {
+    if (!salarieId) { renderAnnuVide('Aucun salarié actif.'); return; }
+    const contrats = (await rpc('list_contrats_salaries', { p_inclure_inactifs: false })) || [];
+    const contrat = contrats.find(c => c.personne_id === salarieId) || null;
+    contratId = contrat ? contrat.id : null;
+    if (!contratId) { renderAnnuVide('Aucun contrat actif pour ce salarié.'); return; }
+
+    const synth = (await rpc('list_compteur_annualisation', { p_contrat_id: contratId })) || [];
+    const today = new Date().toISOString().slice(0, 10);
+    periode = synth.find(p => p.date_debut <= today && today <= p.date_fin) || synth[0] || null;
+    renderAnnu();
+  }
+
+  function renderAnnuVide(msg) {
+    $('peAnnuBody').style.display = 'none';
+    const v = $('peAnnuVide');
+    v.textContent = msg || "Aucune période d'annualisation courante.";
+    v.style.display = 'block';
+  }
+
+  function renderAnnu() {
+    if (!periode) { renderAnnuVide(); return; }
+    $('peAnnuVide').style.display = 'none';
+    $('peAnnuBody').style.display = 'block';
+    const p = periode;
     const cible = Number(p.cible_heures || 0);
     const realise = Number(p.realise_heures || 0);
+    const solde = Number(p.solde_heures || 0);
+    $('peAnnuRealise').textContent = fmtH(realise);
+    $('peAnnuCible').textContent = fmtH(cible);
     const pct = cible > 0 ? Math.min(100, Math.round((realise / cible) * 100)) : 0;
-    const bar = $('cpBar');
+    const bar = $('peAnnuBar');
     bar.firstElementChild.style.width = pct + '%';
     bar.classList.toggle('cp-over', realise > cible);
+    const reste = cible - realise;
+    const resteTxt = reste > 0 ? ('reste ' + fmtH(reste) + ' h') : ('dépassé de ' + fmtH(-reste) + ' h');
+    $('peAnnuSub').textContent = pct + ' % · ' + resteTxt + (Number.isFinite(solde) ? '' : '');
   }
 
-  function renderReleve(rows) {
-    const tb = $('cpRows'); tb.innerHTML = '';
-    $('cpEmpty').style.display = rows.length ? 'none' : 'block';
-    rows.forEach(r => {
-      const tr = document.createElement('tr');
-      const misLbl = r.mission_id
-        ? escapeHtml((cpMissionsSal.find(m => m.id === r.mission_id) || {}).libelle || '—')
-        : '—';
-      tr.innerHTML =
-        '<td>' + (r.date_jour || '') + '</td>' +
-        '<td>' + fmtH(r.heures) + ' h</td>' +
-        '<td>' + escapeHtml(r.heure_debut ? String(r.heure_debut).slice(0, 5) : '—') + '</td>' +
-        '<td>' + escapeHtml(CP_CAT_LBL[r.categorie] || r.categorie || '—') + '</td>' +
-        '<td>' + misLbl + '</td>' +
-        '<td style="text-align:right"></td>';
-      const actions = tr.lastElementChild;
-      const b = document.createElement('button');
-      b.className = 'gs-link edit'; b.textContent = 'Éditer';
-      b.onclick = () => openReleve(r);
-      actions.appendChild(b);
-      const d = document.createElement('button');
-      d.className = 'gs-link danger'; d.textContent = 'Supprimer';
-      d.onclick = () => delReleve(r.id, r.date_jour);
-      actions.appendChild(d);
-      tb.appendChild(tr);
-    });
+  // ---------- En-tete ----------
+  function renderEntete() {
+    const saison = (saisonActive && saisonActive.libelle) ? saisonActive.libelle : '—';
+    const nom = salarieNom || '—';
+    $('peSub').textContent = nom + ' · employeur : MOM · saison ' + saison;
   }
-
-  function openReleve(r) {
-    if (!cpContratId) { flash('Aucun contrat actif : saisie impossible.', 'err'); return; }
-    editingReleveId = r ? r.id : null;
-    $('cpModalTitle').textContent = r ? 'Modifier le relevé' : 'Saisir des heures';
-    $('cpDate').value = r ? (r.date_jour || '') : (new Date().toISOString().slice(0, 10));
-    $('cpHeures').value = r ? (r.heures != null ? r.heures : '') : '';
-    $('cpHeureDebut').value = r && r.heure_debut ? String(r.heure_debut).slice(0, 5) : '';
-    $('cpCategorie').value = r ? (r.categorie || 'autre') : 'autre';
-    $('cpMission').value = r ? (r.mission_id || '') : '';
-    $('cpNotes').value = r ? (r.notes || '') : '';
-    $('cpOverlay').classList.add('open');
-  }
-  function closeReleve() { $('cpOverlay').classList.remove('open'); }
-
-  async function saveReleve() {
-    const dateJour = $('cpDate').value || null;
-    const heuresRaw = $('cpHeures').value;
-    if (!dateJour) { flash('La date est obligatoire.', 'err'); return; }
-    if (heuresRaw === '' || isNaN(Number(heuresRaw))) { flash('Les heures sont obligatoires.', 'err'); return; }
-    // Champs optionnels : null explicite (l'upsert les écrit tels quels en édition).
-    const params = {
-      p_id: editingReleveId,
-      p_contrat_id: cpContratId,
-      p_date_jour: dateJour,
-      p_heures: Number(heuresRaw),
-      p_heure_debut: $('cpHeureDebut').value || null,
-      p_categorie: $('cpCategorie').value || 'autre',
-      p_mission_id: $('cpMission').value || null,
-      p_notes: $('cpNotes').value.trim() || null
-    };
-    try {
-      await rpc('upsert_releve_heures', params);
-      flash(editingReleveId ? 'Relevé mis à jour.' : 'Heures enregistrées.', 'ok');
-      closeReleve();
-      await loadCompteur();
-    } catch (e) {
-      flash(errMsg(e), 'err');
-    }
-  }
-
-  async function delReleve(id, dateJour) {
-    if (!confirm('Supprimer le relevé du ' + (dateJour || '') + ' ?')) return;
-    try {
-      await rpc('supprimer_releve_heures', { p_id: id });
-      flash('Relevé supprimé.', 'ok');
-      await loadCompteur();
-    } catch (e) {
-      flash(errMsg(e), 'err');
-    }
-  }
-
-  $('cpAddBtn').addEventListener('click', () => openReleve(null));
-  $('cpClose').addEventListener('click', closeReleve);
-  $('cpCancel').addEventListener('click', closeReleve);
-  $('cpSave').addEventListener('click', saveReleve);
-  $('cpOverlay').addEventListener('click', (e) => { if (e.target === $('cpOverlay')) closeReleve(); });
 
   // ---------- Boot ----------
   try {
-    await Promise.all([loadSites(), loadSalaries()]);
-    await loadEntites();   // remplit aussi entitesAll + la pioche bénéficiaire
-    await loadMissions();
-    await loadCompteur();  // pt 86 : synthèse + relevé du salarié actif
+    await resoudreSalarie();
+    renderEntete();
+    await chargerAnnualisation();
   } catch (e) {
     flash('Chargement impossible : ' + errMsg(e), 'err');
   }
