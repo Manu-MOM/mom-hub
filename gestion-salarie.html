@@ -159,10 +159,39 @@
   .pe-cadre-no { color: #993c1d; font-weight: 600; }
   .pe-sig { font-size: 12.5px; color: var(--ink-mute, #6b7a74); margin: 4px 0 0; }
   .pe-sig.alert { color: var(--rouge-blesse, #c0392b); }
-  .pe-filters { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 16px; opacity: .5; pointer-events: none; }
-  .pe-chip { font-size: 13px; padding: 6px 14px; border-radius: 16px; border: 1px solid var(--line, #cabe9f); color: var(--ink-mute, #6b7a74); }
+  .pe-filters { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 16px; }
+  .pe-chip { font: inherit; font-size: 13px; padding: 6px 14px; border-radius: 16px; border: 1px solid var(--line, #cabe9f); color: var(--ink-mute, #6b7a74); background: transparent; cursor: pointer; }
+  .pe-chip:hover { border-color: var(--vert-prairie, #2d7a3e); color: var(--vert-prairie, #2d7a3e); }
   .pe-chip.on { background: var(--feedback-info-bg, #eaf1fa); color: var(--feedback-info-fg, #1f4a82); border-color: transparent; }
   .pe-foot { font-size: 12.5px; color: var(--ink-mute, #6b7a74); margin: 18px 0 0; line-height: 1.6; }
+
+  /* ----- Liste centree-mission (etape 3) ----- */
+  .pe-card { background: #fff; border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 12px; padding: 14px 16px; margin: 0 0 12px; }
+  .pe-card-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .pe-card-main { flex: 1; min-width: 0; }
+  .pe-card-titrow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 6px; }
+  .pe-card-titre { font-size: 16px; font-weight: 600; color: var(--ink, #0c3d24); }
+  .pe-card-meta { margin: 0 0 8px; font-size: 13px; color: var(--ink-mute, #6b7a74); }
+  .pe-card-meta.nomb { margin-bottom: 0; }
+  .pe-grp-titre { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-mute, #6b7a74); margin: 18px 0 8px; }
+  .pe-grp-titre:first-child { margin-top: 0; }
+  /* Badges statut (reutilise le gabarit visuel des .gs-badge existants) */
+  .pe-pill { font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 12px; white-space: nowrap; }
+  .pe-pill.st-interne { background: var(--paper, #f0ede6); color: var(--ink-soft, #2a4836); }
+  .pe-pill.st-facturable { background: var(--feedback-warning-bg, #fbf1dd); color: #854f0b; }
+  .pe-pill.st-autre { background: var(--feedback-info-bg, #eaf1fa); color: var(--feedback-info-fg, #1f4a82); }
+  .pe-pill.cad-ok { background: #eaf3de; color: #3b6d11; }
+  .pe-pill.cad-no { background: var(--feedback-error-bg, #fdecea); color: var(--rouge-blesse, #c0392b); }
+  .pe-pill.cad-inc { background: var(--feedback-warning-bg, #fbf1dd); color: #854f0b; }
+  /* Bloc prestation (facturable) */
+  .pe-presta { display: inline-flex; gap: 14px; padding: 6px 12px; border-radius: 8px; margin: 6px 0 0; font-size: 12.5px; }
+  .pe-presta.ok { background: var(--feedback-warning-bg, #fbf1dd); color: #854f0b; }
+  .pe-presta.no { background: var(--feedback-error-bg, #fdecea); color: var(--rouge-blesse, #c0392b); }
+  /* Actions carte */
+  .pe-acts { display: flex; gap: 6px; flex: 0 0 auto; }
+  .pe-icbtn { width: 34px; height: 34px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 8px; background: transparent; border: 1px solid var(--line, #cabe9f); color: var(--ink-mute, #6b7a74); cursor: pointer; text-decoration: none; }
+  .pe-icbtn:hover { border-color: var(--vert-prairie, #2d7a3e); color: var(--vert-prairie, #2d7a3e); }
+  .pe-icbtn svg { width: 16px; height: 16px; }
 </style>
 </head>
 <body class="auth-pending">
@@ -269,19 +298,18 @@
 
   </div>
 
-  <!-- ===== Filtres (placeholder etape 3) ===== -->
-  <div class="pe-filters" id="peFilters" aria-hidden="true">
-    <span class="pe-chip on">Toutes</span>
-    <span class="pe-chip">Par bénéficiaire</span>
-    <span class="pe-chip">Facturables</span>
-    <span class="pe-chip">En cours</span>
-    <span class="pe-chip">À clôturer</span>
+  <!-- ===== Filtres (cable etape 3) ===== -->
+  <div class="pe-filters" id="peFilters">
+    <button type="button" class="pe-chip on" data-filter="toutes">Toutes</button>
+    <button type="button" class="pe-chip" data-filter="benef">Par bénéficiaire</button>
+    <button type="button" class="pe-chip" data-filter="facturables">Facturables</button>
+    <button type="button" class="pe-chip" data-filter="encours">En cours</button>
+    <button type="button" class="pe-chip" data-filter="aclore">À clôturer</button>
   </div>
 
-  <!-- ===== Liste centree-mission (placeholder etape 3) ===== -->
-  <div id="peListe">
-    <div class="gs-empty" id="peListeSoon">La liste centrée-mission est câblée à l'étape 3.</div>
-  </div>
+  <!-- ===== Liste centree-mission (cable etape 3) ===== -->
+  <div id="peListe"></div>
+  <div class="gs-empty" id="peListeVide" style="display:none">Aucune mission pour ce filtre.</div>
 
   <p class="pe-foot">Chaque donnée affichée existe déjà en base (chantiers A→D). La page ne fait que
   les remonter et les agréger côté front — zéro SQL de modèle.</p>
@@ -359,6 +387,7 @@
   let missions = [];       // list_missions (saison + salarie)
   let entites = [];        // list_entites(true) : toutes (actives + inactives)
   const entiteById = new Map();
+  let filtreCourant = 'toutes';  // toutes | benef | facturables | encours | aclore
 
   // ---------- Resolution du salarie v1 ----------
   // list_salaries() ne renvoie que les salaries (contrat courant) : v1 = staff[0].
@@ -539,6 +568,175 @@
     sig(sansCoord, sansCoord > 1 ? 'bénéficiaires sans coordonnées' : 'bénéficiaire sans coordonnées', true);
   }
 
+  // ---------- Liste centree-mission (etape 3) ----------
+  // Vocabulaire reel (sonde H) : missions.etat ∈ {prevue, terminee, annulee}
+  // (la maquette « en cours » etait une etiquette d'illustration). statut ∈
+  // {interne, facturable, autre}. Badge de cadrage : sur facturable seulement.
+  // DS-1 (decision tracee) : pas d'heures/seances sur les cartes (vivent dans les
+  // seances, vides jusqu'a aout ; rebranchement a la rentree).
+  const ETAT_LBL = { prevue: 'prévue', terminee: 'terminée', annulee: 'annulée' };
+  const STATUT_LBL = { interne: 'interne', facturable: 'facturable', autre: 'autre' };
+
+  function fmtDateFR(s) {
+    if (!s) return '—';
+    const p = String(s).slice(0, 10).split('-');
+    return p.length === 3 ? (p[2] + '/' + p[1] + '/' + p[0]) : s;
+  }
+
+  // Badge de cadrage (facturable uniquement) : cadree (ref+montant) / a cadrer
+  // (ref manquante) / incomplete (ref XOR montant). Affichage conditionnel pur.
+  function cadrageBadge(m) {
+    const aRef = !!(m.reference_commande && String(m.reference_commande).trim());
+    const aMt = (m.montant != null && Number(m.montant) > 0);
+    if (aRef && aMt) return { cls: 'cad-ok', txt: 'cadrée' };
+    if (!aRef && aMt) return { cls: 'cad-no', txt: 'à cadrer' };
+    if (aRef && !aMt) return { cls: 'cad-inc', txt: 'incomplète' };
+    return { cls: 'cad-no', txt: 'à cadrer' };
+  }
+
+  // Filtrage selon le chip courant. « benef » ne retire rien (groupement, gere au rendu).
+  function missionsFiltrees() {
+    switch (filtreCourant) {
+      case 'facturables': return missions.filter(m => m.statut === 'facturable');
+      case 'encours':     return missions.filter(m => m.etat === 'prevue');
+      case 'aclore':      return missions.filter(m => m.etat === 'terminee' && !(m.bilan_text && String(m.bilan_text).trim()));
+      default:            return missions.slice();  // toutes | benef
+    }
+  }
+
+  function buildCarte(m) {
+    const card = document.createElement('div');
+    card.className = 'pe-card';
+
+    const row = document.createElement('div');
+    row.className = 'pe-card-row';
+
+    const main = document.createElement('div');
+    main.className = 'pe-card-main';
+
+    // Titre + badges (etat, statut, cadrage si facturable).
+    const titrow = document.createElement('div');
+    titrow.className = 'pe-card-titrow';
+    const titre = document.createElement('span');
+    titre.className = 'pe-card-titre';
+    titre.textContent = m.libelle || '(sans libellé)';
+    titrow.appendChild(titre);
+
+    const bEtat = document.createElement('span');
+    bEtat.className = 'gs-badge ' + (m.etat || '');
+    bEtat.textContent = ETAT_LBL[m.etat] || m.etat || '—';
+    titrow.appendChild(bEtat);
+
+    const bStatut = document.createElement('span');
+    bStatut.className = 'pe-pill st-' + (m.statut || 'interne');
+    bStatut.textContent = STATUT_LBL[m.statut] || m.statut || '—';
+    titrow.appendChild(bStatut);
+
+    if (m.statut === 'facturable') {
+      const c = cadrageBadge(m);
+      const bCad = document.createElement('span');
+      bCad.className = 'pe-pill ' + c.cls;
+      bCad.textContent = c.txt;
+      titrow.appendChild(bCad);
+    }
+    main.appendChild(titrow);
+
+    // Meta : beneficiaire + dates.
+    const meta = document.createElement('p');
+    const benef = benefLabel(m.entite_id);
+    const bits = [];
+    if (benef) bits.push(benef);
+    bits.push('début ' + fmtDateFR(m.date_debut));
+    if (m.date_fin) bits.push('fin ' + fmtDateFR(m.date_fin));
+    meta.textContent = bits.join(' · ');
+    meta.className = 'pe-card-meta' + (m.statut === 'facturable' ? '' : ' nomb');
+    main.appendChild(meta);
+
+    // Bloc prestation (facturable seulement).
+    if (m.statut === 'facturable') {
+      const presta = document.createElement('div');
+      const aRef = !!(m.reference_commande && String(m.reference_commande).trim());
+      presta.className = 'pe-presta ' + (aRef ? 'ok' : 'no');
+      const sRef = document.createElement('span');
+      sRef.textContent = aRef ? ('cmd ' + m.reference_commande) : 'réf. commande manquante';
+      presta.appendChild(sRef);
+      if (m.montant != null && Number(m.montant) > 0) {
+        const sMt = document.createElement('span');
+        sMt.textContent = fmtEur(m.montant) + ' €';
+        presta.appendChild(sMt);
+      }
+      main.appendChild(presta);
+    }
+
+    row.appendChild(main);
+
+    // Actions : Modifier (renvoi suivi) + Detail. Point ouvert kit 4.1 : le poste
+    // est lecture seule -> « Modifier » renvoie vers suivi-salarie.html (creation/
+    // edition centralisees, kit 1.3). Detail : ancre interne (non cable a l'etape 3).
+    const acts = document.createElement('div');
+    acts.className = 'pe-acts';
+    const edit = document.createElement('a');
+    edit.className = 'pe-icbtn';
+    edit.href = 'suivi-salarie.html';
+    edit.title = 'Modifier (dans le suivi du salarié)';
+    edit.setAttribute('aria-label', 'Modifier');
+    edit.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+    acts.appendChild(edit);
+    row.appendChild(acts);
+
+    card.appendChild(row);
+    return card;
+  }
+
+  function renderListe() {
+    const wrap = $('peListe');
+    wrap.innerHTML = '';
+    const rows = missionsFiltrees();
+    if (!rows.length) {
+      $('peListeVide').style.display = 'block';
+      return;
+    }
+    $('peListeVide').style.display = 'none';
+
+    if (filtreCourant === 'benef') {
+      // Groupement par beneficiaire (« sans bénéficiaire » en fin).
+      const groupes = new Map();
+      rows.forEach(m => {
+        const lbl = benefLabel(m.entite_id) || 'Sans bénéficiaire';
+        if (!groupes.has(lbl)) groupes.set(lbl, []);
+        groupes.get(lbl).push(m);
+      });
+      const noms = Array.prototype.slice.call(groupes.keys()).sort((a, b) => {
+        if (a === 'Sans bénéficiaire') return 1;
+        if (b === 'Sans bénéficiaire') return -1;
+        return a.localeCompare(b, 'fr');
+      });
+      noms.forEach(nom => {
+        const h = document.createElement('p');
+        h.className = 'pe-grp-titre';
+        h.textContent = nom;
+        wrap.appendChild(h);
+        groupes.get(nom).forEach(m => wrap.appendChild(buildCarte(m)));
+      });
+    } else {
+      rows.forEach(m => wrap.appendChild(buildCarte(m)));
+    }
+  }
+
+  function wireFiltres() {
+    const cont = $('peFilters');
+    if (!cont) return;
+    cont.addEventListener('click', function (e) {
+      const btn = e.target.closest('.pe-chip');
+      if (!btn) return;
+      filtreCourant = btn.getAttribute('data-filter') || 'toutes';
+      Array.prototype.forEach.call(cont.querySelectorAll('.pe-chip'), function (c) {
+        c.classList.toggle('on', c === btn);
+      });
+      renderListe();
+    });
+  }
+
   // ---------- En-tete ----------
   function renderEntete() {
     const saison = (saisonActive && saisonActive.libelle) ? saisonActive.libelle : '—';
@@ -554,6 +752,8 @@
     await chargerMissionsEntites();
     renderRefac();
     renderTraiter();
+    wireFiltres();
+    renderListe();
   } catch (e) {
     flash('Chargement impossible : ' + errMsg(e), 'err');
   }
