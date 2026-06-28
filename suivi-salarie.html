@@ -607,7 +607,9 @@
     <div class="ss-fact" id="ssMisFact">
       <p class="ss-fact-head">Prestation (cette mission)</p>
       <div class="ss-row2">
-        <div class="ss-field"><label for="ssMisRefCommande">Référence commande</label><input type="text" id="ssMisRefCommande"></div>
+        <div class="ss-field"><label for="ssMisRefCommande">Référence commande</label><input type="text" id="ssMisRefCommande">
+          <button type="button" class="ss-link" id="ssMisGenRef" style="margin-top:4px;padding:0;">⟳ Générer une référence interne</button>
+        </div>
         <div class="ss-field"><label for="ssMisMontant">Montant (€)</label><input type="number" id="ssMisMontant" min="0" step="0.01"></div>
       </div>
     </div>
@@ -1423,6 +1425,28 @@
     $('ssMisBenefWrap').style.display = benefVisible ? '' : 'none';
     $('ssMisFact').classList.toggle('open', st === 'facturable');
   }
+  // Generation d'une reference commande INTERNE (RPC generer_reference_commande,
+  // sequence globale cote base). Override-safe : si le champ contient deja une
+  // valeur, on confirme avant d'ecraser. La RPC consomme un numero a l'appel
+  // (sequence a trous possible si la mission n'est pas enregistree ensuite -
+  // comportement assume, comme une numerotation de facture).
+  async function genererRefCommande() {
+    const champ = $('ssMisRefCommande');
+    const actuel = (champ.value || '').trim();
+    if (actuel && !window.confirm('Une référence est déjà saisie (« ' + actuel + ' »). La remplacer par une référence générée ?')) {
+      return;
+    }
+    const btn = $('ssMisGenRef');
+    if (btn) btn.disabled = true;
+    try {
+      const ref = await rpc('generer_reference_commande', {});
+      if (ref) { champ.value = ref; champ.focus(); }
+    } catch (e) {
+      flash(errMsg(e), 'err');
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
   // Forfaits durée : remplit le champ Durée (min) du bloc Récurrence (aucun comptage neuf).
   function applyForfait(min) {
     $('ssMisRecurDuree').value = String(min);
@@ -1915,6 +1939,7 @@
     $('ssMisBenefCreate').addEventListener('click', function () { $('ssEntCreate').classList.toggle('open'); });
     // Chantier D : pilotage statut, forfaits durée, mode récurrence.
     $('ssMisStatut').addEventListener('change', applyStatutUI);
+    if ($('ssMisGenRef')) $('ssMisGenRef').addEventListener('click', genererRefCommande);
     $('ssMisForfaits').addEventListener('click', function (e) {
       const b = e.target.closest('.ss-forfait');
       if (b && b.dataset.min) applyForfait(parseInt(b.dataset.min, 10));
