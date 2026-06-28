@@ -113,9 +113,9 @@
     </nav>
 
     <div class="user-profile">
-      <div class="avatar" id="dgAvatar">LH</div>
+      <div class="avatar" id="dgAvatar">·</div>
       <div class="user-info">
-        <div class="user-name" id="dgName">Salarié</div>
+        <div class="user-name" id="dgName">Espace salarié</div>
         <div class="user-role">Démarchage</div>
       </div>
       <a href="./" class="user-action" title="Retour au portail" aria-label="Retour au portail">
@@ -176,18 +176,11 @@
     }
   } catch (_) { /* libellé statique conservé */ }
 
-  // Nom affiché (best effort, ne bloque rien).
-  try {
-    const staff = (await SupabaseHub.client.rpc('list_salaries')).data || [];
-    if (staff.length) {
-      const nom = [staff[0].prenom, staff[0].nom].filter(Boolean).join(' ').trim();
-      if (nom) {
-        document.getElementById('dgName').textContent = nom;
-        const ini = [staff[0].prenom, staff[0].nom].filter(Boolean).map(s => s[0]).join('').toUpperCase();
-        if (ini) document.getElementById('dgAvatar').textContent = ini.slice(0, 2);
-      }
-    }
-  } catch (_) { /* « Salarié » par défaut */ }
+  // Topbar (nom/pastille/rôle) : gérée par le helper central _remplirProfilTopbar
+  // de supabase-client.js, qui affiche l'identité RÉELLE du connecté (toi=admin,
+  // Lohann=encadrant). On NE force PLUS list_salaries()[0] ici : ce bloc affichait
+  // toujours Lohann (1er salarié) quel que soit qui regarde → « Lohann · Administrateur »
+  // quand un admin ouvrait la page. Le helper + le repli en dur neutre suffisent.
 
   const client = SupabaseHub.client;
   const $ = (id) => document.getElementById(id);
