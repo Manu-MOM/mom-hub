@@ -1,0 +1,31 @@
+{
+  "_meta": {
+    "type": "mail-types",
+    "nom": "Mails-types de prospection",
+    "version": "1.0",
+    "date_creation": "2026-06-28",
+    "date_maj": "2026-06-28",
+    "description": "Gabarits de mail de démarchage, indexés par type_entite. Hand-editable : le bureau modifie le contenu par commit, aucun backend, aucun SMTP. Envoi via le client mail (mailto / copier-coller).",
+    "source": "Module B « Prospection / Développement scolaire » (FAIT FOI §3.5)",
+    "_variables": {
+      "{nom_ecole}": "entites.libelle",
+      "{contact_nom}": "entites.contact_nom"
+    },
+    "_note_creneau": "Le créneau proposé n'est PAS une variable : il dépend du planning de Lohann, instable à la rentrée. Il est saisi à la main par Lohann dans son client mail.",
+    "_changelog": [
+      "1.0 (2026-06-28) - Création initiale. Seule clé remplie : ecole_elementaire (cible v1). Structure dict par type_entite extensible (collège, lycée, mjc… à remplir au besoin, hors v1)."
+    ]
+  },
+  "mails": {
+    "ecole_elementaire": {
+      "objet": "Mutzig Ovalie Molsheim — proposition d'un cycle rugby éducatif pour vos classes",
+      "corps": "Bonjour {contact_nom},\n\nJe me permets de vous contacter au nom du club de rugby Mutzig Ovalie Molsheim (MOM).\n\nDans le cadre de nos actions auprès des écoles du secteur, nous proposons aux établissements comme {nom_ecole} un cycle de rugby éducatif : un ensemble de séances structurées sur une période, encadrées par un intervenant diplômé du club et conçues pour s'intégrer au projet pédagogique de l'école (motricité, coopération, respect des règles et de l'adversaire).\n\nLe cycle est adapté à l'âge des élèves et au matériel disponible ; il ne nécessite aucun équipement particulier de votre part. Nous nous calons sur votre organisation pour définir ensemble les créneaux les plus adaptés.\n\nSeriez-vous disponible pour un court échange afin d'envisager une intervention au sein de {nom_ecole} ? Je reste à votre disposition pour vous présenter le contenu des séances et répondre à vos questions.\n\nBien cordialement,\n\nMutzig Ovalie Molsheim\nÉcole de rugby"
+    },
+    "college": null,
+    "lycee": null,
+    "mjc": null,
+    "club": null,
+    "interne": null,
+    "autre": null
+  }
+}
