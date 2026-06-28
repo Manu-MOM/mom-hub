@@ -389,6 +389,14 @@
   const entiteById = new Map();
   let filtreCourant = 'toutes';  // toutes | benef | facturables | encours | aclore
 
+  // Agregat de seances par mission : { nbSeances, hPrevues, hReelles }.
+  // Voie alpha (boucle list_mission_seances par mission ; aucune voie agregee en base,
+  // sonde K). hPrevues = somme duree_min/60 (dispo des generation des seances).
+  // hReelles = somme heures_reelles (renseigne par declarer_occurrence -> peuple a la
+  // rentree, aout 2026). Tant qu'aucune heure reelle n'existe, on n'affiche que le prevu.
+  const seancesAgg = new Map();   // mission_id -> { nbSeances, hPrevues, hReelles }
+  let aDuReel = false;            // bascule auto : true des qu'une heure_reelle existe
+
   // ---------- Resolution du salarie v1 ----------
   // list_salaries() ne renvoie que les salaries (contrat courant) : v1 = staff[0].
   // DS-1 : list_salaries renvoie nom/prenom (≠ list_contrats_salaries) -> nom dispo ici.
@@ -458,6 +466,38 @@
     entites = (await rpc('list_entites', { p_inclure_inactives: true })) || [];
     entiteById.clear();
     entites.forEach(e => entiteById.set(e.id, e));
+
+    // Seances : voie alpha (une lecture par mission ; aucune voie agregee, sonde K).
+    // Volume reel minuscule (poignee de missions x poignee de seances). On agrege
+    // ici une fois ; cartes ET bandeaux reutilisent seancesAgg (zero requete en plus).
+    seancesAgg.clear();
+    aDuReel = false;
+    for (let i = 0; i < missions.length; i++) {
+      const mid = missions[i].id;
+      let seances = [];
+      try {
+        seances = (await rpc('list_mission_seances', { p_mission_id: mid })) || [];
+      } catch (e) { seances = []; }
+      let nb = 0, hPrev = 0, hReel = 0;
+      seances.forEach(s => {
+        if (s.etat === 'annulee') return;               // exclut les seances annulees
+        nb++;
+        if (s.duree_min != null) hPrev += Number(s.duree_min) / 60;
+        if (s.heures_reelles != null) { hReel += Number(s.heures_reelles); aDuReel = true; }
+      });
+      seancesAgg.set(mid, { nbSeances: nb, hPrevues: hPrev, hReelles: hReel });
+    }
+  }
+
+  // Libelle heures d'une mission : « N séances · H h prévues » (+ « · R h réelles »
+  // des qu'une heure reelle existe en base, bascule auto via aDuReel a la rentree).
+  function heuresLabel(missionId) {
+    const a = seancesAgg.get(missionId);
+    if (!a || a.nbSeances === 0) return null;
+    const bits = [a.nbSeances + (a.nbSeances > 1 ? ' séances' : ' séance')];
+    bits.push(fmtH(a.hPrevues) + ' h prévues');
+    if (aDuReel) bits.push(fmtH(a.hReelles) + ' h réelles');
+    return bits.join(' · ');
   }
 
   // Format monetaire FR (2 decimales, espace milliers, virgule).
@@ -486,7 +526,7 @@
     $('peRefacVide').style.display = 'none';
     $('peRefacBody').style.display = 'block';
 
-    let total = 0, cadre = 0, aCadrer = 0;
+    let total = 0, cadre = 0, aCadrer = 0, hPrev = 0, hReel = 0;
     const parBenef = new Map();
     fact.forEach(m => {
       const mt = Number(m.montant || 0);
@@ -495,10 +535,16 @@
       if (aRef) cadre += mt; else aCadrer += mt;
       const lbl = benefLabel(m.entite_id) || 'sans bénéficiaire';
       parBenef.set(lbl, (parBenef.get(lbl) || 0) + mt);
+      const agg = seancesAgg.get(m.id);
+      if (agg) { hPrev += agg.hPrevues; hReel += agg.hReelles; }
     });
 
     $('peRefacTotal').textContent = fmtEur(total);
-    $('peRefacCount').textContent = fact.length + ' mission' + (fact.length > 1 ? 's' : '') + ' facturable' + (fact.length > 1 ? 's' : '');
+    // Compteur : missions + heures prevues facturables (+ reelles des qu'elles existent).
+    const hTxt = aDuReel
+      ? (fmtH(hPrev) + ' h prévues · ' + fmtH(hReel) + ' h réelles')
+      : (fmtH(hPrev) + ' h prévues');
+    $('peRefacCount').textContent = hTxt + ' · ' + fact.length + ' mission' + (fact.length > 1 ? 's' : '');
 
     // Ventilation par beneficiaire (triee montant decroissant).
     const vent = Array.prototype.slice.call(parBenef.entries())
@@ -641,11 +687,13 @@
     }
     main.appendChild(titrow);
 
-    // Meta : beneficiaire + dates.
+    // Meta : beneficiaire + seances/heures + dates.
     const meta = document.createElement('p');
     const benef = benefLabel(m.entite_id);
     const bits = [];
     if (benef) bits.push(benef);
+    const hLbl = heuresLabel(m.id);
+    if (hLbl) bits.push(hLbl);
     bits.push('début ' + fmtDateFR(m.date_debut));
     if (m.date_fin) bits.push('fin ' + fmtDateFR(m.date_fin));
     meta.textContent = bits.join(' · ');
