@@ -302,6 +302,16 @@
       <div id="peEmissionListe"></div>
     </div>
 
+    <!-- Bloc EXPORT comptable (B-facturation-export pt 132, greffe additive E1=c/E3=a/E4=a/E5=a) -->
+    <div class="pe-band" id="peRefacExport" style="display:none">
+      <p class="pe-band-lbl">Export comptable</p>
+      <p class="pe-band-sub" id="peExportInfo">—</p>
+      <div class="pe-emis-row" style="border:none;padding-top:6px;">
+        <button type="button" class="pe-emis-btn" id="peExportCsv">⬇ CSV</button>
+        <button type="button" class="pe-emis-btn" id="peExportXlsx">⬇ xlsx</button>
+      </div>
+    </div>
+
     <!-- Bandeau 3 : A TRAITER (cable etape 2) -->
     <div class="pe-band" id="peBandTraiter">
       <p class="pe-band-lbl">À traiter</p>
@@ -329,6 +339,8 @@
   les remonter et les agréger côté front — zéro SQL de modèle.</p>
 </div>
 
+<!-- SheetJS (export xlsx « À refacturer », B-facturation-export pt 132). Meme CDN que pt 125. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="js/supabase-client.js"></script>
 <script>
@@ -743,6 +755,125 @@
     w.document.open(); w.document.write(doc); w.document.close();
   }
 
+  // ---------- Export comptable « A refacturer » (B-facturation-export pt 132) ----------
+  // 2e temps de D1 : export structure transmissible a la compta aval. Greffe additive.
+  // Reutilise EXACTEMENT la logique d'emissibilite (β) du justificatif (helpers
+  // lignesCadrees / nbACadrer / entiteById), donc memes lignes / meme total que le
+  // document imprimable pt 131. ZERO SQL, ZERO mutation (poste lecture seule).
+  // E1=c (CSV + xlsx), E2=a (1 ligne = 1 mission cadree), E3=a (tous emissibles d'un
+  // coup), E4=a (bouton global), E5=a (cadrees seulement).
+  //
+  // collecteRefac() : produit la table commune (entete + lignes) consommee par les
+  // deux exports, afin que CSV et xlsx restent strictement coherents entre eux et avec
+  // le justificatif. Lignes triees par beneficiaire (montant cadre decroissant, meme
+  // ordre que renderEmission), puis par reference interne.
+  function collecteRefac() {
+    const ids = [];
+    const vus = new Set();
+    missions.forEach(m => {
+      if (m.statut !== 'facturable') return;
+      if (!m.entite_id || vus.has(m.entite_id)) return;
+      if (lignesCadrees(m.entite_id).length) { vus.add(m.entite_id); ids.push(m.entite_id); }
+    });
+    ids.sort((a, b) => {
+      const sa = lignesCadrees(a).reduce((s, m) => s + Number(m.montant || 0), 0);
+      const sb = lignesCadrees(b).reduce((s, m) => s + Number(m.montant || 0), 0);
+      return sb - sa;
+    });
+    const enTete = ['Bénéficiaire', 'SIRET bénéf.', 'Réf interne', 'Cycle', 'Début', 'Fin', 'Montant (€)'];
+    const lignes = [];
+    let total = 0;
+    ids.forEach(id => {
+      const e = entiteById.get(id) || {};
+      const nom = e.raison_sociale || e.libelle || benefLabel(id) || '—';
+      const sortBy = (a, b) => String(a.reference_commande).localeCompare(String(b.reference_commande), 'fr');
+      lignesCadrees(id).slice().sort(sortBy).forEach(m => {
+        const mt = Number(m.montant || 0);
+        total += mt;
+        lignes.push([
+          nom,
+          e.siret || '',
+          m.reference_commande || '',
+          m.libelle || m.code || '',
+          fmtDateFR(m.date_debut),
+          fmtDateFR(m.date_fin),
+          mt
+        ]);
+      });
+    });
+    return { enTete, lignes, total, nbBenef: ids.length };
+  }
+
+  // Horodatage de fichier AAAAMMJJ (date locale).
+  function stampFichier() {
+    const d = new Date();
+    return d.getFullYear() + ('0' + (d.getMonth() + 1)).slice(-2) + ('0' + d.getDate()).slice(-2);
+  }
+
+  // Echappe une cellule CSV (RFC 4180 : guillemets doubles, virgule, retour ligne).
+  function csvCell(v) {
+    const s = (v == null) ? '' : String(v);
+    return /[";\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  // Export CSV (separateur point-virgule, conv FR ; BOM UTF-8 pour Excel ; montant
+  // en virgule decimale FR). Net forfaitaire D4, montants tels quels, aucun calcul TVA.
+  function exporterRefacCSV() {
+    const { enTete, lignes, total } = collecteRefac();
+    if (!lignes.length) { flash('Rien à refacturer (aucune ligne cadrée).', 'err'); return; }
+    const fmtMt = (n) => Number(n).toFixed(2).replace('.', ',');
+    const rows = [];
+    rows.push(enTete.map(csvCell).join(';'));
+    lignes.forEach(l => {
+      const out = l.slice();
+      out[6] = fmtMt(out[6]);
+      rows.push(out.map(csvCell).join(';'));
+    });
+    rows.push(['TOTAL', '', '', '', '', '', fmtMt(total)].map(csvCell).join(';'));
+    const blob = new Blob(['\uFEFF' + rows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'refacturation-MOM-' + stampFichier() + '.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  // Export xlsx (SheetJS, meme patron que le bilan d'heures pt 125). Montant en nombre
+  // (cellule numerique) ; ligne TOTAL en formule SUM pour controle compta. Garde CDN.
+  function exporterRefacXlsx() {
+    if (typeof XLSX === 'undefined') {
+      flash('Bibliothèque xlsx indisponible (CDN bloqué). Utilisez l’export CSV.', 'err');
+      return;
+    }
+    const { enTete, lignes, total } = collecteRefac();
+    if (!lignes.length) { flash('Rien à refacturer (aucune ligne cadrée).', 'err'); return; }
+    const aoa = [enTete];
+    lignes.forEach(l => aoa.push(l.slice()));
+    const totalRow = aoa.length + 1; // 1-based ; ligne TOTAL ajoutee juste apres.
+    aoa.push(['TOTAL', '', '', '', '', '', { t: 'n', f: 'SUM(G2:G' + (aoa.length) + ')' }]);
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [{ wch: 28 }, { wch: 16 }, { wch: 14 }, { wch: 24 }, { wch: 11 }, { wch: 11 }, { wch: 13 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'À refacturer'); // <=31 car.
+    XLSX.writeFile(wb, 'refacturation-MOM-' + stampFichier() + '.xlsx');
+  }
+
+  // Affiche / masque le bloc d'export selon emissibilite (β) ; meme condition que
+  // renderEmission(). Cable les deux boutons (idempotent : on remplace les handlers).
+  function renderExport() {
+    const box = $('peRefacExport');
+    if (!box) return;
+    const { lignes, total, nbBenef } = collecteRefac();
+    if (!lignes.length) { box.style.display = 'none'; return; }
+    box.style.display = 'block';
+    $('peExportInfo').textContent =
+      lignes.length + ' ligne' + (lignes.length > 1 ? 's' : '')
+      + ' · ' + nbBenef + ' bénéficiaire' + (nbBenef > 1 ? 's' : '')
+      + ' · ' + fmtEur(total) + ' €';
+    $('peExportCsv').onclick = exporterRefacCSV;
+    $('peExportXlsx').onclick = exporterRefacXlsx;
+  }
+
   // ---------- Bandeau « A traiter » ----------
   // Compteur de signaux, tous lus sur missions (+ croisement entites pour l'obs. 3) :
   //  - bilan manquant : bilan_text vide ;
@@ -973,6 +1104,7 @@
     await chargerMissionsEntites();
     renderRefac();
     renderEmission();
+    renderExport();
     renderTraiter();
     wireFiltres();
     renderListe();
