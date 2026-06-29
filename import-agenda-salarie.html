@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Import agenda · MOM Hub</title>
+<link rel="icon" type="image/png" href="assets/logo-m2m.png">
+<!--
+  MOM Hub · Import agenda Google → séances — surface EXÉCUTANT (Lohann), module B-light.
+  Conforme au FAIT FOI « Agenda Google → séances » (29/06/2026), gate amont pt 133.
+  Plateforme licences FFR : OVAL-E (avec A).
+
+  PRINCIPE (FAIT FOI D-DIRECTION) : sens unique ENTRANT. Google PROPOSE, le Hub
+  ÉCRIT mission_seances, jamais l'inverse, toujours via confirmation humaine.
+
+  PLOMBERIE (FAIT FOI D-LECTURE) : dépôt MANUEL du fichier .ics (téléchargé par
+  l'humain depuis Google), parsé en JS LOCAL dans le navigateur. Le fetch() direct
+  de l'URL iCal Google est bloqué par CORS (sonde S3bis) → un fichier déposé se lit
+  sans requête réseau. ZÉRO OAuth, ZÉRO secret, ZÉRO backend, ZÉRO Edge Function.
+
+  CONFIRMATION (FAIT FOI D-CONFIRMATION, choix α) : c'est Lohann qui confirme, via
+  creer_seance_ponctuelle (garde voie 3 : salarié de la mission). Pour un non-admin
+  l'état est FORCÉ à 'realisee'. Le compteur d'annualisation ne bouge qu'à la
+  VALIDATION bureau (sync_releve_depuis_occurrence = validee-only) → l'import ne
+  contamine jamais le compteur.
+
+  ANTI-DOUBLON : colonne-pont mission_seances.gcal_uid (sql_134) + index unique
+  partiel. Pré-check FRONT (arbitrage 4 = oui) : un créneau dont l'UID est déjà en
+  base s'affiche grisé « déjà dans le Hub » au lieu de laisser planter la contrainte.
+
+  RPC consommées (wrappers supabase-client.js v1.70) :
+    listMissionsSalarie(salarieId) — list_missions filtrée p_salarie_id (sélecteur).
+    listMissionSeances(missionId)  — list_mission_seances (inclut gcal_uid : pré-check).
+    creerSeancePonctuelle({...})    — creer_seance_ponctuelle étendue (p_gcal_uid).
+
+  PÉRIMÈTRE v1 : créations seules. Modif/suppression/récurrence Google = v2 (FAIT FOI §8).
+  RGPD : ne projeter que date/heure/durée/libellé/lieu/UID. Pas d'invités, pas d'emails.
+-->
+<link rel="stylesheet" href="css/hub.css">
+<style>
+  body.auth-pending { visibility: hidden; }
+
+  .ia-wrap { max-width: 760px; margin: 0 auto; padding: 32px 20px 56px; min-height: 60vh; }
+  .ia-hd { text-align: center; margin-bottom: 22px; }
+  .ia-hd h1 { font-size: 19px; margin: 0 0 4px; color: var(--ink, #0c3d24); }
+  .ia-hd p { font-size: 13px; color: var(--ink-mute, #6b7a74); margin: 0; }
+
+  .gs-msg { padding: 10px 14px; border-radius: 8px; font-size: 14px; margin: 0 0 16px; display: none; }
+  .gs-msg.ok { background: #e8f1ec; color: var(--vert-prairie, #1b6b4c); display: block; }
+  .gs-msg.err { background: #f7e6e2; color: var(--rouge-blesse, #c0392b); display: block; }
+  .gs-msg.info { background: #eef3f7; color: #2c5777; display: block; }
+
+  /* Étape 1 : dépôt du fichier */
+  .ia-drop { background: #fff; border: 1.5px dashed var(--paper-warm, #cfd8d2);
+             border-radius: 16px; padding: 26px 22px; text-align: center;
+             transition: border-color .15s, background .15s; }
+  .ia-drop.drag { border-color: var(--vert-prairie, #1b6b4c); background: #f3f8f5; }
+  .ia-drop h2 { font-size: 15px; margin: 0 0 6px; color: var(--ink, #0c3d24); }
+  .ia-drop p { font-size: 13px; color: var(--ink-mute, #6b7a74); margin: 0 0 14px; }
+  .ia-filebtn { display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+                background: var(--vert-prairie, #1b6b4c); color: #fff; font-size: 14px;
+                font-weight: 600; padding: 10px 18px; border-radius: 10px; border: none; }
+  .ia-filebtn input { display: none; }
+  .ia-hint { font-size: 12px; color: var(--ink-mute, #8a978f); margin-top: 12px; line-height: 1.5; }
+
+  /* Bandeau récap fichier */
+  .ia-fileinfo { display: none; align-items: center; gap: 10px; background: #fff;
+                 border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 12px;
+                 padding: 12px 16px; margin-top: 14px; font-size: 13px; color: var(--ink, #0c3d24); }
+  .ia-fileinfo.show { display: flex; }
+  .ia-fileinfo .nm { font-weight: 600; }
+  .ia-fileinfo .reset { margin-left: auto; background: none; border: none; cursor: pointer;
+                        color: var(--ink-mute, #6b7a74); font-size: 13px; text-decoration: underline; }
+
+  /* File de créneaux */
+  .ia-list { margin-top: 22px; display: flex; flex-direction: column; gap: 14px; }
+  .ia-card { background: #fff; border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 14px;
+             padding: 18px 18px 16px; box-shadow: 0 4px 16px rgba(12,61,36,.06); }
+  .ia-card.dup { opacity: .62; background: #f6f7f6; }
+  .ia-card.done { border-color: var(--vert-prairie, #9cc4b2); }
+  .ia-card-top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+  .ia-card-top .when { font-size: 15px; font-weight: 700; color: var(--ink, #0c3d24); }
+  .ia-card-top .dur { font-size: 12px; color: var(--ink-mute, #6b7a74); }
+  .ia-sum { font-size: 14px; color: var(--ink, #0c3d24); margin: 2px 0 12px; }
+  .ia-loc { font-size: 12px; color: var(--ink-mute, #6b7a74); }
+  .ia-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600;
+              padding: 3px 9px; border-radius: 999px; }
+  .ia-badge.dup { background: #eceff0; color: #6b7a74; }
+  .ia-badge.done { background: #e8f1ec; color: var(--vert-prairie, #1b6b4c); }
+
+  .ia-fields { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 6px; }
+  @media (min-width: 560px) { .ia-fields { grid-template-columns: 1fr 150px; } }
+  .ia-fld label { display: block; font-size: 12px; font-weight: 600; color: var(--ink-mute, #6b7a74); margin-bottom: 4px; }
+  .ia-fld select, .ia-fld input { width: 100%; box-sizing: border-box; padding: 9px 11px;
+            border: 1px solid var(--paper-warm, #d4dbd6); border-radius: 9px; font-size: 14px;
+            color: var(--ink, #0c3d24); background: #fff; font-family: inherit; }
+  .ia-fld select:focus, .ia-fld input:focus { outline: 2px solid var(--vert-prairie, #1b6b4c); outline-offset: 1px; }
+
+  .ia-actions { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+  .ia-confirm { background: var(--vert-prairie, #1b6b4c); color: #fff; border: none; cursor: pointer;
+                font-size: 14px; font-weight: 600; padding: 10px 20px; border-radius: 10px; }
+  .ia-confirm:disabled { background: #b4c3bb; cursor: not-allowed; }
+  .ia-skip { background: none; border: none; cursor: pointer; color: var(--ink-mute, #6b7a74);
+             font-size: 13px; text-decoration: underline; }
+
+  .ia-empty { text-align: center; padding: 40px 20px; color: var(--ink-mute, #6b7a74); font-size: 14px; }
+  .ia-warn { font-size: 12px; color: #8a6d1f; background: #fbf3dc; border-radius: 8px;
+             padding: 9px 13px; margin-top: 8px; line-height: 1.5; }
+</style>
+</head>
+<body class="auth-pending">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo"><img src="assets/logo-m2m.png" alt="MOM Rugby"></div>
+      <div class="brand-text">
+        <h1>MOM Hub</h1>
+        <p>Mutzig Ovalie Molsheim</p>
+      </div>
+    </div>
+
+    <div class="season-pill" id="season-pill">SAISON 2025 / 2026</div>
+
+    <nav class="main-nav">
+      <a href="dashboard.html">Tableau de bord</a>
+      <a href="suivi-salarie.html">Mon suivi</a>
+    </nav>
+
+    <div class="user-profile">
+      <div class="avatar" id="iaAvatar">EJ</div>
+      <div class="user-info">
+        <div class="user-name" id="iaName">Emmanuel Jung</div>
+        <div class="user-role" id="iaRole">Administrateur</div>
+      </div>
+      <a href="./" class="user-action" title="Retour au portail" aria-label="Retour au portail">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/></svg>
+      </a>
+      <button type="button" class="user-action" id="btn-signout" title="Se déconnecter" aria-label="Se déconnecter">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </header>
+
+<div class="ia-wrap">
+  <div class="ia-hd">
+    <h1>Importer mon agenda</h1>
+    <p>Déposez l'export de votre calendrier « Missions de Lohann » pour créer vos séances.</p>
+  </div>
+
+  <div id="gsMsg" class="gs-msg"></div>
+
+  <div class="ia-drop" id="dropZone">
+    <h2>Déposez votre fichier .ics</h2>
+    <p>Glissez le fichier ici, ou choisissez-le sur votre appareil.</p>
+    <label class="ia-filebtn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Choisir un fichier
+      <input type="file" id="fileInput" accept=".ics,text/calendar">
+    </label>
+    <p class="ia-hint">
+      Depuis Google Agenda : ouvrez le calendrier « Missions de Lohann » →
+      Paramètres → Exporter. Le fichier .ics peut mettre quelques heures à refléter
+      vos dernières saisies (délai normal côté Google).
+    </p>
+  </div>
+
+  <div class="ia-fileinfo" id="fileInfo">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--vert-prairie,#1b6b4c)" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+    <span class="nm" id="fileName">—</span>
+    <span id="fileCount"></span>
+    <button type="button" class="reset" id="fileReset">Changer de fichier</button>
+  </div>
+
+  <div class="ia-list" id="list"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/supabase-client.js"></script>
+<script>
+
+(async function () {
+  'use strict';
+
+  // ===================== Garde d'auth (alignée demarchage-scolaire) =====================
+  const session = await SupabaseHub.getSession();
+  if (!session) { window.location.replace('login.html'); return; }
+  const roles = await SupabaseHub.getMyRoles();
+  const estBureau = roles.indexOf('admin') !== -1 || roles.indexOf('bureau') !== -1;
+  let estSalarie = false;
+  try { estSalarie = !!(await SupabaseHub.client.rpc('suis_je_salarie')).data; } catch (_) { estSalarie = false; }
+  if (!estBureau && !estSalarie) { window.location.replace('./'); return; }
+  document.body.classList.remove('auth-pending');
+  document.body.classList.add('auth-resolved');
+
+  const _signout = document.getElementById('btn-signout');
+  if (_signout) _signout.addEventListener('click', async function () { _signout.disabled = true; await SupabaseHub.signOut(); });
+
+  try {
+    const sa = await SupabaseHub.getSaisonActive();
+    if (sa && sa.libelle) { const p = document.getElementById('season-pill'); if (p) p.textContent = 'SAISON ' + sa.libelle; }
+  } catch (_) {}
+  // Topbar (nom/pastille/rôle) : helper central _remplirProfilTopbar de supabase-client.js.
+
+  const $ = (id) => document.getElementById(id);
+  function flash(text, kind) {
+    const m = $('gsMsg'); m.textContent = text; m.className = 'gs-msg ' + kind;
+    if (kind === 'ok') setTimeout(() => { m.className = 'gs-msg'; }, 4000);
+  }
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+      ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  }
+  function errMsg(e) {
+    const m = (e && (e.message || e.error_description || e.hint)) || 'Erreur inconnue.';
+    if (/duplicate key|unique|gcal_uid/i.test(m)) return 'Ce créneau est déjà dans le Hub.';
+    return /salari|admin|bureau|réserv/i.test(m) ? "Accès réservé au salarié ou à l'administration." : m;
+  }
+
+  // ===================== Identité salarié pour list_missions =====================
+  // On rattache l'import au salarié connecté. Si admin/bureau ouvre la page sans être
+  // salarié, on retombe sur le 1er salarié (cas d'usage : Lohann ; admin = test).
+  let salarieId = null;
+  try {
+    const sj = await SupabaseHub.client.rpc('qui_suis_je');
+    if (sj && sj.data && sj.data.length) salarieId = sj.data[0].personne_id || null;
+  } catch (_) {}
+  // Si l'utilisateur n'est pas lui-même salarié (admin pur), on liste via le 1er salarié.
+  if (!estSalarie) {
+    try {
+      const sals = await SupabaseHub.client.rpc('list_salaries');
+      if (sals && sals.data && sals.data.length) salarieId = sals.data[0].personne_id || sals.data[0].id || salarieId;
+    } catch (_) {}
+  }
+
+  // ===================== Chargement des missions du salarié =====================
+  let missions = [];
+  try { missions = await SupabaseHub.listMissionsSalarie(salarieId); } catch (_) { missions = []; }
+  if (!Array.isArray(missions)) missions = [];
+
+  function missionLabel(m) {
+    const code = m.code ? (m.code + ' — ') : '';
+    const lib = m.libelle || '(mission sans libellé)';
+    return code + lib;
+  }
+  function optionsMissions(selectedId) {
+    let html = '<option value="">— Choisir la mission —</option>';
+    for (const m of missions) {
+      const sel = (m.id === selectedId) ? ' selected' : '';
+      html += '<option value="' + escapeHtml(m.id) + '"' + sel + '>' + escapeHtml(missionLabel(m)) + '</option>';
+    }
+    return html;
+  }
+  // Pré-remplissage piste d : match SUMMARY/LOCATION vers une mission (libellé/lieu).
+  function devineMission(ev) {
+    const hay = ((ev.summary || '') + ' ' + (ev.location || '')).toLowerCase();
+    if (!hay.trim()) return '';
+    for (const m of missions) {
+      const lib = (m.libelle || '').toLowerCase();
+      const lieu = (m.lieu_libre || '').toLowerCase();
+      if (lib && hay.indexOf(lib) !== -1) return m.id;
+      if (lieu && lieu.length > 3 && hay.indexOf(lieu) !== -1) return m.id;
+    }
+    return '';
+  }
+
+  // ===================== Coeur iCal (parser + reconversion UTC -> Europe/Paris) =====================
+  function unfoldICS(text) {
+    return String(text).replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\n[ \t]/g, '');
+  }
+  function pad2(n){return String(n).padStart(2,'0');}
+  function parseICSDate(val) {
+    const m = val.match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})(Z)?)?$/);
+    if (!m) return null;
+    const [, y, mo, d, hh, mm, ss, z] = m;
+    if (hh === undefined) return { allDay:true, y:+y, mo:+mo, d:+d };
+    return { allDay:false, y:+y, mo:+mo, d:+d, hh:+hh, mm:+mm, ss:+ss, utc: z === 'Z' };
+  }
+  function parisOffsetHours(utcDate) {
+    const y = utcDate.getUTCFullYear();
+    const lastSunday = (year, month) => {
+      const d = new Date(Date.UTC(year, month + 1, 0));
+      return new Date(Date.UTC(year, month, d.getUTCDate() - d.getUTCDay()));
+    };
+    const dstStart = lastSunday(y, 2); dstStart.setUTCHours(1,0,0,0);
+    const dstEnd   = lastSunday(y, 9); dstEnd.setUTCHours(1,0,0,0);
+    return (utcDate >= dstStart && utcDate < dstEnd) ? 2 : 1;
+  }
+  function toParisLocal(p) {
+    if (!p) return { date:null, time:null };
+    if (p.allDay) return { date: p.y+'-'+pad2(p.mo)+'-'+pad2(p.d), time:null };
+    let dt = new Date(Date.UTC(p.y, p.mo-1, p.d, p.hh, p.mm, p.ss));
+    if (p.utc) dt = new Date(dt.getTime() + parisOffsetHours(dt)*3600*1000);
+    return { date: dt.getUTCFullYear()+'-'+pad2(dt.getUTCMonth()+1)+'-'+pad2(dt.getUTCDate()),
+             time: pad2(dt.getUTCHours())+':'+pad2(dt.getUTCMinutes()) };
+  }
+  function dureeMinutes(a, b) {
+    if (!a || !b || a.allDay || b.allDay) return null;
+    const ta = Date.UTC(a.y,a.mo-1,a.d,a.hh,a.mm,a.ss);
+    const tb = Date.UTC(b.y,b.mo-1,b.d,b.hh,b.mm,b.ss);
+    return Math.round((tb - ta)/60000);
+  }
+  function parseVEVENTs(icsText) {
+    const text = unfoldICS(icsText);
+    const events = [];
+    const blocks = text.split('BEGIN:VEVENT').slice(1);
+    for (const b of blocks) {
+      const body = b.split('END:VEVENT')[0];
+      const ev = {};
+      for (const line of body.split('\n')) {
+        if (!line) continue;
+        const idx = line.indexOf(':'); if (idx === -1) continue;
+        let key = line.slice(0, idx); const val = line.slice(idx + 1);
+        const semi = key.indexOf(';'); if (semi !== -1) key = key.slice(0, semi);
+        if (key === 'UID') ev.uid = val.trim();
+        else if (key === 'SUMMARY') ev.summary = val.trim();
+        else if (key === 'LOCATION') ev.location = val.trim();
+        else if (key === 'DESCRIPTION') ev.description = val.trim();
+        else if (key === 'STATUS') ev.status = val.trim();
+        else if (key === 'DTSTART') ev.dtstart = parseICSDate(val.trim());
+        else if (key === 'DTEND') ev.dtend = parseICSDate(val.trim());
+        else if (key === 'RRULE') ev.rrule = val.trim();
+      }
+      events.push(ev);
+    }
+    return events;
+  }
+
+  const MOIS = ['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
+  const JOURS = ['dim.','lun.','mar.','mer.','jeu.','ven.','sam.'];
+  function joliDate(isoDate, time) {
+    if (!isoDate) return '—';
+    const [y,m,d] = isoDate.split('-').map(Number);
+    const dt = new Date(Date.UTC(y, m-1, d));
+    const base = JOURS[dt.getUTCDay()] + ' ' + d + ' ' + MOIS[m-1] + ' ' + y;
+    return time ? (base + ' · ' + time) : base;
+  }
+
+  // ===================== Pré-check anti-doublon =====================
+  // On agrège les gcal_uid déjà présents sur l'ensemble des missions du salarié.
+  // Un créneau dont l'UID y figure est marqué « déjà dans le Hub » (grisé).
+  async function chargerUidsExistants() {
+    const set = new Set();
+    for (const m of missions) {
+      let seances = [];
+      try { seances = await SupabaseHub.listMissionSeances(m.id); } catch (_) { seances = []; }
+      for (const s of (seances || [])) { if (s && s.gcal_uid) set.add(s.gcal_uid); }
+    }
+    return set;
+  }
+
+  // ===================== Rendu de la file de créneaux =====================
+  let creneaux = [];   // { ev, start, dureeMin, dup, done }
+  let uidsExistants = new Set();
+
+  function render() {
+    const wrap = $('list');
+    if (!creneaux.length) {
+      wrap.innerHTML = '<div class="ia-empty">Aucun créneau lu dans ce fichier. Vérifiez que c\'est bien l\'export du calendrier « Missions de Lohann ».</div>';
+      return;
+    }
+    let html = '';
+    creneaux.forEach((c, i) => {
+      const cls = 'ia-card' + (c.done ? ' done' : (c.dup ? ' dup' : ''));
+      let badge = '';
+      if (c.done) badge = '<span class="ia-badge done">✓ Séance créée</span>';
+      else if (c.dup) badge = '<span class="ia-badge dup">Déjà dans le Hub</span>';
+      const dur = (c.dureeMin != null) ? (c.dureeMin + ' min') : '';
+      const heures = (c.dureeMin != null) ? (Math.round(c.dureeMin/60*100)/100) : '';
+      const devine = c.done ? c.missionId : (c.missionId || devineMission(c.ev));
+
+      html += '<div class="ia-card' + (c.done?' done':(c.dup?' dup':'')) + '" data-i="' + i + '">';
+      html +=   '<div class="ia-card-top"><span class="when">' + escapeHtml(joliDate(c.start.date, c.start.time)) + '</span>';
+      if (dur) html += '<span class="dur">' + escapeHtml(dur) + '</span>';
+      if (badge) html += badge;
+      html +=   '</div>';
+      if (c.ev.summary) html += '<div class="ia-sum">' + escapeHtml(c.ev.summary) + '</div>';
+      if (c.ev.location) html += '<div class="ia-loc">📍 ' + escapeHtml(c.ev.location) + '</div>';
+
+      if (!c.done && !c.dup) {
+        html += '<div class="ia-fields">';
+        html +=   '<div class="ia-fld"><label>Rattacher à la mission</label><select data-role="mission" data-i="' + i + '">' + optionsMissions(devine) + '</select></div>';
+        html +=   '<div class="ia-fld"><label>Heures réelles</label><input type="number" step="0.25" min="0" data-role="heures" data-i="' + i + '" value="' + escapeHtml(String(heures)) + '"></div>';
+        html += '</div>';
+        if (!missions.length) html += '<div class="ia-warn">Aucune mission rattachable trouvée pour ce salarié. Le bureau doit d\'abord créer la mission correspondante.</div>';
+        html += '<div class="ia-actions">';
+        html +=   '<button type="button" class="ia-confirm" data-role="confirm" data-i="' + i + '">Créer la séance</button>';
+        html +=   '<button type="button" class="ia-skip" data-role="skip" data-i="' + i + '">Ignorer</button>';
+        html += '</div>';
+      }
+      html += '</div>';
+    });
+    wrap.innerHTML = html;
+
+    wrap.querySelectorAll('[data-role="confirm"]').forEach(b =>
+      b.addEventListener('click', () => confirmer(+b.getAttribute('data-i'))));
+    wrap.querySelectorAll('[data-role="skip"]').forEach(b =>
+      b.addEventListener('click', () => { creneaux[+b.getAttribute('data-i')].dup = true; render(); }));
+  }
+
+  async function confirmer(i) {
+    const c = creneaux[i]; if (!c || c.done) return;
+    const card = $('list').querySelector('[data-i="' + i + '"]');
+    const selMission = card.querySelector('[data-role="mission"]');
+    const inpHeures = card.querySelector('[data-role="heures"]');
+    const btn = card.querySelector('[data-role="confirm"]');
+    const missionId = selMission ? selMission.value : '';
+    if (!missionId) { flash('Choisissez une mission avant de créer la séance.', 'err'); return; }
+    if (!c.start.date) { flash('Ce créneau n\'a pas de date exploitable.', 'err'); return; }
+
+    btn.disabled = true; btn.textContent = 'Création…';
+    const heuresReelles = inpHeures && inpHeures.value !== '' ? parseFloat(inpHeures.value) : null;
+    const notes = c.ev.summary || null;
+
+    const res = await SupabaseHub.creerSeancePonctuelle({
+      missionId: missionId,
+      dateSeance: c.start.date,
+      heureDebut: c.start.time || null,
+      dureeMin: (c.dureeMin != null ? c.dureeMin : null),
+      lieuLibre: c.ev.location || null,
+      heuresReelles: heuresReelles,
+      notes: notes,
+      gcalUid: c.ev.uid || null
+    });
+
+    if (res && res.ok) {
+      c.done = true; c.missionId = missionId;
+      if (c.ev.uid) uidsExistants.add(c.ev.uid);
+      flash('Séance créée. Elle sera comptée après validation par le bureau.', 'ok');
+      render();
+    } else {
+      btn.disabled = false; btn.textContent = 'Créer la séance';
+      flash(errMsg(res && res.error ? { message: res.error } : null), 'err');
+    }
+  }
+
+  // ===================== Lecture du fichier déposé (zéro réseau) =====================
+  async function traiterFichier(file) {
+    if (!file) return;
+    if (!/\.ics$/i.test(file.name) && file.type !== 'text/calendar') {
+      flash('Ce fichier ne semble pas être un .ics. Choisissez l\'export de votre calendrier.', 'err'); return;
+    }
+    flash('Lecture du fichier…', 'info');
+    let text = '';
+    try { text = await file.text(); } catch (_) { flash('Impossible de lire ce fichier.', 'err'); return; }
+
+    const events = parseVEVENTs(text);
+    // RGPD + périmètre v1 : on ne garde que les VEVENT datés (créneaux). On ignore
+    // les annulés (STATUS:CANCELLED) — hors périmètre v1.
+    const gardes = events.filter(e => e.dtstart && (!e.status || e.status.toUpperCase() !== 'CANCELLED'));
+
+    uidsExistants = await chargerUidsExistants();
+
+    let nbRec = 0;
+    creneaux = gardes.map(ev => {
+      if (ev.rrule) nbRec++;
+      const start = toParisLocal(ev.dtstart);
+      const dureeMin = dureeMinutes(ev.dtstart, ev.dtend);
+      const dup = !!(ev.uid && uidsExistants.has(ev.uid));
+      return { ev, start, dureeMin, dup, done: false, missionId: '' };
+    });
+
+    $('fileName').textContent = file.name;
+    $('fileCount').textContent = '· ' + creneaux.length + ' créneau' + (creneaux.length > 1 ? 'x' : '');
+    $('fileInfo').classList.add('show');
+    $('dropZone').style.display = 'none';
+
+    if (!creneaux.length) flash('Aucun créneau exploitable dans ce fichier.', 'info');
+    else {
+      const nbDup = creneaux.filter(c => c.dup).length;
+      let msg = creneaux.length + ' créneau' + (creneaux.length>1?'x':'') + ' lu' + (creneaux.length>1?'s':'') + '.';
+      if (nbDup) msg += ' ' + nbDup + ' déjà dans le Hub.';
+      flash(msg, 'ok');
+    }
+    if (nbRec) flash('Attention : ' + nbRec + ' évènement(s) récurrent(s) détecté(s). En v1, créez des créneaux ponctuels — la récurrence Google n\'est pas encore prise en charge.', 'info');
+
+    render();
+  }
+
+  // Input fichier
+  $('fileInput').addEventListener('change', e => {
+    const f = e.target.files && e.target.files[0];
+    traiterFichier(f);
+  });
+  // Reset
+  $('fileReset').addEventListener('click', () => {
+    creneaux = []; uidsExistants = new Set();
+    $('fileInput').value = '';
+    $('fileInfo').classList.remove('show');
+    $('dropZone').style.display = '';
+    $('list').innerHTML = '';
+    $('gsMsg').className = 'gs-msg';
+  });
+  // Drag & drop
+  const dz = $('dropZone');
+  ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('drag'); }));
+  ['dragleave','drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('drag'); }));
+  dz.addEventListener('drop', e => {
+    const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    traiterFichier(f);
+  });
+
+})();
+</script>
+</body>
+</html>
