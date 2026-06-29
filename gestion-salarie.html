@@ -200,6 +200,26 @@
   .pe-icbtn { width: 34px; height: 34px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 8px; background: transparent; border: 1px solid var(--line, #cabe9f); color: var(--ink-mute, #6b7a74); cursor: pointer; text-decoration: none; }
   .pe-icbtn:hover { border-color: var(--vert-prairie, #2d7a3e); color: var(--vert-prairie, #2d7a3e); }
   .pe-icbtn svg { width: 16px; height: 16px; }
+
+  /* ----- Compteur d'heures (FAIT FOI 29/06, option beta : bloc complet +
+     selecteur salarie). Vue de consultation des heures depuis le tableau de
+     bord admin. Reprend le gabarit visuel du compteur de suivi-salarie. ----- */
+  .gc-compteur { margin: 36px 0 0; padding: 18px 0 0; border-top: 1px solid var(--line, #cabe9f); }
+  .gc-compteur-hd { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0 0 14px; }
+  .gc-compteur h2 { font-size: 16px; margin: 0; color: var(--ink, #0c3d24); }
+  .gc-sel-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-mute, #6b7a74); }
+  .gc-sel-row select { font: inherit; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line, #cabe9f); background: #fff; color: var(--ink, #0c3d24); }
+  .gc-export-row { margin: 0 0 12px; }
+  .gc-export-btn { font: inherit; cursor: pointer; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line, #cabe9f); background: transparent; color: var(--ink, #0c3d24); }
+  .gc-export-btn:hover { border-color: var(--vert-prairie, #2d7a3e); color: var(--vert-prairie, #2d7a3e); }
+  .gc-export-btn:disabled { opacity: .5; cursor: default; }
+  .gc-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin: 0 0 16px; }
+  .gc-card { background: #fff; border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 12px; padding: 14px 16px; }
+  .gc-card-lbl { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-mute, #6b7a74); margin: 0 0 6px; }
+  .gc-card-val { font-size: 22px; font-weight: 600; color: var(--ink, #0c3d24); margin: 0; }
+  .gc-releve { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .gc-releve th, .gc-releve td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--paper-warm, #e3e0d8); }
+  .gc-releve th { font-weight: 600; color: var(--ink-soft, #2a4836); }
 </style>
 </head>
 <body class="auth-pending">
@@ -261,7 +281,7 @@
 
   <div class="pe-hd">
     <div>
-      <h1>Activité du salarié — gestion</h1>
+      <h1>Suivi et Facturation</h1>
       <p class="gs-sub" id="peSub" style="margin:4px 0 0;">Chargement…</p>
     </div>
     <a class="gs-btn gs-btn-sm" id="peNewMission" href="suivi-salarie.html"
@@ -334,6 +354,31 @@
   <!-- ===== Liste centree-mission (cable etape 3) ===== -->
   <div id="peListe"></div>
   <div class="gs-empty" id="peListeVide" style="display:none">Aucune mission pour ce filtre.</div>
+
+  <!-- ===== Compteur d'heures (FAIT FOI 29/06, option beta) =====
+       Bloc de consultation des heures depuis le tableau de bord admin.
+       Selecteur de salarie (v1 : Lohann seul -> liste a une entree), cartes
+       cible/realise/solde, releve detaille, export bilan xlsx. Doublon assume
+       avec le bandeau Annualisation (decision Manu). Reprend les RPC du
+       compteur de suivi-salarie : list_compteur_annualisation, list_releve_heures,
+       rapport_heures_salarie. -->
+  <section class="gc-compteur" id="gcCompteur">
+    <div class="gc-compteur-hd">
+      <h2>Compteur d'heures</h2>
+      <div class="gc-sel-row">
+        <label for="gcSelSalarie">Compteur de :</label>
+        <select id="gcSelSalarie"></select>
+      </div>
+    </div>
+    <div class="gc-export-row">
+      <button type="button" id="gcExportXlsx" class="gc-export-btn">Exporter le bilan d'heures (.xlsx)</button>
+    </div>
+    <div class="gc-cards" id="gcCards"></div>
+    <table class="gc-releve">
+      <thead><tr><th>Date</th><th>Mission</th><th>Heures</th></tr></thead>
+      <tbody id="gcReleve"></tbody>
+    </table>
+  </section>
 
   <p class="pe-foot">Chaque donnée affichée existe déjà en base (chantiers A→D). La page ne fait que
   les remonter et les agréger côté front — zéro SQL de modèle.</p>
@@ -1096,6 +1141,222 @@
     $('peSub').textContent = nom + ' · employeur : MOM · ' + saison;
   }
 
+  // ============================================================
+  // COMPTEUR D'HEURES (FAIT FOI 29/06, option beta : bloc complet + selecteur)
+  // ============================================================
+  // Vue de consultation des heures depuis le tableau de bord admin. Selecteur
+  // de salarie (staff = list_salaries), cartes cible/realise/solde, releve
+  // detaille (list_releve_heures), export bilan xlsx (rapport_heures_salarie).
+  // Reprend fidelement la mecanique du compteur de suivi-salarie. Doublon assume
+  // avec le bandeau Annualisation.
+  const MOIS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin',
+                   'Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+
+  let gcContrat = null;     // contrat resolu pour le salarie selectionne
+  let gcSynth   = null;     // ligne v_compteur_annualisation courante (pour l'export)
+
+  // Peuple le selecteur a partir de staff (list_salaries). v1 : Lohann seul.
+  function renderSelecteurSalarie() {
+    const sel = $('gcSelSalarie');
+    if (!sel) return;
+    sel.innerHTML = '';
+    if (!staff.length) {
+      const o = document.createElement('option');
+      o.value = ''; o.textContent = 'Aucun salarié';
+      sel.appendChild(o);
+      sel.disabled = true;
+      return;
+    }
+    staff.forEach(function (s) {
+      const o = document.createElement('option');
+      o.value = s.personne_id || '';
+      o.textContent = [s.prenom, s.nom].filter(Boolean).join(' ').trim() || '—';
+      sel.appendChild(o);
+    });
+    // Selection par defaut = salarie deja resolu pour l'entete (salarieId).
+    if (salarieId) sel.value = salarieId;
+    sel.disabled = staff.length <= 1; // un seul salarie -> figé mais affiché
+    sel.addEventListener('change', function () {
+      chargerCompteurDetail(sel.value);
+    });
+  }
+
+  // Charge cartes + releve pour un personne_id donne. Resout son contrat via
+  // list_contrats_salaries (meme voie que chargerAnnualisation).
+  async function chargerCompteurDetail(personneId) {
+    gcContrat = null; gcSynth = null;
+    try {
+      if (!personneId) { renderGcCards(null); renderGcReleve([]); return; }
+      const contrats = (await rpc('list_contrats_salaries', { p_inclure_inactifs: false })) || [];
+      const contrat = contrats.find(function (c) { return c.personne_id === personneId; }) || null;
+      if (!contrat) { renderGcCards(null); renderGcReleve([]); return; }
+      gcContrat = contrat;
+      const synth = (await rpc('list_compteur_annualisation', { p_contrat_id: contrat.id })) || [];
+      const today = new Date().toISOString().slice(0, 10);
+      gcSynth = synth.find(function (p) { return p.date_debut <= today && today <= p.date_fin; }) || synth[0] || null;
+      renderGcCards(gcSynth);
+      const lignes = (await rpc('list_releve_heures', { p_contrat_id: contrat.id })) || [];
+      renderGcReleve(lignes);
+    } catch (e) {
+      renderGcCards(null); renderGcReleve([]);
+    }
+  }
+
+  function renderGcCards(s) {
+    const cards = $('gcCards');
+    cards.innerHTML = '';
+    if (!s) {
+      cards.innerHTML = '<div class="gc-card"><p class="gc-card-lbl">Compteur</p><p class="gc-card-val">—</p></div>';
+      return;
+    }
+    const items = [
+      { lbl: 'Heures cible', val: s.cible_heures != null ? s.cible_heures : '—' },
+      { lbl: 'Heures réalisées', val: s.realise_heures != null ? s.realise_heures : '—' },
+      { lbl: 'Solde', val: s.solde_heures != null ? s.solde_heures : '—' }
+    ];
+    items.forEach(function (it) {
+      const c = document.createElement('div');
+      c.className = 'gc-card';
+      c.innerHTML = '<p class="gc-card-lbl">' + escapeHtml(it.lbl) +
+                    '</p><p class="gc-card-val">' + escapeHtml(String(it.val)) + '</p>';
+      cards.appendChild(c);
+    });
+  }
+
+  function renderGcReleve(rows) {
+    const tb = $('gcReleve');
+    tb.innerHTML = '';
+    if (!rows || !rows.length) {
+      tb.innerHTML = '<tr><td colspan="3" style="color:var(--ink-mute,#6b7a74);">Aucune ligne au relevé.</td></tr>';
+      return;
+    }
+    rows.forEach(function (r) {
+      const tr = document.createElement('tr');
+      const d = r.date_jour || '';
+      const mis = r.mission_id ? missions.find(function (m) { return m.id === r.mission_id; }) : null;
+      const label = (mis && (mis.libelle || mis.code)) || r.categorie || '—';
+      tr.innerHTML = '<td>' + escapeHtml(d ? d : '—') + '</td>' +
+                     '<td>' + escapeHtml(label) + '</td>' +
+                     '<td>' + escapeHtml(r.heures != null ? String(r.heures) : '—') + '</td>';
+      tb.appendChild(tr);
+    });
+  }
+
+  // Export bilan xlsx — replique fidele de exportBilanHeures (suivi-salarie),
+  // sur le contrat selectionne (gcContrat) + sa synthese (gcSynth).
+  async function gcExportBilan() {
+    const btn = $('gcExportXlsx');
+    if (typeof XLSX === 'undefined') {
+      flash('Export indisponible : librairie tableur non chargée.', 'err');
+      return;
+    }
+    if (!gcContrat || !gcContrat.id) {
+      flash('Aucun contrat salarié résolu — export impossible.', 'err');
+      return;
+    }
+    if (btn) { btn.disabled = true; }
+    try {
+      const rows = (await rpc('rapport_heures_salarie', { p_contrat_id: gcContrat.id })) || [];
+      const parMois = {};
+      rows.forEach(function (r) {
+        const k = String(r.out_date_jour || '').slice(0, 7);
+        if (!k) return;
+        (parMois[k] = parMois[k] || []).push(r);
+      });
+      const moisKeys = Object.keys(parMois).sort();
+
+      const cible = (gcSynth && gcSynth.cible_heures != null) ? Number(gcSynth.cible_heures) : null;
+      const debut = (gcSynth && gcSynth.date_debut) ? fmtDateFR(gcSynth.date_debut) : '—';
+      const fin   = (gcSynth && gcSynth.date_fin)   ? fmtDateFR(gcSynth.date_fin)   : '—';
+      const nomSalarie = (gcContrat && (gcContrat.nom_complet || gcContrat.libelle)) || 'Salarié';
+
+      const wb = XLSX.utils.book_new();
+
+      const synthAOA = [];
+      synthAOA.push(["BILAN D'HEURES — SALARIÉ"]);
+      synthAOA.push([]);
+      synthAOA.push(['Salarié', nomSalarie]);
+      synthAOA.push(['Contrat (annualisation)', debut + ' → ' + fin]);
+      synthAOA.push(['Volume annuel cible (h)', cible != null ? cible : '—']);
+      synthAOA.push(['Rapport édité le', fmtDateFR(new Date().toISOString())]);
+      synthAOA.push([]);
+      synthAOA.push(['Mois', 'Nb saisies', 'Heures réalisées', 'Cumul contrat', '% cible annuelle', 'Reste à la cible']);
+
+      let cumul = 0, totalN = 0, totalH = 0;
+      moisKeys.forEach(function (k) {
+        const lignes = parMois[k];
+        const h = lignes.reduce(function (a, r) { return a + Number(r.out_heures || 0); }, 0);
+        cumul += h; totalN += lignes.length; totalH += h;
+        const y = k.slice(0, 4), m = parseInt(k.slice(5, 7), 10);
+        synthAOA.push([
+          MOIS_FR[m - 1] + ' ' + y, lignes.length, h, cumul,
+          cible ? (cumul / cible) : '', cible != null ? (cible - cumul) : ''
+        ]);
+      });
+      synthAOA.push(['TOTAL', totalN, totalH, cumul,
+        cible ? (cumul / cible) : '', cible != null ? (cible - cumul) : '']);
+      if (!moisKeys.length) {
+        synthAOA.push([]);
+        synthAOA.push(['Aucune heure relevée sur la période du contrat à ce jour.']);
+      }
+      const wsSynth = XLSX.utils.aoa_to_sheet(synthAOA);
+      wsSynth['!cols'] = [{ wch: 22 }, { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }];
+      XLSX.utils.book_append_sheet(wb, wsSynth, 'Synthèse');
+
+      moisKeys.forEach(function (k) {
+        const lignes = parMois[k];
+        const y = k.slice(0, 4), m = parseInt(k.slice(5, 7), 10);
+        const titre = MOIS_FR[m - 1] + ' ' + y;
+        const aoa = [];
+        aoa.push(['DÉTAIL DES HEURES — ' + titre.toUpperCase()]);
+        aoa.push([nomSalarie + '  ·  Contrat ' + debut + ' → ' + fin]);
+        aoa.push([]);
+        aoa.push(['Date', 'Heures', 'Début', 'Catégorie', 'Type de mission', 'Mission (code)', 'Notes']);
+        let tot = 0; const parCat = {}, parType = {};
+        lignes.forEach(function (r) {
+          const h = Number(r.out_heures || 0); tot += h;
+          const cat = r.out_categorie || '—';
+          const typ = r.out_type_mission || '(hors mission)';
+          parCat[cat] = (parCat[cat] || 0) + h;
+          parType[typ] = (parType[typ] || 0) + h;
+          aoa.push([
+            fmtDateFR(r.out_date_jour), h,
+            r.out_heure_debut ? String(r.out_heure_debut).slice(0, 5) : '',
+            cat, r.out_type_mission || '(hors mission)',
+            r.out_mission_code || '', r.out_notes || ''
+          ]);
+        });
+        aoa.push(['TOTAL DU MOIS', tot]);
+        aoa.push([]);
+        aoa.push(['VENTILATION']);
+        aoa.push(['Par catégorie', '', '', 'Par type de mission']);
+        const cats = Object.keys(parCat).sort();
+        const typs = Object.keys(parType).sort();
+        const nv = Math.max(cats.length, typs.length);
+        for (let i = 0; i < nv; i++) {
+          aoa.push([
+            cats[i] || '', cats[i] ? parCat[cats[i]] : '', '',
+            typs[i] || '', typs[i] ? parType[typs[i]] : ''
+          ]);
+        }
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+        ws['!cols'] = [{ wch: 12 }, { wch: 9 }, { wch: 8 }, { wch: 14 },
+                       { wch: 22 }, { wch: 26 }, { wch: 34 }];
+        const safe = titre.replace(/[\\/?*\[\]:]/g, ' ').slice(0, 31);
+        XLSX.utils.book_append_sheet(wb, ws, safe);
+      });
+
+      const fname = 'bilan-heures-' + String(nomSalarie).replace(/\s+/g, '-').toLowerCase()
+        + '-' + new Date().toISOString().slice(0, 10) + '.xlsx';
+      XLSX.writeFile(wb, fname);
+      flash('Bilan d\'heures exporté (' + (moisKeys.length || 0) + ' mois).', 'ok');
+    } catch (e) {
+      flash('Export impossible : ' + errMsg(e), 'err');
+    } finally {
+      if (btn) { btn.disabled = false; }
+    }
+  }
+
   // ---------- Boot ----------
   try {
     await resoudreSalarie();
@@ -1108,6 +1369,12 @@
     renderTraiter();
     wireFiltres();
     renderListe();
+    // Compteur d'heures (FAIT FOI 29/06) : selecteur + chargement initial sur
+    // le salarie deja resolu pour l'entete. chargerMissionsEntites() a deja
+    // peuple `missions` (utilise par le releve pour les libelles).
+    renderSelecteurSalarie();
+    if ($('gcExportXlsx')) $('gcExportXlsx').addEventListener('click', gcExportBilan);
+    await chargerCompteurDetail(salarieId);
   } catch (e) {
     flash('Chargement impossible : ' + errMsg(e), 'err');
   }
