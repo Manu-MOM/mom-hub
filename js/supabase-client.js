@@ -18,6 +18,23 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 1.70 — juin 2026
+ *   v1.70 : AGENDA-GOOGLE → SÉANCES (B-light, sens unique entrant).
+ *           3 wrappers ADDITIFS pour le pont iCal Google Agenda
+ *           « Missions de Lohann » → mission_seances (cf. FAIT FOI
+ *           29/06/2026, gate amont pt 133) :
+ *           - listMissionsSalarie(salarieId) → list_missions filtrée
+ *             p_salarie_id (sélecteur de rattachement de l'import).
+ *           - listMissionSeances(missionId) → list_mission_seances
+ *             (SETOF mission_seances, inclut gcal_uid : pré-check
+ *             anti-doublon).
+ *           - creerSeancePonctuelle({...}) → creer_seance_ponctuelle
+ *             étendue sql_134 (p_gcal_uid 11e param). Garde voie 3,
+ *             état forcé 'realisee' pour Lohann, gcal_uid persisté.
+ *           Lecture .ics déposée manuellement, parsée JS local côté
+ *           page : zéro OAuth, zéro secret, zéro réseau Google ici.
+ *           node --check OK. boot v1.69 → v1.70 (rattrapage : le
+ *           console.log déployé affichait encore v1.68).
  * Version : 1.69 — juin 2026
  *   v1.69 : DASHBOARD-TUILES-PAR-CAPABILITY. 1 wrapper ADDITIF
  *           suisJeSalarie() adossé à la RPC suis_je_salarie() (sql_122),
@@ -6977,6 +6994,103 @@
         return { ok: false, error: error.message || 'Erreur écriture responsables de pôle' };
       }
       return { ok: true, data: data };
+    },
+
+    // ============================================================
+    // AGENDA-GOOGLE → SÉANCES (B-light, sens unique entrant) — v1.70
+    // Pont iCal Google Agenda « Missions de Lohann » vers mission_seances.
+    // Lecture .ics déposé manuellement, parsé en JS local côté page ;
+    // ces 3 wrappers ne font que LIRE les missions/séances et ÉCRIRE une
+    // séance ponctuelle confirmée. Aucun secret, aucun OAuth, aucun réseau
+    // Google ici (cf. FAIT FOI 29/06/2026). OVAL-E (avec A).
+    // ============================================================
+
+    /**
+     * Liste les missions d'un salarié (sélecteur de rattachement de l'import
+     * iCal). Adossé à list_missions(p_saison_id, p_salarie_id, p_entite_id) :
+     * on ne passe QUE p_salarie_id, les deux autres restent null (pas de
+     * filtre saison/entité). RETURNS SETOF missions → toutes les colonnes,
+     * dont code, libelle, date_debut, date_fin, lieu_libre, etat, statut.
+     * Tri RPC : date_debut DESC.
+     *
+     * @param {string} salarieId UUID personnes.id du salarié (requis)
+     * @returns {Promise<Array>} 0..N missions du salarié, [] si erreur/absent
+     */
+    async listMissionsSalarie(salarieId) {
+      if (!salarieId) { console.error('MOM Hub: listMissionsSalarie() salarieId requis'); return []; }
+      const { data, error } = await client.rpc('list_missions', {
+        p_saison_id:  null,
+        p_salarie_id: salarieId,
+        p_entite_id:  null
+      });
+      if (error) { console.error('MOM Hub: listMissionsSalarie() / list_missions', error); return []; }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * Liste les séances d'une mission. Adossé à list_mission_seances(p_mission_id)
+     * (RETURNS SETOF mission_seances → inclut la colonne-pont gcal_uid ajoutée
+     * par sql_134). Sert le PRÉ-CHECK anti-doublon de l'import iCal : on
+     * collecte les gcal_uid déjà présents pour griser les créneaux connus.
+     *
+     * @param {string} missionId UUID missions.id (requis)
+     * @returns {Promise<Array>} 0..N séances de la mission, [] si erreur/absent
+     */
+    async listMissionSeances(missionId) {
+      if (!missionId) { console.error('MOM Hub: listMissionSeances() missionId requis'); return []; }
+      const { data, error } = await client.rpc('list_mission_seances', {
+        p_mission_id: missionId
+      });
+      if (error) { console.error('MOM Hub: listMissionSeances() / list_mission_seances', error); return []; }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * Crée une séance ponctuelle confirmée depuis un créneau iCal importé.
+     * Adossé à creer_seance_ponctuelle (étendue par sql_134 avec p_gcal_uid
+     * en 11e paramètre). Garde voie 3 : Lohann (salarié de la mission) est
+     * autorisé ; pour un non-admin l'état est FORCÉ à 'realisee' (p_etat
+     * laissé au défaut). gcal_uid persiste l'UID iCal (anti-doublon dur via
+     * l'index unique partiel ux_mission_seances_gcal_uid).
+     *
+     * Tous les paramètres optionnels par défaut à null : on ne transmet que
+     * ce que le créneau iCal fournit (date/heure/durée/lieu_libre/notes/uid).
+     *
+     * @param {Object} p
+     * @param {string}  p.missionId    UUID mission rattachée (requis)
+     * @param {string}  p.dateSeance   'YYYY-MM-DD' (heure locale Europe/Paris, requis)
+     * @param {?string} [p.heureDebut] 'HH:MM' locale, ou null
+     * @param {?number} [p.dureeMin]   durée en minutes, ou null
+     * @param {?string} [p.lieuLibre]  LOCATION iCal, ou null
+     * @param {?number} [p.heuresReelles] pré-rempli dureeMin/60, modifiable, ou null
+     * @param {?string} [p.notes]      SUMMARY iCal (+ DESCRIPTION si pertinente), ou null
+     * @param {?string} [p.gcalUid]    UID iCal source (clé anti-doublon), ou null
+     * @returns {Promise<{ok:boolean, data?:Object, error?:string}>}
+     *   data = la ligne mission_seances créée. ok:false + message si la RPC lève
+     *   (garde voie 3, mission introuvable, doublon gcal_uid = contrainte unique).
+     */
+    async creerSeancePonctuelle(p) {
+      p = p || {};
+      if (!p.missionId || !p.dateSeance) {
+        return { ok: false, error: 'missionId et dateSeance requis' };
+      }
+      const { data, error } = await client.rpc('creer_seance_ponctuelle', {
+        p_mission_id:     p.missionId,
+        p_date_seance:    p.dateSeance,
+        p_heure_debut:    p.heureDebut    != null ? p.heureDebut    : null,
+        p_duree_min:      p.dureeMin       != null ? p.dureeMin       : null,
+        p_lieu_id:        null,
+        p_lieu_libre:     p.lieuLibre      != null ? p.lieuLibre      : null,
+        p_refacturable:   null,
+        p_heures_reelles: p.heuresReelles  != null ? p.heuresReelles  : null,
+        p_notes:          p.notes          != null ? p.notes          : null,
+        p_gcal_uid:       p.gcalUid        != null ? p.gcalUid        : null
+      });
+      if (error) {
+        console.error('MOM Hub: creerSeancePonctuelle() / creer_seance_ponctuelle', error);
+        return { ok: false, error: error.message || 'Erreur création séance ponctuelle' };
+      }
+      return { ok: true, data: data };
     }
 
   };
@@ -7121,7 +7235,7 @@
   }
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.68 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.70 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
