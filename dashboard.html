@@ -64,6 +64,31 @@
     }
 
     /* ============================================================
+       Sections métier (DASHBOARD-SECTIONS-METIER, FAIT FOI 29/06) :
+       le hub est rangé en groupes thématiques (Sportif / Salarié /
+       Prospection / Administration socle). Chaque section = un titre
+       + sa grille. Une section dont toutes les tuiles sont masquées
+       pour le rôle est repliée par le JS (pas de titre orphelin).
+       ============================================================ */
+    .admin-section {
+      margin-bottom: 36px;
+    }
+    .admin-section:last-child {
+      margin-bottom: 0;
+    }
+    .admin-section-title {
+      font-family: 'Oswald', sans-serif;
+      font-weight: 500;
+      font-size: 14px;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      color: var(--ink-mute);
+      margin: 0 0 14px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    /* ============================================================
        Grille du hub d'administration : une tuile = un écran à
        administrer. Tuiles actives = liens <a> ; tuiles « à venir »
        = <div> grisé non cliquable (transparence honnête).
@@ -200,9 +225,13 @@
       <p>Vos écrans du Hub. Chacun ne voit que les tuiles qui le concernent.</p>
     </div>
 
-    <section class="admin-grid" aria-label="Écrans d'administration">
+        <div class="admin-sections" aria-label="Écrans d'administration">
 
-      <!-- Collectif joueurs (admin (i)) — le staff a sa propre tuile -->
+      <section class="admin-section" data-section="sportif">
+        <h3 class="admin-section-title">Sportif</h3>
+        <div class="admin-grid">
+
+        <!-- Collectif joueurs (admin (i)) — le staff a sa propre tuile -->
       <a class="admin-tile" data-show="admin" href="u-admin.html">
         <div class="admin-tile-icon">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -211,7 +240,7 @@
         <p class="admin-tile-desc">Vivier des joueurs par entente et par saison (collectif de catégorie).</p>
       </a>
 
-      <!-- Équipes par catégorie (ADMIN-(ii) sous-chantier 1) -->
+        <!-- Équipes par catégorie (ADMIN-(ii) sous-chantier 1) -->
       <a class="admin-tile" data-show="admin" href="admin-equipes.html">
         <div class="admin-tile-icon">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
@@ -220,25 +249,7 @@
         <p class="admin-tile-desc">Équipes par pôle et catégorie, cadres d'entente, par saison.</p>
       </a>
 
-      <!-- Sites (ADMIN-(ii) sous-chantier 4) -->
-      <a class="admin-tile" data-show="admin" href="admin-sites.html">
-        <div class="admin-tile-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-        </div>
-        <p class="admin-tile-title">Sites</p>
-        <p class="admin-tile-desc">Lieux d'entraînement et de match.</p>
-      </a>
-
-      <!-- Saisons (ADMIN-(ii) sous-chantier 2) -->
-      <a class="admin-tile" data-show="admin" href="admin-saisons.html">
-        <div class="admin-tile-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-        </div>
-        <p class="admin-tile-title">Saisons</p>
-        <p class="admin-tile-desc">Création de saison et bascule des catégories par millésime.</p>
-      </a>
-
-      <!-- Staff (vivier + fonctions, volet A refonte admin) -->
+        <!-- Staff (vivier + fonctions, volet A refonte admin) -->
       <a class="admin-tile" data-show="admin" href="staff.html">
         <div class="admin-tile-icon">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="m8.5 13.5-2 6 5.5-3 5.5 3-2-6"/></svg>
@@ -247,16 +258,14 @@
         <p class="admin-tile-desc">Le vivier (qui fait partie du staff) et les fonctions (entraîneur, logisticien, référent…) par catégorie.</p>
       </a>
 
-      <!-- Rôles & accès (volet B refonte admin) -->
-      <a class="admin-tile" data-show="admin" href="roles-acces.html">
-        <div class="admin-tile-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg>
         </div>
-        <p class="admin-tile-title">Rôles &amp; accès</p>
-        <p class="admin-tile-desc">Qui peut faire quoi dans le Hub : attribuer admin, bureau ou référent aux personnes connectées.</p>
-      </a>
+      </section>
 
-      <!-- Activité du salarié — QUOTIDIEN (DASHBOARD-TUILES-PAR-CAPABILITY) : écran
+      <section class="admin-section" data-section="salarie">
+        <h3 class="admin-section-title">Salarié</h3>
+        <div class="admin-grid">
+
+        <!-- Activité du salarié — QUOTIDIEN (DASHBOARD-TUILES-PAR-CAPABILITY) : écran
            à vignettes suivi-salarie.html. Visible à l'admin ET au salarié relié
            (data-show combiné admin+salarie). Garde de page = voie 3 (admin|bureau
            OU salarié relié). C'est la tuile par laquelle Lohann atteint son espace.
@@ -267,11 +276,11 @@
         <div class="admin-tile-icon">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
         </div>
-        <p class="admin-tile-title">Activité du salarié</p>
+        <p class="admin-tile-title">Saisie des missions &amp; séances</p>
         <p class="admin-tile-desc">Planning hebdomadaire et suivi des séances</p>
       </a>
 
-      <!-- Importer mon agenda — surface salarié du pont Agenda Google -> séances
+        <!-- Importer mon agenda — surface salarié du pont Agenda Google -> séances
            (B-light, import-agenda-salarie.html). Lohann dépose l'export .ics de son
            calendrier « Missions de Lohann » et crée ses séances. Garde de page =
            voie 3 (admin|bureau OU salarié relié) -> data-show="admin bureau salarie".
@@ -280,44 +289,29 @@
         <div class="admin-tile-icon">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="8 15 11 18 16 13"/></svg>
         </div>
-        <p class="admin-tile-title">Importer mon agenda</p>
+        <p class="admin-tile-title">Importation de l’agenda</p>
         <p class="admin-tile-desc">Créer ses séances à partir de l'export du calendrier « Missions de Lohann ».</p>
       </a>
 
-      <!-- Activité du salarié — ADMINISTRATION (socle pt 78 : entités bénéficiaires
+        <!-- Activité du salarié — ADMINISTRATION (socle pt 78 : entités bénéficiaires
            + missions + compteur horaire détaillé). Même titre que la tuile quotidien
            (ancrage de groupe) ; sous-titre distinct. Usage occasionnel, admin. -->
       <a class="admin-tile" data-show="admin" href="gestion-salarie.html">
         <div class="admin-tile-icon">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         </div>
-        <p class="admin-tile-title">Activité du salarié</p>
+        <p class="admin-tile-title">Suivi et Facturation</p>
         <p class="admin-tile-desc">Missions, bénéficiaires et compteur horaire</p>
       </a>
 
-      <!-- Import OVAL-E (pt 82 : alimente personnes.qualites_ffr depuis un export OVAL-E) -->
-      <a class="admin-tile" data-show="admin" href="import-oval-e.html">
-        <div class="admin-tile-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         </div>
-        <p class="admin-tile-title">Import OVAL-E</p>
-        <p class="admin-tile-desc">Mettre à jour les qualités FFR des licenciés (entraîneur, éducateur, soigneur…) depuis un export OVAL-E.</p>
-      </a>
+      </section>
 
-      <!-- Développement scolaire — surface PILOTE du module B « Prospection »
-           (developpement-scolaire.html). Le bureau prépare les écoles, fait avancer
-           le statut de démarchage, journalise les contacts et programme les cycles.
-           Garde de page = admin OU bureau (_gs_peut_ecrire) -> data-show="admin bureau".
-           Le jeton « bureau » est filtré au boot (estBureau déjà résolu). -->
-      <a class="admin-tile" data-show="admin bureau" href="developpement-scolaire.html">
-        <div class="admin-tile-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
-        </div>
-        <p class="admin-tile-title">Développement scolaire</p>
-        <p class="admin-tile-desc">Piloter la prospection des écoles : statut de démarchage, contacts, programmation des cycles.</p>
-      </a>
+      <section class="admin-section" data-section="prospection">
+        <h3 class="admin-section-title">Prospection</h3>
+        <div class="admin-grid">
 
-      <!-- Démarchage scolaire — surface EXÉCUTANT du module B (demarchage-scolaire.html).
+        <!-- Démarchage scolaire — surface EXÉCUTANT du module B (demarchage-scolaire.html).
            L'écran « une école à la fois » de Lohann : carte unique, geste « C'est fait »,
            mail-type. Garde de page = salarié OU admin|bureau (sql_132) -> mêmes jetons
            que la tuile « Activité du salarié » : data-show="admin salarie". C'est la
@@ -330,7 +324,66 @@
         <p class="admin-tile-desc">Une école à la fois : la prochaine à contacter, le mail-type, le geste « C'est fait ».</p>
       </a>
 
-    </section>
+        <!-- Développement scolaire — surface PILOTE du module B « Prospection »
+           (developpement-scolaire.html). Le bureau prépare les écoles, fait avancer
+           le statut de démarchage, journalise les contacts et programme les cycles.
+           Garde de page = admin OU bureau (_gs_peut_ecrire) -> data-show="admin bureau".
+           Le jeton « bureau » est filtré au boot (estBureau déjà résolu). -->
+      <a class="admin-tile" data-show="admin bureau" href="developpement-scolaire.html">
+        <div class="admin-tile-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+        </div>
+        <p class="admin-tile-title">Développement scolaire</p>
+        <p class="admin-tile-desc">Piloter la prospection des écoles : statut de démarchage, contacts, programmation des cycles.</p>
+      </a>
+
+        </div>
+      </section>
+
+      <section class="admin-section" data-section="administration-socle">
+        <h3 class="admin-section-title">Administration socle</h3>
+        <div class="admin-grid">
+
+        <!-- Rôles & accès (volet B refonte admin) -->
+      <a class="admin-tile" data-show="admin" href="roles-acces.html">
+        <div class="admin-tile-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg>
+        </div>
+        <p class="admin-tile-title">Rôles &amp; accès</p>
+        <p class="admin-tile-desc">Qui peut faire quoi dans le Hub : attribuer admin, bureau ou référent aux personnes connectées.</p>
+      </a>
+
+        <!-- Saisons (ADMIN-(ii) sous-chantier 2) -->
+      <a class="admin-tile" data-show="admin" href="admin-saisons.html">
+        <div class="admin-tile-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        </div>
+        <p class="admin-tile-title">Saisons</p>
+        <p class="admin-tile-desc">Création de saison et bascule des catégories par millésime.</p>
+      </a>
+
+        <!-- Sites (ADMIN-(ii) sous-chantier 4) -->
+      <a class="admin-tile" data-show="admin" href="admin-sites.html">
+        <div class="admin-tile-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+        </div>
+        <p class="admin-tile-title">Sites</p>
+        <p class="admin-tile-desc">Lieux d'entraînement et de match.</p>
+      </a>
+
+        <!-- Import OVAL-E (pt 82 : alimente personnes.qualites_ffr depuis un export OVAL-E) -->
+      <a class="admin-tile" data-show="admin" href="import-oval-e.html">
+        <div class="admin-tile-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </div>
+        <p class="admin-tile-title">Import OVAL-E</p>
+        <p class="admin-tile-desc">Mettre à jour les qualités FFR des licenciés (entraîneur, éducateur, soigneur…) depuis un export OVAL-E.</p>
+      </a>
+
+        </div>
+      </section>
+
+    </div>
 
     <p class="footer dashboard-footer">
       <span class="footer-club">Mutzig Ovalie Molsheim</span><br />
@@ -426,15 +479,29 @@
           }
         });
 
-        // Grille vide -> message honnête plutôt qu'un écran blanc.
+        // Sections vides (DASHBOARD-SECTIONS-METIER) : une section dont TOUTES
+        // les tuiles sont masquées pour le rôle ne doit pas afficher un titre
+        // orphelin surplombant du vide. On replie la section entière (titre +
+        // grille). FAIT FOI 29/06 : titre masqué si 0 tuile visible.
+        document.querySelectorAll('.admin-section').forEach(function (sec) {
+          const tuilesSec = sec.querySelectorAll('.admin-tile[data-show]');
+          const auMoinsUne = Array.prototype.some.call(tuilesSec, function (t) {
+            return !t.hidden;
+          });
+          if (!auMoinsUne) {
+            sec.hidden = true;
+            sec.setAttribute('aria-hidden', 'true');
+          }
+        });
+
+        // Plus aucune section visible -> message honnête plutôt qu'un écran blanc.
         if (visibles === 0) {
-          const grid = document.querySelector('.admin-grid');
-          if (grid) {
+          const wrap = document.querySelector('.admin-sections');
+          if (wrap) {
             const vide = document.createElement('p');
             vide.className = 'admin-tile-desc';
-            vide.style.gridColumn = '1 / -1';
             vide.textContent = 'Aucun écran ne vous est ouvert pour le moment.';
-            grid.appendChild(vide);
+            wrap.appendChild(vide);
           }
         }
       })();
