@@ -1835,14 +1835,17 @@
   // Résout les équipes de la catégorie active courante. Repli M14.
   async function _resoudreEquipesCategorieActive() {
     const catId = CTX_PERIMETRE && CTX_PERIMETRE.active;
-    if (!catId) return [M14_TEAM_UUID];
+    // Plus de repli M14 silencieux (décision Manu) : pas de catégorie active
+    // résolue → aucune équipe (liste vide → empty state honnête, pas les
+    // évènements M14 sous un faux titre).
+    if (!catId) return [];
     try {
       const eqs = await SupabaseHub.listEquipes(catId);
       const ids = Array.isArray(eqs) ? eqs.map(e => e && e.id).filter(Boolean) : [];
-      return ids.length > 0 ? ids : [M14_TEAM_UUID];
+      return ids; // vide si la catégorie n'a aucune équipe sur la saison active (plus de repli M14)
     } catch (e) {
-      console.warn('Évènements : listEquipes(catégorie active) échouée, repli M14', e);
-      return [M14_TEAM_UUID];
+      console.warn('Évènements : listEquipes(catégorie active) échouée', e);
+      return []; // échec de résolution → liste vide (plus de repli M14 trompeur)
     }
   }
 
@@ -1863,7 +1866,7 @@
     if (!window.SupabaseHub || typeof SupabaseHub.getEvenementsAVenir !== 'function') {
       throw new Error('SupabaseHub.getEvenementsAVenir indisponible (v1.10+ requis)');
     }
-    const equipes = CTX_EQUIPES_ACTIVES || [M14_TEAM_UUID];
+    const equipes = CTX_EQUIPES_ACTIVES || []; // plus de repli M14 (décision Manu)
     const listes = await Promise.all(
       equipes.map(eqId => SupabaseHub.getEvenementsAVenir(eqId, FENETRE_JOURS_AVENIR))
     );
@@ -1874,7 +1877,7 @@
     if (!window.SupabaseHub || typeof SupabaseHub.getEvenementsPasses !== 'function') {
       throw new Error('SupabaseHub.getEvenementsPasses indisponible (v1.10+ requis)');
     }
-    const equipes = CTX_EQUIPES_ACTIVES || [M14_TEAM_UUID];
+    const equipes = CTX_EQUIPES_ACTIVES || []; // plus de repli M14 (décision Manu)
     const listes = await Promise.all(
       equipes.map(eqId => SupabaseHub.getEvenementsPasses(eqId, FENETRE_JOURS_PASSES, PASSES_LIMIT))
     );
@@ -2189,8 +2192,21 @@
     // ne voit plus le toggle, cohérent H-5 admin-only strict).
 
     if (total === 0) {
-      list.innerHTML =
-        '<div class="evt-list-empty">Aucun évènement trouvé.<br><small>Essayez d\'élargir les filtres ou de modifier la recherche.</small></div>';
+      // Distinguer deux cas d'absence : (a) la catégorie active n'a AUCUNE
+      // équipe sur la saison active (ex. ententes 2026/2027 pas encore
+      // créées) → message honnête, pas « élargissez les filtres » ; (b)
+      // il y a des équipes mais aucun évènement passe les filtres.
+      const sansEquipe = Array.isArray(CTX_EQUIPES_ACTIVES) && CTX_EQUIPES_ACTIVES.length === 0;
+      if (sansEquipe) {
+        const lib = (typeof _libelleCategorieActive === 'function' && _libelleCategorieActive()) || 'cette catégorie';
+        list.innerHTML =
+          '<div class="evt-list-empty">Aucune équipe pour ' + escHtml(lib) + ' sur la saison active.'
+          + '<br><small>Aucune entente n\'est encore créée pour cette catégorie cette saison — '
+          + 'les évènements apparaîtront une fois l\'équipe engagée.</small></div>';
+      } else {
+        list.innerHTML =
+          '<div class="evt-list-empty">Aucun évènement trouvé.<br><small>Essayez d\'élargir les filtres ou de modifier la recherche.</small></div>';
+      }
       bindCardEvents();
       return;
     }
@@ -6620,7 +6636,8 @@
   // si la catégorie active est introuvable (on garde le libellé en dur).
   function _libelleCategorieActive() {
     if (!CTX_PERIMETRE || !Array.isArray(CTX_PERIMETRE.categories)) return null;
-    if (CTX_PERIMETRE.transverse) return null; // admin/bureau : pas de cat unique
+    // Admin/bureau (transverse) A DÉSORMAIS une catégorie active (la
+    // mémorisée ou la 1re) → on résout son libellé comme pour un encadrant.
     const c = CTX_PERIMETRE.categories.find(x => x.id === CTX_PERIMETRE.active);
     return c ? (c.libelle_court || c.code || null) : null;
   }
@@ -6635,13 +6652,18 @@
 
   // Monte le sélecteur dans le header SI le périmètre compte > 1 catégorie.
   // Un encadrant mono-catégorie (1 entrée) n'a pas de sélecteur (UX
-  // inchangée). Un compte transverse (admin/bureau) n'en a pas non plus
-  // ici : le module reste centré sur l'équipe par défaut (le filtrage
-  // transverse relève d'un autre chantier). Insertion APRÈS .evt-header,
-  // dans la colonne principale ; aucune édition du HTML de la page.
+  // inchangée). Un compte transverse (admin/bureau) OBTIENT le sélecteur
+  // sur toutes les catégories du club (décision Manu). Choisir une
+  // catégorie résout ses équipes (listEquipes) et charge leurs évènements ;
+  // une catégorie sans équipe sur la saison active affiche un empty state
+  // honnête (plus de repli M14). Insertion APRÈS .evt-header, dans la
+  // colonne principale ; aucune édition du HTML de la page.
   function _monterSelecteurCategorie() {
     if (!CTX_PERIMETRE || !Array.isArray(CTX_PERIMETRE.categories)) return;
-    if (CTX_PERIMETRE.transverse) return;
+    // Admin/bureau (transverse) obtient AUSSI le sélecteur : ses catégories
+    // sont toutes celles du club, il doit pouvoir naviguer entre elles
+    // (décision Manu). Seul le cas mono-catégorie (encadrant à 1 entrée)
+    // n'a pas de sélecteur.
     if (CTX_PERIMETRE.categories.length <= 1) return;
 
     const header = document.querySelector('.evt-header');
