@@ -11,6 +11,34 @@
  *   - 5.5.A : éditeur méta + sauvegarde manuelle (CETTE VERSION)
  *   - 5.5.B : autosave 30s + dropdowns lieu/événement + champs secondaires
  *
+ * Version : 1.19 — FIX pioche staff en intersaison : 0 au lieu du repli M14 (juil. 2026)
+ *   v1.19 : Bug recette terrain (Manu, PC admin, M6 sélectionné) : la pioche
+ *           encadrants méta ET la pioche coachs des blocs proposaient les 8
+ *           encadrants M14, quelle que soit la catégorie choisie. Cause racine
+ *           (sondée, DS-1) : depuis la bascule de saison (2026/2027 active), les
+ *           ententes sont restées rattachées à 2025/2026 (inactive) →
+ *           listEquipes(cat) renvoie [] pour TOUTE catégorie → l'écran retombait
+ *           sur le repli en dur M14_TEAM_UUID (dans _seanceChoisirEquipeActive
+ *           ET _equipeActive) → getCategorieEquipe résolvait la catégorie M14 →
+ *           list_staff_disponibles(M14) = les 8 encadrants M14. Ce n'était donc
+ *           NI un bug de getCategorieEquipe NI un trou de fonction_staff, mais le
+ *           repli M14 silencieux qui masquait l'absence d'équipe active.
+ *           Correctif (3 gestes solidaires, périmètre seance-editor.js seul) :
+ *             (1) _equipeActive() → renvoie null (plus de repli M14).
+ *             (2) _seanceChoisirEquipeActive() → liste vide pose equipeActive=null.
+ *             (3) loadStaffDisponibles() → GARDE d'entrée : eqActive null →
+ *                 State.staffDisponible=[] SANS appeler list_staff_disponibles(null)
+ *                 (qui aurait renvoyé TOUT le staff du club, ~63 personnes).
+ *           Résultat : pioche VIDE en intersaison (état honnête), le champ libre
+ *           du menu encadrants reste pour un intervenant hors staff. Cas nominal
+ *           (saison avec ententes) INCHANGÉ : listEquipes renvoie des équipes →
+ *           choix 1re/mémorisée → comportement identique. Constante M14_TEAM_UUID
+ *           conservée inerte (relique, plus référencée — retrait = geste séparé).
+ *           Dette tracée : compositions.html/joueurs/pilotage ont probablement le
+ *           même repli M14 (à auditer). Chantier distinct : reconduction des
+ *           ententes à la bascule (l'outil bascule surclasse les joueurs mais ne
+ *           reconduit pas les ententes → cause amont de cet état intersaison).
+ *           node --check OK. boot v1.18.1 → v1.19.
  * Version : 1.18.1 — FIX hotfix : enterSelectionMode happé par un /** orphelin (juin 2026)
  *   v1.18.1 : Le bloc d'insertion v1.18 avait laissé un commentaire /**
  *             non fermé juste avant function enterSelectionMode(), qui
@@ -398,9 +426,16 @@
   // a > 1 équipe, un 2e sélecteur d'équipe apparaît ; mono-équipe
   // (cas réel actuel M14) → résolution directe, aucun sélecteur.
 
-  /** UUID de l'équipe de séance courante (repli M14 honnête). */
+  /**
+   * UUID de l'équipe de séance courante, ou null si aucune équipe active
+   * n'est résolue (intersaison : ententes non rattachées à la saison active
+   * → listEquipes renvoie [] → aucune équipe légitime). v1.19 : plus de
+   * repli M14_TEAM_UUID (trompeur — affichait le staff M14 sous une autre
+   * catégorie). null = état honnête « pas d'équipe » ; les consommateurs
+   * (loadStaffDisponibles) gèrent ce null explicitement.
+   */
   function _equipeActive() {
-    return State.equipeActive || M14_TEAM_UUID;
+    return State.equipeActive || null;
   }
 
   /** Équipes de la catégorie active → objets [{id,…}]. [] si indispo. */
@@ -428,7 +463,12 @@
   function _seanceChoisirEquipeActive() {
     const liste = State.equipesCategorieActive || [];
     if (liste.length === 0) {
-      State.equipeActive = M14_TEAM_UUID; // repli honnête
+      // v1.19 : aucune équipe active pour cette catégorie (intersaison :
+      // ententes non rattachées à la saison active). On pose null au lieu
+      // de retomber sur M14_TEAM_UUID — ce repli affichait le staff M14
+      // sous n'importe quelle catégorie (bug recette Manu, M6). null =
+      // état honnête : loadStaffDisponibles rendra une pioche vide.
+      State.equipeActive = null;
       return;
     }
     let memorisee = null;
@@ -4945,6 +4985,19 @@
    */
   async function loadStaffDisponibles() {
     try {
+      // v1.19 — GARDE INTERSAISON : si aucune équipe active n'est résolue
+      // (_equipeActive() === null : ententes non rattachées à la saison
+      // active, listEquipes []), on rend une pioche VIDE. On NE tombe PAS
+      // sur list_staff_disponibles(null) qui renverrait TOUT le staff du
+      // club (bug recette Manu : staff M14 proposé en M6). État honnête :
+      // pas d'équipe → personne à proposer (le champ libre du menu
+      // encadrants reste disponible pour un intervenant hors staff).
+      const eqActive = _equipeActive();
+      if (!eqActive) {
+        State.staffDisponible = [];
+        console.log('SeanceEditor: aucune équipe active (intersaison) → pioche staff vide.');
+        return;
+      }
       // v1.11 (recette terrain) — la pioche coach exige le VRAI categorie_id
       // (uuid), pas la chaîne factice window.momSeanceContext.categorie_uuid
       // ('cat-m14'). On le résout depuis l'équipe active via getCategorieEquipe
