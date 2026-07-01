@@ -2328,8 +2328,18 @@
 
     const sub = document.getElementById('evt-header-sub');
     if (sub) {
-      const totalAll = EVENEMENTS_AVENIR.length + EVENEMENTS_PASSES.length;
-      sub.textContent = totalAll + ' évènement(s) chargé(s) · ' + FENETRE_JOURS_AVENIR + ' jours à venir, ' + FENETRE_JOURS_PASSES + ' jours passés';
+      // Compter les RACINES (ce que la liste affiche) et, séparément, les
+      // matchs enfants de tournoi (evenement_parent_id non nul). L'ancien
+      // libellé « N évènement(s) chargé(s) » comptait tout à plat
+      // (racines + enfants) et affichait « 30 » quand la liste ne montre
+      // que 2 racines — trompeur. On distingue désormais les deux.
+      const nbRacines = EVENEMENTS_AVENIR.filter(e => !e.evenement_parent_id).length
+                      + EVENEMENTS_PASSES.filter(e => !e.evenement_parent_id).length;
+      const nbMatchs  = (EVENEMENTS_AVENIR.length + EVENEMENTS_PASSES.length) - nbRacines;
+      let txt = nbRacines + ' évènement(s)';
+      if (nbMatchs > 0) txt += ' · ' + nbMatchs + ' match(s) de tournoi';
+      txt += ' · ' + FENETRE_JOURS_AVENIR + ' jours à venir, ' + FENETRE_JOURS_PASSES + ' jours passés';
+      sub.textContent = txt;
     }
   }
 
@@ -7102,10 +7112,14 @@
       if (smoke) {
         const avenirRoots = EVENEMENTS_AVENIR.filter(e => !e.evenement_parent_id);
         const passesRoots = EVENEMENTS_PASSES.filter(e => !e.evenement_parent_id);
+        // 'nœuds-parents' = tout parent ayant des enfants dans l'arbre
+        // (racine → phase → match) : ce n'est PAS le nombre de tournois
+        // de tête. On le nomme honnêtement pour ne pas laisser croire
+        // « 10 tournois » quand la liste n'en montre que 2.
         smoke.textContent = 'MOM Hub · Module Évènements · S2.2 (v1.1) · ' +
           avenirRoots.length + ' à venir + ' +
           passesRoots.length + ' passé(s) racines · ' +
-          Object.keys(CHILDREN_BY_PARENT).length + ' tournoi(s) avec matchs';
+          Object.keys(CHILDREN_BY_PARENT).length + ' nœud(s)-parent(s) dans l\'arbre';
       }
     } catch (err) {
       console.error('Évènements : erreur lors du chargement', err);
