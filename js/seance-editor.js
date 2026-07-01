@@ -39,6 +39,15 @@
  *           ententes à la bascule (l'outil bascule surclasse les joueurs mais ne
  *           reconduit pas les ententes → cause amont de cet état intersaison).
  *           node --check OK. boot v1.18.1 → v1.19.
+ *   v1.19b : Effet de bord du fix v1.19 corrigé (recette Manu, immédiate) :
+ *           _equipeActive() renvoyant null, onNouvelleSeance() envoyait
+ *           equipe_id=null à createSeance → « Erreur création séance :
+ *           equipe_id requis ». Garde ajoutée en tête de onNouvelleSeance :
+ *           sans équipe active, message métier clair (intersaison, équipes
+ *           non rattachées à la saison active) et AUCUN appel RPC. Les 4
+ *           autres consommateurs de _equipeActive() (listSeancesByEquipe,
+ *           listBrouillonsVides, getEvenementsAVenir, getVivierCompo)
+ *           tolèrent déjà null (warning + []) → chargement intersaison OK.
  * Version : 1.18.1 — FIX hotfix : enterSelectionMode happé par un /** orphelin (juin 2026)
  *   v1.18.1 : Le bloc d'insertion v1.18 avait laissé un commentaire /**
  *             non fermé juste avant function enterSelectionMode(), qui
@@ -3884,6 +3893,19 @@
   }
 
   async function onNouvelleSeance() {
+    // v1.19b — GARDE INTERSAISON : sans équipe active résolue
+    // (_equipeActive() === null : ententes non rattachées à la saison
+    // active), la création de séance échouerait côté RPC (equipe_id requis).
+    // On intercepte AVANT l'appel pour donner un message métier clair au
+    // lieu de l'erreur technique brute, et on ne crée rien.
+    if (!_equipeActive()) {
+      alert('Aucune équipe active pour cette catégorie : impossible de créer '
+        + 'une séance.\n\nLa saison a basculé mais les équipes ne sont pas '
+        + 'encore rattachées à la saison active. Reviens une fois les '
+        + 'ententes de la nouvelle saison en place.');
+      return;
+    }
+
     const sidebarBtn = DOM.sidebarCta();
     const centerBtn  = DOM.ctaCenter();
     if (sidebarBtn) sidebarBtn.disabled = true;
