@@ -14,7 +14,10 @@
        Conception-UX-ADMIN-ii-v1.md §3.4. Habillage calqué sur
        admin-sites.html (mêmes tokens css/hub.css), namespace `asn-`.
        Deux zones : (2a) liste saisons + création/activation ;
-       (2b) écran bascule = aperçu 3 groupes LECTURE SEULE + Appliquer. */
+       (2b) écran bascule = aperçu 3 groupes LECTURE SEULE + Appliquer.
+       (2c) v1.1 : GESTE UNIQUE — l'aperçu est complété par la reconduction
+       (ententes/équipes/collectif, sql_141, FAIT FOI
+       Conception-Reconduction-Saison-v1.md) et Appliquer enchaîne les 2 RPC. */
 
     body.auth-pending { visibility: hidden; }
 
@@ -84,6 +87,8 @@
     .asn-group-label { font-size: 12px; color: var(--ink-mute); margin-top: 4px; }
 
     .asn-tables { margin-top: 18px; }
+    .asn-recon { display: none; margin-top: 18px; }
+    .asn-recon.is-shown { display: block; }
     .asn-table-wrap { margin-top: 14px; }
     .asn-table-title { font-size: 14px; font-weight: 600; margin: 0 0 6px; }
     .asn-table-scroll { max-height: 320px; overflow-y: auto; border: 1px solid var(--paper-warm, #ece6da); border-radius: 8px; }
@@ -235,6 +240,7 @@
       <div class="asn-section-head">
         <h3 id="asn-s2-title">Bascule des catégories par millésime</h3>
         <p>Fait monter les joueurs d'une catégorie d'âge à la suivante pour la saison choisie.</p>
+        <p>Reconduit dans le même geste les ententes, le rattachement des équipes et le collectif.</p>
       </div>
 
       <div class="asn-bascule-controls">
@@ -251,6 +257,9 @@
         <strong>inchangés</strong> (déjà à la bonne catégorie), et <strong>à vérifier</strong> (cas que l'outil
         ne bascule jamais tout seul : sexe ou date de naissance manquants, F15 intégrée, surclassement, hors grille).
         Les séniors et le loisir ne sont pas concernés.
+        <strong>Geste unique</strong> : l'aperçu inclut la <strong>reconduction de saison</strong>
+        (ententes recréées au nouveau millésime, équipes re-rattachées, collectif ré-amorcé) ;
+        « Appliquer » enchaîne bascule puis reconduction, chacune atomique et rejouable sans doublon.
       </div>
 
       <div class="asn-apercu" id="asn-apercu">
@@ -271,8 +280,28 @@
 
         <div class="asn-tables" id="asn-tables"></div>
 
+        <!-- (2c) Reconduction — compteurs remplis par renderRecon() -->
+        <div class="asn-recon" id="asn-recon">
+          <p class="asn-table-title">Reconduction — ententes · équipes · collectif</p>
+          <div class="asn-groups">
+            <div class="asn-group-card asn-group-card--basculer">
+              <div class="asn-group-n" id="asn-n-rec-ententes">0</div>
+              <div class="asn-group-label">ententes à créer</div>
+            </div>
+            <div class="asn-group-card asn-group-card--basculer">
+              <div class="asn-group-n" id="asn-n-rec-equipes">0</div>
+              <div class="asn-group-label">équipes à rebrancher</div>
+            </div>
+            <div class="asn-group-card asn-group-card--basculer">
+              <div class="asn-group-n" id="asn-n-rec-membres">0</div>
+              <div class="asn-group-label">membres à amorcer</div>
+            </div>
+          </div>
+          <p class="asn-field-hint" id="asn-recon-note"></p>
+        </div>
+
         <div class="asn-apply-row">
-          <button type="button" class="asn-btn asn-btn--warn" id="asn-appliquer-btn" disabled>Appliquer la bascule</button>
+          <button type="button" class="asn-btn asn-btn--warn" id="asn-appliquer-btn" disabled>Appliquer la bascule de saison</button>
           <span class="asn-field-hint" id="asn-apply-hint"></span>
         </div>
 
