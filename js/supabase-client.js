@@ -18,6 +18,21 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 1.71 — juillet 2026
+ *   v1.71 : RECONDUCTION-SAISON (geste unique, FAIT FOI
+ *           Conception-Reconduction-Saison-v1.md, md5 2f50aabf).
+ *           2 wrappers ADDITIFS adossés aux RPC SECURITY DEFINER de
+ *           sql_141 (has_role('admin')) :
+ *           - apercuReconduction(sourceId, cibleId) →
+ *             apercu_reconduction (LECTURE SEULE, plan des 3 volets
+ *             ententes / équipes / collectif).
+ *           - appliquerReconduction(sourceId, cibleId) →
+ *             appliquer_reconduction (transaction unique, fail-loud,
+ *             idempotente, journal reconduction_log).
+ *           Comble le trou de sql/53 : la bascule surclassait les
+ *           joueurs sans reconduire la chaîne saison → ententes →
+ *           équipes → collectif (Hub bloqué au lendemain de la
+ *           bascule, 01/07/2026). node --check OK. boot v1.70 → v1.71.
  * Version : 1.70 — juin 2026
  *   v1.70 : AGENDA-GOOGLE → SÉANCES (B-light, sens unique entrant).
  *           3 wrappers ADDITIFS pour le pont iCal Google Agenda
@@ -6143,6 +6158,84 @@
     },
 
     // ============================================================
+    // ADMIN-(ii) · (2c) RECONDUCTION DE SAISON  (v1.71)
+    //   Doc FAIT FOI Conception-Reconduction-Saison-v1.md (md5 2f50aabf).
+    //   2 wrappers ADDITIFS appelant les RPC SECURITY DEFINER de
+    //   sql_141 (has_role('admin')). Comblent le trou fonctionnel de
+    //   sql/53 : la bascule surclasse les joueurs mais ne reconduisait
+    //   ni les ententes, ni le rattachement des équipes, ni le
+    //   collectif. Geste unique cible (écran admin-saisons) :
+    //   appliquerBascule PUIS appliquerReconduction, séquencés côté UI
+    //   (si la première échoue, la seconde n'est pas tentée — P1,
+    //   pas de méga-RPC).
+    // ============================================================
+
+    /**
+     * LECTURE — Aperçu de la reconduction de saison (2c), STRICTEMENT
+     * LECTURE SEULE (rien n'est écrit). RPC apercu_reconduction : plan
+     * complet des 3 volets calculé serveur. Une ligne par objet :
+     * {volet, groupe, libelle, detail}. volet ∈ {entente, equipe,
+     * collectif} ; groupe ∈ {a_creer, deja_existante, a_rebrancher,
+     * deja_rebranchee, a_amorcer, deja_amorce, sans_entente_cible}.
+     * Payload RGPD minimal (nom court côté collectif, jamais personnes
+     * brute — patron apercu_bascule). sans_entente_cible = catégories
+     * sans entente MOM (ex-F18), non amorcées : attendu métier.
+     *
+     * @param {string} saisonSourceId UUID de la saison N (source)
+     * @param {string} saisonCibleId  UUID de la saison N+1 (cible)
+     * @returns {Promise<{ok:boolean, data?:Array, error?:string}>}
+     */
+    async apercuReconduction(saisonSourceId, saisonCibleId) {
+      if (!saisonSourceId || !saisonCibleId) {
+        return { ok: false, error: 'saisonSourceId et saisonCibleId requis' };
+      }
+      const { data, error } = await client.rpc('apercu_reconduction', {
+        p_saison_source: saisonSourceId,
+        p_saison_cible: saisonCibleId
+      });
+      if (error) {
+        console.error('MOM Hub: apercuReconduction()', error);
+        return { ok: false, error: error.message || 'Erreur aperçu reconduction' };
+      }
+      return { ok: true, data: Array.isArray(data) ? data : [] };
+    },
+
+    /**
+     * ÉCRITURE DE MASSE — Applique la reconduction (2c). RPC
+     * appliquer_reconduction : RECALCULE serveur (ne fait PAS confiance
+     * à l'aperçu client), transaction unique ententes (création N+1
+     * remillésimée : code/slug/libelle_long, tokens dérivés de
+     * saisons.code) → équipes (re-rattachement entente_id + code) →
+     * collectif (joueurs dérivés de personnes post-bascule, staff
+     * copié, double garde anti-doublon patron sql/55), fail-loud
+     * (nb écrit = nb attendu à chaque étape + invariants POST sinon
+     * ROLLBACK total) + INSERT reconduction_log. IDEMPOTENTE : re-run
+     * répond ok sans écrire ni journaliser. À n'appeler que derrière
+     * une confirmation explicite (garde-fou UI), APRÈS appliquerBascule
+     * dans le geste unique.
+     *
+     * @param {string} saisonSourceId UUID de la saison N (source)
+     * @param {string} saisonCibleId  UUID de la saison N+1 (cible)
+     * @returns {Promise<{ok:boolean, data?:Object, error?:string}>}
+     *          data = {ok, nb_ententes, nb_equipes, nb_membres,
+     *          log_id, message?}
+     */
+    async appliquerReconduction(saisonSourceId, saisonCibleId) {
+      if (!saisonSourceId || !saisonCibleId) {
+        return { ok: false, error: 'saisonSourceId et saisonCibleId requis' };
+      }
+      const { data, error } = await client.rpc('appliquer_reconduction', {
+        p_saison_source: saisonSourceId,
+        p_saison_cible: saisonCibleId
+      });
+      if (error) {
+        console.error('MOM Hub: appliquerReconduction()', error);
+        return { ok: false, error: error.message || 'Erreur application reconduction' };
+      }
+      return { ok: true, data: data };
+    },
+
+    // ============================================================
     // PRODUCTION · STAFF DU COLLECTIF N1  (v1.34)
     //   Pioche staff de u-admin (option A). Côté écriture, RIEN de
     //   neuf : addCollectifMembre(role:'staff') + listCollectifMembres
@@ -7235,7 +7328,7 @@
   }
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.70 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.71 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
