@@ -20,9 +20,17 @@
  *    RECALCULE au moment d'appliquer (ne fait pas confiance à l'aperçu
  *    client). Changer de cible invalide l'aperçu (re-calcul requis).
  *  - Activation et bascule sont INDÉPENDANTES (deux gestes séparés, §1).
+ *  - (2c) Reconduction (v1.1, FAIT FOI Conception-Reconduction-Saison-v1.md,
+ *    md5 2f50aabf) : GESTE UNIQUE — l'aperçu bascule est complété par
+ *    l'aperçu reconduction (ententes / équipes / collectif, RPC sql_141),
+ *    et « Appliquer » enchaîne appliquerBascule PUIS appliquerReconduction
+ *    (si la première échoue, la seconde n'est pas tentée). La saison
+ *    SOURCE de reconduction est dérivée : la plus récente saison dont
+ *    date_debut précède celle de la cible, affichée dans l'aperçu.
  *  - Garde UI admin-strict (cf. admin-saisons.html) ; les RPC sont elles
  *    aussi gardées has_role('admin') côté base.
  *
+ * Version : 1.1 — 01/07/2026 (RECONDUCTION-SAISON, geste unique 2c).
  * Version : 1.0 — 28/05/2026 (Production ADMIN-(ii), pt 24).
  */
 (function (global) {
@@ -59,6 +67,25 @@
   }
   function findSaison(id) {
     return State.saisons.find(function (s) { return s.id === id; }) || null;
+  }
+
+  // (2c) État reconduction — porté par State, déclaré ADDITIVEMENT ici
+  // pour ne pas retoucher le littéral historique.
+  State.reconRows = null;       // dernier aperçu reconduction (array) ou null
+  State.reconSourceId = null;   // saison source dérivée pour cet aperçu
+
+  // (2c) Saison SOURCE de reconduction pour une cible donnée : la plus
+  // récente saison dont date_debut précède strictement celle de la cible
+  // (dérivation déterministe, affichée à l'écran — aucune inférence cachée).
+  function findSourcePour(cibleId) {
+    const cible = findSaison(cibleId);
+    if (!cible || !cible.date_debut) return null;
+    const candidates = State.saisons.filter(function (s) {
+      return s.id !== cible.id && s.date_debut && s.date_debut < cible.date_debut;
+    });
+    if (!candidates.length) return null;
+    candidates.sort(function (a, b) { return a.date_debut < b.date_debut ? 1 : -1; });
+    return candidates[0];
   }
 
   // ----------------------------------------------------------------
@@ -216,6 +243,11 @@
     $('asn-result').classList.remove('is-shown');
     $('asn-appliquer-btn').disabled = true;
     $('asn-apply-hint').textContent = '';
+    // (2c) L'invalidation de l'aperçu invalide aussi la reconduction.
+    State.reconRows = null;
+    State.reconSourceId = null;
+    $('asn-recon').classList.remove('is-shown');
+    $('asn-recon-note').textContent = '';
   }
 
   async function calculerApercu() {
@@ -231,6 +263,9 @@
       State.apercuRows = Array.isArray(res.data) ? res.data : [];
       State.apercuSaisonId = cibleId;
       renderApercu();
+      // (2c) GESTE UNIQUE — l'aperçu bascule est complété par l'aperçu
+      // reconduction (LECTURE SEULE lui aussi).
+      await calculerApercuRecon(cibleId);
     } catch (e) {
       console.error('AdminSaisons.calculerApercu()', e);
       showError('Erreur inattendue : ' + (e && e.message ? e.message : e));
@@ -302,6 +337,95 @@
   }
 
   // ----------------------------------------------------------------
+  // (2c) APERÇU RECONDUCTION — lecture seule (FAIT FOI
+  // Conception-Reconduction-Saison-v1.md §4 ; RPC sql_141).
+  // ----------------------------------------------------------------
+  function reconRowsBy(volet, groupe) {
+    return (State.reconRows || []).filter(function (r) {
+      return r.volet === volet && r.groupe === groupe;
+    });
+  }
+
+  function reconPending() {
+    return reconRowsBy('entente', 'a_creer').length
+      + reconRowsBy('equipe', 'a_rebrancher').length
+      + reconRowsBy('collectif', 'a_amorcer').length;
+  }
+
+  async function calculerApercuRecon(cibleId) {
+    const source = findSourcePour(cibleId);
+    State.reconRows = null;
+    State.reconSourceId = null;
+    if (!source) {
+      renderRecon(null);
+      return;
+    }
+    try {
+      const res = await Hub.apercuReconduction(source.id, cibleId);
+      if (!res || !res.ok) {
+        renderRecon(source, (res && res.error) || 'Échec de l\u2019aperçu reconduction.');
+        return;
+      }
+      State.reconRows = Array.isArray(res.data) ? res.data : [];
+      State.reconSourceId = source.id;
+      renderRecon(source);
+    } catch (e) {
+      console.error('AdminSaisons.calculerApercuRecon()', e);
+      renderRecon(source, 'Erreur inattendue : ' + (e && e.message ? e.message : e));
+    }
+  }
+
+  function renderRecon(source, errMsg) {
+    const nEnt = reconRowsBy('entente', 'a_creer').length;
+    const nEq = reconRowsBy('equipe', 'a_rebrancher').length;
+    const nMb = reconRowsBy('collectif', 'a_amorcer').length;
+    $('asn-n-rec-ententes').textContent = nEnt;
+    $('asn-n-rec-equipes').textContent = nEq;
+    $('asn-n-rec-membres').textContent = nMb;
+
+    let note = '';
+    if (!source) {
+      note = 'Aucune saison antérieure à la cible : reconduction sans objet.';
+    } else if (errMsg) {
+      note = '⚠ ' + errMsg;
+    } else {
+      const dejaEnt = reconRowsBy('entente', 'deja_existante').length;
+      const dejaEq = reconRowsBy('equipe', 'deja_rebranchee').length;
+      const dejaMb = reconRowsBy('collectif', 'deja_amorce').length;
+      const sansCible = reconRowsBy('collectif', 'sans_entente_cible').length;
+      const bits = ['Reconduit depuis « ' + saisonLabel(source) + ' ».'];
+      if (dejaEnt + dejaEq + dejaMb) {
+        bits.push('Déjà fait : ' + dejaEnt + ' entente(s), ' + dejaEq +
+          ' équipe(s), ' + dejaMb + ' membre(s).');
+      }
+      if (sansCible) {
+        bits.push(sansCible + ' personne(s) sans entente cible (catégorie sans ' +
+          'entente MOM, ex-F18) : non amorcées, attendu.');
+      }
+      note = bits.join(' ');
+    }
+    $('asn-recon-note').textContent = note;
+    $('asn-recon').classList.add('is-shown');
+
+    // Surcharge du bouton Appliquer (le rendu bascule a déjà posé son état :
+    // on le recompose ici en combinant bascule + reconduction — additif, le
+    // code historique de renderApercu n'est pas retouché).
+    const nBasc = rowsByGroup('a_basculer').length;
+    const nRec = nEnt + nEq + nMb;
+    const btn = $('asn-appliquer-btn');
+    btn.disabled = (nBasc + nRec) === 0;
+    const hints = [];
+    hints.push(nBasc
+      ? nBasc + ' joueur' + (nBasc > 1 ? 's' : '') + ' seront basculés.'
+      : 'Aucun joueur à basculer.');
+    hints.push(nRec
+      ? 'Reconduction : ' + nEnt + ' entente(s), ' + nEq + ' équipe(s), ' +
+        nMb + ' membre(s).'
+      : 'Rien à reconduire.');
+    $('asn-apply-hint').textContent = hints.join(' ');
+  }
+
+  // ----------------------------------------------------------------
   // (2b) APPLIQUER — sous confirmation
   // ----------------------------------------------------------------
   function demanderAppliquer() {
@@ -311,11 +435,27 @@
       return;
     }
     const n = rowsByGroup('a_basculer').length;
-    if (!n) return;
+    if (!n && !reconPending()) return;   // (2c) modifié : recon seule = geste valide
     const s = findSaison(State.cibleId);
     $('asn-confirm-text').innerHTML =
       'Vous allez basculer <span class="asn-confirm-strong">' + n + ' joueur' + (n > 1 ? 's' : '') +
       '</span> vers la saison <span class="asn-confirm-strong">' + esc(saisonLabel(s)) + '</span>.';
+    // (2c) GESTE UNIQUE — la confirmation annonce aussi la reconduction.
+    const nEnt = reconRowsBy('entente', 'a_creer').length;
+    const nEq = reconRowsBy('equipe', 'a_rebrancher').length;
+    const nMb = reconRowsBy('collectif', 'a_amorcer').length;
+    if (nEnt + nEq + nMb) {
+      $('asn-confirm-text').innerHTML +=
+        ' La reconduction sera appliquée dans la foulée : <span class="asn-confirm-strong">' +
+        nEnt + ' entente(s), ' + nEq + ' équipe(s), ' + nMb + ' membre(s)</span>.';
+    }
+    if (!n && (nEnt + nEq + nMb)) {
+      $('asn-confirm-text').innerHTML =
+        'Aucun joueur à basculer. Vous allez appliquer la <span class="asn-confirm-strong">reconduction' +
+        '</span> vers la saison <span class="asn-confirm-strong">' + esc(saisonLabel(s)) + '</span> : ' +
+        '<span class="asn-confirm-strong">' + nEnt + ' entente(s), ' + nEq + ' équipe(s), ' +
+        nMb + ' membre(s)</span>.';
+    }
     openModal('asn-modal-confirm');
   }
 
@@ -334,6 +474,24 @@
       result.textContent = '✓ Bascule appliquée : ' + nb + ' joueur' + (nb > 1 ? 's' : '') +
         ' basculé' + (nb > 1 ? 's' : '') + '.' + (d.log_id ? ' (journal : ' + d.log_id + ')' : '');
       result.classList.add('is-shown');
+      // (2c) GESTE UNIQUE — enchaîne la reconduction (FAIT FOI §6). On est
+      // ici = la bascule a réussi ; si elle avait échoué, le return au-dessus
+      // garantit que la reconduction n'est PAS tentée. RPC idempotente :
+      // en cas d'échec ici, recalculer l'aperçu puis ré-appliquer suffit.
+      if (reconPending() && State.reconSourceId) {
+        const r2 = await Hub.appliquerReconduction(State.reconSourceId, cibleId);
+        if (!r2 || !r2.ok) {
+          showError('Bascule appliquée, mais la reconduction a échoué : ' +
+            ((r2 && r2.error) || 'erreur inconnue') +
+            '. Recalculez l\u2019aperçu puis ré-appliquez (geste idempotent, sans doublon).');
+        } else {
+          const d2 = r2.data || {};
+          result.textContent += ' ✓ Reconduction : ' + (d2.nb_ententes || 0) +
+            ' entente(s), ' + (d2.nb_equipes || 0) + ' équipe(s), ' +
+            (d2.nb_membres || 0) + ' membre(s).' +
+            (d2.log_id ? ' (journal : ' + d2.log_id + ')' : '');
+        }
+      }
       // Recalcule l'aperçu : « à basculer » doit retomber à 0.
       await calculerApercu();
     } catch (e) {
@@ -402,6 +560,6 @@
 
   global.AdminSaisons = { init: init };
 
-  console.log('%c🏉 MOM Hub · admin-saisons.js v1.0 chargé', 'color: #2D7D46; font-weight: bold;');
+  console.log('%c🏉 MOM Hub · admin-saisons.js v1.1 chargé', 'color: #2D7D46; font-weight: bold;');
 
 })(typeof window !== 'undefined' ? window : globalThis);
