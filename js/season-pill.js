@@ -64,14 +64,23 @@
       }
     }
 
-    /* 2) Métas d'en-tête composites : on remplace la portion année seule,
-     *    en gardant le reste du libellé (« · MES JOUEURS », etc.). */
+    /* 2) Métas d'en-tête composites : format « SAISON <année> · <suffixe> ».
+     *    On reconstruit la portion saison quelle que soit sa valeur actuelle
+     *    (« 2025-2026 », « … », ou déjà « 2026-2027 »), en préservant le
+     *    suffixe après le séparateur « · ». Robuste au texte laissé en HTML. */
     if (texteTiret) {
       var metas = ['joueur-header-meta', 'evt-header-meta'];
       for (var j = 0; j < metas.length; j++) {
         var el = document.getElementById(metas[j]);
-        if (el && el.textContent) {
-          el.textContent = el.textContent.replace(/20\d{2}\s*[-/]\s*20\d{2}/, texteTiret);
+        if (!el || !el.textContent) continue;
+        var txt = el.textContent;
+        var sep = txt.indexOf('·');
+        if (sep !== -1) {
+          /* garde tout ce qui suit le séparateur (suffixe + espaces) */
+          el.textContent = 'SAISON ' + texteTiret + ' ' + txt.slice(sep);
+        } else {
+          /* pas de séparateur : on remplace juste la portion année si présente */
+          el.textContent = txt.replace(/20\d{2}\s*[-/]\s*20\d{2}|…/, texteTiret);
         }
       }
     }
