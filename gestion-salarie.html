@@ -25,6 +25,9 @@
   Décisions actées (conv pt 79) : 2 onglets ; séances inline ;
     code entité auto-dérivé (slug majuscule + suffixe base36) ;
     champ refacturable mission visible (héritage entité par défaut).
+  Compteur previsionnel (FAIT FOI 02/07/2026 md5 4f6c2662) : nouveau bloc
+    gcPrev (RPC list_periodes_annualisation + list_seances_previsionnel
+    sql_142) ; compteur existant renomme « effectives » ; export xlsx.
 -->
 <link rel="stylesheet" href="css/hub.css">
 <style>
@@ -220,6 +223,19 @@
   .gc-releve { width: 100%; border-collapse: collapse; font-size: 13px; }
   .gc-releve th, .gc-releve td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--paper-warm, #e3e0d8); }
   .gc-releve th { font-weight: 600; color: var(--ink-soft, #2a4836); }
+
+  /* ----- Compteur d'heures previsionnel (FAIT FOI 02/07/2026, md5 4f6c2662).
+     Agregation front des seances generees (RPC list_seances_previsionnel,
+     sql_142) : synthese annuelle (prevu pur + projection vs cible), tableau
+     hebdo avec marquage des seuils 44/48 lus de periodes_annualisation
+     (une seule verite, rien en dur), recap mensuel, export xlsx. ----- */
+  .gc-prev-h3 { font-size: 14px; margin: 18px 0 8px; color: var(--ink, #0c3d24); }
+  .gc-prev-warn { margin: 0 0 12px; padding: 8px 12px; border-radius: 8px; font-size: 13px;
+                  background: #fff6e0; border: 1px solid #e8cf8a; color: #8a5a00; }
+  .gc-sem-badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; }
+  .gc-sem-badge.alerte { background: #fff3cd; border: 1px solid #e8cf8a; color: #8a5a00; }
+  .gc-sem-badge.forte { background: #f8d7da; border: 1px solid #f1aeb5; color: #842029; }
+
 </style>
 </head>
 <body class="auth-pending">
@@ -364,7 +380,7 @@
        rapport_heures_salarie. -->
   <section class="gc-compteur" id="gcCompteur">
     <div class="gc-compteur-hd">
-      <h2>Compteur d'heures</h2>
+      <h2>Compteur d'heures effectives</h2>
       <div class="gc-sel-row">
         <label for="gcSelSalarie">Compteur de :</label>
         <select id="gcSelSalarie"></select>
@@ -377,6 +393,37 @@
     <table class="gc-releve">
       <thead><tr><th>Date</th><th>Mission</th><th>Heures</th></tr></thead>
       <tbody id="gcReleve"></tbody>
+    </table>
+  </section>
+
+
+  <!-- ===== Compteur d'heures previsionnel (FAIT FOI 02/07/2026, md5 4f6c2662) =====
+       Pilotage employeur : heures A VENIR agregees des seances generees
+       (RPC list_seances_previsionnel, sql_142) ; periode / cible / seuils
+       lus de periodes_annualisation via list_periodes_annualisation (une
+       seule verite, rien en dur). Le selecteur du compteur effectif
+       (gcSelSalarie) pilote LES DEUX blocs : un seul geste (simplicite P1).
+       Regles FAIT FOI §3 : seances annulees ET missions annulees exclues
+       (filtre en base, sql_142) ; duree NULL comptee 0 + avertissement
+       fail-loud ; prevu pur vs projection = realise + prevues (D5). -->
+  <section class="gc-compteur" id="gcPrev">
+    <div class="gc-compteur-hd">
+      <h2>Compteur d'heures prévisionnel</h2>
+    </div>
+    <div class="gc-export-row">
+      <button type="button" id="gcPrevExportXlsx" class="gc-export-btn">Exporter le prévisionnel (.xlsx)</button>
+    </div>
+    <p class="gc-prev-warn" id="gcPrevWarn" hidden></p>
+    <div class="gc-cards" id="gcPrevCards"></div>
+    <h3 class="gc-prev-h3">Par semaine</h3>
+    <table class="gc-releve">
+      <thead><tr><th>Semaine</th><th>Séances</th><th>Heures prévues</th><th>Seuils</th></tr></thead>
+      <tbody id="gcPrevSemaines"></tbody>
+    </table>
+    <h3 class="gc-prev-h3">Par mois</h3>
+    <table class="gc-releve">
+      <thead><tr><th>Mois</th><th>Séances</th><th>Heures prévues</th></tr></thead>
+      <tbody id="gcPrevMois"></tbody>
     </table>
   </section>
 
@@ -1179,6 +1226,8 @@
     sel.disabled = staff.length <= 1; // un seul salarie -> figé mais affiché
     sel.addEventListener('change', function () {
       chargerCompteurDetail(sel.value);
+      // Previsionnel pilote par le MEME selecteur (FAIT FOI 02/07/2026, un seul geste).
+      chargerPrevisionnel(sel.value);
     });
   }
 
@@ -1358,6 +1407,262 @@
     }
   }
 
+  // ===== Compteur d'heures previsionnel (FAIT FOI 02/07/2026, md5 4f6c2662) =====
+  // Bloc AUTOPORTE volontairement (4 RPC de lecture) : il resout son propre
+  // contrat (patron chargerCompteurDetail) plutot que de lire gcContrat /
+  // gcSynth, pour eviter toute course entre les deux chargements asynchrones
+  // (decision deleguee, tracee au FAIT FOI §6). Regles §3 : les seances /
+  // missions annulees sont deja exclues en base (sql_142) ; duree_min NULL
+  // compte 0 h + avertissement fail-loud ; realise = v_compteur_annualisation
+  // (meme chiffre que le compteur effectif, jamais deux verites).
+  let gcPrevPeriode = null;   // ligne periodes_annualisation retenue (couvre aujourd'hui)
+  let gcPrevSeances = [];     // seances remontees par list_seances_previsionnel
+  let gcPrevRealise = 0;      // realise_heures de la periode (numeric -> Number)
+  let gcPrevNom = null;       // libelle salarie (export)
+
+  // Cle de semaine = date ISO (aaaa-mm-jj) du LUNDI de la semaine de dstr (UTC).
+  function gcPrevLundiKey(dstr) {
+    const d = new Date(String(dstr) + 'T00:00:00Z');
+    const dec = (d.getUTCDay() + 6) % 7; // 0 = lundi ... 6 = dimanche
+    d.setUTCDate(d.getUTCDate() - dec);
+    return d.toISOString().slice(0, 10);
+  }
+
+  // Numero ISO de la semaine dont lundiStr est le lundi (regle du jeudi).
+  function gcPrevNumSemaine(lundiStr) {
+    const jeudi = new Date(String(lundiStr) + 'T00:00:00Z');
+    jeudi.setUTCDate(jeudi.getUTCDate() + 3);
+    const jan4 = new Date(Date.UTC(jeudi.getUTCFullYear(), 0, 4));
+    const dec = (jan4.getUTCDay() + 6) % 7;
+    const lundi1 = new Date(jan4);
+    lundi1.setUTCDate(jan4.getUTCDate() - dec);
+    return 1 + Math.round((jeudi - lundi1) / (7 * 86400000));
+  }
+
+  function gcPrevArr2(v) { return Math.round(Number(v) * 100) / 100; }
+
+  // Charge periode + realise + seances pour un personne_id, puis rend le bloc.
+  async function chargerPrevisionnel(personneId) {
+    gcPrevPeriode = null; gcPrevSeances = []; gcPrevRealise = 0; gcPrevNom = null;
+    try {
+      if (!personneId) { renderPrevisionnel(); return; }
+      const s = staff.find(function (x) { return x.personne_id === personneId; }) || null;
+      gcPrevNom = s ? [s.prenom, s.nom].filter(Boolean).join(' ').trim() : null;
+      const contrats = (await rpc('list_contrats_salaries', { p_inclure_inactifs: false })) || [];
+      const contrat = contrats.find(function (c) { return c.personne_id === personneId; }) || null;
+      if (!contrat) { renderPrevisionnel(); return; }
+      const today = new Date().toISOString().slice(0, 10);
+      const periodes = (await rpc('list_periodes_annualisation', { p_contrat_id: contrat.id })) || [];
+      gcPrevPeriode = periodes.find(function (p) { return p.date_debut <= today && today <= p.date_fin; })
+        || periodes[0] || null;
+      if (!gcPrevPeriode) { renderPrevisionnel(); return; }
+      const synth = (await rpc('list_compteur_annualisation', { p_contrat_id: contrat.id })) || [];
+      const sp = synth.find(function (p) { return p.periode_id === gcPrevPeriode.id; }) || null;
+      gcPrevRealise = (sp && sp.realise_heures != null) ? Number(sp.realise_heures) : 0;
+      gcPrevSeances = (await rpc('list_seances_previsionnel', {
+        p_contrat_id: contrat.id,
+        p_from: gcPrevPeriode.date_debut,
+        p_to: gcPrevPeriode.date_fin
+      })) || [];
+      renderPrevisionnel();
+    } catch (e) {
+      renderPrevisionnel();
+      flash('Prévisionnel indisponible : ' + errMsg(e), 'err');
+    }
+  }
+
+  // Agregats du previsionnel (FAIT FOI §3.2/§3.4) :
+  //   prevu pur  = somme duree_min/60 des seances remontees (deja filtrees) ;
+  //   projection = realise (releve) + duree prevue des seules seances 'prevue'
+  //                (les realisee/validee vivent dans le releve -> zero doublon) ;
+  //   semaines ISO (lundi->dimanche) et mois calendaires, arrondi 2 dec.
+  function gcPrevCalcule() {
+    const semaines = {}; const mois = {};
+    let prevuPur = 0; let aVenir = 0; let sansDuree = 0;
+    gcPrevSeances.forEach(function (r) {
+      if (r.out_duree_min == null) { sansDuree += 1; }
+      const h = (r.out_duree_min != null) ? gcPrevArr2(Number(r.out_duree_min) / 60) : 0;
+      prevuPur += h;
+      if (r.out_etat === 'prevue') { aVenir += h; }
+      const wk = gcPrevLundiKey(r.out_date_seance);
+      if (!semaines[wk]) { semaines[wk] = { n: 0, h: 0 }; }
+      semaines[wk].n += 1; semaines[wk].h += h;
+      const mk = String(r.out_date_seance).slice(0, 7);
+      if (!mois[mk]) { mois[mk] = { n: 0, h: 0 }; }
+      mois[mk].n += 1; mois[mk].h += h;
+    });
+    return {
+      prevuPur: gcPrevArr2(prevuPur),
+      projection: gcPrevArr2(gcPrevRealise + aVenir),
+      sansDuree: sansDuree,
+      semaines: Object.keys(semaines).sort().map(function (k) {
+        return { lundi: k, n: semaines[k].n, h: gcPrevArr2(semaines[k].h) };
+      }),
+      mois: Object.keys(mois).sort().map(function (k) {
+        return { mois: k, n: mois[k].n, h: gcPrevArr2(mois[k].h) };
+      })
+    };
+  }
+
+  function renderPrevisionnel() {
+    const cards = $('gcPrevCards'); const tbS = $('gcPrevSemaines');
+    const tbM = $('gcPrevMois'); const warn = $('gcPrevWarn');
+    if (!cards || !tbS || !tbM || !warn) { return; }
+    cards.innerHTML = ''; tbS.innerHTML = ''; tbM.innerHTML = '';
+    warn.hidden = true; warn.textContent = '';
+    const vide = '<tr><td colspan="4" style="color:var(--ink-mute,#6b7a74);">';
+    if (!gcPrevPeriode) {
+      cards.innerHTML = '<div class="gc-card"><p class="gc-card-lbl">Prévisionnel</p><p class="gc-card-val">—</p></div>';
+      tbS.innerHTML = vide + 'Aucune période d\'annualisation.</td></tr>';
+      tbM.innerHTML = vide + 'Aucune période d\'annualisation.</td></tr>';
+      return;
+    }
+    const c = gcPrevCalcule();
+    const cible = (gcPrevPeriode.volume_annuel_cible_heures != null) ? Number(gcPrevPeriode.volume_annuel_cible_heures) : null;
+    const sHaut = (gcPrevPeriode.seuil_haut_hebdo_heures != null) ? Number(gcPrevPeriode.seuil_haut_hebdo_heures) : null;
+    const sExc  = (gcPrevPeriode.seuil_haut_except_hebdo_heures != null) ? Number(gcPrevPeriode.seuil_haut_except_hebdo_heures) : null;
+    if (c.sansDuree > 0) {
+      warn.textContent = c.sansDuree + ' séance(s) sans durée prévue — comptée(s) 0 h dans le prévisionnel.';
+      warn.hidden = false;
+    }
+    const items = [
+      { lbl: 'Heures cible', val: (cible != null) ? fmtH(cible) + ' h' : '—' },
+      { lbl: 'Prévu pur', val: fmtH(c.prevuPur) + ' h' },
+      { lbl: 'Écart prévu → cible', val: (cible != null) ? fmtH(gcPrevArr2(cible - c.prevuPur)) + ' h' : '—' },
+      { lbl: 'Projection', val: fmtH(c.projection) + ' h' },
+      { lbl: 'Écart projection → cible', val: (cible != null) ? fmtH(gcPrevArr2(cible - c.projection)) + ' h' : '—' }
+    ];
+    items.forEach(function (it) {
+      const el = document.createElement('div');
+      el.className = 'gc-card';
+      el.innerHTML = '<p class="gc-card-lbl">' + escapeHtml(it.lbl) +
+                     '</p><p class="gc-card-val">' + escapeHtml(String(it.val)) + '</p>';
+      cards.appendChild(el);
+    });
+    if (!c.semaines.length) {
+      tbS.innerHTML = vide + 'Aucune séance sur la période.</td></tr>';
+    } else {
+      c.semaines.forEach(function (w) {
+        const num = gcPrevNumSemaine(w.lundi);
+        const dim = new Date(w.lundi + 'T00:00:00Z');
+        dim.setUTCDate(dim.getUTCDate() + 6);
+        const dimStr = dim.toISOString().slice(0, 10);
+        let badge = '';
+        if (sExc != null && w.h > sExc) {
+          badge = '<span class="gc-sem-badge forte">&gt; ' + escapeHtml(fmtH(sExc)) + ' h</span>';
+        } else if (sHaut != null && w.h > sHaut) {
+          badge = '<span class="gc-sem-badge alerte">&gt; ' + escapeHtml(fmtH(sHaut)) + ' h</span>';
+        }
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td>S' + num + ' · ' + escapeHtml(fmtDateFR(w.lundi)) + ' → ' + escapeHtml(fmtDateFR(dimStr)) + '</td>'
+          + '<td>' + w.n + '</td><td>' + escapeHtml(fmtH(w.h)) + '</td><td>' + badge + '</td>';
+        tbS.appendChild(tr);
+      });
+    }
+    if (!c.mois.length) {
+      tbM.innerHTML = '<tr><td colspan="3" style="color:var(--ink-mute,#6b7a74);">Aucune séance sur la période.</td></tr>';
+    } else {
+      c.mois.forEach(function (m) {
+        const y = m.mois.slice(0, 4); const mm = parseInt(m.mois.slice(5, 7), 10);
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td>' + escapeHtml(MOIS_FR[mm - 1] + ' ' + y) + '</td>'
+          + '<td>' + m.n + '</td><td>' + escapeHtml(fmtH(m.h)) + '</td>';
+        tbM.appendChild(tr);
+      });
+    }
+  }
+
+  // Export xlsx du previsionnel (patron gcExportBilan / SheetJS pt 125) :
+  // 3 feuilles — Synthese, Par semaine, Par mois. FAIT FOI §5.
+  async function gcPrevExport() {
+    const btn = $('gcPrevExportXlsx');
+    if (typeof XLSX === 'undefined') {
+      flash('Export indisponible : librairie tableur non chargée.', 'err');
+      return;
+    }
+    if (!gcPrevPeriode) {
+      flash('Aucune période d\'annualisation — export impossible.', 'err');
+      return;
+    }
+    if (btn) { btn.disabled = true; }
+    try {
+      const c = gcPrevCalcule();
+      const cible = (gcPrevPeriode.volume_annuel_cible_heures != null) ? Number(gcPrevPeriode.volume_annuel_cible_heures) : null;
+      const sHaut = (gcPrevPeriode.seuil_haut_hebdo_heures != null) ? Number(gcPrevPeriode.seuil_haut_hebdo_heures) : null;
+      const sExc  = (gcPrevPeriode.seuil_haut_except_hebdo_heures != null) ? Number(gcPrevPeriode.seuil_haut_except_hebdo_heures) : null;
+      const debut = fmtDateFR(gcPrevPeriode.date_debut);
+      const fin   = fmtDateFR(gcPrevPeriode.date_fin);
+      const nom   = gcPrevNom || 'Salarié';
+      const wb = XLSX.utils.book_new();
+
+      const synthAOA = [];
+      synthAOA.push(["PRÉVISIONNEL D'HEURES — SALARIÉ"]);
+      synthAOA.push([]);
+      synthAOA.push(['Salarié', nom]);
+      synthAOA.push(['Période (annualisation)', debut + ' → ' + fin]);
+      synthAOA.push(['Volume annuel cible (h)', cible != null ? cible : '—']);
+      synthAOA.push(['Seuil hebdo habituel (h)', sHaut != null ? sHaut : '—']);
+      synthAOA.push(['Seuil hebdo exceptionnel (h)', sExc != null ? sExc : '—']);
+      synthAOA.push(['Édité le', fmtDateFR(new Date().toISOString())]);
+      synthAOA.push([]);
+      synthAOA.push(['Prévu pur (h)', c.prevuPur]);
+      synthAOA.push(['Projection : réalisé + à venir (h)', c.projection]);
+      if (cible != null) {
+        synthAOA.push(['Écart prévu → cible (h)', gcPrevArr2(cible - c.prevuPur)]);
+        synthAOA.push(['Écart projection → cible (h)', gcPrevArr2(cible - c.projection)]);
+      }
+      if (c.sansDuree > 0) {
+        synthAOA.push([]);
+        synthAOA.push([c.sansDuree + ' séance(s) sans durée prévue — comptée(s) 0 h.']);
+      }
+      const wsSynth = XLSX.utils.aoa_to_sheet(synthAOA);
+      wsSynth['!cols'] = [{ wch: 32 }, { wch: 22 }];
+      XLSX.utils.book_append_sheet(wb, wsSynth, 'Synthèse');
+
+      const aoaS = [];
+      aoaS.push(['PRÉVISIONNEL PAR SEMAINE']);
+      aoaS.push([nom + '  ·  Période ' + debut + ' → ' + fin]);
+      aoaS.push([]);
+      aoaS.push(['Semaine ISO', 'Du', 'Au', 'Séances', 'Heures prévues', 'Dépassement']);
+      c.semaines.forEach(function (w) {
+        const dim = new Date(w.lundi + 'T00:00:00Z');
+        dim.setUTCDate(dim.getUTCDate() + 6);
+        let dep = '';
+        if (sExc != null && w.h > sExc) { dep = '> seuil exceptionnel'; }
+        else if (sHaut != null && w.h > sHaut) { dep = '> seuil habituel'; }
+        aoaS.push(['S' + gcPrevNumSemaine(w.lundi), fmtDateFR(w.lundi),
+          fmtDateFR(dim.toISOString().slice(0, 10)), w.n, w.h, dep]);
+      });
+      if (!c.semaines.length) { aoaS.push(['Aucune séance sur la période.']); }
+      const wsS = XLSX.utils.aoa_to_sheet(aoaS);
+      wsS['!cols'] = [{ wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 9 }, { wch: 14 }, { wch: 20 }];
+      XLSX.utils.book_append_sheet(wb, wsS, 'Par semaine');
+
+      const aoaM = [];
+      aoaM.push(['PRÉVISIONNEL PAR MOIS']);
+      aoaM.push([nom + '  ·  Période ' + debut + ' → ' + fin]);
+      aoaM.push([]);
+      aoaM.push(['Mois', 'Séances', 'Heures prévues']);
+      c.mois.forEach(function (m) {
+        const y = m.mois.slice(0, 4); const mm = parseInt(m.mois.slice(5, 7), 10);
+        aoaM.push([MOIS_FR[mm - 1] + ' ' + y, m.n, m.h]);
+      });
+      if (!c.mois.length) { aoaM.push(['Aucune séance sur la période.']); }
+      const wsM = XLSX.utils.aoa_to_sheet(aoaM);
+      wsM['!cols'] = [{ wch: 18 }, { wch: 9 }, { wch: 14 }];
+      XLSX.utils.book_append_sheet(wb, wsM, 'Par mois');
+
+      const fname = 'previsionnel-heures-' + String(nom).replace(/\s+/g, '-').toLowerCase()
+        + '-' + new Date().toISOString().slice(0, 10) + '.xlsx';
+      XLSX.writeFile(wb, fname);
+      flash('Prévisionnel exporté (' + c.semaines.length + ' semaine(s), ' + c.mois.length + ' mois).', 'ok');
+    } catch (e) {
+      flash('Export impossible : ' + errMsg(e), 'err');
+    } finally {
+      if (btn) { btn.disabled = false; }
+    }
+  }
+
   // ---------- Boot ----------
   try {
     await resoudreSalarie();
@@ -1376,6 +1681,9 @@
     renderSelecteurSalarie();
     if ($('gcExportXlsx')) $('gcExportXlsx').addEventListener('click', gcExportBilan);
     await chargerCompteurDetail(salarieId);
+    // Compteur previsionnel (FAIT FOI 02/07/2026) : meme salarie, chargement dedie.
+    if ($('gcPrevExportXlsx')) $('gcPrevExportXlsx').addEventListener('click', gcPrevExport);
+    await chargerPrevisionnel(salarieId);
   } catch (e) {
     flash('Chargement impossible : ' + errMsg(e), 'err');
   }
