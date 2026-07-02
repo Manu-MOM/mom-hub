@@ -44,8 +44,10 @@
     même global XLSX, + styles de cellule que la CE ignore — cause de l'écart
     maquette pt 125 vs exports réels). Feuilles du PRÉVISIONNEL stylées
     (titres, en-têtes fond vert bouteille, bordures, chiffres-clés gras,
-    dépassements rouges). Bilan effectif + export refacturer (pt 132) :
-    compatibles, non stylés à ce geste — suite optionnelle tracée.
+    dépassements rouges). 2e geste (recette Manu) : export BILAN EFFECTIF
+    stylé à l'identique (Synthèse + feuilles mensuelles, TOTAL gras, bloc
+    VENTILATION). Export refacturer (pt 132) : compatible, non stylé —
+    suite optionnelle tracée.
 -->
 <link rel="stylesheet" href="css/hub.css">
 <style>
@@ -1501,6 +1503,14 @@
       }
       const wsSynth = XLSX.utils.aoa_to_sheet(synthAOA);
       wsSynth['!cols'] = [{ wch: 22 }, { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }];
+      // MISE EN FORME (02/07/2026, alignée export prévisionnel) : titre,
+      // fiche bordée (idx 2..5), en-tête mensuel (idx 7), bordures sur les
+      // mois (idx 8..), ligne TOTAL en gras.
+      gcXlsSetS(wsSynth, 0, 0, GC_XLS_TITRE);
+      gcXlsBordures(wsSynth, 2, 5, 2);
+      gcXlsHead(wsSynth, 7, 6);
+      if (moisKeys.length) { gcXlsBordures(wsSynth, 8, 7 + moisKeys.length, 6); }
+      for (let cT = 0; cT < 6; cT++) { gcXlsSetS(wsSynth, 8 + moisKeys.length, cT, GC_XLS_VAL); }
       XLSX.utils.book_append_sheet(wb, wsSynth, 'Synthèse');
 
       moisKeys.forEach(function (k) {
@@ -1542,6 +1552,25 @@
         const ws = XLSX.utils.aoa_to_sheet(aoa);
         ws['!cols'] = [{ wch: 12 }, { wch: 9 }, { wch: 8 }, { wch: 14 },
                        { wch: 22 }, { wch: 26 }, { wch: 34 }];
+        // MISE EN FORME (02/07/2026, alignée export prévisionnel) : titre,
+        // sous-titre, en-tête (idx 3), bordures sur le détail (idx 4..),
+        // TOTAL DU MOIS gras, bloc VENTILATION (titres + deux mini-tables).
+        const nD = lignes.length;
+        gcXlsSetS(ws, 0, 0, GC_XLS_TITRE);
+        gcXlsSetS(ws, 1, 0, GC_XLS_SOUS);
+        gcXlsHead(ws, 3, 7);
+        if (nD) { gcXlsBordures(ws, 4, 3 + nD, 7); }
+        gcXlsSetS(ws, 4 + nD, 0, GC_XLS_VAL);
+        gcXlsSetS(ws, 4 + nD, 1, GC_XLS_VAL);
+        gcXlsSetS(ws, 4 + nD + 2, 0, GC_XLS_TITRE);
+        gcXlsSetS(ws, 4 + nD + 3, 0, GC_XLS_HEAD);
+        gcXlsSetS(ws, 4 + nD + 3, 1, GC_XLS_HEAD);
+        gcXlsSetS(ws, 4 + nD + 3, 3, GC_XLS_HEAD);
+        gcXlsSetS(ws, 4 + nD + 3, 4, GC_XLS_HEAD);
+        for (let rV = 4 + nD + 4; rV < 4 + nD + 4 + nv; rV++) {
+          gcXlsSetS(ws, rV, 0, GC_XLS_CELL); gcXlsSetS(ws, rV, 1, GC_XLS_CELL);
+          gcXlsSetS(ws, rV, 3, GC_XLS_CELL); gcXlsSetS(ws, rV, 4, GC_XLS_CELL);
+        }
         const safe = titre.replace(/[\\/?*\[\]:]/g, ' ').slice(0, 31);
         XLSX.utils.book_append_sheet(wb, ws, safe);
       });
