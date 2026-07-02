@@ -48,6 +48,26 @@
     stylé à l'identique (Synthèse + feuilles mensuelles, TOTAL gras, bloc
     VENTILATION). Export refacturer (pt 132) : compatible, non stylé —
     suite optionnelle tracée.
+  PROJECTION-ECOLES (02/07/2026, FAIT FOI figé, kit pt 137 §3.1 option b
+    affinée « méga-cycles ») : carte de pilotage du démarchage scolaire en
+    queue de section gcPrev. Modèle : 1 cycle = 1 classe × 5 séances × 1 h
+    sur 1 créneau hebdo (6e semaine tampon), 1 cycle max par créneau et par
+    méga-cycle ; 5 méga-cycles bornés par 6 dates contiguës (défauts zone B /
+    académie de Strasbourg 2026-2027, modifiables). Posé = comptage des
+    séances type intervention_scolaire de gcPrevSeances par fenêtre de dates
+    (cycles = plafond(séances/5), fenêtre [borne_i, borne_i+1) — les vacances
+    ne contiennent pas de séances écoles, le comptage contigu est équivalent
+    au comptage « périodes de cours », décision déléguée tracée). Capacité =
+    créneaux saisis × 1 cycle ; restant = max(0, capacité − posé) ; curseur
+    taux de remplissage 0-100 %. Base de la projection haute = Projection du
+    compteur (réalisé + prévues, même définition que la carte « Projection »,
+    jamais deux vérités — décision déléguée tracée). Euros = cycles × tarif
+    saisi (défaut 120, simple valeur de formulaire, zéro constante
+    contractuelle en dur) : estimation de pilotage, mention permanente à
+    l'écran, la facturation réelle reste portée par le bilan effectif. Config
+    (créneaux, tarif, 6 bornes, taux) mémorisée en localStorage clé
+    gcProjEcoles — aucune écriture en base, jamais exportée (la projection
+    n'entre dans aucun xlsx). Front pur, zéro SQL, zéro RPC nouvelle.
 -->
 <link rel="stylesheet" href="css/hub.css">
 <style>
@@ -256,6 +276,36 @@
   .gc-sem-badge.alerte { background: #fff3cd; border: 1px solid #e8cf8a; color: #8a5a00; }
   .gc-sem-badge.forte { background: #f8d7da; border: 1px solid #f1aeb5; color: #842029; }
 
+  /* ----- Projection démarchage écoles (PROJECTION-ECOLES, FAIT FOI figé
+     02/07/2026). Carte de pilotage front pur en queue de section gcPrev :
+     config (créneaux/tarif/6 bornes), tableau des 5 méga-cycles, curseur de
+     taux, synthèses heures + tarification. Réutilise gc-cards / gc-card /
+     gc-releve de la charte ; localStorage gcProjEcoles. ----- */
+  .gc-eco-cfg { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin: 0 0 14px;
+                padding: 10px 12px; background: #fff; border: 1px solid var(--paper-warm, #e3e0d8);
+                border-radius: 12px; font-size: 13px; color: var(--ink-mute, #6b7a74); }
+  .gc-eco-cfg label { display: flex; align-items: center; gap: 6px; }
+  .gc-eco-cfg input[type=number] { font: inherit; width: 72px; padding: 6px 8px; border-radius: 8px;
+                border: 1px solid var(--line, #cabe9f); background: #fff; color: var(--ink, #0c3d24); }
+  .gc-eco-hint { font-size: 12px; }
+  .gc-eco-cfg .gc-eco-btn { margin-left: auto; padding: 6px 12px; font-size: 13px; }
+  .gc-eco-dates { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px;
+                  margin: 0 0 14px; padding: 10px 12px; background: #fff;
+                  border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 12px; }
+  .gc-eco-dates label { display: flex; flex-direction: column; gap: 4px; font-size: 12px;
+                        color: var(--ink-mute, #6b7a74); }
+  .gc-eco-dates input[type=date] { font: inherit; padding: 6px 8px; border-radius: 8px;
+                border: 1px solid var(--line, #cabe9f); background: #fff; color: var(--ink, #0c3d24); }
+  .gc-eco-taux { display: flex; align-items: center; gap: 10px; margin: 14px 0; font-size: 13px;
+                 color: var(--ink-mute, #6b7a74); }
+  .gc-eco-taux input[type=range] { flex: 1; accent-color: var(--vert-prairie, #2d7a3e); }
+  .gc-eco-taux strong { min-width: 46px; text-align: right; color: var(--ink, #0c3d24); }
+  .gc-eco-rest { display: inline-block; padding: 1px 10px; border-radius: 10px; font-size: 12px;
+                 font-weight: 600; background: #e6f2e8; border: 1px solid #bfdcc5; color: #1d5a2c; }
+  .gc-eco-h4 { font-size: 13px; margin: 16px 0 8px; color: var(--ink-soft, #2a4836); }
+  .gc-eco-note { font-size: 12px; color: var(--ink-mute, #6b7a74); margin: 10px 0 0; }
+  .gc-eco-sub { display: block; font-size: 11px; color: var(--ink-mute, #6b7a74); font-weight: 400; }
+
 </style>
 </head>
 <body class="auth-pending">
@@ -459,6 +509,47 @@
       <thead><tr><th>Type de mission</th><th>Séances</th><th>Heures prévues</th></tr></thead>
       <tbody id="gcPrevTypes"></tbody>
     </table>
+    <!-- PROJECTION-ECOLES (FAIT FOI figé 02/07/2026, kit pt 137 §3.1 option b
+         « méga-cycles ») : pilotage du démarchage scolaire. Capacité =
+         créneaux hebdo × 1 cycle par méga-cycle ; posé compté dans
+         gcPrevSeances (type intervention_scolaire, fenêtres de dates) ;
+         curseur taux de remplissage ; synthèses heures + tarification.
+         Estimation de pilotage : rien en base, rien dans les exports. -->
+    <h3 class="gc-prev-h3">Projection démarchage écoles</h3>
+    <div class="gc-eco-cfg">
+      <label>Créneaux hebdo
+        <input type="number" id="gcEcoCreneaux" min="0" step="1" value="0">
+      </label>
+      <label>Tarif / cycle
+        <input type="number" id="gcEcoTarif" min="0" step="10" value="120">
+      </label><span>€</span>
+      <span class="gc-eco-hint">1 cycle = 1 classe · 5 séances de 1 h · 1 créneau/sem</span>
+      <button type="button" class="gc-export-btn gc-eco-btn" id="gcEcoDatesBtn">Dates des périodes</button>
+    </div>
+    <div class="gc-eco-dates" id="gcEcoDates" hidden>
+      <label>Rentrée<input type="date" id="gcEcoB0"></label>
+      <label>Reprise Toussaint<input type="date" id="gcEcoB1"></label>
+      <label>Reprise Noël<input type="date" id="gcEcoB2"></label>
+      <label>Reprise hiver<input type="date" id="gcEcoB3"></label>
+      <label>Reprise printemps<input type="date" id="gcEcoB4"></label>
+      <label>Début été<input type="date" id="gcEcoB5"></label>
+    </div>
+    <p class="gc-prev-warn" id="gcEcoWarn" hidden></p>
+    <table class="gc-releve">
+      <thead><tr><th>Méga-cycle</th><th>Capacité</th><th>Posé</th><th>Restant</th><th>Engagé €</th></tr></thead>
+      <tbody id="gcEcoTbody"></tbody>
+    </table>
+    <div class="gc-eco-taux">
+      <label for="gcEcoTaux">Taux de remplissage</label>
+      <input type="range" id="gcEcoTaux" min="0" max="100" step="5" value="100">
+      <strong id="gcEcoTauxOut">100 %</strong>
+    </div>
+    <h4 class="gc-eco-h4">Heures</h4>
+    <div class="gc-cards" id="gcEcoCardsH"></div>
+    <h4 class="gc-eco-h4">Tarification écoles</h4>
+    <div class="gc-cards" id="gcEcoCardsE"></div>
+    <p class="gc-eco-note">Estimation de pilotage (cycles × tarif saisi) — la facturation réelle
+      reste portée par le bilan effectif.</p>
   </section>
 
   <p class="pe-foot">Chaque donnée affichée existe déjà en base (chantiers A→D). La page ne fait que
@@ -1705,6 +1796,8 @@
       tbS.innerHTML = vide + 'Aucune période d\'annualisation.</td></tr>';
       tbM.innerHTML = vide + 'Aucune période d\'annualisation.</td></tr>';
       if (tbT) { tbT.innerHTML = vide3 + 'Aucune période d\'annualisation.</td></tr>'; }
+      // PROJECTION-ECOLES : la carte se rend aussi dans le cas vide (fail-soft).
+      gcEcolesRender();
       return;
     }
     const c = gcPrevCalcule();
@@ -1773,6 +1866,172 @@
         });
       }
     }
+    // PROJECTION-ECOLES : rendu de la carte écoles une fois les données prêtes
+    // (gcPrevSeances / gcPrevPeriode posés par chargerPrevisionnel).
+    gcEcolesRender();
+  }
+
+  // ===== Projection démarchage écoles (PROJECTION-ECOLES, FAIT FOI figé
+  // 02/07/2026, kit pt 137 §3.1 option b « méga-cycles ») =====
+  // Modèle : 1 cycle = 1 classe × 5 séances de 1 h sur 1 créneau hebdo
+  // (6e semaine tampon) ; 1 cycle max par créneau et par méga-cycle.
+  // 5 méga-cycles bornés par 6 dates contiguës [b_i, b_i+1) — les vacances
+  // ne contenant pas de séances écoles, ce découpage compte comme le
+  // découpage « périodes de cours » (décision déléguée tracée au FAIT FOI).
+  // Posé = séances intervention_scolaire de gcPrevSeances par fenêtre,
+  // converties en cycles par plafond(n/5) : un cycle partiel occupe son
+  // créneau (prudence capacitaire, décision déléguée). Cycles hors calibrage
+  // ou à cheval : absorbés par le comptage par dates, comportement assumé.
+  // Base de la projection haute = Projection du compteur (réalisé + prévues,
+  // même définition que la carte « Projection » — jamais deux vérités).
+  // Euros = cycles × tarif saisi : estimation de pilotage, mention permanente
+  // à l'écran, la facturation réelle reste portée par le bilan effectif.
+  // Rien en base, rien dans les exports ; config en localStorage gcProjEcoles.
+  const GC_ECO_TYPE = 'intervention_scolaire'; // clé canonique (CHECK sql_114, GC_TYPE_LBL)
+  const GC_ECO_SEANCES_CYCLE = 5;              // 5 séances par cycle
+  const GC_ECO_H_CYCLE = 5;                    // 5 h par cycle (5 × 1 h)
+  const GC_ECO_LS_KEY = 'gcProjEcoles';
+  // Défauts 2026-2027 zone B / académie de Strasbourg (calendrier officiel,
+  // recherche 02/07/2026) : rentrée puis dates de REPRISE après chaque
+  // vacances, borne finale = début des vacances d'été. Modifiables à l'écran.
+  const GC_ECO_BORNES_DEFAUT = ['2026-09-01', '2026-11-02', '2027-01-04',
+                                '2027-03-08', '2027-05-03', '2027-07-03'];
+  const GC_ECO_LBL = ['P1 · Rentrée → Toussaint', 'P2 · Toussaint → Noël',
+                      'P3 · Noël → Hiver', 'P4 · Hiver → Printemps',
+                      'P5 · Printemps → Été'];
+  const GC_ECO_IDS_BORNES = ['gcEcoB0', 'gcEcoB1', 'gcEcoB2', 'gcEcoB3', 'gcEcoB4', 'gcEcoB5'];
+
+  function gcEcoFmtEur(n) { return Math.round(Number(n)).toLocaleString('fr-FR') + ' €'; }
+
+  // Lecture de la config mémorisée (fail-soft : toute anomalie -> défauts).
+  function gcEcoLireCfg() {
+    const def = { creneaux: 0, tarif: 120, bornes: GC_ECO_BORNES_DEFAUT.slice(), taux: 100 };
+    try {
+      const raw = localStorage.getItem(GC_ECO_LS_KEY);
+      if (!raw) { return def; }
+      const c = JSON.parse(raw);
+      const okDate = function (s) { return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s); };
+      return {
+        creneaux: (Number.isFinite(Number(c.creneaux)) && Number(c.creneaux) >= 0) ? Math.floor(Number(c.creneaux)) : def.creneaux,
+        tarif: (Number.isFinite(Number(c.tarif)) && Number(c.tarif) >= 0) ? Number(c.tarif) : def.tarif,
+        bornes: (Array.isArray(c.bornes) && c.bornes.length === 6 && c.bornes.every(okDate)) ? c.bornes.slice() : def.bornes,
+        taux: (Number.isFinite(Number(c.taux)) && Number(c.taux) >= 0 && Number(c.taux) <= 100) ? Number(c.taux) : def.taux
+      };
+    } catch (e) { return def; }
+  }
+
+  function gcEcoEcrireCfg(cfg) {
+    try { localStorage.setItem(GC_ECO_LS_KEY, JSON.stringify(cfg)); } catch (e) { /* quota/privé : sans conséquence */ }
+  }
+
+  // Config courante lue de l'UI (source d'affichage), repli défauts si champ vide.
+  function gcEcoCfgDepuisUI() {
+    const cfg = gcEcoLireCfg();
+    const inC = $('gcEcoCreneaux'); const inT = $('gcEcoTarif'); const inX = $('gcEcoTaux');
+    if (inC && inC.value !== '') { const v = Math.floor(Number(inC.value)); if (Number.isFinite(v) && v >= 0) { cfg.creneaux = v; } }
+    if (inT && inT.value !== '') { const v = Number(inT.value); if (Number.isFinite(v) && v >= 0) { cfg.tarif = v; } }
+    if (inX) { const v = Number(inX.value); if (Number.isFinite(v)) { cfg.taux = Math.min(100, Math.max(0, v)); } }
+    GC_ECO_IDS_BORNES.forEach(function (id, i) {
+      const el = $(id);
+      if (el && /^\d{4}-\d{2}-\d{2}$/.test(el.value)) { cfg.bornes[i] = el.value; }
+    });
+    return cfg;
+  }
+
+  // Initialisation : pose la config dans l'UI et câble les écouteurs.
+  function gcEcoInitUI() {
+    const inC = $('gcEcoCreneaux');
+    if (!inC) { return; } // page sans le bloc : rien à câbler
+    const cfg = gcEcoLireCfg();
+    inC.value = String(cfg.creneaux);
+    const inT = $('gcEcoTarif'); if (inT) { inT.value = String(cfg.tarif); }
+    const inX = $('gcEcoTaux'); if (inX) { inX.value = String(cfg.taux); }
+    GC_ECO_IDS_BORNES.forEach(function (id, i) {
+      const el = $(id); if (el) { el.value = cfg.bornes[i]; }
+    });
+    const onChange = function () { gcEcoEcrireCfg(gcEcoCfgDepuisUI()); gcEcolesRender(); };
+    [inC, inT, inX].forEach(function (el) { if (el) { el.addEventListener('input', onChange); } });
+    GC_ECO_IDS_BORNES.forEach(function (id) {
+      const el = $(id); if (el) { el.addEventListener('change', onChange); }
+    });
+    const btn = $('gcEcoDatesBtn'); const pan = $('gcEcoDates');
+    if (btn && pan) { btn.addEventListener('click', function () { pan.hidden = !pan.hidden; }); }
+  }
+
+  function gcEcoCarte(lbl, val, sub) {
+    return '<div class="gc-card"><p class="gc-card-lbl">' + escapeHtml(lbl) +
+           '</p><p class="gc-card-val">' + val +
+           (sub ? '<span class="gc-eco-sub">' + escapeHtml(sub) + '</span>' : '') +
+           '</p></div>';
+  }
+
+  // Rendu complet de la carte (appelé par renderPrevisionnel + à chaque saisie).
+  function gcEcolesRender() {
+    const tbody = $('gcEcoTbody'); const cardsH = $('gcEcoCardsH');
+    const cardsE = $('gcEcoCardsE'); const warn = $('gcEcoWarn');
+    const tauxOut = $('gcEcoTauxOut');
+    if (!tbody || !cardsH || !cardsE) { return; }
+    const videE = '<tr><td colspan="5" style="color:var(--ink-mute,#6b7a74);">';
+    if (warn) { warn.hidden = true; warn.textContent = ''; }
+    const cfg = gcEcoCfgDepuisUI();
+    if (tauxOut) { tauxOut.textContent = Math.round(cfg.taux) + ' %'; }
+    if (!gcPrevPeriode) {
+      tbody.innerHTML = videE + 'Aucune période d\'annualisation.</td></tr>';
+      cardsH.innerHTML = gcEcoCarte('Projection haute', '—', null);
+      cardsE.innerHTML = gcEcoCarte('Projeté saison', '—', null);
+      return;
+    }
+    // Fail-loud doux : bornes non strictement croissantes -> fenêtres vides possibles.
+    let croissant = true;
+    for (let i = 0; i < 5; i++) { if (!(cfg.bornes[i] < cfg.bornes[i + 1])) { croissant = false; } }
+    if (!croissant && warn) {
+      warn.textContent = 'Dates de périodes non croissantes — les fenêtres concernées comptent 0 séance.';
+      warn.hidden = false;
+    }
+    // Comptage des séances écoles par fenêtre [b_i, b_i+1) (comparaison ISO).
+    const nParPeriode = [0, 0, 0, 0, 0];
+    gcPrevSeances.forEach(function (r) {
+      if (r.out_type_mission !== GC_ECO_TYPE) { return; }
+      const d = String(r.out_date_seance);
+      for (let i = 0; i < 5; i++) {
+        if (d >= cfg.bornes[i] && d < cfg.bornes[i + 1]) { nParPeriode[i] += 1; break; }
+      }
+    });
+    let totPose = 0; let totRest = 0; const lignes = [];
+    for (let i = 0; i < 5; i++) {
+      const pose = Math.ceil(nParPeriode[i] / GC_ECO_SEANCES_CYCLE);
+      const rest = Math.max(0, cfg.creneaux - pose);
+      totPose += pose; totRest += rest;
+      const fin = new Date(cfg.bornes[i + 1] + 'T00:00:00Z');
+      fin.setUTCDate(fin.getUTCDate() - 1);
+      lignes.push('<tr><td>' + escapeHtml(GC_ECO_LBL[i]) +
+        '<span class="gc-eco-sub">' + escapeHtml(fmtDateFR(cfg.bornes[i])) + ' → ' +
+        escapeHtml(fmtDateFR(fin.toISOString().slice(0, 10))) + '</span></td>' +
+        '<td>' + cfg.creneaux + '</td><td>' + pose + '</td>' +
+        '<td><span class="gc-eco-rest">' + rest + '</span></td>' +
+        '<td>' + escapeHtml(gcEcoFmtEur(pose * cfg.tarif)) + '</td></tr>');
+    }
+    lignes.push('<tr style="font-weight:600;"><td>Total écoles</td>' +
+      '<td>' + (cfg.creneaux * 5) + '</td><td>' + totPose + '</td>' +
+      '<td>' + totRest + '</td><td>' + escapeHtml(gcEcoFmtEur(totPose * cfg.tarif)) + '</td></tr>');
+    tbody.innerHTML = lignes.join('');
+    // Synthèses. Base heures = Projection du compteur (réalisé + prévues).
+    const c = gcPrevCalcule();
+    const cible = (gcPrevPeriode.volume_annuel_cible_heures != null)
+      ? Number(gcPrevPeriode.volume_annuel_cible_heures) : null;
+    const cyclesRetenus = Math.round(totRest * cfg.taux / 100);
+    const potH = cyclesRetenus * GC_ECO_H_CYCLE;
+    const projHaute = gcPrevArr2(c.projection + potH);
+    cardsH.innerHTML =
+      gcEcoCarte('Projection actuelle', escapeHtml(fmtH(c.projection)) + ' h', 'réalisé + séances prévues') +
+      gcEcoCarte('Potentiel écoles retenu', escapeHtml(fmtH(potH)) + ' h', cyclesRetenus + ' cycle(s) à ' + Math.round(cfg.taux) + ' %') +
+      gcEcoCarte('Projection haute', escapeHtml(fmtH(projHaute)) + (cible != null ? ' / ' + escapeHtml(fmtH(cible)) : '') + ' h',
+        (cible != null) ? ('écart restant : ' + fmtH(gcPrevArr2(Math.max(0, cible - projHaute))) + ' h') : 'cible indisponible');
+    cardsE.innerHTML =
+      gcEcoCarte('Engagé (signé)', escapeHtml(gcEcoFmtEur(totPose * cfg.tarif)), totPose + ' cycle(s)') +
+      gcEcoCarte('Potentiel démarchage', escapeHtml(gcEcoFmtEur(cyclesRetenus * cfg.tarif)), cyclesRetenus + ' cycle(s) retenu(s)') +
+      gcEcoCarte('Projeté saison', escapeHtml(gcEcoFmtEur((totPose + cyclesRetenus) * cfg.tarif)),
+        'sur ' + gcEcoFmtEur(cfg.creneaux * 5 * cfg.tarif).replace(' €', '') + ' € max théorique');
   }
 
   // Export xlsx du previsionnel (patron gcExportBilan / SheetJS pt 125) :
@@ -1934,6 +2193,9 @@
     await chargerCompteurDetail(salarieId);
     // Compteur previsionnel (FAIT FOI 02/07/2026) : meme salarie, chargement dedie.
     if ($('gcPrevExportXlsx')) $('gcPrevExportXlsx').addEventListener('click', gcPrevExport);
+    // PROJECTION-ECOLES : restaure la config (localStorage gcProjEcoles) et
+    // câble les saisies AVANT le premier rendu porté par chargerPrevisionnel.
+    gcEcoInitUI();
     await chargerPrevisionnel(salarieId);
   } catch (e) {
     flash('Chargement impossible : ' + errMsg(e), 'err');
