@@ -34,6 +34,26 @@
   avant re-render, restauration après (générique, couvre toutes les actions).
   Alternative écartée : scrollIntoView sur la mission agie (exigeait de propager
   l'id dans chaque handler pour un gain quasi nul).
+  MAJ : UNIFICATION-SEANCES-MISSION (02/07/2026, front pur, zéro SQL — FAIT FOI figé,
+  gate pt 139). La création de séances devient un choix EXPLICITE de la modale
+  mission (bloc « Séances » : Aucune | Récurrentes | Ponctuelles) :
+    - Récurrentes : motif inchangé (hebdo/consécutif) ; génération déclenchée
+      AUTOMATIQUEMENT à l'enregistrement (generer_occurrences_recurrentes,
+      idempotence prouvée par sonde 02/07/2026 : garde EXISTS(mission_id,
+      date_seance) — jamais de résurrection d'annulées ni d'écrasement d'éditées.
+      Génération ADDITIVE SEULEMENT : un motif modifié ne supprime pas les séances
+      déjà matérialisées ; nettoyage = annulation manuelle, limitation tracée).
+    - Ponctuelles : n'écrit rien en base ; à l'enregistrement, la modale ponctuelle
+      s'ouvre pré-verrouillée sur la mission créée (saisie en série).
+    - Le bouton « Générer les séances » du bandeau est SUPPRIMÉ (la génération vit
+      dans l'enregistrement, genMission conservé) ; « + Ponctuelle » CONSERVÉ
+      (voie 3 salarié, invariant).
+  Modale ponctuelle enrichie : heure de début (p_heure_debut, jusqu'ici null en
+  dur) ; lieu référencé (p_lieu_id, pioche sites) OU lieu libre (exclusifs) ;
+  bouton « Créer et ajouter une autre » (mission/état/notes conservés, date vidée,
+  heure/durée/lieu pré-remplis ; bandeau compteur de session ; refreshAll UNIQUE à
+  la fermeture) ; « Heures réelles » masqué quand état = Prévue ; défaut admin =
+  Prévue (décision déléguée tracée : usage dominant = planification).
 
   ARCHITECTURE (calque gestion-salarie.html, vérifié à la source 26/06) :
     - charge supabase.min.js (CDN jsDelivr) puis js/supabase-client.js (SupabaseHub).
@@ -258,6 +278,23 @@
   .ss-recur[data-mode="consecutif"] .ss-recur-hebdo-only { display: none; }
   .ss-recur[data-mode="consecutif"] .ss-recur-consecutif-only { display: block; }
 
+  /* === UNIFICATION-SEANCES-MISSION : bloc « Séances » (3 choix) + session ponctuelle === */
+  .ss-seances-mode { display: flex; gap: 8px; margin: 0 0 6px; }
+  .ss-seances-opt { flex: 1; }
+  .ss-seances-opt input { position: absolute; opacity: 0; pointer-events: none; }
+  .ss-seances-opt label { display: block; text-align: center; cursor: pointer; padding: 8px 6px;
+    border: 1px solid var(--line, #cabe9f); border-radius: 8px; font-size: 13px; font-weight: 600;
+    color: var(--ink-soft, #2a4836); background: var(--paper, #f8f5ec); user-select: none; transition: all .12s; }
+  .ss-seances-opt input:checked + label { border-color: var(--vert-prairie, #2d7a3e);
+    background: var(--vert-prairie, #2d7a3e); color: #fff; }
+  .ss-seances-opt input:focus-visible + label { outline: 2px solid var(--bleu-base, #1f4a82); outline-offset: 2px; }
+  .ss-seances-hint { font-size: 12px; color: var(--ink-mute, #6b7a74); margin: 0 0 12px; min-height: 15px; }
+  .ss-recur.ss-recur-off { display: none; }
+  .ss-ponct-banner { display: none; font-size: 13px; font-weight: 600; color: var(--vert-prairie, #2d7a3e);
+    background: var(--paper, #f8f5ec); border: 1px solid var(--vert-prairie, #2d7a3e); border-radius: 8px;
+    padding: 8px 10px; margin: 0 0 12px; }
+  .ss-ponct-banner.on { display: block; }
+
   /* Garde-fou : tout SVG non explicitement dimensionné reste petit (évite le chevron géant). */
   .hub-back-row .hub-back-btn svg { width: 16px; height: 16px; flex: 0 0 auto; }
   .ss-wrap svg, .ss-typehead svg { max-width: 22px; max-height: 22px; }
@@ -427,34 +464,50 @@
 <div class="ss-overlay" id="ssPonctOverlay">
   <div class="ss-modal">
     <h3>Nouvelle séance ponctuelle</h3>
-    <p class="ss-sub" style="margin-bottom:14px;">Une séance isolée (hors génération récurrente), rattachée à l'une de vos missions.</p>
+    <p class="ss-sub" style="margin-bottom:14px;">Une ou plusieurs séances isolées (hors génération récurrente), rattachées à l'une de vos missions.</p>
+    <!-- UNIFICATION-SEANCES-MISSION : compteur de la session de saisie en série. -->
+    <div class="ss-ponct-banner" id="ssPonctBanner" aria-live="polite"></div>
     <div class="ss-field">
       <label for="ssPonctMission">Mission *</label>
       <select id="ssPonctMission"><option value="">— choisir —</option></select>
     </div>
-    <div class="ss-field">
-      <label for="ssPonctDate">Date *</label>
-      <input type="date" id="ssPonctDate">
+    <div class="ss-row2">
+      <div class="ss-field">
+        <label for="ssPonctDate">Date *</label>
+        <input type="date" id="ssPonctDate">
+      </div>
+      <!-- UNIFICATION-SEANCES-MISSION : heure de début (p_heure_debut, jusqu'ici null en dur). -->
+      <div class="ss-field">
+        <label for="ssPonctHeure">Heure de début</label>
+        <input type="time" id="ssPonctHeure">
+      </div>
     </div>
     <div class="ss-field">
       <label for="ssPonctDuree">Durée (minutes)</label>
       <input type="number" id="ssPonctDuree" step="5" min="0" inputmode="numeric" placeholder="ex. 90">
     </div>
-    <div class="ss-field">
+    <!-- UNIFICATION-SEANCES-MISSION : masqué quand état = Prévue (pas de réel sur du futur). -->
+    <div class="ss-field" id="ssPonctHeuresWrap">
       <label for="ssPonctHeures">Heures réelles</label>
       <input type="number" id="ssPonctHeures" step="0.25" min="0" inputmode="decimal">
       <p class="ss-hint">Pré-rempli depuis la durée. Ajustez si besoin.</p>
     </div>
+    <!-- UNIFICATION-SEANCES-MISSION : lieu référencé (p_lieu_id, pioche sites, même
+         source que ssMisLieu) OU lieu libre (p_lieu_libre) — exclusifs, jamais les deux. -->
     <div class="ss-field">
+      <label for="ssPonctLieuSel">Lieu</label>
+      <select id="ssPonctLieuSel"></select>
+    </div>
+    <div class="ss-field" id="ssPonctLieuLibreWrap" style="display:none;">
       <label for="ssPonctLieu">Lieu (texte libre)</label>
-      <input type="text" id="ssPonctLieu" placeholder="ex. École Jean Macé">
+      <input type="text" id="ssPonctLieu" placeholder="ex. Stade adverse, Sélestat">
     </div>
     <!-- État : visible admin seulement (le salarié crée toujours en realisee). -->
     <div class="ss-field" id="ssPonctEtatWrap" hidden>
       <label for="ssPonctEtat">État</label>
       <select id="ssPonctEtat">
-        <option value="realisee">Réalisée</option>
         <option value="prevue">Prévue</option>
+        <option value="realisee">Réalisée</option>
       </select>
     </div>
     <div class="ss-field">
@@ -463,7 +516,9 @@
     </div>
     <div class="ss-modal-act">
       <button class="ss-btn ss-btn-ghost" id="ssPonctCancel" type="button">Annuler</button>
-      <button class="ss-btn" id="ssPonctSave" type="button">Créer la séance</button>
+      <!-- UNIFICATION-SEANCES-MISSION : création en série (la modale reste ouverte). -->
+      <button class="ss-btn ss-btn-ghost" id="ssPonctSaveMore" type="button">Créer et ajouter une autre</button>
+      <button class="ss-btn" id="ssPonctSave" type="button">Créer et fermer</button>
     </div>
   </div>
 </div>
@@ -542,10 +597,34 @@
       <label for="ssMisLieu">Lieu</label>
       <select id="ssMisLieu"></select>
     </div>
+    <!-- UNIFICATION-SEANCES-MISSION : bloc « Séances » à 3 choix. Aiguillage UI PUR
+         (rien d'écrit en base) : « Récurrentes » révèle le motif ci-dessous (inchangé) ;
+         « Ponctuelles » enchaîne la modale ponctuelle après l'enregistrement ;
+         « Aucune » = mission sans séance (ajout ultérieur via « + Ponctuelle »). -->
+    <div class="ss-field">
+      <label>Séances de la mission</label>
+      <div class="ss-seances-mode" id="ssMisSeancesMode" role="radiogroup" aria-label="Séances de la mission">
+        <div class="ss-seances-opt">
+          <input type="radio" name="ssMisSeancesModeR" id="ssMisSeancesAucune" value="aucune" checked>
+          <label for="ssMisSeancesAucune">Aucune</label>
+        </div>
+        <div class="ss-seances-opt">
+          <input type="radio" name="ssMisSeancesModeR" id="ssMisSeancesRecurrente" value="recurrente">
+          <label for="ssMisSeancesRecurrente">Récurrentes</label>
+        </div>
+        <div class="ss-seances-opt">
+          <input type="radio" name="ssMisSeancesModeR" id="ssMisSeancesPonctuelle" value="ponctuelle">
+          <label for="ssMisSeancesPonctuelle">Ponctuelles</label>
+        </div>
+      </div>
+      <p class="ss-seances-hint" id="ssMisSeancesHint"></p>
+    </div>
     <!-- Bloc Récurrence (chantier #1). Repliable (details natif, P1) : ouvert si la
          mission porte déjà une récurrence, replié en création. Produit le jsonb
-         recurrence consommé par saveMission. Aucun jour coché = mission non récurrente. -->
-    <details class="ss-recur" id="ssMisRecurWrap">
+         recurrence consommé par saveMission. Aucun jour coché = mission non récurrente.
+         UNIFICATION-SEANCES-MISSION : visible seulement quand « Récurrentes » est
+         choisi (classe ss-recur-off sinon), déplié d'office dans ce cas. -->
+    <details class="ss-recur ss-recur-off" id="ssMisRecurWrap">
       <summary class="ss-recur-summary">Récurrence <span class="ss-recur-hint" id="ssMisRecurHint">— aucune</span></summary>
       <div class="ss-recur-body">
         <!-- Chantier D : choix du mode. hebdo = motif {frequence:'hebdomadaire', jours,…} ;
@@ -606,7 +685,7 @@
           <button class="ss-forfait" type="button" data-min="420">7 h</button>
           <button class="ss-forfait" type="button" data-min="480">8 h</button>
         </div>
-        <p class="ss-recur-note">Coche les jours (ou choisis « jours consécutifs ») pour rendre la mission récurrente. La génération des séances se fait depuis le bouton « Générer les séances » de la mission.</p>
+        <p class="ss-recur-note">Coche les jours (ou choisis « jours consécutifs »). Les séances seront générées automatiquement à l'enregistrement de la mission.</p>
         <p class="ss-recur-preview" id="ssMisRecurPreview" aria-live="polite"></p>
       </div>
     </details>
@@ -696,6 +775,9 @@
   let editingMissionBilan = null;
   let editingMissionQuestFait = false;
   let editingMissionLieuLibre = null;
+  // UNIFICATION-SEANCES-MISSION : session de saisie en série de la modale ponctuelle.
+  let ponctSessionCount = 0;       // séances créées depuis l'ouverture de la modale
+  let ponctSessionDirty = false;   // au moins une création -> refreshAll UNIQUE à la fermeture
   let currentType = null;          // code type affiché dans la vue-type
   let currentView = 'liste';       // 'liste' | 'agenda'
   let weekStart = null;            // Date (lundi) de la semaine affichée en agenda
@@ -936,12 +1018,9 @@
       headRight.appendChild(mkBtn('✎ Éditer', 'ss-btn ss-btn-sm ss-btn-ghost', function () {
         openMission(m);
       }));
-      // Bouton « Générer les séances » (chantier #1) : génère la pleine période
-      // de CETTE mission. Visible mais alerte si pas de récurrence (P4).
-      const genBtn = mkBtn('Générer les séances', 'ss-btn ss-btn-sm ss-btn-ghost', function () {
-        genMission(m, genBtn);
-      });
-      headRight.appendChild(genBtn);
+      // UNIFICATION-SEANCES-MISSION : le bouton « Générer les séances » est SUPPRIMÉ
+      // du bandeau — la génération est déclenchée à l'enregistrement de la mission
+      // (saveMission -> genMission). « + Ponctuelle » reste (voie 3 salarié, invariant).
     }
     // Bouton « + Ponctuelle » (chantier #2) : ouvre la modale ponctuelle avec
     // CETTE mission pré-sélectionnée. Ouvert à TOUS (admin ET salarié) — hors du
@@ -1102,11 +1181,15 @@
   // TYPE courant (déjà filtrées au salarié par list_missions p_salarie_id).
   // L'état n'est proposé qu'à l'admin ; le salarié crée toujours en 'realisee'
   // (la RPC sql_123 le force côté serveur — le front ne fait que refléter).
-  function openPonctuelle(mission) {
+  function openPonctuelle(mission, opts) {
     // mission optionnelle (chantier #2) : si fournie, on pré-sélectionne CETTE
     // mission dans le select. Garde MouseEvent : un click listener passerait un
     // MouseEvent (sans .id) — neutralisé par le test mission && mission.id.
+    // UNIFICATION-SEANCES-MISSION : opts.verrou = enchaînement post-enregistrement
+    // (mode « Ponctuelles » de la modale mission) -> select verrouillé sur la
+    // mission qui vient d'être créée.
     const preMission = (mission && mission.id) ? mission : null;
+    const verrou = !!(opts && opts.verrou && preMission);
     const sel = $('ssPonctMission');
     sel.innerHTML = '<option value="">— choisir —</option>';
     const mis = missions.filter(function (m) {
@@ -1119,22 +1202,71 @@
       sel.appendChild(opt);
     });
     // Pré-sélection : mission imposée (#2, ouverture depuis la vignette) si fournie,
-    // sinon confort « une seule mission candidate ». Le select reste modifiable.
+    // sinon confort « une seule mission candidate ». Le select reste modifiable,
+    // SAUF enchaînement verrouillé.
     if (preMission) sel.value = preMission.id;
     else if (mis.length === 1) sel.value = mis[0].id;
+    sel.disabled = verrou;
+
+    // Session de saisie en série : remise à zéro à chaque ouverture.
+    ponctSessionCount = 0;
+    ponctSessionDirty = false;
+    $('ssPonctBanner').classList.remove('on');
+    $('ssPonctBanner').textContent = '';
+    $('ssPonctCancel').textContent = 'Annuler';
 
     $('ssPonctDate').value = isoDate(new Date());
+    $('ssPonctHeure').value = '';
     $('ssPonctDuree').value = '';
     $('ssPonctHeures').value = '';
+    fillPonctLieuSelect();
+    $('ssPonctLieuSel').value = '';
     $('ssPonctLieu').value = '';
+    applyPonctLieuUI();
     $('ssPonctNotes').value = '';
     $('ssPonctEtatWrap').hidden = !peutEcrire;   // sélecteur d'état : admin seul
-    if (peutEcrire) $('ssPonctEtat').value = 'realisee';
+    // Défaut admin = 'prevue' (décision déléguée tracée : l'usage dominant de la
+    // modale est la planification ; le salarié reste forcé 'realisee' côté serveur).
+    if (peutEcrire) $('ssPonctEtat').value = 'prevue';
+    applyPonctEtatUI();
     $('ssPonctOverlay').classList.add('open');
   }
-  function closePonctuelle() { $('ssPonctOverlay').classList.remove('open'); }
+  function closePonctuelle() {
+    $('ssPonctOverlay').classList.remove('open');
+    $('ssPonctMission').disabled = false;
+    // UNIFICATION-SEANCES-MISSION : un seul refreshAll pour toute la session de
+    // saisie en série (les créations unitaires n'en déclenchent plus).
+    if (ponctSessionDirty) {
+      ponctSessionDirty = false;
+      refreshAll().catch(function (e) { flash('Rafraîchissement impossible : ' + errMsg(e), 'err'); });
+    }
+  }
+  // UNIFICATION-SEANCES-MISSION : pioche des lieux référencés de la modale
+  // ponctuelle (même source que fillLieuSelect : sites actifs) + option « lieu
+  // libre » révélant le champ texte historique.
+  function fillPonctLieuSelect() {
+    const sel = $('ssPonctLieuSel');
+    sel.innerHTML = '<option value="">— aucun —</option>';
+    sites.forEach(function (s) {
+      const o = document.createElement('option');
+      o.value = s.id; o.textContent = s.libelle || s.nom || s.id;
+      sel.appendChild(o);
+    });
+    const libre = document.createElement('option');
+    libre.value = '__libre__'; libre.textContent = '— lieu libre (texte) —';
+    sel.appendChild(libre);
+  }
+  function applyPonctLieuUI() {
+    $('ssPonctLieuLibreWrap').style.display = ($('ssPonctLieuSel').value === '__libre__') ? '' : 'none';
+  }
+  // « Heures réelles » n'a de sens que sur une séance déjà réalisée : masqué quand
+  // l'admin choisit 'prevue'. Le salarié (sans sélecteur, forcé realisee) le voit.
+  function applyPonctEtatUI() {
+    const etat = peutEcrire ? ($('ssPonctEtat').value || 'prevue') : 'realisee';
+    $('ssPonctHeuresWrap').style.display = (etat === 'prevue') ? 'none' : '';
+  }
 
-  async function savePonctuelle() {
+  async function savePonctuelle(fermerApres) {
     const missionId = $('ssPonctMission').value;
     const date = $('ssPonctDate').value || null;
     if (!missionId) return flash('Choisis une mission.', 'err');
@@ -1142,32 +1274,67 @@
 
     const dureeRaw = $('ssPonctDuree').value;
     const duree = (dureeRaw === '' || dureeRaw == null) ? null : Number(dureeRaw);
-    const heuresRaw = $('ssPonctHeures').value;
-    const heures = (heuresRaw === '' || heuresRaw == null) ? null : Number(heuresRaw);
     // État : admin choisit (prevue|realisee) ; salarié -> realisee (forcé serveur).
-    const etat = peutEcrire ? ($('ssPonctEtat').value || 'realisee') : 'realisee';
+    const etat = peutEcrire ? ($('ssPonctEtat').value || 'prevue') : 'realisee';
+    // Heures réelles : ignorées quand l'état est 'prevue' (champ masqué — pas de
+    // réel sur du futur).
+    const heuresRaw = (etat === 'prevue') ? '' : $('ssPonctHeures').value;
+    const heures = (heuresRaw === '' || heuresRaw == null) ? null : Number(heuresRaw);
+    // UNIFICATION-SEANCES-MISSION : heure de début + lieu référencé (p_lieu_id) OU
+    // libre (p_lieu_libre), jamais les deux.
+    const heure = $('ssPonctHeure').value || null;
+    const lieuSel = $('ssPonctLieuSel').value;
+    const lieuId = (lieuSel && lieuSel !== '__libre__') ? lieuSel : null;
+    const lieuLibre = (lieuSel === '__libre__') ? ($('ssPonctLieu').value.trim() || null) : null;
 
     $('ssPonctSave').disabled = true;
+    $('ssPonctSaveMore').disabled = true;
     try {
       await rpc('creer_seance_ponctuelle', {
         p_mission_id: missionId,
         p_date_seance: date,
-        p_heure_debut: null,
+        p_heure_debut: heure,
         p_duree_min: duree,
-        p_lieu_id: null,
-        p_lieu_libre: $('ssPonctLieu').value.trim() || null,
+        p_lieu_id: lieuId,
+        p_lieu_libre: lieuLibre,
         p_refacturable: null,
         p_heures_reelles: heures,
         p_notes: $('ssPonctNotes').value.trim() || null,
         p_etat: etat
       });
-      flash('Séance ponctuelle créée.', 'ok');
-      closePonctuelle();
-      await refreshAll();
+      ponctSessionCount += 1;
+      ponctSessionDirty = true;
+      // Bandeau récapitulatif de la session (anti-doublon : « où en suis-je ? »).
+      const p = date.split('-');
+      let dernierLbl = (p.length === 3 ? (p[2] + '/' + p[1] + '/' + p[0]) : date)
+        + (heure ? ', ' + heure : '');
+      if (lieuId) {
+        const s = sites.find(function (x) { return x.id === lieuId; });
+        if (s) dernierLbl += ' · ' + (s.libelle || s.nom || '');
+      } else if (lieuLibre) {
+        dernierLbl += ' · ' + lieuLibre;
+      }
+      $('ssPonctBanner').textContent = ponctSessionCount
+        + (ponctSessionCount > 1 ? ' séances créées' : ' séance créée')
+        + ' dans cette session — dernière : ' + dernierLbl;
+      $('ssPonctBanner').classList.add('on');
+      // Dès qu'une séance existe, on ne peut plus « annuler » ce qui est en base.
+      $('ssPonctCancel').textContent = 'Fermer';
+      if (fermerApres) {
+        flash('Séance ponctuelle créée.', 'ok');
+        closePonctuelle();   // déclenche l'unique refreshAll de la session
+      } else {
+        // Série : mission/état/notes conservés ; date vidée (prochaine saisie) ;
+        // heure/durée/lieu pré-remplis de la séance précédente (point de départ).
+        $('ssPonctDate').value = '';
+        $('ssPonctHeures').value = '';
+        $('ssPonctDate').focus();
+      }
     } catch (e) {
       flash('Création impossible : ' + errMsg(e), 'err');
     } finally {
       $('ssPonctSave').disabled = false;
+      $('ssPonctSaveMore').disabled = false;
     }
   }
 
@@ -1402,20 +1569,40 @@
   function updateRecurPreview() {
     const el = $('ssMisRecurPreview');
     const rec = readRecurInputs();
-    if (!rec) { el.textContent = ''; return; }
+    if (!rec) { el.textContent = ''; updateSaveLabel(); return; }
     const debut = parseLocalDate($('ssMisDateDebut').value);
-    if (!debut) { el.textContent = 'Renseigne une date de début pour estimer les séances.'; return; }
+    if (!debut) { el.textContent = 'Renseigne une date de début pour estimer les séances.'; updateSaveLabel(); return; }
     const finRaw = parseLocalDate($('ssMisDateFin').value);
     const fin = finRaw || debut; // date_fin vide -> une seule journée (comme la génération)
-    if (fin < debut) { el.textContent = 'La date de fin précède la date de début.'; return; }
-    // Chantier D : mode consécutif -> une séance par jour calendaire sur [debut, fin].
+    if (fin < debut) { el.textContent = 'La date de fin précède la date de début.'; updateSaveLabel(); return; }
+    // UNIFICATION-SEANCES-MISSION : comptage factorisé dans estimerNbSeances()
+    // (partagé avec le libellé adaptatif du bouton Enregistrer) ; messages inchangés.
+    const n = estimerNbSeances();
     if (rec.frequence === 'consecutif') {
-      const MS = 86400000;
-      const nc = Math.floor((fin - debut) / MS) + 1;
       el.textContent = finRaw
-        ? ('≈ ' + nc + (nc > 1 ? ' séances consécutives' : ' séance') + ' sur la période.')
-        : ('≈ ' + nc + ' séance (ajoute une date de fin pour couvrir une période).');
-      return;
+        ? ('≈ ' + n + (n > 1 ? ' séances consécutives' : ' séance') + ' sur la période.')
+        : ('≈ ' + n + ' séance (ajoute une date de fin pour couvrir une période).');
+    } else {
+      el.textContent = finRaw
+        ? ('≈ ' + n + (n > 1 ? ' séances' : ' séance') + ' sur la période.')
+        : ('≈ ' + n + (n > 1 ? ' séances' : ' séance') + ' (ajoute une date de fin pour couvrir une période).');
+    }
+    updateSaveLabel();
+  }
+  // UNIFICATION-SEANCES-MISSION : nombre de séances que le motif courant produirait
+  // sur [date_debut, date_fin]. Une SEULE implémentation front du comptage (aperçu +
+  // libellé du bouton) — la RPC generer_occurrences_recurrentes reste la source de
+  // vérité de la génération. null si motif absent ou dates invalides.
+  function estimerNbSeances() {
+    const rec = readRecurInputs();
+    if (!rec) return null;
+    const debut = parseLocalDate($('ssMisDateDebut').value);
+    if (!debut) return null;
+    const fin = parseLocalDate($('ssMisDateFin').value) || debut;
+    if (fin < debut) return null;
+    const MS_DAY = 86400000;
+    if (rec.frequence === 'consecutif') {
+      return Math.floor((fin - debut) / MS_DAY) + 1;
     }
     const interval = rec.intervalle_semaines || 1;
     const debutLundi = mondayISO(debut);
@@ -1423,7 +1610,6 @@
     rec.jours.forEach(function (j) { joursSet[j] = true; });
     let n = 0;
     const cur = new Date(debut.getFullYear(), debut.getMonth(), debut.getDate());
-    const MS_DAY = 86400000;
     while (cur <= fin) {
       const dow = cur.getDay() === 0 ? 7 : cur.getDay();
       if (joursSet[dow]) {
@@ -1432,9 +1618,7 @@
       }
       cur.setDate(cur.getDate() + 1);
     }
-    el.textContent = finRaw
-      ? ('≈ ' + n + (n > 1 ? ' séances' : ' séance') + ' sur la période.')
-      : ('≈ ' + n + (n > 1 ? ' séances' : ' séance') + ' (ajoute une date de fin pour couvrir une période).');
+    return n;
   }
 
   // ---- Chantier D : pilotage du statut ----
@@ -1501,6 +1685,46 @@
     updateRecurPreview();
   }
 
+  // ---- UNIFICATION-SEANCES-MISSION : bloc « Séances » (3 choix) ----
+  // Aiguillage UI PUR : « recurrente » révèle le motif (details déplié d'office) ;
+  // « aucune » / « ponctuelle » le masquent et forcent p_recurrence = null au save.
+  function getSeancesMode() {
+    const r = document.querySelector('input[name="ssMisSeancesModeR"]:checked');
+    return r ? r.value : 'aucune';
+  }
+  function setSeancesMode(v) {
+    const val = (v === 'recurrente' || v === 'ponctuelle') ? v : 'aucune';
+    const r = document.getElementById('ssMisSeances' + val.charAt(0).toUpperCase() + val.slice(1));
+    if (r) r.checked = true;
+    applySeancesModeUI();
+  }
+  const SEANCES_HINTS = {
+    aucune: 'Aucune séance à la création — ajout possible plus tard via « + Ponctuelle » sur la mission.',
+    recurrente: 'Un motif régulier : les séances seront générées automatiquement à l\'enregistrement.',
+    ponctuelle: 'Des dates au cas par cas (heure, durée, lieu propres à chaque séance) — la saisie s\'ouvre après l\'enregistrement.'
+  };
+  function applySeancesModeUI() {
+    const mode = getSeancesMode();
+    $('ssMisSeancesHint').textContent = SEANCES_HINTS[mode] || '';
+    const wrap = $('ssMisRecurWrap');
+    wrap.classList.toggle('ss-recur-off', mode !== 'recurrente');
+    if (mode === 'recurrente') wrap.open = true;
+    updateSaveLabel();
+  }
+  // Libellé adaptatif du bouton principal (symétrie des trois choix, FAIT FOI L2).
+  function updateSaveLabel() {
+    const btn = $('ssMisSave');
+    const mode = getSeancesMode();
+    if (mode === 'recurrente') {
+      const n = estimerNbSeances();
+      btn.textContent = 'Enregistrer, puis générer les séances' + (n != null && n > 0 ? ' (≈ ' + n + ')' : '');
+    } else if (mode === 'ponctuelle') {
+      btn.textContent = 'Enregistrer, puis saisir les séances';
+    } else {
+      btn.textContent = 'Enregistrer';
+    }
+  }
+
   function openMission(mission) {
     if (!peutEcrire) return;
     // Édition si une mission réelle est fournie ; sinon création (le listener du
@@ -1553,6 +1777,10 @@
     // Bloc Récurrence : pré-rempli depuis la récurrence mémorisée (édition),
     // vidé en création. fillRecurInputs gère l'ouverture/repli du details.
     fillRecurInputs(edit ? editingMissionRecurrence : null);
+    // UNIFICATION-SEANCES-MISSION : restitution du choix « Séances » — motif présent
+    // -> « Récurrentes » ; sinon « Aucune » (le Hub ne distingue pas « aucune » de
+    // « ponctuelles déjà saisies » : les séances existantes vivent sur le bandeau).
+    setSeancesMode((edit && editingMissionRecurrence) ? 'recurrente' : 'aucune');
     $('ssMisOverlay').classList.add('open');
   }
   function closeMission() {
@@ -1628,6 +1856,13 @@
     if (benefRequis && !entite) { flash('Choisissez un bénéficiaire.', 'err'); return; }
     const dateDebut = $('ssMisDateDebut').value;
     if (!dateDebut) { flash('La date de début est obligatoire.', 'err'); return; }
+    // UNIFICATION-SEANCES-MISSION : garde du mode « Récurrentes » — un motif doit
+    // être défini (jours cochés ou mode consécutif), sinon rien à générer.
+    const modeSeances = getSeancesMode();
+    if (modeSeances === 'recurrente' && !readRecurInputs()) {
+      flash('Coche des jours de la semaine (ou choisis « jours consécutifs ») pour la récurrence.', 'err');
+      return;
+    }
     $('ssMisSave').disabled = true;
     try {
       const enEdition = editingMissionId != null;
@@ -1650,9 +1885,11 @@
         // sinon elles seraient écrasées à leur DEFAULT. En création, valeurs neutres.
         p_lieu_libre: enEdition ? editingMissionLieuLibre : null,
         // Récurrence : construite depuis le bloc de la modale (source de vérité,
-        // création ET édition). Aucun jour coché -> null (mission non récurrente).
-        // Remplace la simple ré-émission de editingMissionRecurrence du pt 118.
-        p_recurrence: readRecurInputs(),
+        // création ET édition). UNIFICATION-SEANCES-MISSION : le choix « Séances »
+        // est l'aiguillage — hors mode « Récurrentes », p_recurrence = null (une
+        // mission repassée de Récurrentes à Aucune perd son motif, aligné sur
+        // l'ex-comportement « aucun jour coché »). Remplace la ré-émission pt 118.
+        p_recurrence: (modeSeances === 'recurrente') ? readRecurInputs() : null,
         p_etat: enEdition ? editingMissionEtat : 'prevue',
         p_bilan_text: enEdition ? editingMissionBilan : null,
         p_questionnaire_fait: enEdition ? editingMissionQuestFait : false,
@@ -1666,10 +1903,29 @@
           ? parseFloat($('ssMisMontant').value) : null,
         p_statut: statut
       };
-      await rpc('upsert_mission', params);
-      flash(enEdition ? 'Mission modifiée.' : 'Mission enregistrée.', 'ok');
+      const saved = await rpc('upsert_mission', params);
+      // upsert_mission RETURNS missions : PostgREST renvoie la ligne (objet, ou
+      // tableau d'une ligne selon le client) — on couvre les deux formes.
+      const row = Array.isArray(saved) ? saved[0] : saved;
       closeMission();
-      await refreshAll();
+      // UNIFICATION-SEANCES-MISSION (FAIT FOI L2) : enchaînement selon l'aiguillage.
+      if (modeSeances === 'recurrente' && row && row.id) {
+        // Génération automatique : genMission (conservé du bandeau) flashe
+        // « X créées, Y déjà présentes » et rafraîchit. RPC idempotente (sonde
+        // 02/07/2026) : ré-enregistrer une mission ne crée aucun doublon.
+        flash(enEdition ? 'Mission modifiée. Génération des séances…' : 'Mission enregistrée. Génération des séances…', 'ok');
+        await genMission(row, null);
+      } else if (modeSeances === 'ponctuelle' && row && row.id) {
+        // Enchaînement : la modale ponctuelle s'ouvre pré-verrouillée sur la
+        // mission créée (refreshAll d'abord, pour que le select la connaisse).
+        flash(enEdition ? 'Mission modifiée. Saisis les séances ponctuelles.' : 'Mission enregistrée. Saisis les séances ponctuelles.', 'ok');
+        await refreshAll();
+        const mNeuve = missions.find(function (m) { return m.id === row.id; }) || row;
+        openPonctuelle(mNeuve, { verrou: true });
+      } else {
+        flash(enEdition ? 'Mission modifiée.' : 'Mission enregistrée.', 'ok');
+        await refreshAll();
+      }
     } catch (e) {
       flash('Enregistrement impossible : ' + errMsg(e), 'err');
     } finally {
@@ -1942,7 +2198,12 @@
     $('ssDeclOverlay').addEventListener('click', function (e) { if (e.target === $('ssDeclOverlay')) closeDecl(); });
     // Séance ponctuelle
     $('ssPonctCancel').addEventListener('click', closePonctuelle);
-    $('ssPonctSave').addEventListener('click', savePonctuelle);
+    // UNIFICATION-SEANCES-MISSION : deux voies de création — « et fermer » (geste
+    // historique) / « et ajouter une autre » (série, la modale reste ouverte).
+    $('ssPonctSave').addEventListener('click', function () { savePonctuelle(true); });
+    $('ssPonctSaveMore').addEventListener('click', function () { savePonctuelle(false); });
+    $('ssPonctEtat').addEventListener('change', applyPonctEtatUI);
+    $('ssPonctLieuSel').addEventListener('change', applyPonctLieuUI);
     $('ssPonctOverlay').addEventListener('click', function (e) { if (e.target === $('ssPonctOverlay')) closePonctuelle(); });
     // Auto-remplissage des heures depuis la durée saisie (confort, ajustable).
     $('ssPonctDuree').addEventListener('input', function () {
@@ -1976,6 +2237,8 @@
       if (b && b.dataset.min) applyForfait(parseInt(b.dataset.min, 10));
     });
     $('ssMisRecurMode').addEventListener('change', applyRecurModeUI);
+    // UNIFICATION-SEANCES-MISSION : aiguillage du bloc « Séances » (3 choix).
+    $('ssMisSeancesMode').addEventListener('change', applySeancesModeUI);
     $('ssEntCancel').addEventListener('click', function () { $('ssEntCreate').classList.remove('open'); });
     $('ssEntSave').addEventListener('click', saveEntiteInline);
     // Signout
