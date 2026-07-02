@@ -39,6 +39,13 @@
     réalisées » (jamais deux vérités). Libellés = référentiel des 10 types
     de suivi-salarie.html (repli = jeton brut), « (hors mission) » si NULL.
     Tri par heures décroissantes (pilotage). Zéro SQL côté effectif.
+  EXPORT-XLSX-MISE-EN-FORME (02/07/2026, correctif de recette 3.3) : bascule
+    CDN SheetJS CE 0.18.5 -> xlsx-js-style 1.2.0 (fork drop-in, même API,
+    même global XLSX, + styles de cellule que la CE ignore — cause de l'écart
+    maquette pt 125 vs exports réels). Feuilles du PRÉVISIONNEL stylées
+    (titres, en-têtes fond vert bouteille, bordures, chiffres-clés gras,
+    dépassements rouges). Bilan effectif + export refacturer (pt 132) :
+    compatibles, non stylés à ce geste — suite optionnelle tracée.
 -->
 <link rel="stylesheet" href="css/hub.css">
 <style>
@@ -456,8 +463,16 @@
   les remonter et les agréger côté front — zéro SQL de modèle.</p>
 </div>
 
-<!-- SheetJS (export xlsx « À refacturer », B-facturation-export pt 132). Meme CDN que pt 125. -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- xlsx-js-style 1.2.0 (EXPORT-XLSX-MISE-EN-FORME 02/07/2026) : remplace
+     SheetJS 0.18.5 (cdnjs, pt 125/132). Fork DROP-IN de SheetJS CE 0.18.5
+     (même API, même global XLSX) + styles de cellule (gras/couleurs/bordures),
+     que la CE ne sait pas produire — cause de l'écart maquette pt 125 vs
+     exports réels constaté en recette. jsDelivr = CDN déjà utilisé par la
+     page (supabase). Les 3 exports de la page (refacturer pt 132, bilan
+     effectif, prévisionnel) restent compatibles ; seul le PRÉVISIONNEL est
+     stylé à ce geste (objet de la remarque), bilan/refacturer tracés en
+     suite optionnelle. -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/season-pill.js"></script>
@@ -1252,6 +1267,45 @@
     }).sort(function (a, b) { return b.h - a.h || gcTypeLbl(a.code).localeCompare(gcTypeLbl(b.code)); });
   }
 
+  // EXPORT-XLSX-MISE-EN-FORME (02/07/2026) : styles de cellule xlsx-js-style,
+  // tokens de la charte MOM (vert bouteille 0C3D24, ligne CABE9F, encre douce
+  // 6B7A74). Appliqués APRÈS aoa_to_sheet, par adresse calculée. Si la page
+  // tournait encore sur SheetJS CE (cache), la propriété .s serait simplement
+  // ignorée — aucun risque de casse.
+  const GC_XLS_TITRE = { font: { bold: true, sz: 14, color: { rgb: '0C3D24' } } };
+  const GC_XLS_SOUS = { font: { italic: true, sz: 10, color: { rgb: '6B7A74' } } };
+  const GC_XLS_HEAD = {
+    font: { bold: true, color: { rgb: 'FFFFFF' } },
+    fill: { fgColor: { rgb: '0C3D24' } },
+    alignment: { vertical: 'center' }
+  };
+  const GC_XLS_BORD = { style: 'thin', color: { rgb: 'CABE9F' } };
+  const GC_XLS_CELL = {
+    border: { top: GC_XLS_BORD, bottom: GC_XLS_BORD, left: GC_XLS_BORD, right: GC_XLS_BORD }
+  };
+  const GC_XLS_VAL = {
+    font: { bold: true, color: { rgb: '0C3D24' } },
+    border: { top: GC_XLS_BORD, bottom: GC_XLS_BORD, left: GC_XLS_BORD, right: GC_XLS_BORD }
+  };
+  const GC_XLS_DEP = {
+    font: { bold: true, color: { rgb: 'B3261E' } },
+    border: { top: GC_XLS_BORD, bottom: GC_XLS_BORD, left: GC_XLS_BORD, right: GC_XLS_BORD }
+  };
+  function gcXlsSetS(ws, r, c, s) {
+    const cell = ws[XLSX.utils.encode_cell({ r: r, c: c })];
+    if (cell) { cell.s = s; }
+  }
+  // En-tête de tableau : ligne r stylée sur nb colonnes.
+  function gcXlsHead(ws, r, nb) {
+    for (let c = 0; c < nb; c++) { gcXlsSetS(ws, r, c, GC_XLS_HEAD); }
+  }
+  // Corps de tableau : bordures fines de rFrom à rTo inclus sur nb colonnes.
+  function gcXlsBordures(ws, rFrom, rTo, nb) {
+    for (let r = rFrom; r <= rTo; r++) {
+      for (let c = 0; c < nb; c++) { gcXlsSetS(ws, r, c, GC_XLS_CELL); }
+    }
+  }
+
   let gcContrat = null;     // contrat resolu pour le salarie selectionne
   let gcSynth   = null;     // ligne v_compteur_annualisation courante (pour l'export)
 
@@ -1737,6 +1791,18 @@
       }
       const wsSynth = XLSX.utils.aoa_to_sheet(synthAOA);
       wsSynth['!cols'] = [{ wch: 32 }, { wch: 22 }];
+      // MISE EN FORME (02/07/2026) : titre + fiche (lignes 3-8, idx 2..7)
+      // bordée + chiffres-clés (Prévu pur, Projection, écarts) en gras. Les
+      // indices sont ceux du build ci-dessus (fiche fixe ; chiffres-clés à
+      // partir de l'idx 9, 2 à 4 lignes selon cible).
+      gcXlsSetS(wsSynth, 0, 0, GC_XLS_TITRE);
+      gcXlsBordures(wsSynth, 2, 7, 2);
+      const nbCles = 2 + (cible != null ? 2 : 0);
+      for (let rK = 9; rK < 9 + nbCles; rK++) {
+        gcXlsSetS(wsSynth, rK, 0, GC_XLS_CELL);
+        gcXlsSetS(wsSynth, rK, 1, GC_XLS_VAL);
+      }
+      if (c.sansDuree > 0) { gcXlsSetS(wsSynth, 9 + nbCles + 1, 0, GC_XLS_DEP); }
       XLSX.utils.book_append_sheet(wb, wsSynth, 'Synthèse');
 
       const aoaS = [];
@@ -1756,6 +1822,18 @@
       if (!c.semaines.length) { aoaS.push(['Aucune séance sur la période.']); }
       const wsS = XLSX.utils.aoa_to_sheet(aoaS);
       wsS['!cols'] = [{ wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 9 }, { wch: 14 }, { wch: 20 }];
+      // MISE EN FORME : titre, sous-titre, en-tête (idx 3), bordures sur les
+      // données (idx 4..), dépassements en rouge (col F).
+      gcXlsSetS(wsS, 0, 0, GC_XLS_TITRE);
+      gcXlsSetS(wsS, 1, 0, GC_XLS_SOUS);
+      gcXlsHead(wsS, 3, 6);
+      if (c.semaines.length) {
+        gcXlsBordures(wsS, 4, 3 + c.semaines.length, 6);
+        c.semaines.forEach(function (w, i) {
+          const dep = (sExc != null && w.h > sExc) || (sHaut != null && w.h > sHaut);
+          if (dep) { gcXlsSetS(wsS, 4 + i, 5, GC_XLS_DEP); }
+        });
+      }
       XLSX.utils.book_append_sheet(wb, wsS, 'Par semaine');
 
       const aoaM = [];
@@ -1770,6 +1848,11 @@
       if (!c.mois.length) { aoaM.push(['Aucune séance sur la période.']); }
       const wsM = XLSX.utils.aoa_to_sheet(aoaM);
       wsM['!cols'] = [{ wch: 18 }, { wch: 9 }, { wch: 14 }];
+      // MISE EN FORME : mêmes gestes que Par semaine (3 colonnes).
+      gcXlsSetS(wsM, 0, 0, GC_XLS_TITRE);
+      gcXlsSetS(wsM, 1, 0, GC_XLS_SOUS);
+      gcXlsHead(wsM, 3, 3);
+      if (c.mois.length) { gcXlsBordures(wsM, 4, 3 + c.mois.length, 3); }
       XLSX.utils.book_append_sheet(wb, wsM, 'Par mois');
 
       // VENTILATION-TYPE (02/07/2026) : 4e feuille « Par type ».
@@ -1784,6 +1867,11 @@
       if (!c.types.length) { aoaT.push(['Aucune séance sur la période.']); }
       const wsT = XLSX.utils.aoa_to_sheet(aoaT);
       wsT['!cols'] = [{ wch: 26 }, { wch: 9 }, { wch: 14 }];
+      // MISE EN FORME : mêmes gestes que Par semaine (3 colonnes).
+      gcXlsSetS(wsT, 0, 0, GC_XLS_TITRE);
+      gcXlsSetS(wsT, 1, 0, GC_XLS_SOUS);
+      gcXlsHead(wsT, 3, 3);
+      if (c.types.length) { gcXlsBordures(wsT, 4, 3 + c.types.length, 3); }
       XLSX.utils.book_append_sheet(wb, wsT, 'Par type');
 
       const fname = 'previsionnel-heures-' + String(nom).replace(/\s+/g, '-').toLowerCase()
