@@ -25,6 +25,15 @@
   salarié) appelant la RPC voie 3 creer_seance_ponctuelle() (sql_123). Le salarié
   crée sur SES missions, état forcé 'realisee' (garde serveur) ; l'admin choisit
   prevue|realisee. Appel par nom via le helper rpc() inline (zéro wrapper client).
+  MAJ : SUIVI-SEANCES-ETAT-AFFICHAGE (02/07/2026, front pur, zéro SQL) — après
+  chaque action, refreshAll re-rendait tout : repli des missions perdu (état
+  'collapsed' DOM-only) + retour parasite en tête de liste (clamp du scroll au
+  vidage de #ssList). D1 : Set missionsPliees (clé mission.id, alimenté au toggle,
+  consulté au build ; survit liste<->agenda et changements de type ; portée =
+  session de page, un F5 repart tout déplié — voulu). D2 : capture de scrollY
+  avant re-render, restauration après (générique, couvre toutes les actions).
+  Alternative écartée : scrollIntoView sur la mission agie (exigeait de propager
+  l'id dans chaque handler pour un gain quasi nul).
 
   ARCHITECTURE (calque gestion-salarie.html, vérifié à la source 26/06) :
     - charge supabase.min.js (CDN jsDelivr) puis js/supabase-client.js (SupabaseHub).
@@ -691,6 +700,13 @@
   let currentView = 'liste';       // 'liste' | 'agenda'
   let weekStart = null;            // Date (lundi) de la semaine affichée en agenda
   let declTarget = null;           // occurrence en cours de déclaration
+  // SUIVI-SEANCES-ETAT-AFFICHAGE (D1) : mémoire du repli par mission. L'état
+  // 'collapsed' vivait uniquement dans le DOM et était perdu à chaque re-render
+  // (refreshAll après toute action). Ce Set (clé = mission.id) est alimenté au
+  // toggle et consulté au build -> l'état survit au re-render, aux allers-retours
+  // liste/agenda et aux changements de type. Portée = session de page (voulu,
+  // FAIT FOI 02/07/2026) : un rechargement repart tout déplié.
+  const missionsPliees = new Set();
 
   // ============================================================
   // Helper RPC (calque gestion-salarie.html : appel par nom)
@@ -885,6 +901,10 @@
     const occ = occurrencesDeMission(m);
     const block = document.createElement('div');
     block.className = 'ss-mission';
+    // D1 : le bloc porte l'id de sa mission et rejoue l'état de repli mémorisé.
+    block.dataset.missionId = m.id;
+    const estPliee = missionsPliees.has(m.id);
+    if (estPliee) block.classList.add('collapsed');
 
     const head = document.createElement('div');
     head.className = 'ss-mission-head';
@@ -893,10 +913,10 @@
     const title = document.createElement('button');
     title.type = 'button';
     title.className = 'ss-mission-title ss-mission-toggle';
-    title.setAttribute('aria-expanded', 'true');
+    title.setAttribute('aria-expanded', estPliee ? 'false' : 'true');
     const chevron = document.createElement('span');
     chevron.className = 'ss-mission-chevron';
-    chevron.textContent = '▾';
+    chevron.textContent = estPliee ? '▸' : '▾';
     const titleText = document.createElement('span');
     titleText.textContent = m.libelle || '(sans libellé)';
     title.appendChild(chevron);
@@ -950,6 +970,8 @@
       const collapsed = block.classList.toggle('collapsed');
       title.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
       chevron.textContent = collapsed ? '▸' : '▾';
+      // D1 : mémoriser l'état pour le rejouer aux re-renders suivants.
+      if (collapsed) missionsPliees.add(m.id); else missionsPliees.delete(m.id);
     });
 
     return block;
@@ -1232,10 +1254,17 @@
   }
 
   async function refreshAll() {
+    // SUIVI-SEANCES-ETAT-AFFICHAGE (D2) : le vidage de #ssList raccourcit le
+    // document -> le navigateur clampe le scroll en tête de liste. On capture la
+    // position AVANT le re-render et on la restaure APRÈS : la mission en cours
+    // reste sous les yeux, pour les 7 chemins d'action d'un coup (déclarer,
+    // valider, dévalider, annuler/réactiver, ponctuelle, édition, génération).
+    const scrollAvant = window.scrollY;
     await chargerMissions();
     await chargerOccurrences();
     renderGrid();
     if (currentType) { if (currentView === 'liste') renderListe(); else renderAgenda(); }
+    window.scrollTo(0, scrollAvant);
   }
 
   // ============================================================
