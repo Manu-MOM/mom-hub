@@ -54,6 +54,27 @@
   heure/durée/lieu pré-remplis ; bandeau compteur de session ; refreshAll UNIQUE à
   la fermeture) ; « Heures réelles » masqué quand état = Prévue ; défaut admin =
   Prévue (décision déléguée tracée : usage dominant = planification).
+  MAJ : SEANCE-EDITION-LIBELLE-FORFAITS (02/07/2026, sql_145 + front — FAIT FOI figé) :
+    - ÉDITION UNITAIRE (admin) : modale ssEditOverlay ouverte depuis les lignes (✎).
+      Persistance via upsert_mission_seance 12 params. CONTRAT : l'UPDATE écrase
+      TOUTES les colonnes sans COALESCE (sonde S1 02/07) -> la modale renvoie la
+      ligne COMPLÈTE, p_etat à l'identique (pas un outil de transition d'état),
+      p_refacturable en pass-through SANS UI (le statut pilote, chantier D).
+      A2 : édition VERROUILLÉE sur validee (dévalider d'abord — le compteur ne lit
+      que validee) et annulee (réactiver d'abord) ; bouton désactivé + title.
+      gcal_uid jamais touché par l'upsert (pont Agenda pt 134 préservé, sonde S1).
+      Génération : jamais d'UPDATE (idempotence EXISTS) -> une séance éditée n'est
+      jamais écrasée ; une date libérée du motif sera RE-CRÉÉE (assumé, documenté).
+    - LIBELLÉ (sql_145, colonne mission_seances.libelle) : champ optionnel dans les
+      modales ponctuelle ET édition ; sur la ligne, il PRIME visuellement (p en tête,
+      injection textContent — jamais innerHTML sur du texte libre). Vidé entre deux
+      saisies en série (spécifique à chaque séance, contrairement aux notes —
+      décision déléguée tracée). setEtatSeance repasse p_libelle (sinon écrasé null).
+      Le SUMMARY du flux .ics reste un chantier DISTINCT.
+    - FORFAITS PONCTUELLE : patron .ss-forfaits repris (1h->8h) ; le clic assigne la
+      durée ET appelle EXPLICITEMENT ponctPrefillHeures() (assigner .value ne
+      déclenche PAS le listener input — remontée de recette pt 140) ; pré-remplissage
+      seulement si le champ heures est vide (même sémantique que la saisie manuelle).
 
   ARCHITECTURE (calque gestion-salarie.html, vérifié à la source 26/06) :
     - charge supabase.min.js (CDN jsDelivr) puis js/supabase-client.js (SupabaseHub).
@@ -153,6 +174,8 @@
   .ss-row-main p { margin: 0; }
   .ss-row-when { font-size: 14px; font-weight: 600; color: var(--ink, #0c3d24); }
   .ss-row-meta { font-size: 12px; color: var(--ink-mute, #6b7a74); margin-top: 2px !important; }
+  /* SEANCE-EDITION-LIBELLE-FORFAITS : le libellé de séance prime visuellement. */
+  .ss-row-libelle { font-size: 14px; font-weight: 700; color: var(--ink, #0c3d24); }
   .ss-row-act { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 
   .ss-badge { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 6px; white-space: nowrap; }
@@ -471,6 +494,12 @@
       <label for="ssPonctMission">Mission *</label>
       <select id="ssPonctMission"><option value="">— choisir —</option></select>
     </div>
+    <!-- SEANCE-EDITION-LIBELLE-FORFAITS : intitulé optionnel (sql_145). Vidé entre
+         deux saisies en série (spécifique à chaque séance, contrairement aux notes). -->
+    <div class="ss-field">
+      <label for="ssPonctLibelle">Libellé (optionnel)</label>
+      <input type="text" id="ssPonctLibelle" placeholder="ex. Suivi Chpt Seniors J1 - Ext">
+    </div>
     <div class="ss-row2">
       <div class="ss-field">
         <label for="ssPonctDate">Date *</label>
@@ -485,6 +514,19 @@
     <div class="ss-field">
       <label for="ssPonctDuree">Durée (minutes)</label>
       <input type="number" id="ssPonctDuree" step="5" min="0" inputmode="numeric" placeholder="ex. 90">
+      <!-- SEANCE-EDITION-LIBELLE-FORFAITS : patron .ss-forfaits repris du bloc
+           récurrent. Le clic assigne la durée ET appelle ponctPrefillHeures()
+           (assigner .value ne déclenche pas le listener input). -->
+      <div class="ss-forfaits" id="ssPonctForfaits" aria-label="Forfaits de durée">
+        <button class="ss-forfait" type="button" data-min="60">1 h</button>
+        <button class="ss-forfait" type="button" data-min="120">2 h</button>
+        <button class="ss-forfait" type="button" data-min="180">3 h</button>
+        <button class="ss-forfait" type="button" data-min="240">4 h</button>
+        <button class="ss-forfait" type="button" data-min="300">5 h</button>
+        <button class="ss-forfait" type="button" data-min="360">6 h</button>
+        <button class="ss-forfait" type="button" data-min="420">7 h</button>
+        <button class="ss-forfait" type="button" data-min="480">8 h</button>
+      </div>
     </div>
     <!-- UNIFICATION-SEANCES-MISSION : masqué quand état = Prévue (pas de réel sur du futur). -->
     <div class="ss-field" id="ssPonctHeuresWrap">
@@ -519,6 +561,59 @@
       <!-- UNIFICATION-SEANCES-MISSION : création en série (la modale reste ouverte). -->
       <button class="ss-btn ss-btn-ghost" id="ssPonctSaveMore" type="button">Créer et ajouter une autre</button>
       <button class="ss-btn" id="ssPonctSave" type="button">Créer et fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODALE ÉDITION DE SÉANCE (admin) ============
+     SEANCE-EDITION-LIBELLE-FORFAITS : édition unitaire d'une séance prevue|realisee
+     (A2 : validee/annulee verrouillées côté liste). L'état n'est PAS éditable ici
+     (les transitions restent les gestes dédiés) ; refacturable en pass-through sans
+     UI (le statut de mission pilote, chantier D). -->
+<div class="ss-overlay" id="ssEditOverlay">
+  <div class="ss-modal">
+    <h3>Éditer la séance</h3>
+    <div class="ss-modal-flash" aria-live="polite"></div>
+    <p class="ss-sub" id="ssEditCtx" style="margin-bottom:14px;"></p>
+    <div class="ss-field">
+      <label for="ssEditLibelle">Libellé (optionnel)</label>
+      <input type="text" id="ssEditLibelle" placeholder="ex. Suivi Chpt Seniors J1 - Ext">
+    </div>
+    <div class="ss-row2">
+      <div class="ss-field">
+        <label for="ssEditDate">Date *</label>
+        <input type="date" id="ssEditDate">
+      </div>
+      <div class="ss-field">
+        <label for="ssEditHeure">Heure de début</label>
+        <input type="time" id="ssEditHeure">
+      </div>
+    </div>
+    <div class="ss-field">
+      <label for="ssEditDuree">Durée (minutes)</label>
+      <input type="number" id="ssEditDuree" step="5" min="0" inputmode="numeric" placeholder="ex. 90">
+    </div>
+    <!-- « Heures réelles » masqué sur une séance prevue (pas de réel sur du futur,
+         même règle que la modale ponctuelle). -->
+    <div class="ss-field" id="ssEditHeuresWrap">
+      <label for="ssEditHeures">Heures réelles</label>
+      <input type="number" id="ssEditHeures" step="0.25" min="0" inputmode="decimal">
+    </div>
+    <div class="ss-field">
+      <label for="ssEditLieuSel">Lieu</label>
+      <select id="ssEditLieuSel"></select>
+    </div>
+    <div class="ss-field" id="ssEditLieuLibreWrap" style="display:none;">
+      <label for="ssEditLieu">Lieu (texte libre)</label>
+      <input type="text" id="ssEditLieu" placeholder="ex. Stade adverse, Sélestat">
+    </div>
+    <div class="ss-field">
+      <label for="ssEditNotes">Notes</label>
+      <textarea id="ssEditNotes" rows="2"></textarea>
+    </div>
+    <div class="ss-modal-act">
+      <button class="ss-btn ss-btn-ghost" id="ssEditCancel" type="button">Annuler</button>
+      <button class="ss-btn" id="ssEditSave" type="button">Enregistrer</button>
     </div>
   </div>
 </div>
@@ -1070,6 +1165,14 @@
     main.innerHTML =
       '<p class="ss-row-when">' + fmtWhen(o) + '</p>' +
       '<p class="ss-row-meta">' + (meta.join(' · ') || '—') + '</p>';
+    // SEANCE-EDITION-LIBELLE-FORFAITS : le libellé PRIME visuellement quand présent
+    // (ligne en tête). Injection en textContent — jamais innerHTML sur du texte libre.
+    if (o.libelle) {
+      const lib = document.createElement('p');
+      lib.className = 'ss-row-libelle';
+      lib.textContent = o.libelle;
+      main.insertBefore(lib, main.firstChild);
+    }
 
     const act = document.createElement('div');
     act.className = 'ss-row-act';
@@ -1106,6 +1209,21 @@
       // Réactiver : admin, sur annulee → repasse en prevue (anti-fausse-manip).
       if (o.etat === 'annulee') {
         out.push(mkBtn('Réactiver', 'ss-btn ss-btn-sm ss-btn-ghost', function () { askReactiver(o); }));
+      }
+      // SEANCE-EDITION-LIBELLE-FORFAITS : édition unitaire (admin seul). A2 :
+      // verrouillée sur validee (le compteur ne lit que validee — dévalider
+      // d'abord) et annulee (réactiver d'abord) — bouton désactivé + title.
+      if (o.etat === 'prevue' || o.etat === 'realisee') {
+        const eb = mkBtn('✎', 'ss-btn ss-btn-sm ss-btn-ghost', function () { openEditSeance(o); });
+        eb.title = 'Éditer la séance';
+        out.push(eb);
+      } else {
+        const eb = mkBtn('✎', 'ss-btn ss-btn-sm ss-btn-ghost', function () {});
+        eb.disabled = true;
+        eb.title = (o.etat === 'validee')
+          ? 'Dévalider d’abord pour éditer'
+          : 'Réactiver d’abord pour éditer';
+        out.push(eb);
       }
     }
     return out;
@@ -1224,6 +1342,8 @@
     $('ssPonctLieu').value = '';
     applyPonctLieuUI();
     $('ssPonctNotes').value = '';
+    // SEANCE-EDITION-LIBELLE-FORFAITS : libellé remis à zéro à chaque ouverture.
+    $('ssPonctLibelle').value = '';
     $('ssPonctEtatWrap').hidden = !peutEcrire;   // sélecteur d'état : admin seul
     // Défaut admin = 'prevue' (décision déléguée tracée : l'usage dominant de la
     // modale est la planification ; le salarié reste forcé 'realisee' côté serveur).
@@ -1265,6 +1385,16 @@
     const etat = peutEcrire ? ($('ssPonctEtat').value || 'prevue') : 'realisee';
     $('ssPonctHeuresWrap').style.display = (etat === 'prevue') ? 'none' : '';
   }
+  // SEANCE-EDITION-LIBELLE-FORFAITS : pré-remplissage des heures depuis la durée,
+  // EXTRAIT en fonction nommée pour être appelé aussi par les forfaits (assigner
+  // .value par programme ne déclenche PAS le listener input — recette pt 140).
+  // Ne remplit que si le champ heures est vide (même sémantique que la saisie).
+  function ponctPrefillHeures() {
+    const d = $('ssPonctDuree').value;
+    if (d !== '' && d != null && $('ssPonctHeures').value === '') {
+      $('ssPonctHeures').value = Math.round((Number(d) / 60) * 100) / 100;
+    }
+  }
 
   async function savePonctuelle(fermerApres) {
     const missionId = $('ssPonctMission').value;
@@ -1300,7 +1430,9 @@
         p_refacturable: null,
         p_heures_reelles: heures,
         p_notes: $('ssPonctNotes').value.trim() || null,
-        p_etat: etat
+        p_etat: etat,
+        // SEANCE-EDITION-LIBELLE-FORFAITS : intitulé optionnel (sql_145).
+        p_libelle: $('ssPonctLibelle').value.trim() || null
       });
       ponctSessionCount += 1;
       ponctSessionDirty = true;
@@ -1328,6 +1460,9 @@
         // heure/durée/lieu pré-remplis de la séance précédente (point de départ).
         $('ssPonctDate').value = '';
         $('ssPonctHeures').value = '';
+        // SEANCE-EDITION-LIBELLE-FORFAITS : libellé vidé (spécifique à chaque
+        // séance, contrairement aux notes conservées — décision déléguée tracée).
+        $('ssPonctLibelle').value = '';
         $('ssPonctDate').focus();
       }
     } catch (e) {
@@ -1408,7 +1543,10 @@
         p_refacturable: o.refacturable != null ? o.refacturable : null,
         p_etat: nouvelEtat,
         p_heures_reelles: o.heures_reelles != null ? o.heures_reelles : null,
-        p_notes: o.notes != null ? o.notes : null
+        p_notes: o.notes != null ? o.notes : null,
+        // SEANCE-EDITION-LIBELLE-FORFAITS : repassé à l'identique (RPC 12 params
+        // sql_145 — tout champ omis serait écrasé à null).
+        p_libelle: o.libelle != null ? o.libelle : null
       });
       flash(nouvelEtat === 'annulee' ? 'Séance annulée.' : 'Séance réactivée.', 'ok');
       closeConfirm();
@@ -1417,6 +1555,99 @@
       flash('Action impossible : ' + errMsg(e), 'err');
     } finally {
       $('ssConfirmOk').disabled = false;
+    }
+  }
+
+  // ============================================================
+  // ÉDITION UNITAIRE D'UNE SÉANCE (admin) — SEANCE-EDITION-LIBELLE-FORFAITS
+  // ============================================================
+  // Chantier B élargi (FAIT FOI figé 02/07/2026). États éditables : prevue|realisee
+  // (A2 : validee/annulee verrouillées dans buildActions). L'état N'EST PAS modifié
+  // ici (p_etat renvoyé à l'identique) ; refacturable en pass-through sans UI.
+  // CONTRAT : upsert_mission_seance écrase TOUT (pas de COALESCE) -> la ligne
+  // complète est renvoyée, pré-chargée depuis l'occurrence en mémoire (SETOF
+  // mission_seances, sonde 02/07 : libelle remonte automatiquement).
+  let editSeanceCourante = null;
+  // Pioche des lieux : même source et même patron que fillPonctLieuSelect
+  // (duplication assumée, zéro mutualisation risquée sur l'existant).
+  function fillEditLieuSelect() {
+    const sel = $('ssEditLieuSel');
+    sel.innerHTML = '<option value="">— aucun —</option>';
+    sites.forEach(function (s) {
+      const o = document.createElement('option');
+      o.value = s.id; o.textContent = s.libelle || s.nom || s.id;
+      sel.appendChild(o);
+    });
+    const libre = document.createElement('option');
+    libre.value = '__libre__'; libre.textContent = '— lieu libre (texte) —';
+    sel.appendChild(libre);
+  }
+  function applyEditLieuUI() {
+    $('ssEditLieuLibreWrap').style.display = ($('ssEditLieuSel').value === '__libre__') ? '' : 'none';
+  }
+  function openEditSeance(o) {
+    editSeanceCourante = o;
+    $('ssEditCtx').textContent =
+      ((o._mission && o._mission.libelle) ? o._mission.libelle + ' · ' : '')
+      + fmtWhen(o) + ' · ' + (ETAT_LABEL[o.etat] || o.etat);
+    $('ssEditLibelle').value = o.libelle || '';
+    $('ssEditDate').value = String(o.date_seance).slice(0, 10);
+    $('ssEditHeure').value = o.heure_debut ? String(o.heure_debut).slice(0, 5) : '';
+    $('ssEditDuree').value = o.duree_min != null ? o.duree_min : '';
+    $('ssEditHeures').value = o.heures_reelles != null ? o.heures_reelles : '';
+    // Même règle que la ponctuelle : pas de réel sur une séance prevue.
+    $('ssEditHeuresWrap').style.display = (o.etat === 'prevue') ? 'none' : '';
+    fillEditLieuSelect();
+    if (o.lieu_id) $('ssEditLieuSel').value = o.lieu_id;
+    else if (o.lieu_libre) $('ssEditLieuSel').value = '__libre__';
+    else $('ssEditLieuSel').value = '';
+    $('ssEditLieu').value = o.lieu_libre || '';
+    applyEditLieuUI();
+    $('ssEditNotes').value = o.notes || '';
+    $('ssEditOverlay').classList.add('open');
+  }
+  function closeEditSeance() {
+    $('ssEditOverlay').classList.remove('open');
+    editSeanceCourante = null;
+  }
+  async function saveEditSeance() {
+    const o = editSeanceCourante;
+    if (!o) return;
+    const date = $('ssEditDate').value || null;
+    if (!date) return flash('La date est obligatoire.', 'err');
+    const dureeRaw = $('ssEditDuree').value;
+    const duree = (dureeRaw === '' || dureeRaw == null) ? null : Number(dureeRaw);
+    // Heures réelles : ignorées sur une séance prevue (champ masqué).
+    const heuresRaw = (o.etat === 'prevue') ? '' : $('ssEditHeures').value;
+    const heures = (heuresRaw === '' || heuresRaw == null) ? null : Number(heuresRaw);
+    const lieuSel = $('ssEditLieuSel').value;
+    const lieuId = (lieuSel && lieuSel !== '__libre__') ? lieuSel : null;
+    const lieuLibre = (lieuSel === '__libre__') ? ($('ssEditLieu').value.trim() || null) : null;
+    $('ssEditSave').disabled = true;
+    try {
+      await rpc('upsert_mission_seance', {
+        p_id: o.id,
+        p_mission_id: o.mission_id || (o._mission && o._mission.id),
+        p_date_seance: date,
+        p_heure_debut: $('ssEditHeure').value || null,
+        p_duree_min: duree,
+        p_lieu_id: lieuId,
+        p_lieu_libre: lieuLibre,
+        // Pass-through : le statut de mission pilote refacturable (chantier D).
+        p_refacturable: o.refacturable != null ? o.refacturable : null,
+        // La modale n'est PAS un outil de transition d'état.
+        p_etat: o.etat,
+        p_heures_reelles: heures,
+        p_notes: $('ssEditNotes').value.trim() || null,
+        p_libelle: $('ssEditLibelle').value.trim() || null
+      });
+      flash('Séance modifiée.', 'ok');
+      closeEditSeance();
+      await refreshAll();
+    } catch (e) {
+      flash('Modification impossible : ' + errMsg(e), 'err');
+    } finally {
+      $('ssEditSave').disabled = false;
     }
   }
 
@@ -2206,12 +2437,22 @@
     $('ssPonctLieuSel').addEventListener('change', applyPonctLieuUI);
     $('ssPonctOverlay').addEventListener('click', function (e) { if (e.target === $('ssPonctOverlay')) closePonctuelle(); });
     // Auto-remplissage des heures depuis la durée saisie (confort, ajustable).
-    $('ssPonctDuree').addEventListener('input', function () {
-      const d = $('ssPonctDuree').value;
-      if (d !== '' && d != null && $('ssPonctHeures').value === '') {
-        $('ssPonctHeures').value = Math.round((Number(d) / 60) * 100) / 100;
+    // SEANCE-EDITION-LIBELLE-FORFAITS : logique extraite dans ponctPrefillHeures()
+    // (appelée aussi par les forfaits) — comportement inchangé au clavier.
+    $('ssPonctDuree').addEventListener('input', ponctPrefillHeures);
+    // Forfaits ponctuelle : durée assignée + appel EXPLICITE du pré-remplissage.
+    $('ssPonctForfaits').addEventListener('click', function (e) {
+      const b = e.target.closest('.ss-forfait');
+      if (b && b.dataset.min) {
+        $('ssPonctDuree').value = b.dataset.min;
+        ponctPrefillHeures();
       }
     });
+    // SEANCE-EDITION-LIBELLE-FORFAITS : modale d'édition unitaire.
+    $('ssEditCancel').addEventListener('click', closeEditSeance);
+    $('ssEditSave').addEventListener('click', saveEditSeance);
+    $('ssEditLieuSel').addEventListener('change', applyEditLieuUI);
+    $('ssEditOverlay').addEventListener('click', function (e) { if (e.target === $('ssEditOverlay')) closeEditSeance(); });
     // Confirmation (annuler / réactiver)
     $('ssConfirmCancel').addEventListener('click', closeConfirm);
     $('ssConfirmOk').addEventListener('click', function () { if (confirmAction) confirmAction(); });
