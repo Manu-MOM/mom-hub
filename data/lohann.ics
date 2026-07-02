@@ -23,17 +23,6 @@ RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU
 END:STANDARD
 END:VTIMEZONE
 BEGIN:VEVENT
-UID:51407068-c188-419d-9296-8f2ec4373e85@mom-hub
-DTSTAMP:20260702T081905Z
-DTSTART;VALUE=DATE:20260702
-DTEND;VALUE=DATE:20260703
-SUMMARY:Suivi Chpt Seniors Masculins - J1 - Ext
-DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
- io/mom-hub/suivi-salarie.html
-LOCATION:DRUSUS HARPASTUM RUGBY
-STATUS:TENTATIVE
-END:VEVENT
-BEGIN:VEVENT
 UID:c569aa68-89ef-47fb-b24f-cf313dab03a5@mom-hub
 DTSTAMP:20260702T072017Z
 DTSTART;TZID=Europe/Paris:20260805T190000
@@ -156,7 +145,7 @@ STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
 UID:397c0de7-264e-42e5-b4e9-01165f58bac0@mom-hub
-DTSTAMP:20260702T052253Z
+DTSTAMP:20260702T153934Z
 DTSTART;TZID=Europe/Paris:20260908T150000
 DTEND;TZID=Europe/Paris:20260908T170000
 SUMMARY:Entraînement section 6èmes et 5èmes
@@ -254,13 +243,14 @@ LOCATION:Stade René Brencklé
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
-UID:daa30877-2e65-4170-8191-be30667c5080@mom-hub
-DTSTAMP:20260702T075301Z
+UID:8c5b14cf-e006-4a4e-a5ca-fbe9f0e925eb@mom-hub
+DTSTAMP:20260702T152527Z
 DTSTART;VALUE=DATE:20260920
 DTEND;VALUE=DATE:20260921
-SUMMARY:Suivi Chpt Seniors Masculins - J1 - Ext
+SUMMARY:Suivi Chpt Seniors Masculins
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
+LOCATION:Drusenheim
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
@@ -316,6 +306,17 @@ SUMMARY:Entraînements des Seniors Masculins
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 LOCATION:Stade René Brencklé
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:47821bce-4063-4c43-8900-bfe41f2e358f@mom-hub
+DTSTAMP:20260702T152628Z
+DTSTART;VALUE=DATE:20260927
+DTEND;VALUE=DATE:20260928
+SUMMARY:Suivi Chpt Seniors Masculins
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+LOCATION:Sarreguemines
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
@@ -429,6 +430,17 @@ LOCATION:Stade René Brencklé
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
+UID:bed08c13-64b0-4119-ab55-e2e3076980fd@mom-hub
+DTSTAMP:20260702T152720Z
+DTSTART;VALUE=DATE:20261011
+DTEND;VALUE=DATE:20261012
+SUMMARY:Suivi Chpt Seniors Masculins
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+LOCATION:Stade René Brencklé
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
 UID:0c6eafa8-99de-4cb2-8363-4c4ed9e07e79@mom-hub
 DTSTAMP:20260702T051304Z
 DTSTART;TZID=Europe/Paris:20261012T150000
@@ -484,6 +496,17 @@ LOCATION:Stade René Brencklé
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
+UID:967b21aa-6500-435e-ab33-1468cbf7240f@mom-hub
+DTSTAMP:20260702T152804Z
+DTSTART;VALUE=DATE:20261018
+DTEND;VALUE=DATE:20261019
+SUMMARY:Suivi Chpt Seniors Masculins
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+LOCATION:Stade René Brencklé
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
 UID:5275e40b-f4a8-4adc-9ee2-07794fb10c9b@mom-hub
 DTSTAMP:20260702T072017Z
 DTSTART;TZID=Europe/Paris:20261021T190000
@@ -522,6 +545,17 @@ DTSTAMP:20260702T072017Z
 DTSTART;TZID=Europe/Paris:20261030T190000
 DTEND;TZID=Europe/Paris:20261030T210000
 SUMMARY:Entraînements des Seniors Masculins
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+LOCATION:Stade René Brencklé
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:c854c915-1d07-40b3-b12c-c22b67913fe0@mom-hub
+DTSTAMP:20260702T152851Z
+DTSTART;VALUE=DATE:20261101
+DTEND;VALUE=DATE:20261102
+SUMMARY:Suivi Chpt Seniors Masculins
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 LOCATION:Stade René Brencklé
@@ -583,6 +617,17 @@ LOCATION:Stade René Brencklé
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
+UID:dd5a49cd-5ddf-4ad6-a37b-2aaefc45803f@mom-hub
+DTSTAMP:20260702T153005Z
+DTSTART;VALUE=DATE:20261108
+DTEND;VALUE=DATE:20261109
+SUMMARY:Suivi Chpt Seniors Masculins
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+LOCATION:Sélestat
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
 UID:2e296a0a-9f65-4840-8541-7497df362d43@mom-hub
 DTSTAMP:20260702T051304Z
 DTSTART;TZID=Europe/Paris:20261109T150000
@@ -632,6 +677,17 @@ DTSTAMP:20260702T072017Z
 DTSTART;TZID=Europe/Paris:20261113T190000
 DTEND;TZID=Europe/Paris:20261113T210000
 SUMMARY:Entraînements des Seniors Masculins
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+LOCATION:Stade René Brencklé
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:1d083ea5-74be-45f8-acf9-213800f50814@mom-hub
+DTSTAMP:20260702T153053Z
+DTSTART;VALUE=DATE:20261115
+DTEND;VALUE=DATE:20261116
+SUMMARY:Suivi Chpt Seniors Masculins
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 LOCATION:Stade René Brencklé
@@ -748,6 +804,17 @@ LOCATION:Stade René Brencklé
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
+UID:69067aee-64f8-43ca-98b3-65129f779623@mom-hub
+DTSTAMP:20260702T153134Z
+DTSTART;VALUE=DATE:20261129
+DTEND;VALUE=DATE:20261130
+SUMMARY:Suivi Chpt Seniors Masculins
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+LOCATION:Stade René Brencklé
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
 UID:f7d27ca3-4cb7-4ff8-b0c9-b8ff1460c84b@mom-hub
 DTSTAMP:20260702T051304Z
 DTSTART;TZID=Europe/Paris:20261130T150000
@@ -797,6 +864,17 @@ DTSTAMP:20260702T072017Z
 DTSTART;TZID=Europe/Paris:20261204T190000
 DTEND;TZID=Europe/Paris:20261204T210000
 SUMMARY:Entraînements des Seniors Masculins
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+LOCATION:Stade René Brencklé
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:5f51d071-2250-451a-816c-ccbcf51f2f7b@mom-hub
+DTSTAMP:20260702T153218Z
+DTSTART;VALUE=DATE:20261206
+DTEND;VALUE=DATE:20261207
+SUMMARY:Suivi Chpt Seniors Masculins
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 LOCATION:Stade René Brencklé
@@ -968,6 +1046,17 @@ LOCATION:Stade René Brencklé
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
+UID:40ee8734-4b3d-4c55-a158-d44a62a7cd5c@mom-hub
+DTSTAMP:20260702T153331Z
+DTSTART;VALUE=DATE:20270110
+DTEND;VALUE=DATE:20270111
+SUMMARY:Suivi Chpt Seniors Masculins
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+LOCATION:Lauterbourg
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
 UID:eb771832-7b2e-4221-a8d4-2340ce31c866@mom-hub
 DTSTAMP:20260702T051304Z
 DTSTART;TZID=Europe/Paris:20270111T150000
@@ -1017,6 +1106,17 @@ DTSTAMP:20260702T072017Z
 DTSTART;TZID=Europe/Paris:20270115T190000
 DTEND;TZID=Europe/Paris:20270115T210000
 SUMMARY:Entraînements des Seniors Masculins
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+LOCATION:Stade René Brencklé
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:e30a5708-cf5f-4c54-b3c6-edfb90362b0a@mom-hub
+DTSTAMP:20260702T153411Z
+DTSTART;VALUE=DATE:20270117
+DTEND;VALUE=DATE:20270118
+SUMMARY:Suivi Chpt Seniors Masculins
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 LOCATION:Stade René Brencklé
@@ -1133,6 +1233,17 @@ LOCATION:Stade René Brencklé
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
+UID:68706345-25ae-4c9b-9a33-2260fa407e6b@mom-hub
+DTSTAMP:20260702T153457Z
+DTSTART;VALUE=DATE:20270131
+DTEND;VALUE=DATE:20270201
+SUMMARY:Suivi Chpt Seniors Masculins
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+LOCATION:Saverne
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
 UID:3653209f-ebea-4d90-89be-2d8b272c4b8c@mom-hub
 DTSTAMP:20260702T051304Z
 DTSTART;TZID=Europe/Paris:20270201T150000
@@ -1243,6 +1354,17 @@ LOCATION:Stade René Brencklé
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
+UID:361e562f-8114-4662-b498-99839b288243@mom-hub
+DTSTAMP:20260702T153538Z
+DTSTART;VALUE=DATE:20270214
+DTEND;VALUE=DATE:20270215
+SUMMARY:Suivi Chpt Seniors Masculins
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+LOCATION:Stade René Brencklé
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
 UID:4afe4917-2eb1-419a-9950-8284bf83c503@mom-hub
 DTSTAMP:20260702T051304Z
 DTSTART;TZID=Europe/Paris:20270215T150000
@@ -1339,6 +1461,17 @@ SUMMARY:Entraînements des Seniors Masculins
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 LOCATION:Stade René Brencklé
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:632590c1-55b3-41c9-bd77-2cb9cb3b8e06@mom-hub
+DTSTAMP:20260702T153730Z
+DTSTART;VALUE=DATE:20270307
+DTEND;VALUE=DATE:20270308
+SUMMARY:Suivi Chpt Seniors Masculins
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+LOCATION:Saint-Dié
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
