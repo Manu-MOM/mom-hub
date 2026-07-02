@@ -28,6 +28,17 @@
   Compteur previsionnel (FAIT FOI 02/07/2026 md5 4f6c2662) : nouveau bloc
     gcPrev (RPC list_periodes_annualisation + list_seances_previsionnel
     sql_142) ; compteur existant renomme « effectives » ; export xlsx.
+  COMPTEURS-VENTILATION-TYPE (02/07/2026, passation §3.3, mini-FAIT FOI figé) :
+    ventilation par type_mission dans les DEUX compteurs. Prévisionnel :
+    out_type_mission remontée par la RPC v2 (sql_143, DROP+recréation — piège
+    RETURNS TABLE tracé), agrégée dans gcPrevCalcule, tableau écran « Par type
+    de mission » + feuille export « Par type ». Effectif : tableau écran
+    « Réalisé par type de mission » alimenté par rapport_heures_salarie (RPC
+    pt 125 déjà déployée, celle de l'export bilan), FILTRÉ sur la période
+    d'annualisation courante pour coller au chiffre de la carte « Heures
+    réalisées » (jamais deux vérités). Libellés = référentiel des 10 types
+    de suivi-salarie.html (repli = jeton brut), « (hors mission) » si NULL.
+    Tri par heures décroissantes (pilotage). Zéro SQL côté effectif.
 -->
 <link rel="stylesheet" href="css/hub.css">
 <style>
@@ -390,6 +401,14 @@
       <button type="button" id="gcExportXlsx" class="gc-export-btn">Exporter le bilan d'heures (.xlsx)</button>
     </div>
     <div class="gc-cards" id="gcCards"></div>
+    <!-- VENTILATION-TYPE (02/07/2026) : réalisé par type, période courante,
+         alimenté par rapport_heures_salarie (même source que l'export bilan). -->
+    <h3 class="gc-prev-h3">Réalisé par type de mission</h3>
+    <table class="gc-releve">
+      <thead><tr><th>Type de mission</th><th>Saisies</th><th>Heures réalisées</th></tr></thead>
+      <tbody id="gcTypesEff"></tbody>
+    </table>
+    <h3 class="gc-prev-h3">Relevé</h3>
     <table class="gc-releve">
       <thead><tr><th>Date</th><th>Mission</th><th>Heures</th></tr></thead>
       <tbody id="gcReleve"></tbody>
@@ -424,6 +443,12 @@
     <table class="gc-releve">
       <thead><tr><th>Mois</th><th>Séances</th><th>Heures prévues</th></tr></thead>
       <tbody id="gcPrevMois"></tbody>
+    </table>
+    <!-- VENTILATION-TYPE (02/07/2026) : agrégat par type_mission (sql_143). -->
+    <h3 class="gc-prev-h3">Par type de mission</h3>
+    <table class="gc-releve">
+      <thead><tr><th>Type de mission</th><th>Séances</th><th>Heures prévues</th></tr></thead>
+      <tbody id="gcPrevTypes"></tbody>
     </table>
   </section>
 
@@ -1200,6 +1225,33 @@
   const MOIS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin',
                    'Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
 
+  // VENTILATION-TYPE (02/07/2026) : libellés des 10 types canoniques
+  // (CHECK missions.type_mission, sql_114), REPRIS À L'IDENTIQUE du
+  // référentiel TYPES de suivi-salarie.html. Repli = jeton brut.
+  const GC_TYPE_LBL = {
+    intervention_scolaire:  'Intervention scolaire',
+    entrainement_section:   'Entraînement section',
+    entrainement_sr_m:      'Entraînement SR-M',
+    autre_entrainement_mom: 'Autre entraînement MOM',
+    reunion:                'Réunion',
+    suivi_competition:      'Suivi compétition',
+    accompagnement_terrain: 'Accompagnement terrain',
+    travail_personnel:      'Travail personnel',
+    stage:                  'Stage',
+    divers:                 'Divers'
+  };
+  function gcTypeLbl(code) {
+    if (code == null || code === '') { return '(hors mission)'; }
+    return GC_TYPE_LBL[code] || code;
+  }
+  // Agrégateur commun {clé type -> {n, h}} -> lignes triées heures décroissantes
+  // (pilotage : le plus gros poste d'abord ; décision déléguée tracée).
+  function gcTypesTriees(parType) {
+    return Object.keys(parType).map(function (k) {
+      return { code: k, n: parType[k].n, h: Math.round(parType[k].h * 100) / 100 };
+    }).sort(function (a, b) { return b.h - a.h || gcTypeLbl(a.code).localeCompare(gcTypeLbl(b.code)); });
+  }
+
   let gcContrat = null;     // contrat resolu pour le salarie selectionne
   let gcSynth   = null;     // ligne v_compteur_annualisation courante (pour l'export)
 
@@ -1236,10 +1288,10 @@
   async function chargerCompteurDetail(personneId) {
     gcContrat = null; gcSynth = null;
     try {
-      if (!personneId) { renderGcCards(null); renderGcReleve([]); return; }
+      if (!personneId) { renderGcCards(null); renderGcReleve([]); renderGcTypesEff(null); return; }
       const contrats = (await rpc('list_contrats_salaries', { p_inclure_inactifs: false })) || [];
       const contrat = contrats.find(function (c) { return c.personne_id === personneId; }) || null;
-      if (!contrat) { renderGcCards(null); renderGcReleve([]); return; }
+      if (!contrat) { renderGcCards(null); renderGcReleve([]); renderGcTypesEff(null); return; }
       gcContrat = contrat;
       const synth = (await rpc('list_compteur_annualisation', { p_contrat_id: contrat.id })) || [];
       const today = new Date().toISOString().slice(0, 10);
@@ -1247,9 +1299,53 @@
       renderGcCards(gcSynth);
       const lignes = (await rpc('list_releve_heures', { p_contrat_id: contrat.id })) || [];
       renderGcReleve(lignes);
+      // VENTILATION-TYPE (02/07/2026) : réalisé par type, MÊME source que
+      // l'export bilan (rapport_heures_salarie, pt 125), FILTRÉ sur la période
+      // d'annualisation courante pour que le total colle à la carte « Heures
+      // réalisées » (jamais deux vérités). Échec isolé : le reste du compteur
+      // reste rendu (try dédié).
+      try {
+        const rows = (await rpc('rapport_heures_salarie', { p_contrat_id: contrat.id })) || [];
+        const deb = gcSynth ? gcSynth.date_debut : null;
+        const fin = gcSynth ? gcSynth.date_fin : null;
+        const parType = {};
+        rows.forEach(function (r) {
+          const d = r.out_date_jour;
+          if (deb != null && fin != null && (d < deb || d > fin)) { return; }
+          const k = r.out_type_mission || '';
+          if (!parType[k]) { parType[k] = { n: 0, h: 0 }; }
+          parType[k].n += 1; parType[k].h += Number(r.out_heures || 0);
+        });
+        renderGcTypesEff(gcTypesTriees(parType));
+      } catch (e2) {
+        renderGcTypesEff(null);
+      }
     } catch (e) {
-      renderGcCards(null); renderGcReleve([]);
+      renderGcCards(null); renderGcReleve([]); renderGcTypesEff(null);
     }
+  }
+
+  // VENTILATION-TYPE (02/07/2026) : tableau « Réalisé par type de mission ».
+  // rows = lignes triées de gcTypesTriees() ; null = indisponible.
+  function renderGcTypesEff(rows) {
+    const tb = $('gcTypesEff');
+    if (!tb) { return; }
+    tb.innerHTML = '';
+    const mute = '<tr><td colspan="3" style="color:var(--ink-mute,#6b7a74);">';
+    if (rows == null) {
+      tb.innerHTML = mute + 'Ventilation indisponible.</td></tr>';
+      return;
+    }
+    if (!rows.length) {
+      tb.innerHTML = mute + 'Aucune heure réalisée sur la période.</td></tr>';
+      return;
+    }
+    rows.forEach(function (t) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + escapeHtml(gcTypeLbl(t.code)) + '</td>'
+        + '<td>' + t.n + '</td><td>' + escapeHtml(fmtH(t.h)) + '</td>';
+      tb.appendChild(tr);
+    });
   }
 
   function renderGcCards(s) {
@@ -1477,7 +1573,7 @@
   //                (les realisee/validee vivent dans le releve -> zero doublon) ;
   //   semaines ISO (lundi->dimanche) et mois calendaires, arrondi 2 dec.
   function gcPrevCalcule() {
-    const semaines = {}; const mois = {};
+    const semaines = {}; const mois = {}; const parType = {};
     let prevuPur = 0; let aVenir = 0; let sansDuree = 0;
     gcPrevSeances.forEach(function (r) {
       if (r.out_duree_min == null) { sansDuree += 1; }
@@ -1490,6 +1586,12 @@
       const mk = String(r.out_date_seance).slice(0, 7);
       if (!mois[mk]) { mois[mk] = { n: 0, h: 0 }; }
       mois[mk].n += 1; mois[mk].h += h;
+      // VENTILATION-TYPE (02/07/2026) : out_type_mission remontée par la RPC
+      // v2 (sql_143). Repli '' si la v1 est encore déployée (colonne absente) :
+      // tout tombe alors en « (hors mission) », le total reste juste.
+      const tk = r.out_type_mission || '';
+      if (!parType[tk]) { parType[tk] = { n: 0, h: 0 }; }
+      parType[tk].n += 1; parType[tk].h += h;
     });
     return {
       prevuPur: gcPrevArr2(prevuPur),
@@ -1500,21 +1602,26 @@
       }),
       mois: Object.keys(mois).sort().map(function (k) {
         return { mois: k, n: mois[k].n, h: gcPrevArr2(mois[k].h) };
-      })
+      }),
+      types: gcTypesTriees(parType)
     };
   }
 
   function renderPrevisionnel() {
     const cards = $('gcPrevCards'); const tbS = $('gcPrevSemaines');
     const tbM = $('gcPrevMois'); const warn = $('gcPrevWarn');
+    const tbT = $('gcPrevTypes');
     if (!cards || !tbS || !tbM || !warn) { return; }
     cards.innerHTML = ''; tbS.innerHTML = ''; tbM.innerHTML = '';
+    if (tbT) { tbT.innerHTML = ''; }
     warn.hidden = true; warn.textContent = '';
     const vide = '<tr><td colspan="4" style="color:var(--ink-mute,#6b7a74);">';
+    const vide3 = '<tr><td colspan="3" style="color:var(--ink-mute,#6b7a74);">';
     if (!gcPrevPeriode) {
       cards.innerHTML = '<div class="gc-card"><p class="gc-card-lbl">Prévisionnel</p><p class="gc-card-val">—</p></div>';
       tbS.innerHTML = vide + 'Aucune période d\'annualisation.</td></tr>';
       tbM.innerHTML = vide + 'Aucune période d\'annualisation.</td></tr>';
+      if (tbT) { tbT.innerHTML = vide3 + 'Aucune période d\'annualisation.</td></tr>'; }
       return;
     }
     const c = gcPrevCalcule();
@@ -1569,6 +1676,19 @@
           + '<td>' + m.n + '</td><td>' + escapeHtml(fmtH(m.h)) + '</td>';
         tbM.appendChild(tr);
       });
+    }
+    // VENTILATION-TYPE (02/07/2026) : tableau « Par type de mission ».
+    if (tbT) {
+      if (!c.types.length) {
+        tbT.innerHTML = vide3 + 'Aucune séance sur la période.</td></tr>';
+      } else {
+        c.types.forEach(function (t) {
+          const tr = document.createElement('tr');
+          tr.innerHTML = '<td>' + escapeHtml(gcTypeLbl(t.code)) + '</td>'
+            + '<td>' + t.n + '</td><td>' + escapeHtml(fmtH(t.h)) + '</td>';
+          tbT.appendChild(tr);
+        });
+      }
     }
   }
 
@@ -1651,6 +1771,20 @@
       const wsM = XLSX.utils.aoa_to_sheet(aoaM);
       wsM['!cols'] = [{ wch: 18 }, { wch: 9 }, { wch: 14 }];
       XLSX.utils.book_append_sheet(wb, wsM, 'Par mois');
+
+      // VENTILATION-TYPE (02/07/2026) : 4e feuille « Par type ».
+      const aoaT = [];
+      aoaT.push(['PRÉVISIONNEL PAR TYPE DE MISSION']);
+      aoaT.push([nom + '  ·  Période ' + debut + ' → ' + fin]);
+      aoaT.push([]);
+      aoaT.push(['Type de mission', 'Séances', 'Heures prévues']);
+      c.types.forEach(function (t) {
+        aoaT.push([gcTypeLbl(t.code), t.n, t.h]);
+      });
+      if (!c.types.length) { aoaT.push(['Aucune séance sur la période.']); }
+      const wsT = XLSX.utils.aoa_to_sheet(aoaT);
+      wsT['!cols'] = [{ wch: 26 }, { wch: 9 }, { wch: 14 }];
+      XLSX.utils.book_append_sheet(wb, wsT, 'Par type');
 
       const fname = 'previsionnel-heures-' + String(nom).replace(/\s+/g, '-').toLowerCase()
         + '-' + new Date().toISOString().slice(0, 10) + '.xlsx';
