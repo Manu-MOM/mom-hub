@@ -1664,10 +1664,15 @@
     </div>
 
     <div class="user-profile">
-      <div class="avatar">EJ</div>
+      <!-- PROFIL-TOPBAR-ROLE-STATIQUE (soldée par PORTAIL-MULTI-PERIMETRE
+           Lot 3, 03/07/2026) : identité EN DUR neutralisée — le helper
+           central _remplirProfilTopbar() (supabase-client v1.54→v1.58)
+           remplit prénom, fonction et initiales pour tout connecté ; la
+           carte est masquée en auth-anon/auth-user (hub.css). -->
+      <div class="avatar">·</div>
       <div class="user-info">
-        <div class="user-name">Emmanuel Jung</div>
-        <div class="user-role">Référent M14</div>
+        <div class="user-name">…</div>
+        <div class="user-role">…</div>
       </div>
       <a href="dashboard.html" class="user-action" id="action-admin" title="Tableau de bord admin" aria-label="Tableau de bord admin">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
