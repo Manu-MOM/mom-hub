@@ -18,7 +18,16 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.72 — juillet 2026
+ * Version : 1.73 — juillet 2026
+ *   v1.73 : PORTAIL-MULTI-PERIMETRE (Lot 1, FAIT FOI gelé 03/07/2026).
+ *           1 wrapper ADDITIF monContexteStaff() → RPC sql_149
+ *           mon_contexte_staff (self-only via qui_suis_je, SECURITY
+ *           DEFINER, EXECUTE authenticated, REVOKE public+anon) :
+ *           fonction staff active + catégorie (id, code, libelle_court).
+ *           Alimente la section 02 du portail (« Mon équipe — X ») —
+ *           l'ORDER BY de la RPC est identique à ma_fonction_staff
+ *           (invariant de cohérence topbar/greeting/section). Aucune
+ *           méthode existante touchée.
  *   v1.72 : ENROLEMENT-REPARATION (option B, FAIT FOI gelé 03/07/2026).
  *           1 wrapper ADDITIF listFichesEnrolables() → RPC sql_147
  *           list_fiches_enrolables (SECURITY DEFINER, EXECUTE
@@ -6984,6 +6993,33 @@
       return (typeof data === 'string' && data) ? data : null;
     },
 
+    /**
+     * PORTAIL-MULTI-PERIMETRE (Lot 1, v1.73) — contexte staff complet de la
+     * personne connectée : fonction active + catégorie associée. Adossé à la
+     * RPC self-only mon_contexte_staff() (sql_149), dont l'ORDER BY est
+     * IDENTIQUE à ma_fonction_staff (sql_92) : la fonction élue ici est
+     * toujours celle affichée par la topbar et le greeting (invariant de
+     * cohérence — ne modifier l'une des deux RPC sans l'autre).
+     *
+     * Sert la section 02 du portail (« Mon équipe — <libelle_court> ») :
+     * l'appelant ne révèle la section que si categorie_libelle_court est
+     * non-null (fonction transverse sans catégorie → section masquée).
+     *
+     * @returns {Promise<?{fonction: string, categorie_id: ?string,
+     *   categorie_code: ?string, categorie_libelle_court: ?string}>}
+     *   null si aucune fonction active, compte non relié, hors session ou
+     *   erreur (dégradation honnête : section masquée, jamais de mensonge).
+     */
+    async monContexteStaff() {
+      const { data, error } = await client.rpc('mon_contexte_staff');
+      if (error) {
+        console.error('MOM Hub: monContexteStaff() / mon_contexte_staff', error);
+        return null;
+      }
+      const row = Array.isArray(data) ? data[0] : data;
+      return (row && row.fonction) ? row : null;
+    },
+
     // ============================================================
     // SOCLE MULTI-CATÉGORIES (v1.59) — UX-MULTI-CATEGORIES Lot 2
     // ============================================================
@@ -7379,7 +7415,7 @@
   }
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.72 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.73 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
