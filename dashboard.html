@@ -266,13 +266,15 @@
         <div class="admin-grid">
 
         <!-- Activité du salarié — QUOTIDIEN (DASHBOARD-TUILES-PAR-CAPABILITY) : écran
-           à vignettes suivi-salarie.html. Visible à l'admin ET au salarié relié
-           (data-show combiné admin+salarie). Garde de page = voie 3 (admin|bureau
-           OU salarié relié). C'est la tuile par laquelle Lohann atteint son espace.
+           à vignettes suivi-salarie.html. Visible à l'admin, au bureau ET au salarié
+           relié (data-show aligné sur la garde de page = voie 3 : admin|bureau OU
+           salarié relié — jeton « bureau » ajouté par ACCES-DASHBOARD-BUREAU, la
+           tuile était plus étroite que sa garde). C'est la tuile par laquelle Lohann
+           atteint son espace, et le bureau (suivi du salarié) le sien.
            Placée AVANT la tuile administration : usage le plus fréquent en premier
            (SALARIE-LIBELLES-ET-EDITION, chantier 1). Titre commun « Activité du
            salarié » = ancrage de groupe ; le sous-titre distingue les deux. -->
-      <a class="admin-tile" data-show="admin salarie" href="suivi-salarie.html">
+      <a class="admin-tile" data-show="admin bureau salarie" href="suivi-salarie.html">
         <div class="admin-tile-icon">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
         </div>
@@ -314,9 +316,10 @@
         <!-- Démarchage scolaire — surface EXÉCUTANT du module B (demarchage-scolaire.html).
            L'écran « une école à la fois » de Lohann : carte unique, geste « C'est fait »,
            mail-type. Garde de page = salarié OU admin|bureau (sql_132) -> mêmes jetons
-           que la tuile « Activité du salarié » : data-show="admin salarie". C'est la
-           porte par laquelle Lohann atteint son démarchage. -->
-      <a class="admin-tile" data-show="admin salarie" href="demarchage-scolaire.html">
+           que la tuile « Activité du salarié » : data-show="admin bureau salarie"
+           (jeton « bureau » ajouté par ACCES-DASHBOARD-BUREAU, alignement sur la garde
+           sql_132). C'est la porte par laquelle Lohann atteint son démarchage. -->
+      <a class="admin-tile" data-show="admin bureau salarie" href="demarchage-scolaire.html">
         <div class="admin-tile-icon">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/><path d="M10 9h.01"/><path d="M14 9h.01"/></svg>
         </div>
