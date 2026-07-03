@@ -18,6 +18,25 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 1.72 — juillet 2026
+ *   v1.72 : ENROLEMENT-REPARATION (option B, FAIT FOI gelé 03/07/2026).
+ *           1 wrapper ADDITIF listFichesEnrolables() → RPC sql_147
+ *           list_fiches_enrolables (SECURITY DEFINER, EXECUTE
+ *           authenticated, REVOKE public+anon) : pioche DÉDIÉE de la
+ *           modale d'enrôlement, limitée aux personnes ayant un rôle
+ *           en attente (roles_en_attente) et pas encore reliées
+ *           (auth_personne). Motif : la garde par rôle de
+ *           list_staff_disponibles (retrofit u-admin v2) excluait les
+ *           comptes orphelins — précisément ceux que la modale sert
+ *           (œuf-et-poule, confirmé 2× en recette terrain 03/07).
+ *           RGPD : un compte auto-inscrit sans pré-attribution voit
+ *           une liste VIDE (vs ~46 fiches staff exposées si la garde
+ *           avait été élargie). listStaffDisponibles INCHANGÉ (pioche
+ *           u-admin). Va de pair avec sql_146 (fix 42702
+ *           relier_ma_fiche) et index.html (swap d'appel de la
+ *           modale). Sortie alignée [{personne_id, nom, prenom}],
+ *           [] si erreur (dégradation honnête).
+ *           node --check OK. boot v1.71 → v1.72.
  * Version : 1.71 — juillet 2026
  *   v1.71 : RECONDUCTION-SAISON (geste unique, FAIT FOI
  *           Conception-Reconduction-Saison-v1.md, md5 2f50aabf).
@@ -6294,6 +6313,38 @@
       });
     },
 
+    /**
+     * (v1.72) Pioche de la modale d'enrôlement — voie DÉDIÉE (option B,
+     * FAIT FOI ENROLEMENT-REPARATION, gelé 03/07/2026). Ne renvoie QUE
+     * les personnes ayant un rôle en attente (roles_en_attente) et pas
+     * encore reliées (auth_personne) — c'est-à-dire celles que
+     * l'administrateur ATTEND. Remplace listStaffDisponibles() dans la
+     * modale : sa garde par rôle (retrofit u-admin) excluait les
+     * comptes orphelins, précisément ceux que la modale sert
+     * (œuf-et-poule, recette 03/07/2026). RGPD : un compte auto-inscrit
+     * sans pré-attribution voit une liste VIDE. RPC sql_147
+     * list_fiches_enrolables, SECURITY DEFINER, EXECUTE authenticated.
+     *
+     * @returns {Promise<Array>} [{personne_id, nom, prenom}] trié
+     *   nom/prenom ; [] si erreur (dégradation honnête, miroir
+     *   listStaffDisponibles).
+     */
+    async listFichesEnrolables() {
+      const { data, error } = await client.rpc('list_fiches_enrolables');
+      if (error) {
+        console.error('MOM Hub: listFichesEnrolables()', error);
+        return [];
+      }
+      if (!Array.isArray(data)) return [];
+      return data.map(function (r) {
+        return {
+          personne_id: r.personne_id,
+          nom:    r.nom || '',
+          prenom: r.prenom || ''
+        };
+      });
+    },
+
     // ============================================================
     // RAPPORTS DE MATCH — saisi (2e temps). Wrappers ADDITIFS v1.45.
     //   Backend C13-a (table rapports + RPC SECURITY DEFINER garde
@@ -7328,7 +7379,7 @@
   }
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.71 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.72 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
