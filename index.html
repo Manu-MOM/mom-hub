@@ -755,10 +755,16 @@
     </div>
 
     <div class="user-profile">
-      <div class="avatar">EJ</div>
+      <!-- PROFIL-TOPBAR-ROLE-STATIQUE (soldée ici par PORTAIL-MULTI-PERIMETRE
+           Lot 2) : l'identité EN DUR (« EJ / Emmanuel Jung / Référent M14 »)
+           est neutralisée. Le helper central _remplirProfilTopbar()
+           (supabase-client v1.54→v1.58) remplit prénom, fonction et initiales
+           pour tout connecté ; la carte est masquée en auth-anon/auth-user
+           (hub.css l.394-409). Placeholders honnêtes en attendant. -->
+      <div class="avatar">·</div>
       <div class="user-info">
-        <div class="user-name">Emmanuel Jung</div>
-        <div class="user-role">Référent M14</div>
+        <div class="user-name">…</div>
+        <div class="user-role">…</div>
       </div>
       <!-- Phase 2.5.6 — boutons admin intégrés au profil -->
       <a href="dashboard.html" class="user-action" id="action-admin" title="Tableau de bord admin" aria-label="Tableau de bord admin">
@@ -786,8 +792,13 @@
       <div class="greeting">
         <div>
           <div class="greeting-meta" id="greeting-meta">CHARGEMENT…</div>
-          <h2>Bonjour <span class="name" id="greeting-prenom">Manu</span>,</h2>
-          <div class="greeting-sub" id="greeting-sub">Référent M14 · saison 2025-2026</div>
+          <!-- PORTAIL-MULTI-PERIMETRE (Lot 2) : identité et fonction EN DUR
+               neutralisées — l'anonyme ne voit plus « Manu / Référent M14 ».
+               Connecté : setGreeting() remplit le prénom (l'espace le
+               précédant vit dans le JS) ; _remplirContexteGreeting() remplit
+               « Fonction · saison » (replis sensibles à l'état conservés). -->
+          <h2>Bonjour<span class="name" id="greeting-prenom"></span>,</h2>
+          <div class="greeting-sub" id="greeting-sub">Portail du club · saison en cours</div>
         </div>
 
         <!-- ============ KPI ============ -->
@@ -842,7 +853,7 @@
             <div class="tool-status on">Disponible</div>
           </div>
           <!-- 1.3 — Préparation de séance (DISPONIBLE) -->
-          <div class="tool" onclick="location.href='seance.html'" role="link" tabindex="0" title="Ouvrir la Préparation de séance M14">
+          <div class="tool" onclick="location.href='seance.html'" role="link" tabindex="0" title="Ouvrir la Préparation de séance">
             <div class="tool-top">
               <div class="tool-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg></div>
               <div>
@@ -866,16 +877,23 @@
         </div>
       </section>
 
-      <section class="tool-section">
+      <!-- PORTAIL-MULTI-PERIMETRE (Lot 2, option C gelée le 03/07/2026) :
+           section MASQUÉE par défaut (display:none inline, .tool-section n'a
+           pas de display CSS), révélée + titrée par _remplirSectionEquipe()
+           depuis le contexte staff réel (monContexteStaff → RPC sql_149) :
+           Manu → « Mon équipe — M16 », Arnaud → « M10 », Vanessa / anonyme /
+           sans fonction / erreur → section absente (dégradation honnête).
+           Le libellé d'équipe (« SAR×MOM ») appartient aux modules. -->
+      <section class="tool-section" id="sec-equipe" style="display:none">
         <div class="sec-head">
           <span class="sec-num">02</span>
-          <span class="sec-title">Mon équipe — M14 SAR×MOM</span>
+          <span class="sec-title" id="sec-equipe-title">Mon équipe</span>
           <span class="sec-subtitle">le quotidien du coach</span>
           <span class="sec-meta">4 outils · 4 disponibles</span>
         </div>
         <div class="tool-grid">
           <!-- 2.1 — Évènements (DISPONIBLE depuis S2.4.b livré le 15/05 après-midi) -->
-          <div class="tool" onclick="location.href='evenements.html'" role="link" tabindex="0" title="Ouvrir le module Évènements M14">
+          <div class="tool" onclick="location.href='evenements.html'" role="link" tabindex="0" title="Ouvrir le module Évènements">
             <div class="tool-top">
               <div class="tool-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="8" cy="15" r="1.5" fill="currentColor"/><circle cx="16" cy="15" r="1.5" fill="currentColor"/></svg></div>
               <div>
@@ -886,7 +904,7 @@
             <div class="tool-status on">Disponible</div>
           </div>
           <!-- 2.2 — Joueurs (DISPONIBLE depuis Phase 5.14 livrée le 15/05 soir) -->
-          <div class="tool" onclick="location.href='joueurs.html'" role="link" tabindex="0" title="Ouvrir le module Joueurs M14">
+          <div class="tool" onclick="location.href='joueurs.html'" role="link" tabindex="0" title="Ouvrir le module Joueurs">
             <div class="tool-top">
               <div class="tool-icon"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
               <div>
@@ -1113,7 +1131,7 @@
       <!-- Carte 3 : PROCHAIN ÉVÉNEMENT (Phase 4.4 - Étape C) -->
       <div class="sb-card">
         <div class="sb-card-head">
-          <span class="sb-card-title">Prochain événement M14</span>
+          <span class="sb-card-title">Prochain événement</span>
         </div>
         <div class="sb-pill" id="evt-when">…</div>
         <p class="sb-row"><span class="sb-row-lbl">Type</span> <span class="sb-row-val" id="evt-type">…</span></p>
@@ -1247,10 +1265,11 @@
 
     // ----------------------------------------------------------
     // Contexte greeting (UX-MULTI-CATEGORIES, Lot 1) — saison active
-    // + sous-titre de fonction réels, en remplacement des valeurs EN DUR
-    // « SAISON 2025 / 2026 » (pastille) et « Référent M14 · saison
-    // 2025-2026 » (greeting-sub), toutes deux figées et désormais
-    // périmées (la saison active en base est 2026-2027).
+    // + sous-titre de fonction réels. Les valeurs EN DUR historiques
+    // (« SAISON 2025 / 2026 » en pastille, « Référent M14 · saison
+    // 2025-2026 » en greeting-sub) ont été neutralisées par
+    // PORTAIL-MULTI-PERIMETRE (Lot 2) : le statique est désormais un
+    // repli générique (« Portail du club · saison en cours »).
     //
     // Sources (wrappers déjà déployés, ZÉRO SQL neuf) :
     //   - listSaisons() → {ok, data:[{libelle, code, est_active, …}]}
@@ -1347,6 +1366,40 @@
     _remplirContexteGreeting();
 
     // ==========================================================
+    // SECTION 02 « MON ÉQUIPE » (PORTAIL-MULTI-PERIMETRE, Lot 2)
+    // ==========================================================
+    // La section était M14 EN DUR (« Mon équipe — M14 SAR×MOM »),
+    // héritage du portail mono-catégorie de Manu. Elle est masquée par
+    // défaut (display:none inline) et révélée + titrée depuis le
+    // contexte staff réel : monContexteStaff() (wrapper v1.73, RPC
+    // self-only mon_contexte_staff, sql_149 — ORDER BY identique à
+    // ma_fonction_staff : la catégorie affichée est TOUJOURS celle de
+    // la fonction élue par la topbar/greeting, invariant de cohérence).
+    // Dégradation honnête : pas de session, pas de fonction, fonction
+    // sans catégorie, client < v1.73 ou erreur → la section RESTE
+    // masquée. Jamais de « M14 » mensonger. Libellé : libelle_court de
+    // catégorie (arbitrage 03/07) — libellés d'équipe aux modules.
+    async function _remplirSectionEquipe() {
+      var sec = document.getElementById('sec-equipe');
+      var titre = document.getElementById('sec-equipe-title');
+      if (!sec || !titre) return;
+      if (typeof SupabaseHub === 'undefined'
+          || typeof SupabaseHub.monContexteStaff !== 'function') {
+        return; // client < v1.73 : section masquée, pas de mensonge
+      }
+      var session = null;
+      try { session = await SupabaseHub.getSession(); } catch (e) { /* honnête */ }
+      if (!session) return;
+      var ctx = null;
+      try { ctx = await SupabaseHub.monContexteStaff(); } catch (e) { /* honnête */ }
+      if (!ctx || !ctx.categorie_libelle_court) return;
+      titre.textContent = 'Mon équipe — ' + ctx.categorie_libelle_court;
+      sec.style.display = '';
+    }
+
+    _remplirSectionEquipe();
+
+    // ==========================================================
     // ENRÔLEMENT (v1 front) — résolution d'identité + modale
     // ==========================================================
     // Faits (lus à la source, pt 84) :
@@ -1367,7 +1420,9 @@
 
     function setGreeting(prenom) {
       const el = document.getElementById('greeting-prenom');
-      if (el && prenom) el.textContent = prenom;
+      // Lot 2 : l'espace avant le prénom vit ici — le statique est
+      // « Bonjour, » sans espace orphelin pour l'anonyme. Insécable.
+      if (el && prenom) el.textContent = '\u00A0' + prenom;
     }
 
     async function resolveIdentity(isAdmin) {
@@ -1388,9 +1443,10 @@
           const prenom = await SupabaseHub.monPrenom();
           if (prenom) setGreeting(prenom);
           // ACCES-DASHBOARD-BUREAU : en état auth-staff (bureau non-admin),
-          // la carte profil est révélée mais son contenu est EN DUR
+          // la carte profil est révélée ; son contenu statique, jadis EN DUR
           // (« Emmanuel Jung · Référent M14 », dette PROFIL-TOPBAR-ROLE-
-          // STATIQUE). Correction locale à cet état uniquement : nom réel
+          // STATIQUE), est neutralisé par le Lot 2 — cette correction
+          // locale reste utile (remplissage immédiat). Nom réel
           // via monPrenom (déjà résolu ci-dessus) + libellé de rôle
           // « Bureau » (motif dashboard.html). L'affichage admin de Manu
           // reste inchangé. Dégradation honnête : prénom non résolu →
