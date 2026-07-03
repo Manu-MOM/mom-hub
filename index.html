@@ -1289,9 +1289,18 @@
       } catch (err) {
         console.warn('MOM Hub portail: listSaisons() échouée (contexte greeting)', err);
       }
-      if (libelleSaison) {
+      // COSMETIQUES-GREETING (addendum ENROLEMENT-REPARATION, 03/07) :
+      // le libellé en base contient déjà le mot (« Saison 2026/2027 ») ;
+      // les concaténations 'saison '/'SAISON ' doublonnaient (« saison
+      // Saison 2026/2027 », constat recette). Normalisation : retrait
+      // d'un préfixe « saison » éventuel, insensible à la casse —
+      // robuste aux deux formes de libellé, sans toucher la base.
+      var libelleCourt = libelleSaison
+        ? String(libelleSaison).replace(/^\s*saison\s*/i, '')
+        : null;
+      if (libelleCourt) {
         var pill = document.querySelector('.season-pill');
-        if (pill) pill.textContent = 'SAISON ' + String(libelleSaison).replace('-', ' / ').replace('/', ' / ');
+        if (pill) pill.textContent = 'SAISON ' + libelleCourt.replace('-', ' / ').replace('/', ' / ');
       }
 
       // (2) Fonction réelle → préfixe du sous-titre (greeting-sub).
@@ -1312,16 +1321,25 @@
       // Reconstruit le sous-titre : « <Fonction> · saison <libellé> ».
       // Si la fonction manque, on garde le préfixe en dur existant ;
       // si la saison manque, on garde le suffixe en dur existant.
-      if (libelleFonction || libelleSaison) {
-        var prefixe = libelleFonction || 'Encadrant';
-        var suffixe = libelleSaison ? ('saison ' + libelleSaison) : 'saison en cours';
+      // COSMETIQUES-GREETING : le repli « Encadrant » datait d'avant le
+      // persona bureau (état auth-staff, ACCES-DASHBOARD-BUREAU) — un
+      // bureau sans fonction_staff (cas Vanessa, recette 03/07) était
+      // étiqueté « Encadrant » à tort. Repli sensible à l'état.
+      // Suffixe : libellé normalisé (libelleCourt) pour éviter le
+      // doublon « saison Saison ».
+      if (libelleFonction || libelleCourt) {
+        var prefixeRepli = document.body.classList.contains('auth-staff')
+          ? 'Bureau'
+          : 'Encadrant';
+        var prefixe = libelleFonction || prefixeRepli;
+        var suffixe = libelleCourt ? ('saison ' + libelleCourt) : 'saison en cours';
         // On n'écrase que si on a au moins une vraie donnée.
-        if (libelleFonction && libelleSaison) {
+        if (libelleFonction && libelleCourt) {
           sub.textContent = prefixe + ' · ' + suffixe;
         } else if (libelleFonction) {
           sub.textContent = prefixe + ' · saison en cours';
-        } else if (libelleSaison) {
-          sub.textContent = 'Encadrant · ' + suffixe;
+        } else if (libelleCourt) {
+          sub.textContent = prefixeRepli + ' · ' + suffixe;
         }
       }
     }
