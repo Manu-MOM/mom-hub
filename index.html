@@ -680,6 +680,21 @@
   .enrol-btn-no { background: var(--paper); color: var(--ink-mute); }
   .enrol-error { margin: 10px 24px 0; color: var(--clay); font-size: 0.86rem; }
 
+  /* ------------------------------------------------------------
+   * ACCES-DASHBOARD-BUREAU — état auth-staff (bureau non-admin).
+   * La carte profil est visible par défaut (hub.css .user-profile
+   * display:flex, aucune règle ne la masque hors auth-anon/auth-user)
+   * et la pilule login masquée par défaut : seule la règle globale
+   * hub.css `body:not(.auth-admin) .user-action{display:none}` doit
+   * être surchargée ici pour révéler les boutons du profil (accès
+   * dashboard + déconnexion). Motif identique au CSS local de
+   * dashboard.html (DASHBOARD-TUILES-PAR-CAPABILITY). hub.css NON
+   * modifié (11 pages en dépendent).
+   * ------------------------------------------------------------ */
+  body.auth-staff .user-action {
+    display: inline-flex;
+  }
+
 </style>
 </head>
 <body class="fullscreen-app">
@@ -1141,14 +1156,20 @@
     const body = document.body;
     const btnSignout = document.getElementById('btn-signout');
 
-    function applyState(isAdmin, isAnon) {
-      // 3 états (pt 86) : 'admin' (rôle admin), 'user' (connecté sans
-      // rôle admin), 'anon' (aucune session). Avant l'enrôlement, seuls
-      // 'admin'/'anon' existaient ; un connecté sans rôle tombait dans
-      // 'anon' → bouton « Se connecter » affiché à tort (corrigé ici).
-      body.classList.remove('auth-admin', 'auth-user', 'auth-anon');
+    function applyState(isAdmin, isStaff, isAnon) {
+      // 4 états (pt 86, puis ACCES-DASHBOARD-BUREAU) :
+      //   'admin' (rôle admin), 'staff' (connecté bureau non-admin —
+      //   carte profil + boutons d'action révélés, cf. CSS local),
+      //   'user' (connecté sans rôle qualifiant), 'anon' (aucune session).
+      // Avant l'enrôlement, seuls 'admin'/'anon' existaient ; un connecté
+      // sans rôle tombait dans 'anon' → bouton « Se connecter » affiché
+      // à tort (corrigé pt 86). Le nommage 'auth-staff' est aligné sur
+      // l'état homonyme de dashboard.html.
+      body.classList.remove('auth-admin', 'auth-staff', 'auth-user', 'auth-anon');
       if (isAdmin) {
         body.classList.add('auth-admin');
+      } else if (isStaff) {
+        body.classList.add('auth-staff');
       } else if (isAnon) {
         body.classList.add('auth-anon');
       } else {
@@ -1161,18 +1182,28 @@
       try {
         const session = await SupabaseHub.getSession();
         if (!session) {
-          applyState(false, true);   // aucune session → anonyme
+          applyState(false, false, true);   // aucune session → anonyme
           return;
         }
-        const admin = await SupabaseHub.isAdmin();
-        applyState(admin, false);    // session active → admin ou user
+        // ACCES-DASHBOARD-BUREAU : résolution bureau en parallèle de
+        // admin (wrapper hasRole existant, aucun SQL neuf). Un bureau
+        // non-admin obtient l'état auth-staff → carte profil + bouton
+        // dashboard révélés (la porte de dashboard.html l'accepte déjà).
+        const [admin, bureau] = await Promise.all([
+          SupabaseHub.isAdmin(),
+          SupabaseHub.hasRole('bureau')
+        ]);
+        applyState(admin, bureau, false);   // admin > staff > user
         // Enrôlement (v1 front) : résout l'identité du compte connecté.
         // Si la fiche est reliée → greeting dynamique ; sinon, et si non-admin,
         // → modale d'auto-identification. L'admin n'est jamais bloqué.
+        // NB : un bureau pré-attribué non relié passe bien ici par la
+        // modale (c'est elle qui matérialise le rôle via relierMaFiche,
+        // puis reload → l'état auth-staff est résolu au rechargement).
         resolveIdentity(admin);
       } catch (err) {
         console.error('MOM Hub portail: erreur résolution auth', err);
-        applyState(false, true);    // erreur → repli anonyme (sûr)
+        applyState(false, false, true);    // erreur → repli anonyme (sûr)
       }
     }
 
@@ -1335,6 +1366,24 @@
         try {
           const prenom = await SupabaseHub.monPrenom();
           if (prenom) setGreeting(prenom);
+          // ACCES-DASHBOARD-BUREAU : en état auth-staff (bureau non-admin),
+          // la carte profil est révélée mais son contenu est EN DUR
+          // (« Emmanuel Jung · Référent M14 », dette PROFIL-TOPBAR-ROLE-
+          // STATIQUE). Correction locale à cet état uniquement : nom réel
+          // via monPrenom (déjà résolu ci-dessus) + libellé de rôle
+          // « Bureau » (motif dashboard.html). L'affichage admin de Manu
+          // reste inchangé. Dégradation honnête : prénom non résolu →
+          // seul le libellé de rôle est corrigé.
+          if (document.body.classList.contains('auth-staff')) {
+            const nameEl = document.querySelector('.user-profile .user-name');
+            const roleEl = document.querySelector('.user-profile .user-role');
+            const avatarEl = document.querySelector('.user-profile .avatar');
+            if (nameEl && prenom) nameEl.textContent = prenom;
+            if (roleEl) roleEl.textContent = 'Bureau';
+            if (avatarEl && prenom) {
+              avatarEl.textContent = prenom.charAt(0).toUpperCase();
+            }
+          }
         } catch (err) {
           console.warn('MOM Hub portail: greeting dynamique échoué', err);
         }
