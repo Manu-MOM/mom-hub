@@ -1336,8 +1336,11 @@
     //     renvoie la personne_id reliée, ou null si compte orphelin.
     //   - relier_ma_fiche(p_personne_id) → wrapper relierMaFiche() : seul
     //     écrivain de auth_personne, matérialise les rôles pré-attribués.
-    //   - listStaffDisponibles() : pioche RGPD-safe (~46 staff), EXECUTE
-    //     authenticated confirmé → peuple la liste pour un compte orphelin.
+    //   - listFichesEnrolables() (v1.72) : pioche DÉDIÉE de la modale —
+    //     personnes en attente (roles_en_attente) non reliées. Remplace
+    //     listStaffDisponibles(), dont la garde par rôle (retrofit
+    //     u-admin) excluait les comptes orphelins (œuf-et-poule,
+    //     recette 03/07/2026 — FAIT FOI ENROLEMENT-REPARATION).
     //   - get_noms_personnes() (via greeting) : prénom réel post-liaison.
     //   - Admin Manu n'a pas de pont auth_personne (déjà fonctionnel via
     //     son rôle) → jamais bloqué par la modale.
@@ -1406,9 +1409,11 @@
 
       let staff = [];
       try {
-        staff = await SupabaseHub.listStaffDisponibles();
+        // ENROLEMENT-REPARATION : voie dédiée (personnes attendues
+        // uniquement). Le nommage `staff` est conservé (portée locale).
+        staff = await SupabaseHub.listFichesEnrolables();
       } catch (err) {
-        console.error('MOM Hub portail: listStaffDisponibles() échouée', err);
+        console.error('MOM Hub portail: listFichesEnrolables() échouée', err);
       }
 
       if (!Array.isArray(staff) || staff.length === 0) {
