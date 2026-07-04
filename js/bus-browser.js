@@ -9,7 +9,9 @@
  *  - Catégorie : pioche B5 (mesCategoriesAutorisees), pas de liste en dur.
  *  - Responsable : pioche personnes (D2), pas de texte libre.
  *  - Persistance : createDemandeBus (wrapper v1.50), pas de mémoire JS.
- *  - Validation (bureau|admin) : file des demandes pending + validerBus.
+ *  - Validation (bureau|admin) : DÉMÉNAGÉE au poste tri-source
+ *    logistique-validation.html (REFONTE-PARCOURS-LOGISTIQUE, FAIT FOI
+ *    777551e9…, arbitrages 5.3/5.5) — le guichet est purifié.
  *
  * Mapping JSONB (aligné schéma SQL §4.4) :
  *   arrets_aller  [{lieu, heure, nb_mom}]
@@ -29,21 +31,11 @@
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
-  const MOIS = ['janvier','février','mars','avril','mai','juin','juillet',
-                'août','septembre','octobre','novembre','décembre'];
-  function formatDateLong(iso) {
-    if (!iso) return '';
-    const d = new Date(iso + 'T00:00:00');
-    if (isNaN(d.getTime())) return '';
-    return d.getDate() + ' ' + MOIS[d.getMonth()] + ' ' + d.getFullYear();
-  }
-
   // ============================================================
   // État
   // ============================================================
   const state = {
     isTransverse: false,
-    canValidate: false,
     categories: [],
     arretsAller:  [{ lieu: '', heure: '', nb_mom: '' }],
     arretsRetour: [{ lieu: '', heure: '' }],
@@ -57,12 +49,8 @@
     const session = await SupabaseHub.getSession();
     if (!session) { window.location.replace('login.html'); return; }
 
-    const roles = await SupabaseHub.getMyRoles();
-    state.canValidate = roles.indexOf('bureau') !== -1 || roles.indexOf('admin') !== -1;
-
     document.body.classList.remove('auth-pending');
     document.body.classList.add('auth-resolved');
-    if (state.canValidate) document.body.classList.add('show-admin');
 
     const signoutBtn = el('btn-signout');
     if (signoutBtn) {
@@ -83,10 +71,8 @@
     renderArrets('retour');
     renderDelegations();
     updateTotaux();
-    if (state.canValidate) await refreshValidation();
 
-    console.log('%c🏉 Bus chargé', 'color:#2D7D46;font-weight:bold;',
-      { validation: state.canValidate });
+    console.log('%c🏉 Bus chargé', 'color:#2D7D46;font-weight:bold;');
   }
 
   // ============================================================
@@ -351,7 +337,6 @@
     if (!res.ok) { showToast('Échec : ' + (res.error || 'erreur'), false); return; }
     showToast('Demande de bus envoyée (en attente)', true);
     resetForm();
-    if (state.canValidate) await refreshValidation();
   }
 
   function resetForm() {
@@ -366,51 +351,10 @@
   }
 
   // ============================================================
-  // Validation (bureau|admin)
+  // REFONTE-PARCOURS-LOGISTIQUE (FAIT FOI 777551e9…, arbitrages 5.3/5.5) :
+  // refreshValidation() (file pending + validerBus, bureau|admin) a
+  // DÉMÉNAGÉ au poste tri-source logistique-validation.html.
   // ============================================================
-  async function refreshValidation() {
-    const host = el('bus-validation');
-    if (!host) return;
-    const pend = await SupabaseHub.listDemandesBus({ statut: 'pending' });
-    const badge = el('bus-validation-badge');
-    if (badge) badge.textContent = pend.length ? String(pend.length) : '';
-    if (!pend || pend.length === 0) {
-      host.innerHTML = '<div class="bus-empty">Aucune demande en attente.</div>';
-      return;
-    }
-    host.innerHTML = '';
-    pend.forEach(function (r) {
-      const row = document.createElement('div');
-      row.className = 'bus-valid-row';
-      row.innerHTML =
-        '<span class="bus-valid-dest">' + escapeHtml(r.destination || '—') + '</span>' +
-        '<span class="bus-valid-meta">' + escapeHtml(formatDateLong(r.date)) +
-          ' · ' + (r.total_bus || 0) + ' pax</span>';
-      const actions = document.createElement('span');
-      actions.className = 'bus-valid-actions';
-
-      const ok = document.createElement('button');
-      ok.type = 'button'; ok.className = 'bus-btn-ok'; ok.textContent = 'Approuver';
-      ok.addEventListener('click', async function () {
-        ok.disabled = true;
-        const res = await SupabaseHub.validerBus(r.id, 'approved');
-        if (res.ok) { showToast('Bus approuvé', true); await refreshValidation(); }
-        else { showToast('Échec : ' + (res.error||''), false); ok.disabled = false; }
-      });
-      const no = document.createElement('button');
-      no.type = 'button'; no.className = 'bus-btn-no'; no.textContent = 'Refuser';
-      no.addEventListener('click', async function () {
-        const motif = window.prompt('Motif du refus (facultatif) :') || null;
-        no.disabled = true;
-        const res = await SupabaseHub.validerBus(r.id, 'rejected', motif);
-        if (res.ok) { showToast('Bus refusé', true); await refreshValidation(); }
-        else { showToast('Échec : ' + (res.error||''), false); no.disabled = false; }
-      });
-      actions.appendChild(ok); actions.appendChild(no);
-      row.appendChild(actions);
-      host.appendChild(row);
-    });
-  }
 
   // ============================================================
   // Lancement
