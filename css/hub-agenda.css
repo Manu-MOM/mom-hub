@@ -72,6 +72,7 @@ body.ag-fs-lock { overflow: hidden; }
   .ag-list { display: block; }
   .ag-minitoggle { display: inline-block; }
   .ag-mini.ag-mini-collapsed .ag-minigrid, .ag-mini.ag-mini-collapsed .ag-legend { display: none; }
+} /* ← FERMETURE du @media (max-width:720px) : accolade manquante à l'origine (extraction pt 147) qui capturait la modale dans le média → .ag-overlay/.ag-modal sans position:fixed hors mobile, modale rejetée en bas de page sur desktop. Correctif : REFONTE-PARCOURS-LOGISTIQUE (dérogation Manu 04/07). */
 
 /* ---- Modale de détail du module : copies à l'identique de ss-overlay /
    ss-modal / ss-modal-act / ss-btn / ss-btn-ghost / ss-empty (suivi-salarie.html).
