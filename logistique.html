@@ -37,13 +37,6 @@
       letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft);
       margin: 0 0 12px; display: flex; align-items: center; gap: 8px;
     }
-    .logi-badge {
-      font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600;
-      background: var(--vert-prairie); color: #fff; border-radius: 10px;
-      padding: 1px 7px; min-width: 16px; text-align: center;
-    }
-    .logi-badge:empty { display: none; }
-
     /* Grille ressources */
     .logi-ressources { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
     .logi-res-card {
@@ -103,41 +96,28 @@
     }
     .logi-submit:disabled { opacity: 0.5; cursor: default; }
 
-    /* Agenda / validation / récurrents — lignes */
-    .logi-agenda-row, .logi-valid-row, .logi-recur-row {
+    /* Agenda — lignes */
+    .logi-agenda-row {
       display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
       background: #fff; border: 1px solid var(--line); border-radius: 10px;
       padding: 12px 16px; margin-bottom: 8px;
     }
-    .logi-agenda-date, .logi-valid-meta, .logi-recur-meta {
+    .logi-agenda-date {
       font-family: 'JetBrains Mono', monospace; font-size: 11px;
       letter-spacing: 0.08em; color: var(--ink-mute);
     }
-    .logi-agenda-res, .logi-valid-res, .logi-recur-res {
+    .logi-agenda-res {
       font-family: 'Oswald', sans-serif; font-size: 15px; color: var(--ink); flex: 1;
     }
     .logi-agenda-creneau { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink-soft); }
-    .logi-agenda-motif, .logi-valid-motif {
+    .logi-agenda-motif {
       font-size: 12px; color: var(--ink-mute); font-style: italic;
       flex-basis: 100%;
     }
-    .logi-valid-actions { display: flex; gap: 8px; }
-    .logi-btn-ok, .logi-btn-no, .logi-recur-toggle-btn {
-      font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 500;
-      border-radius: 6px; padding: 7px 14px; cursor: pointer; border: 1px solid var(--line);
-    }
-    .logi-btn-ok { background: var(--vert-prairie); color: #fff; border-color: var(--vert-prairie); }
-    .logi-btn-no { background: #fff; color: var(--rouge-alerte, #b23); }
-    .logi-recur-toggle-btn { background: #fff; color: var(--ink-soft); }
-    .logi-recur-row.is-suspended { opacity: 0.55; }
 
     .logi-empty {
       text-align: center; padding: 30px 20px; color: var(--ink-mute); font-size: 14px;
     }
-
-    /* Sections admin masquées tant que le rôle n'est pas bureau|admin */
-    .logi-admin-only { display: none; }
-    body.show-admin .logi-admin-only { display: block; }
 
     /* Toast */
     .logi-toast {
@@ -383,19 +363,11 @@
       <div id="logi-agenda"><div class="logi-empty">Chargement…</div></div>
     </section>
 
-    <!-- VALIDATION (bureau|admin) -->
-    <section class="logi-section logi-admin-only">
-      <h3 class="logi-section__title">
-        Validation <span id="logi-validation-badge" class="logi-badge"></span>
-      </h3>
-      <div id="logi-validation"><div class="logi-empty">—</div></div>
-    </section>
-
-    <!-- RÉCURRENTS (bureau|admin) -->
-    <section class="logi-section logi-admin-only">
-      <h3 class="logi-section__title">Règles récurrentes</h3>
-      <div id="logi-recurrents"><div class="logi-empty">—</div></div>
-    </section>
+    <!-- REFONTE-PARCOURS-LOGISTIQUE (FAIT FOI 777551e9…, arbitrage 5.5) :
+         les sections « Validation » et « Règles récurrentes » (bureau|admin)
+         ont DÉMÉNAGÉ au poste de validation tri-source
+         logistique-validation.html (tuile du dashboard). Le guichet est
+         purifié : demande + occupation seulement. -->
 
       </div><!-- /.logi-col-main -->
 
