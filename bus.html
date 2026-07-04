@@ -101,32 +101,6 @@
     }
     .bus-submit:disabled { opacity: 0.5; cursor: default; }
 
-    /* Validation admin */
-    .bus-admin-only { display: none; }
-    body.show-admin .bus-admin-only { display: block; }
-    .bus-valid-row {
-      display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-      background: #fff; border: 1px solid var(--line); border-radius: 10px;
-      padding: 12px 16px; margin-bottom: 8px;
-    }
-    .bus-valid-dest { font-family: 'Oswald', sans-serif; font-size: 15px; color: var(--ink); flex: 1; }
-    .bus-valid-meta { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-mute); }
-    .bus-valid-actions { display: flex; gap: 8px; }
-    .bus-btn-ok, .bus-btn-no {
-      font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 500;
-      border-radius: 6px; padding: 7px 14px; cursor: pointer; border: 1px solid var(--line);
-    }
-    .bus-btn-ok { background: var(--vert-prairie); color: #fff; border-color: var(--vert-prairie); }
-    .bus-btn-no { background: #fff; color: var(--rouge-alerte, #b23); }
-
-    .bus-badge {
-      font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600;
-      background: var(--vert-prairie); color: #fff; border-radius: 10px;
-      padding: 1px 7px; min-width: 16px; text-align: center;
-    }
-    .bus-badge:empty { display: none; }
-    .bus-empty { text-align: center; padding: 24px; color: var(--ink-mute); font-size: 14px; }
-
     .bus-toast {
       position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(20px);
       background: var(--ink); color: #fff; padding: 11px 20px; border-radius: 8px;
@@ -300,13 +274,10 @@
       </div>
     </div>
 
-    <!-- VALIDATION (bureau|admin) -->
-    <div class="bus-card bus-admin-only">
-      <h3 class="bus-card__title">
-        Validation <span id="bus-validation-badge" class="bus-badge"></span>
-      </h3>
-      <div id="bus-validation"><div class="bus-empty">—</div></div>
-    </div>
+    <!-- REFONTE-PARCOURS-LOGISTIQUE (FAIT FOI 777551e9…, arbitrages 5.3/5.5) :
+         la section « Validation » (bureau|admin) a DÉMÉNAGÉ au poste de
+         validation tri-source logistique-validation.html (dashboard). Le
+         guichet bus est purifié : demande seulement. -->
   </main>
 
   <div id="bus-toast" class="bus-toast"></div>
