@@ -362,13 +362,16 @@
 
       // ------------------------------------------------------------------
       // Projection fenêtrée des règles récurrentes (jumeau exact — voir
-      // logistique-agenda.html pour la justification sémantique).
+      // logistique-agenda.html pour la justification sémantique ; INVERSION
+      // DS-1 recette 04/07 : reservations_recurrentes n'a PAS de colonne
+      // date_debut, contrairement au FAIT FOI §1.1 — bornes = fenêtre +
+      // date_fin, fidèle au guichet).
       // ------------------------------------------------------------------
       function occurrencesFenetre(rule, debutISO, finISO) {
         var out = [];
         var jours = rule.jours || [];
         if (!jours.length || !rule.date_fin) return out;
-        var lo = (rule.date_debut && rule.date_debut > debutISO) ? rule.date_debut : debutISO;
+        var lo = debutISO;
         var hi = (rule.date_fin < finISO) ? rule.date_fin : finISO;
         if (lo > hi) return out;
         var cur = new Date(parseInt(lo.slice(0, 4), 10), parseInt(lo.slice(5, 7), 10) - 1, 1);
@@ -380,7 +383,6 @@
           for (var d = 1; d <= dim; d++) {
             var dt = new Date(yr, mo, d);
             var iso = isoOf(dt);
-            if (rule.date_debut && iso < rule.date_debut) continue;
             if (iso > rule.date_fin) continue;
             var dow = dt.getDay() === 0 ? 6 : dt.getDay() - 1;
             if (jours.indexOf(dow) === -1) continue;
@@ -428,7 +430,6 @@
           .from('reservations_recurrentes').select('*')
           .in('statut', ['pending', 'approved'])
           .eq('active', true)
-          .lte('date_debut', finISO)
           .gte('date_fin', debutISO);
         if (q.error) throw q.error;
         (q.data || []).forEach(function (rule) {
