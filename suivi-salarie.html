@@ -113,6 +113,9 @@
       la mesure terrain le justifie. Aujourd'hui : boucle list_mission_seances par mission (voie α).
 -->
 <link rel="stylesheet" href="css/hub.css">
+<!-- AGENDA-HUB-PATRON (pt 147) : CSS structurel du patron agenda, extrait de cette page.
+     Chargé AVANT le <style> inline (la palette .t-* de la page reste ici, FAIT FOI G3). -->
+<link rel="stylesheet" href="css/hub-agenda.css">
 <style>
   body.auth-pending { visibility: hidden; }
   .ss-wrap { max-width: 980px; margin: 0 auto; padding: 24px 24px 48px; }
@@ -321,39 +324,11 @@
   /* Garde-fou : tout SVG non explicitement dimensionné reste petit (évite le chevron géant). */
   .hub-back-row .hub-back-btn svg { width: 16px; height: 16px; flex: 0 0 auto; }
   .ss-wrap svg, .ss-typehead svg { max-width: 22px; max-height: 22px; }
-  /* ===== SUIVI-AGENDA-TOUS-TYPES (section ag*) — FAIT FOI v1 §4 + ADDENDUM 1 =====
-     MAQUETTE-v2 non fournie a la session de production : grille horaire + palette 10
-     types (Q3) reconstruites d'apres la spec textuelle ; ecarts visuels mineurs traces (R2). */
-  .ag-root { margin: 26px 0 0; padding: 18px 0 0; border-top: 1px solid var(--line, #cabe9f); }
-  .ag-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0 0 14px; }
-  .ag-head h2 { font-size: 16px; margin: 0; color: var(--ink, #0c3d24); }
-  .ag-head-ctrls { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-  .ag-chk { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-mute, #6b7a74); cursor: pointer; }
-  .ag-chk input { width: auto; }
-  .ag-fsbtn { background: transparent; border: 1px solid var(--line, #cabe9f); border-radius: 8px; cursor: pointer; padding: 6px 12px; font: inherit; font-size: 13px; color: var(--ink, #0c3d24); }
-  .ag-layout { display: grid; grid-template-columns: 1fr 232px; gap: 16px; align-items: start; }
-  .ag-main { min-width: 0; }
-  .ag-weeknav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 10px; }
-  .ag-weeknav button { background: transparent; border: 1px solid var(--line, #cabe9f); border-radius: 8px; cursor: pointer; padding: 6px 10px; font: inherit; color: var(--ink, #0c3d24); }
-  .ag-weeklabel { font-size: 13px; font-weight: 600; color: var(--ink, #0c3d24); }
-  .ag-week { border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 12px; overflow: hidden; background: #fff; }
-  .ag-weekhd, .ag-weekbody { display: grid; grid-template-columns: 46px repeat(7, 1fr); }
-  .ag-weekhd { border-bottom: 1px solid var(--paper-warm, #e3e0d8); }
-  .ag-weekhd .ag-hcell { padding: 6px 2px; text-align: center; font-size: 11px; font-weight: 600; color: var(--ink-mute, #6b7a74); border-left: 1px solid var(--paper-warm, #e3e0d8); }
-  .ag-weekhd .ag-hcell.ag-axis { border-left: 0; }
-  .ag-weekhd .ag-hcell.today { color: var(--vert-prairie, #2d7a3e); }
-  .ag-axiscol { position: relative; }
-  .ag-axiscol .ag-hourlbl { position: absolute; right: 4px; font-size: 10px; color: var(--ink-mute, #6b7a74); transform: translateY(-50%); }
-  .ag-daycol { position: relative; border-left: 1px solid var(--paper-warm, #e3e0d8); }
-  .ag-hourline { position: absolute; left: 0; right: 0; border-top: 1px solid #f0ede4; pointer-events: none; }
-  .ag-untimed { position: relative; z-index: 2; display: flex; flex-direction: column; gap: 2px; padding: 2px; }
-  .ag-ev { position: absolute; left: 0; overflow: hidden; border-radius: 5px; border-left: 3px solid #888; background: #eef; color: #234; padding: 2px 4px; font-size: 10px; line-height: 1.15; cursor: pointer; box-sizing: border-box; }
-  .ag-ev .ag-ev-t { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .ag-ev .ag-ev-l { overflow: hidden; text-overflow: ellipsis; }
-  .ag-chip { border-radius: 5px; border-left: 3px solid #888; background: #eef; color: #234; padding: 3px 8px; font-size: 12px; cursor: pointer; }
-  .ag-chip .ag-ev-t { font-weight: 700; display: inline; }
-  .ag-chip .ag-ev-l { display: inline; }
-  .ag-ev.annulee, .ag-chip.annulee { text-decoration: line-through; opacity: .6; }
+  /* ===== SUIVI-AGENDA-TOUS-TYPES — PALETTE par type (métier, reste en page) =====
+     AGENDA-HUB-PATRON (pt 147) : le CSS STRUCTUREL ag-* a été extrait vers
+     css/hub-agenda.css (module partagé, correctifs recette 04/07 inclus).
+     Cette palette suit la convention du module : .ag-ev.t-X / .ag-chip.t-X /
+     .ag-sw.t-X — chaque page consommatrice fournit la sienne (FAIT FOI G3). */
   .ag-ev.t-intervention_scolaire, .ag-chip.t-intervention_scolaire { background: #eaf1fa; color: #1f4a6b; border-left-color: #2f6fb0; }
   .ag-sw.t-intervention_scolaire { background: #2f6fb0; }
   .ag-ev.t-entrainement_section, .ag-chip.t-entrainement_section { background: #e7f3ec; color: #1f5a32; border-left-color: #2d7a3e; }
@@ -374,36 +349,6 @@
   .ag-sw.t-stage { background: #b03a6e; }
   .ag-ev.t-divers, .ag-chip.t-divers { background: #eef0ef; color: #42504a; border-left-color: #6b7a74; }
   .ag-sw.t-divers { background: #6b7a74; }
-  .ag-mini { border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 12px; padding: 10px 12px; background: #fff; }
-  .ag-mininav { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: 0 0 8px; }
-  .ag-mininav .ag-minilabel { font-size: 13px; font-weight: 600; color: var(--ink, #0c3d24); flex: 1; text-align: center; }
-  .ag-mininav button { background: transparent; border: 1px solid var(--line, #cabe9f); border-radius: 6px; cursor: pointer; padding: 3px 8px; font: inherit; color: var(--ink, #0c3d24); }
-  .ag-minigrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
-  .ag-minidow { font-size: 10px; text-align: center; color: var(--ink-mute, #6b7a74); padding: 2px 0; }
-  .ag-miniday { position: relative; text-align: center; font: inherit; font-size: 11px; padding: 5px 0; border: 0; border-radius: 6px; cursor: pointer; color: var(--ink, #0c3d24); background: transparent; }
-  .ag-miniday.oth { color: #b9c2bd; }
-  .ag-miniday.selweek { background: var(--paper, #f8f5ec); }
-  .ag-miniday.today { outline: 1px solid var(--vert-prairie, #2d7a3e); }
-  .ag-miniday .ag-dot { position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 50%; background: var(--vert-prairie, #2d7a3e); }
-  .ag-minitoggle { display: none; }
-  .ag-legend { display: flex; flex-wrap: wrap; gap: 6px 10px; margin: 12px 0 0; }
-  .ag-legend .ag-lg { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--ink-mute, #6b7a74); }
-  .ag-legend .ag-sw { width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto; } /* correctif recette 04/07 : background #888 retiré (même spécificité que .ag-sw.t-* mais plus tardif, il écrasait les 10 couleurs) */
-  .ag-list { display: none; }
-  .ag-list .ag-lday { margin: 0 0 12px; }
-  .ag-list .ag-lday h4 { margin: 0 0 6px; font-size: 12px; font-weight: 700; color: var(--ink-mute, #6b7a74); }
-  .ag-list .ag-chip { display: block; margin: 0 0 4px; }
-  .ag-root.ag-fs { position: fixed; inset: 0; z-index: 50; /* correctif recette 04/07 : sous .ss-overlay (60) pour que les modales détail/édition restent visibles en plein écran */ margin: 0; padding: 16px 20px 40px; background: #fff; overflow-y: auto; border-top: 0; }
-  body.ag-fs-lock { overflow: hidden; }
-  .ag-det-row { margin: 0 0 10px; font-size: 14px; color: var(--ink, #0c3d24); }
-  .ag-det-row .ag-det-lbl { display: block; font-size: 12px; color: var(--ink-mute, #6b7a74); margin: 0 0 2px; }
-  @media (max-width: 720px) {
-    .ag-layout { grid-template-columns: 1fr; }
-    .ag-mini { order: -1; }
-    .ag-week { display: none; }
-    .ag-list { display: block; }
-    .ag-minitoggle { display: inline-block; }
-    .ag-mini.ag-mini-collapsed .ag-minigrid, .ag-mini.ag-mini-collapsed .ag-legend { display: none; }
   }
 </style>
 </head>
@@ -520,40 +465,10 @@
   </section>
   <!-- ============ AGENDA TOUS TYPES (SUIVI-AGENDA-TOUS-TYPES) ============
        Toujours visible sous la grille des vignettes, au-dessus du compteur (Q2 :
-       pas d'onglet, pas d'etat de navigation). IDs prefixes ag* (aucune collision ss*). -->
-  <section class="ag-root" id="agRoot">
-    <div class="ag-head">
-      <h2>Agenda — toutes les séances</h2>
-      <div class="ag-head-ctrls">
-        <label class="ag-chk"><input type="checkbox" id="agShowAnnulees"> afficher les annulées</label>
-        <button type="button" class="ag-fsbtn" id="agFsBtn">⛶ Plein écran</button>
-      </div>
-    </div>
-    <div class="ag-layout">
-      <div class="ag-main">
-        <div class="ag-weeknav">
-          <button type="button" id="agWeekPrev">‹ Semaine préc.</button>
-          <span class="ag-weeklabel" id="agWeekLabel">—</span>
-          <button type="button" id="agWeekNext">Semaine suiv. ›</button>
-        </div>
-        <div class="ag-week" id="agWeek">
-          <div class="ag-weekhd" id="agWeekHd"></div>
-          <div class="ag-weekbody" id="agWeekBody"></div>
-        </div>
-        <div class="ag-list" id="agList"></div>
-      </div>
-      <aside class="ag-mini" id="agMini">
-        <div class="ag-mininav">
-          <button type="button" id="agMiniPrev" aria-label="Mois précédent">‹</button>
-          <span class="ag-minilabel" id="agMiniLabel">—</span>
-          <button type="button" id="agMiniNext" aria-label="Mois suivant">›</button>
-          <button type="button" class="ag-fsbtn ag-minitoggle" id="agMiniToggle">Replier</button>
-        </div>
-        <div class="ag-minigrid" id="agMiniGrid"></div>
-        <div class="ag-legend" id="agLegend"></div>
-      </aside>
-    </div>
-  </section>
+       pas d'onglet, pas d'etat de navigation). AGENDA-HUB-PATRON (pt 147) : le
+       squelette est désormais GÉNÉRÉ par js/hub-agenda.js dans ce container
+       (HubAgenda.create y ajoute la classe ag-root — DOM final inchangé). -->
+  <section id="agRoot"></section>
 
   <!-- ============ COMPTEUR (salarié) ============ -->
   <section class="ss-compteur" id="ssCompteur" hidden>
@@ -922,30 +837,16 @@
       <button class="ss-btn ss-btn-ghost" id="ssMisCancel" type="button">Annuler</button>
       <button class="ss-btn" id="ssMisSave" type="button">Enregistrer</button>
     </div>
-  </div>
-</div>
-
-<!-- ============ MODALE DÉTAIL SÉANCE (agenda, ag*) ============
-     Q4 : clic séance -> détail (type—mission, date·horaire·durée, lieu, état).
-     Admin/bureau : bouton « Modifier » (A2 : désactivé si validée/annulée) qui
-     recharge la ligne complète (list_mission_seances) et ouvre ssEditOverlay.
-     Voie 3 (salarié) : consultation seule, bouton masqué. -->
-<div class="ss-overlay" id="agDetailOverlay">
-  <div class="ss-modal" style="max-width:460px;">
-    <h3 id="agDetTitre">Séance</h3>
-    <div class="ag-det-row"><span class="ag-det-lbl">Type — mission</span><span id="agDetType">—</span></div>
-    <div class="ag-det-row"><span class="ag-det-lbl">Date · horaire · durée</span><span id="agDetWhen">—</span></div>
-    <div class="ag-det-row"><span class="ag-det-lbl">Lieu</span><span id="agDetLieu">—</span></div>
-    <div class="ag-det-row"><span class="ag-det-lbl">État</span><span id="agDetEtat">—</span></div>
-    <div class="ss-modal-act">
-      <button class="ss-btn ss-btn-ghost" id="agDetCancel" type="button">Fermer</button>
-      <button class="ss-btn" id="agDetEdit" type="button" hidden>Modifier</button>
-    </div>
-  </div>
-</div>
+<!-- ============ MODALE DÉTAIL SÉANCE (agenda) ============
+     AGENDA-HUB-PATRON (pt 147) : générée par js/hub-agenda.js (classes ag-overlay/
+     ag-modal, z-index 60 conservé au-dessus du plein écran) ; contenu et action
+     « Modifier » (garde peutEcrire + verrou A2, flux pt 141) injectés par
+     l'adaptateur de cette page — voir section JS SUIVI-AGENDA-TOUS-TYPES. -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="js/supabase-client.js"></script>
+<!-- AGENDA-HUB-PATRON (pt 147) : module partagé du patron agenda (HubAgenda). -->
+<script src="js/hub-agenda.js"></script>
 <script src="js/season-pill.js"></script>
 <!-- EXPORT-BILAN-HEURES (pt 124+) : SheetJS pour generer le .xlsx du bilan d'heures cote navigateur. -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -1791,400 +1692,106 @@
   }
 
   // ============================================================
-  // SUIVI-AGENDA-TOUS-TYPES (section ag*) — FAIT FOI v1 §4 + ADDENDUM 1.
-  // Agenda TOUS TYPES CONFONDUS, patron Google Agenda : grille horaire (semaine)
-  // + mini-mois navigateur. UN appel agenda_seances_salarie par fenetre affichee
-  // (union [semaine ∪ grille mini-mois]) ; re-fetch sur navigation. Le rendu reutilise
-  // les patrons de la page : rpc(), salarieId/peutEcrire (garde deja calculee),
-  // parseDate/isoDate/mondayOf (anti-UTC + lundi ISO, deja presents — non dupliques),
-  // openEditSeance (flux existant pt 141). MAQUETTE-v2 non fournie a la session :
-  // grille + palette --t-* reconstruites d'apres Q1/Q3, ecarts visuels mineurs traces (R2).
   // ============================================================
-  var agState = {
-    weekStart: null,     // Date (lundi ISO) de la semaine affichee
-    monthAnchor: null,   // 1er du mois affiche dans le mini-mois
-    showAnnulees: false, // Q5 : annulees masquees par defaut
-    rows: [],            // cache de la fenetre courante
-    fullscreen: false,
-    inited: false
-  };
-  var AG_PXMIN = 0.7;    // px par minute (grille horaire)
-  var AG_MINH = 22;      // hauteur mini d'un evenement (lisibilite)
+  // SUIVI-AGENDA-TOUS-TYPES — branché sur le MODULE PARTAGÉ js/hub-agenda.js
+  // (AGENDA-HUB-PATRON, pt 147). Le patron (grille horaire, mini-mois, plein
+  // écran, légende, modale de détail, repli mobile) vit dans HubAgenda ; cette
+  // page ne fournit que l'ADAPTATEUR :
+  //   - fetchWindow : UN appel agenda_seances_salarie par fenetre affichee
+  //     (union [semaine ∪ grille mini-mois]) via rpc(), mapping out_* -> item ;
+  //   - la palette .t-* (CSS de page) et l'ordre de légende (TYPES + DIVERS) ;
+  //   - la garde peutEcrire + verrou A2 et le CHEMIN D'ÉDITION pt 141 inchangé :
+  //     recharge la ligne COMPLETE via list_mission_seances(out_mission_id),
+  //     retrouve la seance par out_seance_id, puis ouvre la modale ssEditOverlay
+  //     EXISTANTE par son flux normal. L'agenda ne fabrique JAMAIS l'objet
+  //     d'edition depuis sa projection.
+  // ============================================================
+  var agenda = null;   // instance HubAgenda (créée au câblage, init au boot)
 
-  function agAddDays(d, n) { var x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() + n); return x; }
-  function agSameYMD(a, b) { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
-  function agTypeLabel(code) { var t = TYPE_BY_CODE[code]; return t ? t.lib : (code || '—'); }
-  function agDureeLabel(min) {
-    if (min == null) return '';
-    if (min < 60) return min + ' min';
-    var h = Math.floor(min / 60), r = min % 60;
-    return r === 0 ? (h + ' h') : (h + ' h ' + (r < 10 ? '0' + r : r));
-  }
-  function agEtatMark(etat) { return etat === 'validee' ? '✓✓' : (etat === 'realisee' ? '✓' : ''); }
+  function agTypeLib(code) { var t = TYPE_BY_CODE[code]; return t ? t.lib : (code || '—'); }
 
-  // Rows filtrees (Q5 : annulees masquees sauf case cochee).
-  function agFilteredRows() {
-    if (agState.showAnnulees) return agState.rows.slice();
-    return agState.rows.filter(function (o) { return o.out_etat !== 'annulee'; });
-  }
-
-  // Libelle de puce : « heure · duree » + libelle (seance sinon mission). Q3.
-  function agChipText(o) {
-    var bits = [];
-    if (o.out_heure_debut) bits.push(String(o.out_heure_debut).slice(0, 5));
-    var dl = agDureeLabel(o.out_duree_min);
-    if (dl) bits.push(dl);
-    var head = bits.join(' · ');
-    var lib = o.out_libelle || o.out_mission_libelle || agTypeLabel(o.out_type_mission);
-    return { head: head, lib: lib };
+  // Mapping RPC -> modèle d'item neutre du module (meta = ligne brute, source
+  // de vérité pour le détail et l'édition).
+  function agMapRow(o) {
+    return {
+      id: o.out_seance_id,
+      date: String(o.out_date_seance).slice(0, 10),
+      heure: o.out_heure_debut ? String(o.out_heure_debut).slice(0, 5) : null,
+      duree_min: o.out_duree_min,
+      type: o.out_type_mission,
+      libelle: o.out_libelle || o.out_mission_libelle || null,
+      etat: o.out_etat,
+      meta: o
+    };
   }
 
-  // Un evenement de grille (positionne en absolu) OU une puce empilee (liste/untimed).
-  function agBuildEvent(o, positioned) {
-    var el = document.createElement('div');
-    el.className = (positioned ? 'ag-ev ' : 'ag-chip ') + 't-' + o.out_type_mission + ' ' + o.out_etat;
-    var t = agChipText(o);
-    var mark = agEtatMark(o.out_etat);
-    var pt = document.createElement('div');
-    pt.className = 'ag-ev-t';
-    pt.textContent = (t.head ? t.head + ' ' : '') + (mark ? mark + ' ' : '');
-    var pl = document.createElement('div');
-    pl.className = 'ag-ev-l';
-    pl.textContent = t.lib;                 // texte libre -> textContent (jamais innerHTML)
-    el.appendChild(pt);
-    el.appendChild(pl);
-    el.addEventListener('click', function () { agOpenDetail(o); });
-    return el;
-  }
-
-  // ---- Grille horaire (semaine) ----
-  function agRenderWeek() {
-    var hd = $('agWeekHd'); var body = $('agWeekBody');
-    hd.innerHTML = ''; body.innerHTML = '';
-    var rows = agFilteredRows();
-    var wk = agState.weekStart;
-    var days = [];
-    for (var i = 0; i < 7; i++) { var d = agAddDays(wk, i); days.push({ d: d, iso: isoDate(d), timed: [], untimed: [] }); }
-    var byIso = {};
-    days.forEach(function (dd) { byIso[dd.iso] = dd; });
-    rows.forEach(function (o) {
-      var dd = byIso[String(o.out_date_seance).slice(0, 10)];
-      if (!dd) return;
-      if (o.out_heure_debut) dd.timed.push(o); else dd.untimed.push(o);
-    });
-
-    // Plage horaire dynamique : min heure -1 -> max fin +1 ; repli 08-19 si vide.
-    var minH = 24, maxH = 0, has = false;
-    days.forEach(function (dd) {
-      dd.timed.forEach(function (o) {
-        has = true;
-        var sh = parseInt(String(o.out_heure_debut).slice(0, 2), 10);
-        var sm = parseInt(String(o.out_heure_debut).slice(3, 5), 10);
-        var start = sh * 60 + sm;
-        var dur = (o.out_duree_min != null ? o.out_duree_min : 60);
-        minH = Math.min(minH, Math.floor(start / 60));
-        maxH = Math.max(maxH, Math.ceil((start + dur) / 60));
-      });
-    });
-    if (!has) { minH = 8; maxH = 19; } else { minH = Math.max(0, minH - 1); maxH = Math.min(24, maxH + 1); }
-    var rangeMin = (maxH - minH) * 60;
-    var bodyH = rangeMin * AG_PXMIN;
-    var todayIso = isoDate(new Date());
-
-    // En-tete : cellule d'axe vide + 7 jours.
-    var axisHd = document.createElement('div'); axisHd.className = 'ag-hcell ag-axis'; axisHd.textContent = '';
-    hd.appendChild(axisHd);
-    days.forEach(function (dd, idx) {
-      var c = document.createElement('div');
-      c.className = 'ag-hcell' + (dd.iso === todayIso ? ' today' : '');
-      c.textContent = JOURS[idx] + ' ' + dd.d.getDate();
-      hd.appendChild(c);
-    });
-
-    // Corps : colonne d'axe (labels heures) + 7 colonnes-jour.
-    var axis = document.createElement('div');
-    axis.className = 'ag-axiscol'; axis.style.height = bodyH + 'px';
-    for (var h = minH; h <= maxH; h++) {
-      var lbl = document.createElement('div');
-      lbl.className = 'ag-hourlbl';
-      lbl.style.top = ((h - minH) * 60 * AG_PXMIN) + 'px';
-      lbl.textContent = (h < 10 ? '0' + h : h) + 'h';
-      axis.appendChild(lbl);
-    }
-    body.appendChild(axis);
-
-    days.forEach(function (dd) {
-      var col = document.createElement('div');
-      col.className = 'ag-daycol'; col.style.height = bodyH + 'px';
-      // Lignes horaires.
-      for (var h2 = minH; h2 <= maxH; h2++) {
-        var line = document.createElement('div');
-        line.className = 'ag-hourline';
-        line.style.top = ((h2 - minH) * 60 * AG_PXMIN) + 'px';
-        col.appendChild(line);
-      }
-      // Seances sans heure : bandeau en tete de colonne.
-      if (dd.untimed.length) {
-        var ut = document.createElement('div');
-        ut.className = 'ag-untimed';
-        dd.untimed.forEach(function (o) { ut.appendChild(agBuildEvent(o, false)); });
-        col.appendChild(ut);
-      }
-      // Seances horodatees : positionnees + partage de largeur (chevauchements).
-      agLayoutTimed(dd.timed).forEach(function (it) {
-        var o = it.o;
-        var sh = parseInt(String(o.out_heure_debut).slice(0, 2), 10);
-        var sm = parseInt(String(o.out_heure_debut).slice(3, 5), 10);
-        var start = sh * 60 + sm;
-        var dur = (o.out_duree_min != null ? o.out_duree_min : 60);
-        var top = (start - minH * 60) * AG_PXMIN;
-        var hgt = Math.max(dur * AG_PXMIN, AG_MINH);
-        var ev = agBuildEvent(o, true);
-        ev.style.top = top + 'px';
-        ev.style.height = hgt + 'px';
-        ev.style.left = (it.lane / it.lanes * 100) + '%';
-        ev.style.width = (1 / it.lanes * 100) + '%';
-        col.appendChild(ev);
-      });
-      body.appendChild(col);
-    });
-  }
-
-  // Partage de largeur : algorithme glouton par grappe de chevauchement.
-  function agLayoutTimed(list) {
-    var evs = list.map(function (o) {
-      var sh = parseInt(String(o.out_heure_debut).slice(0, 2), 10);
-      var sm = parseInt(String(o.out_heure_debut).slice(3, 5), 10);
-      var start = sh * 60 + sm;
-      var dur = (o.out_duree_min != null ? o.out_duree_min : 60);
-      return { o: o, start: start, end: start + dur, lane: 0, lanes: 1 };
-    });
-    evs.sort(function (a, b) { return a.start - b.start || a.end - b.end; });
-    var out = [];
-    var batch = [];
-    var lanesEnd = [];        // fin courante de chaque lane du batch
-    function flush() {
-      var n = lanesEnd.length || 1;
-      batch.forEach(function (e) { e.lanes = n; out.push(e); });
-      batch = []; lanesEnd = [];
-    }
-    evs.forEach(function (e) {
-      if (batch.length && e.start >= Math.max.apply(null, lanesEnd)) flush();
-      var placed = false;
-      for (var i = 0; i < lanesEnd.length; i++) {
-        if (e.start >= lanesEnd[i]) { e.lane = i; lanesEnd[i] = e.end; placed = true; break; }
-      }
-      if (!placed) { e.lane = lanesEnd.length; lanesEnd.push(e.end); }
-      batch.push(e);
-    });
-    flush();
-    return out;
-  }
-
-  // ---- Liste empilee (mobile, Q6 : jours vides masques) ----
-  function agRenderList() {
-    var host = $('agList'); host.innerHTML = '';
-    var rows = agFilteredRows();
-    var wk = agState.weekStart;
-    for (var i = 0; i < 7; i++) {
-      var d = agAddDays(wk, i); var iso = isoDate(d);
-      var dayRows = rows.filter(function (o) { return String(o.out_date_seance).slice(0, 10) === iso; });
-      dayRows.sort(function (a, b) { return String(a.out_heure_debut || '').localeCompare(String(b.out_heure_debut || '')); });
-      if (!dayRows.length) continue;                 // jour vide masque
-      var blk = document.createElement('div'); blk.className = 'ag-lday';
-      var h4 = document.createElement('h4');
-      h4.textContent = JOURS[i] + ' ' + d.getDate() + ' ' + MOIS[d.getMonth()];
-      blk.appendChild(h4);
-      dayRows.forEach(function (o) { blk.appendChild(agBuildEvent(o, false)); });
-      host.appendChild(blk);
-    }
-    if (!host.children.length) {
-      var e = document.createElement('div'); e.className = 'ss-empty'; e.textContent = 'Aucune séance cette semaine.';
-      host.appendChild(e);
-    }
-  }
-
-  // ---- Mini-mois navigateur ----
-  function agRenderMini() {
-    var lbl = $('agMiniLabel'); var grid = $('agMiniGrid');
-    var anchor = agState.monthAnchor;
-    lbl.textContent = MOIS[anchor.getMonth()] + ' ' + anchor.getFullYear();
-    grid.innerHTML = '';
-    var dows = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
-    dows.forEach(function (x) { var c = document.createElement('div'); c.className = 'ag-minidow'; c.textContent = x; grid.appendChild(c); });
-
-    // Jours a pastille (fenetre courante, filtrage Q5).
-    var withSeance = {};
-    agFilteredRows().forEach(function (o) { withSeance[String(o.out_date_seance).slice(0, 10)] = true; });
-
-    var first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
-    var gridStart = mondayOf(first);
-    var selMon = agState.weekStart ? isoDate(agState.weekStart) : null;
-    var todayIso = isoDate(new Date());
-    for (var k = 0; k < 42; k++) {
-      var d = agAddDays(gridStart, k);
-      var iso = isoDate(d);
-      var cell = document.createElement('button');
-      cell.type = 'button';
-      cell.className = 'ag-miniday'
-        + (d.getMonth() !== anchor.getMonth() ? ' oth' : '')
-        + (selMon && isoDate(mondayOf(d)) === selMon ? ' selweek' : '')
-        + (iso === todayIso ? ' today' : '');
-      cell.textContent = String(d.getDate());
-      if (withSeance[iso]) { var dot = document.createElement('span'); dot.className = 'ag-dot'; cell.appendChild(dot); }
-      (function (dd) {
-        cell.addEventListener('click', function () {
-          agState.weekStart = mondayOf(dd);
-          agFetchAndRender().catch(function (e) { flash('Agenda : ' + errMsg(e), 'err'); });
-        });
-      })(d);
-      grid.appendChild(cell);
-    }
-  }
-
-  // ---- Legende (10 types) ----
-  function agRenderLegend() {
-    var host = $('agLegend'); if (!host || host.dataset.done === '1') return;
-    TYPES.concat([TYPE_DIVERS]).forEach(function (t) {
-      var lg = document.createElement('span'); lg.className = 'ag-lg';
-      var sw = document.createElement('span'); sw.className = 'ag-sw t-' + t.code;
-      lg.appendChild(sw);
-      var tx = document.createElement('span'); tx.textContent = t.lib;
-      lg.appendChild(tx);
-      host.appendChild(lg);
-    });
-    host.dataset.done = '1';
-  }
-
-  // ---- Fenetre + fetch (UN appel par fenetre : union semaine ∪ grille mini-mois) ----
-  function agWindow() {
-    var wkStart = agState.weekStart, wkEnd = agAddDays(wkStart, 6);
-    var mFirst = new Date(agState.monthAnchor.getFullYear(), agState.monthAnchor.getMonth(), 1);
-    var mStart = mondayOf(mFirst), mEnd = agAddDays(mStart, 41);
-    var debut = (wkStart < mStart) ? wkStart : mStart;
-    var fin = (wkEnd > mEnd) ? wkEnd : mEnd;
-    return { debut: debut, fin: fin };
-  }
-  function agRenderAll() { agRenderWeek(); agRenderList(); agRenderMini(); agRenderLegend(); agUpdateWeekLabel(); }
-  function agUpdateWeekLabel() {
-    var s = agState.weekStart, e = agAddDays(s, 6);
-    $('agWeekLabel').textContent = s.getDate() + ' ' + MOIS[s.getMonth()] + ' – ' + e.getDate() + ' ' + MOIS[e.getMonth()];
-  }
-  async function agFetchAndRender() {
-    var w = agWindow();
-    var data = await rpc('agenda_seances_salarie', {
-      p_salarie_id: salarieId,
-      p_date_debut: isoDate(w.debut),
-      p_date_fin: isoDate(w.fin)
-    });
-    agState.rows = data || [];
-    agRenderAll();
-  }
-
-  // ---- Modale de detail (Q4) ----
-  var agDetailCourant = null;
-  function agOpenDetail(o) {
-    agDetailCourant = o;
-    var d = parseDate(o.out_date_seance);
+  // Lignes de la modale de détail (Q4) — contenu identique à l'avant-factorisation.
+  function agDetailRows(it) {
+    var o = it.meta;
+    var d = parseDate(it.date);
     var when = JOURS[(d.getDay() + 6) % 7] + ' ' + d.getDate() + ' ' + MOIS[d.getMonth()]
-      + (o.out_heure_debut ? ' · ' + String(o.out_heure_debut).slice(0, 5) : '')
-      + (o.out_duree_min != null ? ' · ' + agDureeLabel(o.out_duree_min) : '');
-    $('agDetTitre').textContent = o.out_libelle || o.out_mission_libelle || agTypeLabel(o.out_type_mission);
-    $('agDetType').textContent = agTypeLabel(o.out_type_mission)
-      + (o.out_mission_libelle ? ' — ' + o.out_mission_libelle : '');
-    $('agDetWhen').textContent = when;
-    $('agDetLieu').textContent = o.out_lieu || '—';
-    $('agDetEtat').textContent = ETAT_LABEL[o.out_etat] || o.out_etat;
-    // Bouton « Modifier » : admin|bureau seulement (peutEcrire) ; A2 : desactive si
-    // validee/annulee. Voie 3 (salarie) : aucun bouton (consultation seule).
-    var btn = $('agDetEdit');
-    if (peutEcrire) {
-      btn.hidden = false;
-      var editable = (o.out_etat === 'prevue' || o.out_etat === 'realisee');
-      btn.disabled = !editable;
-      btn.title = editable ? 'Éditer la séance'
-        : (o.out_etat === 'validee' ? 'Dévalider d’abord pour éditer' : 'Réactiver d’abord pour éditer');
-    } else {
-      btn.hidden = true;
-    }
-    $('agDetailOverlay').classList.add('open');
+      + (it.heure ? ' · ' + it.heure : '')
+      + (it.duree_min != null ? ' · ' + HubAgenda.dureeLabel(it.duree_min) : '');
+    return [
+      { lbl: 'Type — mission', val: agTypeLib(it.type) + (o.out_mission_libelle ? ' — ' + o.out_mission_libelle : '') },
+      { lbl: 'Date · horaire · durée', val: when },
+      { lbl: 'Lieu', val: o.out_lieu || '—' },
+      { lbl: 'État', val: ETAT_LABEL[it.etat] || it.etat }
+    ];
   }
-  function agCloseDetail() { $('agDetailOverlay').classList.remove('open'); agDetailCourant = null; }
 
-  // Chemin d'edition (critique, FAIT FOI §4) : recharge la ligne COMPLETE via
-  // list_mission_seances(out_mission_id), retrouve la seance par out_seance_id, puis
-  // ouvre la modale ssEditOverlay EXISTANTE par son flux normal (pt 141). L'agenda ne
-  // fabrique JAMAIS l'objet d'edition depuis sa projection.
-  async function agModifier() {
-    var o = agDetailCourant;
-    if (!o || !peutEcrire) return;
-    if (o.out_etat === 'validee' || o.out_etat === 'annulee') return; // A2 (bouton deja desactive)
+  // Bouton « Modifier » : admin|bureau seulement (peutEcrire) ; A2 : desactive si
+  // validee/annulee. Voie 3 (salarie) : aucun bouton (consultation seule).
+  function agAction(it) {
+    if (!peutEcrire) return null;
+    var editable = (it.etat === 'prevue' || it.etat === 'realisee');
+    return {
+      label: 'Modifier',
+      disabled: !editable,
+      title: editable ? 'Éditer la séance'
+        : (it.etat === 'validee' ? 'Dévalider d’abord pour éditer' : 'Réactiver d’abord pour éditer'),
+      onClick: agModifier
+    };
+  }
+
+  // Chemin d'edition (critique, FAIT FOI pt 145 §4) : flux pt 141 INCHANGÉ.
+  async function agModifier(it, closeDetail) {
+    if (!it || !peutEcrire) return;
+    if (it.etat === 'validee' || it.etat === 'annulee') return; // A2 (bouton deja desactive)
+    var o = it.meta;
     try {
       var full = (await rpc('list_mission_seances', { p_mission_id: o.out_mission_id })) || [];
       var ligne = full.filter(function (r) { return r.id === o.out_seance_id; })[0];
       if (!ligne) { flash('Séance introuvable au rechargement.', 'err'); return; }
       ligne._mission = missions.filter(function (m) { return m.id === ligne.mission_id; })[0]
         || { id: ligne.mission_id, libelle: o.out_mission_libelle };
-      agCloseDetail();
+      closeDetail();
       openEditSeance(ligne);   // flux existant ; refreshAll (donc re-rendu agenda) au save
     } catch (e) {
       flash('Ouverture de l’édition impossible : ' + errMsg(e), 'err');
     }
   }
 
-  // ---- Plein ecran (Q2 : classe CSS + verrou scroll + Echap ; pas d'API Fullscreen) ----
-  function agSetFullscreen(on) {
-    agState.fullscreen = !!on;
-    $('agRoot').classList.toggle('ag-fs', agState.fullscreen);
-    document.body.classList.toggle('ag-fs-lock', agState.fullscreen);
-    $('agFsBtn').textContent = agState.fullscreen ? '⛶ Quitter' : '⛶ Plein écran';
-    if (agState.fullscreen) { agRenderWeek(); }  // relayout a la nouvelle largeur
-  }
-
-  // ---- Cablage + init ----
-  function agWireEvents() {
-    $('agWeekPrev').addEventListener('click', function () {
-      agState.weekStart = agAddDays(agState.weekStart, -7);
-      agFetchAndRender().catch(function (e) { flash('Agenda : ' + errMsg(e), 'err'); });
-    });
-    $('agWeekNext').addEventListener('click', function () {
-      agState.weekStart = agAddDays(agState.weekStart, 7);
-      agFetchAndRender().catch(function (e) { flash('Agenda : ' + errMsg(e), 'err'); });
-    });
-    $('agMiniPrev').addEventListener('click', function () {
-      agState.monthAnchor = new Date(agState.monthAnchor.getFullYear(), agState.monthAnchor.getMonth() - 1, 1);
-      agFetchAndRender().catch(function (e) { flash('Agenda : ' + errMsg(e), 'err'); });
-    });
-    $('agMiniNext').addEventListener('click', function () {
-      agState.monthAnchor = new Date(agState.monthAnchor.getFullYear(), agState.monthAnchor.getMonth() + 1, 1);
-      agFetchAndRender().catch(function (e) { flash('Agenda : ' + errMsg(e), 'err'); });
-    });
-    $('agShowAnnulees').addEventListener('change', function () {
-      agState.showAnnulees = $('agShowAnnulees').checked;
-      agRenderAll();
-    });
-    $('agFsBtn').addEventListener('click', function () { agSetFullscreen(!agState.fullscreen); });
-    $('agMiniToggle').addEventListener('click', function () { $('agMini').classList.toggle('ag-mini-collapsed'); });
-    $('agDetCancel').addEventListener('click', agCloseDetail);
-    $('agDetEdit').addEventListener('click', agModifier);
-    $('agDetailOverlay').addEventListener('click', function (e) { if (e.target === $('agDetailOverlay')) agCloseDetail(); });
-    // Echap : ferme la modale de detail, sinon sort du plein ecran (Q2/Q4). Additif :
-    // les modales existantes ne consomment pas Echap, aucun conflit.
-    document.addEventListener('keydown', function (e) {
-      if (e.key !== 'Escape') return;
-      if ($('agDetailOverlay').classList.contains('open')) { agCloseDetail(); return; }
-      if (agState.fullscreen) { agSetFullscreen(false); }
+  function agCreate() {
+    agenda = HubAgenda.create($('agRoot'), {
+      titre: 'Agenda — toutes les séances',
+      libelleVide: 'Aucune séance cette semaine.',
+      fetchWindow: async function (debutISO, finISO) {
+        var data = await rpc('agenda_seances_salarie', {
+          p_salarie_id: salarieId,
+          p_date_debut: debutISO,
+          p_date_fin: finISO
+        });
+        return (data || []).map(agMapRow);
+      },
+      types: TYPES.concat([TYPE_DIVERS]).map(function (t) { return { code: t.code, lib: t.lib }; }),
+      detail: { titre: function (it) { return it.libelle || agTypeLib(it.type); }, rows: agDetailRows, action: agAction },
+      capacites: { pleinEcran: true, caseAnnulees: true },
+      estAnnulee: function (it) { return it.etat === 'annulee'; },
+      etatMark: function (it) { return it.etat === 'validee' ? '✓✓' : (it.etat === 'realisee' ? '✓' : ''); },
+      onError: function (e) { flash('Agenda : ' + errMsg(e), 'err'); }
     });
   }
-  async function agInit() {
-    agState.weekStart = mondayOf(new Date());
-    var t = new Date();
-    agState.monthAnchor = new Date(t.getFullYear(), t.getMonth(), 1);
-    agState.showAnnulees = false;
-    agState.inited = true;
-    await agFetchAndRender();
-  }
-
   async function refreshAll() {
     // SUIVI-SEANCES-ETAT-AFFICHAGE (D2) : le vidage de #ssList raccourcit le
     // document -> le navigateur clampe le scroll en tête de liste. On capture la
@@ -2196,7 +1803,7 @@
     await chargerOccurrences();
     renderGrid();
     if (currentType) { if (currentView === 'liste') renderListe(); else renderAgenda(); }
-    if (agState.inited) { try { await agFetchAndRender(); } catch (e) { /* agenda best-effort */ } }
+    if (agenda) { try { await agenda.refresh(); } catch (e) { /* agenda best-effort ; no-op tant que init() n'a pas tourné */ } }
     window.scrollTo(0, scrollAvant);
   }
 
@@ -3017,8 +2624,8 @@
     $('ssMisSeancesMode').addEventListener('change', applySeancesModeUI);
     $('ssEntCancel').addEventListener('click', function () { $('ssEntCreate').classList.remove('open'); });
     $('ssEntSave').addEventListener('click', saveEntiteInline);
-    // SUIVI-AGENDA-TOUS-TYPES : cablage de la section agenda.
-    agWireEvents();
+    // SUIVI-AGENDA-TOUS-TYPES : creation de l'instance agenda (module partage).
+    agCreate();
     // Signout
     const so = $('btn-signout');
     if (so) so.addEventListener('click', async function () { try { await SupabaseHub.signOut(); } catch (e) {} window.location.replace('login.html'); });
@@ -3062,7 +2669,7 @@
     await chargerOccurrences();
     renderGrid();
     // SUIVI-AGENDA-TOUS-TYPES : initialisation + 1er fetch de l'agenda global.
-    try { await agInit(); } catch (e) { flash('Agenda : ' + errMsg(e), 'err'); }
+    try { await agenda.init(); } catch (e) { flash('Agenda : ' + errMsg(e), 'err'); }
     await loadCompteur();
   } catch (e) {
     flash('Chargement impossible : ' + errMsg(e), 'err');
