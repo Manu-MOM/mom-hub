@@ -7,9 +7,15 @@
  * persistance Supabase, RLS B5-saisie, rôles auth_roles.
  *
  * SAISIE adossée B5 : la pioche catégorie = mesCategoriesAutorisees() ;
- * un référent ne réserve que pour sa catégorie. VALIDATION révélée si
- * bureau|admin (D1), via RPC valider_reservation / valider_recurrence /
- * set_recurrence_active.
+ * un référent ne réserve que pour sa catégorie. VALIDATION : DÉMÉNAGÉE au
+ * poste tri-source logistique-validation.html (REFONTE-PARCOURS-LOGISTIQUE,
+ * FAIT FOI 777551e9…, arbitrage 5.5) — le guichet est purifié : demande +
+ * occupation seulement, plus aucune interface bureau|admin ici.
+ *
+ * PRÉ-REMPLISSAGE PAR URL (§5.7 du FAIT FOI) : le boot lit, en plus de
+ * ?type=, les paramètres ressource / date / debut / fin posés par l'agenda
+ * de consultation (logistique-agenda.html, clic créneau libre) et rejoue la
+ * sélection de la carte ressource + les champs du formulaire.
  *
  * Occurrences récurrentes projetées 100% front (réplique getOccurrences) ;
  * aucune matérialisation en base. Convention jours : 0=Lundi .. 6=Dimanche.
@@ -58,15 +64,6 @@
     return JOURS_LBL[dow] + ' ' + d.getDate() + ' ' + MOIS[d.getMonth()] + ' ' + d.getFullYear();
   }
 
-  function libelleStatut(s) {
-    switch (s) {
-      case 'pending':  return 'En attente';
-      case 'approved': return 'Approuvée';
-      case 'rejected': return 'Refusée';
-      default:         return s || '';
-    }
-  }
-
   function el(id) { return document.getElementById(id); }
 
   // ============================================================
@@ -107,7 +104,6 @@
     selectedRessourceId: null,
     categories: [],        // mes catégories autorisées (B5) résolues
     isTransverse: false,   // admin|bureau → toutes catégories
-    canValidate: false,    // bureau|admin → section validation
     recurOn: false,
     recurJours: [],
     // --- Calendrier d'occupation (v1) -----------------------------
@@ -134,12 +130,8 @@
     const session = await SupabaseHub.getSession();
     if (!session) { window.location.replace('login.html'); return; }
 
-    const roles = await SupabaseHub.getMyRoles();
-    state.canValidate = roles.indexOf('bureau') !== -1 || roles.indexOf('admin') !== -1;
-
     document.body.classList.remove('auth-pending');
     document.body.classList.add('auth-resolved');
-    if (state.canValidate) document.body.classList.add('auth-can-validate');
 
     // Déconnexion
     const signoutBtn = el('btn-signout');
@@ -162,16 +154,48 @@
 
     await Promise.all([loadRessources(), loadCategories()]);
     wireForm();
-    if (state.canValidate) {
-      document.body.classList.add('show-admin');
-      await refreshValidation();
-      await refreshRecurrences();
-    }
+    applyUrlPrefill();
     await refreshAgenda();
     await refreshCalendar();
 
     console.log('%c🏉 Logistique chargé', 'color:#2D7D46;font-weight:bold;',
-      { type: state.type, ressources: state.ressources.length, validation: state.canValidate });
+      { type: state.type, ressources: state.ressources.length });
+  }
+
+  // ============================================================
+  // Pré-remplissage par URL (§5.7 FAIT FOI REFONTE-PARCOURS) :
+  // ?ressource=<uuid>&date=<iso>&debut=<hh:mm>&fin=<hh:mm>, posés
+  // par le clic créneau libre de logistique-agenda.html. Fail-soft
+  // intégral : paramètre absent/invalide → champ laissé tel quel.
+  // La carte ressource est sélectionnée en REJOUANT son click()
+  // (état + classes + activation du formulaire, un seul chemin).
+  // NB : les champs date/heures n'ont pas de listener d'état → le
+  // .value programmatique suffit (piège pt 140 sans objet ici).
+  // ============================================================
+  function applyUrlPrefill() {
+    const sp = new URLSearchParams(window.location.search);
+    const ressource = sp.get('ressource');
+    const date = sp.get('date');
+    const debut = sp.get('debut');
+    const fin = sp.get('fin');
+    if (!ressource && !date && !debut && !fin) return;
+
+    if (ressource) {
+      const host = el('logi-ressources');
+      const card = host
+        ? host.querySelector('.logi-res-card[data-id="' + CSS.escape(ressource) + '"]')
+        : null;
+      if (card) card.click();
+    }
+    if (date && /^\d{4}-\d{2}-\d{2}$/.test(date) && el('logi-date')) {
+      el('logi-date').value = date;
+    }
+    if (debut && /^\d{2}:\d{2}$/.test(debut) && el('logi-heure-debut')) {
+      el('logi-heure-debut').value = debut;
+    }
+    if (fin && /^\d{2}:\d{2}$/.test(fin) && el('logi-heure-fin')) {
+      el('logi-heure-fin').value = fin;
+    }
   }
 
   // ============================================================
@@ -423,7 +447,6 @@
     showToast('Demande envoyée (en attente de validation)', true);
     resetForm();
     await refreshAgenda();
-    if (state.canValidate) { await refreshValidation(); await refreshRecurrences(); }
   }
 
   function resetForm() {
@@ -501,110 +524,10 @@
   }
 
   // ============================================================
-  // Validation (bureau|admin) — file des demandes en attente
+  // REFONTE-PARCOURS-LOGISTIQUE (FAIT FOI 777551e9…, arbitrage 5.5) :
+  // refreshValidation() et refreshRecurrences() (bureau|admin) ont
+  // DÉMÉNAGÉ au poste tri-source logistique-validation.html.
   // ============================================================
-  async function refreshValidation() {
-    const host = el('logi-validation');
-    if (!host) return;
-    const byId = {};
-    state.ressources.forEach(function (r) { byId[r.id] = r.libelle; });
-
-    const pendingSimples = [];
-    for (let i = 0; i < state.ressources.length; i++) {
-      const rs = await SupabaseHub.listReservations({
-        ressourceId: state.ressources[i].id, statut: 'pending' });
-      rs.forEach(function (r) { pendingSimples.push(r); });
-    }
-
-    const badge = el('logi-validation-badge');
-    if (badge) badge.textContent = pendingSimples.length
-      ? String(pendingSimples.length) : '';
-
-    if (pendingSimples.length === 0) {
-      host.innerHTML = '<div class="logi-empty">Aucune demande en attente.</div>';
-      return;
-    }
-    host.innerHTML = '';
-    pendingSimples.forEach(function (r) {
-      const row = document.createElement('div');
-      row.className = 'logi-valid-row';
-      row.innerHTML =
-        '<span class="logi-valid-res">' + escapeHtml(byId[r.ressource_id] || '—') + '</span>' +
-        '<span class="logi-valid-meta">' + escapeHtml(formatDateLong(r.date)) + ' · ' +
-          escapeHtml((r.heure_debut||'').slice(0,5)) + '–' +
-          escapeHtml((r.heure_fin||'').slice(0,5)) + '</span>' +
-        (r.motif ? '<span class="logi-valid-motif">' + escapeHtml(r.motif) + '</span>' : '');
-      const actions = document.createElement('span');
-      actions.className = 'logi-valid-actions';
-
-      const ok = document.createElement('button');
-      ok.type = 'button'; ok.className = 'logi-btn-ok'; ok.textContent = 'Approuver';
-      ok.addEventListener('click', async function () {
-        ok.disabled = true;
-        const res = await SupabaseHub.validerReservation(r.id, 'approved');
-        if (res.ok) { showToast('Réservation approuvée', true); await refreshValidation(); await refreshAgenda(); }
-        else { showToast('Échec : ' + (res.error||''), false); ok.disabled = false; }
-      });
-
-      const no = document.createElement('button');
-      no.type = 'button'; no.className = 'logi-btn-no'; no.textContent = 'Refuser';
-      no.addEventListener('click', async function () {
-        const motif = window.prompt('Motif du refus (facultatif) :') || null;
-        no.disabled = true;
-        const res = await SupabaseHub.validerReservation(r.id, 'rejected', motif);
-        if (res.ok) { showToast('Réservation refusée', true); await refreshValidation(); }
-        else { showToast('Échec : ' + (res.error||''), false); no.disabled = false; }
-      });
-
-      actions.appendChild(ok);
-      actions.appendChild(no);
-      row.appendChild(actions);
-      host.appendChild(row);
-    });
-  }
-
-  // ============================================================
-  // Récurrents (bureau|admin) — activer / suspendre
-  // ============================================================
-  async function refreshRecurrences() {
-    const host = el('logi-recurrents');
-    if (!host) return;
-    const byId = {};
-    state.ressources.forEach(function (r) { byId[r.id] = r.libelle; });
-
-    const all = [];
-    for (let i = 0; i < state.ressources.length; i++) {
-      const rr = await SupabaseHub.listRecurrences({ ressourceId: state.ressources[i].id });
-      rr.forEach(function (r) { all.push(r); });
-    }
-    if (all.length === 0) {
-      host.innerHTML = '<div class="logi-empty">Aucune règle récurrente.</div>';
-      return;
-    }
-    host.innerHTML = '';
-    all.forEach(function (r) {
-      const joursTxt = (r.jours || []).map(function (j) { return JOURS_LBL[j]; }).join(' ');
-      const row = document.createElement('div');
-      row.className = 'logi-recur-row' + (r.active ? '' : ' is-suspended');
-      row.innerHTML =
-        '<span class="logi-recur-res">' + escapeHtml(byId[r.ressource_id] || '—') + '</span>' +
-        '<span class="logi-recur-meta">' + escapeHtml(r.freq) + ' · ' + escapeHtml(joursTxt) +
-          ' · jusqu\'au ' + escapeHtml(formatDateLong(r.date_fin)) +
-          ' · ' + escapeHtml(libelleStatut(r.statut)) + '</span>';
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'logi-recur-toggle-btn';
-      btn.textContent = r.active ? 'Suspendre' : 'Réactiver';
-      btn.addEventListener('click', async function () {
-        btn.disabled = true;
-        const res = await SupabaseHub.setRecurrenceActive(r.id, !r.active);
-        if (res.ok) { showToast('Règle mise à jour', true); await refreshRecurrences(); await refreshAgenda(); }
-        else { showToast('Échec : ' + (res.error||''), false); btn.disabled = false; }
-      });
-      row.appendChild(btn);
-      host.appendChild(row);
-    });
-  }
 
   // ============================================================
   // CALENDRIER D'OCCUPATION (v1)
