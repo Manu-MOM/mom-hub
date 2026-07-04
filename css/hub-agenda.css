@@ -1,0 +1,91 @@
+/* ============================================================================
+   HUB-AGENDA v1.0 — CSS structurel du patron agenda (AGENDA-HUB-PATRON, pt 147)
+   ----------------------------------------------------------------------------
+   Extraction SANS changement des règles ag-* de suivi-salarie.html (déployé
+   md5 14d7de7e9ff04d9d8bdf76c9fcffef39), correctifs recette du 04/07 inclus.
+   La PALETTE par type (.ag-ev.t-X / .ag-chip.t-X / .ag-sw.t-X) n'est PAS ici :
+   elle est métier, chaque page consommatrice fournit la sienne (FAIT FOI G3).
+   Les classes ag-overlay / ag-modal / ag-modal-act / ag-btn / ag-empty sont des
+   copies À L'IDENTIQUE des règles ss-* de la page (le module ne dépend pas du
+   CSS d'une page) — écart tracé §3 du FAIT FOI, z-index 60 CONSERVÉ.
+   Chargement : APRÈS css/hub.css, AVANT le <style> de page.
+   ========================================================================== */
+.ag-root { margin: 26px 0 0; padding: 18px 0 0; border-top: 1px solid var(--line, #cabe9f); }
+.ag-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0 0 14px; }
+.ag-head h2 { font-size: 16px; margin: 0; color: var(--ink, #0c3d24); }
+.ag-head-ctrls { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.ag-chk { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-mute, #6b7a74); cursor: pointer; }
+.ag-chk input { width: auto; }
+.ag-fsbtn { background: transparent; border: 1px solid var(--line, #cabe9f); border-radius: 8px; cursor: pointer; padding: 6px 12px; font: inherit; font-size: 13px; color: var(--ink, #0c3d24); }
+.ag-layout { display: grid; grid-template-columns: 1fr 232px; gap: 16px; align-items: start; }
+.ag-main { min-width: 0; }
+.ag-weeknav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 10px; }
+.ag-weeknav button { background: transparent; border: 1px solid var(--line, #cabe9f); border-radius: 8px; cursor: pointer; padding: 6px 10px; font: inherit; color: var(--ink, #0c3d24); }
+.ag-weeklabel { font-size: 13px; font-weight: 600; color: var(--ink, #0c3d24); }
+.ag-week { border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 12px; overflow: hidden; background: #fff; }
+.ag-weekhd, .ag-weekbody { display: grid; grid-template-columns: 46px repeat(7, 1fr); }
+.ag-weekhd { border-bottom: 1px solid var(--paper-warm, #e3e0d8); }
+.ag-weekhd .ag-hcell { padding: 6px 2px; text-align: center; font-size: 11px; font-weight: 600; color: var(--ink-mute, #6b7a74); border-left: 1px solid var(--paper-warm, #e3e0d8); }
+.ag-weekhd .ag-hcell.ag-axis { border-left: 0; }
+.ag-weekhd .ag-hcell.today { color: var(--vert-prairie, #2d7a3e); }
+.ag-axiscol { position: relative; }
+.ag-axiscol .ag-hourlbl { position: absolute; right: 4px; font-size: 10px; color: var(--ink-mute, #6b7a74); transform: translateY(-50%); }
+.ag-daycol { position: relative; border-left: 1px solid var(--paper-warm, #e3e0d8); }
+.ag-hourline { position: absolute; left: 0; right: 0; border-top: 1px solid #f0ede4; pointer-events: none; }
+.ag-untimed { position: relative; z-index: 2; display: flex; flex-direction: column; gap: 2px; padding: 2px; }
+.ag-ev { position: absolute; left: 0; overflow: hidden; border-radius: 5px; border-left: 3px solid #888; background: #eef; color: #234; padding: 2px 4px; font-size: 10px; line-height: 1.15; cursor: pointer; box-sizing: border-box; }
+.ag-ev .ag-ev-t { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ag-ev .ag-ev-l { overflow: hidden; text-overflow: ellipsis; }
+.ag-chip { border-radius: 5px; border-left: 3px solid #888; background: #eef; color: #234; padding: 3px 8px; font-size: 12px; cursor: pointer; }
+.ag-chip .ag-ev-t { font-weight: 700; display: inline; }
+.ag-chip .ag-ev-l { display: inline; }
+.ag-ev.annulee, .ag-chip.annulee { text-decoration: line-through; opacity: .6; }
+
+/* ---- Mini-mois, légende, liste mobile, plein écran, détail, repli <720px ---- */
+.ag-mini { border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 12px; padding: 10px 12px; background: #fff; }
+.ag-mininav { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: 0 0 8px; }
+.ag-mininav .ag-minilabel { font-size: 13px; font-weight: 600; color: var(--ink, #0c3d24); flex: 1; text-align: center; }
+.ag-mininav button { background: transparent; border: 1px solid var(--line, #cabe9f); border-radius: 6px; cursor: pointer; padding: 3px 8px; font: inherit; color: var(--ink, #0c3d24); }
+.ag-minigrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.ag-minidow { font-size: 10px; text-align: center; color: var(--ink-mute, #6b7a74); padding: 2px 0; }
+.ag-miniday { position: relative; text-align: center; font: inherit; font-size: 11px; padding: 5px 0; border: 0; border-radius: 6px; cursor: pointer; color: var(--ink, #0c3d24); background: transparent; }
+.ag-miniday.oth { color: #b9c2bd; }
+.ag-miniday.selweek { background: var(--paper, #f8f5ec); }
+.ag-miniday.today { outline: 1px solid var(--vert-prairie, #2d7a3e); }
+.ag-miniday .ag-dot { position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 50%; background: var(--vert-prairie, #2d7a3e); }
+.ag-minitoggle { display: none; }
+.ag-legend { display: flex; flex-wrap: wrap; gap: 6px 10px; margin: 12px 0 0; }
+.ag-legend .ag-lg { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--ink-mute, #6b7a74); }
+.ag-legend .ag-sw { width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto; } /* correctif recette 04/07 : background #888 retiré (même spécificité que .ag-sw.t-* mais plus tardif, il écrasait les 10 couleurs) */
+.ag-list { display: none; }
+.ag-list .ag-lday { margin: 0 0 12px; }
+.ag-list .ag-lday h4 { margin: 0 0 6px; font-size: 12px; font-weight: 700; color: var(--ink-mute, #6b7a74); }
+.ag-list .ag-chip { display: block; margin: 0 0 4px; }
+.ag-root.ag-fs { position: fixed; inset: 0; z-index: 50; /* correctif recette 04/07 : sous .ss-overlay (60) pour que les modales détail/édition restent visibles en plein écran */ margin: 0; padding: 16px 20px 40px; background: #fff; overflow-y: auto; border-top: 0; }
+body.ag-fs-lock { overflow: hidden; }
+.ag-det-row { margin: 0 0 10px; font-size: 14px; color: var(--ink, #0c3d24); }
+.ag-det-row .ag-det-lbl { display: block; font-size: 12px; color: var(--ink-mute, #6b7a74); margin: 0 0 2px; }
+@media (max-width: 720px) {
+  .ag-layout { grid-template-columns: 1fr; }
+  .ag-mini { order: -1; }
+  .ag-week { display: none; }
+  .ag-list { display: block; }
+  .ag-minitoggle { display: inline-block; }
+  .ag-mini.ag-mini-collapsed .ag-minigrid, .ag-mini.ag-mini-collapsed .ag-legend { display: none; }
+
+/* ---- Modale de détail du module : copies à l'identique de ss-overlay /
+   ss-modal / ss-modal-act / ss-btn / ss-btn-ghost / ss-empty (suivi-salarie.html).
+   z-index 60 : au-dessus du plein écran (.ag-root.ag-fs, z-index 50) —
+   correctif recette du 04/07 préservé. ---- */
+.ag-overlay { display: none; position: fixed; inset: 0; background: rgba(12,40,23,.45); z-index: 60;
+              align-items: flex-start; justify-content: center; padding: 40px 16px; overflow-y: auto; }
+.ag-overlay.open { display: flex; }
+.ag-modal { background: #fff; border-radius: 14px; width: 100%; max-width: 520px; padding: 22px 24px;
+            box-shadow: 0 12px 40px rgba(12,40,23,.28); }
+.ag-modal h3 { margin: 0 0 16px; font-size: 17px; color: var(--ink, #0c3d24); }
+.ag-modal-act { display: flex; justify-content: flex-end; gap: 10px; margin: 18px 0 0; }
+.ag-btn { padding: 9px 16px; border: 0; border-radius: 8px; font: inherit; font-weight: 600; cursor: pointer;
+          background: var(--vert-prairie, #2d7a3e); color: #fff; }
+.ag-btn:disabled { opacity: .5; cursor: default; }
+.ag-btn-ghost { background: transparent; color: var(--ink, #0c3d24); border: 1px solid var(--line, #cabe9f); }
+.ag-empty { padding: 28px 16px; text-align: center; color: var(--ink-mute, #6b7a74); font-size: 14px; }
