@@ -343,6 +343,30 @@
         </div>
       </section>
 
+      <!-- REFONTE-PARCOURS-LOGISTIQUE (FAIT FOI 777551e9…, phase B, R4) :
+           la validation logistique quitte les guichets (logistique.html,
+           bus.html) pour un poste tri-source dédié. Forme R4 = tuile →
+           page logistique-validation.html (le dashboard reste un hub de
+           tuiles ; la disposition 2A exige la pleine largeur). Le repli
+           automatique des sections vides gère les rôles sans jeton. -->
+      <section class="admin-section" data-section="logistique">
+        <h3 class="admin-section-title">Logistique</h3>
+        <div class="admin-grid">
+
+        <!-- Validation logistique — poste tri-source (ponctuelles +
+           récurrences + demandes de bus). Garde de page = bureau|admin ;
+           la vérité reste les RPC valider_* gardées bureau|admin. -->
+      <a class="admin-tile" data-show="admin bureau" href="logistique-validation.html">
+        <div class="admin-tile-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="m9 15 2 2 4-4"/></svg>
+        </div>
+        <p class="admin-tile-title">Validation logistique</p>
+        <p class="admin-tile-desc">Réservations, récurrences et demandes de bus : la file des demandes en attente et l'agenda d'arbitrage.</p>
+      </a>
+
+        </div>
+      </section>
+
       <section class="admin-section" data-section="administration-socle">
         <h3 class="admin-section-title">Administration socle</h3>
         <div class="admin-grid">
