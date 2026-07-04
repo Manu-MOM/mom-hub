@@ -101,6 +101,22 @@
     }
     .bus-submit:disabled { opacity: 0.5; cursor: default; }
 
+    /* Mode édition (?edit=<id>, cycle de vie B4) */
+    .bus-edit-banner {
+      display: none; background: #faf3e2; border: 1px solid #d9a222;
+      border-radius: 8px; padding: 10px 14px; font-size: 13.5px;
+      color: #7a5a12; margin-bottom: 14px;
+    }
+    .bus-edit-banner.is-on { display: block; }
+    .bus-annule-btn {
+      display: none; font-family: 'Oswald', sans-serif; font-size: 13px;
+      font-weight: 500; background: #fff; color: var(--rouge-alerte, #b23);
+      border: 1px solid var(--line); border-radius: 8px; padding: 12px 18px;
+      cursor: pointer; margin-left: 10px;
+    }
+    .bus-annule-btn.is-on { display: inline-block; }
+    .bus-annule-btn:disabled { opacity: 0.5; cursor: default; }
+
     .bus-toast {
       position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(20px);
       background: var(--ink); color: #fff; padding: 11px 20px; border-radius: 8px;
@@ -269,8 +285,13 @@
     <div class="bus-card">
       <h3 class="bus-card__title">Notes complémentaires</h3>
       <textarea id="b-notes" placeholder="Bagages, équipements, contraintes, repas…" style="height:80px;"></textarea>
+      <div id="b-edit-banner" class="bus-edit-banner">
+        Mode modification : cette demande repassera en attente de validation
+        après enregistrement.
+      </div>
       <div style="margin-top:14px;">
         <button type="button" id="b-submit" class="bus-submit">Envoyer la demande →</button>
+        <button type="button" id="b-annuler-demande" class="bus-annule-btn">Annuler la demande</button>
       </div>
     </div>
 
