@@ -144,6 +144,36 @@ LOCATION:Stade René Brencklé
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
+UID:3af7a300-3b18-4267-a1cf-b6dea2c6b65a@mom-hub
+DTSTAMP:20260703T080444Z
+DTSTART;TZID=Europe/Paris:20260908T084500
+DTEND;TZID=Europe/Paris:20260908T094500
+SUMMARY:Ecole Schickelé MUTZIG - classe A
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:01c68b14-13b5-47b0-bfaf-c3a15ae80ceb@mom-hub
+DTSTAMP:20260703T123447Z
+DTSTART;TZID=Europe/Paris:20260908T094500
+DTEND;TZID=Europe/Paris:20260908T104500
+SUMMARY:Ecole Schickelé MUTZIG - classe B
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:f25607c4-eb7d-4e2b-8dd1-342a9775343e@mom-hub
+DTSTAMP:20260703T124123Z
+DTSTART;TZID=Europe/Paris:20260908T141500
+DTEND;TZID=Europe/Paris:20260908T151500
+SUMMARY:Ecole Schickelé MUTZIG - classe G
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
 UID:397c0de7-264e-42e5-b4e9-01165f58bac0@mom-hub
 DTSTAMP:20260702T153934Z
 DTSTART;TZID=Europe/Paris:20260908T150000
@@ -163,6 +193,76 @@ SUMMARY:Entraînements des Seniors Masculins
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 LOCATION:Stade René Brencklé
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:85293bfc-34ab-4a02-b7dd-e8059f59e11b@mom-hub
+DTSTAMP:20260703T124403Z
+DTSTART;TZID=Europe/Paris:20260910T084500
+DTEND;TZID=Europe/Paris:20260910T094500
+SUMMARY:Ecole Schickelé MUTZIG - classe C
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:103e59ab-3899-4660-ac62-ed0125ab8d1f@mom-hub
+DTSTAMP:20260703T124545Z
+DTSTART;TZID=Europe/Paris:20260910T094500
+DTEND;TZID=Europe/Paris:20260910T104500
+SUMMARY:Ecole Schickelé MUTZIG - classe D
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:c7dfb05d-8e30-45cb-b574-f026561a5fcd@mom-hub
+DTSTAMP:20260703T130046Z
+DTSTART;TZID=Europe/Paris:20260910T134500
+DTEND;TZID=Europe/Paris:20260910T144500
+SUMMARY:Ecole URMATT - classe A
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:effb7997-7bb8-472b-ace0-cf97f215c034@mom-hub
+DTSTAMP:20260703T130357Z
+DTSTART;TZID=Europe/Paris:20260910T144500
+DTEND;TZID=Europe/Paris:20260910T154500
+SUMMARY:Ecole URMATT - classe B
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:5881b258-b2d9-45c8-9007-0b81f207b48d@mom-hub
+DTSTAMP:20260703T125002Z
+DTSTART;TZID=Europe/Paris:20260911T084500
+DTEND;TZID=Europe/Paris:20260911T094500
+SUMMARY:Ecole Schickelé MUTZIG - classe E
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:ff00cff9-f861-4431-882d-8903419ff92e@mom-hub
+DTSTAMP:20260703T125216Z
+DTSTART;TZID=Europe/Paris:20260911T094500
+DTEND;TZID=Europe/Paris:20260911T104500
+SUMMARY:Ecole Schickelé MUTZIG - classe F
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:be1b0b7d-1a6c-4930-97aa-b43da2fe20c5@mom-hub
+DTSTAMP:20260703T125358Z
+DTSTART;TZID=Europe/Paris:20260911T141500
+DTEND;TZID=Europe/Paris:20260911T151500
+SUMMARY:Ecole Schickelé MUTZIG - classe H
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
@@ -199,6 +299,36 @@ LOCATION:Stade René Brencklé
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
+UID:df8e27a0-e0e6-4d58-96ce-e499e1e0f2ae@mom-hub
+DTSTAMP:20260703T080444Z
+DTSTART;TZID=Europe/Paris:20260915T084500
+DTEND;TZID=Europe/Paris:20260915T094500
+SUMMARY:Ecole Schickelé MUTZIG - classe A
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:88e89c2e-44f4-4aff-8ce0-bd2f9c85ede4@mom-hub
+DTSTAMP:20260703T123447Z
+DTSTART;TZID=Europe/Paris:20260915T094500
+DTEND;TZID=Europe/Paris:20260915T104500
+SUMMARY:Ecole Schickelé MUTZIG - classe B
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:d23a227b-7431-4002-9382-a197eb2eeae6@mom-hub
+DTSTAMP:20260703T124123Z
+DTSTART;TZID=Europe/Paris:20260915T141500
+DTEND;TZID=Europe/Paris:20260915T151500
+SUMMARY:Ecole Schickelé MUTZIG - classe G
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
 UID:fa5a28e5-afdd-455e-96bf-0beffbab33ff@mom-hub
 DTSTAMP:20260702T052253Z
 DTSTART;TZID=Europe/Paris:20260915T150000
@@ -218,6 +348,76 @@ SUMMARY:Entraînements des Seniors Masculins
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 LOCATION:Stade René Brencklé
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:7597df50-e694-4d1f-9550-33f5588ea3da@mom-hub
+DTSTAMP:20260703T124403Z
+DTSTART;TZID=Europe/Paris:20260917T084500
+DTEND;TZID=Europe/Paris:20260917T094500
+SUMMARY:Ecole Schickelé MUTZIG - classe C
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:cc863583-92b6-4b1f-8be2-2f79af1dcf55@mom-hub
+DTSTAMP:20260703T124545Z
+DTSTART;TZID=Europe/Paris:20260917T094500
+DTEND;TZID=Europe/Paris:20260917T104500
+SUMMARY:Ecole Schickelé MUTZIG - classe D
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:493e9b1e-9a70-4507-b81a-d77eb419f4ca@mom-hub
+DTSTAMP:20260703T130046Z
+DTSTART;TZID=Europe/Paris:20260917T134500
+DTEND;TZID=Europe/Paris:20260917T144500
+SUMMARY:Ecole URMATT - classe A
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:77f1b362-b133-42b7-b723-1d9bb4f92841@mom-hub
+DTSTAMP:20260703T130357Z
+DTSTART;TZID=Europe/Paris:20260917T144500
+DTEND;TZID=Europe/Paris:20260917T154500
+SUMMARY:Ecole URMATT - classe B
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:85c0c7f7-c0b1-44d8-b56d-e7e90d1bc250@mom-hub
+DTSTAMP:20260703T125002Z
+DTSTART;TZID=Europe/Paris:20260918T084500
+DTEND;TZID=Europe/Paris:20260918T094500
+SUMMARY:Ecole Schickelé MUTZIG - classe E
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:5dca411c-e9ba-41b8-96d7-230e31f9c3ee@mom-hub
+DTSTAMP:20260703T125216Z
+DTSTART;TZID=Europe/Paris:20260918T094500
+DTEND;TZID=Europe/Paris:20260918T104500
+SUMMARY:Ecole Schickelé MUTZIG - classe F
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:95ef76fd-1326-487e-a8c2-bb0cd3a04f76@mom-hub
+DTSTAMP:20260703T125358Z
+DTSTART;TZID=Europe/Paris:20260918T141500
+DTEND;TZID=Europe/Paris:20260918T151500
+SUMMARY:Ecole Schickelé MUTZIG - classe H
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
@@ -265,6 +465,36 @@ LOCATION:Stade René Brencklé
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
+UID:9e798d4d-d0e9-4247-9607-8934c87c8dcb@mom-hub
+DTSTAMP:20260703T080444Z
+DTSTART;TZID=Europe/Paris:20260922T084500
+DTEND;TZID=Europe/Paris:20260922T094500
+SUMMARY:Ecole Schickelé MUTZIG - classe A
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:c37d70cd-f4ac-40c8-aca3-1c91f27b03a2@mom-hub
+DTSTAMP:20260703T123447Z
+DTSTART;TZID=Europe/Paris:20260922T094500
+DTEND;TZID=Europe/Paris:20260922T104500
+SUMMARY:Ecole Schickelé MUTZIG - classe B
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:d446bfa3-de8d-46e1-ae4f-8eae75a8ac85@mom-hub
+DTSTAMP:20260703T124123Z
+DTSTART;TZID=Europe/Paris:20260922T141500
+DTEND;TZID=Europe/Paris:20260922T151500
+SUMMARY:Ecole Schickelé MUTZIG - classe G
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
 UID:c2032f51-9403-4e20-a74c-686b365a0b7a@mom-hub
 DTSTAMP:20260702T052253Z
 DTSTART;TZID=Europe/Paris:20260922T150000
@@ -284,6 +514,76 @@ SUMMARY:Entraînements des Seniors Masculins
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 LOCATION:Stade René Brencklé
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:031dc42b-5366-45ed-8d3d-6f22437e487b@mom-hub
+DTSTAMP:20260703T124403Z
+DTSTART;TZID=Europe/Paris:20260924T084500
+DTEND;TZID=Europe/Paris:20260924T094500
+SUMMARY:Ecole Schickelé MUTZIG - classe C
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:738f1832-f096-4caa-9af0-9674f9c06d73@mom-hub
+DTSTAMP:20260703T124545Z
+DTSTART;TZID=Europe/Paris:20260924T094500
+DTEND;TZID=Europe/Paris:20260924T104500
+SUMMARY:Ecole Schickelé MUTZIG - classe D
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:acbc2ef8-9e03-4e99-9ab3-3d36ce99ffa7@mom-hub
+DTSTAMP:20260703T130046Z
+DTSTART;TZID=Europe/Paris:20260924T134500
+DTEND;TZID=Europe/Paris:20260924T144500
+SUMMARY:Ecole URMATT - classe A
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:4bdfd7c5-e5fd-40f2-83c3-e3ff55f688b0@mom-hub
+DTSTAMP:20260703T130357Z
+DTSTART;TZID=Europe/Paris:20260924T144500
+DTEND;TZID=Europe/Paris:20260924T154500
+SUMMARY:Ecole URMATT - classe B
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:96fef03c-4d04-4b6a-b002-f5e3ae521afa@mom-hub
+DTSTAMP:20260703T125002Z
+DTSTART;TZID=Europe/Paris:20260925T084500
+DTEND;TZID=Europe/Paris:20260925T094500
+SUMMARY:Ecole Schickelé MUTZIG - classe E
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:2559e968-229e-48c2-a6b4-ebc010f00142@mom-hub
+DTSTAMP:20260703T125216Z
+DTSTART;TZID=Europe/Paris:20260925T094500
+DTEND;TZID=Europe/Paris:20260925T104500
+SUMMARY:Ecole Schickelé MUTZIG - classe F
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:758c63d7-145e-4482-928f-4128d6af4113@mom-hub
+DTSTAMP:20260703T125358Z
+DTSTART;TZID=Europe/Paris:20260925T141500
+DTEND;TZID=Europe/Paris:20260925T151500
+SUMMARY:Ecole Schickelé MUTZIG - classe H
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
@@ -331,6 +631,36 @@ LOCATION:Stade René Brencklé
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
+UID:15e204e1-5f81-4a48-9c2a-6a812bd8c713@mom-hub
+DTSTAMP:20260703T080444Z
+DTSTART;TZID=Europe/Paris:20260929T084500
+DTEND;TZID=Europe/Paris:20260929T094500
+SUMMARY:Ecole Schickelé MUTZIG - classe A
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:4d62baa2-1c0a-4a12-9080-3aa45c2e85e0@mom-hub
+DTSTAMP:20260703T123447Z
+DTSTART;TZID=Europe/Paris:20260929T094500
+DTEND;TZID=Europe/Paris:20260929T104500
+SUMMARY:Ecole Schickelé MUTZIG - classe B
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:3cb0768c-c3d9-4c76-9358-ca6fad68a062@mom-hub
+DTSTAMP:20260703T124123Z
+DTSTART;TZID=Europe/Paris:20260929T141500
+DTEND;TZID=Europe/Paris:20260929T151500
+SUMMARY:Ecole Schickelé MUTZIG - classe G
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
 UID:e04799ae-3d9d-4ad7-9827-780e5d98561a@mom-hub
 DTSTAMP:20260702T052253Z
 DTSTART;TZID=Europe/Paris:20260929T150000
@@ -350,6 +680,76 @@ SUMMARY:Entraînements des Seniors Masculins
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 LOCATION:Stade René Brencklé
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:519c1573-decd-47e1-86c9-2234b2638f6d@mom-hub
+DTSTAMP:20260703T124403Z
+DTSTART;TZID=Europe/Paris:20261001T084500
+DTEND;TZID=Europe/Paris:20261001T094500
+SUMMARY:Ecole Schickelé MUTZIG - classe C
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:ce85dbd9-e329-4f6d-9c16-2fe4fbc284b9@mom-hub
+DTSTAMP:20260703T124545Z
+DTSTART;TZID=Europe/Paris:20261001T094500
+DTEND;TZID=Europe/Paris:20261001T104500
+SUMMARY:Ecole Schickelé MUTZIG - classe D
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:f81f095d-1638-48d0-814e-2dc552b46ff7@mom-hub
+DTSTAMP:20260703T130046Z
+DTSTART;TZID=Europe/Paris:20261001T134500
+DTEND;TZID=Europe/Paris:20261001T144500
+SUMMARY:Ecole URMATT - classe A
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:f398a38a-8fc6-41d8-aef6-bd61f51a853e@mom-hub
+DTSTAMP:20260703T130357Z
+DTSTART;TZID=Europe/Paris:20261001T144500
+DTEND;TZID=Europe/Paris:20261001T154500
+SUMMARY:Ecole URMATT - classe B
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:08d05690-f14e-4506-8565-2d0a71d997c6@mom-hub
+DTSTAMP:20260703T125002Z
+DTSTART;TZID=Europe/Paris:20261002T084500
+DTEND;TZID=Europe/Paris:20261002T094500
+SUMMARY:Ecole Schickelé MUTZIG - classe E
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:0501565a-c692-4a17-80c5-5a385efa282e@mom-hub
+DTSTAMP:20260703T125216Z
+DTSTART;TZID=Europe/Paris:20261002T094500
+DTEND;TZID=Europe/Paris:20261002T104500
+SUMMARY:Ecole Schickelé MUTZIG - classe F
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:b1e40d43-cb40-45e3-986a-32aefd4800a9@mom-hub
+DTSTAMP:20260703T125358Z
+DTSTART;TZID=Europe/Paris:20261002T141500
+DTEND;TZID=Europe/Paris:20261002T151500
+SUMMARY:Ecole Schickelé MUTZIG - classe H
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
@@ -386,6 +786,36 @@ LOCATION:Stade René Brencklé
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
+UID:71f628a1-9585-4296-921d-955861939c9d@mom-hub
+DTSTAMP:20260703T080444Z
+DTSTART;TZID=Europe/Paris:20261006T084500
+DTEND;TZID=Europe/Paris:20261006T094500
+SUMMARY:Ecole Schickelé MUTZIG - classe A
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:5d4c9fb5-3363-4d33-8a1b-123313cec8cb@mom-hub
+DTSTAMP:20260703T123447Z
+DTSTART;TZID=Europe/Paris:20261006T094500
+DTEND;TZID=Europe/Paris:20261006T104500
+SUMMARY:Ecole Schickelé MUTZIG - classe B
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:61f27c16-a5d3-4c0c-95e6-bff89dcca085@mom-hub
+DTSTAMP:20260703T124123Z
+DTSTART;TZID=Europe/Paris:20261006T141500
+DTEND;TZID=Europe/Paris:20261006T151500
+SUMMARY:Ecole Schickelé MUTZIG - classe G
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
 UID:a4cb4db5-d16e-48ce-997f-628bdda3239f@mom-hub
 DTSTAMP:20260702T052253Z
 DTSTART;TZID=Europe/Paris:20261006T150000
@@ -405,6 +835,76 @@ SUMMARY:Entraînements des Seniors Masculins
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 LOCATION:Stade René Brencklé
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:06ebf331-181f-45fc-95ff-d621bed28164@mom-hub
+DTSTAMP:20260703T124403Z
+DTSTART;TZID=Europe/Paris:20261008T084500
+DTEND;TZID=Europe/Paris:20261008T094500
+SUMMARY:Ecole Schickelé MUTZIG - classe C
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:065e79f6-91e8-400a-a4b2-8a1b5b77c6f2@mom-hub
+DTSTAMP:20260703T124545Z
+DTSTART;TZID=Europe/Paris:20261008T094500
+DTEND;TZID=Europe/Paris:20261008T104500
+SUMMARY:Ecole Schickelé MUTZIG - classe D
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:b0ff1073-c3d1-40d6-a32a-829a0620d694@mom-hub
+DTSTAMP:20260703T130046Z
+DTSTART;TZID=Europe/Paris:20261008T134500
+DTEND;TZID=Europe/Paris:20261008T144500
+SUMMARY:Ecole URMATT - classe A
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:51d3b1c5-3f97-4941-8dce-c6fb37350560@mom-hub
+DTSTAMP:20260703T130357Z
+DTSTART;TZID=Europe/Paris:20261008T144500
+DTEND;TZID=Europe/Paris:20261008T154500
+SUMMARY:Ecole URMATT - classe B
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:b715f843-5933-4248-92e4-21735c29af28@mom-hub
+DTSTAMP:20260703T125002Z
+DTSTART;TZID=Europe/Paris:20261009T084500
+DTEND;TZID=Europe/Paris:20261009T094500
+SUMMARY:Ecole Schickelé MUTZIG - classe E
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:391c59a0-350b-42e4-bcf1-04956400357a@mom-hub
+DTSTAMP:20260703T125216Z
+DTSTART;TZID=Europe/Paris:20261009T094500
+DTEND;TZID=Europe/Paris:20261009T104500
+SUMMARY:Ecole Schickelé MUTZIG - classe F
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:1157e73a-b56a-413e-af89-790a1233ff4c@mom-hub
+DTSTAMP:20260703T125358Z
+DTSTART;TZID=Europe/Paris:20261009T141500
+DTEND;TZID=Europe/Paris:20261009T151500
+SUMMARY:Ecole Schickelé MUTZIG - classe H
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
@@ -1486,6 +1986,36 @@ LOCATION:Stade René Brencklé
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
+UID:8c7a1e4e-3eb1-4711-b774-e2080ec667b3@mom-hub
+DTSTAMP:20260703T134543Z
+DTSTART;TZID=Europe/Paris:20270309T083000
+DTEND;TZID=Europe/Paris:20270309T093000
+SUMMARY:Ecole ERGERSHEIM - classe A
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:6a2b6576-3b31-48bf-95a9-b21d6e4b4868@mom-hub
+DTSTAMP:20260703T134803Z
+DTSTART;TZID=Europe/Paris:20270309T093000
+DTEND;TZID=Europe/Paris:20270309T103000
+SUMMARY:Ecole ERGERSHEIM - classe B
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:8f273f07-cf89-4edb-8339-d2380ae9b232@mom-hub
+DTSTAMP:20260703T135256Z
+DTSTART;TZID=Europe/Paris:20270309T103000
+DTEND;TZID=Europe/Paris:20270309T113000
+SUMMARY:Ecole ERGERSHEIM - classe C
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
 UID:57884f18-9510-48e4-a150-f2fd1b13c116@mom-hub
 DTSTAMP:20260702T052253Z
 DTSTART;TZID=Europe/Paris:20270309T150000
@@ -1505,6 +2035,66 @@ SUMMARY:Entraînements des Seniors Masculins
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 LOCATION:Stade René Brencklé
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:d76a7c7a-211a-4db0-8e46-70e7fa5567f4@mom-hub
+DTSTAMP:20260703T140636Z
+DTSTART;TZID=Europe/Paris:20270311T090000
+DTEND;TZID=Europe/Paris:20270311T100000
+SUMMARY:Ecole SCHARRACHBERGHEIM - classe A
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:c7c3919b-86f1-45d8-b2c9-0530aeb06b7a@mom-hub
+DTSTAMP:20260703T140856Z
+DTSTART;TZID=Europe/Paris:20270311T100000
+DTEND;TZID=Europe/Paris:20270311T110000
+SUMMARY:Ecole SCHARRACHBERGHEIM - classe B
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:09056324-6541-4861-8be5-5ce13812c7f7@mom-hub
+DTSTAMP:20260703T135653Z
+DTSTART;TZID=Europe/Paris:20270311T134500
+DTEND;TZID=Europe/Paris:20270311T144500
+SUMMARY:Ecole ERGERSHEIM - classe D
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:7c4a1443-b03e-4440-964e-ca2a447cb5af@mom-hub
+DTSTAMP:20260703T135807Z
+DTSTART;TZID=Europe/Paris:20270311T144500
+DTEND;TZID=Europe/Paris:20270311T154500
+SUMMARY:Ecole ERGERSHEIM - classe E
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:97e42ece-d5f8-4e14-9e54-39e9586901fc@mom-hub
+DTSTAMP:20260703T141848Z
+DTSTART;TZID=Europe/Paris:20270312T090000
+DTEND;TZID=Europe/Paris:20270312T100000
+SUMMARY:Ecole BISCHOFFSHEIM - classe A
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:40106a3f-5b73-4e6c-acec-770c65475cb1@mom-hub
+DTSTAMP:20260703T142116Z
+DTSTART;TZID=Europe/Paris:20270312T100000
+DTEND;TZID=Europe/Paris:20270312T110000
+SUMMARY:Ecole BISCHOFFSHEIM - classe B
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
@@ -1541,6 +2131,36 @@ LOCATION:Stade René Brencklé
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
+UID:f7be537f-cffd-472d-b4ce-b50555c21431@mom-hub
+DTSTAMP:20260703T134543Z
+DTSTART;TZID=Europe/Paris:20270316T083000
+DTEND;TZID=Europe/Paris:20270316T093000
+SUMMARY:Ecole ERGERSHEIM - classe A
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:35a881d4-7790-4688-88ef-f60aa59a8648@mom-hub
+DTSTAMP:20260703T134803Z
+DTSTART;TZID=Europe/Paris:20270316T093000
+DTEND;TZID=Europe/Paris:20270316T103000
+SUMMARY:Ecole ERGERSHEIM - classe B
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:aaba3f8d-eb16-4518-8285-7dbf156fa020@mom-hub
+DTSTAMP:20260703T135256Z
+DTSTART;TZID=Europe/Paris:20270316T103000
+DTEND;TZID=Europe/Paris:20270316T113000
+SUMMARY:Ecole ERGERSHEIM - classe C
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
 UID:cb06272c-7bd5-4478-9f86-efdc76bdcd10@mom-hub
 DTSTAMP:20260702T052253Z
 DTSTART;TZID=Europe/Paris:20270316T150000
@@ -1560,6 +2180,66 @@ SUMMARY:Entraînements des Seniors Masculins
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 LOCATION:Stade René Brencklé
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:77316591-4dad-42e5-aeac-0b7575bda686@mom-hub
+DTSTAMP:20260703T140636Z
+DTSTART;TZID=Europe/Paris:20270318T090000
+DTEND;TZID=Europe/Paris:20270318T100000
+SUMMARY:Ecole SCHARRACHBERGHEIM - classe A
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:0e98519c-ef28-47bf-b217-382e4d52e648@mom-hub
+DTSTAMP:20260703T140856Z
+DTSTART;TZID=Europe/Paris:20270318T100000
+DTEND;TZID=Europe/Paris:20270318T110000
+SUMMARY:Ecole SCHARRACHBERGHEIM - classe B
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:654de534-8b02-46b6-9aa6-e8576e04fcc7@mom-hub
+DTSTAMP:20260703T135653Z
+DTSTART;TZID=Europe/Paris:20270318T134500
+DTEND;TZID=Europe/Paris:20270318T144500
+SUMMARY:Ecole ERGERSHEIM - classe D
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:10e90d8f-9a68-424a-b9c6-fbfcd471296b@mom-hub
+DTSTAMP:20260703T135858Z
+DTSTART;TZID=Europe/Paris:20270318T144500
+DTEND;TZID=Europe/Paris:20270318T154500
+SUMMARY:Ecole ERGERSHEIM - classe E
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:caaecb90-f7c0-474e-b92f-3f8f853103dc@mom-hub
+DTSTAMP:20260703T141848Z
+DTSTART;TZID=Europe/Paris:20270319T090000
+DTEND;TZID=Europe/Paris:20270319T100000
+SUMMARY:Ecole BISCHOFFSHEIM - classe A
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:7ae9eb9c-bbe8-4a5a-a613-551ea4bcbea5@mom-hub
+DTSTAMP:20260703T142116Z
+DTSTART;TZID=Europe/Paris:20270319T100000
+DTEND;TZID=Europe/Paris:20270319T110000
+SUMMARY:Ecole BISCHOFFSHEIM - classe B
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
@@ -1596,6 +2276,36 @@ LOCATION:Stade René Brencklé
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
+UID:493dfd9b-563a-43ed-a2ce-966c57e74805@mom-hub
+DTSTAMP:20260703T134543Z
+DTSTART;TZID=Europe/Paris:20270323T083000
+DTEND;TZID=Europe/Paris:20270323T093000
+SUMMARY:Ecole ERGERSHEIM - classe A
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:60aec2c9-2259-46fc-a783-309d298f0546@mom-hub
+DTSTAMP:20260703T134803Z
+DTSTART;TZID=Europe/Paris:20270323T093000
+DTEND;TZID=Europe/Paris:20270323T103000
+SUMMARY:Ecole ERGERSHEIM - classe B
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:ec69e66b-1cc7-448a-9903-72eb496b638a@mom-hub
+DTSTAMP:20260703T135256Z
+DTSTART;TZID=Europe/Paris:20270323T103000
+DTEND;TZID=Europe/Paris:20270323T113000
+SUMMARY:Ecole ERGERSHEIM - classe C
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
 UID:df78fcef-1125-4eef-9340-420d011c0f34@mom-hub
 DTSTAMP:20260702T052253Z
 DTSTART;TZID=Europe/Paris:20270323T150000
@@ -1618,6 +2328,46 @@ LOCATION:Stade René Brencklé
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
+UID:9834d0f7-64f3-491b-8665-484e45be6baa@mom-hub
+DTSTAMP:20260703T140636Z
+DTSTART;TZID=Europe/Paris:20270325T090000
+DTEND;TZID=Europe/Paris:20270325T100000
+SUMMARY:Ecole SCHARRACHBERGHEIM - classe A
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:9bfc9b84-a90c-4610-895d-6a0ad5c92381@mom-hub
+DTSTAMP:20260703T140856Z
+DTSTART;TZID=Europe/Paris:20270325T100000
+DTEND;TZID=Europe/Paris:20270325T110000
+SUMMARY:Ecole SCHARRACHBERGHEIM - classe B
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:25521365-2797-4f2c-9991-64c41cfe7dc4@mom-hub
+DTSTAMP:20260703T135653Z
+DTSTART;TZID=Europe/Paris:20270325T134500
+DTEND;TZID=Europe/Paris:20270325T144500
+SUMMARY:Ecole ERGERSHEIM - classe D
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:4837be53-3489-4659-b746-79f69e7589ac@mom-hub
+DTSTAMP:20260703T135858Z
+DTSTART;TZID=Europe/Paris:20270325T144500
+DTEND;TZID=Europe/Paris:20270325T154500
+SUMMARY:Ecole ERGERSHEIM - classe E
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
 UID:98679bc0-aad7-4ec0-b7d8-f7fe51cf7304@mom-hub
 DTSTAMP:20260702T072017Z
 DTSTART;TZID=Europe/Paris:20270326T190000
@@ -1626,6 +2376,36 @@ SUMMARY:Entraînements des Seniors Masculins
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 LOCATION:Stade René Brencklé
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:ec7f9922-553a-415f-910b-fa2c7e1cda4c@mom-hub
+DTSTAMP:20260703T134543Z
+DTSTART;TZID=Europe/Paris:20270330T083000
+DTEND;TZID=Europe/Paris:20270330T093000
+SUMMARY:Ecole ERGERSHEIM - classe A
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:57b78845-cb8b-4ac7-a415-cc471244b0ae@mom-hub
+DTSTAMP:20260703T134803Z
+DTSTART;TZID=Europe/Paris:20270330T093000
+DTEND;TZID=Europe/Paris:20270330T103000
+SUMMARY:Ecole ERGERSHEIM - classe B
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:24468ef5-d5cc-47a1-b435-82ae82fd78b5@mom-hub
+DTSTAMP:20260703T135256Z
+DTSTART;TZID=Europe/Paris:20270330T103000
+DTEND;TZID=Europe/Paris:20270330T113000
+SUMMARY:Ecole ERGERSHEIM - classe C
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
@@ -1648,6 +2428,66 @@ SUMMARY:Entraînements des Seniors Masculins
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 LOCATION:Stade René Brencklé
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:05f3d284-9bc2-4165-b4ea-e6660efb75f2@mom-hub
+DTSTAMP:20260703T140636Z
+DTSTART;TZID=Europe/Paris:20270401T090000
+DTEND;TZID=Europe/Paris:20270401T100000
+SUMMARY:Ecole SCHARRACHBERGHEIM - classe A
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:da9f3ac0-8635-4999-9cc6-13f9fe04525e@mom-hub
+DTSTAMP:20260703T140856Z
+DTSTART;TZID=Europe/Paris:20270401T100000
+DTEND;TZID=Europe/Paris:20270401T110000
+SUMMARY:Ecole SCHARRACHBERGHEIM - classe B
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:fbc0206e-c6f6-4f40-b1f7-7dde2d099427@mom-hub
+DTSTAMP:20260703T135653Z
+DTSTART;TZID=Europe/Paris:20270401T134500
+DTEND;TZID=Europe/Paris:20270401T144500
+SUMMARY:Ecole ERGERSHEIM - classe D
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:22a702bd-cc58-46eb-99b0-67a4f8377a97@mom-hub
+DTSTAMP:20260703T135858Z
+DTSTART;TZID=Europe/Paris:20270401T144500
+DTEND;TZID=Europe/Paris:20270401T154500
+SUMMARY:Ecole ERGERSHEIM - classe E
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:1955d6df-24bf-4e3f-8e82-312dbea36b68@mom-hub
+DTSTAMP:20260703T141848Z
+DTSTART;TZID=Europe/Paris:20270402T090000
+DTEND;TZID=Europe/Paris:20270402T100000
+SUMMARY:Ecole BISCHOFFSHEIM - classe A
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:6cec6cf8-4e5a-4e44-9802-7227b84bff6c@mom-hub
+DTSTAMP:20260703T142116Z
+DTSTART;TZID=Europe/Paris:20270402T100000
+DTEND;TZID=Europe/Paris:20270402T110000
+SUMMARY:Ecole BISCHOFFSHEIM - classe B
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
@@ -1684,6 +2524,36 @@ LOCATION:Stade René Brencklé
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
+UID:b6d46e44-3e87-4078-9a7a-1813b4067218@mom-hub
+DTSTAMP:20260703T134543Z
+DTSTART;TZID=Europe/Paris:20270406T083000
+DTEND;TZID=Europe/Paris:20270406T093000
+SUMMARY:Ecole ERGERSHEIM - classe A
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:099f8af4-ed4d-423d-ab6c-187e2146593b@mom-hub
+DTSTAMP:20260703T134803Z
+DTSTART;TZID=Europe/Paris:20270406T093000
+DTEND;TZID=Europe/Paris:20270406T103000
+SUMMARY:Ecole ERGERSHEIM - classe B
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:270a32da-ffb4-40a7-87fa-fe0ebd935c66@mom-hub
+DTSTAMP:20260703T135256Z
+DTSTART;TZID=Europe/Paris:20270406T103000
+DTEND;TZID=Europe/Paris:20270406T113000
+SUMMARY:Ecole ERGERSHEIM - classe C
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
 UID:db9db4e4-adca-4948-bfa8-258afccaf99a@mom-hub
 DTSTAMP:20260702T052253Z
 DTSTART;TZID=Europe/Paris:20270406T150000
@@ -1703,6 +2573,66 @@ SUMMARY:Entraînements des Seniors Masculins
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 LOCATION:Stade René Brencklé
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:e67615b1-109c-48be-9d6d-fb7fe670e92d@mom-hub
+DTSTAMP:20260703T140636Z
+DTSTART;TZID=Europe/Paris:20270408T090000
+DTEND;TZID=Europe/Paris:20270408T100000
+SUMMARY:Ecole SCHARRACHBERGHEIM - classe A
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:48ca8955-c6f1-42ca-a2fe-4a8d7496f17c@mom-hub
+DTSTAMP:20260703T140856Z
+DTSTART;TZID=Europe/Paris:20270408T100000
+DTEND;TZID=Europe/Paris:20270408T110000
+SUMMARY:Ecole SCHARRACHBERGHEIM - classe B
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:dceef99f-db32-4acf-ab77-a0981eb627c9@mom-hub
+DTSTAMP:20260703T135653Z
+DTSTART;TZID=Europe/Paris:20270408T134500
+DTEND;TZID=Europe/Paris:20270408T144500
+SUMMARY:Ecole ERGERSHEIM - classe D
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:d60336d9-69d4-4664-9de5-462aa8c7e46d@mom-hub
+DTSTAMP:20260703T135858Z
+DTSTART;TZID=Europe/Paris:20270408T144500
+DTEND;TZID=Europe/Paris:20270408T154500
+SUMMARY:Ecole ERGERSHEIM - classe E
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:9250b27e-55b4-43f8-b9a7-ee56e245eaea@mom-hub
+DTSTAMP:20260703T141848Z
+DTSTART;TZID=Europe/Paris:20270409T090000
+DTEND;TZID=Europe/Paris:20270409T100000
+SUMMARY:Ecole BISCHOFFSHEIM - classe A
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:b57b6037-120d-46bd-bf99-b8e65d948b00@mom-hub
+DTSTAMP:20260703T142116Z
+DTSTART;TZID=Europe/Paris:20270409T100000
+DTEND;TZID=Europe/Paris:20270409T110000
+SUMMARY:Ecole BISCHOFFSHEIM - classe B
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
@@ -1758,6 +2688,26 @@ SUMMARY:Entraînements des Seniors Masculins
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 LOCATION:Stade René Brencklé
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:cd185178-45a6-487b-b76e-9e0c6f8a3176@mom-hub
+DTSTAMP:20260703T141926Z
+DTSTART;TZID=Europe/Paris:20270416T090000
+DTEND;TZID=Europe/Paris:20270416T100000
+SUMMARY:Ecole BISCHOFFSHEIM - classe A
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:5ee0ff6a-7f64-42d4-99e1-d407a700614e@mom-hub
+DTSTAMP:20260703T142140Z
+DTSTART;TZID=Europe/Paris:20270416T100000
+DTEND;TZID=Europe/Paris:20270416T110000
+SUMMARY:Ecole BISCHOFFSHEIM - classe B
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
