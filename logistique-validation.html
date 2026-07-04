@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Validation logistique · MOM Hub</title>
+  <link rel="icon" type="image/png" href="assets/logo-m2m.png">
+  <meta name="description" content="Poste de validation des réservations logistiques et demandes de bus — MOM Hub." />
+
+  <link rel="stylesheet" href="css/hub.css">
+  <!-- Module partagé AGENDA-HUB-PATRON (pt 147, CSS corrigé pt 148 md5 85b567b9…). -->
+  <link rel="stylesheet" href="css/hub-agenda.css">
+
+  <style>
+    /* ==========================================================
+       REFONTE-PARCOURS-LOGISTIQUE (FAIT FOI 777551e9…, phase B) —
+       POSTE DE VALIDATION TRI-SOURCE (arbitrages 5.1b/5.2/5.3,
+       disposition 2A validée en maquette : file à gauche, agenda
+       à droite pour l'arbitrage EN CONTEXTE de conflit).
+       Forme R4 tranchée au DS-1 phase B : tuile du dashboard →
+       cette page dédiée (le dashboard reste un hub de tuiles,
+       largeur 960px incompatible avec la 2A).
+       Garde de page = bureau|admin (ergonomie) ; la VÉRITÉ reste
+       les RPC valider_* gardées bureau|admin (§1.4 — rien à
+       toucher côté SQL).
+       ========================================================== */
+    body.auth-pending { visibility: hidden; }
+
+    .lgv-layout { max-width: 1500px; margin: 0 auto; padding: 28px 22px 60px; }
+
+    .lgv-back {
+      display: inline-block; margin-bottom: 16px;
+      font-family: 'JetBrains Mono', monospace; font-size: 12px;
+      letter-spacing: 0.06em; color: var(--ink-mute); text-decoration: none;
+    }
+    .lgv-back:hover { color: var(--vert-prairie); }
+
+    .lgv-head { margin-bottom: 18px; }
+    .lgv-title {
+      font-family: 'Oswald', sans-serif; font-size: 24px; font-weight: 500;
+      color: var(--ink); letter-spacing: 0.3px; margin: 0 0 4px;
+    }
+    .lgv-subtitle {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      letter-spacing: 0.12em; color: var(--ink-mute); text-transform: uppercase;
+    }
+
+    /* Disposition 2A : file (gauche) / agenda (droite) */
+    .lgv-cols {
+      display: grid;
+      grid-template-columns: 380px minmax(0, 1fr);
+      gap: 30px;
+      align-items: start;
+    }
+    .lgv-col-file { min-width: 0; }
+    .lgv-col-agenda { min-width: 0; }
+    @media (max-width: 1020px) {
+      .lgv-cols { grid-template-columns: 1fr; }
+    }
+
+    .lgv-section { margin-bottom: 28px; }
+    .lgv-section__title {
+      font-family: 'Oswald', sans-serif; font-size: 14px; font-weight: 600;
+      letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft);
+      margin: 0 0 12px; display: flex; align-items: center; gap: 8px;
+    }
+    .lgv-badge {
+      font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600;
+      background: var(--vert-prairie); color: #fff; border-radius: 10px;
+      padding: 1px 7px; min-width: 16px; text-align: center;
+    }
+    .lgv-badge:empty { display: none; }
+
+    /* File tri-source : une carte par demande en attente */
+    .lgv-card {
+      background: #fff; border: 1px solid var(--line); border-radius: 10px;
+      padding: 12px 14px; margin-bottom: 10px;
+    }
+    .lgv-card__top {
+      display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+      margin-bottom: 4px;
+    }
+    .lgv-tag {
+      font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 600;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      border: 1px solid var(--line); border-radius: 8px; padding: 2px 7px;
+      color: var(--ink-mute);
+    }
+    .lgv-tag--recur { color: #4a3577; border-color: #cfc3ee; }
+    .lgv-tag--bus   { color: #333e4a; border-color: #c4ccd4; }
+    .lgv-card__res {
+      font-family: 'Oswald', sans-serif; font-size: 15px; color: var(--ink); flex: 1;
+    }
+    .lgv-card__meta {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      letter-spacing: 0.06em; color: var(--ink-mute); margin-bottom: 2px;
+    }
+    .lgv-card__motif { font-size: 12px; color: var(--ink-mute); font-style: italic; }
+    .lgv-card__actions { display: flex; gap: 8px; margin-top: 9px; }
+    .lgv-btn-ok, .lgv-btn-no, .lgv-btn-toggle {
+      font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 500;
+      border-radius: 6px; padding: 7px 14px; cursor: pointer; border: 1px solid var(--line);
+    }
+    .lgv-btn-ok { background: var(--vert-prairie); color: #fff; border-color: var(--vert-prairie); }
+    .lgv-btn-no { background: #fff; color: var(--rouge-alerte, #b23); }
+    .lgv-btn-ok:disabled, .lgv-btn-no:disabled, .lgv-btn-toggle:disabled { opacity: 0.5; cursor: default; }
+    .lgv-btn-toggle { background: #fff; color: var(--ink-soft); }
+    .lgv-card.is-suspended { opacity: 0.55; }
+
+    .lgv-empty {
+      text-align: center; padding: 24px 16px; color: var(--ink-mute); font-size: 13.5px;
+      background: #fff; border: 1px dashed var(--line); border-radius: 10px;
+    }
+
+    /* ----------------------------------------------------------
+       PALETTE PAR RESSOURCE (arbitrage 5.4 — 7 entrées, IDENTIQUE
+       à logistique-agenda.html : duplication de page assumée et
+       tracée, patron G5).
+       ---------------------------------------------------------- */
+    .ag-ev.t-site-mom-brenckle,   .ag-chip.t-site-mom-brenckle   { background:#e7f3ea; color:#1d5c33; border-left-color:#2d7d46; }
+    .ag-sw.t-site-mom-brenckle   { background:#2d7d46; }
+    .ag-ev.t-site-mom-holtzplatz, .ag-chip.t-site-mom-holtzplatz { background:#eaf1fa; color:#1f4a6b; border-left-color:#2f6fb0; }
+    .ag-sw.t-site-mom-holtzplatz { background:#2f6fb0; }
+    .ag-ev.t-site-mom-clubhouse,  .ag-chip.t-site-mom-clubhouse  { background:#faeee8; color:#7a3d20; border-left-color:#c0622f; }
+    .ag-sw.t-site-mom-clubhouse  { background:#c0622f; }
+    .ag-ev.t-minibus-1,           .ag-chip.t-minibus-1           { background:#f1ecfa; color:#4a3577; border-left-color:#6d4fc2; }
+    .ag-sw.t-minibus-1           { background:#6d4fc2; }
+    .ag-ev.t-minibus-2,           .ag-chip.t-minibus-2           { background:#faf3e2; color:#7a5a12; border-left-color:#d9a222; }
+    .ag-sw.t-minibus-2           { background:#d9a222; }
+    .ag-ev.t-veo,                 .ag-chip.t-veo                 { background:#fae9f0; color:#82345a; border-left-color:#c7508a; }
+    .ag-sw.t-veo                 { background:#c7508a; }
+    .ag-ev.t-bus,                 .ag-chip.t-bus                 { background:#eceff2; color:#333e4a; border-left-color:#52616f; }
+    .ag-sw.t-bus                 { background:#52616f; }
+
+    /* Pending : hachuré + bordure pointillée (badge ⏳ via etatMark) */
+    .ag-ev.pending, .ag-chip.pending {
+      border-left-style: dashed;
+      outline: 1px dashed rgba(60, 60, 60, 0.45);
+      outline-offset: -1px;
+      background-image: repeating-linear-gradient(
+        45deg, rgba(255, 255, 255, 0.55) 0 5px, transparent 5px 10px);
+    }
+
+    /* Toast */
+    .lgv-toast {
+      position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(20px);
+      background: var(--ink); color: #fff; padding: 11px 20px; border-radius: 8px;
+      font-size: 14px; opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s;
+      z-index: 70;
+    }
+    .lgv-toast.is-show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .lgv-toast.is-err { background: var(--rouge-alerte, #b23); }
+  </style>
+</head>
+<body class="auth-pending">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo"><img src="assets/logo-m2m.png" alt="MOM Rugby"></div>
+      <div class="brand-text">
+        <h1>MOM Hub</h1>
+        <p>Mutzig Ovalie Molsheim</p>
+      </div>
+    </div>
+
+    <div class="season-pill">SAISON …</div>
+
+    <nav class="main-nav">
+      <a href="dashboard.html">Tableau de bord</a>
+      <a class="active">Validation logistique</a>
+    </nav>
+
+    <div class="user-profile">
+      <!-- Identité neutralisée (doctrine PROFIL-TOPBAR pt 143) : le helper
+           central _remplirProfilTopbar() remplit prénom, fonction, initiales. -->
+      <div class="avatar">·</div>
+      <div class="user-info">
+        <div class="user-name">…</div>
+        <div class="user-role">…</div>
+      </div>
+      <a href="dashboard.html" class="user-action" title="Retour au tableau de bord" aria-label="Retour au tableau de bord">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/></svg>
+      </a>
+      <button type="button" class="user-action" id="btn-signout" title="Se déconnecter" aria-label="Se déconnecter">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="lgv-layout">
+    <a href="dashboard.html" class="lgv-back" title="Retour au tableau de bord">← Retour au tableau de bord</a>
+    <div class="lgv-head">
+      <h2 class="lgv-title">Validation logistique</h2>
+      <p class="lgv-subtitle">Réservations · récurrences · demandes de bus</p>
+    </div>
+
+    <div class="lgv-cols">
+      <!-- FILE TRI-SOURCE (gauche) -->
+      <div class="lgv-col-file">
+        <section class="lgv-section">
+          <h3 class="lgv-section__title">
+            Demandes en attente <span id="lgv-badge" class="lgv-badge"></span>
+          </h3>
+          <div id="lgv-file"><div class="lgv-empty">Chargement…</div></div>
+        </section>
+
+        <section class="lgv-section">
+          <h3 class="lgv-section__title">Règles récurrentes</h3>
+          <div id="lgv-regles"><div class="lgv-empty">—</div></div>
+        </section>
+      </div>
+
+      <!-- AGENDA D'ARBITRAGE (droite) : les conflits se lisent en contexte,
+           les occurrences des règles pending y sont projetées AVANT
+           approbation (arbitrage FAIT FOI §2). -->
+      <div class="lgv-col-agenda">
+        <section id="agRoot"></section>
+      </div>
+    </div>
+  </main>
+
+  <div id="lgv-toast" class="lgv-toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/supabase-client.js"></script>
+<script src="js/season-pill.js"></script>
+  <script src="js/hub-agenda.js"></script>
+  <script>
+    /* ========================================================================
+       POSTE DE VALIDATION TRI-SOURCE
+       (REFONTE-PARCOURS-LOGISTIQUE phase B, FAIT FOI 777551e9…)
+
+       - File (gauche) : ponctuelles pending + règles récurrentes pending +
+         demandes de bus pending, Approuver/Refuser via les wrappers existants
+         validerReservation / validerRecurrence / validerBus (RPC gardées
+         bureau|admin, §1.4 — AUCUN SQL). Refus : motif facultatif au prompt
+         (patron du guichet, repris à l'identique).
+       - Règles récurrentes : gestion Suspendre/Réactiver (setRecurrenceActive)
+         DÉMÉNAGÉE du guichet (retrait §5.5) — le poste reprend l'intégralité
+         de la fonction.
+       - Agenda (droite) : MÊME adaptateur tri-source que
+         logistique-agenda.html (jumeau — duplication de page assumée et
+         tracée, patron G5) ; l'action injectée dans la modale de détail =
+         « Approuver » sur un item pending (arbitrage en contexte 2A) ; le
+         refus passe par la file (une seule action par modale, contrat module).
+       - Après chaque décision : file + règles rechargées ET agenda.refresh().
+       ======================================================================== */
+    (async function () {
+      'use strict';
+
+      function el(id) { return document.getElementById(id); }
+      function pad2(n) { return (n < 10 ? '0' : '') + n; }
+      function isoOf(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+      function escapeHtml(s) {
+        return String(s == null ? '' : s)
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+      }
+      var JOURS_LBL = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']; // 0=Lun..6=Dim
+      var MOIS_LONG = ['janvier','février','mars','avril','mai','juin','juillet',
+                       'août','septembre','octobre','novembre','décembre'];
+      function formatDateLong(iso) {
+        if (!iso) return '';
+        var d = new Date(iso + 'T00:00:00');
+        if (isNaN(d.getTime())) return '';
+        return d.getDate() + ' ' + MOIS_LONG[d.getMonth()] + ' ' + d.getFullYear();
+      }
+
+      function showToast(msg, ok) {
+        var t = el('lgv-toast');
+        if (!t) { alert(msg); return; }
+        t.textContent = msg;
+        t.className = 'lgv-toast is-show ' + (ok === false ? 'is-err' : 'is-ok');
+        setTimeout(function () { t.className = 'lgv-toast'; }, 3200);
+      }
+
+      // ------------------------------------------------------------------
+      // Garde de page : bureau|admin (ergonomie — la vérité reste les RPC).
+      // ------------------------------------------------------------------
+      var session = await SupabaseHub.getSession();
+      if (!session) { window.location.replace('login.html'); return; }
+      var roles = await Promise.all([
+        SupabaseHub.isAdmin(),
+        SupabaseHub.hasRole('bureau')
+      ]);
+      if (!roles[0] && !roles[1]) { window.location.replace('./'); return; }
+      document.body.classList.remove('auth-pending');
+      document.body.classList.add('auth-resolved');
+
+      var signoutBtn = el('btn-signout');
+      if (signoutBtn) {
+        signoutBtn.addEventListener('click', async function () {
+          signoutBtn.disabled = true;
+          await SupabaseHub.signOut();
+        });
+      }
+      if (SupabaseHub.onAuthChange) {
+        SupabaseHub.onAuthChange(function (event) {
+          if (event === 'SIGNED_OUT') window.location.replace('login.html');
+        });
+      }
+
+      // ------------------------------------------------------------------
+      // Référentiels (jumeau de logistique-agenda.html)
+      // ------------------------------------------------------------------
+      var ressById = {};
+      var catById = {};
+
+      async function chargerReferentiels() {
+        var r1 = await SupabaseHub.client
+          .from('ressources_logistiques')
+          .select('id, code, type, sous_type, libelle, actif')
+          .order('libelle', { ascending: true });
+        if (r1.error) throw r1.error;
+        (r1.data || []).forEach(function (r) { ressById[r.id] = r; });
+        var r2 = await SupabaseHub.client
+          .from('categories')
+          .select('id, code, libelle_court, libelle_long')
+          .order('ordre_tri', { ascending: true });
+        if (r2.error) throw r2.error;
+        (r2.data || []).forEach(function (c) {
+          catById[c.id] = c.libelle_court || c.code || c.libelle_long || c.id;
+        });
+      }
+
+      function typeCodeOf(ressourceId) {
+        var r = ressById[ressourceId];
+        return (r && r.code) ? r.code : 'autre';
+      }
+      function ressLbl(ressourceId) {
+        var r = ressById[ressourceId];
+        return r ? r.libelle : '—';
+      }
+      function catLbl(categorieId) {
+        if (!categorieId) return 'Bureau / Autre';
+        return catById[categorieId] || '—';
+      }
+      function dureeEntre(hd, hf) {
+        if (!hd || !hf) return null;
+        var a = parseInt(String(hd).slice(0, 2), 10) * 60 + parseInt(String(hd).slice(3, 5), 10);
+        var b = parseInt(String(hf).slice(0, 2), 10) * 60 + parseInt(String(hf).slice(3, 5), 10);
+        if (isNaN(a) || isNaN(b) || b <= a) return null;
+        return b - a;
+      }
+      function freqLbl(f) {
+        return f === 'weekly' ? 'Hebdomadaire'
+             : f === 'biweekly' ? 'Une semaine sur deux'
+             : f === 'monthly' ? 'Mensuelle' : (f || '—');
+      }
+      function statutLbl(s) {
+        return s === 'pending' ? 'En attente ⏳'
+             : s === 'approved' ? 'Approuvée'
+             : s === 'rejected' ? 'Refusée' : (s || '—');
+      }
+      function creneauLbl(r) {
+        return (r.heure_debut ? String(r.heure_debut).slice(0, 5) : '—') + '–'
+             + (r.heure_fin ? String(r.heure_fin).slice(0, 5) : '—');
+      }
+      function joursLbl(jours) {
+        return (jours || []).map(function (j) { return JOURS_LBL[j]; }).join(' ');
+      }
+
+      // ------------------------------------------------------------------
+      // Projection fenêtrée des règles récurrentes (jumeau exact — voir
+      // logistique-agenda.html pour la justification sémantique).
+      // ------------------------------------------------------------------
+      function occurrencesFenetre(rule, debutISO, finISO) {
+        var out = [];
+        var jours = rule.jours || [];
+        if (!jours.length || !rule.date_fin) return out;
+        var lo = (rule.date_debut && rule.date_debut > debutISO) ? rule.date_debut : debutISO;
+        var hi = (rule.date_fin < finISO) ? rule.date_fin : finISO;
+        if (lo > hi) return out;
+        var cur = new Date(parseInt(lo.slice(0, 4), 10), parseInt(lo.slice(5, 7), 10) - 1, 1);
+        var last = new Date(parseInt(hi.slice(0, 4), 10), parseInt(hi.slice(5, 7), 10) - 1, 1);
+        while (cur <= last) {
+          var yr = cur.getFullYear(), mo = cur.getMonth();
+          var dim = new Date(yr, mo + 1, 0).getDate();
+          var monthlyDone = false;
+          for (var d = 1; d <= dim; d++) {
+            var dt = new Date(yr, mo, d);
+            var iso = isoOf(dt);
+            if (rule.date_debut && iso < rule.date_debut) continue;
+            if (iso > rule.date_fin) continue;
+            var dow = dt.getDay() === 0 ? 6 : dt.getDay() - 1;
+            if (jours.indexOf(dow) === -1) continue;
+            if (rule.freq === 'biweekly') {
+              var wk = Math.floor((dt - new Date(yr, 0, 1)) / 604800000);
+              if (wk % 2 !== 0) continue;
+            }
+            if (rule.freq === 'monthly') {
+              if (monthlyDone) continue;
+              monthlyDone = true;
+            }
+            if (iso >= debutISO && iso <= finISO) out.push(iso);
+          }
+          cur.setMonth(cur.getMonth() + 1);
+        }
+        return out;
+      }
+
+      // ------------------------------------------------------------------
+      // fetchWindow — tri-source, IDENTIQUE à la consultation (les pending
+      // sont projetés, règles pending incluses AVANT approbation).
+      // ------------------------------------------------------------------
+      async function fetchWindow(debutISO, finISO) {
+        var items = [];
+
+        var p = await SupabaseHub.client
+          .from('reservations_logistiques').select('*')
+          .gte('date', debutISO).lte('date', finISO)
+          .in('statut', ['pending', 'approved']);
+        if (p.error) throw p.error;
+        (p.data || []).forEach(function (r) {
+          items.push({
+            id: 'p-' + r.id,
+            date: r.date,
+            heure: r.heure_debut ? String(r.heure_debut).slice(0, 5) : null,
+            duree_min: dureeEntre(r.heure_debut, r.heure_fin),
+            type: typeCodeOf(r.ressource_id),
+            libelle: (r.motif || ressLbl(r.ressource_id)) + ' · ' + catLbl(r.categorie_id),
+            etat: r.statut,
+            meta: { src: 'ponctuelle', row: r }
+          });
+        });
+
+        var q = await SupabaseHub.client
+          .from('reservations_recurrentes').select('*')
+          .in('statut', ['pending', 'approved'])
+          .eq('active', true)
+          .lte('date_debut', finISO)
+          .gte('date_fin', debutISO);
+        if (q.error) throw q.error;
+        (q.data || []).forEach(function (rule) {
+          occurrencesFenetre(rule, debutISO, finISO).forEach(function (iso) {
+            items.push({
+              id: 'r-' + rule.id + '-' + iso,
+              date: iso,
+              heure: rule.heure_debut ? String(rule.heure_debut).slice(0, 5) : null,
+              duree_min: dureeEntre(rule.heure_debut, rule.heure_fin),
+              type: typeCodeOf(rule.ressource_id),
+              libelle: '↻ ' + (rule.motif || ressLbl(rule.ressource_id)) + ' · ' + catLbl(rule.categorie_id),
+              etat: rule.statut,
+              meta: { src: 'recurrence', row: rule }
+            });
+          });
+        });
+
+        var b = await SupabaseHub.client
+          .from('demandes_bus').select('*')
+          .gte('date', debutISO).lte('date', finISO)
+          .in('statut', ['pending', 'approved']);
+        if (b.error) throw b.error;
+        (b.data || []).forEach(function (d) {
+          items.push({
+            id: 'b-' + d.id,
+            date: d.date,
+            heure: null,
+            duree_min: null,
+            type: 'bus',
+            libelle: 'Bus · ' + (d.destination || '—') + ' · ' + catLbl(d.categorie_id),
+            etat: d.statut,
+            meta: { src: 'bus', row: d }
+          });
+        });
+
+        return items;
+      }
+
+      function detailTitre(it) {
+        if (it.meta.src === 'bus') return 'Bus · ' + (it.meta.row.destination || '—');
+        return ressLbl(it.meta.row.ressource_id);
+      }
+      function detailRows(it) {
+        var r = it.meta.row;
+        var rows = [];
+        if (it.meta.src === 'bus') {
+          rows.push({ lbl: 'Destination', val: r.destination || '—' });
+          rows.push({ lbl: 'Date', val: it.date });
+          if (r.heure_arrivee_souhaitee) rows.push({ lbl: 'Arrivée souhaitée', val: String(r.heure_arrivee_souhaitee).slice(0, 5) });
+          rows.push({ lbl: 'Catégorie', val: catLbl(r.categorie_id) });
+          if (r.total_bus != null) rows.push({ lbl: 'Passagers', val: String(r.total_bus) });
+          rows.push({ lbl: 'Statut', val: statutLbl(r.statut) });
+          return rows;
+        }
+        rows.push({ lbl: 'Ressource', val: ressLbl(r.ressource_id) });
+        rows.push({ lbl: 'Date', val: it.date });
+        rows.push({
+          lbl: 'Créneau',
+          val: creneauLbl(r) + (it.duree_min ? ' · ' + HubAgenda.dureeLabel(it.duree_min) : '')
+        });
+        rows.push({ lbl: 'Catégorie', val: catLbl(r.categorie_id) });
+        if (r.motif) rows.push({ lbl: 'Motif', val: r.motif });
+        if (it.meta.src === 'recurrence') {
+          rows.push({
+            lbl: 'Règle',
+            val: freqLbl(r.freq) + ' · ' + joursLbl(r.jours) + ' · jusqu\'au ' + (r.date_fin || '—')
+          });
+        }
+        rows.push({ lbl: 'Statut', val: statutLbl(r.statut) });
+        return rows;
+      }
+
+      // ------------------------------------------------------------------
+      // Décisions (Approuver/Refuser) — un seul aiguillage par source
+      // ------------------------------------------------------------------
+      async function decider(src, id, decision, motif) {
+        if (src === 'ponctuelle') return SupabaseHub.validerReservation(id, decision, motif);
+        if (src === 'recurrence') return SupabaseHub.validerRecurrence(id, decision, motif);
+        if (src === 'bus')        return SupabaseHub.validerBus(id, decision, motif);
+        return { ok: false, error: 'source inconnue' };
+      }
+
+      // ------------------------------------------------------------------
+      // File tri-source (gauche)
+      // ------------------------------------------------------------------
+      function carteFile(src, tag, tagClass, titre, meta, motif, id) {
+        var card = document.createElement('div');
+        card.className = 'lgv-card';
+        card.innerHTML =
+          '<div class="lgv-card__top">' +
+            '<span class="lgv-tag' + (tagClass ? ' ' + tagClass : '') + '">' + escapeHtml(tag) + '</span>' +
+            '<span class="lgv-card__res">' + escapeHtml(titre) + '</span>' +
+          '</div>' +
+          '<div class="lgv-card__meta">' + escapeHtml(meta) + '</div>' +
+          (motif ? '<div class="lgv-card__motif">' + escapeHtml(motif) + '</div>' : '');
+        var actions = document.createElement('div');
+        actions.className = 'lgv-card__actions';
+        var ok = document.createElement('button');
+        ok.type = 'button'; ok.className = 'lgv-btn-ok'; ok.textContent = 'Approuver';
+        ok.addEventListener('click', async function () {
+          ok.disabled = true;
+          var res = await decider(src, id, 'approved', null);
+          if (res.ok) { showToast('Demande approuvée', true); await refreshTout(); }
+          else { showToast('Échec : ' + (res.error || ''), false); ok.disabled = false; }
+        });
+        var no = document.createElement('button');
+        no.type = 'button'; no.className = 'lgv-btn-no'; no.textContent = 'Refuser';
+        no.addEventListener('click', async function () {
+          var motifRefus = window.prompt('Motif du refus (facultatif) :') || null;
+          no.disabled = true;
+          var res = await decider(src, id, 'rejected', motifRefus);
+          if (res.ok) { showToast('Demande refusée', true); await refreshTout(); }
+          else { showToast('Échec : ' + (res.error || ''), false); no.disabled = false; }
+        });
+        actions.appendChild(ok); actions.appendChild(no);
+        card.appendChild(actions);
+        return card;
+      }
+
+      async function refreshFile() {
+        var host = el('lgv-file');
+        if (!host) return;
+
+        var pp = await SupabaseHub.client
+          .from('reservations_logistiques').select('*')
+          .eq('statut', 'pending')
+          .order('date', { ascending: true }).order('heure_debut', { ascending: true });
+        var pr = await SupabaseHub.client
+          .from('reservations_recurrentes').select('*')
+          .eq('statut', 'pending')
+          .order('created_at', { ascending: true });
+        var pb = await SupabaseHub.listDemandesBus({ statut: 'pending' });
+
+        var ponct = (pp.error ? [] : (pp.data || []));
+        var recur = (pr.error ? [] : (pr.data || []));
+        var bus = pb || [];
+        var total = ponct.length + recur.length + bus.length;
+
+        var badge = el('lgv-badge');
+        if (badge) badge.textContent = total ? String(total) : '';
+
+        host.innerHTML = '';
+        if (total === 0) {
+          host.innerHTML = '<div class="lgv-empty">Aucune demande en attente.</div>';
+          return;
+        }
+        ponct.forEach(function (r) {
+          host.appendChild(carteFile(
+            'ponctuelle', 'Ponctuelle', '',
+            ressLbl(r.ressource_id),
+            formatDateLong(r.date) + ' · ' + creneauLbl(r) + ' · ' + catLbl(r.categorie_id),
+            r.motif, r.id));
+        });
+        recur.forEach(function (r) {
+          host.appendChild(carteFile(
+            'recurrence', 'Récurrente', 'lgv-tag--recur',
+            ressLbl(r.ressource_id),
+            freqLbl(r.freq) + ' · ' + joursLbl(r.jours) + ' · ' + creneauLbl(r) +
+              ' · jusqu\'au ' + formatDateLong(r.date_fin) + ' · ' + catLbl(r.categorie_id),
+            r.motif, r.id));
+        });
+        bus.forEach(function (d) {
+          host.appendChild(carteFile(
+            'bus', 'Bus', 'lgv-tag--bus',
+            d.destination || '—',
+            formatDateLong(d.date) + ' · ' + (d.total_bus || 0) + ' pax · ' + catLbl(d.categorie_id),
+            d.notes, d.id));
+        });
+      }
+
+      // ------------------------------------------------------------------
+      // Règles récurrentes — Suspendre/Réactiver (déménagé du guichet §5.5)
+      // ------------------------------------------------------------------
+      async function refreshRegles() {
+        var host = el('lgv-regles');
+        if (!host) return;
+        var all = await SupabaseHub.listRecurrences({});
+        host.innerHTML = '';
+        if (!all || all.length === 0) {
+          host.innerHTML = '<div class="lgv-empty">Aucune règle récurrente.</div>';
+          return;
+        }
+        all.forEach(function (r) {
+          var card = document.createElement('div');
+          card.className = 'lgv-card' + (r.active ? '' : ' is-suspended');
+          card.innerHTML =
+            '<div class="lgv-card__top">' +
+              '<span class="lgv-tag lgv-tag--recur">' + escapeHtml(statutLbl(r.statut)) + '</span>' +
+              '<span class="lgv-card__res">' + escapeHtml(ressLbl(r.ressource_id)) + '</span>' +
+            '</div>' +
+            '<div class="lgv-card__meta">' +
+              escapeHtml(freqLbl(r.freq) + ' · ' + joursLbl(r.jours) + ' · ' + creneauLbl(r) +
+                ' · jusqu\'au ' + formatDateLong(r.date_fin)) +
+            '</div>' +
+            (r.motif ? '<div class="lgv-card__motif">' + escapeHtml(r.motif) + '</div>' : '');
+          var actions = document.createElement('div');
+          actions.className = 'lgv-card__actions';
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'lgv-btn-toggle';
+          btn.textContent = r.active ? 'Suspendre' : 'Réactiver';
+          btn.addEventListener('click', async function () {
+            btn.disabled = true;
+            var res = await SupabaseHub.setRecurrenceActive(r.id, !r.active);
+            if (res.ok) { showToast('Règle mise à jour', true); await refreshTout(); }
+            else { showToast('Échec : ' + (res.error || ''), false); btn.disabled = false; }
+          });
+          actions.appendChild(btn);
+          card.appendChild(actions);
+          host.appendChild(card);
+        });
+      }
+
+      // ------------------------------------------------------------------
+      // Boot
+      // ------------------------------------------------------------------
+      try {
+        await chargerReferentiels();
+      } catch (e) {
+        console.error('Validation logistique : référentiels', e);
+        showToast('Impossible de charger les ressources.', false);
+      }
+
+      var ORDRE_LEGENDE = [
+        { code: 'site-mom-brenckle',   repli: 'Stade Brencklé' },
+        { code: 'site-mom-holtzplatz', repli: 'Stade Holtzplatz' },
+        { code: 'site-mom-clubhouse',  repli: 'Clubhouse' },
+        { code: 'minibus-1',           repli: 'Minibus 1' },
+        { code: 'minibus-2',           repli: 'Minibus 2' },
+        { code: 'veo',                 repli: 'Caméra Veo' }
+      ];
+      var libByCode = {};
+      Object.keys(ressById).forEach(function (id) {
+        libByCode[ressById[id].code] = ressById[id].libelle;
+      });
+      var types = ORDRE_LEGENDE.map(function (t) {
+        return { code: t.code, lib: libByCode[t.code] || t.repli };
+      });
+      types.push({ code: 'bus', lib: 'Bus (affrété)' });
+
+      var agenda = HubAgenda.create(el('agRoot'), {
+        titre: 'Agenda d\'arbitrage — toutes les ressources',
+        libelleVide: 'Aucune réservation cette semaine.',
+        fetchWindow: fetchWindow,
+        types: types,
+        detail: {
+          titre: detailTitre,
+          rows: detailRows,
+          // Arbitrage EN CONTEXTE (2A) : un item pending s'approuve depuis
+          // sa modale de détail ; le refus (motif) passe par la file.
+          action: function (it) {
+            if (it.etat !== 'pending') return null;
+            return {
+              label: 'Approuver',
+              onClick: async function (item, closeDetail) {
+                var id = item.meta.row.id;
+                var res = await decider(item.meta.src, id, 'approved', null);
+                if (res.ok) {
+                  closeDetail();
+                  showToast('Demande approuvée', true);
+                  await refreshTout();
+                } else {
+                  showToast('Échec : ' + (res.error || ''), false);
+                }
+              }
+            };
+          }
+        },
+        capacites: { pleinEcran: true, caseAnnulees: false },
+        estAnnulee: function () { return false; },
+        etatMark: function (it) { return it.etat === 'pending' ? '⏳' : ''; },
+        onError: function (e) {
+          console.error('Validation logistique : agenda', e);
+          showToast('Agenda : ' + (e && e.message ? e.message : 'erreur de chargement'), false);
+        }
+      });
+
+      async function refreshTout() {
+        await refreshFile();
+        await refreshRegles();
+        await agenda.refresh();
+      }
+
+      await refreshFile();
+      await refreshRegles();
+      await agenda.init();
+
+      console.log('%c🏉 Validation logistique chargée', 'color:#2D7D46;font-weight:bold;',
+        { ressources: Object.keys(ressById).length });
+    })();
+  </script>
+<script src="js/pwa.js"></script>
+</body>
+</html>
