@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agenda logistique · MOM Hub</title>
+  <link rel="icon" type="image/png" href="assets/logo-m2m.png">
+  <meta name="description" content="Agenda transversal des réservations logistiques (toutes ressources) — MOM Hub." />
+
+  <link rel="stylesheet" href="css/hub.css">
+  <!-- Module partagé AGENDA-HUB-PATRON (pt 147, CSS corrigé pt 148 md5 85b567b9…).
+       Le CSS structurel vit dans css/hub-agenda.css ; la palette par type
+       (.ag-ev.t-X / .ag-chip.t-X / .ag-sw.t-X) est fournie CI-DESSOUS par la
+       page (contrat NOTE-USAGE-HUB-AGENDA §2). -->
+  <link rel="stylesheet" href="css/hub-agenda.css">
+
+  <style>
+    /* ==========================================================
+       REFONTE-PARCOURS-LOGISTIQUE (FAIT FOI 777551e9…, phase B) —
+       AGENDA DE CONSULTATION (arbitrage 5.1a : page neuve).
+       Lecture transversale toutes ressources : la RLS SELECT est
+       qual=true pour authenticated (§1.3 du FAIT FOI) → garde de
+       page = session seulement, AUCUN SQL.
+       ========================================================== */
+    body.auth-pending { visibility: hidden; }
+
+    .lga-layout { max-width: 1400px; margin: 0 auto; padding: 28px 22px 60px; }
+
+    .lga-back {
+      display: inline-block; margin-bottom: 16px;
+      font-family: 'JetBrains Mono', monospace; font-size: 12px;
+      letter-spacing: 0.06em; color: var(--ink-mute); text-decoration: none;
+    }
+    .lga-back:hover { color: var(--vert-prairie); }
+
+    .lga-head { margin-bottom: 10px; }
+    .lga-title {
+      font-family: 'Oswald', sans-serif; font-size: 24px; font-weight: 500;
+      color: var(--ink); letter-spacing: 0.3px; margin: 0 0 4px;
+    }
+    .lga-subtitle {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      letter-spacing: 0.12em; color: var(--ink-mute); text-transform: uppercase;
+    }
+
+    .lga-hint {
+      font-size: 12.5px; color: var(--ink-mute); margin: 0 0 6px;
+    }
+
+    /* ----------------------------------------------------------
+       PALETTE PAR RESSOURCE (arbitrage 5.4 — 7 entrées : 6 ressources
+       + Bus). Convention du module : .ag-ev.t-X / .ag-chip.t-X /
+       .ag-sw.t-X. Codes = ressources_logistiques.code (sonde S1) +
+       'bus' hors palette ressource (une demande de bus n'a pas de
+       ressource_id — décision technique tracée du FAIT FOI §2).
+       ---------------------------------------------------------- */
+    .ag-ev.t-site-mom-brenckle,   .ag-chip.t-site-mom-brenckle   { background:#e7f3ea; color:#1d5c33; border-left-color:#2d7d46; }
+    .ag-sw.t-site-mom-brenckle   { background:#2d7d46; }
+    .ag-ev.t-site-mom-holtzplatz, .ag-chip.t-site-mom-holtzplatz { background:#eaf1fa; color:#1f4a6b; border-left-color:#2f6fb0; }
+    .ag-sw.t-site-mom-holtzplatz { background:#2f6fb0; }
+    .ag-ev.t-site-mom-clubhouse,  .ag-chip.t-site-mom-clubhouse  { background:#faeee8; color:#7a3d20; border-left-color:#c0622f; }
+    .ag-sw.t-site-mom-clubhouse  { background:#c0622f; }
+    .ag-ev.t-minibus-1,           .ag-chip.t-minibus-1           { background:#f1ecfa; color:#4a3577; border-left-color:#6d4fc2; }
+    .ag-sw.t-minibus-1           { background:#6d4fc2; }
+    .ag-ev.t-minibus-2,           .ag-chip.t-minibus-2           { background:#faf3e2; color:#7a5a12; border-left-color:#d9a222; }
+    .ag-sw.t-minibus-2           { background:#d9a222; }
+    .ag-ev.t-veo,                 .ag-chip.t-veo                 { background:#fae9f0; color:#82345a; border-left-color:#c7508a; }
+    .ag-sw.t-veo                 { background:#c7508a; }
+    .ag-ev.t-bus,                 .ag-chip.t-bus                 { background:#eceff2; color:#333e4a; border-left-color:#52616f; }
+    .ag-sw.t-bus                 { background:#52616f; }
+
+    /* ----------------------------------------------------------
+       PENDING (rendu validé en maquette : hachuré + bordure
+       pointillée + badge ⏳ via etatMark). Le module pose la classe
+       d'état sur .ag-ev/.ag-chip (buildEvent : 't-'+type+' '+etat).
+       Placé APRÈS la palette : le background-image se superpose au
+       background-color de la palette (le shorthand des règles t-*
+       est écrasé sur la seule couche image).
+       ---------------------------------------------------------- */
+    .ag-ev.pending, .ag-chip.pending {
+      border-left-style: dashed;
+      outline: 1px dashed rgba(60, 60, 60, 0.45);
+      outline-offset: -1px;
+      background-image: repeating-linear-gradient(
+        45deg, rgba(255, 255, 255, 0.55) 0 5px, transparent 5px 10px);
+    }
+
+    /* ----------------------------------------------------------
+       CHOIX DE RESSOURCE (clic créneau libre → guichet pré-rempli,
+       arbitrage acté + §5.7). L'agenda superpose TOUTES les
+       ressources : un créneau libre ne désigne pas une ressource →
+       mini-modale de page (z-60, au-dessus du plein écran z-50,
+       contrat NOTE-USAGE) qui demande laquelle réserver.
+       ---------------------------------------------------------- */
+    .lga-overlay {
+      position: fixed; inset: 0; background: rgba(12, 20, 16, 0.45);
+      display: none; align-items: center; justify-content: center; z-index: 60;
+    }
+    .lga-overlay.open { display: flex; }
+    .lga-modal {
+      background: #fff; border-radius: 12px; padding: 20px 22px;
+      max-width: 420px; width: calc(100% - 40px);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.22);
+    }
+    .lga-modal h3 {
+      font-family: 'Oswald', sans-serif; font-size: 17px; font-weight: 500;
+      color: var(--ink); margin: 0 0 4px;
+    }
+    .lga-modal-when {
+      font-family: 'JetBrains Mono', monospace; font-size: 12px;
+      color: var(--ink-mute); margin: 0 0 14px;
+    }
+    .lga-res-list { display: flex; flex-direction: column; gap: 8px; }
+    .lga-res-btn {
+      display: flex; align-items: center; gap: 10px; text-align: left;
+      font-family: 'Oswald', sans-serif; font-size: 14px; color: var(--ink);
+      background: #fff; border: 1px solid var(--line); border-radius: 9px;
+      padding: 10px 14px; cursor: pointer;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .lga-res-btn:hover { border-color: var(--vert-prairie); }
+    .lga-res-dot { width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto; }
+    .lga-modal-act { display: flex; justify-content: flex-end; margin-top: 14px; }
+    .lga-btn-ghost {
+      font-family: 'Oswald', sans-serif; font-size: 13px; color: var(--ink-soft);
+      background: #fff; border: 1px solid var(--line); border-radius: 7px;
+      padding: 8px 16px; cursor: pointer;
+    }
+
+    /* Toast (patron logi-toast) */
+    .lga-toast {
+      position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(20px);
+      background: var(--ink); color: #fff; padding: 11px 20px; border-radius: 8px;
+      font-size: 14px; opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s;
+      z-index: 70;
+    }
+    .lga-toast.is-show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .lga-toast.is-err { background: var(--rouge-alerte, #b23); }
+  </style>
+</head>
+<body class="auth-pending">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo"><img src="assets/logo-m2m.png" alt="MOM Rugby"></div>
+      <div class="brand-text">
+        <h1>MOM Hub</h1>
+        <p>Mutzig Ovalie Molsheim</p>
+      </div>
+    </div>
+
+    <div class="season-pill">SAISON …</div>
+
+    <nav class="main-nav">
+      <a href="./">Tableau de bord</a>
+      <a class="active">Logistique</a>
+    </nav>
+
+    <div class="user-profile">
+      <!-- Identité neutralisée (doctrine PROFIL-TOPBAR pt 143) : le helper
+           central _remplirProfilTopbar() remplit prénom, fonction, initiales. -->
+      <div class="avatar">·</div>
+      <div class="user-info">
+        <div class="user-name">…</div>
+        <div class="user-role">…</div>
+      </div>
+      <a href="./" class="user-action" title="Retour au portail" aria-label="Retour au portail">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/></svg>
+      </a>
+      <button type="button" class="user-action" id="btn-signout" title="Se déconnecter" aria-label="Se déconnecter">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="lga-layout">
+    <a href="./" class="lga-back" title="Retour à l'accueil">← Retour à l'accueil</a>
+    <div class="lga-head">
+      <h2 class="lga-title">Agenda logistique</h2>
+      <p class="lga-subtitle">Toutes ressources · disponibilités &amp; demandes</p>
+    </div>
+    <p class="lga-hint">Les créneaux pleins sont approuvés ; les hachurés ⏳ sont en attente de validation.
+      Cliquez un créneau libre de la grille pour préparer une demande.</p>
+
+    <!-- Le module génère son DOM dans ce container (classe ag-root posée
+         par HubAgenda.create — contrat NOTE-USAGE, point d'attention 1). -->
+    <section id="agRoot"></section>
+  </main>
+
+  <!-- Mini-modale « quelle ressource ? » (clic créneau libre) -->
+  <div class="lga-overlay" id="lgaChooser">
+    <div class="lga-modal">
+      <h3>Préparer une demande</h3>
+      <p class="lga-modal-when" id="lgaChooserWhen">—</p>
+      <div class="lga-res-list" id="lgaChooserList"></div>
+      <div class="lga-modal-act">
+        <button type="button" class="lga-btn-ghost" id="lgaChooserCancel">Annuler</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="lga-toast" class="lga-toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/supabase-client.js"></script>
+<script src="js/season-pill.js"></script>
+  <script src="js/hub-agenda.js"></script>
+  <script>
+    /* ========================================================================
+       ADAPTATEUR — AGENDA DE CONSULTATION LOGISTIQUE
+       (REFONTE-PARCOURS-LOGISTIQUE phase B, FAIT FOI 777551e9…)
+
+       - fetchWindow projette 3 sources bornées à la fenêtre demandée
+         (ponctuelles + occurrences des règles récurrentes + demandes de bus),
+         front pur, AUCUN SQL (RLS SELECT qual=true, §1.3).
+       - Statuts projetés : approved (plein) + pending (hachuré ⏳) ;
+         rejected exclu. Règles récurrentes : approved ET pending projetées
+         (arbitrage « projection pending avant approbation »), active=true.
+       - Projection fenêtrée DÉDIÉE : réplique la sémantique du getOccurrences
+         du guichet (biweekly = parité de semaine vs 1er janvier ; monthly =
+         1re occurrence du mois) + borne basse date_debut de la règle
+         (le guichet ne la teste pas — divergence assumée et tracée : sans
+         elle, une règle à départ futur projetterait des occurrences
+         antérieures à son propre début).
+       - Bus = événement de JOURNÉE (heure=null → bandeau de tête de colonne,
+         contrat NOTE-USAGE ; PAS d'heure de départ aller en base, S4/S5).
+       - Clic créneau libre : écouteur délégué de PAGE sur la grille du module
+         (lecture du DOM généré, AUCUNE modification du module) → mini-modale
+         de choix de ressource → URL guichet pré-rempli (§5.7).
+       - NB : cet adaptateur a un JUMEAU dans logistique-validation.html
+         (duplication de page assumée et tracée, patron G5 « copies privées »
+         — le module partagé reste le seul code commun).
+       ======================================================================== */
+    (async function () {
+      'use strict';
+
+      function el(id) { return document.getElementById(id); }
+      function pad2(n) { return (n < 10 ? '0' : '') + n; }
+      function isoOf(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+      function hhmm(min) { return pad2(Math.floor(min / 60)) + ':' + pad2(min % 60); }
+      function escapeHtml(s) {
+        return String(s == null ? '' : s)
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+      }
+      // Copies privées (module MOIS/JOURS — duplication tracée, patron G5)
+      var MOIS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+      var JOURS_LBL = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']; // 0=Lun..6=Dim
+
+      function showToast(msg, ok) {
+        var t = el('lga-toast');
+        if (!t) { alert(msg); return; }
+        t.textContent = msg;
+        t.className = 'lga-toast is-show ' + (ok === false ? 'is-err' : 'is-ok');
+        setTimeout(function () { t.className = 'lga-toast'; }, 3200);
+      }
+
+      // ------------------------------------------------------------------
+      // Garde de page : AUTHENTIFIÉ (FAIT FOI §4 — la lecture transversale
+      // est déjà permise par la RLS, aucune garde de rôle).
+      // ------------------------------------------------------------------
+      var session = await SupabaseHub.getSession();
+      if (!session) { window.location.replace('login.html'); return; }
+      document.body.classList.remove('auth-pending');
+      document.body.classList.add('auth-resolved');
+
+      var signoutBtn = el('btn-signout');
+      if (signoutBtn) {
+        signoutBtn.addEventListener('click', async function () {
+          signoutBtn.disabled = true;
+          await SupabaseHub.signOut();
+        });
+      }
+      if (SupabaseHub.onAuthChange) {
+        SupabaseHub.onAuthChange(function (event) {
+          if (event === 'SIGNED_OUT') window.location.replace('login.html');
+        });
+      }
+
+      // ------------------------------------------------------------------
+      // Référentiels chargés une fois : ressources (TOUTES, y compris
+      // inactives — une réservation peut référencer une ressource
+      // désactivée depuis) + catégories (SELECT direct, voie éprouvée du
+      // domaine — cf. fallbackCategories du guichet).
+      // ------------------------------------------------------------------
+      var ressById = {};    // id -> { code, libelle, type, sous_type, actif }
+      var ressActives = []; // pour la mini-modale de choix
+      var catById = {};     // id -> libellé court
+
+      async function chargerReferentiels() {
+        var r1 = await SupabaseHub.client
+          .from('ressources_logistiques')
+          .select('id, code, type, sous_type, libelle, actif')
+          .order('libelle', { ascending: true });
+        if (r1.error) throw r1.error;
+        (r1.data || []).forEach(function (r) {
+          ressById[r.id] = r;
+          if (r.actif) ressActives.push(r);
+        });
+        var r2 = await SupabaseHub.client
+          .from('categories')
+          .select('id, code, libelle_court, libelle_long')
+          .order('ordre_tri', { ascending: true });
+        if (r2.error) throw r2.error;
+        (r2.data || []).forEach(function (c) {
+          catById[c.id] = c.libelle_court || c.code || c.libelle_long || c.id;
+        });
+      }
+
+      function typeCodeOf(ressourceId) {
+        var r = ressById[ressourceId];
+        return (r && r.code) ? r.code : 'autre';
+      }
+      function ressLbl(ressourceId) {
+        var r = ressById[ressourceId];
+        return r ? r.libelle : '—';
+      }
+      function catLbl(categorieId) {
+        if (!categorieId) return 'Bureau / Autre';
+        return catById[categorieId] || '—';
+      }
+      function dureeEntre(hd, hf) {
+        if (!hd || !hf) return null;
+        var a = parseInt(String(hd).slice(0, 2), 10) * 60 + parseInt(String(hd).slice(3, 5), 10);
+        var b = parseInt(String(hf).slice(0, 2), 10) * 60 + parseInt(String(hf).slice(3, 5), 10);
+        if (isNaN(a) || isNaN(b) || b <= a) return null; // module : null -> 60 min
+        return b - a;
+      }
+      function freqLbl(f) {
+        return f === 'weekly' ? 'Hebdomadaire'
+             : f === 'biweekly' ? 'Une semaine sur deux'
+             : f === 'monthly' ? 'Mensuelle' : (f || '—');
+      }
+      function statutLbl(s) {
+        return s === 'pending' ? 'En attente ⏳'
+             : s === 'approved' ? 'Approuvée'
+             : s === 'rejected' ? 'Refusée' : (s || '—');
+      }
+
+      // ------------------------------------------------------------------
+      // Projection fenêtrée des règles récurrentes (dédiée — le
+      // getOccurrences du guichet n'est PAS touché, décision déléguée du
+      // FAIT FOI §2). Sémantique répliquée : jours 0=Lun..6=Dim ;
+      // biweekly = parité de semaine calculée vs le 1er janvier de
+      // l'année de l'occurrence ; monthly = 1re occurrence du mois
+      // (évaluée sur le MOIS ENTIER, pas sur la fenêtre). Bornes de la
+      // règle : [date_debut, date_fin].
+      // ------------------------------------------------------------------
+      function occurrencesFenetre(rule, debutISO, finISO) {
+        var out = [];
+        var jours = rule.jours || [];
+        if (!jours.length || !rule.date_fin) return out;
+        var lo = (rule.date_debut && rule.date_debut > debutISO) ? rule.date_debut : debutISO;
+        var hi = (rule.date_fin < finISO) ? rule.date_fin : finISO;
+        if (lo > hi) return out;
+        var cur = new Date(parseInt(lo.slice(0, 4), 10), parseInt(lo.slice(5, 7), 10) - 1, 1);
+        var last = new Date(parseInt(hi.slice(0, 4), 10), parseInt(hi.slice(5, 7), 10) - 1, 1);
+        while (cur <= last) {
+          var yr = cur.getFullYear(), mo = cur.getMonth();
+          var dim = new Date(yr, mo + 1, 0).getDate();
+          var monthlyDone = false;
+          for (var d = 1; d <= dim; d++) {
+            var dt = new Date(yr, mo, d);
+            var iso = isoOf(dt);
+            if (rule.date_debut && iso < rule.date_debut) continue;
+            if (iso > rule.date_fin) continue;
+            var dow = dt.getDay() === 0 ? 6 : dt.getDay() - 1;
+            if (jours.indexOf(dow) === -1) continue;
+            if (rule.freq === 'biweekly') {
+              var wk = Math.floor((dt - new Date(yr, 0, 1)) / 604800000);
+              if (wk % 2 !== 0) continue;
+            }
+            if (rule.freq === 'monthly') {
+              if (monthlyDone) continue;
+              monthlyDone = true;
+            }
+            if (iso >= debutISO && iso <= finISO) out.push(iso);
+          }
+          cur.setMonth(cur.getMonth() + 1);
+        }
+        return out;
+      }
+
+      // ------------------------------------------------------------------
+      // fetchWindow — projection tri-source bornée [debutISO, finISO]
+      // ------------------------------------------------------------------
+      var lastWindow = null; // mémorisée pour résoudre l'année du clic créneau libre
+
+      async function fetchWindow(debutISO, finISO) {
+        lastWindow = { debut: debutISO, fin: finISO };
+        var items = [];
+
+        // 1) Ponctuelles (pending + approved) fenêtrées sur date
+        var p = await SupabaseHub.client
+          .from('reservations_logistiques').select('*')
+          .gte('date', debutISO).lte('date', finISO)
+          .in('statut', ['pending', 'approved']);
+        if (p.error) throw p.error;
+        (p.data || []).forEach(function (r) {
+          items.push({
+            id: 'p-' + r.id,
+            date: r.date,
+            heure: r.heure_debut ? String(r.heure_debut).slice(0, 5) : null,
+            duree_min: dureeEntre(r.heure_debut, r.heure_fin),
+            type: typeCodeOf(r.ressource_id),
+            libelle: (r.motif || ressLbl(r.ressource_id)) + ' · ' + catLbl(r.categorie_id),
+            etat: r.statut,
+            meta: { src: 'ponctuelle', row: r }
+          });
+        });
+
+        // 2) Règles récurrentes (pending + approved, actives) chevauchant
+        //    la fenêtre → occurrences projetées
+        var q = await SupabaseHub.client
+          .from('reservations_recurrentes').select('*')
+          .in('statut', ['pending', 'approved'])
+          .eq('active', true)
+          .lte('date_debut', finISO)
+          .gte('date_fin', debutISO);
+        if (q.error) throw q.error;
+        (q.data || []).forEach(function (rule) {
+          occurrencesFenetre(rule, debutISO, finISO).forEach(function (iso) {
+            items.push({
+              id: 'r-' + rule.id + '-' + iso,
+              date: iso,
+              heure: rule.heure_debut ? String(rule.heure_debut).slice(0, 5) : null,
+              duree_min: dureeEntre(rule.heure_debut, rule.heure_fin),
+              type: typeCodeOf(rule.ressource_id),
+              libelle: '↻ ' + (rule.motif || ressLbl(rule.ressource_id)) + ' · ' + catLbl(rule.categorie_id),
+              etat: rule.statut,
+              meta: { src: 'recurrence', row: rule }
+            });
+          });
+        });
+
+        // 3) Demandes de bus (pending + approved) — événements de journée
+        var b = await SupabaseHub.client
+          .from('demandes_bus').select('*')
+          .gte('date', debutISO).lte('date', finISO)
+          .in('statut', ['pending', 'approved']);
+        if (b.error) throw b.error;
+        (b.data || []).forEach(function (d) {
+          items.push({
+            id: 'b-' + d.id,
+            date: d.date,
+            heure: null,        // journée entière (pas d'heure de départ aller)
+            duree_min: null,
+            type: 'bus',
+            libelle: 'Bus · ' + (d.destination || '—') + ' · ' + catLbl(d.categorie_id),
+            etat: d.statut,
+            meta: { src: 'bus', row: d }
+          });
+        });
+
+        return items;
+      }
+
+      // ------------------------------------------------------------------
+      // Détail (modale du module) — catégorie + motif affichés (arbitrage)
+      // ------------------------------------------------------------------
+      function detailTitre(it) {
+        if (it.meta.src === 'bus') return 'Bus · ' + (it.meta.row.destination || '—');
+        return ressLbl(it.meta.row.ressource_id);
+      }
+      function detailRows(it) {
+        var r = it.meta.row;
+        var rows = [];
+        if (it.meta.src === 'bus') {
+          rows.push({ lbl: 'Destination', val: r.destination || '—' });
+          rows.push({ lbl: 'Date', val: it.date });
+          if (r.heure_arrivee_souhaitee) rows.push({ lbl: 'Arrivée souhaitée', val: String(r.heure_arrivee_souhaitee).slice(0, 5) });
+          rows.push({ lbl: 'Catégorie', val: catLbl(r.categorie_id) });
+          if (r.total_bus != null) rows.push({ lbl: 'Passagers', val: String(r.total_bus) });
+          rows.push({ lbl: 'Statut', val: statutLbl(r.statut) });
+          return rows;
+        }
+        rows.push({ lbl: 'Ressource', val: ressLbl(r.ressource_id) });
+        rows.push({ lbl: 'Date', val: it.date });
+        rows.push({
+          lbl: 'Créneau',
+          val: (it.heure || '—') + '–' + (r.heure_fin ? String(r.heure_fin).slice(0, 5) : '—')
+             + (it.duree_min ? ' · ' + HubAgenda.dureeLabel(it.duree_min) : '')
+        });
+        rows.push({ lbl: 'Catégorie', val: catLbl(r.categorie_id) });
+        if (r.motif) rows.push({ lbl: 'Motif', val: r.motif });
+        if (it.meta.src === 'recurrence') {
+          rows.push({
+            lbl: 'Règle',
+            val: freqLbl(r.freq) + ' · ' + (r.jours || []).map(function (j) { return JOURS_LBL[j]; }).join(' ')
+               + ' · jusqu\'au ' + (r.date_fin || '—')
+          });
+        }
+        rows.push({ lbl: 'Statut', val: statutLbl(r.statut) });
+        return rows;
+      }
+
+      // ------------------------------------------------------------------
+      // Boot
+      // ------------------------------------------------------------------
+      try {
+        await chargerReferentiels();
+      } catch (e) {
+        console.error('Agenda logistique : référentiels', e);
+        showToast('Impossible de charger les ressources.', false);
+      }
+
+      // Légende (ordre = palette FAIT FOI 5.4) : libellés lus du
+      // référentiel, repli sur les libellés connus si absent.
+      var ORDRE_LEGENDE = [
+        { code: 'site-mom-brenckle',   repli: 'Stade Brencklé' },
+        { code: 'site-mom-holtzplatz', repli: 'Stade Holtzplatz' },
+        { code: 'site-mom-clubhouse',  repli: 'Clubhouse' },
+        { code: 'minibus-1',           repli: 'Minibus 1' },
+        { code: 'minibus-2',           repli: 'Minibus 2' },
+        { code: 'veo',                 repli: 'Caméra Veo' }
+      ];
+      var libByCode = {};
+      Object.keys(ressById).forEach(function (id) {
+        libByCode[ressById[id].code] = ressById[id].libelle;
+      });
+      var types = ORDRE_LEGENDE.map(function (t) {
+        return { code: t.code, lib: libByCode[t.code] || t.repli };
+      });
+      types.push({ code: 'bus', lib: 'Bus (affrété)' });
+
+      var agRoot = el('agRoot');
+      var agenda = HubAgenda.create(agRoot, {
+        titre: 'Agenda — toutes les ressources',
+        libelleVide: 'Aucune réservation cette semaine.',
+        fetchWindow: fetchWindow,
+        types: types,
+        detail: {
+          titre: detailTitre,
+          rows: detailRows,
+          action: function () { return null; }   // consultation : lecture seule
+        },
+        capacites: { pleinEcran: true, caseAnnulees: false },
+        estAnnulee: function () { return false; },   // statuts pending|approved seuls projetés
+        etatMark: function (it) { return it.etat === 'pending' ? '⏳' : ''; },
+        onError: function (e) {
+          console.error('Agenda logistique', e);
+          showToast('Agenda : ' + (e && e.message ? e.message : 'erreur de chargement'), false);
+        }
+      });
+      await agenda.init();
+
+      // ------------------------------------------------------------------
+      // CLIC CRÉNEAU LIBRE → guichet pré-rempli (§5.7).
+      // Écouteur délégué de PAGE : lit le DOM généré par le module
+      // (colonnes .ag-daycol, libellé .ag-weeklabel, axe .ag-hourlbl) sans
+      // le modifier. Fail-soft intégral : si une lecture échoue, le clic
+      // ne fait rien (jamais d'erreur utilisateur).
+      // ------------------------------------------------------------------
+      function lireLundiAffiche() {
+        var lblEl = agRoot.querySelector('.ag-weeklabel');
+        if (!lblEl || !lastWindow) return null;
+        var part = String(lblEl.textContent).split('–')[0].trim(); // « 7 juil. »
+        var m = part.match(/^(\d{1,2})\s+(.+)$/);
+        if (!m) return null;
+        var day = parseInt(m[1], 10);
+        var moIdx = MOIS.indexOf(m[2]);
+        if (moIdx === -1) return null;
+        // Année : candidates = années de la fenêtre courante ; on retient
+        // celle qui place le lundi DANS la fenêtre (le lundi affiché en
+        // fait toujours partie, cf. windowOf du module).
+        var years = [parseInt(lastWindow.debut.slice(0, 4), 10), parseInt(lastWindow.fin.slice(0, 4), 10)];
+        for (var i = 0; i < years.length; i++) {
+          var cand = new Date(years[i], moIdx, day);
+          var iso = isoOf(cand);
+          if (iso >= lastWindow.debut && iso <= lastWindow.fin) return cand;
+        }
+        return null;
+      }
+      function lirePxParMinute() {
+        var lbls = agRoot.querySelectorAll('.ag-hourlbl');
+        if (lbls.length >= 2) {
+          var t0 = parseFloat(lbls[0].style.top), t1 = parseFloat(lbls[1].style.top);
+          if (!isNaN(t0) && !isNaN(t1) && t1 > t0) return (t1 - t0) / 60;
+        }
+        return 0.7; // repli = constante du module (AG_PXMIN)
+      }
+      function lireMinH() {
+        var lbl = agRoot.querySelector('.ag-hourlbl');
+        if (!lbl) return 8;
+        var h = parseInt(String(lbl.textContent), 10);
+        return isNaN(h) ? 8 : h;
+      }
+
+      var chooserCtx = null; // { dateISO, debut, fin }
+      function ouvrirChoixRessource(dateISO, debut, fin) {
+        chooserCtx = { dateISO: dateISO, debut: debut, fin: fin };
+        el('lgaChooserWhen').textContent = dateISO + ' · ' + debut + '–' + fin + ' — pour quelle ressource ?';
+        var host = el('lgaChooserList');
+        host.innerHTML = '';
+        ressActives.forEach(function (r) {
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'lga-res-btn';
+          btn.innerHTML = '<span class="lga-res-dot ag-sw t-' + escapeHtml(r.code) + '"></span>'
+            + escapeHtml(r.libelle);
+          btn.addEventListener('click', function () {
+            var t = r.type === 'site' ? 'site'
+                  : r.sous_type === 'minibus' ? 'minibus' : 'autre';
+            window.location.href = 'logistique.html?type=' + encodeURIComponent(t)
+              + '&ressource=' + encodeURIComponent(r.id)
+              + '&date=' + encodeURIComponent(chooserCtx.dateISO)
+              + '&debut=' + encodeURIComponent(chooserCtx.debut)
+              + '&fin=' + encodeURIComponent(chooserCtx.fin);
+          });
+          host.appendChild(btn);
+        });
+        el('lgaChooser').classList.add('open');
+      }
+      el('lgaChooserCancel').addEventListener('click', function () {
+        el('lgaChooser').classList.remove('open');
+      });
+      el('lgaChooser').addEventListener('click', function (e) {
+        if (e.target === el('lgaChooser')) el('lgaChooser').classList.remove('open');
+      });
+
+      agRoot.addEventListener('click', function (e) {
+        if (!e.target.closest) return;
+        if (e.target.closest('.ag-ev') || e.target.closest('.ag-chip') || e.target.closest('.ag-untimed')) return;
+        var col = e.target.closest('.ag-daycol');
+        if (!col) return;
+        var cols = Array.prototype.slice.call(agRoot.querySelectorAll('.ag-daycol'));
+        var idx = cols.indexOf(col);
+        if (idx < 0) return;
+        var monday = lireLundiAffiche();
+        if (!monday) return;
+        var jour = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + idx);
+        var rect = col.getBoundingClientRect();
+        var y = e.clientY - rect.top;
+        var pxMin = lirePxParMinute();
+        var minutes = lireMinH() * 60 + (y / pxMin);
+        minutes = Math.round(minutes / 30) * 30;              // arrondi à la demi-heure
+        minutes = Math.max(0, Math.min(23 * 60, minutes));
+        var finMin = Math.min(minutes + 60, 23 * 60 + 59);    // durée par défaut : 1 h
+        ouvrirChoixRessource(isoOf(jour), hhmm(minutes), hhmm(finMin));
+      });
+
+      console.log('%c🏉 Agenda logistique chargé', 'color:#2D7D46;font-weight:bold;',
+        { ressources: Object.keys(ressById).length });
+    })();
+  </script>
+<script src="js/pwa.js"></script>
+</body>
+</html>
