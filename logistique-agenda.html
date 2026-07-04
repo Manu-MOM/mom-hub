@@ -218,10 +218,11 @@
          (arbitrage « projection pending avant approbation »), active=true.
        - Projection fenêtrée DÉDIÉE : réplique la sémantique du getOccurrences
          du guichet (biweekly = parité de semaine vs 1er janvier ; monthly =
-         1re occurrence du mois) + borne basse date_debut de la règle
-         (le guichet ne la teste pas — divergence assumée et tracée : sans
-         elle, une règle à départ futur projetterait des occurrences
-         antérieures à son propre début).
+         1re occurrence du mois). INVERSION DS-1 tracée (recette 04/07) : le
+         FAIT FOI §1.1 annonçait une colonne date_debut sur
+         reservations_recurrentes — elle N'EXISTE PAS (erreur PostgREST à la
+         source ; le guichet ne la saisit ni ne la lit). Bornes de projection
+         = [fenêtre demandée, date_fin de la règle], fidèle au guichet.
        - Bus = événement de JOURNÉE (heure=null → bandeau de tête de colonne,
          contrat NOTE-USAGE ; PAS d'heure de départ aller en base, S4/S5).
        - Clic créneau libre : écouteur délégué de PAGE sur la grille du module
@@ -350,7 +351,7 @@
         var out = [];
         var jours = rule.jours || [];
         if (!jours.length || !rule.date_fin) return out;
-        var lo = (rule.date_debut && rule.date_debut > debutISO) ? rule.date_debut : debutISO;
+        var lo = debutISO;
         var hi = (rule.date_fin < finISO) ? rule.date_fin : finISO;
         if (lo > hi) return out;
         var cur = new Date(parseInt(lo.slice(0, 4), 10), parseInt(lo.slice(5, 7), 10) - 1, 1);
@@ -362,7 +363,6 @@
           for (var d = 1; d <= dim; d++) {
             var dt = new Date(yr, mo, d);
             var iso = isoOf(dt);
-            if (rule.date_debut && iso < rule.date_debut) continue;
             if (iso > rule.date_fin) continue;
             var dow = dt.getDay() === 0 ? 6 : dt.getDay() - 1;
             if (jours.indexOf(dow) === -1) continue;
@@ -415,7 +415,6 @@
           .from('reservations_recurrentes').select('*')
           .in('statut', ['pending', 'approved'])
           .eq('active', true)
-          .lte('date_debut', finISO)
           .gte('date_fin', debutISO);
         if (q.error) throw q.error;
         (q.data || []).forEach(function (rule) {
