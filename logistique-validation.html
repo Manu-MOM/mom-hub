@@ -107,6 +107,53 @@
     .lgv-btn-toggle { background: #fff; color: var(--ink-soft); }
     .lgv-card.is-suspended { opacity: 0.55; }
 
+    /* ----------------------------------------------------------
+       Modale d'édition (cycle de vie B3) — CSS de PAGE, aucune
+       dépendance aux classes ag-* du module (indépendance tracée).
+       z-index 80 : au-dessus de la modale de détail du module (60).
+       ---------------------------------------------------------- */
+    .lgv-edit-overlay {
+      position: fixed; inset: 0; background: rgba(20, 24, 28, 0.45);
+      display: none; align-items: center; justify-content: center;
+      z-index: 80; padding: 16px;
+    }
+    .lgv-edit-overlay.is-open { display: flex; }
+    .lgv-edit-modal {
+      background: #fff; border-radius: 12px; max-width: 480px; width: 100%;
+      max-height: 90vh; overflow: auto; padding: 20px;
+    }
+    .lgv-edit-modal h3 { margin: 0 0 14px; font-family: 'Oswald', sans-serif; }
+    .lgv-edit-field { margin-bottom: 12px; }
+    .lgv-edit-field label {
+      display: block; font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-mute);
+      margin-bottom: 4px;
+    }
+    .lgv-edit-field input, .lgv-edit-field select {
+      width: 100%; box-sizing: border-box; padding: 8px 10px;
+      border: 1px solid var(--line); border-radius: 6px;
+      font-size: 14px; font-family: inherit; background: #fff;
+    }
+    .lgv-edit-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .lgv-edit-days { display: flex; gap: 6px; flex-wrap: wrap; }
+    .lgv-edit-day {
+      font-family: 'Oswald', sans-serif; font-size: 12px; padding: 6px 10px;
+      border: 1px solid var(--line); border-radius: 6px; background: #fff; cursor: pointer;
+    }
+    .lgv-edit-day.is-on {
+      background: var(--vert-prairie); color: #fff; border-color: var(--vert-prairie);
+    }
+    .lgv-edit-actions {
+      display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; flex-wrap: wrap;
+    }
+    .lgv-btn-annule {
+      background: #fff; color: var(--rouge-alerte, #b23);
+      font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 500;
+      border: 1px solid var(--line); border-radius: 6px; padding: 7px 14px;
+      cursor: pointer; margin-right: auto;
+    }
+    .lgv-btn-annule:disabled { opacity: 0.5; cursor: default; }
+
     .lgv-empty {
       text-align: center; padding: 24px 16px; color: var(--ink-mute); font-size: 13.5px;
       background: #fff; border: 1px dashed var(--line); border-radius: 10px;
@@ -220,6 +267,70 @@
   </main>
 
   <div id="lgv-toast" class="lgv-toast"></div>
+
+  <!-- Modale d'édition (cycle de vie B3) : ponctuelles + règles.
+       Le bus s'édite sur SON formulaire : bus.html?edit=<id> (B4,
+       une seule source de vérité — décision tracée FAIT FOI §2-B4). -->
+  <div id="lgv-edit-overlay" class="lgv-edit-overlay">
+    <div class="lgv-edit-modal">
+      <h3 id="lgv-edit-titre">Modifier la demande</h3>
+      <div class="lgv-edit-field">
+        <label for="lgv-edit-ressource">Ressource</label>
+        <select id="lgv-edit-ressource"></select>
+      </div>
+      <div class="lgv-edit-field">
+        <label for="lgv-edit-categorie">Catégorie</label>
+        <select id="lgv-edit-categorie"></select>
+      </div>
+      <div class="lgv-edit-field" id="lgv-edit-f-date">
+        <label for="lgv-edit-date">Date</label>
+        <input type="date" id="lgv-edit-date" />
+      </div>
+      <div id="lgv-edit-recur" style="display:none;">
+        <div class="lgv-edit-field">
+          <label for="lgv-edit-freq">Fréquence</label>
+          <select id="lgv-edit-freq">
+            <option value="weekly">Hebdomadaire</option>
+            <option value="biweekly">Une semaine sur deux</option>
+            <option value="monthly">Mensuelle</option>
+          </select>
+        </div>
+        <div class="lgv-edit-field">
+          <label>Jours</label>
+          <div id="lgv-edit-jours" class="lgv-edit-days"></div>
+        </div>
+        <div class="lgv-edit-2col">
+          <div class="lgv-edit-field">
+            <label for="lgv-edit-debut">À partir du</label>
+            <input type="date" id="lgv-edit-debut" />
+          </div>
+          <div class="lgv-edit-field">
+            <label for="lgv-edit-fin">Jusqu'au</label>
+            <input type="date" id="lgv-edit-fin" />
+          </div>
+        </div>
+      </div>
+      <div class="lgv-edit-2col">
+        <div class="lgv-edit-field">
+          <label for="lgv-edit-hdebut">Heure début</label>
+          <input type="time" id="lgv-edit-hdebut" />
+        </div>
+        <div class="lgv-edit-field">
+          <label for="lgv-edit-hfin">Heure fin</label>
+          <input type="time" id="lgv-edit-hfin" />
+        </div>
+      </div>
+      <div class="lgv-edit-field">
+        <label for="lgv-edit-motif">Motif</label>
+        <input type="text" id="lgv-edit-motif" />
+      </div>
+      <div class="lgv-edit-actions">
+        <button type="button" id="lgv-edit-annuler-demande" class="lgv-btn-annule">Annuler la demande</button>
+        <button type="button" id="lgv-edit-fermer" class="lgv-btn-toggle">Fermer</button>
+        <button type="button" id="lgv-edit-enregistrer" class="lgv-btn-ok">Enregistrer</button>
+      </div>
+    </div>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="js/supabase-client.js"></script>
@@ -361,12 +472,22 @@
       }
 
       // ------------------------------------------------------------------
-      // Projection fenêtrée des règles récurrentes (jumeau exact — voir
-      // logistique-agenda.html pour la justification sémantique ; INVERSION
-      // DS-1 recette 04/07 : reservations_recurrentes n'a PAS de colonne
-      // date_debut, contrairement au FAIT FOI §1.1 — bornes = fenêtre +
-      // date_fin, fidèle au guichet).
+      // Projection fenêtrée des règles récurrentes (jumeau exact de
+      // logistique-agenda.html ; sémantique IDENTIQUE au getOccurrences du
+      // guichet). Cycle de vie (sql_151, FAIT FOI b59b44d9) : la colonne
+      // date_debut EXISTE désormais (l'inversion pt 149 est résolue) —
+      // borne basse (NULL = pas de borne) ; biweekly ancré sur la semaine
+      // calendaire de date_debut (repli parité vs 1er janvier si NULL) ;
+      // monthly = 1re occurrence du mois >= date_debut (mois en ENTIER).
       // ------------------------------------------------------------------
+      // Lundi de la semaine calendaire d'une date — ancre biweekly (A2).
+      function mondayOf(dt) {
+        var d = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+        var dow = d.getDay() === 0 ? 6 : d.getDay() - 1;
+        d.setDate(d.getDate() - dow);
+        return d;
+      }
+
       function occurrencesFenetre(rule, debutISO, finISO) {
         var out = [];
         var jours = rule.jours || [];
@@ -374,6 +495,8 @@
         var lo = debutISO;
         var hi = (rule.date_fin < finISO) ? rule.date_fin : finISO;
         if (lo > hi) return out;
+        // Cycle de vie (sql_151) : borne basse date_debut, NULL = pas de borne.
+        var depuis = rule.date_debut ? new Date(rule.date_debut + 'T00:00:00') : null;
         var cur = new Date(parseInt(lo.slice(0, 4), 10), parseInt(lo.slice(5, 7), 10) - 1, 1);
         var last = new Date(parseInt(hi.slice(0, 4), 10), parseInt(hi.slice(5, 7), 10) - 1, 1);
         while (cur <= last) {
@@ -386,8 +509,19 @@
             if (iso > rule.date_fin) continue;
             var dow = dt.getDay() === 0 ? 6 : dt.getDay() - 1;
             if (jours.indexOf(dow) === -1) continue;
+            // A3 : AUCUNE occurrence avant date_debut (en amont du
+            // marqueur monthly : la 1re projetée = la 1re >= date_debut).
+            if (depuis && iso < rule.date_debut) continue;
             if (rule.freq === 'biweekly') {
-              var wk = Math.floor((dt - new Date(yr, 0, 1)) / 604800000);
+              var wk;
+              if (depuis) {
+                // A2 : semaine 0 = semaine calendaire de date_debut,
+                // puis 1/2. Math.round absorbe les décalages DST.
+                wk = Math.round((mondayOf(dt) - mondayOf(depuis)) / 604800000);
+              } else {
+                // Repli sans borne : parité vs 1er janvier (historique).
+                wk = Math.floor((dt - new Date(yr, 0, 1)) / 604800000);
+              }
               if (wk % 2 !== 0) continue;
             }
             if (rule.freq === 'monthly') {
@@ -544,7 +678,10 @@
           if (res.ok) { showToast('Demande refusée', true); await refreshTout(); }
           else { showToast('Échec : ' + (res.error || ''), false); no.disabled = false; }
         });
-        actions.appendChild(ok); actions.appendChild(no);
+        var ed = document.createElement('button');
+        ed.type = 'button'; ed.className = 'lgv-btn-toggle'; ed.textContent = 'Modifier';
+        ed.addEventListener('click', function () { ouvrirEdition(src, id); });
+        actions.appendChild(ok); actions.appendChild(no); actions.appendChild(ed);
         card.appendChild(actions);
         return card;
       }
@@ -637,17 +774,204 @@
             if (res.ok) { showToast('Règle mise à jour', true); await refreshTout(); }
             else { showToast('Échec : ' + (res.error || ''), false); btn.disabled = false; }
           });
+          var edt = document.createElement('button');
+          edt.type = 'button';
+          edt.className = 'lgv-btn-toggle';
+          edt.textContent = 'Modifier';
+          edt.addEventListener('click', function () {
+            ouvrirEdition('recurrence', r.id);
+          });
           actions.appendChild(btn);
+          actions.appendChild(edt);
           card.appendChild(actions);
           host.appendChild(card);
         });
       }
 
       // ------------------------------------------------------------------
+      // Édition & annulation (cycle de vie B1-B7, FAIT FOI b59b44d9).
+      // La ligne est RECHARGÉE INTÉGRALEMENT avant ouverture (patron
+      // pt 141) et TOUS les champs sont ré-émis (B7 — UPDATE dur côté
+      // SQL). Toute modification repasse la demande en 'pending' (B2).
+      // « Annuler la demande » (B5) vit ICI, dans la surface d'édition :
+      // un seul emplacement, qui couvre pending ET approved, et évite la
+      // confusion Refuser (décision bureau) / Annuler (retrait).
+      // Le bus s'édite sur SON formulaire : bus.html?edit=<id> (B4).
+      // ------------------------------------------------------------------
+      var editCtx = null;   // { src, row } — ligne rechargée avant ouverture
+      var editJours = [];
+
+      function peuplerSelectsEdition() {
+        var sr = el('lgv-edit-ressource');
+        if (sr) {
+          sr.innerHTML = '';
+          Object.keys(ressById).forEach(function (id) {
+            var o = document.createElement('option');
+            o.value = id; o.textContent = ressById[id].libelle || id;
+            sr.appendChild(o);
+          });
+        }
+        var sc = el('lgv-edit-categorie');
+        if (sc) {
+          sc.innerHTML = '';
+          var o0 = document.createElement('option');
+          o0.value = ''; o0.textContent = 'Bureau / Autre';
+          sc.appendChild(o0);
+          Object.keys(catById).forEach(function (id) {
+            var o = document.createElement('option');
+            o.value = id; o.textContent = catById[id];
+            sc.appendChild(o);
+          });
+        }
+      }
+
+      function renderEditJours() {
+        var host = el('lgv-edit-jours');
+        if (!host) return;
+        host.innerHTML = '';
+        JOURS_LBL.forEach(function (lbl, idx) {
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'lgv-edit-day' + (editJours.indexOf(idx) !== -1 ? ' is-on' : '');
+          b.textContent = lbl;
+          b.addEventListener('click', function () {
+            var pos = editJours.indexOf(idx);
+            if (pos === -1) { editJours.push(idx); b.classList.add('is-on'); }
+            else { editJours.splice(pos, 1); b.classList.remove('is-on'); }
+          });
+          host.appendChild(b);
+        });
+      }
+
+      async function rechargerLigne(src, id) {
+        var table = (src === 'recurrence')
+          ? 'reservations_recurrentes' : 'reservations_logistiques';
+        var q = await SupabaseHub.client
+          .from(table).select('*').eq('id', id).single();
+        return q.error ? null : q.data;
+      }
+
+      async function ouvrirEdition(src, id) {
+        if (src === 'bus') {
+          window.location.href = 'bus.html?edit=' + encodeURIComponent(id);
+          return;
+        }
+        var row = await rechargerLigne(src, id);
+        if (!row) { showToast('Impossible de recharger la demande.', false); return; }
+        if (row.statut === 'cancelled') {
+          showToast('Demande annulée : non modifiable (re-créer).', false); return;
+        }
+        editCtx = { src: src, row: row };
+        var isRecur = (src === 'recurrence');
+        el('lgv-edit-titre').textContent = isRecur
+          ? 'Modifier la règle récurrente' : 'Modifier la réservation';
+        el('lgv-edit-ressource').value = row.ressource_id || '';
+        el('lgv-edit-categorie').value = row.categorie_id || '';
+        el('lgv-edit-hdebut').value = row.heure_debut ? String(row.heure_debut).slice(0, 5) : '';
+        el('lgv-edit-hfin').value = row.heure_fin ? String(row.heure_fin).slice(0, 5) : '';
+        el('lgv-edit-motif').value = row.motif || '';
+        el('lgv-edit-f-date').style.display = isRecur ? 'none' : '';
+        el('lgv-edit-recur').style.display = isRecur ? '' : 'none';
+        if (isRecur) {
+          el('lgv-edit-freq').value = row.freq || 'weekly';
+          editJours = (row.jours || []).slice();
+          renderEditJours();
+          el('lgv-edit-debut').value = row.date_debut || '';
+          el('lgv-edit-fin').value = row.date_fin || '';
+        } else {
+          el('lgv-edit-date').value = row.date || '';
+        }
+        el('lgv-edit-overlay').classList.add('is-open');
+      }
+
+      function fermerEdition() {
+        editCtx = null;
+        el('lgv-edit-overlay').classList.remove('is-open');
+      }
+
+      async function enregistrerEdition() {
+        if (!editCtx) return;
+        var btn = el('lgv-edit-enregistrer');
+        var hd = el('lgv-edit-hdebut').value || null;
+        var hf = el('lgv-edit-hfin').value || null;
+        if (!hd || !hf) { showToast('Renseigne le créneau', false); return; }
+        var res;
+        if (btn) btn.disabled = true;
+        if (editCtx.src === 'recurrence') {
+          if (editJours.length === 0) {
+            showToast('Choisis au moins un jour', false);
+            if (btn) btn.disabled = false; return;
+          }
+          if (!el('lgv-edit-fin').value) {
+            showToast('Renseigne une date de fin', false);
+            if (btn) btn.disabled = false; return;
+          }
+          res = await SupabaseHub.modifierRecurrence(editCtx.row.id, {
+            ressource_id: el('lgv-edit-ressource').value,
+            categorie_id: el('lgv-edit-categorie').value || null,
+            freq: el('lgv-edit-freq').value || 'weekly',
+            jours: editJours.slice(),
+            heure_debut: hd,
+            heure_fin: hf,
+            date_debut: el('lgv-edit-debut').value || null,
+            date_fin: el('lgv-edit-fin').value,
+            motif: el('lgv-edit-motif').value || null
+          });
+        } else {
+          if (!el('lgv-edit-date').value) {
+            showToast('Renseigne une date', false);
+            if (btn) btn.disabled = false; return;
+          }
+          res = await SupabaseHub.modifierReservation(editCtx.row.id, {
+            ressource_id: el('lgv-edit-ressource').value,
+            categorie_id: el('lgv-edit-categorie').value || null,
+            date: el('lgv-edit-date').value,
+            heure_debut: hd,
+            heure_fin: hf,
+            motif: el('lgv-edit-motif').value || null
+          });
+        }
+        if (btn) btn.disabled = false;
+        if (!res.ok) { showToast('Échec : ' + (res.error || ''), false); return; }
+        showToast('Demande modifiée — repassée en attente de validation', true);
+        fermerEdition();
+        await refreshTout();
+      }
+
+      async function annulerDemande() {
+        if (!editCtx) return;
+        if (!window.confirm('Annuler définitivement cette demande ? Elle disparaîtra des agendas (trace conservée).')) return;
+        var btn = el('lgv-edit-annuler-demande');
+        if (btn) btn.disabled = true;
+        var res = (editCtx.src === 'recurrence')
+          ? await SupabaseHub.annulerRecurrence(editCtx.row.id)
+          : await SupabaseHub.annulerReservation(editCtx.row.id);
+        if (btn) btn.disabled = false;
+        if (!res.ok) { showToast('Échec : ' + (res.error || ''), false); return; }
+        showToast('Demande annulée', true);
+        fermerEdition();
+        await refreshTout();
+      }
+
+      (function wireEdition() {
+        var f = el('lgv-edit-fermer');
+        if (f) f.addEventListener('click', fermerEdition);
+        var s = el('lgv-edit-enregistrer');
+        if (s) s.addEventListener('click', enregistrerEdition);
+        var a = el('lgv-edit-annuler-demande');
+        if (a) a.addEventListener('click', annulerDemande);
+        var ov = el('lgv-edit-overlay');
+        if (ov) ov.addEventListener('click', function (e) {
+          if (e.target === ov) fermerEdition();
+        });
+      })();
+
+      // ------------------------------------------------------------------
       // Boot
       // ------------------------------------------------------------------
       try {
         await chargerReferentiels();
+        peuplerSelectsEdition();
       } catch (e) {
         console.error('Validation logistique : référentiels', e);
         showToast('Impossible de charger les ressources.', false);
@@ -680,22 +1004,36 @@
           rows: detailRows,
           // Arbitrage EN CONTEXTE (2A) : un item pending s'approuve depuis
           // sa modale de détail ; le refus (motif) passe par la file.
+          // Cycle de vie (B3) : un item approved se MODIFIE depuis sa
+          // modale — une seule action par modale, contrat module respecté
+          // (l'action est déterminée PAR ITEM, module intact).
           action: function (it) {
-            if (it.etat !== 'pending') return null;
-            return {
-              label: 'Approuver',
-              onClick: async function (item, closeDetail) {
-                var id = item.meta.row.id;
-                var res = await decider(item.meta.src, id, 'approved', null);
-                if (res.ok) {
-                  closeDetail();
-                  showToast('Demande approuvée', true);
-                  await refreshTout();
-                } else {
-                  showToast('Échec : ' + (res.error || ''), false);
+            if (it.etat === 'pending') {
+              return {
+                label: 'Approuver',
+                onClick: async function (item, closeDetail) {
+                  var id = item.meta.row.id;
+                  var res = await decider(item.meta.src, id, 'approved', null);
+                  if (res.ok) {
+                    closeDetail();
+                    showToast('Demande approuvée', true);
+                    await refreshTout();
+                  } else {
+                    showToast('Échec : ' + (res.error || ''), false);
+                  }
                 }
-              }
-            };
+              };
+            }
+            if (it.etat === 'approved') {
+              return {
+                label: 'Modifier',
+                onClick: async function (item, closeDetail) {
+                  closeDetail();
+                  await ouvrirEdition(item.meta.src, item.meta.row.id);
+                }
+              };
+            }
+            return null;
           }
         },
         capacites: { pleinEcran: true, caseAnnulees: false },
