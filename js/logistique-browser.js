@@ -71,9 +71,20 @@
   // jours : int[] 0=Lundi..6=Dimanche. Renvoie les jours (1..31) du
   // mois (yr, mo 0-based) où la règle s'applique.
   // ============================================================
+  // Lundi de la semaine calendaire d'une date (0=Lun..6=Dim) —
+  // ancre biweekly du cycle de vie (A2).
+  function mondayOf(dt) {
+    const d = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+    const dow = d.getDay() === 0 ? 6 : d.getDay() - 1;
+    d.setDate(d.getDate() - dow);
+    return d;
+  }
+
   function getOccurrences(rule, yr, mo) {
     if (!rule.active || rule.statut !== 'approved') return [];
     const until = new Date(rule.date_fin + 'T23:59:59');
+    // Cycle de vie (sql_151) : borne basse date_debut, NULL = pas de borne.
+    const depuis = rule.date_debut ? new Date(rule.date_debut + 'T00:00:00') : null;
     const dim = new Date(yr, mo + 1, 0).getDate();
     const occ = [];
     for (let d = 1; d <= dim; d++) {
@@ -81,11 +92,23 @@
       const dow = dt.getDay() === 0 ? 6 : dt.getDay() - 1; // 0=Lun..6=Dim
       if (rule.jours.indexOf(dow) === -1) continue;
       if (dt > until) continue;
+      // A3 : AUCUNE occurrence avant date_debut, toutes fréquences.
+      if (depuis && dt < depuis) continue;
       if (rule.freq === 'biweekly') {
-        const wk = Math.floor((dt - new Date(yr, 0, 1)) / 604800000);
-        if (wk % 2 !== 0) continue;
+        if (depuis) {
+          // A2 : semaine 0 = semaine calendaire de date_debut, puis 1/2.
+          // Math.round absorbe les décalages DST (±1 h).
+          const wk = Math.round((mondayOf(dt) - mondayOf(depuis)) / 604800000);
+          if (wk % 2 !== 0) continue;
+        } else {
+          // Repli sans borne : parité vs 1er janvier (sémantique historique).
+          const wk = Math.floor((dt - new Date(yr, 0, 1)) / 604800000);
+          if (wk % 2 !== 0) continue;
+        }
       }
-      // monthly : 1re occurrence du/des jour(s) dans le mois
+      // monthly : 1re occurrence du/des jour(s) dans le mois — le filtre
+      // date_debut s'applique EN AMONT de ce marqueur (A3) : la 1re
+      // occurrence projetée est la 1re >= date_debut.
       if (rule.freq === 'monthly') {
         const premier = occ.length === 0;
         if (!premier) continue;
@@ -353,6 +376,19 @@
         state.recurOn = recurToggle.checked;
         const box = el('logi-recur-box');
         if (box) box.classList.toggle('is-open', state.recurOn);
+        // Cycle de vie (A1) : « À partir du » pré-rempli à la date du
+        // jour à l'ouverture (seulement si vide — ne pas écraser un
+        // choix). Appel explicite : .value programmatique ne déclenche
+        // aucun listener (piège pt 140, sans objet ici).
+        if (state.recurOn) {
+          const deb = el('logi-recur-debut');
+          if (deb && !deb.value) {
+            const now = new Date();
+            deb.value = now.getFullYear() + '-'
+              + String(now.getMonth() + 1).padStart(2, '0') + '-'
+              + String(now.getDate()).padStart(2, '0');
+          }
+        }
       });
     }
     // Jours de la semaine (0=Lun..6=Dim)
@@ -402,8 +438,9 @@
 
     let res;
     if (state.recurOn) {
-      const dateFin = (el('logi-recur-fin') || {}).value || null;
-      const freq    = (el('logi-recur-freq') || {}).value || 'weekly';
+      const dateFin   = (el('logi-recur-fin') || {}).value || null;
+      const dateDebut = (el('logi-recur-debut') || {}).value || null;
+      const freq      = (el('logi-recur-freq') || {}).value || 'weekly';
       if (state.recurJours.length === 0) {
         showToast('Choisis au moins un jour', false);
         if (submitBtn) submitBtn.disabled = false; return;
@@ -420,6 +457,7 @@
         jours: state.recurJours.slice(),
         heure_debut: hDebut,
         heure_fin: hFin,
+        date_debut: dateDebut,
         date_fin: dateFin,
         motif: motif
       });
@@ -450,7 +488,7 @@
   }
 
   function resetForm() {
-    ['logi-date','logi-heure-debut','logi-heure-fin','logi-motif','logi-recur-fin']
+    ['logi-date','logi-heure-debut','logi-heure-fin','logi-motif','logi-recur-debut','logi-recur-fin']
       .forEach(function (id) { if (el(id)) el(id).value = ''; });
     state.recurOn = false;
     state.recurJours = [];
