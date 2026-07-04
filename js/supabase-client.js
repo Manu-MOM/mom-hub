@@ -18,7 +18,19 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.73 — juillet 2026
+ * Version : 1.74 — juillet 2026
+ *   v1.74 : LOGISTIQUE-CYCLE-VIE-RESERVATIONS (FAIT FOI gelé 04/07/2026,
+ *           md5 b59b44d9). 6 wrappers ADDITIFS vers les RPC sql_152
+ *           (SECURITY DEFINER, patron valider_*, gardes bureau|admin OU
+ *           demandeur propriétaire, B5 re-vérifié sur la catégorie cible
+ *           pour les modifier_*) : modifierReservation / modifierRecurrence
+ *           / modifierBus (UPDATE DUR de tous les champs métier — B7, le
+ *           front ré-émet TOUT ; toute modification repasse statut
+ *           'pending' et purge motif_refus/valide_par/valide_le — B2) ;
+ *           annulerReservation / annulerRecurrence / annulerBus (statut
+ *           'cancelled', trace conservée — B5). createRecurrence INCHANGÉ :
+ *           le payload transite tel quel, date_debut (sql_151) passe sans
+ *           modification du wrapper. Aucune méthode existante touchée.
  *   v1.73 : PORTAIL-MULTI-PERIMETRE (Lot 1, FAIT FOI gelé 03/07/2026).
  *           1 wrapper ADDITIF monContexteStaff() → RPC sql_149
  *           mon_contexte_staff (self-only via qui_suis_je, SECURITY
@@ -6740,6 +6752,184 @@
     },
 
     // ========================================================
+    // CYCLE DE VIE DES RÉSERVATIONS (sql_152) — 6 wrappers
+    // ADDITIFS (v1.74). RPC SECURITY DEFINER gardées bureau|admin
+    // OU demandeur propriétaire ; toute modification repasse la
+    // demande en 'pending' (B2) ; UPDATE DUR côté SQL : TOUJOURS
+    // ré-émettre TOUS les champs (B7, recharger la ligne avant).
+    // ========================================================
+
+    /**
+     * Modifie une réservation ponctuelle (repasse en 'pending').
+     * UPDATE DUR : tous les champs métier requis (B7).
+     * @param {string} id  reservation_id
+     * @param {Object} payload { ressource_id, categorie_id, date,
+     *   heure_debut, heure_fin, motif? }
+     * @returns {Promise<{ok:boolean, data?:object, error?:string}>}
+     */
+    async modifierReservation(id, payload) {
+      if (!id || !payload || !payload.ressource_id || !payload.date
+          || !payload.heure_debut || !payload.heure_fin) {
+        return { ok: false, error: 'Champs requis manquants : id, ressource_id, date, heure_debut, heure_fin' };
+      }
+      const { data, error } = await client.rpc('modifier_reservation', {
+        p_reservation_id: id,
+        p_ressource_id: payload.ressource_id,
+        p_categorie_id: payload.categorie_id || null,
+        p_date: payload.date,
+        p_heure_debut: payload.heure_debut,
+        p_heure_fin: payload.heure_fin,
+        p_motif: payload.motif || null
+      });
+      if (error) {
+        console.error('MOM Hub: modifierReservation()', error);
+        return { ok: false, error: error.message || 'Erreur modifier_reservation' };
+      }
+      const r = Array.isArray(data) ? (data[0] || null) : data;
+      return { ok: true, data: r };
+    },
+
+    /**
+     * Modifie une règle récurrente (repasse en 'pending').
+     * UPDATE DUR : tous les champs métier requis (B7), dont
+     * date_debut (sql_151 — null = pas de borne basse).
+     * @param {string} id  recurrence_id
+     * @param {Object} payload { ressource_id, categorie_id, freq,
+     *   jours, heure_debut, heure_fin, date_debut?, date_fin, motif? }
+     * @returns {Promise<{ok:boolean, data?:object, error?:string}>}
+     */
+    async modifierRecurrence(id, payload) {
+      if (!id || !payload || !payload.ressource_id || !payload.freq
+          || !Array.isArray(payload.jours) || !payload.heure_debut
+          || !payload.heure_fin || !payload.date_fin) {
+        return { ok: false, error: 'Champs requis manquants : id, ressource_id, freq, jours[], heure_debut, heure_fin, date_fin' };
+      }
+      const { data, error } = await client.rpc('modifier_recurrence', {
+        p_recurrence_id: id,
+        p_ressource_id: payload.ressource_id,
+        p_categorie_id: payload.categorie_id || null,
+        p_freq: payload.freq,
+        p_jours: payload.jours,
+        p_heure_debut: payload.heure_debut,
+        p_heure_fin: payload.heure_fin,
+        p_date_debut: payload.date_debut || null,
+        p_date_fin: payload.date_fin,
+        p_motif: payload.motif || null
+      });
+      if (error) {
+        console.error('MOM Hub: modifierRecurrence()', error);
+        return { ok: false, error: error.message || 'Erreur modifier_recurrence' };
+      }
+      const r = Array.isArray(data) ? (data[0] || null) : data;
+      return { ok: true, data: r };
+    },
+
+    /**
+     * Modifie une demande de bus (repasse en 'pending').
+     * UPDATE DUR : tous les champs métier requis (B7), jsonb compris.
+     * responsable_personne_id IMMUABLE (hors périmètre v1).
+     * @param {string} id  demande_id
+     * @param {Object} payload { categorie_id, date, type_competition,
+     *   destination, heure_arrivee_souhaitee, retour_depart,
+     *   retour_arrivee, arrets_aller, arrets_retour, delegations,
+     *   pax_joueurs, pax_staff, total_mom, total_deleg, total_bus,
+     *   notes? }
+     * @returns {Promise<{ok:boolean, data?:object, error?:string}>}
+     */
+    async modifierBus(id, payload) {
+      if (!id || !payload || !payload.date || !payload.destination) {
+        return { ok: false, error: 'Champs requis manquants : id, date, destination' };
+      }
+      const { data, error } = await client.rpc('modifier_bus', {
+        p_demande_id: id,
+        p_categorie_id: payload.categorie_id || null,
+        p_date: payload.date,
+        p_type_competition: payload.type_competition || null,
+        p_destination: payload.destination,
+        p_heure_arrivee_souhaitee: payload.heure_arrivee_souhaitee || null,
+        p_retour_depart: payload.retour_depart || null,
+        p_retour_arrivee: payload.retour_arrivee || null,
+        p_arrets_aller: Array.isArray(payload.arrets_aller) ? payload.arrets_aller : [],
+        p_arrets_retour: Array.isArray(payload.arrets_retour) ? payload.arrets_retour : [],
+        p_delegations: Array.isArray(payload.delegations) ? payload.delegations : [],
+        p_pax_joueurs: payload.pax_joueurs || 0,
+        p_pax_staff: payload.pax_staff || 0,
+        p_total_mom: payload.total_mom || 0,
+        p_total_deleg: payload.total_deleg || 0,
+        p_total_bus: payload.total_bus || 0,
+        p_notes: payload.notes || null
+      });
+      if (error) {
+        console.error('MOM Hub: modifierBus()', error);
+        return { ok: false, error: error.message || 'Erreur modifier_bus' };
+      }
+      const r = Array.isArray(data) ? (data[0] || null) : data;
+      return { ok: true, data: r };
+    },
+
+    /**
+     * Annule une réservation ponctuelle (statut 'cancelled', trace
+     * conservée en base ; disparaît de toutes les surfaces).
+     * @param {string} id  reservation_id
+     * @returns {Promise<{ok:boolean, data?:object, error?:string}>}
+     */
+    async annulerReservation(id) {
+      if (!id) {
+        return { ok: false, error: 'id requis' };
+      }
+      const { data, error } = await client.rpc('annuler_reservation', {
+        p_reservation_id: id
+      });
+      if (error) {
+        console.error('MOM Hub: annulerReservation()', error);
+        return { ok: false, error: error.message || 'Erreur annuler_reservation' };
+      }
+      const r = Array.isArray(data) ? (data[0] || null) : data;
+      return { ok: true, data: r };
+    },
+
+    /**
+     * Annule une règle récurrente (statut 'cancelled' : ne projette
+     * plus aucune occurrence ; distinct de la suspension active=false).
+     * @param {string} id  recurrence_id
+     * @returns {Promise<{ok:boolean, data?:object, error?:string}>}
+     */
+    async annulerRecurrence(id) {
+      if (!id) {
+        return { ok: false, error: 'id requis' };
+      }
+      const { data, error } = await client.rpc('annuler_recurrence', {
+        p_recurrence_id: id
+      });
+      if (error) {
+        console.error('MOM Hub: annulerRecurrence()', error);
+        return { ok: false, error: error.message || 'Erreur annuler_recurrence' };
+      }
+      const r = Array.isArray(data) ? (data[0] || null) : data;
+      return { ok: true, data: r };
+    },
+
+    /**
+     * Annule une demande de bus (statut 'cancelled').
+     * @param {string} id  demande_id
+     * @returns {Promise<{ok:boolean, data?:object, error?:string}>}
+     */
+    async annulerBus(id) {
+      if (!id) {
+        return { ok: false, error: 'id requis' };
+      }
+      const { data, error } = await client.rpc('annuler_bus', {
+        p_demande_id: id
+      });
+      if (error) {
+        console.error('MOM Hub: annulerBus()', error);
+        return { ok: false, error: error.message || 'Erreur annuler_bus' };
+      }
+      const r = Array.isArray(data) ? (data[0] || null) : data;
+      return { ok: true, data: r };
+    },
+
+    // ========================================================
     // PLANIFICATION ANNUELLE (sql/73) — 5 wrappers ADDITIFS
     // ========================================================
 
@@ -7415,7 +7605,7 @@
   }
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.73 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.74 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
