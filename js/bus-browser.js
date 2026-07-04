@@ -35,6 +35,7 @@
   // État
   // ============================================================
   const state = {
+    editId: null,        // mode édition ?edit=<id> (cycle de vie B4)
     isTransverse: false,
     categories: [],
     arretsAller:  [{ lieu: '', heure: '', nb_mom: '' }],
@@ -71,6 +72,7 @@
     renderArrets('retour');
     renderDelegations();
     updateTotaux();
+    await applyEditMode();
 
     console.log('%c🏉 Bus chargé', 'color:#2D7D46;font-weight:bold;');
   }
@@ -332,9 +334,21 @@
       notes: (el('b-notes') || {}).value || null
     };
 
-    const res = await SupabaseHub.createDemandeBus(payload);
+    // Cycle de vie (B4) : en mode édition, ré-émission INTÉGRALE via
+    // modifierBus (UPDATE dur B7 — repasse en 'pending' B2).
+    // responsable_personne_id du payload : ignoré par modifierBus
+    // (immuable en édition, décision tracée FAIT FOI).
+    const res = state.editId
+      ? await SupabaseHub.modifierBus(state.editId, payload)
+      : await SupabaseHub.createDemandeBus(payload);
     if (submit) submit.disabled = false;
     if (!res.ok) { showToast('Échec : ' + (res.error || 'erreur'), false); return; }
+    if (state.editId) {
+      showToast('Demande modifiée — repassée en attente de validation', true);
+      // Retour au poste (l'entrée v1 de l'édition est le poste bureau).
+      setTimeout(function () { window.location.href = 'logistique-validation.html'; }, 900);
+      return;
+    }
     showToast('Demande de bus envoyée (en attente)', true);
     resetForm();
   }
@@ -355,6 +369,105 @@
   // refreshValidation() (file pending + validerBus, bureau|admin) a
   // DÉMÉNAGÉ au poste tri-source logistique-validation.html.
   // ============================================================
+
+  // ============================================================
+  // Mode ÉDITION (?edit=<id>) — cycle de vie B4 (FAIT FOI b59b44d9).
+  // Le formulaire de création est LA surface d'édition du bus (une
+  // seule source de vérité) : la demande est rechargée INTÉGRALEMENT
+  // (patron pt 141) puis ré-émise en entier via modifierBus (B7).
+  // Entrée : bouton « Modifier » de logistique-validation.html ;
+  // retour au poste après enregistrement ou annulation.
+  // « Annuler la demande » (B5) vit ici, dans la surface d'édition.
+  // ============================================================
+  function getEditParam() {
+    try {
+      return new URLSearchParams(window.location.search).get('edit') || null;
+    } catch (e) { return null; }
+  }
+
+  async function applyEditMode() {
+    const editId = getEditParam();
+    if (!editId || !/^[0-9a-f-]{36}$/i.test(editId)) return;
+    const q = await SupabaseHub.client
+      .from('demandes_bus').select('*').eq('id', editId).single();
+    if (q.error || !q.data) {
+      showToast('Demande introuvable — formulaire en mode création.', false);
+      return;
+    }
+    const row = q.data;
+    if (row.statut === 'cancelled') {
+      showToast('Demande annulée : non modifiable (re-créer).', false);
+      return;
+    }
+    state.editId = editId;
+    // Pré-remplissage INTÉGRAL (B7). La catégorie est posée par .value
+    // programmatique : le onchange ne se déclenche PAS (piège pt 140)
+    // → loadResponsables est appelé EXPLICITEMENT ensuite.
+    if (el('b-cat')) el('b-cat').value = row.categorie_id || '';
+    await loadResponsables(row.categorie_id || null);
+    if (el('b-resp')) {
+      el('b-resp').value = row.responsable_personne_id || '';
+      el('b-resp').disabled = true; // immuable en édition (décision tracée)
+    }
+    if (el('b-date')) el('b-date').value = row.date || '';
+    if (el('b-comp')) el('b-comp').value = row.type_competition || '';
+    if (el('b-to')) el('b-to').value = row.destination || '';
+    if (el('b-arrival')) {
+      el('b-arrival').value = row.heure_arrivee_souhaitee
+        ? String(row.heure_arrivee_souhaitee).slice(0, 5) : '';
+    }
+    if (el('b-retour-depart')) {
+      el('b-retour-depart').value = row.retour_depart
+        ? String(row.retour_depart).slice(0, 5) : '';
+    }
+    if (el('b-retour-arrival')) {
+      el('b-retour-arrival').value = row.retour_arrivee
+        ? String(row.retour_arrivee).slice(0, 5) : '';
+    }
+    if (el('b-pax-joueurs')) el('b-pax-joueurs').value = row.pax_joueurs || 0;
+    if (el('b-pax-staff')) el('b-pax-staff').value = row.pax_staff || 0;
+    if (el('b-notes')) el('b-notes').value = row.notes || '';
+    state.arretsAller = (Array.isArray(row.arrets_aller) && row.arrets_aller.length)
+      ? row.arrets_aller.map(function (a) {
+          return { lieu: a.lieu || '', heure: a.heure || '',
+                   nb_mom: (a.nb_mom != null ? String(a.nb_mom) : '') };
+        })
+      : [{ lieu: '', heure: '', nb_mom: '' }];
+    state.arretsRetour = (Array.isArray(row.arrets_retour) && row.arrets_retour.length)
+      ? row.arrets_retour.map(function (a) {
+          return { lieu: a.lieu || '', heure: a.heure || '' };
+        })
+      : [{ lieu: '', heure: '' }];
+    state.delegations = Array.isArray(row.delegations)
+      ? row.delegations.map(function (d) {
+          return { club: d.club || '',
+                   nb_pax: (d.nb_pax != null ? String(d.nb_pax) : '') };
+        })
+      : [];
+    renderArrets('aller'); renderArrets('retour'); renderDelegations();
+    updateTotaux();
+    const banner = el('b-edit-banner');
+    if (banner) banner.classList.add('is-on');
+    const submit = el('b-submit');
+    if (submit) submit.textContent = 'Enregistrer les modifications';
+    const ann = el('b-annuler-demande');
+    if (ann) {
+      ann.classList.add('is-on');
+      ann.addEventListener('click', annulerDemandeBus);
+    }
+  }
+
+  async function annulerDemandeBus() {
+    if (!state.editId) return;
+    if (!window.confirm('Annuler définitivement cette demande de bus ? Elle disparaîtra des agendas (trace conservée).')) return;
+    const ann = el('b-annuler-demande');
+    if (ann) ann.disabled = true;
+    const res = await SupabaseHub.annulerBus(state.editId);
+    if (ann) ann.disabled = false;
+    if (!res.ok) { showToast('Échec : ' + (res.error || ''), false); return; }
+    showToast('Demande annulée', true);
+    setTimeout(function () { window.location.href = 'logistique-validation.html'; }, 900);
+  }
 
   // ============================================================
   // Lancement
