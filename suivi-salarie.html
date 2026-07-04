@@ -388,12 +388,12 @@
   .ag-minitoggle { display: none; }
   .ag-legend { display: flex; flex-wrap: wrap; gap: 6px 10px; margin: 12px 0 0; }
   .ag-legend .ag-lg { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--ink-mute, #6b7a74); }
-  .ag-legend .ag-sw { width: 10px; height: 10px; border-radius: 3px; background: #888; flex: 0 0 auto; }
+  .ag-legend .ag-sw { width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto; } /* correctif recette 04/07 : background #888 retiré (même spécificité que .ag-sw.t-* mais plus tardif, il écrasait les 10 couleurs) */
   .ag-list { display: none; }
   .ag-list .ag-lday { margin: 0 0 12px; }
   .ag-list .ag-lday h4 { margin: 0 0 6px; font-size: 12px; font-weight: 700; color: var(--ink-mute, #6b7a74); }
   .ag-list .ag-chip { display: block; margin: 0 0 4px; }
-  .ag-root.ag-fs { position: fixed; inset: 0; z-index: 70; margin: 0; padding: 16px 20px 40px; background: #fff; overflow-y: auto; border-top: 0; }
+  .ag-root.ag-fs { position: fixed; inset: 0; z-index: 50; /* correctif recette 04/07 : sous .ss-overlay (60) pour que les modales détail/édition restent visibles en plein écran */ margin: 0; padding: 16px 20px 40px; background: #fff; overflow-y: auto; border-top: 0; }
   body.ag-fs-lock { overflow: hidden; }
   .ag-det-row { margin: 0 0 10px; font-size: 14px; color: var(--ink, #0c3d24); }
   .ag-det-row .ag-det-lbl { display: block; font-size: 12px; color: var(--ink-mute, #6b7a74); margin: 0 0 2px; }
