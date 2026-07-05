@@ -18,7 +18,14 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.75 — juillet 2026
+ * Version : 1.76 — juillet 2026
+ *   v1.76 : LOGISTIQUE-EXCEPTIONS-RECURRENCE (FAIT FOI gelé 05/07/2026).
+ *           2 wrappers ADDITIFS vers les RPC sql_155 :
+ *           exclureOccurrence(id, date) / reinclureOccurrence(id, date)
+ *           (colonne dates_exclues SEULE écrite — E4 ; la règle ne
+ *           repasse PAS en pending — E3, dérogation tracée à B2).
+ *           node --check OK. boot v1.75 → v1.76.
+ *
  *   v1.75 : CATEGORIE-SECTION-RUGBY (FAIT FOI gelé 05/07/2026, md5
  *           b67f451d + ADDENDUM 1). 2 wrappers ADDITIFS vers les RPC
  *           sql_154 : getJoueursSection() (jumelle de getJoueursF15,
@@ -6984,6 +6991,53 @@
       if (error) {
         console.error('MOM Hub: annulerBus()', error);
         return { ok: false, error: error.message || 'Erreur annuler_bus' };
+      }
+      const r = Array.isArray(data) ? (data[0] || null) : data;
+      return { ok: true, data: r };
+    },
+
+    /**
+     * Exclut UNE occurrence d'une règle récurrente (sql_155, E1-E4) :
+     * la date est ajoutée à dates_exclues, sautée par les 3 projections.
+     * La règle ne repasse PAS en 'pending' (E3, dérogation tracée à B2).
+     * @param {string} id  recurrence_id
+     * @param {string} date  'YYYY-MM-DD' (dans les bornes de la règle)
+     * @returns {Promise<{ok:boolean, data?:object, error?:string}>}
+     */
+    async exclureOccurrence(id, date) {
+      if (!id || !date) {
+        return { ok: false, error: 'id et date requis' };
+      }
+      const { data, error } = await client.rpc('exclure_occurrence', {
+        p_recurrence_id: id,
+        p_date: date
+      });
+      if (error) {
+        console.error('MOM Hub: exclureOccurrence()', error);
+        return { ok: false, error: error.message || 'Erreur exclure_occurrence' };
+      }
+      const r = Array.isArray(data) ? (data[0] || null) : data;
+      return { ok: true, data: r };
+    },
+
+    /**
+     * Réinclut une date précédemment exclue (sql_155, E5) : la date
+     * est retirée de dates_exclues, l'occurrence réapparaît partout.
+     * @param {string} id  recurrence_id
+     * @param {string} date  'YYYY-MM-DD' (doit figurer dans dates_exclues)
+     * @returns {Promise<{ok:boolean, data?:object, error?:string}>}
+     */
+    async reinclureOccurrence(id, date) {
+      if (!id || !date) {
+        return { ok: false, error: 'id et date requis' };
+      }
+      const { data, error } = await client.rpc('reinclure_occurrence', {
+        p_recurrence_id: id,
+        p_date: date
+      });
+      if (error) {
+        console.error('MOM Hub: reinclureOccurrence()', error);
+        return { ok: false, error: error.message || 'Erreur reinclure_occurrence' };
       }
       const r = Array.isArray(data) ? (data[0] || null) : data;
       return { ok: true, data: r };
