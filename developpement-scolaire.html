@@ -34,6 +34,17 @@
     - mail-type : data/mail-types.json (2 variables {nom_ecole}/{contact_nom}).
     - compteur d'objectif = dérivé, jamais stocké.
     - saisie d'historique portée par le BUREAU (cette page), jamais Lohann.
+
+  ENRICHISSEMENT FICHE ÉCOLE (OODA retour terrain Lohann, 05/07/2026 —
+  sql_159 colonnes + sql_160 seed 67 écoles secteur) :
+    - 7 champs additifs : adresse, code_postal, commune, telephone, uai,
+      zone (circonscription), lieu_pratique (lieu de pratique envisagé).
+    - upsert_entite passe de 16 à 23 params (7 nouveaux en fin, DEFAULT NULL) ;
+      paramsEntite/saveEcole renvoient LES 23 (UPDATE DUR reconduit).
+    - liste : commune + téléphone affichés, champ de recherche (nom/commune/
+      zone) — décision technique mineure tracée (67 écoles = liste
+      inutilisable sans).
+    - uai affiché en lecture seule dans la fiche (identifiant Éducation nat.).
 -->
 <link rel="stylesheet" href="css/hub.css">
 <style>
@@ -53,6 +64,10 @@
   .gs-msg { padding: 10px 14px; border-radius: 8px; font-size: 14px; margin-bottom: 14px; display: none; }
   .gs-msg.ok { background: #e8f1ec; color: var(--vert-prairie, #1b6b4c); display: block; }
   .gs-msg.err { background: #f7e6e2; color: var(--rouge-blesse, #c0392b); display: block; }
+
+  /* Champ de recherche (liste 67+ écoles) */
+  .ds-search { width: 100%; box-sizing: border-box; padding: 9px 12px; margin: 0 0 12px;
+               border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 8px; font: inherit; }
 
   /* En-tête de page */
   .ds-hd { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
@@ -247,6 +262,8 @@
     <span class="sp"></span>
   </div>
 
+  <input type="search" class="ds-search" id="dsSearch"
+         placeholder="Rechercher une école (nom, commune, zone…)">
   <div class="ds-list" id="dsListe"></div>
   <div class="gs-empty" id="dsListeVide" style="display:none">
     Aucune école pour l'instant. Ajoutez une première école pour lancer le démarchage.
@@ -302,6 +319,40 @@
         <input type="email" id="dsEcoleContactEmail" placeholder="ecole@…">
       </div>
     </div>
+
+    <div class="gs-field">
+      <label for="dsEcoleAdresse">Adresse postale</label>
+      <input type="text" id="dsEcoleAdresse" placeholder="3 rue des Écoles">
+    </div>
+
+    <div class="gs-grid2">
+      <div class="gs-field">
+        <label for="dsEcoleCp">Code postal</label>
+        <input type="text" id="dsEcoleCp" placeholder="67120">
+      </div>
+      <div class="gs-field">
+        <label for="dsEcoleCommune">Commune</label>
+        <input type="text" id="dsEcoleCommune" placeholder="Molsheim">
+      </div>
+    </div>
+
+    <div class="gs-grid2">
+      <div class="gs-field">
+        <label for="dsEcoleTel">Téléphone</label>
+        <input type="text" id="dsEcoleTel" placeholder="03 88 …">
+      </div>
+      <div class="gs-field">
+        <label for="dsEcoleZone">Zone / circonscription</label>
+        <input type="text" id="dsEcoleZone" placeholder="Circ. Molsheim">
+      </div>
+    </div>
+
+    <div class="gs-field">
+      <label for="dsEcoleLieuPratique">Lieu de pratique envisagé</label>
+      <input type="text" id="dsEcoleLieuPratique" placeholder="Cour, gymnase, stade municipal… (à collecter au premier contact)">
+    </div>
+
+    <p class="gs-modal-note" id="dsEcoleUai" style="display:none"></p>
 
     <!-- Journal de contacts (visible en édition uniquement) -->
     <div class="ds-journal" id="dsJournalWrap" style="display:none">
@@ -480,6 +531,7 @@
   let missionsParEntite = new Map(); // entite_id -> [missions]
   let salarieId = null;          // salarié v1 (pré-remplit la mission de cycle)
   let filtreCourant = 'toutes';
+  let rechercheCourante = '';
   let ficheId = null;            // école en cours d'édition (null = création)
   let cycleEcoleId = null;       // école pour laquelle on programme un cycle
 
@@ -553,6 +605,11 @@
 
   // ---------- Liste des écoles ----------
   function passeFiltre(e) {
+    if (rechercheCourante) {
+      const hay = [e.libelle, e.commune, e.zone, e.code_postal]
+        .filter(Boolean).join(' ').toLowerCase();
+      if (hay.indexOf(rechercheCourante) === -1) return false;
+    }
     const s = e.statut_prospection;
     if (filtreCourant === 'toutes') return true;
     if (filtreCourant === 'client') return s === 'client';
@@ -584,7 +641,8 @@
     wrap.innerHTML = visibles.map(e => {
       const off = e.actif === false;
       const contact = [e.contact_nom, e.contact_email].filter(Boolean).join(' · ');
-      const meta = [STATUT_LBL[e.type_entite] || e.type_entite, contact].filter(Boolean).join(' — ');
+      const lieu = [e.commune, e.telephone].filter(Boolean).join(' · ');
+      const meta = [lieu, contact].filter(Boolean).join(' — ');
       // Badge d'avancement dérivé uniquement pour les clientes.
       let derive = '';
       if (e.statut_prospection === 'client') {
@@ -652,7 +710,14 @@
       p_adresse_facturation: e.adresse_facturation != null ? e.adresse_facturation : null,
       p_raison_sociale: e.raison_sociale != null ? e.raison_sociale : null,
       p_email_facturation: e.email_facturation != null ? e.email_facturation : null,
-      p_siret: e.siret != null ? e.siret : null
+      p_siret: e.siret != null ? e.siret : null,
+      p_adresse: e.adresse != null ? e.adresse : null,
+      p_code_postal: e.code_postal != null ? e.code_postal : null,
+      p_commune: e.commune != null ? e.commune : null,
+      p_telephone: e.telephone != null ? e.telephone : null,
+      p_uai: e.uai != null ? e.uai : null,
+      p_zone: e.zone != null ? e.zone : null,
+      p_lieu_pratique: e.lieu_pratique != null ? e.lieu_pratique : null
     };
     return Object.assign(base, overrides || {});
   }
@@ -679,6 +744,19 @@
     $('dsEcoleStatut').value = e ? (e.statut_prospection || 'a_contacter') : 'a_contacter';
     $('dsEcoleContactNom').value = e ? (e.contact_nom || '') : '';
     $('dsEcoleContactEmail').value = e ? (e.contact_email || '') : '';
+    $('dsEcoleAdresse').value = e ? (e.adresse || '') : '';
+    $('dsEcoleCp').value = e ? (e.code_postal || '') : '';
+    $('dsEcoleCommune').value = e ? (e.commune || '') : '';
+    $('dsEcoleTel').value = e ? (e.telephone || '') : '';
+    $('dsEcoleZone').value = e ? (e.zone || '') : '';
+    $('dsEcoleLieuPratique').value = e ? (e.lieu_pratique || '') : '';
+    if (e && e.uai) {
+      $('dsEcoleUai').textContent = 'Code UAI (Éducation nationale) : ' + e.uai;
+      $('dsEcoleUai').style.display = 'block';
+    } else {
+      $('dsEcoleUai').textContent = '';
+      $('dsEcoleUai').style.display = 'none';
+    }
     // Journal : visible seulement en édition (une école doit exister).
     if (e) { $('dsJournalWrap').style.display = 'block'; chargerJournal(e.id); }
     else   { $('dsJournalWrap').style.display = 'none'; $('dsJournalListe').innerHTML = ''; }
@@ -700,7 +778,13 @@
           p_type_entite: $('dsEcoleType').value,
           p_statut_prospection: $('dsEcoleStatut').value,
           p_contact_nom: $('dsEcoleContactNom').value.trim() || null,
-          p_contact_email: $('dsEcoleContactEmail').value.trim() || null
+          p_contact_email: $('dsEcoleContactEmail').value.trim() || null,
+          p_adresse: $('dsEcoleAdresse').value.trim() || null,
+          p_code_postal: $('dsEcoleCp').value.trim() || null,
+          p_commune: $('dsEcoleCommune').value.trim() || null,
+          p_telephone: $('dsEcoleTel').value.trim() || null,
+          p_zone: $('dsEcoleZone').value.trim() || null,
+          p_lieu_pratique: $('dsEcoleLieuPratique').value.trim() || null
         });
       } else {
         // Création : les 16 params, defaults neutres pour les champs non saisis.
@@ -720,7 +804,14 @@
           p_adresse_facturation: null,
           p_raison_sociale: null,
           p_email_facturation: null,
-          p_siret: null
+          p_siret: null,
+          p_adresse: $('dsEcoleAdresse').value.trim() || null,
+          p_code_postal: $('dsEcoleCp').value.trim() || null,
+          p_commune: $('dsEcoleCommune').value.trim() || null,
+          p_telephone: $('dsEcoleTel').value.trim() || null,
+          p_uai: null,
+          p_zone: $('dsEcoleZone').value.trim() || null,
+          p_lieu_pratique: $('dsEcoleLieuPratique').value.trim() || null
         };
       }
       await rpc('upsert_entite', params);
@@ -891,6 +982,11 @@
     if (!b) return;
     filtreCourant = b.dataset.filter;
     Array.prototype.forEach.call($('dsFilters').children, c => c.classList.toggle('on', c === b));
+    renderListe();
+  });
+
+  $('dsSearch').addEventListener('input', function () {
+    rechercheCourante = this.value.trim().toLowerCase();
     renderListe();
   });
 
