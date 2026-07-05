@@ -13,6 +13,14 @@
  *    logistique-validation.html (REFONTE-PARCOURS-LOGISTIQUE, FAIT FOI
  *    777551e9…, arbitrages 5.3/5.5) — le guichet est purifié.
  *
+ * MULTI-CATEGORIES (FAIT FOI gelé 05/07/2026) : pioches catégories ET
+ * responsables en cases à cocher (patron bus-days, M5/M6 complète),
+ * ordre de coche = ordre du tableau (T4), 1er = principal/officiel.
+ * Responsables = UNION du staff des catégories cochées (T3).
+ * Mode ?edit= : catégories rechargées depuis categorie_ids (fallback
+ * scalaire) et rééditables ; responsables AFFICHÉS FIGÉS (chips
+ * désactivées, T2 — immuables en édition comme avant).
+ *
  * Mapping JSONB (aligné schéma SQL §4.4) :
  *   arrets_aller  [{lieu, heure, nb_mom}]
  *   arrets_retour [{lieu, heure}]
@@ -38,6 +46,8 @@
     editId: null,        // mode édition ?edit=<id> (cycle de vie B4)
     isTransverse: false,
     categories: [],
+    catCoches: [],       // uuid[] catégories cochées, ORDRE DE COCHE (T4)
+    respCoches: [],      // uuid[] responsables cochés, ORDRE DE COCHE (T4)
     arretsAller:  [{ lieu: '', heure: '', nb_mom: '' }],
     arretsRetour: [{ lieu: '', heure: '' }],
     delegations:  []
@@ -106,53 +116,118 @@
   }
 
   function renderCategorieOptions() {
-    const sel = el('b-cat');
-    if (!sel) return;
-    let html = state.isTransverse ? '<option value="">— Bureau / Autre —</option>'
-                                  : '<option value="">— Sélectionner —</option>';
+    const host = el('b-cat');
+    if (!host) return;
+    host.innerHTML = '';
+    state.catCoches = [];
+    // MULTI (M5) : cases patron bus-days, ordre de coche = tableau (T4).
+    // AUCUNE coche = « Bureau / Autre » (tableau vide, M3), contrôlé au
+    // submit (transverses seulement), la policy tranche en dernier.
     state.categories
       .slice()
       .sort(function (a, b) { return (a.ordre_tri || 0) - (b.ordre_tri || 0); })
       .forEach(function (c) {
-        html += '<option value="' + escapeHtml(c.id) + '">' +
-          escapeHtml(c.libelle_court || c.code || c.libelle_long || c.id) + '</option>';
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'bus-day';
+        b.dataset.id = c.id;
+        b.textContent = c.libelle_court || c.code || c.libelle_long || c.id;
+        b.addEventListener('click', function () {
+          const pos = state.catCoches.indexOf(c.id);
+          if (pos === -1) { state.catCoches.push(c.id); b.classList.add('is-on'); }
+          else { state.catCoches.splice(pos, 1); b.classList.remove('is-on'); }
+          if (state.catCoches.length
+              && typeof SupabaseHub.memoriserCategorieActive === 'function') {
+            SupabaseHub.memoriserCategorieActive(state.catCoches[0]);
+          }
+          loadResponsables(state.catCoches.slice());
+        });
+        host.appendChild(b);
       });
-    sel.innerHTML = html;
-    // Synchro inter-écrans : pré-sélectionne la catégorie active
-    // mémorisée (clé partagée mom_hub.categorie_active via le socle)
-    // si elle figure dans la liste, et mémorise tout nouveau choix.
+    // Synchro inter-écrans : pré-coche la catégorie active mémorisée.
     try {
       if (typeof SupabaseHub.lireCategorieActiveMemorisee === 'function') {
         const memo = SupabaseHub.lireCategorieActiveMemorisee();
         if (memo && state.categories.some(function (c) { return c.id === memo; })) {
-          sel.value = memo;
+          state.catCoches = [memo];
+          const btn = host.querySelector('.bus-day[data-id="' + CSS.escape(memo) + '"]');
+          if (btn) btn.classList.add('is-on');
         }
       }
     } catch (e) { /* honnête : pas de synchro, choix manuel */ }
-    sel.onchange = function () {
-      if (sel.value && typeof SupabaseHub.memoriserCategorieActive === 'function') {
-        SupabaseHub.memoriserCategorieActive(sel.value);
-      }
-      loadResponsables(sel.value || null);
-    };
-    loadResponsables(sel.value || null);
+    loadResponsables(state.catCoches.slice());
   }
 
-  async function loadResponsables(categorieId) {
-    const sel = el('b-resp');
-    if (!sel) return;
-    sel.innerHTML = '<option value="">Chargement…</option>';
-    const staff = await SupabaseHub.listStaffDisponibles(categorieId);
-    if (!staff || staff.length === 0) {
-      sel.innerHTML = '<option value="">Aucun encadrant disponible</option>';
+  async function loadResponsables(categorieIds) {
+    const host = el('b-resp');
+    if (!host) return;
+    // T2 : en mode édition les responsables sont FIGÉS — un changement de
+    // catégories ne re-rend pas la pioche éditable, on ré-affiche le gel.
+    if (state.editId) { renderResponsablesFiges(state.respCoches.slice()); return; }
+    host.innerHTML = '<span style="font-size:12px;color:var(--ink-mute);">Chargement…</span>';
+    // T3 : UNION du staff des catégories cochées, fusion dédupliquée.
+    // Aucune coche → listStaffDisponibles(null) = tous les staffs.
+    const staff = [];
+    const seen = {};
+    const ids = (categorieIds && categorieIds.length) ? categorieIds : [null];
+    for (let i = 0; i < ids.length; i++) {
+      const lot = await SupabaseHub.listStaffDisponibles(ids[i]);
+      (lot || []).forEach(function (p) {
+        if (!p || !p.personne_id || seen[p.personne_id]) return;
+        seen[p.personne_id] = true;
+        staff.push(p);
+      });
+    }
+    staff.sort(function (a, b) {
+      return ((a.nom || '') + ' ' + (a.prenom || ''))
+        .localeCompare(((b.nom || '') + ' ' + (b.prenom || '')), 'fr');
+    });
+    state.respCoches = [];
+    host.innerHTML = '';
+    if (staff.length === 0) {
+      host.innerHTML = '<span style="font-size:12px;color:var(--ink-mute);">Aucun encadrant disponible</span>';
       return;
     }
-    let html = '<option value="">— Choisir —</option>';
+    // M6 complète : 1er coché = responsable officiel, suivants indicatifs.
     staff.forEach(function (p) {
-      const nom = ((p.nom || '') + ' ' + (p.prenom || '')).trim();
-      html += '<option value="' + escapeHtml(p.personne_id) + '">' + escapeHtml(nom) + '</option>';
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'bus-day';
+      b.dataset.id = p.personne_id;
+      b.textContent = ((p.nom || '') + ' ' + (p.prenom || '')).trim();
+      b.addEventListener('click', function () {
+        const pos = state.respCoches.indexOf(p.personne_id);
+        if (pos === -1) { state.respCoches.push(p.personne_id); b.classList.add('is-on'); }
+        else { state.respCoches.splice(pos, 1); b.classList.remove('is-on'); }
+      });
+      host.appendChild(b);
     });
-    sel.innerHTML = html;
+  }
+
+  // Mode ?edit= (T2) : responsables affichés cochés et DÉSACTIVÉS —
+  // immuables en édition (modifier_bus ne les prend pas, comme avant).
+  // Les libellés sont résolus via listStaffDisponibles(null) (tous staffs).
+  async function renderResponsablesFiges(ids) {
+    const host = el('b-resp');
+    if (!host) return;
+    host.innerHTML = '<span style="font-size:12px;color:var(--ink-mute);">Chargement…</span>';
+    const tous = await SupabaseHub.listStaffDisponibles(null);
+    const nomById = {};
+    (tous || []).forEach(function (p) {
+      if (p && p.personne_id) {
+        nomById[p.personne_id] = ((p.nom || '') + ' ' + (p.prenom || '')).trim();
+      }
+    });
+    host.innerHTML = '';
+    (ids || []).forEach(function (id) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'bus-day is-on';
+      b.disabled = true;
+      b.dataset.id = id;
+      b.textContent = nomById[id] || '—';
+      host.appendChild(b);
+    });
   }
 
   // ============================================================
@@ -295,13 +370,17 @@
   }
 
   async function onSubmit() {
-    const categorieId = (el('b-cat') || {}).value || null;
-    const responsable = (el('b-resp') || {}).value || null;
+    // MULTI : tableaux ordonnés (T4), 1er élément = scalaire.
+    const categorieIds = state.catCoches.slice();
+    const responsables = state.respCoches.slice();
     const date        = (el('b-date') || {}).value || null;
     const destination = (el('b-to') || {}).value || null;
     const arrivee     = (el('b-arrival') || {}).value || null;
 
-    if (!responsable) { showToast('Choisis un responsable', false); return; }
+    if (responsables.length === 0) { showToast('Coche au moins un responsable', false); return; }
+    if (categorieIds.length === 0 && !state.isTransverse) {
+      showToast('Coche au moins une catégorie', false); return;
+    }
     if (!date)        { showToast('Renseigne la date', false); return; }
     if (!destination) { showToast('Renseigne la destination', false); return; }
     const arretsAller = state.arretsAller.filter(function (a) { return a.lieu; });
@@ -312,8 +391,10 @@
     if (submit) submit.disabled = true;
 
     const payload = {
-      categorie_id: categorieId,
-      responsable_personne_id: responsable,
+      categorie_id: categorieIds[0] || null,
+      categorie_ids: categorieIds,
+      responsable_personne_id: responsables[0],
+      responsables_personne_ids: responsables,
       date: date,
       type_competition: (el('b-comp') || {}).value || null,
       destination: destination,
@@ -400,15 +481,26 @@
       return;
     }
     state.editId = editId;
-    // Pré-remplissage INTÉGRAL (B7). La catégorie est posée par .value
-    // programmatique : le onchange ne se déclenche PAS (piège pt 140)
-    // → loadResponsables est appelé EXPLICITEMENT ensuite.
-    if (el('b-cat')) el('b-cat').value = row.categorie_id || '';
-    await loadResponsables(row.categorie_id || null);
-    if (el('b-resp')) {
-      el('b-resp').value = row.responsable_personne_id || '';
-      el('b-resp').disabled = true; // immuable en édition (décision tracée)
+    // Pré-remplissage INTÉGRAL (B7) — MULTI : coches rechargées depuis
+    // categorie_ids (fallback scalaire pour une demande d'avant chantier),
+    // rééditables ; responsables FIGÉS depuis responsables_personne_ids
+    // (fallback scalaire), chips désactivées (T2).
+    state.catCoches = (Array.isArray(row.categorie_ids) && row.categorie_ids.length)
+      ? row.categorie_ids.slice()
+      : (row.categorie_id ? [row.categorie_id] : []);
+    const catHost = el('b-cat');
+    if (catHost) {
+      Array.prototype.forEach.call(
+        catHost.querySelectorAll('.bus-day'),
+        function (b) {
+          b.classList.toggle('is-on', state.catCoches.indexOf(b.dataset.id) !== -1);
+        });
     }
+    state.respCoches = (Array.isArray(row.responsables_personne_ids)
+        && row.responsables_personne_ids.length)
+      ? row.responsables_personne_ids.slice()
+      : (row.responsable_personne_id ? [row.responsable_personne_id] : []);
+    await renderResponsablesFiges(state.respCoches.slice());
     if (el('b-date')) el('b-date').value = row.date || '';
     if (el('b-comp')) el('b-comp').value = row.type_competition || '';
     if (el('b-to')) el('b-to').value = row.destination || '';
