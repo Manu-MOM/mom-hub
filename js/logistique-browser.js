@@ -70,6 +70,10 @@
   // getOccurrences — réplique fidèle de la maquette.
   // jours : int[] 0=Lundi..6=Dimanche. Renvoie les jours (1..31) du
   // mois (yr, mo 0-based) où la règle s'applique.
+  // Exceptions (sql_155, E6/E7) : les dates de dates_exclues sont
+  // sautées APRÈS le calcul d'occurrence — un monthly dont la 1re
+  // occurrence est exclue ne projette RIEN ce mois-là (pas de report),
+  // d'où le marqueur moisPris posé AVANT le saut (aligné jumelles).
   // ============================================================
   function getOccurrences(rule, yr, mo) {
     if (!rule.active || rule.statut !== 'approved') return [];
@@ -81,6 +85,8 @@
       ? new Date(rule.date_debut + 'T00:00:00') : null;
     const dim = new Date(yr, mo + 1, 0).getDate();
     const occ = [];
+    const exclues = rule.dates_exclues || [];
+    let moisPris = false;
     for (let d = 1; d <= dim; d++) {
       const dt = new Date(yr, mo, d);
       const dow = dt.getDay() === 0 ? 6 : dt.getDay() - 1; // 0=Lun..6=Dim
@@ -104,9 +110,12 @@
       // monthly : 1re occurrence du/des jour(s) dans le mois >= borne
       // (la borne s'applique AVANT le marqueur « première » — A3).
       if (rule.freq === 'monthly') {
-        const premier = occ.length === 0;
-        if (!premier) continue;
+        if (moisPris) continue;
+        moisPris = true;
       }
+      // E6 : saut de la date exclue APRÈS la pose du marqueur monthly
+      // (l'occurrence exclue est consommée, jamais reportée).
+      if (exclues.indexOf(dayKey(yr, mo, d)) !== -1) continue;
       occ.push(d);
     }
     return occ;
