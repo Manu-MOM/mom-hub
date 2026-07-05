@@ -358,6 +358,7 @@
       function occurrencesFenetre(rule, debutISO, finISO) {
         var out = [];
         var jours = rule.jours || [];
+        var exclues = rule.dates_exclues || []; // sql_155 (E6)
         if (!jours.length || !rule.date_fin) return out;
         var lo = debutISO;
         var hi = (rule.date_fin < finISO) ? rule.date_fin : finISO;
@@ -395,6 +396,9 @@
               if (monthlyDone) continue;
               monthlyDone = true;
             }
+            // E6 (sql_155) : saut de la date exclue APRÈS la pose du
+            // marqueur monthly (occurrence consommée, jamais reportée).
+            if (exclues.indexOf(iso) !== -1) continue;
             if (iso >= debutISO && iso <= finISO) out.push(iso);
           }
           cur.setMonth(cur.getMonth() + 1);
