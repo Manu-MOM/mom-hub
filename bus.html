@@ -60,6 +60,17 @@
     .bus-field--sm { flex: 0 0 120px; }
     .bus-row { display: flex; gap: 12px; }
 
+    /* MULTI-CATEGORIES (FAIT FOI 05/07/2026, M5/M6) : patron cases à
+       cocher, miroir de .logi-days/.logi-day du guichet. */
+    .bus-days { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+    .bus-day {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      border: 1px solid var(--line); background: #fff; color: var(--ink-soft);
+      border-radius: 6px; padding: 6px 10px; cursor: pointer;
+    }
+    .bus-day.is-on { background: var(--vert-prairie); color: #fff; border-color: var(--vert-prairie); }
+    .bus-day:disabled { opacity: 0.55; cursor: default; }
+
     .bus-arret-row, .bus-deleg-row {
       display: flex; gap: 10px; align-items: flex-end; margin-bottom: 10px;
     }
@@ -181,15 +192,16 @@
     <!-- BLOC 1 : Infos générales -->
     <div class="bus-card">
       <h3 class="bus-card__title">Informations générales</h3>
-      <div class="bus-row">
-        <div class="bus-field">
-          <label for="b-cat">Catégorie MOM *</label>
-          <select id="b-cat"></select>
-        </div>
-        <div class="bus-field">
-          <label for="b-resp">Responsable MOM *</label>
-          <select id="b-resp"><option value="">—</option></select>
-        </div>
+      <!-- MULTI (M5/M6) : pioches en cases à cocher (patron bus-days),
+           empilées — les listes de cases côte à côte seraient à l'étroit
+           sur mobile (tracé). 1re/1er coché(e) = principal(e)/officiel. -->
+      <div class="bus-field">
+        <label>Catégories MOM * <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink-mute);text-transform:none;letter-spacing:0;">(plusieurs possibles — la 1re cochée est la principale)</span></label>
+        <div id="b-cat" class="bus-days"></div>
+      </div>
+      <div class="bus-field">
+        <label>Responsables MOM * <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink-mute);text-transform:none;letter-spacing:0;">(le 1er coché est le responsable officiel, les autres indicatifs)</span></label>
+        <div id="b-resp" class="bus-days"></div>
       </div>
       <div class="bus-row">
         <div class="bus-field">
