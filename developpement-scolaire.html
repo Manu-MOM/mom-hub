@@ -23,6 +23,9 @@
         que statut_prospection — sinon contact/siret/actif sont écrasés au DEFAULT.
     inserer_prospection_contact(6 params)        -- journal de contacts (sql_131).
     list_prospection_contacts(p_entite_id)       -- historique par école (sql_131).
+    inserer_prospection_contact_interne(6 params) -- enseignants (sql_161).
+    list_prospection_contacts_internes(p_entite_id) -- enseignants par école (sql_161).
+    supprimer_prospection_contact_interne(p_id)  -- suppression autorisée (sql_161).
     upsert_mission(19 params — p_est_cadre droppé sql_129)  -- passerelle
         « Programmer le cycle » : pré-remplit une mission avec p_entite_id câblé.
     list_missions(p_saison_id, p_salarie_id, p_entite_id) -- avancement dérivé.
@@ -45,6 +48,20 @@
       zone) — décision technique mineure tracée (67 écoles = liste
       inutilisable sans).
     - uai affiché en lecture seule dans la fiche (identifiant Éducation nat.).
+
+  CONTACTS INTERNES + INTERVENTIONS (mini-FAIT FOI 05/07/2026, sql_161) :
+    - « Journal de démarchage » renommé « Historique des derniers échanges »
+      (bouton « + Noter un échange » — collision sémantique évitée avec les
+      contacts internes).
+    - Interventions dans l'école : DÉRIVÉES de list_missions (saison courante,
+      déjà chargée par la page) — dates + état, jamais stockées ici.
+    - Classes concernées : DÉRIVÉES des classes des contacts internes
+      (FAIT FOI §1).
+    - Contacts internes (enseignants) : nouvelle table sql_161, 3 RPC —
+      inserer_prospection_contact_interne(6 params),
+      list_prospection_contacts_internes(p_entite_id),
+      supprimer_prospection_contact_interne(p_id) [suppression autorisée,
+      FAIT FOI §2]. Contact principal (direction) inchangé (FAIT FOI §3).
 -->
 <link rel="stylesheet" href="css/hub.css">
 <style>
@@ -64,6 +81,16 @@
   .gs-msg { padding: 10px 14px; border-radius: 8px; font-size: 14px; margin-bottom: 14px; display: none; }
   .gs-msg.ok { background: #e8f1ec; color: var(--vert-prairie, #1b6b4c); display: block; }
   .gs-msg.err { background: #f7e6e2; color: var(--rouge-blesse, #c0392b); display: block; }
+
+  /* Contacts internes + interventions (fiche) */
+  .ds-irow { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+             padding: 7px 0; border-bottom: 1px dashed var(--paper-warm, #e3e0d8); font-size: 13px; }
+  .ds-irow:last-child { border-bottom: 0; }
+  .ds-iclasse { display: inline-block; background: #eef3ef; border-radius: 6px; padding: 1px 8px;
+                font-weight: 600; margin-right: 6px; }
+  .ds-idel { background: transparent; border: 0; cursor: pointer; color: var(--rouge-blesse, #c0392b);
+             font: inherit; font-size: 13px; padding: 2px 6px; }
+  .ds-classes { font-size: 13px; color: var(--ink-mute, #6b7a74); margin: 4px 0 0; }
 
   /* Champ de recherche (liste 67+ écoles) */
   .ds-search { width: 100%; box-sizing: border-box; padding: 9px 12px; margin: 0 0 12px;
@@ -354,18 +381,73 @@
 
     <p class="gs-modal-note" id="dsEcoleUai" style="display:none"></p>
 
+    <!-- Interventions dérivées des missions (visible en édition uniquement) -->
+    <div class="ds-journal" id="dsInterventionsWrap" style="display:none">
+      <h3>Interventions dans cette école</h3>
+      <div id="dsInterventionsListe"></div>
+      <p class="ds-classes" id="dsClassesConcernees" style="display:none"></p>
+    </div>
+
+    <!-- Contacts internes / enseignants (visible en édition uniquement) -->
+    <div class="ds-journal" id="dsInternesWrap" style="display:none">
+      <h3>Contacts internes (enseignants)</h3>
+      <div id="dsInternesListe"></div>
+      <div style="margin-top:12px;">
+        <button class="gs-btn gs-btn-sm" id="dsAddInterne" type="button">+ Ajouter un contact interne</button>
+      </div>
+    </div>
+
     <!-- Journal de contacts (visible en édition uniquement) -->
     <div class="ds-journal" id="dsJournalWrap" style="display:none">
-      <h3>Journal de démarchage</h3>
+      <h3>Historique des derniers échanges</h3>
       <div id="dsJournalListe"></div>
       <div style="margin-top:12px;">
-        <button class="gs-btn gs-btn-sm" id="dsAddContact" type="button">+ Noter un contact</button>
+        <button class="gs-btn gs-btn-sm" id="dsAddContact" type="button">+ Noter un échange</button>
       </div>
     </div>
 
     <div class="gs-modal-actions">
       <button class="gs-cancel" id="dsEcoleCancel" type="button">Annuler</button>
       <button class="gs-btn" id="dsEcoleSave" type="button">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ Modale AJOUTER UN CONTACT INTERNE (enseignant) ============ -->
+<div class="gs-overlay" id="dsInterneOverlay">
+  <div class="gs-modal">
+    <div class="gs-modal-head">
+      <h2>Ajouter un contact interne</h2>
+      <button class="gs-x" id="dsInterneClose" type="button" aria-label="Fermer">×</button>
+    </div>
+    <p class="gs-modal-note">Enseignant·e de l'école, rattaché·e à sa classe.</p>
+    <div class="gs-grid2">
+      <div class="gs-field">
+        <label for="dsInterneNom">Nom *</label>
+        <input type="text" id="dsInterneNom" placeholder="Muller">
+      </div>
+      <div class="gs-field">
+        <label for="dsInternePrenom">Prénom</label>
+        <input type="text" id="dsInternePrenom" placeholder="Claire">
+      </div>
+    </div>
+    <div class="gs-grid2">
+      <div class="gs-field">
+        <label for="dsInterneClasse">Classe</label>
+        <input type="text" id="dsInterneClasse" placeholder="CE2, CM1-CM2…">
+      </div>
+      <div class="gs-field">
+        <label for="dsInterneTel">Téléphone</label>
+        <input type="text" id="dsInterneTel" placeholder="06 …">
+      </div>
+    </div>
+    <div class="gs-field">
+      <label for="dsInterneEmail">Email</label>
+      <input type="email" id="dsInterneEmail" placeholder="prenom.nom@…">
+    </div>
+    <div class="gs-modal-actions">
+      <button class="gs-cancel" id="dsInterneCancel" type="button">Annuler</button>
+      <button class="gs-btn" id="dsInterneSave" type="button">Enregistrer</button>
     </div>
   </div>
 </div>
@@ -760,6 +842,19 @@
     // Journal : visible seulement en édition (une école doit exister).
     if (e) { $('dsJournalWrap').style.display = 'block'; chargerJournal(e.id); }
     else   { $('dsJournalWrap').style.display = 'none'; $('dsJournalListe').innerHTML = ''; }
+    // Interventions (dérivées des missions de la saison) + contacts internes.
+    if (e) {
+      $('dsInterventionsWrap').style.display = 'block';
+      renderInterventions(e.id);
+      $('dsInternesWrap').style.display = 'block';
+      chargerInternes(e.id);
+    } else {
+      $('dsInterventionsWrap').style.display = 'none';
+      $('dsInterventionsListe').innerHTML = '';
+      $('dsClassesConcernees').style.display = 'none';
+      $('dsInternesWrap').style.display = 'none';
+      $('dsInternesListe').innerHTML = '';
+    }
     $('dsEcoleOverlay').classList.add('open');
   }
   function closeEcole() { $('dsEcoleOverlay').classList.remove('open'); ficheId = null; }
@@ -846,6 +941,105 @@
       }).join('');
     } catch (err) {
       box.innerHTML = '<div class="ds-jempty">Lecture impossible : ' + escapeHtml(errMsg(err)) + '</div>';
+    }
+  }
+
+  // ---------- Interventions dérivées (saison courante, list_missions déjà chargé) ----------
+  const ETAT_LBL = { prevue: 'Prévue', terminee: 'Réalisée', annulee: 'Annulée' };
+  function renderInterventions(entiteId) {
+    const box = $('dsInterventionsListe');
+    const ms = (missionsParEntite.get(entiteId) || []).slice()
+      .sort((a, b) => String(b.date_debut || '').localeCompare(String(a.date_debut || '')));
+    if (!ms.length) {
+      box.innerHTML = '<div class="ds-jempty">Aucune intervention sur la saison courante.</div>';
+      return;
+    }
+    box.innerHTML = ms.map(m => {
+      const dates = [m.date_debut, m.date_fin].filter(Boolean).join(' → ');
+      const etat = ETAT_LBL[m.etat] || m.etat || '';
+      return '<div class="ds-irow"><span>' + escapeHtml(m.libelle || m.code || 'Mission')
+        + (dates ? ' — ' + escapeHtml(dates) : '') + '</span>'
+        + '<span class="ds-jcanal">' + escapeHtml(etat) + '</span></div>';
+    }).join('');
+  }
+
+  // ---------- Contacts internes (enseignants, sql_161) ----------
+  async function chargerInternes(entiteId) {
+    const box = $('dsInternesListe');
+    box.innerHTML = '<div class="ds-jempty">Chargement…</div>';
+    try {
+      const rows = (await rpc('list_prospection_contacts_internes', { p_entite_id: entiteId })) || [];
+      if (!rows.length) {
+        box.innerHTML = '<div class="ds-jempty">Aucun contact interne pour l\'instant.</div>';
+        $('dsClassesConcernees').style.display = 'none';
+        return;
+      }
+      box.innerHTML = rows.map(r => {
+        const nom = [r.prenom, r.nom].filter(Boolean).join(' ');
+        const coord = [r.telephone, r.email].filter(Boolean).join(' · ');
+        return '<div class="ds-irow"><span>'
+          + (r.classe ? '<span class="ds-iclasse">' + escapeHtml(r.classe) + '</span>' : '')
+          + escapeHtml(nom) + (coord ? ' — ' + escapeHtml(coord) : '') + '</span>'
+          + '<button type="button" class="ds-idel" data-delinterne="' + r.id + '" title="Supprimer">Suppr.</button>'
+          + '</div>';
+      }).join('');
+      // Classes concernées : dérivées des classes des contacts internes (FAIT FOI §1).
+      const classes = Array.from(new Set(rows.map(r => r.classe).filter(Boolean)));
+      if (classes.length) {
+        $('dsClassesConcernees').textContent = 'Classes concernées : ' + classes.join(', ');
+        $('dsClassesConcernees').style.display = 'block';
+      } else {
+        $('dsClassesConcernees').style.display = 'none';
+      }
+    } catch (err) {
+      box.innerHTML = '<div class="ds-jempty">Lecture impossible : ' + escapeHtml(errMsg(err)) + '</div>';
+    }
+  }
+
+  function openInterne() {
+    if (!ficheId) return;
+    $('dsInterneNom').value = '';
+    $('dsInternePrenom').value = '';
+    $('dsInterneClasse').value = '';
+    $('dsInterneTel').value = '';
+    $('dsInterneEmail').value = '';
+    $('dsInterneOverlay').classList.add('open');
+  }
+  function closeInterne() { $('dsInterneOverlay').classList.remove('open'); }
+
+  async function saveInterne() {
+    if (!ficheId) return;
+    const nom = $('dsInterneNom').value.trim();
+    if (!nom) { flash('Le nom du contact interne est obligatoire.', 'err'); return; }
+    $('dsInterneSave').disabled = true;
+    try {
+      await rpc('inserer_prospection_contact_interne', {
+        p_entite_id: ficheId,
+        p_nom: nom,
+        p_prenom: $('dsInternePrenom').value.trim() || null,
+        p_classe: $('dsInterneClasse').value.trim() || null,
+        p_telephone: $('dsInterneTel').value.trim() || null,
+        p_email: $('dsInterneEmail').value.trim() || null
+      });
+      flash('Contact interne ajouté.', 'ok');
+      closeInterne();
+      await chargerInternes(ficheId);
+    } catch (err) {
+      flash('Enregistrement impossible : ' + errMsg(err), 'err');
+    } finally {
+      $('dsInterneSave').disabled = false;
+    }
+  }
+
+  async function supprimerInterne(id) {
+    if (!ficheId) return;
+    if (!window.confirm('Supprimer ce contact interne ?')) return;
+    try {
+      await rpc('supprimer_prospection_contact_interne', { p_id: id });
+      flash('Contact interne supprimé.', 'ok');
+      await chargerInternes(ficheId);
+    } catch (err) {
+      flash('Suppression impossible : ' + errMsg(err), 'err');
     }
   }
 
@@ -995,6 +1189,14 @@
   $('dsEcoleCancel').addEventListener('click', closeEcole);
   $('dsEcoleSave').addEventListener('click', saveEcole);
   $('dsAddContact').addEventListener('click', openContact);
+  $('dsAddInterne').addEventListener('click', openInterne);
+  $('dsInterneClose').addEventListener('click', closeInterne);
+  $('dsInterneCancel').addEventListener('click', closeInterne);
+  $('dsInterneSave').addEventListener('click', saveInterne);
+  $('dsInternesListe').addEventListener('click', function (ev) {
+    const t = ev.target.closest('button');
+    if (t && t.dataset.delinterne) supprimerInterne(t.dataset.delinterne);
+  });
   $('dsContactClose').addEventListener('click', closeContact);
   $('dsContactCancel').addEventListener('click', closeContact);
   $('dsContactSave').addEventListener('click', saveContact);
@@ -1003,7 +1205,8 @@
   $('dsCycleSave').addEventListener('click', saveCycle);
 
   // Fermeture des modales au clic sur l'overlay.
-  [['dsEcoleOverlay', closeEcole], ['dsContactOverlay', closeContact], ['dsCycleOverlay', closeCycle]]
+  [['dsEcoleOverlay', closeEcole], ['dsContactOverlay', closeContact], ['dsCycleOverlay', closeCycle],
+   ['dsInterneOverlay', closeInterne]]
     .forEach(([id, fn]) => {
       $(id).addEventListener('click', function (ev) { if (ev.target === this) fn(); });
     });
