@@ -292,8 +292,9 @@
         <select id="lgv-edit-ressource"></select>
       </div>
       <div class="lgv-edit-field">
-        <label for="lgv-edit-categorie">Catégorie</label>
-        <select id="lgv-edit-categorie"></select>
+        <label>Catégories <span style="font-size:10px;color:var(--ink-mute);">(plusieurs possibles — la 1re cochée est la principale ; aucune = Bureau / Autre)</span></label>
+        <!-- MULTI (FAIT FOI 05/07/2026, M5) : cases patron lgv-edit-days. -->
+        <div id="lgv-edit-categorie" class="lgv-edit-days"></div>
       </div>
       <div class="lgv-edit-field" id="lgv-edit-f-date">
         <label for="lgv-edit-date">Date</label>
@@ -437,6 +438,7 @@
       // ------------------------------------------------------------------
       var ressById = {};
       var catById = {};
+      var persById = {};   // MULTI (M6) : personne_id -> nom (détail)
 
       async function chargerReferentiels() {
         var r1 = await SupabaseHub.client
@@ -453,6 +455,17 @@
         (r2.data || []).forEach(function (c) {
           catById[c.id] = c.libelle_court || c.code || c.libelle_long || c.id;
         });
+        // MULTI (M6/M7) : noms des responsables pour l'affichage au détail.
+        // Voie éprouvée listStaffDisponibles(null) = tous les staffs actifs
+        // (RPC) ; un id absent (fonction terminée) s'affiche '—' — tracé.
+        try {
+          var staff = await SupabaseHub.listStaffDisponibles(null);
+          (staff || []).forEach(function (p) {
+            if (p && p.personne_id) {
+              persById[p.personne_id] = ((p.nom || '') + ' ' + (p.prenom || '')).trim();
+            }
+          });
+        } catch (e) { /* fail-soft : détail sans noms */ }
       }
 
       function typeCodeOf(ressourceId) {
@@ -466,6 +479,28 @@
       function catLbl(categorieId) {
         if (!categorieId) return 'Bureau / Autre';
         return catById[categorieId] || '—';
+      }
+      // MULTI (M7) : concaténation « M16 + M18 » dans l'ordre du tableau ;
+      // fallback scalaire pour les lignes d'avant chantier ; vide =
+      // Bureau / Autre (M3). catLbl (mono) conservé — additif.
+      function catsLbl(row) {
+        var ids = (row && Array.isArray(row.categorie_ids) && row.categorie_ids.length)
+          ? row.categorie_ids
+          : (row && row.categorie_id ? [row.categorie_id] : []);
+        if (!ids.length) return 'Bureau / Autre';
+        return ids.map(function (id) { return catById[id] || '—'; }).join(' + ');
+      }
+      // MULTI (M6) : responsables — 1er = officiel, suivants indicatifs.
+      function respsLbl(row) {
+        var ids = (row && Array.isArray(row.responsables_personne_ids)
+            && row.responsables_personne_ids.length)
+          ? row.responsables_personne_ids
+          : (row && row.responsable_personne_id ? [row.responsable_personne_id] : []);
+        if (!ids.length) return null;
+        return ids.map(function (id, i) {
+          var nom = persById[id] || '—';
+          return i === 0 ? nom : nom + ' (indicatif)';
+        }).join(' · ');
       }
       function dureeEntre(hd, hf) {
         if (!hd || !hf) return null;
@@ -579,7 +614,7 @@
             heure: r.heure_debut ? String(r.heure_debut).slice(0, 5) : null,
             duree_min: dureeEntre(r.heure_debut, r.heure_fin),
             type: typeCodeOf(r.ressource_id),
-            libelle: (r.motif || ressLbl(r.ressource_id)) + ' · ' + catLbl(r.categorie_id),
+            libelle: (r.motif || ressLbl(r.ressource_id)) + ' · ' + catsLbl(r),
             etat: r.statut,
             meta: { src: 'ponctuelle', row: r }
           });
@@ -599,7 +634,7 @@
               heure: rule.heure_debut ? String(rule.heure_debut).slice(0, 5) : null,
               duree_min: dureeEntre(rule.heure_debut, rule.heure_fin),
               type: typeCodeOf(rule.ressource_id),
-              libelle: '↻ ' + (rule.motif || ressLbl(rule.ressource_id)) + ' · ' + catLbl(rule.categorie_id),
+              libelle: '↻ ' + (rule.motif || ressLbl(rule.ressource_id)) + ' · ' + catsLbl(rule),
               etat: rule.statut,
               meta: { src: 'recurrence', row: rule }
             });
@@ -618,7 +653,7 @@
             heure: null,
             duree_min: null,
             type: 'bus',
-            libelle: 'Bus · ' + (d.destination || '—') + ' · ' + catLbl(d.categorie_id),
+            libelle: 'Bus · ' + (d.destination || '—') + ' · ' + catsLbl(d),
             etat: d.statut,
             meta: { src: 'bus', row: d }
           });
@@ -638,7 +673,8 @@
           rows.push({ lbl: 'Destination', val: r.destination || '—' });
           rows.push({ lbl: 'Date', val: it.date });
           if (r.heure_arrivee_souhaitee) rows.push({ lbl: 'Arrivée souhaitée', val: String(r.heure_arrivee_souhaitee).slice(0, 5) });
-          rows.push({ lbl: 'Catégorie', val: catLbl(r.categorie_id) });
+          rows.push({ lbl: 'Catégories', val: catsLbl(r) });
+          if (respsLbl(r)) rows.push({ lbl: 'Responsables', val: respsLbl(r) });
           if (r.total_bus != null) rows.push({ lbl: 'Passagers', val: String(r.total_bus) });
           rows.push({ lbl: 'Statut', val: statutLbl(r.statut) });
           return rows;
@@ -649,7 +685,8 @@
           lbl: 'Créneau',
           val: creneauLbl(r) + (it.duree_min ? ' · ' + HubAgenda.dureeLabel(it.duree_min) : '')
         });
-        rows.push({ lbl: 'Catégorie', val: catLbl(r.categorie_id) });
+        rows.push({ lbl: 'Catégories', val: catsLbl(r) });
+        if (respsLbl(r)) rows.push({ lbl: 'Responsables', val: respsLbl(r) });
         if (r.motif) rows.push({ lbl: 'Motif', val: r.motif });
         if (it.meta.src === 'recurrence') {
           rows.push({
@@ -742,7 +779,7 @@
           host.appendChild(carteFile(
             'ponctuelle', 'Ponctuelle', '',
             ressLbl(r.ressource_id),
-            formatDateLong(r.date) + ' · ' + creneauLbl(r) + ' · ' + catLbl(r.categorie_id),
+            formatDateLong(r.date) + ' · ' + creneauLbl(r) + ' · ' + catsLbl(r),
             r.motif, r.id));
         });
         recur.forEach(function (r) {
@@ -750,14 +787,14 @@
             'recurrence', 'Récurrente', 'lgv-tag--recur',
             ressLbl(r.ressource_id),
             freqLbl(r.freq) + ' · ' + joursLbl(r.jours) + ' · ' + creneauLbl(r) +
-              ' · jusqu\'au ' + formatDateLong(r.date_fin) + ' · ' + catLbl(r.categorie_id),
+              ' · jusqu\'au ' + formatDateLong(r.date_fin) + ' · ' + catsLbl(r),
             r.motif, r.id));
         });
         bus.forEach(function (d) {
           host.appendChild(carteFile(
             'bus', 'Bus', 'lgv-tag--bus',
             d.destination || '—',
-            formatDateLong(d.date) + ' · ' + (d.total_bus || 0) + ' pax · ' + catLbl(d.categorie_id),
+            formatDateLong(d.date) + ' · ' + (d.total_bus || 0) + ' pax · ' + catsLbl(d),
             d.notes, d.id));
         });
       }
@@ -825,6 +862,7 @@
       // ------------------------------------------------------------------
       var editCtx = null;   // { src, row } — ligne rechargée avant ouverture
       var editJours = [];
+      var editCats = [];    // MULTI (M5/T4) : uuid[] catégories, ordre de coche
 
       function peuplerSelectsEdition() {
         var sr = el('lgv-edit-ressource');
@@ -838,16 +876,31 @@
         }
         var sc = el('lgv-edit-categorie');
         if (sc) {
+          // MULTI (M5) : le peuplement est délégué à renderEditCats(),
+          // appelé à chaque ouverture (les coches dépendent de la ligne).
           sc.innerHTML = '';
-          var o0 = document.createElement('option');
-          o0.value = ''; o0.textContent = 'Bureau / Autre';
-          sc.appendChild(o0);
-          Object.keys(catById).forEach(function (id) {
-            var o = document.createElement('option');
-            o.value = id; o.textContent = catById[id];
-            sc.appendChild(o);
-          });
         }
+      }
+
+      // MULTI (M5/T4) : cases catégories de la modale — toutes les
+      // catégories du référentiel (surface bureau|admin), ordre de coche
+      // = ordre du tableau, aucune coche = Bureau / Autre (M3).
+      function renderEditCats() {
+        var host = el('lgv-edit-categorie');
+        if (!host) return;
+        host.innerHTML = '';
+        Object.keys(catById).forEach(function (id) {
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'lgv-edit-day' + (editCats.indexOf(id) !== -1 ? ' is-on' : '');
+          b.textContent = catById[id];
+          b.addEventListener('click', function () {
+            var pos = editCats.indexOf(id);
+            if (pos === -1) { editCats.push(id); b.classList.add('is-on'); }
+            else { editCats.splice(pos, 1); b.classList.remove('is-on'); }
+          });
+          host.appendChild(b);
+        });
       }
 
       function renderEditJours() {
@@ -949,7 +1002,12 @@
         el('lgv-edit-titre').textContent = isRecur
           ? 'Modifier la règle récurrente' : 'Modifier la réservation';
         el('lgv-edit-ressource').value = row.ressource_id || '';
-        el('lgv-edit-categorie').value = row.categorie_id || '';
+        // MULTI : coches depuis categorie_ids, fallback scalaire (lignes
+        // d'avant chantier), ordre du tableau conservé (T4).
+        editCats = (Array.isArray(row.categorie_ids) && row.categorie_ids.length)
+          ? row.categorie_ids.slice()
+          : (row.categorie_id ? [row.categorie_id] : []);
+        renderEditCats();
         el('lgv-edit-hdebut').value = row.heure_debut ? String(row.heure_debut).slice(0, 5) : '';
         el('lgv-edit-hfin').value = row.heure_fin ? String(row.heure_fin).slice(0, 5) : '';
         el('lgv-edit-motif').value = row.motif || '';
@@ -998,7 +1056,8 @@
           }
           res = await SupabaseHub.modifierRecurrence(editCtx.row.id, {
             ressource_id: el('lgv-edit-ressource').value,
-            categorie_id: el('lgv-edit-categorie').value || null,
+            categorie_id: editCats[0] || null,
+            categorie_ids: editCats.slice(),
             freq: el('lgv-edit-freq').value || 'weekly',
             jours: editJours.slice(),
             heure_debut: hd,
@@ -1014,7 +1073,8 @@
           }
           res = await SupabaseHub.modifierReservation(editCtx.row.id, {
             ressource_id: el('lgv-edit-ressource').value,
-            categorie_id: el('lgv-edit-categorie').value || null,
+            categorie_id: editCats[0] || null,
+            categorie_ids: editCats.slice(),
             date: el('lgv-edit-date').value,
             heure_debut: hd,
             heure_fin: hf,
