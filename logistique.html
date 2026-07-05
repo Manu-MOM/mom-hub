@@ -299,15 +299,19 @@
       </div>
 
       <div id="logi-form-fields" class="logi-form-fields">
-        <div class="logi-row2">
-          <div class="logi-field">
-            <label for="logi-categorie">Catégorie</label>
-            <select id="logi-categorie"></select>
-          </div>
-          <div class="logi-field">
-            <label for="logi-responsable">Responsable</label>
-            <select id="logi-responsable"><option value="">—</option></select>
-          </div>
+        <!-- MULTI-CATEGORIES (FAIT FOI 05/07/2026, M5/M6) : les deux
+             pioches mono deviennent des cases à cocher (patron logi-days).
+             Empilées verticalement (et non côte à côte en logi-row2) :
+             les listes de cases seraient à l'étroit sur mobile — tracé.
+             1er coché = catégorie principale / responsable officiel
+             (scalaire) ; les responsables suivants sont indicatifs. -->
+        <div class="logi-field">
+          <label>Catégories <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink-mute);text-transform:none;letter-spacing:0;">(plusieurs possibles — la 1re cochée est la principale)</span></label>
+          <div id="logi-categorie" class="logi-days"></div>
+        </div>
+        <div class="logi-field">
+          <label>Responsables <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink-mute);text-transform:none;letter-spacing:0;">(le 1er coché est le responsable officiel, les autres indicatifs)</span></label>
+          <div id="logi-responsable" class="logi-days"></div>
         </div>
 
         <!-- Correctif post-pt 150 (retour terrain) : choix de mode EXPLICITE
