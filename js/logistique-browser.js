@@ -71,20 +71,14 @@
   // jours : int[] 0=Lundi..6=Dimanche. Renvoie les jours (1..31) du
   // mois (yr, mo 0-based) où la règle s'applique.
   // ============================================================
-  // Lundi de la semaine calendaire d'une date (0=Lun..6=Dim) —
-  // ancre biweekly du cycle de vie (A2).
-  function mondayOf(dt) {
-    const d = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
-    const dow = d.getDay() === 0 ? 6 : d.getDay() - 1;
-    d.setDate(d.getDate() - dow);
-    return d;
-  }
-
   function getOccurrences(rule, yr, mo) {
     if (!rule.active || rule.statut !== 'approved') return [];
     const until = new Date(rule.date_fin + 'T23:59:59');
-    // Cycle de vie (sql_151) : borne basse date_debut, NULL = pas de borne.
-    const depuis = rule.date_debut ? new Date(rule.date_debut + 'T00:00:00') : null;
+    // Borne basse date_debut (sql_151, A1/A3 cycle de vie 07/2026) :
+    // AUCUNE occurrence avant date_debut, toutes fréquences.
+    // NULL = pas de borne (sémantique historique préservée).
+    const depuis = rule.date_debut
+      ? new Date(rule.date_debut + 'T00:00:00') : null;
     const dim = new Date(yr, mo + 1, 0).getDate();
     const occ = [];
     for (let d = 1; d <= dim; d++) {
@@ -92,23 +86,23 @@
       const dow = dt.getDay() === 0 ? 6 : dt.getDay() - 1; // 0=Lun..6=Dim
       if (rule.jours.indexOf(dow) === -1) continue;
       if (dt > until) continue;
-      // A3 : AUCUNE occurrence avant date_debut, toutes fréquences.
       if (depuis && dt < depuis) continue;
       if (rule.freq === 'biweekly') {
         if (depuis) {
-          // A2 : semaine 0 = semaine calendaire de date_debut, puis 1/2.
-          // Math.round absorbe les décalages DST (±1 h).
-          const wk = Math.round((mondayOf(dt) - mondayOf(depuis)) / 604800000);
-          if (wk % 2 !== 0) continue;
+          // A2 : blocs de 7 jours ancrés sur date_debut (bloc 0 =
+          // semaine de départ) ; arrondi JOUR pour neutraliser les
+          // bascules d'heure d'été.
+          const jrs = Math.round((dt - depuis) / 86400000);
+          if (Math.floor(jrs / 7) % 2 !== 0) continue;
         } else {
-          // Repli sans borne : parité vs 1er janvier (sémantique historique).
+          // Repli historique (date_debut NULL) : parité vs 1er janvier
+          // de l'année de l'occurrence — formule d'origine inchangée.
           const wk = Math.floor((dt - new Date(yr, 0, 1)) / 604800000);
           if (wk % 2 !== 0) continue;
         }
       }
-      // monthly : 1re occurrence du/des jour(s) dans le mois — le filtre
-      // date_debut s'applique EN AMONT de ce marqueur (A3) : la 1re
-      // occurrence projetée est la 1re >= date_debut.
+      // monthly : 1re occurrence du/des jour(s) dans le mois >= borne
+      // (la borne s'applique AVANT le marqueur « première » — A3).
       if (rule.freq === 'monthly') {
         const premier = occ.length === 0;
         if (!premier) continue;
@@ -370,27 +364,35 @@
   // ============================================================
   function wireForm() {
     // Toggle récurrence
-    const recurToggle = el('logi-recur-toggle');
-    if (recurToggle) {
-      recurToggle.addEventListener('change', function () {
-        state.recurOn = recurToggle.checked;
-        const box = el('logi-recur-box');
-        if (box) box.classList.toggle('is-open', state.recurOn);
-        // Cycle de vie (A1) : « À partir du » pré-rempli à la date du
-        // jour à l'ouverture (seulement si vide — ne pas écraser un
-        // choix). Appel explicite : .value programmatique ne déclenche
-        // aucun listener (piège pt 140, sans objet ici).
-        if (state.recurOn) {
-          const deb = el('logi-recur-debut');
-          if (deb && !deb.value) {
-            const now = new Date();
-            deb.value = now.getFullYear() + '-'
-              + String(now.getMonth() + 1).padStart(2, '0') + '-'
-              + String(now.getDate()).padStart(2, '0');
+    // Correctif post-pt 150 (retour terrain) : choix de mode EXPLICITE
+    // ponctuelle/récurrente en tête de formulaire. En récurrence le champ
+    // Date est MASQUÉ (il ne transporte rien dans ce mode) et sa valeur
+    // éventuelle bascule dans « À partir du » (cas réel : date saisie
+    // AVANT le choix du mode). Appels explicites : l'assignation .value
+    // ne déclenche aucun listener (piège pt 140).
+    function appliquerMode(recurrente) {
+      state.recurOn = !!recurrente;
+      const box = el('logi-recur-box');
+      if (box) box.classList.toggle('is-open', state.recurOn);
+      const fDate = el('logi-field-date');
+      if (fDate) fDate.style.display = state.recurOn ? 'none' : '';
+      if (state.recurOn) {
+        const deb = el('logi-recur-debut');
+        const dateInp = el('logi-date');
+        if (deb && !deb.value) {
+          if (dateInp && dateInp.value) {
+            deb.value = dateInp.value; // la date déjà saisie devient la borne basse
+          } else {
+            const n = new Date();
+            deb.value = dayKey(n.getFullYear(), n.getMonth(), n.getDate());
           }
         }
-      });
+      }
     }
+    const modeP = el('logi-mode-ponctuelle');
+    const modeR = el('logi-mode-recurrente');
+    if (modeP) modeP.addEventListener('change', function () { if (modeP.checked) appliquerMode(false); });
+    if (modeR) modeR.addEventListener('change', function () { if (modeR.checked) appliquerMode(true); });
     // Jours de la semaine (0=Lun..6=Dim)
     const joursHost = el('logi-recur-jours');
     if (joursHost) {
@@ -440,13 +442,19 @@
     if (state.recurOn) {
       const dateFin   = (el('logi-recur-fin') || {}).value || null;
       const dateDebut = (el('logi-recur-debut') || {}).value || null;
-      const freq      = (el('logi-recur-freq') || {}).value || 'weekly';
+      const freq    = (el('logi-recur-freq') || {}).value || 'weekly';
       if (state.recurJours.length === 0) {
         showToast('Choisis au moins un jour', false);
         if (submitBtn) submitBtn.disabled = false; return;
       }
       if (!dateFin) {
         showToast('Renseigne une date de fin', false);
+        if (submitBtn) submitBtn.disabled = false; return;
+      }
+      // Contrôle formulaire (FAIT FOI §3 : pas de contrainte SQL) :
+      // la borne basse ne peut pas dépasser la date de fin.
+      if (dateDebut && dateDebut > dateFin) {
+        showToast('« À partir du » doit précéder la date de fin', false);
         if (submitBtn) submitBtn.disabled = false; return;
       }
       res = await SupabaseHub.createRecurrence({
@@ -488,11 +496,13 @@
   }
 
   function resetForm() {
-    ['logi-date','logi-heure-debut','logi-heure-fin','logi-motif','logi-recur-debut','logi-recur-fin']
+    ['logi-date','logi-heure-debut','logi-heure-fin','logi-motif','logi-recur-fin','logi-recur-debut']
       .forEach(function (id) { if (el(id)) el(id).value = ''; });
     state.recurOn = false;
     state.recurJours = [];
-    const tg = el('logi-recur-toggle'); if (tg) tg.checked = false;
+    const mp = el('logi-mode-ponctuelle'); if (mp) mp.checked = true;
+    const mr = el('logi-mode-recurrente'); if (mr) mr.checked = false;
+    const fd = el('logi-field-date'); if (fd) fd.style.display = '';
     const box = el('logi-recur-box'); if (box) box.classList.remove('is-open');
     Array.prototype.forEach.call(
       document.querySelectorAll('.logi-day.is-on'),
