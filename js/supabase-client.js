@@ -18,6 +18,18 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 1.75 — juillet 2026
+ *   v1.75 : CATEGORIE-SECTION-RUGBY (FAIT FOI gelé 05/07/2026, md5
+ *           b67f451d + ADDENDUM 1). 2 wrappers ADDITIFS vers les RPC
+ *           sql_154 : getJoueursSection() (jumelle de getJoueursF15,
+ *           RPC get_joueurs_section, flag personnes.section_rugby) et
+ *           setSectionRugby(personneId, actif) (RPC set_section_rugby,
+ *           SEUL écrivain du flag ; garde SQL =
+ *           puis_je_ecrire_categorie(SECTION) : admin, bureau,
+ *           responsables du pôle Section). NB : get_joueur_detail
+ *           (sql_154, ADDENDUM 1) sert désormais section_rugby en
+ *           dernière colonne — getJoueurDetail() inchangé (lecture par
+ *           nom, additif transparent).
  * Version : 1.74 — juillet 2026
  *   v1.74 : LOGISTIQUE-CYCLE-VIE-RESERVATIONS (FAIT FOI gelé 04/07/2026,
  *           md5 b59b44d9). 6 wrappers ADDITIFS vers les RPC sql_152
@@ -4277,6 +4289,54 @@
     },
 
     /**
+     * Récupère l'effectif de la Section rugby scolaire via RPC
+     * get_joueurs_section() (sql_154). Jumelle de getJoueursF15 :
+     * MÊME shape de sortie (32 colonnes) → cartes et fiche inchangées.
+     * Périmètre = flag personnes.section_rugby (patron F15), les membres
+     * GARDENT leur categorie_id d'âge. Aiguillage côté écran
+     * (joueurs-browser.js : SECTION_CAT_UUID → cette RPC).
+     *
+     * @returns {Promise<Array<Object>|null>} liste, ou null si erreur.
+     */
+    async getJoueursSection() {
+      const { data, error } = await client.rpc('get_joueurs_section', {});
+      if (error) {
+        console.error('MOM Hub: getJoueursSection()', error);
+        return null;
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * Coche/décoche l'appartenance d'une personne à la Section rugby
+     * via RPC set_section_rugby (sql_154) — SEUL écrivain du flag
+     * personnes.section_rugby. Garde côté SQL :
+     * puis_je_ecrire_categorie(SECTION) → admin, bureau, responsables
+     * du pôle Section (et tout encadrant habilité par fonction_staff
+     * sur SECTION). RETURNS boolean = le nouvel état.
+     *
+     * @param {string} personneId UUID de la personne (personnes.id)
+     * @param {boolean} actif true = membre, false = retiré
+     * @returns {Promise<boolean|null>} nouvel état, ou null si erreur
+     *   (droit insuffisant inclus — l'appelant masque ou signale).
+     */
+    async setSectionRugby(personneId, actif) {
+      if (!personneId || typeof actif !== 'boolean') {
+        console.error('MOM Hub: setSectionRugby() requiert (personneId, boolean)');
+        return null;
+      }
+      const { data, error } = await client.rpc('set_section_rugby', {
+        p_personne_id: personneId,
+        p_actif: actif
+      });
+      if (error) {
+        console.error('MOM Hub: setSectionRugby()', error);
+        return null;
+      }
+      return data === true || data === false ? data : null;
+    },
+
+    /**
      * Récupère l'effectif d'une catégorie via RPC get_joueurs_categorie()
      * (sql_112). Jumelle de getJoueursEquipe/getJoueursF15 : MÊME shape
      * de sortie (32 colonnes) → cartes et fiche inchangées.
@@ -7605,7 +7665,7 @@
   }
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.74 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.75 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
