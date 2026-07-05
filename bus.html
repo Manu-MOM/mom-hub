@@ -178,6 +178,114 @@
     </div>
   </header>
 
+  <!-- HUB-NAV-LOGISTIQUE v1 — snippet dupliqué à l'IDENTIQUE sur
+       logistique.html / logistique-agenda.html / logistique-validation.html /
+       bus.html (N1a, FAIT FOI NAVIGATION-THEMATIQUE 05/07/2026). Toute
+       modification se réplique sur les 4 pages. Navigation PURE : aucun
+       contenu vivant (N6). Le lien Validation naît masqué (fail-safe N2)
+       et n'est révélé que pour admin|bureau via les wrappers existants —
+       la garde de page du poste reste la vérité. -->
+  <style>
+    .hub-nav {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 32px;
+      background: var(--paper-warm);
+      border-bottom: 1px solid var(--line);
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      white-space: nowrap;
+    }
+    .hub-nav__label {
+      flex: 0 0 auto;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ink-mute);
+      margin-right: 6px;
+    }
+    .hub-nav a,
+    .hub-nav .hub-nav__current {
+      flex: 0 0 auto;
+      font-size: 13px;
+      padding: 4px 12px;
+      border-radius: 999px;
+      text-decoration: none;
+    }
+    .hub-nav a {
+      color: var(--ink-soft);
+      border: 1px solid transparent;
+    }
+    .hub-nav a:hover {
+      color: var(--vert-bouteille);
+      border-color: var(--line);
+      background: var(--paper);
+    }
+    .hub-nav .hub-nav__current {
+      color: var(--vert-bouteille);
+      background: var(--paper);
+      border: 1px solid var(--line);
+      font-weight: 600;
+      cursor: default;
+    }
+    @media (max-width: 768px) {
+      .hub-nav { padding: 8px 16px; }
+    }
+  </style>
+  <nav class="hub-nav" aria-label="Navigation logistique">
+    <span class="hub-nav__label">Logistique</span>
+    <a href="./">Accueil</a>
+    <a href="logistique.html">Guichet</a>
+    <a href="logistique-agenda.html">Agenda</a>
+    <a href="bus.html">Bus</a>
+    <a href="logistique-validation.html" data-nav-show="admin bureau" hidden aria-hidden="true">Validation</a>
+  </nav>
+  <script>
+    // HUB-NAV-LOGISTIQUE v1 — marquage page courante + révélation N2.
+    (function () {
+      var nav = document.querySelector('.hub-nav');
+      if (!nav) return;
+
+      // Page courante : le lien dont le dernier segment du href = celui du
+      // pathname devient un <span> marqué non-cliquable ('' → index.html).
+      var courant = window.location.pathname.split('/').pop() || 'index.html';
+      nav.querySelectorAll('a[href]').forEach(function (a) {
+        var cible = (a.getAttribute('href') || '').split('/').pop() || 'index.html';
+        if (cible === courant) {
+          var span = document.createElement('span');
+          span.className = 'hub-nav__current';
+          span.setAttribute('aria-current', 'page');
+          span.textContent = a.textContent;
+          a.replaceWith(span);
+        }
+      });
+
+      // Révélation fail-safe du lien Validation : session + (admin OU bureau).
+      // Attend DOMContentLoaded : les scripts (dont supabase-client.js) sont
+      // chargés en fin de body, APRÈS ce snippet. Échec silencieux = lien
+      // masqué (patron data-show du dashboard répliqué).
+      document.addEventListener('DOMContentLoaded', async function () {
+        try {
+          if (typeof SupabaseHub === 'undefined') return;
+          var session = await SupabaseHub.getSession();
+          if (!session) return;
+          var droits = await Promise.all([
+            SupabaseHub.isAdmin(),
+            SupabaseHub.hasRole('bureau')
+          ]);
+          if (droits[0] || droits[1]) {
+            nav.querySelectorAll('[data-nav-show]').forEach(function (el) {
+              el.hidden = false;
+              el.removeAttribute('aria-hidden');
+            });
+          }
+        } catch (e) { /* honnête : le lien reste masqué */ }
+      });
+    })();
+  </script>
+
   <main class="bus-layout">
     <a href="./" class="bus-back" title="Retour à l'accueil">← Retour à l'accueil</a>
     <div class="bus-head">
