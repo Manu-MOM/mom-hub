@@ -18,7 +18,20 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.76 — juillet 2026
+ * Version : 1.77 — juillet 2026
+ *   v1.77 : LOGISTIQUE-MULTI-CATEGORIES (FAIT FOI gelé 05/07/2026).
+ *           3 mappings ADDITIFS p_categorie_ids (uuid[]) sur les wrappers
+ *           modifierReservation / modifierRecurrence / modifierBus, alignés
+ *           sur les signatures sql_157 (paramètre final DEFAULT NULL —
+ *           null transmis = tableau dérivé du scalaire côté SQL, M4).
+ *           create* INCHANGÉS dans leur code (INSERT PostgREST tel quel :
+ *           categorie_ids / responsables_personne_ids passent dans le
+ *           payload, trigger T1 sql_156 synchronise) — seuls les @param
+ *           documentent les nouveaux champs. ANOMALIE TRACÉE : le boot
+ *           v1.76 affichait encore « v1.75 chargé » (bump annoncé au
+ *           changelog v1.76 mais non appliqué) — corrigé ici, boot → v1.77.
+ *           node --check OK.
+ *
  *   v1.76 : LOGISTIQUE-EXCEPTIONS-RECURRENCE (FAIT FOI gelé 05/07/2026).
  *           2 wrappers ADDITIFS vers les RPC sql_155 :
  *           exclureOccurrence(id, date) / reinclureOccurrence(id, date)
@@ -6654,8 +6667,11 @@
      * Crée une réservation simple (statut 'pending' par défaut côté SQL).
      * Soumis RLS B5-saisie : échoue si le référent n'est pas habilité
      * sur la catégorie (ou categorie_id null hors transverse).
-     * @param {Object} payload { ressource_id, categorie_id?, responsable_personne_id,
+     * @param {Object} payload { ressource_id, categorie_id?, categorie_ids?,
+     *   responsable_personne_id, responsables_personne_ids?,
      *   date, heure_debut, heure_fin, motif? }
+     *   (multi : tableaux uuid[] transmis tels quels, trigger T1 sql_156
+     *   synchronise scalaire ↔ tableau ; policy B5 souple sur le tableau)
      * @returns {Promise<{ok:boolean, data?:object, error?:string}>}
      */
     async createReservation(payload) {
@@ -6678,8 +6694,10 @@
     /**
      * Crée une règle récurrente (statut 'pending' par défaut côté SQL).
      * Soumis RLS B5-saisie. jours : int[] (0=Lundi .. 6=Dimanche).
-     * @param {Object} payload { ressource_id, categorie_id?, responsable_personne_id,
+     * @param {Object} payload { ressource_id, categorie_id?, categorie_ids?,
+     *   responsable_personne_id, responsables_personne_ids?,
      *   freq, jours, heure_debut, heure_fin, date_fin, motif? }
+     *   (multi : cf. createReservation)
      * @returns {Promise<{ok:boolean, data?:object, error?:string}>}
      */
     async createRecurrence(payload) {
@@ -6703,8 +6721,10 @@
     /**
      * Crée une demande de bus (statut 'pending' par défaut côté SQL).
      * Soumis RLS B5-saisie. arrets aller/retour et delegations : tableaux JSON.
-     * @param {Object} payload { categorie_id?, responsable_personne_id, date,
+     * @param {Object} payload { categorie_id?, categorie_ids?,
+     *   responsable_personne_id, responsables_personne_ids?, date,
      *   destination, ... arrets_aller, arrets_retour, delegations, totaux }
+     *   (multi : cf. createReservation)
      * @returns {Promise<{ok:boolean, data?:object, error?:string}>}
      */
     async createDemandeBus(payload) {
@@ -6830,8 +6850,9 @@
      * Modifie une réservation ponctuelle (repasse en 'pending').
      * UPDATE DUR : tous les champs métier requis (B7).
      * @param {string} id  reservation_id
-     * @param {Object} payload { ressource_id, categorie_id, date,
-     *   heure_debut, heure_fin, motif? }
+     * @param {Object} payload { ressource_id, categorie_id, categorie_ids?,
+     *   date, heure_debut, heure_fin, motif? }
+     *   (categorie_ids uuid[] — null/absent : SQL dérive du scalaire, M4)
      * @returns {Promise<{ok:boolean, data?:object, error?:string}>}
      */
     async modifierReservation(id, payload) {
@@ -6846,7 +6867,10 @@
         p_date: payload.date,
         p_heure_debut: payload.heure_debut,
         p_heure_fin: payload.heure_fin,
-        p_motif: payload.motif || null
+        p_motif: payload.motif || null,
+        p_categorie_ids: (Array.isArray(payload.categorie_ids)
+          && payload.categorie_ids.length)
+          ? payload.categorie_ids : null
       });
       if (error) {
         console.error('MOM Hub: modifierReservation()', error);
@@ -6861,8 +6885,9 @@
      * UPDATE DUR : tous les champs métier requis (B7), dont
      * date_debut (sql_151 — null = pas de borne basse).
      * @param {string} id  recurrence_id
-     * @param {Object} payload { ressource_id, categorie_id, freq,
-     *   jours, heure_debut, heure_fin, date_debut?, date_fin, motif? }
+     * @param {Object} payload { ressource_id, categorie_id, categorie_ids?,
+     *   freq, jours, heure_debut, heure_fin, date_debut?, date_fin, motif? }
+     *   (categorie_ids uuid[] — null/absent : SQL dérive du scalaire, M4)
      * @returns {Promise<{ok:boolean, data?:object, error?:string}>}
      */
     async modifierRecurrence(id, payload) {
@@ -6881,7 +6906,10 @@
         p_heure_fin: payload.heure_fin,
         p_date_debut: payload.date_debut || null,
         p_date_fin: payload.date_fin,
-        p_motif: payload.motif || null
+        p_motif: payload.motif || null,
+        p_categorie_ids: (Array.isArray(payload.categorie_ids)
+          && payload.categorie_ids.length)
+          ? payload.categorie_ids : null
       });
       if (error) {
         console.error('MOM Hub: modifierRecurrence()', error);
@@ -6896,7 +6924,8 @@
      * UPDATE DUR : tous les champs métier requis (B7), jsonb compris.
      * responsable_personne_id IMMUABLE (hors périmètre v1).
      * @param {string} id  demande_id
-     * @param {Object} payload { categorie_id, date, type_competition,
+     * @param {Object} payload { categorie_id, categorie_ids?, date,
+     *   type_competition,
      *   destination, heure_arrivee_souhaitee, retour_depart,
      *   retour_arrivee, arrets_aller, arrets_retour, delegations,
      *   pax_joueurs, pax_staff, total_mom, total_deleg, total_bus,
@@ -6924,7 +6953,10 @@
         p_total_mom: payload.total_mom || 0,
         p_total_deleg: payload.total_deleg || 0,
         p_total_bus: payload.total_bus || 0,
-        p_notes: payload.notes || null
+        p_notes: payload.notes || null,
+        p_categorie_ids: (Array.isArray(payload.categorie_ids)
+          && payload.categorie_ids.length)
+          ? payload.categorie_ids : null
       });
       if (error) {
         console.error('MOM Hub: modifierBus()', error);
@@ -7719,7 +7751,7 @@
   }
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.75 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.77 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
