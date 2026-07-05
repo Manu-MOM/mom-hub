@@ -37,6 +37,18 @@
     journalise pas en son nom : le bureau journalise (FAIT FOI §3.1 P1, « la saisie
     d'historique est portée par le bureau, jamais Lohann »). La carte propose donc le
     geste + le mail-type ; la trace écrite reste au bureau. Cohérent avec le modèle.
+
+  CARTE-GESTE ENRICHIE (FAIT FOI conv 05/07/2026, points 1+2+4 — sql_164) :
+    - list_prospection_pour_salarie remonte 4 colonnes de plus : telephone
+      (bouton « Appeler » en tel:), commune + zone (situer l'école),
+      lieu_pratique (OODA — lieu de pratique envisagé).
+    - Contacts internes (enseignants, sql_161) affichés sur la carte —
+      lecture ouverte au salarié par sql_164 ; écriture toujours bureau.
+    - Moteur de priorité : tri SECONDAIRE de proximité par zone sur la
+      règle 3 (à contacter) — circ. Molsheim d'abord, puis proche secteur,
+      puis Obernai nord, puis sud. Les règles 1 et 2 restent triées par
+      date (l'urgence prime la géographie — décision tracée).
+    - Point 3 (journalisation par le salarié) explicitement NON rouvert.
 -->
 <link rel="stylesheet" href="css/hub.css">
 <style>
@@ -52,6 +64,17 @@
   .gs-msg { padding: 10px 14px; border-radius: 8px; font-size: 14px; margin-bottom: 14px; display: none; }
   .gs-msg.ok { background: #e8f1ec; color: var(--vert-prairie, #1b6b4c); display: block; }
   .gs-msg.err { background: #f7e6e2; color: var(--rouge-blesse, #c0392b); display: block; }
+
+  /* Métadonnées de la carte (commune, zone, lieu, tél) */
+  .dg-meta { font-size: 13px; color: var(--ink-mute, #6b7a74); margin: 0; }
+  .dg-lieu { font-size: 13px; margin: 0; padding: 8px 12px; background: #eef3ef;
+             border-radius: 8px; color: var(--ink, #0c3d24); }
+  .dg-internes { border-top: 1px dashed var(--paper-warm, #e3e0d8); padding-top: 10px;
+                 font-size: 13px; color: var(--ink-mute, #6b7a74); }
+  .dg-internes .titre { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; margin: 0 0 6px; }
+  .dg-internes .ligne { margin: 0 0 4px; color: var(--ink, #0c3d24); }
+  .dg-iclasse { display: inline-block; background: #eef3ef; border-radius: 6px; padding: 0 7px;
+                font-weight: 600; margin-right: 6px; }
 
   /* La carte-geste : le seul objet de la page */
   .dg-card { background: #fff; border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 18px;
@@ -234,6 +257,17 @@
     return null;
   }
 
+  // Proximité : plus le rang est bas, plus l'école est proche du club.
+  const ZONE_RANG = {
+    'Circ. Molsheim': 0,
+    'Proche secteur (Eurométropole S-O)': 1,
+    'Circ. Obernai (nord)': 2,
+    'Circ. Obernai (sud)': 3
+  };
+  function zoneRang(z) {
+    return (z != null && ZONE_RANG[z] !== undefined) ? ZONE_RANG[z] : 9;
+  }
+
   function frDate(iso) {
     if (!iso) return '';
     const [y, m, d] = iso.split('-');
@@ -258,9 +292,15 @@
       convert.sort((a, b) => ((a.e.dernier_contact || '') < (b.e.dernier_contact || '') ? -1 : 1));
       return { ...convert[0].g, ecole: convert[0].e, file: convert.length };
     }
-    // Règle 3 : à contacter jamais démarchées (ordre alpha, déjà trié par la RPC).
+    // Règle 3 : à contacter jamais démarchées — tri SECONDAIRE de proximité
+    // par zone (FAIT FOI point 4), puis alpha (ordre RPC conservé à zone égale).
     const premiers = ecoles.map(e => ({ e, g: gestedPremier(e) })).filter(x => x.g);
     if (premiers.length) {
+      premiers.sort((a, b) => {
+        const ra = zoneRang(a.e.zone), rb = zoneRang(b.e.zone);
+        if (ra !== rb) return ra - rb;
+        return String(a.e.libelle || '').localeCompare(String(b.e.libelle || ''), 'fr');
+      });
       return { ...premiers[0].g, ecole: premiers[0].e, file: premiers.length };
     }
     return null;
@@ -308,14 +348,25 @@
 
     const contact = [e.contact_nom, e.contact_email].filter(Boolean).join(' · ');
     const peutMail = e.type_entite === 'ecole_elementaire';
+    const meta = [e.commune, e.zone, e.telephone].filter(Boolean).join(' · ');
 
     slot.innerHTML = ''
       + '<div class="dg-card">'
       +   '<span class="dg-kind ' + geste.kind + '"><span class="dot"></span>' + escapeHtml(geste.kindLabel) + '</span>'
       +   '<p class="dg-ecole">' + escapeHtml(e.libelle) + '</p>'
+      +   (meta ? '<p class="dg-meta">' + escapeHtml(meta) + '</p>' : '')
       +   '<p class="dg-why">' + escapeHtml(geste.why) + '</p>'
       +   (contact ? '<p class="dg-contact">' + escapeHtml(contact) + '</p>' : '')
+      +   (e.lieu_pratique
+          ? '<p class="dg-lieu">Lieu de pratique envisagé : ' + escapeHtml(e.lieu_pratique) + '</p>'
+          : '')
+      +   '<div class="dg-internes" id="dgInternes" style="display:none"></div>'
       +   '<div class="dg-actions">'
+      +     (e.telephone
+            ? '<a class="dg-btn ghost" href="tel:' + encodeURIComponent(String(e.telephone).replace(/[^+0-9]/g, '')) + '">'
+              + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>'
+              + 'Appeler</a>'
+            : '')
       +     (peutMail
             ? '<button type="button" class="dg-btn primary" id="dgMail">'
               + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>'
@@ -335,8 +386,31 @@
 
     const mailBtn = $('dgMail');
     if (mailBtn) mailBtn.addEventListener('click', () => ouvrirMailType(e));
+    chargerInternesCarte(e.entite_id);
     $('dgDone').addEventListener('click', () => marquerFait(e));
     $('dgSkip').addEventListener('click', () => { passees.add(e.entite_id); rendre(); });
+  }
+
+  // Contacts internes (enseignants) : lecture ouverte au salarié par sql_164.
+  // Tolérant : en cas d'erreur la section reste simplement masquée (la carte
+  // fonctionne sans — pas de blocage du geste).
+  async function chargerInternesCarte(entiteId) {
+    const box = $('dgInternes');
+    if (!box) return;
+    try {
+      const rows = (await rpc('list_prospection_contacts_internes', { p_entite_id: entiteId })) || [];
+      if (!rows.length) { box.style.display = 'none'; return; }
+      box.innerHTML = '<p class="titre">Contacts internes</p>' + rows.map(r => {
+        const nom = [r.prenom, r.nom].filter(Boolean).join(' ');
+        const coord = [r.telephone, r.email].filter(Boolean).join(' · ');
+        return '<p class="ligne">'
+          + (r.classe ? '<span class="dg-iclasse">' + escapeHtml(r.classe) + '</span>' : '')
+          + escapeHtml(nom) + (coord ? ' — ' + escapeHtml(coord) : '') + '</p>';
+      }).join('');
+      box.style.display = 'block';
+    } catch (_) {
+      box.style.display = 'none';
+    }
   }
 
   // « C'est fait » : geste de clôture d'un tap (FAIT FOI §1). Avance a_contacter ->
