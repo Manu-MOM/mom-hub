@@ -7,119 +7,101 @@
 <link rel="icon" type="image/png" href="assets/logo-m2m.png">
 <!--
   MOM Hub · Démarchage scolaire — surface EXÉCUTANT (Lohann) du module B.
-  Brique 4 (FAIT FOI conception module B §3.4 ; production pt 130+).
+  Brique 4 — RÉÉCRITE le 05/07/2026 (arbitrage Manu « B », après maquettes
+  A / B / hybride).
 
-  PRINCIPE OPPOSABLE (FAIT FOI §1) : « quel est le prochain petit geste, est-il
-  évident ? » -> UNE seule carte plein écran à la fois, zéro liste, zéro choix.
-  Lohann agit -> carte suivante. Empty state OBLIGATOIRE et non-anxiogène.
+  PRINCIPE OPPOSABLE RÉÉCRIT (remplace le §1 « une carte, zéro liste ») :
+    « La liste complète, chaque action à un tap. » Lohann voit toutes les
+    écoles démarchables, cherche, filtre (statut + zone), et agit depuis la
+    ligne : appeler, mail-type, marquer fait. Le MOTEUR DE PRIORITÉ de la
+    version carte survit en ORDRE DE TRI (relance due > à convertir >
+    premier contact) puis proximité de zone, et en BADGES par ligne.
+    L'ancienne version carte (« un geste à la fois ») reste dans l'historique
+    git si le terrain redemande le mode focalisé.
 
-  ARCHITECTURE :
+  ARCHITECTURE (inchangée) :
     - charge supabase.min.js (CDN) puis js/supabase-client.js (SupabaseHub).
-    - garde d'auth : getSession()->login.html ; rôle salarié OU admin|bureau
-      (aligne la garde SQL de list_prospection_pour_salarie : _gs_peut_ecrire()
-      OR suis_je_salarie()). Lohann n'est ni admin ni bureau : la RPC dédiée
-      sql_132 lui ouvre la LECTURE.
-    - MOTEUR DE PRIORITÉ côté FRONT (Option B, décision production). Ordre validé
-      par Manu (= FAIT FOI §3.4) :
-        1. relances dues (derniere_relance <= today, école non client/inactif) ;
-        2. intéressée sans suite (statut interesse, pas de relance future posée) ;
-        3. à contacter jamais démarchée (a_contacter / non démarchée).
-      Ajustable ici sans nouveau SQL (justification du choix B).
+    - garde d'auth : getSession()->login.html ; salarié OU admin|bureau.
+    - RPC consommées :
+        list_prospection_pour_salarie()            (sql_132 + sql_164 : +telephone,
+          commune, zone, lieu_pratique) — lecture, garde bureau OU salarié ;
+        list_prospection_contacts_internes(p_id)   (sql_161 + garde élargie
+          sql_164) — enseignants, chargés au dépliage d'une ligne ;
+        marquer_contactee(p_entite_id)             (sql_133, idempotente) —
+          geste de clôture « C'est fait » ;
+        inserer_prospection_contact : TOUJOURS PAS appelée ici — la
+          journalisation reste portée par le bureau (FAIT FOI §3.1 maintenu,
+          point 3 non rouvert).
 
-  RPC consommées :
-    list_prospection_pour_salarie()  (sql_132) — lecture, garde bureau OU salarié.
-    inserer_prospection_contact(6p)  (sql_131) — Lohann journalise son propre geste
-      (garde _gs_peut_ecrire() côté SQL : voir note ci-dessous).
-
-  NOTE D'HONNÊTETÉ (à recetter) : inserer_prospection_contact est gardée
-    _gs_peut_ecrire() (admin|bureau) — donc Lohann NE PEUT PAS journaliser via cette
-    RPC en l'état. Cette page laisse Lohann AGIR (préparer le mail-type) mais NE
-    journalise pas en son nom : le bureau journalise (FAIT FOI §3.1 P1, « la saisie
-    d'historique est portée par le bureau, jamais Lohann »). La carte propose donc le
-    geste + le mail-type ; la trace écrite reste au bureau. Cohérent avec le modèle.
-
-  CARTE-GESTE ENRICHIE (FAIT FOI conv 05/07/2026, points 1+2+4 — sql_164) :
-    - list_prospection_pour_salarie remonte 4 colonnes de plus : telephone
-      (bouton « Appeler » en tel:), commune + zone (situer l'école),
-      lieu_pratique (OODA — lieu de pratique envisagé).
-    - Contacts internes (enseignants, sql_161) affichés sur la carte —
-      lecture ouverte au salarié par sql_164 ; écriture toujours bureau.
-    - Moteur de priorité : tri SECONDAIRE de proximité par zone sur la
-      règle 3 (à contacter) — circ. Molsheim d'abord, puis proche secteur,
-      puis Obernai nord, puis sud. Les règles 1 et 2 restent triées par
-      date (l'urgence prime la géographie — décision tracée).
-    - Point 3 (journalisation par le salarié) explicitement NON rouvert.
+  DÉTAILS D'UNE LIGNE (tap sur la ligne) : lieu de pratique envisagé,
+  contact principal, contacts internes (lazy), mail vierge.
+  Filtres : statut (À traiter par défaut / Relances dues / Intéressées /
+  Toutes — clientes et en sommeil ne sortent que sous « Toutes ») ;
+  zone (Toutes / Molsheim / Proche secteur / Obernai nord / Obernai sud).
+  Recherche accent-insensible sur libellé, commune, zone.
 -->
 <link rel="stylesheet" href="css/hub.css">
 <style>
   body.auth-pending { visibility: hidden; }
 
-  .dg-wrap { max-width: 560px; margin: 0 auto; padding: 32px 20px 56px; min-height: 60vh;
-             display: flex; flex-direction: column; }
-  .dg-hd { text-align: center; margin-bottom: 24px; }
+  .dg-wrap { max-width: 720px; margin: 0 auto; padding: 28px 20px 56px; }
+  .dg-hd { text-align: center; margin-bottom: 18px; }
   .dg-hd h1 { font-size: 19px; margin: 0 0 4px; color: var(--ink, #0c3d24); }
   .dg-hd p { font-size: 13px; color: var(--ink-mute, #6b7a74); margin: 0; }
-  .dg-progress { font-size: 12px; color: var(--ink-mute, #6b7a74); text-align: center; margin-top: 6px; }
 
   .gs-msg { padding: 10px 14px; border-radius: 8px; font-size: 14px; margin-bottom: 14px; display: none; }
   .gs-msg.ok { background: #e8f1ec; color: var(--vert-prairie, #1b6b4c); display: block; }
   .gs-msg.err { background: #f7e6e2; color: var(--rouge-blesse, #c0392b); display: block; }
 
-  /* Métadonnées de la carte (commune, zone, lieu, tél) */
-  .dg-meta { font-size: 13px; color: var(--ink-mute, #6b7a74); margin: 0; }
-  .dg-lieu { font-size: 13px; margin: 0; padding: 8px 12px; background: #eef3ef;
-             border-radius: 8px; color: var(--ink, #0c3d24); }
-  .dg-internes { border-top: 1px dashed var(--paper-warm, #e3e0d8); padding-top: 10px;
-                 font-size: 13px; color: var(--ink-mute, #6b7a74); }
-  .dg-internes .titre { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; margin: 0 0 6px; }
-  .dg-internes .ligne { margin: 0 0 4px; color: var(--ink, #0c3d24); }
+  .dg-search { width: 100%; box-sizing: border-box; padding: 10px 12px; margin: 0 0 10px;
+               border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 10px; font: inherit; }
+  .dg-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
+  .dg-chip { border: 1px solid var(--paper-warm, #e3e0d8); background: #fff; border-radius: 999px;
+             padding: 5px 12px; font: inherit; font-size: 12px; cursor: pointer;
+             color: var(--ink-mute, #6b7a74); }
+  .dg-chip.on { background: var(--vert-prairie, #2d7a3e); border-color: var(--vert-prairie, #2d7a3e);
+                color: #fff; font-weight: 600; }
+  .dg-count { font-size: 12px; color: var(--ink-mute, #6b7a74); margin: 8px 0 6px; }
+
+  .dg-row { border-bottom: 1px solid var(--paper-warm, #e3e0d8); padding: 10px 2px; }
+  .dg-row-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .dg-row-main { min-width: 0; cursor: pointer; flex: 1; }
+  .dg-nom { font-size: 14px; font-weight: 600; margin: 0; color: var(--ink, #0c3d24); }
+  .dg-meta { font-size: 12px; color: var(--ink-mute, #6b7a74); margin: 2px 0 0; }
+  .dg-acts { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .dg-icbtn { border: 1px solid var(--paper-warm, #e3e0d8); background: #fff; border-radius: 8px;
+              padding: 6px 9px; cursor: pointer; color: var(--ink, #0c3d24);
+              display: inline-flex; align-items: center; text-decoration: none; }
+  .dg-icbtn svg { width: 16px; height: 16px; }
+  .dg-icbtn:disabled { opacity: .45; cursor: default; }
+
+  .dg-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600;
+              padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
+  .dg-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .dg-badge.relance   { background: #fdf1dc; color: #8a5a12; }
+  .dg-badge.convertir { background: #e3edf8; color: #1f4a82; }
+  .dg-badge.premier   { background: #e8f1ec; color: #1b6b4c; }
+  .dg-badge.client    { background: #eef3ef; color: #2d7a3e; }
+  .dg-badge.inactif   { background: #f1efe8; color: #6b7a74; }
+
+  .dg-detail { margin-top: 10px; padding: 10px 12px; background: #fbfaf6;
+               border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 10px; font-size: 13px; }
+  .dg-detail p { margin: 0 0 6px; }
+  .dg-detail .titre { font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
+                      color: var(--ink-mute, #6b7a74); margin: 8px 0 4px; }
+  .dg-lieu { padding: 7px 10px; background: #eef3ef; border-radius: 8px; color: var(--ink, #0c3d24); }
   .dg-iclasse { display: inline-block; background: #eef3ef; border-radius: 6px; padding: 0 7px;
                 font-weight: 600; margin-right: 6px; }
+  .dg-lien { color: var(--bleu-base, #1f4a82); text-decoration: underline; cursor: pointer;
+             background: transparent; border: 0; font: inherit; font-size: 13px; padding: 0; }
 
-  /* La carte-geste : le seul objet de la page */
-  .dg-card { background: #fff; border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 18px;
-             padding: 28px 26px; box-shadow: 0 8px 28px rgba(12,61,36,0.10);
-             display: flex; flex-direction: column; gap: 18px; }
-  .dg-kind { display: inline-flex; align-self: flex-start; align-items: center; gap: 7px;
-             padding: 5px 13px; border-radius: 20px; font-size: 12.5px; font-weight: 700;
-             text-transform: uppercase; letter-spacing: .03em; }
-  .dg-kind.relance   { background: #fdf3e0; color: #b07814; }
-  .dg-kind.convertir { background: #eaf1fa; color: #1f4a82; }
-  .dg-kind.premier   { background: #e8f1ec; color: #1b6b4c; }
-  .dg-kind .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-
-  .dg-ecole { font-size: 26px; font-weight: 800; color: var(--ink, #0c3d24); line-height: 1.15; margin: 0; }
-  .dg-why { font-size: 15px; color: var(--ink-soft, #2a4836); margin: 0; line-height: 1.45; }
-  .dg-contact { font-size: 13px; color: var(--ink-mute, #6b7a74); margin: 0;
-                padding-top: 12px; border-top: 1px solid var(--paper-warm, #efe9dd); }
-
-  .dg-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
-  .dg-btn { padding: 14px 18px; border: 0; border-radius: 12px; font: inherit; font-size: 15px;
-            font-weight: 700; cursor: pointer; text-align: center; text-decoration: none;
-            display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
-  .dg-btn.primary { background: var(--vert-prairie, #2d7a3e); color: #fff; }
-  .dg-btn.primary:hover { background: var(--vert-prairie-fonce, #246232); }
-  .dg-btn.ghost { background: #fff; border: 1px solid var(--line, #cabe9f); color: var(--ink, #0c3d24); }
-  .dg-btn.ghost:hover { border-color: var(--vert-prairie, #2d7a3e); color: var(--vert-prairie, #2d7a3e); }
-  .dg-btn svg { width: 17px; height: 17px; }
-  .dg-skip { background: transparent; border: 0; font: inherit; font-size: 13px; cursor: pointer;
-             color: var(--ink-mute, #6b7a74); padding: 8px; align-self: center; }
-  .dg-skip:hover { color: var(--ink, #0c3d24); text-decoration: underline; }
-
-  /* Empty state : non-anxiogène, invitation à agir (pas un écran blanc) */
-  .dg-empty { background: #fff; border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 18px;
-              padding: 40px 28px; text-align: center; box-shadow: 0 8px 28px rgba(12,61,36,0.08); }
-  .dg-empty .ico { width: 56px; height: 56px; margin: 0 auto 16px; color: var(--vert-prairie, #2d7a3e); }
-  .dg-empty .ico svg { width: 56px; height: 56px; }
-  .dg-empty h2 { font-size: 19px; margin: 0 0 8px; color: var(--ink, #0c3d24); }
-  .dg-empty p { font-size: 14px; color: var(--ink-mute, #6b7a74); margin: 0; line-height: 1.5; }
-
-  .dg-loading { text-align: center; color: var(--ink-mute, #6b7a74); font-size: 14px; padding: 40px 0; }
+  .dg-empty { text-align: center; padding: 40px 16px; color: var(--ink-mute, #6b7a74); }
+  .dg-loading { text-align: center; padding: 40px 16px; color: var(--ink-mute, #6b7a74); }
 </style>
 </head>
 <body class="auth-pending">
 
-  <header class="topbar">
+<header class="topbar">
     <div class="brand">
       <div class="brand-logo"><img src="assets/logo-m2m.png" alt="MOM Rugby"></div>
       <div class="brand-text">
@@ -152,15 +134,22 @@
 
 <div class="dg-wrap">
   <div class="dg-hd">
-    <h1>Prochaine école à démarcher</h1>
-    <p>Un geste à la fois. Le bureau prépare les écoles, vous les contactez.</p>
-    <p class="dg-progress" id="dgProgress"></p>
+    <h1>Écoles à démarcher</h1>
+    <p>La liste complète — appelez, écrivez, notez : chaque action à un tap.</p>
   </div>
 
   <div id="gsMsg" class="gs-msg"></div>
 
-  <div id="dgSlot">
-    <div class="dg-loading" id="dgLoading">Chargement de votre prochaine école…</div>
+  <input type="search" class="dg-search" id="dgSearch"
+         placeholder="Rechercher (nom, commune, zone…)" autocomplete="off">
+
+  <div class="dg-chips" id="dgStatuts"></div>
+  <div class="dg-chips" id="dgZones"></div>
+
+  <p class="dg-count" id="dgCount"></p>
+
+  <div id="dgListe">
+    <div class="dg-loading">Chargement des écoles…</div>
   </div>
 </div>
 
@@ -172,12 +161,11 @@
 (async function () {
   'use strict';
 
-  // --- Garde d'auth : salarié OU admin|bureau (aligne la garde SQL sql_132) ---
+  // --- Garde d'auth : salarié OU admin|bureau (inchangée) ---
   const session = await SupabaseHub.getSession();
   if (!session) { window.location.replace('login.html'); return; }
   const roles = await SupabaseHub.getMyRoles();
   const estBureau = roles.indexOf('admin') !== -1 || roles.indexOf('bureau') !== -1;
-  // suis_je_salarie() via RPC : Lohann passe ici sans rôle admin/bureau.
   let estSalarie = false;
   try { estSalarie = !!(await SupabaseHub.client.rpc('suis_je_salarie')).data; } catch (_) { estSalarie = false; }
   if (!estBureau && !estSalarie) { window.location.replace('./'); return; }
@@ -200,12 +188,6 @@
     }
   } catch (_) { /* libellé statique conservé */ }
 
-  // Topbar (nom/pastille/rôle) : gérée par le helper central _remplirProfilTopbar
-  // de supabase-client.js, qui affiche l'identité RÉELLE du connecté (toi=admin,
-  // Lohann=encadrant). On NE force PLUS list_salaries()[0] ici : ce bloc affichait
-  // toujours Lohann (1er salarié) quel que soit qui regarde → « Lohann · Administrateur »
-  // quand un admin ouvrait la page. Le helper + le repli en dur neutre suffisent.
-
   const client = SupabaseHub.client;
   const $ = (id) => document.getElementById(id);
 
@@ -213,6 +195,7 @@
     const m = $('gsMsg');
     m.textContent = text; m.className = 'gs-msg ' + kind;
     if (kind === 'ok') setTimeout(() => { m.className = 'gs-msg'; }, 3500);
+    if (kind === 'err') { window.scrollTo({ top: 0, behavior: 'smooth' }); }
   }
   function escapeHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
@@ -222,40 +205,32 @@
     const m = (e && (e.message || e.error_description || e.hint)) || 'Erreur inconnue.';
     return /salari|admin|bureau|réserv/i.test(m) ? "Accès réservé au salarié ou à l'administration." : m;
   }
+  async function rpc(name, params) {
+    const { data, error } = await client.rpc(name, params || {});
+    if (error) throw error;
+    return data;
+  }
   function todayStr() { return new Date().toISOString().slice(0, 10); }
+  function normaliser(s) {
+    return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  }
 
-  // ---------- MOTEUR DE PRIORITÉ (front, ajustable — Option B) ----------
-  // Ordre validé par Manu (= FAIT FOI §3.4) :
-  //   1. relance due, 2. intéressée sans suite, 3. à contacter jamais démarchée.
-  // Chaque règle renvoie un « geste » ou null. La 1re règle qui matche gagne.
-  // Les écoles client/inactif sont hors démarchage (exclues d'office).
-  function gesteRelance(e, today) {
-    if (e.statut_prospection === 'client' || e.statut_prospection === 'inactif') return null;
-    if (e.derniere_relance && e.derniere_relance <= today) {
-      return {
-        kind: 'relance', kindLabel: 'Relance due',
-        why: 'Une relance était prévue pour le ' + frDate(e.derniere_relance) + '.'
-      };
-    }
-    return null;
+  // ---------- Priorité (héritée de la version carte : tri + badges) ----------
+  // 0 = relance due, 1 = à convertir, 2 = premier contact, 3 = cliente, 4 = en sommeil.
+  function prioRang(e, today) {
+    if (e.statut_prospection === 'inactif') return 4;
+    if (e.statut_prospection === 'client') return 3;
+    if (e.derniere_relance && e.derniere_relance <= today) return 0;
+    if (e.statut_prospection === 'interesse') return 1;
+    return 2;
   }
-  function gesteConvertir(e) {
-    if (e.statut_prospection !== 'interesse') return null;
-    // « sans suite » : pas de relance future posée (sinon c'est géré par la règle 1 le jour venu).
-    return {
-      kind: 'convertir', kindLabel: 'À convertir',
-      why: "Cette école s'est montrée intéressée — c'est le moment de concrétiser."
-    };
-  }
-  function gestedPremier(e) {
-    if (e.statut_prospection == null || e.statut_prospection === 'a_contacter') {
-      return {
-        kind: 'premier', kindLabel: 'Premier contact',
-        why: "Cette école n'a pas encore été démarchée. À vous de jouer."
-      };
-    }
-    return null;
-  }
+  const PRIO_BADGE = {
+    0: ['relance', 'Relance due'],
+    1: ['convertir', 'À convertir'],
+    2: ['premier', 'Premier contact'],
+    3: ['client', 'Cliente'],
+    4: ['inactif', 'En sommeil']
+  };
 
   // Proximité : plus le rang est bas, plus l'école est proche du club.
   const ZONE_RANG = {
@@ -268,164 +243,160 @@
     return (z != null && ZONE_RANG[z] !== undefined) ? ZONE_RANG[z] : 9;
   }
 
-  function frDate(iso) {
-    if (!iso) return '';
-    const [y, m, d] = iso.split('-');
-    return d + '/' + m + '/' + y;
-  }
-
-  // Sélectionne LE geste prioritaire parmi toutes les écoles.
-  // On parcourt les règles dans l'ordre : la 1re règle qui trouve AU MOINS une
-  // école gagne, et parmi ces écoles on prend la plus « ancienne » (relance la
-  // plus dépassée / dernier contact le plus lointain / ordre alpha).
-  function choisirGeste(ecoles) {
-    const today = todayStr();
-    // Règle 1 : relances dues (la plus dépassée d'abord).
-    const relances = ecoles.map(e => ({ e, g: gesteRelance(e, today) })).filter(x => x.g);
-    if (relances.length) {
-      relances.sort((a, b) => (a.e.derniere_relance < b.e.derniere_relance ? -1 : 1));
-      return { ...relances[0].g, ecole: relances[0].e, file: relances.length };
-    }
-    // Règle 2 : intéressées sans suite (dernier contact le plus lointain d'abord).
-    const convert = ecoles.map(e => ({ e, g: gesteConvertir(e) })).filter(x => x.g);
-    if (convert.length) {
-      convert.sort((a, b) => ((a.e.dernier_contact || '') < (b.e.dernier_contact || '') ? -1 : 1));
-      return { ...convert[0].g, ecole: convert[0].e, file: convert.length };
-    }
-    // Règle 3 : à contacter jamais démarchées — tri SECONDAIRE de proximité
-    // par zone (FAIT FOI point 4), puis alpha (ordre RPC conservé à zone égale).
-    const premiers = ecoles.map(e => ({ e, g: gestedPremier(e) })).filter(x => x.g);
-    if (premiers.length) {
-      premiers.sort((a, b) => {
-        const ra = zoneRang(a.e.zone), rb = zoneRang(b.e.zone);
-        if (ra !== rb) return ra - rb;
-        return String(a.e.libelle || '').localeCompare(String(b.e.libelle || ''), 'fr');
-      });
-      return { ...premiers[0].g, ecole: premiers[0].e, file: premiers.length };
-    }
-    return null;
-  }
+  // ---------- Filtres ----------
+  const STATUT_CHIPS = [
+    ['a_traiter', 'À traiter'],
+    ['relance', 'Relances dues'],
+    ['interesse', 'Intéressées'],
+    ['toutes', 'Toutes']
+  ];
+  const ZONES_CHIPS = [
+    [null, 'Toutes zones'],
+    ['Circ. Molsheim', 'Molsheim'],
+    ['Proche secteur (Eurométropole S-O)', 'Proche secteur'],
+    ['Circ. Obernai (nord)', 'Obernai nord'],
+    ['Circ. Obernai (sud)', 'Obernai sud']
+  ];
 
   // ---------- État ----------
   let ecoles = [];
   let mailTypesCache = null;
-  const passees = new Set();   // écoles « passées » dans cette session (skip), pour ne pas boucler.
+  let filtreStatut = 'a_traiter';
+  let zoneCourante = null;
+  let recherche = '';
+  let ligneOuverte = null;               // entite_id de la ligne dépliée.
+  const internesCache = new Map();       // entite_id -> rows (lazy, par session).
 
-  async function charger() {
-    ecoles = (await rpc('list_prospection_pour_salarie')) || [];
-    rendre();
+  function passeFiltre(e, today) {
+    if (zoneCourante != null && e.zone !== zoneCourante) return false;
+    if (recherche) {
+      const hay = normaliser([e.libelle, e.commune, e.zone].filter(Boolean).join(' '));
+      if (hay.indexOf(recherche) === -1) return false;
+    }
+    const rang = prioRang(e, today);
+    if (filtreStatut === 'toutes') return true;
+    if (filtreStatut === 'relance') return rang === 0;
+    if (filtreStatut === 'interesse') return rang === 1;
+    // « À traiter » = tout ce qui appelle un geste : relance, conversion, premier contact.
+    return rang <= 2;
   }
 
-  async function rpc(name, params) {
-    const { data, error } = await client.rpc(name, params || {});
-    if (error) throw error;
-    return data;
+  // ---------- Rendu ----------
+  function renderChips() {
+    $('dgStatuts').innerHTML = STATUT_CHIPS.map(([val, lbl]) =>
+      '<button type="button" class="dg-chip' + ((val === filtreStatut) ? ' on' : '')
+      + '" data-statut="' + val + '">' + escapeHtml(lbl) + '</button>').join('');
+    $('dgZones').innerHTML = ZONES_CHIPS.map(([val, lbl]) =>
+      '<button type="button" class="dg-chip' + ((val === zoneCourante) ? ' on' : '')
+      + '" data-zone="' + (val == null ? '' : escapeHtml(val)) + '">' + escapeHtml(lbl) + '</button>').join('');
   }
 
   function rendre() {
-    const slot = $('dgSlot');
-    const candidats = ecoles.filter(e => !passees.has(e.entite_id));
-    const geste = choisirGeste(candidats);
+    renderChips();
+    const today = todayStr();
+    const visibles = ecoles.filter(e => passeFiltre(e, today));
+    visibles.sort((a, b) => {
+      const pa = prioRang(a, today), pb = prioRang(b, today);
+      if (pa !== pb) return pa - pb;
+      const za = zoneRang(a.zone), zb = zoneRang(b.zone);
+      if (za !== zb) return za - zb;
+      return String(a.libelle || '').localeCompare(String(b.libelle || ''), 'fr');
+    });
 
-    if (!geste) {
-      // Empty state OBLIGATOIRE, non-anxiogène (FAIT FOI §3.4).
-      $('dgProgress').textContent = '';
-      slot.innerHTML = ''
-        + '<div class="dg-empty">'
-        +   '<div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">'
-        +     '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg></div>'
-        +   '<h2>Rien à faire pour l\'instant</h2>'
-        +   '<p>Vous êtes à jour sur le démarchage. Le bureau prépare les prochaines écoles — '
-        +   'repassez plus tard, une nouvelle carte vous attendra.</p>'
-        + '</div>';
+    $('dgCount').textContent = visibles.length
+      ? (visibles.length + (visibles.length > 1 ? ' écoles' : ' école') + ' · triées par priorité puis proximité')
+      : '';
+
+    const box = $('dgListe');
+    if (!visibles.length) {
+      box.innerHTML = '<div class="dg-empty"><h2 style="font-size:16px;margin:0 0 6px;">Rien à afficher ici</h2>'
+        + '<p style="margin:0;">Changez de filtre ou de zone — ou tout est à jour, et c\'est une bonne nouvelle.</p></div>';
       return;
     }
 
-    const e = geste.ecole;
-    $('dgProgress').textContent = geste.file > 1
-      ? (geste.file + ' écoles dans cette priorité')
-      : '';
+    box.innerHTML = visibles.map(e => {
+      const today2 = today;
+      const [cls, lbl] = PRIO_BADGE[prioRang(e, today2)];
+      const meta = [e.commune, e.telephone, e.contact_nom].filter(Boolean).join(' · ');
+      const tel = e.telephone ? String(e.telephone).split('/')[0].replace(/[^+0-9]/g, '') : '';
+      const peutMail = e.type_entite === 'ecole_elementaire' && e.contact_email;
+      return ''
+        + '<div class="dg-row" data-id="' + e.entite_id + '">'
+        +   '<div class="dg-row-top">'
+        +     '<div class="dg-row-main" data-open="' + e.entite_id + '">'
+        +       '<p class="dg-nom">' + escapeHtml(e.libelle) + '</p>'
+        +       (meta ? '<p class="dg-meta">' + escapeHtml(meta) + '</p>' : '')
+        +     '</div>'
+        +     '<div class="dg-acts">'
+        +       '<span class="dg-badge ' + cls + '"><span class="dot"></span>' + escapeHtml(lbl) + '</span>'
+        +       (tel
+              ? '<a class="dg-icbtn" href="tel:' + tel + '" title="Appeler" aria-label="Appeler">'
+                + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg></a>'
+              : '')
+        +       (peutMail
+              ? '<button type="button" class="dg-icbtn" data-mail="' + e.entite_id + '" title="Préparer le mail-type" aria-label="Préparer le mail-type">'
+                + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></button>'
+              : '')
+        +       '<button type="button" class="dg-icbtn" data-fait="' + e.entite_id + '" title="C\'est fait" aria-label="C\'est fait">'
+        +         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg></button>'
+        +     '</div>'
+        +   '</div>'
+        +   (ligneOuverte === e.entite_id ? renderDetail(e) : '')
+        + '</div>';
+    }).join('');
 
-    const contact = [e.contact_nom, e.contact_email].filter(Boolean).join(' · ');
-    const peutMail = e.type_entite === 'ecole_elementaire';
-    const meta = [e.commune, e.zone, e.telephone].filter(Boolean).join(' · ');
-
-    slot.innerHTML = ''
-      + '<div class="dg-card">'
-      +   '<span class="dg-kind ' + geste.kind + '"><span class="dot"></span>' + escapeHtml(geste.kindLabel) + '</span>'
-      +   '<p class="dg-ecole">' + escapeHtml(e.libelle) + '</p>'
-      +   (meta ? '<p class="dg-meta">' + escapeHtml(meta) + '</p>' : '')
-      +   '<p class="dg-why">' + escapeHtml(geste.why) + '</p>'
-      +   (contact ? '<p class="dg-contact">' + escapeHtml(contact) + '</p>' : '')
-      +   (e.lieu_pratique
-          ? '<p class="dg-lieu">Lieu de pratique envisagé : ' + escapeHtml(e.lieu_pratique) + '</p>'
-          : '')
-      +   '<div class="dg-internes" id="dgInternes" style="display:none"></div>'
-      +   '<div class="dg-actions">'
-      +     (e.telephone
-            ? '<a class="dg-btn ghost" href="tel:' + encodeURIComponent(String(e.telephone).replace(/[^+0-9]/g, '')) + '">'
-              + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>'
-              + 'Appeler</a>'
-            : '')
-      +     (peutMail
-            ? '<button type="button" class="dg-btn primary" id="dgMail">'
-              + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>'
-              + 'Préparer le mail</button>'
-            : '')
-      +     (e.contact_email
-            ? '<a class="dg-btn ghost" href="mailto:' + encodeURIComponent(e.contact_email) + '">'
-              + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z" opacity="0"/><rect x="3" y="5" width="18" height="14" rx="2"/></svg>'
-              + 'Écrire un mail vierge</a>'
-            : '')
-      +     '<button type="button" class="dg-btn ghost" id="dgDone">'
-      +       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>'
-      +       'C\'est fait</button>'
-      +     '<button type="button" class="dg-skip" id="dgSkip">Passer à l\'école suivante</button>'
-      +   '</div>'
-      + '</div>';
-
-    const mailBtn = $('dgMail');
-    if (mailBtn) mailBtn.addEventListener('click', () => ouvrirMailType(e));
-    chargerInternesCarte(e.entite_id);
-    $('dgDone').addEventListener('click', () => marquerFait(e));
-    $('dgSkip').addEventListener('click', () => { passees.add(e.entite_id); rendre(); });
+    if (ligneOuverte) chargerInternes(ligneOuverte);
   }
 
-  // Contacts internes (enseignants) : lecture ouverte au salarié par sql_164.
-  // Tolérant : en cas d'erreur la section reste simplement masquée (la carte
-  // fonctionne sans — pas de blocage du geste).
-  async function chargerInternesCarte(entiteId) {
-    const box = $('dgInternes');
+  function renderDetail(e) {
+    const mailVierge = e.contact_email
+      ? '<a class="dg-lien" href="mailto:' + encodeURIComponent(e.contact_email) + '">Écrire un mail vierge</a>'
+      : '';
+    return ''
+      + '<div class="dg-detail">'
+      +   (e.lieu_pratique
+          ? '<p class="dg-lieu">Lieu de pratique envisagé : ' + escapeHtml(e.lieu_pratique) + '</p>'
+          : '<p style="color:var(--ink-mute,#6b7a74)">Lieu de pratique envisagé : à collecter au premier contact.</p>')
+      +   (e.contact_email
+          ? '<p>' + escapeHtml([e.contact_nom, e.contact_email].filter(Boolean).join(' · ')) + (mailVierge ? ' — ' + mailVierge : '') + '</p>'
+          : '')
+      +   '<p class="titre">Contacts internes</p>'
+      +   '<div id="dgInternes-' + e.entite_id + '"><span style="color:var(--ink-mute,#6b7a74)">Chargement…</span></div>'
+      + '</div>';
+  }
+
+  async function chargerInternes(entiteId) {
+    const box = document.getElementById('dgInternes-' + entiteId);
     if (!box) return;
     try {
-      const rows = (await rpc('list_prospection_contacts_internes', { p_entite_id: entiteId })) || [];
-      if (!rows.length) { box.style.display = 'none'; return; }
-      box.innerHTML = '<p class="titre">Contacts internes</p>' + rows.map(r => {
+      let rows = internesCache.get(entiteId);
+      if (!rows) {
+        rows = (await rpc('list_prospection_contacts_internes', { p_entite_id: entiteId })) || [];
+        internesCache.set(entiteId, rows);
+      }
+      if (!rows.length) {
+        box.innerHTML = '<span style="color:var(--ink-mute,#6b7a74)">Aucun contact interne pour l\'instant.</span>';
+        return;
+      }
+      box.innerHTML = rows.map(r => {
         const nom = [r.prenom, r.nom].filter(Boolean).join(' ');
         const coord = [r.telephone, r.email].filter(Boolean).join(' · ');
-        return '<p class="ligne">'
+        return '<p style="margin:0 0 4px;">'
           + (r.classe ? '<span class="dg-iclasse">' + escapeHtml(r.classe) + '</span>' : '')
           + escapeHtml(nom) + (coord ? ' — ' + escapeHtml(coord) : '') + '</p>';
       }).join('');
-      box.style.display = 'block';
-    } catch (_) {
-      box.style.display = 'none';
+    } catch (err) {
+      box.innerHTML = '<span style="color:var(--ink-mute,#6b7a74)">Lecture impossible : '
+        + escapeHtml(errMsg(err)) + '</span>';
     }
   }
 
-  // « C'est fait » : geste de clôture d'un tap (FAIT FOI §1). Avance a_contacter ->
-  // contacte côté base (marquer_contactee, sql_133, idempotente : ne touche pas les
-  // autres statuts), puis passe à la carte suivante. Pour les écoles déjà contacte/
-  // interesse (relance, conversion), le statut reste inchangé côté base — on s'appuie
-  // sur le skip de session pour ne pas re-proposer la même dans la foulée.
-  async function marquerFait(e) {
-    const btn = $('dgDone');
+  // ---------- Actions ----------
+  async function marquerFait(entiteId, btn) {
     if (btn) btn.disabled = true;
     try {
-      await rpc('marquer_contactee', { p_entite_id: e.entite_id });
-      passees.add(e.entite_id);
-      flash('Noté. École suivante.', 'ok');
-      // Recharge l'état réel (le statut a pu changer) avant de choisir la carte suivante.
+      await rpc('marquer_contactee', { p_entite_id: entiteId });
+      flash('Noté.', 'ok');
       ecoles = (await rpc('list_prospection_pour_salarie')) || [];
       rendre();
     } catch (err) {
@@ -434,7 +405,6 @@
     }
   }
 
-  // ---------- Mail-type (data/mail-types.json, 2 variables) ----------
   async function ouvrirMailType(e) {
     try {
       if (mailTypesCache === null) {
@@ -457,11 +427,45 @@
     }
   }
 
+  // ---------- Écouteurs ----------
+  $('dgSearch').addEventListener('input', function () {
+    recherche = normaliser(this.value.trim());
+    rendre();
+  });
+  $('dgStatuts').addEventListener('click', function (ev) {
+    const b = ev.target.closest('.dg-chip');
+    if (!b) return;
+    filtreStatut = b.dataset.statut;
+    rendre();
+  });
+  $('dgZones').addEventListener('click', function (ev) {
+    const b = ev.target.closest('.dg-chip');
+    if (!b) return;
+    zoneCourante = b.dataset.zone === '' ? null : b.dataset.zone;
+    rendre();
+  });
+  $('dgListe').addEventListener('click', function (ev) {
+    const mail = ev.target.closest('[data-mail]');
+    if (mail) {
+      const e = ecoles.find(x => x.entite_id === mail.dataset.mail);
+      if (e) ouvrirMailType(e);
+      return;
+    }
+    const fait = ev.target.closest('[data-fait]');
+    if (fait) { marquerFait(fait.dataset.fait, fait); return; }
+    const open = ev.target.closest('[data-open]');
+    if (open) {
+      ligneOuverte = (ligneOuverte === open.dataset.open) ? null : open.dataset.open;
+      rendre();
+    }
+  });
+
   // ---------- Boot ----------
   try {
-    await charger();
+    ecoles = (await rpc('list_prospection_pour_salarie')) || [];
+    rendre();
   } catch (err) {
-    $('dgSlot').innerHTML = '<div class="dg-empty"><h2>Chargement impossible</h2><p>'
+    $('dgListe').innerHTML = '<div class="dg-empty"><h2 style="font-size:16px;margin:0 0 6px;">Chargement impossible</h2><p style="margin:0;">'
       + escapeHtml(errMsg(err)) + '</p></div>';
   }
 
