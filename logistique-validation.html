@@ -143,6 +143,19 @@
     .lgv-edit-day.is-on {
       background: var(--vert-prairie); color: #fff; border-color: var(--vert-prairie);
     }
+    .lgv-edit-exclues { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+    .lgv-edit-exclues-vide { font-size: 12px; color: #888; }
+    .lgv-edit-exclue {
+      font-size: 12px; padding: 4px 8px; border: 1px solid var(--line);
+      border-radius: 6px; background: #f6f6f6; display: inline-flex;
+      align-items: center; gap: 6px;
+    }
+    .lgv-edit-exclue button {
+      border: none; background: none; cursor: pointer; padding: 0;
+      line-height: 1; font-weight: bold; color: var(--rouge-alerte, #b23);
+    }
+    .lgv-edit-exclure-row { display: flex; gap: 8px; align-items: center; }
+    .lgv-edit-exclure-row input { flex: 1; }
     .lgv-edit-actions {
       display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; flex-wrap: wrap;
     }
@@ -307,6 +320,14 @@
           <div class="lgv-edit-field">
             <label for="lgv-edit-fin">Jusqu'au</label>
             <input type="date" id="lgv-edit-fin" />
+          </div>
+        </div>
+        <div class="lgv-edit-field">
+          <label>Occurrences exclues</label>
+          <div id="lgv-edit-exclues" class="lgv-edit-exclues"></div>
+          <div class="lgv-edit-exclure-row">
+            <input type="date" id="lgv-edit-exclure-date" />
+            <button type="button" id="lgv-edit-exclure-btn" class="lgv-btn-toggle">Exclure cette date</button>
           </div>
         </div>
       </div>
@@ -491,6 +512,7 @@
       function occurrencesFenetre(rule, debutISO, finISO) {
         var out = [];
         var jours = rule.jours || [];
+        var exclues = rule.dates_exclues || []; // sql_155 (E6)
         if (!jours.length || !rule.date_fin) return out;
         var lo = debutISO;
         var hi = (rule.date_fin < finISO) ? rule.date_fin : finISO;
@@ -528,6 +550,9 @@
               if (monthlyDone) continue;
               monthlyDone = true;
             }
+            // E6 (sql_155) : saut de la date exclue APRÈS la pose du
+            // marqueur monthly (occurrence consommée, jamais reportée).
+            if (exclues.indexOf(iso) !== -1) continue;
             if (iso >= debutISO && iso <= finISO) out.push(iso);
           }
           cur.setMonth(cur.getMonth() + 1);
@@ -843,6 +868,64 @@
         });
       }
 
+      // ------------------------------------------------------------------
+      // Occurrences exclues (sql_155, E4/E5) — RPC dédiées : la règle ne
+      // repasse PAS en pending (E3, dérogation tracée à B2). La RPC
+      // renvoie la ligne à jour → editCtx.row rafraîchi sans re-fetch
+      // (esprit B7) ; les agendas sont rafraîchis en direct.
+      // ------------------------------------------------------------------
+      function renderEditExclues() {
+        var host = el('lgv-edit-exclues');
+        if (!host) return;
+        host.innerHTML = '';
+        var dates = ((editCtx && editCtx.row && editCtx.row.dates_exclues) || [])
+          .slice().sort();
+        if (dates.length === 0) {
+          host.innerHTML = '<span class="lgv-edit-exclues-vide">Aucune date exclue.</span>';
+          return;
+        }
+        dates.forEach(function (d) {
+          var chip = document.createElement('span');
+          chip.className = 'lgv-edit-exclue';
+          chip.title = formatDateLong(d);
+          chip.appendChild(document.createTextNode(formatDateLong(d)));
+          var x = document.createElement('button');
+          x.type = 'button';
+          x.textContent = '\u2715';
+          x.title = 'Réinclure cette date';
+          x.addEventListener('click', function () { reinclureDate(d); });
+          chip.appendChild(x);
+          host.appendChild(chip);
+        });
+      }
+
+      async function exclureDate() {
+        if (!editCtx || editCtx.src !== 'recurrence') return;
+        var inp = el('lgv-edit-exclure-date');
+        var d = inp ? inp.value : '';
+        if (!d) { showToast('Choisis une date à exclure', false); return; }
+        var btn = el('lgv-edit-exclure-btn');
+        if (btn) btn.disabled = true;
+        var res = await SupabaseHub.exclureOccurrence(editCtx.row.id, d);
+        if (btn) btn.disabled = false;
+        if (!res.ok) { showToast('Échec : ' + (res.error || ''), false); return; }
+        if (res.data) editCtx.row = res.data;
+        if (inp) inp.value = '';
+        renderEditExclues();
+        showToast('Occurrence exclue — le créneau redevient libre', true);
+        await refreshTout();
+      }
+
+      async function reinclureDate(d) {
+        if (!editCtx || editCtx.src !== 'recurrence') return;
+        var res = await SupabaseHub.reinclureOccurrence(editCtx.row.id, d);
+        if (!res.ok) { showToast('Échec : ' + (res.error || ''), false); return; }
+        if (res.data) editCtx.row = res.data;
+        renderEditExclues();
+        showToast('Occurrence réincluse', true);
+        await refreshTout();
+      }
+
       async function rechargerLigne(src, id) {
         var table = (src === 'recurrence')
           ? 'reservations_recurrentes' : 'reservations_logistiques';
@@ -878,6 +961,13 @@
           renderEditJours();
           el('lgv-edit-debut').value = row.date_debut || '';
           el('lgv-edit-fin').value = row.date_fin || '';
+          renderEditExclues();
+          var exd = el('lgv-edit-exclure-date');
+          if (exd) {
+            exd.value = '';
+            exd.min = row.date_debut || '';
+            exd.max = row.date_fin || '';
+          }
         } else {
           el('lgv-edit-date').value = row.date || '';
         }
@@ -960,6 +1050,8 @@
         if (s) s.addEventListener('click', enregistrerEdition);
         var a = el('lgv-edit-annuler-demande');
         if (a) a.addEventListener('click', annulerDemande);
+        var ex = el('lgv-edit-exclure-btn');
+        if (ex) ex.addEventListener('click', exclureDate);
         var ov = el('lgv-edit-overlay');
         if (ov) ov.addEventListener('click', function (e) {
           if (e.target === ov) fermerEdition();
