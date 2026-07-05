@@ -59,4 +59,3 @@ Repo privé pour l'instant, ouvert progressivement selon les phases :
 ## 📅 Statut
 
 **Phase 1 — Mise en service du portail** (mai 2026)
-
