@@ -4,6 +4,21 @@
  *
  * Module IIFE — initialise l'UI de la page joueurs.html.
  *
+ * Version : v1.7 — 5 juillet 2026
+ *   v1.7 : CATEGORIE-SECTION-RUGBY (FAIT FOI b67f451d + ADDENDUM 1).
+ *          (1) Aiguillage Section : si la catégorie active est SECTION
+ *          (SECTION_CAT_UUID), effectif chargé via
+ *          SupabaseHub.getJoueursSection() (RPC get_joueurs_section /
+ *          sql_154, flag personnes.section_rugby — patron F15 : les
+ *          membres GARDENT leur categorie_id d'âge, la voie catégorie
+ *          renverrait 0). (2) Surface D4 : bloc « Section rugby » dans
+ *          la fiche (case Membre), masqué par défaut, révélé si le
+ *          droit est ouvert (mesCategoriesAutorisees : transverse OU
+ *          SECTION — miroir client de puis_je_ecrire_categorie) ;
+ *          écriture par setSectionRugby (SEUL écrivain du flag) ;
+ *          état initial = detail.section_rugby (get_joueur_detail
+ *          sql_154) ; dégradation honnête (socle < v1.75 ou colonne
+ *          absente → bloc invisible). node --check OK.
  * Version : v1.6 — 25 juin 2026
  *   v1.6 : JOUEURS-AFFICHAGE-PAR-CATEGORIE (pt 110). Aiguillage élargi :
  *          toute catégorie autre que F15 est chargée via
@@ -73,6 +88,15 @@ window.JoueursBrowser = (function () {
    * et le repli M14 affiche l'effectif M14 (bug recette pt 108). */
   const F15_CAT_UUID = 'a948997c-255a-430d-88f3-e33cd8782240';
 
+  /** UUID de la catégorie SECTION (categories.id, sql_153). Comme F15,
+   * SECTION est une catégorie transversale SANS équipe ni categorie_id :
+   * le périmètre est porté par le flag personnes.section_rugby (patron
+   * F15, RPC get_joueurs_section / sql_154). Quand cette catégorie est
+   * active, on charge l'effectif via getJoueursSection() — la voie
+   * categorie_id renverrait 0 (personne n'a categorie_id = SECTION,
+   * et ne DOIT jamais l'avoir : invisibilité bascule, FAIT FOI §2). */
+  const SECTION_CAT_UUID = 'b7e4d2a1-5c08-4f96-9a3d-1e8f6c07b254';
+
   // ------------------------------------------------------------
   // Propagation multi-catégories (catégorie active partagée)
   // ------------------------------------------------------------
@@ -135,6 +159,18 @@ window.JoueursBrowser = (function () {
         && typeof SupabaseHub !== 'undefined'
         && typeof SupabaseHub.getJoueursF15 === 'function') {
       return await SupabaseHub.getJoueursF15();
+    }
+
+    // Aiguillage SECTION (v1.7) : même mécanique que F15 — catégorie
+    // transversale par flag (personnes.section_rugby). DOIT précéder la
+    // voie catégorie générique (qui renverrait 0 : aucun categorie_id
+    // ne vaut SECTION, par interdit du FAIT FOI). Dégradation honnête :
+    // wrapper absent (socle < v1.75) → flux d'origine (liste vide via
+    // la voie catégorie, sans erreur).
+    if (catActive === SECTION_CAT_UUID
+        && typeof SupabaseHub !== 'undefined'
+        && typeof SupabaseHub.getJoueursSection === 'function') {
+      return await SupabaseHub.getJoueursSection();
     }
 
     // Aiguillage CATÉGORIE (pt 110) : toute catégorie autre que F15 est
@@ -1132,6 +1168,17 @@ window.JoueursBrowser = (function () {
           <button type="button" class="joueur-btn joueur-btn-edit" data-edit="etat">Modifier état</button>
           <button type="button" class="joueur-btn joueur-btn-edit" data-edit="notes">Notes coach</button>
         </div>
+        <!-- v1.7 · CATEGORIE-SECTION-RUGBY : bloc masqué par défaut,
+             révélé par bindSectionToggle() si le droit est ouvert
+             (miroir client de puis_je_ecrire_categorie(SECTION)). -->
+        <div class="joueur-fiche-section-title" id="joueur-section-title" style="margin-top:14px; display:none;">🏉 Section rugby</div>
+        <div class="joueur-fiche-actions-row" id="joueur-section-row" style="display:none;">
+          <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer;">
+            <input type="checkbox" id="joueur-section-toggle">
+            <span>Membre de la Section rugby scolaire</span>
+          </label>
+          <span id="joueur-section-msg" aria-live="polite"></span>
+        </div>
       </div>
     `;
   }
@@ -1160,6 +1207,77 @@ window.JoueursBrowser = (function () {
       title.addEventListener('click', function () {
         this.closest('.joueur-fiche-collapsible').classList.toggle('is-open');
       });
+    });
+    // v1.7 : révélation + câblage du bloc Section rugby (asynchrone,
+    // n'entrave pas le rendu de la fiche).
+    bindSectionToggle();
+  }
+
+  /**
+   * v1.7 · CATEGORIE-SECTION-RUGBY — révèle et câble la case « Membre
+   * de la Section rugby » de la fiche, si et seulement si :
+   *   (a) le socle expose les wrappers v1.75 (setSectionRugby,
+   *       mesCategoriesAutorisees) ;
+   *   (b) la fiche porte le champ section_rugby (get_joueur_detail
+   *       sql_154 déployée) ;
+   *   (c) le droit est ouvert : périmètre transverse (admin/bureau) OU
+   *       catégorie SECTION dans mes_categories_autorisees (responsable
+   *       du pôle Section, encadrant habilité) — miroir client de la
+   *       garde SQL puis_je_ecrire_categorie(SECTION), qui reste la
+   *       vérité (la RPC refuse même si l'UI était forcée).
+   * Sinon : bloc invisible (dégradation honnête, aucun message).
+   */
+  async function bindSectionToggle() {
+    const titleEl = document.getElementById('joueur-section-title');
+    const rowEl   = document.getElementById('joueur-section-row');
+    const cbEl    = document.getElementById('joueur-section-toggle');
+    const msgEl   = document.getElementById('joueur-section-msg');
+    if (!titleEl || !rowEl || !cbEl) return;
+    const d = currentEditDetail;
+    if (!d || typeof d.section_rugby === 'undefined') return;          // (b)
+    if (typeof SupabaseHub === 'undefined'
+        || typeof SupabaseHub.setSectionRugby !== 'function'
+        || typeof SupabaseHub.mesCategoriesAutorisees !== 'function') { // (a)
+      return;
+    }
+    let autorise = false;
+    try {
+      const rows = await SupabaseHub.mesCategoriesAutorisees();
+      autorise = Array.isArray(rows) && rows.some(function (r) {
+        return r && (r.est_transverse === true
+                     || r.categorie_id === SECTION_CAT_UUID);
+      });
+    } catch (err) {
+      console.error('Joueurs: bindSectionToggle() droits', err);
+      return;                                                           // (c)
+    }
+    if (!autorise) return;                                              // (c)
+
+    cbEl.checked = !!d.section_rugby;
+    cbEl.disabled = false;
+    titleEl.style.display = '';
+    rowEl.style.display = '';
+
+    cbEl.addEventListener('change', async function () {
+      const voulu = !!cbEl.checked;
+      cbEl.disabled = true;
+      if (msgEl) msgEl.textContent = '…';
+      const res = await SupabaseHub.setSectionRugby(currentEditPersonneId, voulu);
+      if (res === voulu) {
+        // Succès : état local aligné + liste rechargée (l'effectif de la
+        // catégorie Section suit sans rouvrir la fiche — décision
+        // déléguée tracée : pas de reopenFiche, le toggle EST le retour
+        // visuel, contrairement aux modales J3/J4/J5).
+        if (currentEditDetail) currentEditDetail.section_rugby = voulu;
+        if (msgEl) msgEl.textContent = voulu ? '✓ ajouté(e) à la Section' : '✓ retiré(e) de la Section';
+        reloadJoueurs();
+      } else {
+        // Échec (droit refusé côté SQL, réseau…) : on REVIENT à l'état
+        // connu — la case ne ment jamais.
+        cbEl.checked = !!(currentEditDetail && currentEditDetail.section_rugby);
+        if (msgEl) msgEl.textContent = '⚠ échec — modification non enregistrée';
+      }
+      cbEl.disabled = false;
     });
   }
 
