@@ -287,6 +287,7 @@
       var ressById = {};    // id -> { code, libelle, type, sous_type, actif }
       var ressActives = []; // pour la mini-modale de choix
       var catById = {};     // id -> libellé court
+      var persById = {};    // MULTI (M6) : personne_id -> nom (détail)
 
       async function chargerReferentiels() {
         var r1 = await SupabaseHub.client
@@ -306,6 +307,17 @@
         (r2.data || []).forEach(function (c) {
           catById[c.id] = c.libelle_court || c.code || c.libelle_long || c.id;
         });
+        // MULTI (M6/M7) : noms des responsables pour le détail — voie
+        // éprouvée listStaffDisponibles(null) (RPC, tous staffs actifs) ;
+        // id à fonction terminée → '—', fail-soft (patron du poste).
+        try {
+          var staff = await SupabaseHub.listStaffDisponibles(null);
+          (staff || []).forEach(function (p) {
+            if (p && p.personne_id) {
+              persById[p.personne_id] = ((p.nom || '') + ' ' + (p.prenom || '')).trim();
+            }
+          });
+        } catch (e) { /* fail-soft : détail sans noms */ }
       }
 
       function typeCodeOf(ressourceId) {
@@ -319,6 +331,27 @@
       function catLbl(categorieId) {
         if (!categorieId) return 'Bureau / Autre';
         return catById[categorieId] || '—';
+      }
+      // MULTI (M7) : concaténation « M16 + M18 » dans l'ordre du tableau ;
+      // fallback scalaire ; vide = Bureau / Autre (M3). catLbl conservé.
+      function catsLbl(row) {
+        var ids = (row && Array.isArray(row.categorie_ids) && row.categorie_ids.length)
+          ? row.categorie_ids
+          : (row && row.categorie_id ? [row.categorie_id] : []);
+        if (!ids.length) return 'Bureau / Autre';
+        return ids.map(function (id) { return catById[id] || '—'; }).join(' + ');
+      }
+      // MULTI (M6) : responsables — 1er = officiel, suivants indicatifs.
+      function respsLbl(row) {
+        var ids = (row && Array.isArray(row.responsables_personne_ids)
+            && row.responsables_personne_ids.length)
+          ? row.responsables_personne_ids
+          : (row && row.responsable_personne_id ? [row.responsable_personne_id] : []);
+        if (!ids.length) return null;
+        return ids.map(function (id, i) {
+          var nom = persById[id] || '—';
+          return i === 0 ? nom : nom + ' (indicatif)';
+        }).join(' · ');
       }
       function dureeEntre(hd, hf) {
         if (!hd || !hf) return null;
@@ -428,7 +461,7 @@
             heure: r.heure_debut ? String(r.heure_debut).slice(0, 5) : null,
             duree_min: dureeEntre(r.heure_debut, r.heure_fin),
             type: typeCodeOf(r.ressource_id),
-            libelle: (r.motif || ressLbl(r.ressource_id)) + ' · ' + catLbl(r.categorie_id),
+            libelle: (r.motif || ressLbl(r.ressource_id)) + ' · ' + catsLbl(r),
             etat: r.statut,
             meta: { src: 'ponctuelle', row: r }
           });
@@ -450,7 +483,7 @@
               heure: rule.heure_debut ? String(rule.heure_debut).slice(0, 5) : null,
               duree_min: dureeEntre(rule.heure_debut, rule.heure_fin),
               type: typeCodeOf(rule.ressource_id),
-              libelle: '↻ ' + (rule.motif || ressLbl(rule.ressource_id)) + ' · ' + catLbl(rule.categorie_id),
+              libelle: '↻ ' + (rule.motif || ressLbl(rule.ressource_id)) + ' · ' + catsLbl(rule),
               etat: rule.statut,
               meta: { src: 'recurrence', row: rule }
             });
@@ -470,7 +503,7 @@
             heure: null,        // journée entière (pas d'heure de départ aller)
             duree_min: null,
             type: 'bus',
-            libelle: 'Bus · ' + (d.destination || '—') + ' · ' + catLbl(d.categorie_id),
+            libelle: 'Bus · ' + (d.destination || '—') + ' · ' + catsLbl(d),
             etat: d.statut,
             meta: { src: 'bus', row: d }
           });
@@ -493,7 +526,8 @@
           rows.push({ lbl: 'Destination', val: r.destination || '—' });
           rows.push({ lbl: 'Date', val: it.date });
           if (r.heure_arrivee_souhaitee) rows.push({ lbl: 'Arrivée souhaitée', val: String(r.heure_arrivee_souhaitee).slice(0, 5) });
-          rows.push({ lbl: 'Catégorie', val: catLbl(r.categorie_id) });
+          rows.push({ lbl: 'Catégories', val: catsLbl(r) });
+          if (respsLbl(r)) rows.push({ lbl: 'Responsables', val: respsLbl(r) });
           if (r.total_bus != null) rows.push({ lbl: 'Passagers', val: String(r.total_bus) });
           rows.push({ lbl: 'Statut', val: statutLbl(r.statut) });
           return rows;
@@ -505,7 +539,8 @@
           val: (it.heure || '—') + '–' + (r.heure_fin ? String(r.heure_fin).slice(0, 5) : '—')
              + (it.duree_min ? ' · ' + HubAgenda.dureeLabel(it.duree_min) : '')
         });
-        rows.push({ lbl: 'Catégorie', val: catLbl(r.categorie_id) });
+        rows.push({ lbl: 'Catégories', val: catsLbl(r) });
+        if (respsLbl(r)) rows.push({ lbl: 'Responsables', val: respsLbl(r) });
         if (r.motif) rows.push({ lbl: 'Motif', val: r.motif });
         if (it.meta.src === 'recurrence') {
           rows.push({
