@@ -12,6 +12,16 @@
  * FAIT FOI 777551e9…, arbitrage 5.5) — le guichet est purifié : demande +
  * occupation seulement, plus aucune interface bureau|admin ici.
  *
+ * MULTI-CATEGORIES (FAIT FOI gelé 05/07/2026) : pioches catégories ET
+ * responsables en cases à cocher (patron logi-days, M5/M6 complète).
+ * Ordre de coche = ordre du tableau (T4) ; 1er coché = catégorie
+ * principale / responsable officiel (scalaire, trigger T1 sql_156).
+ * Responsables = UNION du staff des catégories cochées (T3 : un appel
+ * listStaffDisponibles par catégorie, fusion dédupliquée côté front).
+ * B5 souple (M2) : au moins une catégorie autorisée ; aucune coche =
+ * « Bureau / Autre » (tableau vide), réservé transverses (M3) — le
+ * guichet l'autorise donc seulement si isTransverse, la policy tranche.
+ *
  * PRÉ-REMPLISSAGE PAR URL (§5.7 du FAIT FOI) : le boot lit, en plus de
  * ?type=, les paramètres ressource / date / debut / fin posés par l'agenda
  * de consultation (logistique-agenda.html, clic créneau libre) et rejoue la
@@ -130,6 +140,8 @@
     selectedRessourceId: null,
     categories: [],        // mes catégories autorisées (B5) résolues
     isTransverse: false,   // admin|bureau → toutes catégories
+    catCoches: [],         // uuid[] catégories cochées, ORDRE DE COCHE (T4)
+    respCoches: [],        // uuid[] responsables cochés, ORDRE DE COCHE (T4)
     recurOn: false,
     recurJours: [],
     // --- Calendrier d'occupation (v1) -----------------------------
@@ -311,61 +323,96 @@
   }
 
   function renderCategorieOptions() {
-    const sel = el('logi-categorie');
-    if (!sel) return;
-    let html = '';
-    // Option « sans catégorie » seulement si transverse (un référent
-    // doit choisir une de ses catégories — RLS le rejetterait sinon).
-    if (state.isTransverse) {
-      html += '<option value="">— Bureau / Autre —</option>';
-    }
+    const host = el('logi-categorie');
+    if (!host) return;
+    host.innerHTML = '';
+    state.catCoches = [];
+    // MULTI (M5) : cases à cocher patron logi-days, ordre de coche = ordre
+    // du tableau (T4). Plus d'option « Bureau / Autre » explicite : AUCUNE
+    // coche = tableau vide = Bureau/Autre (M3), permis aux seuls
+    // transverses (contrôle au submit, la policy tranche en dernier).
     state.categories
       .slice()
       .sort(function (a, b) { return (a.ordre_tri || 0) - (b.ordre_tri || 0); })
       .forEach(function (c) {
-        html += '<option value="' + escapeHtml(c.id) + '">' +
-          escapeHtml(c.libelle_court || c.code || c.libelle_long || c.id) +
-          '</option>';
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'logi-day';
+        b.dataset.id = c.id;
+        b.textContent = c.libelle_court || c.code || c.libelle_long || c.id;
+        b.addEventListener('click', function () {
+          const pos = state.catCoches.indexOf(c.id);
+          if (pos === -1) { state.catCoches.push(c.id); b.classList.add('is-on'); }
+          else { state.catCoches.splice(pos, 1); b.classList.remove('is-on'); }
+          // Synchro inter-écrans : la PREMIÈRE cochée = principale
+          if (state.catCoches.length
+              && typeof SupabaseHub.memoriserCategorieActive === 'function') {
+            SupabaseHub.memoriserCategorieActive(state.catCoches[0]);
+          }
+          loadResponsables(state.catCoches.slice());
+        });
+        host.appendChild(b);
       });
-    sel.innerHTML = html;
-    // Synchro inter-écrans : pré-sélectionne la catégorie active
-    // mémorisée (clé partagée mom_hub.categorie_active via le socle)
-    // si elle figure dans la liste, et mémorise tout nouveau choix.
+    // Synchro inter-écrans : pré-coche la catégorie active mémorisée
+    // (clé partagée mom_hub.categorie_active via le socle) si présente.
     try {
       if (typeof SupabaseHub.lireCategorieActiveMemorisee === 'function') {
         const memo = SupabaseHub.lireCategorieActiveMemorisee();
         if (memo && state.categories.some(function (c) { return c.id === memo; })) {
-          sel.value = memo;
+          state.catCoches = [memo];
+          const btn = host.querySelector('.logi-day[data-id="' + CSS.escape(memo) + '"]');
+          if (btn) btn.classList.add('is-on');
         }
       }
     } catch (e) { /* honnête : pas de synchro, choix manuel */ }
-    // Au changement de catégorie → mémoriser + recharger la pioche responsable
-    sel.onchange = function () {
-      if (sel.value && typeof SupabaseHub.memoriserCategorieActive === 'function') {
-        SupabaseHub.memoriserCategorieActive(sel.value);
-      }
-      loadResponsables(sel.value || null);
-    };
-    // Premier chargement responsable
-    loadResponsables(sel.value || null);
+    // Premier chargement responsables (union des coches, possiblement vide)
+    loadResponsables(state.catCoches.slice());
   }
 
-  async function loadResponsables(categorieId) {
-    const sel = el('logi-responsable');
-    if (!sel) return;
-    sel.innerHTML = '<option value="">Chargement…</option>';
-    const staff = await SupabaseHub.listStaffDisponibles(categorieId);
-    if (!staff || staff.length === 0) {
-      sel.innerHTML = '<option value="">Aucun encadrant disponible</option>';
+  async function loadResponsables(categorieIds) {
+    const host = el('logi-responsable');
+    if (!host) return;
+    host.innerHTML = '<span class="logi-empty">Chargement…</span>';
+    // T3 : UNION du staff des catégories cochées — un appel
+    // listStaffDisponibles par catégorie (wrapper INCHANGÉ), fusion
+    // dédupliquée par personne_id. Aucune coche → listStaffDisponibles(null)
+    // = tous les staffs (cas « Bureau / Autre »).
+    const staff = [];
+    const seen = {};
+    const ids = (categorieIds && categorieIds.length) ? categorieIds : [null];
+    for (let i = 0; i < ids.length; i++) {
+      const lot = await SupabaseHub.listStaffDisponibles(ids[i]);
+      (lot || []).forEach(function (p) {
+        if (!p || !p.personne_id || seen[p.personne_id]) return;
+        seen[p.personne_id] = true;
+        staff.push(p);
+      });
+    }
+    staff.sort(function (a, b) {
+      return ((a.nom || '') + ' ' + (a.prenom || ''))
+        .localeCompare(((b.nom || '') + ' ' + (b.prenom || '')), 'fr');
+    });
+    state.respCoches = [];
+    host.innerHTML = '';
+    if (staff.length === 0) {
+      host.innerHTML = '<span class="logi-empty">Aucun encadrant disponible</span>';
       return;
     }
-    let html = '<option value="">— Choisir —</option>';
+    // M6 complète : cases à cocher, 1er coché = responsable officiel
+    // (scalaire), les suivants = indicatifs (tableau, ordre T4).
     staff.forEach(function (p) {
-      const nom = ((p.nom || '') + ' ' + (p.prenom || '')).trim();
-      html += '<option value="' + escapeHtml(p.personne_id) + '">' +
-        escapeHtml(nom) + '</option>';
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'logi-day';
+      b.dataset.id = p.personne_id;
+      b.textContent = ((p.nom || '') + ' ' + (p.prenom || '')).trim();
+      b.addEventListener('click', function () {
+        const pos = state.respCoches.indexOf(p.personne_id);
+        if (pos === -1) { state.respCoches.push(p.personne_id); b.classList.add('is-on'); }
+        else { state.respCoches.splice(pos, 1); b.classList.remove('is-on'); }
+      });
+      host.appendChild(b);
     });
-    sel.innerHTML = html;
   }
 
   // ============================================================
@@ -433,15 +480,21 @@
   }
 
   async function onSubmit() {
-    const categorieId = (el('logi-categorie') || {}).value || null;
-    const responsable = (el('logi-responsable') || {}).value || null;
+    // MULTI : tableaux ordonnés (T4). 1er élément = principal (scalaire,
+    // écrit en double pour rétro-compat, trigger T1 synchronise de toute
+    // façon). Aucune catégorie = Bureau/Autre, transverses seulement (M3).
+    const categorieIds = state.catCoches.slice();
+    const responsables = state.respCoches.slice();
     const date    = (el('logi-date') || {}).value || null;
     const hDebut  = (el('logi-heure-debut') || {}).value || null;
     const hFin    = (el('logi-heure-fin') || {}).value || null;
     const motif   = (el('logi-motif') || {}).value || null;
 
     if (!state.selectedRessourceId) { showToast('Choisis une ressource', false); return; }
-    if (!responsable) { showToast('Choisis un responsable', false); return; }
+    if (responsables.length === 0) { showToast('Coche au moins un responsable', false); return; }
+    if (categorieIds.length === 0 && !state.isTransverse) {
+      showToast('Coche au moins une catégorie', false); return;
+    }
     if (!hDebut || !hFin) { showToast('Renseigne le créneau', false); return; }
 
     const submitBtn = el('logi-submit');
@@ -468,8 +521,10 @@
       }
       res = await SupabaseHub.createRecurrence({
         ressource_id: state.selectedRessourceId,
-        categorie_id: categorieId,
-        responsable_personne_id: responsable,
+        categorie_id: categorieIds[0] || null,
+        categorie_ids: categorieIds,
+        responsable_personne_id: responsables[0],
+        responsables_personne_ids: responsables,
         freq: freq,
         jours: state.recurJours.slice(),
         heure_debut: hDebut,
@@ -485,8 +540,10 @@
       }
       res = await SupabaseHub.createReservation({
         ressource_id: state.selectedRessourceId,
-        categorie_id: categorieId,
-        responsable_personne_id: responsable,
+        categorie_id: categorieIds[0] || null,
+        categorie_ids: categorieIds,
+        responsable_personne_id: responsables[0],
+        responsables_personne_ids: responsables,
         date: date,
         heure_debut: hDebut,
         heure_fin: hFin,
@@ -513,8 +570,11 @@
     const mr = el('logi-mode-recurrente'); if (mr) mr.checked = false;
     const fd = el('logi-field-date'); if (fd) fd.style.display = '';
     const box = el('logi-recur-box'); if (box) box.classList.remove('is-open');
+    // Scopé à #logi-recur-jours : les cases catégories/responsables
+    // (mêmes classes logi-day) survivent au submit, comme les anciens
+    // <select> qui gardaient leur valeur — retrait tracé (1 ligne réécrite).
     Array.prototype.forEach.call(
-      document.querySelectorAll('.logi-day.is-on'),
+      document.querySelectorAll('#logi-recur-jours .logi-day.is-on'),
       function (b) { b.classList.remove('is-on'); });
   }
 
