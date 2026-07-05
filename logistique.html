@@ -310,7 +310,17 @@
           </div>
         </div>
 
-        <div class="logi-field">
+        <!-- Correctif post-pt 150 (retour terrain) : choix de mode EXPLICITE
+             en tête — la date se saisit APRÈS le choix, plus de doublon
+             Date / « À partir du » en récurrence. -->
+        <div class="logi-recur-line" id="logi-mode-line">
+          <input type="radio" name="logi-mode" id="logi-mode-ponctuelle" value="ponctuelle" checked />
+          <label for="logi-mode-ponctuelle" style="margin:0;cursor:pointer;">Réservation ponctuelle</label>
+          <input type="radio" name="logi-mode" id="logi-mode-recurrente" value="recurrente" style="margin-left:14px;" />
+          <label for="logi-mode-recurrente" style="margin:0;cursor:pointer;">Réservation récurrente</label>
+        </div>
+
+        <div class="logi-field" id="logi-field-date">
           <label for="logi-date">Date</label>
           <input type="date" id="logi-date" />
         </div>
@@ -329,11 +339,6 @@
         <div class="logi-field">
           <label for="logi-motif">Motif</label>
           <input type="text" id="logi-motif" placeholder="Entraînement, match, réunion…" />
-        </div>
-
-        <div class="logi-recur-line">
-          <input type="checkbox" id="logi-recur-toggle" />
-          <label for="logi-recur-toggle" style="margin:0;cursor:pointer;">Réservation récurrente</label>
         </div>
 
         <div id="logi-recur-box" class="logi-recur-box">
