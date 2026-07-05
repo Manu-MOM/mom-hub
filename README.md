@@ -53,6 +53,7 @@ Le projet est documenté dans le Drive partagé :
 Repo privé pour l'instant, ouvert progressivement selon les phases :
 - Phase 1-2 : Manu seul
 - Phase 3+ : staff MOM
+- 
 - Phase 5 : membres et familles
 
 ## 📅 Statut
