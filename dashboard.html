@@ -191,8 +191,15 @@
 
     <div class="season-pill" id="season-pill">SAISON …</div>
 
-    <nav class="main-nav">
-      <a href="./">Tableau de bord</a>
+    <!-- HUB-NAV-DASHBOARD v1 — variante carrefour de la nav thématique
+         (avenant n°3 gelé 06/07/2026). Lexique unifié : « Accueil » = le
+         portail (./), « Tableau de bord » = cette page (marquée courante
+         par le BLOC B). Remplace la main-nav locale dont l'unique lien
+         disait « Tableau de bord » mais renvoyait vers l'accueil (retour
+         terrain Manu — 3e cas d'incohérence du lexique, retrait tracé). -->
+    <nav class="main-nav hub-nav" aria-label="Navigation">
+      <a href="./">Accueil</a>
+      <a href="dashboard.html">Tableau de bord</a>
     </nav>
 
     <div class="icon-row">
@@ -218,6 +225,99 @@
       </button>
     </div>
   </header>
+
+  <!-- HUB-NAV-LOGISTIQUE v2 (BLOC B/2) — style + comportement de la nav
+       thématique du BLOC A (topbar). Dupliqué à l'IDENTIQUE sur les 4 pages
+       du thème (avenant FAIT FOI gelé 06/07/2026). css/hub.css NON touché :
+       les surcharges (visibilité mobile de la main-nav, masquée <1000px par
+       le fichier commun) sont locales et scopées .hub-nav. -->
+  <style>
+    .main-nav.hub-nav {
+      gap: 20px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      white-space: nowrap;
+      scrollbar-width: none;
+    }
+    .main-nav.hub-nav::-webkit-scrollbar { display: none; }
+    .main-nav.hub-nav a.active { cursor: default; }
+    @media (max-width: 1000px) {
+      /* hub.css masque .main-nav <1000px : la nav thématique y échappe et
+         devient une rangée pleine largeur défilable sous la marque. */
+      .topbar { height: auto; padding-top: 6px; padding-bottom: 8px; }
+      .main-nav.hub-nav {
+        display: flex;
+        grid-column: 1 / -1; /* topbar en grid entre 768 et 1000px */
+        flex-basis: 100%;    /* topbar en flex-wrap sous 768px */
+        order: 9;
+        justify-content: flex-start;
+        padding: 4px 0 2px;
+      }
+    }
+  </style>
+  <script>
+    // HUB-NAV-LOGISTIQUE v2 — page courante + révélation des liens filtrés.
+    (function () {
+      var nav = document.querySelector('.main-nav.hub-nav');
+      if (!nav) return;
+
+      // Clé d'une URL = fichier + filtre ?type= éventuel. Le guichet sans
+      // ?type= vaut 'site' (défaut D6 de logistique-browser.js).
+      function cle(href) {
+        var u = new URL(href, window.location.href);
+        var f = u.pathname.split('/').pop() || 'index.html';
+        var t = u.searchParams.get('type');
+        if (f === 'logistique.html') { t = t || 'site'; }
+        return f + (t ? '?type=' + t : '');
+      }
+
+      // Page courante : lien marqué .active (style hub.css existant),
+      // href retiré = non-cliquable, patron des main-nav historiques.
+      var courante = cle(window.location.href);
+      nav.querySelectorAll('a[href]').forEach(function (a) {
+        if (cle(a.getAttribute('href')) === courante) {
+          a.classList.add('active');
+          a.removeAttribute('href');
+          a.setAttribute('aria-current', 'page');
+        }
+      });
+
+      // Révélation fail-safe des liens filtrés. Attend DOMContentLoaded :
+      // supabase-client.js est chargé en fin de body, APRÈS ce bloc.
+      // Échec silencieux = liens masqués (patron data-show du dashboard).
+      document.addEventListener('DOMContentLoaded', async function () {
+        try {
+          if (typeof SupabaseHub === 'undefined') { return; }
+          var session = await SupabaseHub.getSession();
+          if (!session) { return; }
+          var droits = await Promise.all([
+            SupabaseHub.isAdmin(),
+            SupabaseHub.hasRole('bureau'),
+            SupabaseHub.suisJeSalarie()
+          ]);
+          var bureau = droits[0] || droits[1];
+          var staff = bureau || droits[2];
+          nav.querySelectorAll('[data-nav-show]').forEach(function (el) {
+            var ok = (el.getAttribute('data-nav-show') === 'staff') ? staff : bureau;
+            if (ok) { el.hidden = false; el.removeAttribute('aria-hidden'); }
+          });
+        } catch (e) { /* honnête : les liens filtrés restent masqués */ }
+      });
+    })();
+  </script>
+  <style>
+    /* HUB-NAV BLOC C-CARREFOUR v1 (avenant n°3 gelé 06/07/2026) — doctrine :
+       sur les pages-CARREFOUR (portail, dashboard), la nav thématique est
+       DESKTOP SEULEMENT ; sur téléphone, les icônes de la carte profil
+       (maison <-> grille) assurent déjà la navigation entre carrefours, la
+       rangée supplémentaire coûterait une ligne d'écran pour un doublon
+       (retour terrain Manu, captures 06/07). Les pages-OUTILS (thèmes)
+       gardent leur nav partout. Bloc IDENTIQUE portail + dashboard, posé
+       APRÈS le BLOC B qu'il surcharge (même spécificité, ordre gagnant). */
+    @media (max-width: 1000px) {
+      .main-nav.hub-nav { display: none; }
+    }
+  </style>
 
   <main class="dashboard-layout">
     <div class="page-intro">
