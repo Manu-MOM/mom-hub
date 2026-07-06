@@ -738,17 +738,12 @@
 
     <div class="season-pill">SAISON …</div>
 
-    <!-- HUB-NAV-PORTAIL v1 — variante portail de la nav thématique
-         (avenant FAIT FOI gelé 06/07/2026). Lexique unifié : « Accueil » =
-         le portail (./), « Tableau de bord » = dashboard.html, révélé aux
-         staff (admin|bureau|salarié) par le BLOC B — bloc IDENTIQUE à
-         celui des 4 pages du thème logistique (un seul patron). Remplace
-         la main-nav locale ; ses 3 liens morts (Mes outils, Annuaire,
-         Configuration) sont retirés, retraits tracés. -->
-    <nav class="main-nav hub-nav" aria-label="Navigation">
-      <a href="./">Accueil</a>
-      <a href="dashboard.html" data-nav-show="staff" hidden aria-hidden="true">Tableau de bord</a>
-    </nav>
+    <!-- HUB-NAV v1.0 — porteur de la navigation thématique, rempli par le
+         module partagé js/hub-nav.js (variante « carrefour-portail » :
+         tronc commun seul, nav desktop seulement — doctrine carrefour/outils
+         gelée pt 155 ; la table des thèmes vit dans le module, un seul point
+         de vérité). Remplace le BLOC A-PORTAIL v1 (retraits tracés). -->
+    <nav class="main-nav hub-nav" data-hub-nav="carrefour-portail"></nav>
 
     <div class="icon-row">
       <button class="icon-btn" title="Recherche">
@@ -803,98 +798,11 @@
     }
   </style>
 
-  <!-- HUB-NAV-LOGISTIQUE v2 (BLOC B/2) — style + comportement de la nav
-       thématique du BLOC A (topbar). Dupliqué à l'IDENTIQUE sur les 4 pages
-       du thème (avenant FAIT FOI gelé 06/07/2026). css/hub.css NON touché :
-       les surcharges (visibilité mobile de la main-nav, masquée <1000px par
-       le fichier commun) sont locales et scopées .hub-nav. -->
-  <style>
-    .main-nav.hub-nav {
-      gap: 20px;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      white-space: nowrap;
-      scrollbar-width: none;
-    }
-    .main-nav.hub-nav::-webkit-scrollbar { display: none; }
-    .main-nav.hub-nav a.active { cursor: default; }
-    @media (max-width: 1000px) {
-      /* hub.css masque .main-nav <1000px : la nav thématique y échappe et
-         devient une rangée pleine largeur défilable sous la marque. */
-      .topbar { height: auto; padding-top: 6px; padding-bottom: 8px; }
-      .main-nav.hub-nav {
-        display: flex;
-        grid-column: 1 / -1; /* topbar en grid entre 768 et 1000px */
-        flex-basis: 100%;    /* topbar en flex-wrap sous 768px */
-        order: 9;
-        justify-content: flex-start;
-        padding: 4px 0 2px;
-      }
-    }
-  </style>
-  <script>
-    // HUB-NAV-LOGISTIQUE v2 — page courante + révélation des liens filtrés.
-    (function () {
-      var nav = document.querySelector('.main-nav.hub-nav');
-      if (!nav) return;
-
-      // Clé d'une URL = fichier + filtre ?type= éventuel. Le guichet sans
-      // ?type= vaut 'site' (défaut D6 de logistique-browser.js).
-      function cle(href) {
-        var u = new URL(href, window.location.href);
-        var f = u.pathname.split('/').pop() || 'index.html';
-        var t = u.searchParams.get('type');
-        if (f === 'logistique.html') { t = t || 'site'; }
-        return f + (t ? '?type=' + t : '');
-      }
-
-      // Page courante : lien marqué .active (style hub.css existant),
-      // href retiré = non-cliquable, patron des main-nav historiques.
-      var courante = cle(window.location.href);
-      nav.querySelectorAll('a[href]').forEach(function (a) {
-        if (cle(a.getAttribute('href')) === courante) {
-          a.classList.add('active');
-          a.removeAttribute('href');
-          a.setAttribute('aria-current', 'page');
-        }
-      });
-
-      // Révélation fail-safe des liens filtrés. Attend DOMContentLoaded :
-      // supabase-client.js est chargé en fin de body, APRÈS ce bloc.
-      // Échec silencieux = liens masqués (patron data-show du dashboard).
-      document.addEventListener('DOMContentLoaded', async function () {
-        try {
-          if (typeof SupabaseHub === 'undefined') { return; }
-          var session = await SupabaseHub.getSession();
-          if (!session) { return; }
-          var droits = await Promise.all([
-            SupabaseHub.isAdmin(),
-            SupabaseHub.hasRole('bureau'),
-            SupabaseHub.suisJeSalarie()
-          ]);
-          var bureau = droits[0] || droits[1];
-          var staff = bureau || droits[2];
-          nav.querySelectorAll('[data-nav-show]').forEach(function (el) {
-            var ok = (el.getAttribute('data-nav-show') === 'staff') ? staff : bureau;
-            if (ok) { el.hidden = false; el.removeAttribute('aria-hidden'); }
-          });
-        } catch (e) { /* honnête : les liens filtrés restent masqués */ }
-      });
-    })();
-  </script>
-  <style>
-    /* HUB-NAV BLOC C-CARREFOUR v1 (avenant n°3 gelé 06/07/2026) — doctrine :
-       sur les pages-CARREFOUR (portail, dashboard), la nav thématique est
-       DESKTOP SEULEMENT ; sur téléphone, les icônes de la carte profil
-       (maison <-> grille) assurent déjà la navigation entre carrefours, la
-       rangée supplémentaire coûterait une ligne d'écran pour un doublon
-       (retour terrain Manu, captures 06/07). Les pages-OUTILS (thèmes)
-       gardent leur nav partout. Bloc IDENTIQUE portail + dashboard, posé
-       APRÈS le BLOC B qu'il surcharge (même spécificité, ordre gagnant). */
-    @media (max-width: 1000px) {
-      .main-nav.hub-nav { display: none; }
-    }
-  </style>
+  <!-- HUB-NAV v1.0 — module partagé : styles injectés dans l'ordre garanti
+       PAR CONSTRUCTION (outils PUIS surcharge carrefour — leçon pt 155
+       encodée), marquage page courante, révélation fail-safe. Remplace les
+       BLOCS B et C dupliqués du pt 155 (retraits tracés au commit). -->
+  <script src="js/hub-nav.js"></script>
 
   <!-- ============ MAIN LAYOUT ============ -->
   <main class="layout">
