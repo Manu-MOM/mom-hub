@@ -43,6 +43,15 @@
       date_seance) — jamais de résurrection d'annulées ni d'écrasement d'éditées.
       Génération ADDITIVE SEULEMENT : un motif modifié ne supprime pas les séances
       déjà matérialisées ; nettoyage = annulation manuelle, limitation tracée).
+      AMENDEMENT A' (REPROPAGATION-HORAIRE-SEANCES, 06/07/2026) : l'additivité
+      reste ENTIÈRE pour les DATES, mais l'HEURE et la DURÉE du motif se
+      repropagent désormais à l'édition sur les occurrences futures encore
+      `prevue` ET encore à l'ancienne heure du motif (RPC
+      repropager_motif_seances, sql_165) ; les ajustements manuels (heure
+      différente), les realisee/validee/annulee et les dates passées sont
+      épargnés. Bouton d'édition renommé « Enregistrer et mettre à jour les
+      séances » (l'ex-libellé promettait une génération sans effet sur
+      l'existant — constat de recette terrain Vanessa, 06/07).
     - Ponctuelles : n'écrit rien en base ; à l'enregistrement, la modale ponctuelle
       s'ouvre pré-verrouillée sur la mission créée (saisie en série).
     - Le bouton « Générer les séances » du bandeau est SUPPRIMÉ (la génération vit
@@ -2089,8 +2098,15 @@
     const btn = $('ssMisSave');
     const mode = getSeancesMode();
     if (mode === 'recurrente') {
-      const n = estimerNbSeances();
-      btn.textContent = 'Enregistrer, puis générer les séances' + (n != null && n > 0 ? ' (≈ ' + n + ')' : '');
+      // REPROPAGATION-HORAIRE-SEANCES : en ÉDITION, l'enchaînement réaligne les
+      // occurrences futures prévues (heure/durée) puis génère les dates neuves —
+      // le libellé le dit. En CRÉATION, libellé historique inchangé.
+      if (editingMissionId != null) {
+        btn.textContent = 'Enregistrer et mettre à jour les séances';
+      } else {
+        const n = estimerNbSeances();
+        btn.textContent = 'Enregistrer, puis générer les séances' + (n != null && n > 0 ? ' (≈ ' + n + ')' : '');
+      }
     } else if (mode === 'ponctuelle') {
       btn.textContent = 'Enregistrer, puis saisir les séances';
     } else {
@@ -2283,11 +2299,47 @@
       closeMission();
       // UNIFICATION-SEANCES-MISSION (FAIT FOI L2) : enchaînement selon l'aiguillage.
       if (modeSeances === 'recurrente' && row && row.id) {
+        // REPROPAGATION-HORAIRE-SEANCES (A', sql_165) : en ÉDITION, si l'heure ou
+        // la durée du motif a changé, les occurrences futures encore `prevue` ET
+        // encore à l'ANCIENNE heure sont réalignées AVANT la génération (les
+        // ajustements manuels sont épargnés côté SQL par IS NOT DISTINCT FROM).
+        // L'ancien motif vient de editingMissionRecurrence (capturé par
+        // openMission, patron pt 118) ; le nouveau, de params.p_recurrence.
+        let nRepro = 0;
+        if (enEdition && editingMissionRecurrence) {
+          const recOld = editingMissionRecurrence;
+          const recNew = params.p_recurrence;
+          const hOld = recOld.heure_debut ? String(recOld.heure_debut).slice(0, 5) : null;
+          const hNew = (recNew && recNew.heure_debut) ? String(recNew.heure_debut).slice(0, 5) : null;
+          const dOld = (recOld.duree_min != null) ? parseInt(recOld.duree_min, 10) : null;
+          const dNew = (recNew && recNew.duree_min != null) ? parseInt(recNew.duree_min, 10) : null;
+          if (hOld !== hNew || dOld !== dNew) {
+            try {
+              nRepro = await rpc('repropager_motif_seances', {
+                p_mission_id: row.id,
+                p_ancienne_heure: hOld,
+                p_nouvelle_heure: hNew,
+                p_ancienne_duree: dOld,
+                p_nouvelle_duree: dNew
+              });
+            } catch (e) {
+              // Fail-soft ISOLÉ : la mission est déjà enregistrée, la génération
+              // qui suit reste due ; on signale sans interrompre l'enchaînement.
+              flash('Mission modifiée, mais réalignement des séances impossible : ' + errMsg(e), 'err');
+            }
+          }
+        }
         // Génération automatique : genMission (conservé du bandeau) flashe
         // « X créées, Y déjà présentes » et rafraîchit. RPC idempotente (sonde
         // 02/07/2026) : ré-enregistrer une mission ne crée aucun doublon.
         flash(enEdition ? 'Mission modifiée. Génération des séances…' : 'Mission enregistrée. Génération des séances…', 'ok');
         await genMission(row, null);
+        // Le réalignement est LE message attendu quand il a eu lieu (constat
+        // Vanessa) : il conclut l'enchaînement, par-dessus le flash de genMission.
+        if (nRepro > 0) {
+          flash(nRepro + (nRepro > 1 ? ' séances réalignées' : ' séance réalignée')
+                + ' sur le nouvel horaire.', 'ok');
+        }
       } else if (modeSeances === 'ponctuelle' && row && row.id) {
         // Enchaînement : la modale ponctuelle s'ouvre pré-verrouillée sur la
         // mission créée (refreshAll d'abord, pour que le select la connaisse).
