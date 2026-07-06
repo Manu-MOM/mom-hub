@@ -52,6 +52,15 @@
       épargnés. Bouton d'édition renommé « Enregistrer et mettre à jour les
       séances » (l'ex-libellé promettait une génération sans effet sur
       l'existant — constat de recette terrain Vanessa, 06/07).
+      LIEU-MISSION (06/07/2026) : la modale MISSION gagne le patron « lieu
+      référencé OU lieu libre (exclusifs) » déjà porté par les modales
+      ponctuelle et édition de séance (option __libre__ + champ texte). Écart
+      pt 118 LEVÉ pour missions.lieu_libre : le champ a désormais sa surface,
+      le save émet la saisie réelle (plus de ré-émission invisible).
+      Suggestion L2 : bénéficiaire choisi avec entites.lieu_pratique renseigné
+      -> lien « Utiliser le lieu de l'école » (sans écrasement). Réversibilité
+      L5/R1 : lieu LIBRE saisi + fiche école VIDE -> set_entite_lieu_pratique
+      (sql_166) renseigne la fiche au premier contact, jamais d'écrasement.
     - Ponctuelles : n'écrit rien en base ; à l'enregistrement, la modale ponctuelle
       s'ouvre pré-verrouillée sur la mission créée (saisie en série).
     - Le bouton « Générer les séances » du bandeau est SUPPRIMÉ (la génération vit
@@ -735,6 +744,17 @@
     <div class="ss-field">
       <label for="ssMisLieu">Lieu</label>
       <select id="ssMisLieu"></select>
+      <!-- LIEU-MISSION L2 : suggestion depuis la fiche école (entites.lieu_pratique),
+           révélée seulement si un bénéficiaire à lieu renseigné est choisi. -->
+      <div class="ss-hint" id="ssMisLieuSuggWrap" style="display:none;">
+        <button type="button" class="ss-link" id="ssMisLieuSugg"></button>
+      </div>
+    </div>
+    <!-- LIEU-MISSION L1 : lieu référencé (p_lieu_id) OU lieu libre (p_lieu_libre),
+         exclusifs — patron des modales ponctuelle/édition de séance. -->
+    <div class="ss-field" id="ssMisLieuLibreWrap" style="display:none;">
+      <label for="ssMisLieuLibre">Lieu (texte libre)</label>
+      <input type="text" id="ssMisLieuLibre" placeholder="ex. Gymnase municipal, cour de l'école">
     </div>
     <!-- UNIFICATION-SEANCES-MISSION : bloc « Séances » à 3 choix. Aiguillage UI PUR
          (rien d'écrit en base) : « Récurrentes » révèle le motif ci-dessous (inchangé) ;
@@ -2021,6 +2041,8 @@
     const benefVisible = (st !== 'interne');
     $('ssMisBenefWrap').style.display = benefVisible ? '' : 'none';
     $('ssMisFact').classList.toggle('open', st === 'facturable');
+    // LIEU-MISSION L2 : la suggestion suit la visibilité du bénéficiaire.
+    updateMisLieuSugg();
   }
   // Generation d'une reference commande INTERNE (RPC generer_reference_commande,
   // sequence globale cote base). Override-safe : si le champ contient deja une
@@ -2161,8 +2183,16 @@
     // Présélection des selects APRÈS leur (re)construction.
     if (edit) {
       $('ssMisBenef').value = mission.entite_id || '';
-      $('ssMisLieu').value = mission.lieu_id || '';
+      // LIEU-MISSION : lieu référencé -> pioche ; sinon lieu libre -> option
+      // « __libre__ » + champ texte (miroir de l'édition de séance).
+      if (mission.lieu_id) $('ssMisLieu').value = mission.lieu_id;
+      else if (mission.lieu_libre) $('ssMisLieu').value = '__libre__';
+      $('ssMisLieuLibre').value = mission.lieu_libre || '';
+    } else {
+      $('ssMisLieuLibre').value = '';
     }
+    applyMisLieuUI();
+    updateMisLieuSugg();
     // Bloc Récurrence : pré-rempli depuis la récurrence mémorisée (édition),
     // vidé en création. fillRecurInputs gère l'ouverture/repli du details.
     fillRecurInputs(edit ? editingMissionRecurrence : null);
@@ -2190,6 +2220,44 @@
       o.value = s.id; o.textContent = s.libelle || s.nom || s.id;
       sel.appendChild(o);
     });
+    // LIEU-MISSION L1 : option « lieu libre » (miroir de fillPonctLieuSelect).
+    const libre = document.createElement('option');
+    libre.value = '__libre__'; libre.textContent = '— lieu libre (texte) —';
+    sel.appendChild(libre);
+  }
+  // LIEU-MISSION : révélation du champ texte (miroir applyPonctLieuUI).
+  function applyMisLieuUI() {
+    $('ssMisLieuLibreWrap').style.display = ($('ssMisLieu').value === '__libre__') ? '' : 'none';
+  }
+  // LIEU-MISSION L2 : suggestion depuis la fiche école. Visible seulement si le
+  // bloc Bénéficiaire est visible (statut non interne), qu'une entité est choisie
+  // et que sa fiche porte un lieu_pratique non vide (list_entites = select *,
+  // la colonne arrive déjà au front — sonde S1 du 06/07).
+  function lieuPratiqueDuBenef() {
+    const eid = $('ssMisBenef').value || null;
+    if (!eid) return '';
+    const ent = entites.find(function (e) { return e.id === eid; });
+    return (ent && ent.lieu_pratique) ? String(ent.lieu_pratique).trim() : '';
+  }
+  function updateMisLieuSugg() {
+    const benefVisible = $('ssMisBenefWrap').style.display !== 'none';
+    const lieu = lieuPratiqueDuBenef();
+    const wrap = $('ssMisLieuSuggWrap');
+    if (benefVisible && lieu) {
+      $('ssMisLieuSugg').textContent = 'Utiliser le lieu de l\'école : « ' + lieu + ' »';
+      wrap.style.display = '';
+    } else {
+      wrap.style.display = 'none';
+    }
+  }
+  // Clic sur la suggestion : bascule en lieu libre pré-rempli (écrasable ensuite,
+  // R1 : jamais d'écrasement automatique d'une saisie).
+  function appliquerLieuSugg() {
+    const lieu = lieuPratiqueDuBenef();
+    if (!lieu) return;
+    $('ssMisLieu').value = '__libre__';
+    $('ssMisLieuLibre').value = lieu;
+    applyMisLieuUI();
   }
   function fillBenefSelect() {
     const sel = $('ssMisBenef');
@@ -2255,6 +2323,12 @@
     $('ssMisSave').disabled = true;
     try {
       const enEdition = editingMissionId != null;
+      // LIEU-MISSION : lieu référencé OU libre, exclusifs (patron ponctuelle/
+      // édition de séance). Écart pt 118 LEVÉ pour lieu_libre : le champ a sa
+      // surface, la modale émet la saisie réelle.
+      const misLieuSel = $('ssMisLieu').value;
+      const misLieuId = (misLieuSel && misLieuSel !== '__libre__') ? misLieuSel : null;
+      const misLieuLibre = (misLieuSel === '__libre__') ? ($('ssMisLieuLibre').value.trim() || null) : null;
       // CORRECTIF v2 (recette 06/07) : closeMission() remet editingMissionRecurrence
       // à null AVANT le bloc de repropagation — l'ancien motif doit donc être
       // capturé ICI, en local, insensible au reset de la modale.
@@ -2272,11 +2346,11 @@
         p_saison_id: saisonActive.id,
         p_date_debut: dateDebut,
         p_date_fin: $('ssMisDateFin').value || null,
-        p_lieu_id: $('ssMisLieu').value || null,
+        p_lieu_id: misLieuId,
         // Champs absents de la modale mais réécrits SEC par l'UPDATE de upsert_mission.
         // En édition on RENVOIE les valeurs d'origine (mémorisées par openMission),
         // sinon elles seraient écrasées à leur DEFAULT. En création, valeurs neutres.
-        p_lieu_libre: enEdition ? editingMissionLieuLibre : null,
+        p_lieu_libre: misLieuLibre,
         // Récurrence : construite depuis le bloc de la modale (source de vérité,
         // création ET édition). UNIFICATION-SEANCES-MISSION : le choix « Séances »
         // est l'aiguillage — hors mode « Récurrentes », p_recurrence = null (une
@@ -2354,6 +2428,25 @@
       } else {
         flash(enEdition ? 'Mission modifiée.' : 'Mission enregistrée.', 'ok');
         await refreshAll();
+      }
+      // LIEU-MISSION L5 (réversibilité R1, sql_166) : un lieu LIBRE saisi pour
+      // un bénéficiaire dont la fiche école n'a pas encore de lieu_pratique le
+      // renseigne — collecte au premier contact, jamais d'écrasement (garanti
+      // dans le WHERE de la RPC). Fail-soft isolé : pur confort, la mission est
+      // déjà enregistrée. Pré-contrôle front pour éviter un appel inutile quand
+      // la fiche est déjà renseignée (la RPC re-garantit de toute façon).
+      if (entite && misLieuLibre) {
+        const entRow = entites.find(function (e) { return e.id === entite; });
+        const dejaRenseigne = !!(entRow && entRow.lieu_pratique && String(entRow.lieu_pratique).trim());
+        if (!dejaRenseigne) {
+          try {
+            const ecrit = await rpc('set_entite_lieu_pratique', { p_entite_id: entite, p_lieu: misLieuLibre });
+            if (ecrit) {
+              if (entRow) entRow.lieu_pratique = misLieuLibre;
+              flash('Lieu de pratique enregistré sur la fiche de l\'école.', 'ok');
+            }
+          } catch (e2) { /* confort : silencieux, jamais bloquant */ }
+        }
       }
     } catch (e) {
       flash('Enregistrement impossible : ' + errMsg(e), 'err');
@@ -2658,6 +2751,11 @@
     // Mission
     $('ssMisCancel').addEventListener('click', closeMission);
     $('ssMisSave').addEventListener('click', saveMission);
+    // LIEU-MISSION : révélation du champ libre, rafraîchissement de la
+    // suggestion au changement de bénéficiaire, application au clic.
+    $('ssMisLieu').addEventListener('change', applyMisLieuUI);
+    $('ssMisBenef').addEventListener('change', updateMisLieuSugg);
+    $('ssMisLieuSugg').addEventListener('click', appliquerLieuSugg);
     $('ssMisOverlay').addEventListener('click', function (e) { if (e.target === $('ssMisOverlay')) closeMission(); });
     // Récurrence : maj de l'indication du summary + aperçu au coche/décoche d'un jour.
     $('ssMisRecurDays').addEventListener('change', function () { updateRecurHint(); updateRecurPreview(); });
