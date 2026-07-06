@@ -787,6 +787,21 @@
     </a>
 
   </header>
+  <style>
+    /* HUB-NAV-PORTAIL v1.1 — correctif recette mobile 06/07/2026 : le
+       layout PROPRE au portail fige la rangée topbar de la grille .app à
+       56px (grid-template-rows: 56px 1fr, height: 100vh). Quand la topbar
+       s'empile sur petit écran (carte profil en 2e ligne — hub.css pt 75 —
+       puis nav thématique en 3e), son contenu débordait de la rangée et se
+       peignait PAR-DESSUS le contenu (constat recette : chevauchement du
+       greeting). La rangée devient auto ; height/overflow du portail
+       inchangés (.main-col garde son défilement interne). Correctif LOCAL
+       au portail : la cause est le layout du portail, pas le patron BLOC B
+       (byte-identique ×5, intact). */
+    @media (max-width: 1000px) {
+      .app { grid-template-rows: auto 1fr; }
+    }
+  </style>
 
   <!-- HUB-NAV-LOGISTIQUE v2 (BLOC B/2) — style + comportement de la nav
        thématique du BLOC A (topbar). Dupliqué à l'IDENTIQUE sur les 4 pages
