@@ -802,19 +802,6 @@
       .app { grid-template-rows: auto 1fr; }
     }
   </style>
-  <style>
-    /* HUB-NAV BLOC C-CARREFOUR v1 (avenant n°3 gelé 06/07/2026) — doctrine :
-       sur les pages-CARREFOUR (portail, dashboard), la nav thématique est
-       DESKTOP SEULEMENT ; sur téléphone, les icônes de la carte profil
-       (maison <-> grille) assurent déjà la navigation entre carrefours, la
-       rangée supplémentaire coûterait une ligne d'écran pour un doublon
-       (retour terrain Manu, captures 06/07). Les pages-OUTILS (thèmes)
-       gardent leur nav partout. Bloc IDENTIQUE portail + dashboard, posé
-       APRÈS le BLOC B qu'il surcharge (même spécificité, ordre gagnant). */
-    @media (max-width: 1000px) {
-      .main-nav.hub-nav { display: none; }
-    }
-  </style>
 
   <!-- HUB-NAV-LOGISTIQUE v2 (BLOC B/2) — style + comportement de la nav
        thématique du BLOC A (topbar). Dupliqué à l'IDENTIQUE sur les 4 pages
@@ -895,6 +882,19 @@
       });
     })();
   </script>
+  <style>
+    /* HUB-NAV BLOC C-CARREFOUR v1 (avenant n°3 gelé 06/07/2026) — doctrine :
+       sur les pages-CARREFOUR (portail, dashboard), la nav thématique est
+       DESKTOP SEULEMENT ; sur téléphone, les icônes de la carte profil
+       (maison <-> grille) assurent déjà la navigation entre carrefours, la
+       rangée supplémentaire coûterait une ligne d'écran pour un doublon
+       (retour terrain Manu, captures 06/07). Les pages-OUTILS (thèmes)
+       gardent leur nav partout. Bloc IDENTIQUE portail + dashboard, posé
+       APRÈS le BLOC B qu'il surcharge (même spécificité, ordre gagnant). */
+    @media (max-width: 1000px) {
+      .main-nav.hub-nav { display: none; }
+    }
+  </style>
 
   <!-- ============ MAIN LAYOUT ============ -->
   <main class="layout">
