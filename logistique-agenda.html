@@ -151,9 +151,23 @@
 
     <div class="season-pill">SAISON …</div>
 
-    <nav class="main-nav">
-      <a href="./">Tableau de bord</a>
-      <a class="active">Logistique</a>
+    <!-- HUB-NAV-LOGISTIQUE v2 (BLOC A/2) — nav thématique dupliquée à
+         l'IDENTIQUE sur logistique.html / logistique-agenda.html /
+         logistique-validation.html / bus.html (avenant FAIT FOI gelé
+         06/07/2026). REMPLACE la main-nav locale de la page. Liens filtrés
+         par rôle : data-nav-show="staff" = admin|bureau|salarié,
+         data-nav-show="admin bureau" = admin|bureau. Naissent masqués
+         (fail-safe), révélés par le BLOC B après </header>. Navigation
+         PURE : aucun contenu vivant (N6). -->
+    <nav class="main-nav hub-nav" aria-label="Navigation logistique">
+      <a href="./">Accueil</a>
+      <a href="dashboard.html" data-nav-show="staff" hidden aria-hidden="true">Tableau de bord</a>
+      <a href="logistique.html?type=site">Sites</a>
+      <a href="logistique.html?type=minibus">Minibus</a>
+      <a href="logistique.html?type=autre">Autre</a>
+      <a href="logistique-agenda.html">Agenda</a>
+      <a href="bus.html">Bus</a>
+      <a href="logistique-validation.html" data-nav-show="admin bureau" hidden aria-hidden="true">Validation</a>
     </nav>
 
     <div class="user-profile">
@@ -173,110 +187,82 @@
     </div>
   </header>
 
-  <!-- HUB-NAV-LOGISTIQUE v1 — snippet dupliqué à l'IDENTIQUE sur
-       logistique.html / logistique-agenda.html / logistique-validation.html /
-       bus.html (N1a, FAIT FOI NAVIGATION-THEMATIQUE 05/07/2026). Toute
-       modification se réplique sur les 4 pages. Navigation PURE : aucun
-       contenu vivant (N6). Le lien Validation naît masqué (fail-safe N2)
-       et n'est révélé que pour admin|bureau via les wrappers existants —
-       la garde de page du poste reste la vérité. -->
+  <!-- HUB-NAV-LOGISTIQUE v2 (BLOC B/2) — style + comportement de la nav
+       thématique du BLOC A (topbar). Dupliqué à l'IDENTIQUE sur les 4 pages
+       du thème (avenant FAIT FOI gelé 06/07/2026). css/hub.css NON touché :
+       les surcharges (visibilité mobile de la main-nav, masquée <1000px par
+       le fichier commun) sont locales et scopées .hub-nav. -->
   <style>
-    .hub-nav {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 8px 32px;
-      background: var(--paper-warm);
-      border-bottom: 1px solid var(--line);
+    .main-nav.hub-nav {
+      gap: 20px;
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
       white-space: nowrap;
+      scrollbar-width: none;
     }
-    .hub-nav__label {
-      flex: 0 0 auto;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--ink-mute);
-      margin-right: 6px;
-    }
-    .hub-nav a,
-    .hub-nav .hub-nav__current {
-      flex: 0 0 auto;
-      font-size: 13px;
-      padding: 4px 12px;
-      border-radius: 999px;
-      text-decoration: none;
-    }
-    .hub-nav a {
-      color: var(--ink-soft);
-      border: 1px solid transparent;
-    }
-    .hub-nav a:hover {
-      color: var(--vert-bouteille);
-      border-color: var(--line);
-      background: var(--paper);
-    }
-    .hub-nav .hub-nav__current {
-      color: var(--vert-bouteille);
-      background: var(--paper);
-      border: 1px solid var(--line);
-      font-weight: 600;
-      cursor: default;
-    }
-    @media (max-width: 768px) {
-      .hub-nav { padding: 8px 16px; }
+    .main-nav.hub-nav::-webkit-scrollbar { display: none; }
+    .main-nav.hub-nav a.active { cursor: default; }
+    @media (max-width: 1000px) {
+      /* hub.css masque .main-nav <1000px : la nav thématique y échappe et
+         devient une rangée pleine largeur défilable sous la marque. */
+      .topbar { height: auto; padding-top: 6px; padding-bottom: 8px; }
+      .main-nav.hub-nav {
+        display: flex;
+        grid-column: 1 / -1; /* topbar en grid entre 768 et 1000px */
+        flex-basis: 100%;    /* topbar en flex-wrap sous 768px */
+        order: 9;
+        justify-content: flex-start;
+        padding: 4px 0 2px;
+      }
     }
   </style>
-  <nav class="hub-nav" aria-label="Navigation logistique">
-    <span class="hub-nav__label">Logistique</span>
-    <a href="./">Accueil</a>
-    <a href="logistique.html">Guichet</a>
-    <a href="logistique-agenda.html">Agenda</a>
-    <a href="bus.html">Bus</a>
-    <a href="logistique-validation.html" data-nav-show="admin bureau" hidden aria-hidden="true">Validation</a>
-  </nav>
   <script>
-    // HUB-NAV-LOGISTIQUE v1 — marquage page courante + révélation N2.
+    // HUB-NAV-LOGISTIQUE v2 — page courante + révélation des liens filtrés.
     (function () {
-      var nav = document.querySelector('.hub-nav');
+      var nav = document.querySelector('.main-nav.hub-nav');
       if (!nav) return;
 
-      // Page courante : le lien dont le dernier segment du href = celui du
-      // pathname devient un <span> marqué non-cliquable ('' → index.html).
-      var courant = window.location.pathname.split('/').pop() || 'index.html';
+      // Clé d'une URL = fichier + filtre ?type= éventuel. Le guichet sans
+      // ?type= vaut 'site' (défaut D6 de logistique-browser.js).
+      function cle(href) {
+        var u = new URL(href, window.location.href);
+        var f = u.pathname.split('/').pop() || 'index.html';
+        var t = u.searchParams.get('type');
+        if (f === 'logistique.html') { t = t || 'site'; }
+        return f + (t ? '?type=' + t : '');
+      }
+
+      // Page courante : lien marqué .active (style hub.css existant),
+      // href retiré = non-cliquable, patron des main-nav historiques.
+      var courante = cle(window.location.href);
       nav.querySelectorAll('a[href]').forEach(function (a) {
-        var cible = (a.getAttribute('href') || '').split('/').pop() || 'index.html';
-        if (cible === courant) {
-          var span = document.createElement('span');
-          span.className = 'hub-nav__current';
-          span.setAttribute('aria-current', 'page');
-          span.textContent = a.textContent;
-          a.replaceWith(span);
+        if (cle(a.getAttribute('href')) === courante) {
+          a.classList.add('active');
+          a.removeAttribute('href');
+          a.setAttribute('aria-current', 'page');
         }
       });
 
-      // Révélation fail-safe du lien Validation : session + (admin OU bureau).
-      // Attend DOMContentLoaded : les scripts (dont supabase-client.js) sont
-      // chargés en fin de body, APRÈS ce snippet. Échec silencieux = lien
-      // masqué (patron data-show du dashboard répliqué).
+      // Révélation fail-safe des liens filtrés. Attend DOMContentLoaded :
+      // supabase-client.js est chargé en fin de body, APRÈS ce bloc.
+      // Échec silencieux = liens masqués (patron data-show du dashboard).
       document.addEventListener('DOMContentLoaded', async function () {
         try {
-          if (typeof SupabaseHub === 'undefined') return;
+          if (typeof SupabaseHub === 'undefined') { return; }
           var session = await SupabaseHub.getSession();
-          if (!session) return;
+          if (!session) { return; }
           var droits = await Promise.all([
             SupabaseHub.isAdmin(),
-            SupabaseHub.hasRole('bureau')
+            SupabaseHub.hasRole('bureau'),
+            SupabaseHub.suisJeSalarie()
           ]);
-          if (droits[0] || droits[1]) {
-            nav.querySelectorAll('[data-nav-show]').forEach(function (el) {
-              el.hidden = false;
-              el.removeAttribute('aria-hidden');
-            });
-          }
-        } catch (e) { /* honnête : le lien reste masqué */ }
+          var bureau = droits[0] || droits[1];
+          var staff = bureau || droits[2];
+          nav.querySelectorAll('[data-nav-show]').forEach(function (el) {
+            var ok = (el.getAttribute('data-nav-show') === 'staff') ? staff : bureau;
+            if (ok) { el.hidden = false; el.removeAttribute('aria-hidden'); }
+          });
+        } catch (e) { /* honnête : les liens filtrés restent masqués */ }
       });
     })();
   </script>
