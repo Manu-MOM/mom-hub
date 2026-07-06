@@ -1,0 +1,245 @@
+/**
+ * MOM Hub · Navigation thématique partagée
+ * =========================================
+ * HUB-NAV v1.0 — naissance (chantier GENERALISATION-NAV-THEMATIQUE,
+ * FAIT FOI gelé le 06/07/2026, calé STATE/CARTE pt 155).
+ *
+ * UN SEUL POINT DE VÉRITÉ pour la navigation thématique du Hub.
+ * Remplace le patron dupliqué HUB-NAV-LOGISTIQUE v2 (BLOCS A/B/C
+ * byte-identiques, pt 155) par un module unique, gouvernance stricte
+ * type hub-agenda (INTERDIT à la clôture du chantier de généralisation).
+ *
+ * USAGE (2 lignes par page, rien d'autre) :
+ *   1. Dans la topbar, un PORTEUR VIDE à l'emplacement voulu :
+ *        <nav class="main-nav hub-nav" data-hub-nav="logistique"></nav>
+ *   2. Après </header> :
+ *        <script src="js/hub-nav.js"></script>
+ *   La page décide de l'EMPLACEMENT, le module décide du CONTENU.
+ *   supabase-client.js doit être chargé sur la page (fin de body) pour
+ *   la révélation des liens filtrés ; sinon ils restent masqués
+ *   (fail-safe, patron data-show du dashboard).
+ *
+ * DOCTRINE ENCODÉE (leçons pt 155) :
+ *   - L'ordre des styles est porteur de sens : le module injecte
+ *     TOUJOURS le style outils PUIS, si carrefour, la surcharge
+ *     carrefour — ordre garanti PAR CONSTRUCTION, l'intégrateur ne
+ *     peut pas se tromper.
+ *   - Lexique unifié GRAVÉ : « Accueil » = le portail (./) ;
+ *     « Tableau de bord » = dashboard.html. Rien d'autre, jamais.
+ *   - Doctrine carrefour/outils : pages-carrefour (portail, dashboard)
+ *     = nav desktop seulement (mobile : icônes des cartes profil) ;
+ *     pages-outils (thèmes) = nav partout, rangée défilable mobile.
+ *   - Navigation PURE (N6) : zéro contenu vivant, zéro badge.
+ *   - La nav MASQUE, la garde de page PROTÈGE (la garde reste LA vérité).
+ *   - css/hub.css JAMAIS touché : surcharges scopées .hub-nav.
+ *
+ * INVARIANTS : aucun SQL ; hub-agenda.js / hub-agenda.css intacts ;
+ * échec silencieux = liens filtrés masqués.
+ */
+(function () {
+  'use strict';
+
+  var VERSION = '1.0';
+
+  /* ------------------------------------------------------------------ *
+   * TRONC COMMUN — présent en tête de chaque nav (lexique unifié).
+   * « Tableau de bord » est une porte staff : masqué fail-safe, révélé
+   * admin|bureau|salarié par la révélation ci-dessous.
+   * ------------------------------------------------------------------ */
+  function tronc() {
+    return [
+      { label: 'Accueil', href: './' },
+      { label: 'Tableau de bord', href: 'dashboard.html', show: 'staff' }
+    ];
+  }
+
+  /* ------------------------------------------------------------------ *
+   * LA TABLE DES THÈMES — source de vérité unique (FAIT FOI 06/07/2026).
+   * Jetons de visibilité : 'staff' = admin|bureau|salarié ;
+   * 'admin bureau' = admin|bureau. Liens sans jeton = tous rôles.
+   * Les thèmes suivants (Écoles, Salarié, Pédagogie, Mon équipe,
+   * Administration, Suivi match) seront ajoutés ICI, conversation par
+   * conversation — jamais dans les pages.
+   * ------------------------------------------------------------------ */
+  var THEMES = {
+
+    'logistique': {
+      ariaLabel: 'Navigation logistique',
+      carrefour: false,
+      liens: tronc().concat([
+        { label: 'Sites', href: 'logistique.html?type=site' },
+        { label: 'Minibus', href: 'logistique.html?type=minibus' },
+        { label: 'Autre', href: 'logistique.html?type=autre' },
+        { label: 'Agenda', href: 'logistique-agenda.html' },
+        { label: 'Bus', href: 'bus.html' },
+        { label: 'Validation', href: 'logistique-validation.html', show: 'admin bureau' }
+      ])
+    },
+
+    'carrefour-portail': {
+      ariaLabel: 'Navigation',
+      carrefour: true,
+      liens: tronc()
+    },
+
+    'carrefour-dashboard': {
+      ariaLabel: 'Navigation',
+      carrefour: true,
+      // Sur le dashboard, « Tableau de bord » est la page courante : la
+      // garde de page a déjà admis l'utilisateur, le lien naît VISIBLE
+      // (patron BLOC A-DASHBOARD v1, avenant 3 pt 155) — il sera marqué
+      // .active non-cliquable par le marquage ci-dessous.
+      liens: [
+        { label: 'Accueil', href: './' },
+        { label: 'Tableau de bord', href: 'dashboard.html' }
+      ]
+    }
+  };
+
+  /* ------------------------------------------------------------------ *
+   * STYLES — repris VERBATIM des BLOCS B et C prouvés pt 155.
+   * css/hub.css masque .main-nav <1000px : la nav thématique y échappe
+   * (spécificité .main-nav.hub-nav) et devient une rangée pleine largeur
+   * défilable sous la marque (pages-outils).
+   * ------------------------------------------------------------------ */
+  var CSS_OUTILS = [
+    '.main-nav.hub-nav {',
+    '  gap: 20px;',
+    '  overflow-x: auto;',
+    '  -webkit-overflow-scrolling: touch;',
+    '  white-space: nowrap;',
+    '  scrollbar-width: none;',
+    '}',
+    '.main-nav.hub-nav::-webkit-scrollbar { display: none; }',
+    '.main-nav.hub-nav a.active { cursor: default; }',
+    '@media (max-width: 1000px) {',
+    '  .topbar { height: auto; padding-top: 6px; padding-bottom: 8px; }',
+    '  .main-nav.hub-nav {',
+    '    display: flex;',
+    '    grid-column: 1 / -1; /* topbar en grid entre 768 et 1000px */',
+    '    flex-basis: 100%;    /* topbar en flex-wrap sous 768px */',
+    '    order: 9;',
+    '    justify-content: flex-start;',
+    '    padding: 4px 0 2px;',
+    '  }',
+    '}'
+  ].join('\n');
+
+  // Doctrine carrefour : nav desktop seulement. Posé APRÈS le style
+  // outils qu'il surcharge (même spécificité, l'ordre gagne) — ordre
+  // garanti par injecterStyles(), PAR CONSTRUCTION (leçon pt 155).
+  var CSS_CARREFOUR = [
+    '@media (max-width: 1000px) {',
+    '  .main-nav.hub-nav { display: none; }',
+    '}'
+  ].join('\n');
+
+  /* ------------------------------------------------------------------ *
+   * Construction de la nav dans le porteur (DOM pur, zéro innerHTML).
+   * Liens filtrés : naissent masqués (fail-safe), révélés plus bas.
+   * ------------------------------------------------------------------ */
+  function construire(nav, theme) {
+    nav.setAttribute('aria-label', theme.ariaLabel);
+    theme.liens.forEach(function (l) {
+      var a = document.createElement('a');
+      a.textContent = l.label;
+      a.setAttribute('href', l.href);
+      if (l.show) {
+        a.setAttribute('data-nav-show', l.show);
+        a.hidden = true;
+        a.setAttribute('aria-hidden', 'true');
+      }
+      nav.appendChild(a);
+    });
+  }
+
+  function injecterStyles(estCarrefour) {
+    var s1 = document.createElement('style');
+    s1.setAttribute('data-hub-nav-style', 'outils');
+    s1.textContent = CSS_OUTILS;
+    document.head.appendChild(s1);
+    if (estCarrefour) {
+      var s2 = document.createElement('style');
+      s2.setAttribute('data-hub-nav-style', 'carrefour');
+      s2.textContent = CSS_CARREFOUR;
+      document.head.appendChild(s2);
+    }
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Page courante — logique cle() reprise à l'IDENTIQUE du BLOC B v2.
+   * Clé d'une URL = fichier + filtre ?type= éventuel. Le guichet sans
+   * ?type= vaut 'site' (défaut D6 de logistique-browser.js).
+   * ------------------------------------------------------------------ */
+  function cle(href) {
+    var u = new URL(href, window.location.href);
+    var f = u.pathname.split('/').pop() || 'index.html';
+    var t = u.searchParams.get('type');
+    if (f === 'logistique.html') { t = t || 'site'; }
+    return f + (t ? '?type=' + t : '');
+  }
+
+  // Lien courant marqué .active (style hub.css existant), href retiré =
+  // non-cliquable, aria-current — patron des main-nav historiques.
+  function marquerCourante(nav) {
+    var courante = cle(window.location.href);
+    nav.querySelectorAll('a[href]').forEach(function (a) {
+      if (cle(a.getAttribute('href')) === courante) {
+        a.classList.add('active');
+        a.removeAttribute('href');
+        a.setAttribute('aria-current', 'page');
+      }
+    });
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Révélation fail-safe des liens filtrés. Attend DOMContentLoaded :
+   * supabase-client.js est chargé en fin de body, APRÈS ce module.
+   * Échec silencieux = liens masqués (patron data-show du dashboard).
+   * ------------------------------------------------------------------ */
+  function revelerFiltres(nav) {
+    document.addEventListener('DOMContentLoaded', async function () {
+      try {
+        if (typeof SupabaseHub === 'undefined') { return; }
+        var session = await SupabaseHub.getSession();
+        if (!session) { return; }
+        var droits = await Promise.all([
+          SupabaseHub.isAdmin(),
+          SupabaseHub.hasRole('bureau'),
+          SupabaseHub.suisJeSalarie()
+        ]);
+        var bureau = droits[0] || droits[1];
+        var staff = bureau || droits[2];
+        nav.querySelectorAll('[data-nav-show]').forEach(function (el) {
+          var ok = (el.getAttribute('data-nav-show') === 'staff') ? staff : bureau;
+          if (ok) { el.hidden = false; el.removeAttribute('aria-hidden'); }
+        });
+      } catch (e) { /* honnête : les liens filtrés restent masqués */ }
+    });
+  }
+
+  /* ------------------------------------------------------------------ *
+   * AUTO-BOOT (G1a gelé) — le module se monte seul sur le porteur
+   * [data-hub-nav]. Thème inconnu = nav laissée vide, erreur console
+   * tracée (fail-safe : rien de faux n'est affiché).
+   * ------------------------------------------------------------------ */
+  var porteur = document.querySelector('[data-hub-nav]');
+  if (!porteur) {
+    console.error('MOM Hub: hub-nav v' + VERSION + ' chargé sans porteur [data-hub-nav] — rien à monter.');
+    return;
+  }
+  var clef = porteur.getAttribute('data-hub-nav');
+  var theme = THEMES[clef];
+  if (!theme) {
+    console.error('MOM Hub: hub-nav — thème inconnu « ' + clef + ' », nav laissée vide (fail-safe).');
+    return;
+  }
+
+  construire(porteur, theme);
+  injecterStyles(theme.carrefour);
+  marquerCourante(porteur);
+  revelerFiltres(porteur);
+
+  // Point de contrôle minimal (version consultable en console).
+  window.HubNav = { version: VERSION, theme: clef };
+})();
