@@ -2255,6 +2255,10 @@
     $('ssMisSave').disabled = true;
     try {
       const enEdition = editingMissionId != null;
+      // CORRECTIF v2 (recette 06/07) : closeMission() remet editingMissionRecurrence
+      // à null AVANT le bloc de repropagation — l'ancien motif doit donc être
+      // capturé ICI, en local, insensible au reset de la modale.
+      const recAvantEdition = enEdition ? editingMissionRecurrence : null;
       const params = {
         p_id: editingMissionId,
         // Code : en édition on conserve celui de la mission (upsert_mission réécrit la
@@ -2303,11 +2307,11 @@
         // la durée du motif a changé, les occurrences futures encore `prevue` ET
         // encore à l'ANCIENNE heure sont réalignées AVANT la génération (les
         // ajustements manuels sont épargnés côté SQL par IS NOT DISTINCT FROM).
-        // L'ancien motif vient de editingMissionRecurrence (capturé par
-        // openMission, patron pt 118) ; le nouveau, de params.p_recurrence.
+        // L'ancien motif vient de recAvantEdition (capturé AVANT closeMission,
+        // correctif v2) ; le nouveau, de params.p_recurrence.
         let nRepro = 0;
-        if (enEdition && editingMissionRecurrence) {
-          const recOld = editingMissionRecurrence;
+        if (enEdition && recAvantEdition) {
+          const recOld = recAvantEdition;
           const recNew = params.p_recurrence;
           const hOld = recOld.heure_debut ? String(recOld.heure_debut).slice(0, 5) : null;
           const hNew = (recNew && recNew.heure_debut) ? String(recNew.heure_debut).slice(0, 5) : null;
