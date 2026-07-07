@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agenda des évènements · MOM Hub</title>
+<link rel="icon" type="image/png" href="assets/logo-m2m.png">
+<!--
+  MOM Hub · Agenda des évènements — surface DÉDIÉE (AGENDA-EVENEMENTS).
+  Vue calendaire (patron Google-agenda) des évènements du club, filtrée sur
+  la/les catégorie(s) sélectionnée(s). Thème « Mon équipe ».
+
+  PÉRIMÈTRE PAR RÔLE (FAIT FOI E2) :
+    - encadrant  : ses catégories (resoudrePerimetreCategories, transverse=false),
+    - admin/bureau (transverse) : toutes les catégories.
+  SÉLECTEUR = CASES À COCHER MULTIPLES, groupées par pôle. L'agenda résout les
+  équipes de TOUTES les catégories cochées (listEquipes par cat), interroge
+  get_evenements_a_venir / _passes par ÉQUIPE, fusionne et DÉDOUBLONNE PAR id
+  d'évènement (un plateau EDR à N équipes = 1 évènement-racine = 1 puce ;
+  invariant assumé, conforme à la conception du Hub). État multi LOCAL à la
+  page ; le socle mono-catégorie partagé (mom_hub.categorie_active) n'est PAS
+  modifié — juste lu comme défaut initial.
+
+  LECTURE SEULE (FAIT FOI E4) : détail au clic, AUCUN bouton « Modifier ».
+  L'édition d'un évènement reste sur evenements.html / la fiche évènement.
+
+  Consomme, sans jamais les modifier, les modules INTERDIT :
+    - css/hub-agenda.css + js/hub-agenda.js  (AGENDA-HUB-PATRON v1.1, pt 166)
+    - js/hub-nav.js                          (nav thématique, INTERDIT)
+  La palette .t-<type> (3 types d'évènement) est FOURNIE PAR CETTE PAGE (G3).
+
+  RPC (déjà exposées, ZÉRO SQL pour cette page) :
+    - get_evenements_a_venir(p_equipe_id, p_jours_a_venir)
+    - get_evenements_passes(p_equipe_id, p_jours_passes, p_limit)
+  Helpers SupabaseHub : client, getSession, getSaisonActive, signOut,
+    resoudrePerimetreCategories, getCategories, getPoles, listEquipes,
+    getEvenementsAVenir, getEvenementsPasses.
+-->
+<link rel="stylesheet" href="css/hub.css">
+<!-- CSS structurel du patron agenda (INTERDIT, consommé). La palette .t-* de la
+     page reste dans le <style> ci-dessous (FAIT FOI G3). -->
+<link rel="stylesheet" href="css/hub-agenda.css">
+<style>
+  body.auth-pending { visibility: hidden; }
+  .ea-wrap { max-width: 980px; margin: 0 auto; padding: 24px 24px 48px; }
+  .ea-wrap h1 { font-size: 20px; margin: 0 0 4px; color: var(--ink, #0c3d24); }
+  .ea-sub { color: var(--ink-mute, #6b7a74); margin: 0 0 20px; font-size: 13px; }
+
+  .ea-msg { margin: 0 0 16px; }
+  .ea-flash { padding: 10px 14px; border-radius: 8px; font-size: 14px; margin-bottom: 10px; }
+  .ea-flash.ok  { background: var(--feedback-success-bg, #e7f3ec); color: var(--feedback-success-fg, #1f5a32); }
+  .ea-flash.err { background: var(--feedback-error-bg, #fdecea);   color: var(--feedback-error-fg, #8a1b14); }
+
+  /* ----- Sélecteur de catégories (cases à cocher, groupées par pôle) ----- */
+  .ea-picker { border: 1px solid var(--line, #e2e8e4); border-radius: 10px; padding: 14px 16px; margin: 0 0 18px; background: var(--surface, #fff); }
+  .ea-picker-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+  .ea-picker-title { font-size: 13px; font-weight: 600; color: var(--ink, #0c3d24); }
+  .ea-picker-actions { display: flex; gap: 8px; }
+  .ea-picker-actions button { font-size: 12px; padding: 3px 10px; border: 1px solid var(--line, #cabe9f); background: var(--surface-2, #f6f4ee); color: var(--ink, #0c3d24); border-radius: 6px; cursor: pointer; }
+  .ea-picker-actions button:hover { background: #ece8dc; }
+  .ea-poles { display: flex; flex-wrap: wrap; gap: 16px 26px; }
+  .ea-pole { min-width: 150px; }
+  .ea-pole-title { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-mute, #6b7a74); margin: 0 0 6px; }
+  .ea-cat { display: flex; align-items: center; gap: 7px; font-size: 13px; padding: 3px 0; cursor: pointer; }
+  .ea-cat input { cursor: pointer; }
+  .ea-picker-empty { font-size: 13px; color: var(--ink-mute, #6b7a74); }
+
+  /* ----- Palette des types d'évènement (FAIT FOI G3).
+     Convention du module : .ag-ev.t-X / .ag-chip.t-X / .ag-sw.t-X. ----- */
+  .ag-ev.t-entrainement, .ag-chip.t-entrainement { background: #e7f3ec; color: #1f5a32; border-left-color: #2d7a3e; }
+  .ag-sw.t-entrainement { background: #2d7a3e; }
+  .ag-ev.t-competition, .ag-chip.t-competition { background: #fbf1dd; color: #83590c; border-left-color: #c08a1e; }
+  .ag-sw.t-competition { background: #c08a1e; }
+  .ag-ev.t-stage, .ag-chip.t-stage { background: #f8e2ec; color: #7a2549; border-left-color: #b03a6e; }
+  .ag-sw.t-stage { background: #b03a6e; }
+  .ag-ev.t-divers, .ag-chip.t-divers { background: #eef0ef; color: #42504a; border-left-color: #6b7a74; }
+  .ag-sw.t-divers { background: #6b7a74; }
+</style>
+</head>
+<body class="auth-pending">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo"><img src="assets/logo-m2m.png" alt="MOM Rugby"></div>
+      <div class="brand-text">
+        <h1>MOM Hub</h1>
+        <p>Mutzig Ovalie Molsheim</p>
+      </div>
+    </div>
+
+    <div class="season-pill" id="season-pill">SAISON</div>
+
+    <nav class="main-nav hub-nav" data-hub-nav="equipe"></nav>
+
+    <div class="icon-row">
+      <button class="icon-btn" title="Recherche" aria-label="Recherche">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      </button>
+    </div>
+
+    <div class="user-profile">
+      <div class="avatar">EJ</div>
+      <div class="user-info">
+        <div class="user-name">Emmanuel Jung</div>
+        <div class="user-role">Administrateur</div>
+      </div>
+      <a href="./" class="user-action" title="Retour au portail" aria-label="Retour au portail">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/></svg>
+      </a>
+      <button type="button" class="user-action" id="btn-signout" title="Se déconnecter" aria-label="Se déconnecter">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <script src="js/hub-nav.js"></script>
+
+  <div class="ea-wrap">
+    <h1>Agenda des évènements</h1>
+    <p class="ea-sub">Vue calendaire des évènements (entraînements, compétitions, stages). Sélectionnez une ou plusieurs catégories. Consultation seule ; l'édition d'un évènement se fait depuis « Évènements ».</p>
+
+    <div class="ea-msg" id="eaMsg"></div>
+
+    <!-- Sélecteur de catégories (cases à cocher, groupées par pôle) -->
+    <section class="ea-picker" id="eaPicker" style="display:none;">
+      <div class="ea-picker-head">
+        <span class="ea-picker-title">Catégories affichées</span>
+        <div class="ea-picker-actions">
+          <button type="button" id="eaSelAll">Tout cocher</button>
+          <button type="button" id="eaSelNone">Tout décocher</button>
+        </div>
+      </div>
+      <div class="ea-poles" id="eaPoles"></div>
+    </section>
+
+    <!-- Container du patron agenda : HubAgenda.create y génère la classe ag-root
+         et tout le squelette (grille horaire, mini-mois, plein écran, légende,
+         modale de détail, repli mobile). -->
+    <section id="agRoot"></section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/hub-agenda.js"></script>
+<script src="js/season-pill.js"></script>
+<script>
+(async function () {
+  'use strict';
+  const $ = function (id) { return document.getElementById(id); };
+
+  // ---- Référentiel des types d'évènement (colonne type_evenement) ----
+  const TYPES = [
+    { code: 'entrainement', lib: 'Entraînement' },
+    { code: 'competition',  lib: 'Compétition' },
+    { code: 'stage',        lib: 'Stage' }
+  ];
+  const TYPE_DIVERS = { code: 'divers', lib: 'Divers' };
+  const TYPE_BY_CODE = {};
+  TYPES.concat([TYPE_DIVERS]).forEach(function (t) { TYPE_BY_CODE[t.code] = t; });
+
+  const JOURS = ['lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.', 'dim.'];
+  const MOIS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+
+  // Marge (jours) ajoutée aux bornes RPC (get_*_a_venir/_passes prennent un
+  // nombre de jours, pas des bornes exactes). On demande large puis on filtre
+  // client sur [debut, fin] fournis par le module.
+  const MARGE_JOURS = 7;
+  const DUREE_DEFAUT_MIN = 60;   // FAIT FOI E3 (décision déléguée) : durée par défaut v1.
+
+  // ---- État ----
+  let saisonActive = null;
+  let perimetre = null;              // {categories, transverse, active, vide}
+  let categoriesById = {};           // id -> {id, code, libelle_court, pole_id, ordre_tri, …}
+  let polesById = {};                // id -> {id, libelle_court, …}
+  let catsCochees = new Set();        // categorie_id sélectionnés (état LOCAL)
+  let equipesParCat = {};            // categorie_id -> [equipeId, …] (cache)
+  let agenda = null;
+
+  // ---- Helpers ----
+  function errMsg(e) {
+    if (!e) return 'erreur inconnue';
+    return e.message || e.error_description || e.msg || String(e);
+  }
+  function flash(msg, kind) {
+    const box = $('eaMsg');
+    if (!box) return;
+    const div = document.createElement('div');
+    div.className = 'ea-flash ' + (kind === 'err' ? 'err' : 'ok');
+    div.textContent = msg;
+    box.innerHTML = '';
+    box.appendChild(div);
+  }
+  function parseDate(s) { const p = String(s).slice(0, 10).split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  function typeLib(code) { const t = TYPE_BY_CODE[code]; return t ? t.lib : (code || '—'); }
+
+  // Normalise un type_evenement vers un code de palette connu (repli 'divers').
+  function normType(t) {
+    const c = String(t || '').toLowerCase();
+    return TYPE_BY_CODE[c] ? c : 'divers';
+  }
+
+  // Heure locale « HH:MM » depuis date_debut ISO, en respectant la convention
+  // du modèle évènements (minuit UTC pile = heure NON saisie -> null).
+  function heureDe(iso) {
+    if (!iso) return null;
+    const d = new Date(iso);
+    if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0) return null;
+    return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  }
+  // Date locale « YYYY-MM-DD » depuis date_debut ISO.
+  function dateDe(iso) {
+    const d = new Date(iso);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  // ---- Mapping évènement (ligne RPC) -> item du module ----
+  function evMapRow(ev) {
+    const type = normType(ev.type_evenement);
+    let libelle = ev.libelle || typeLib(type);
+    if (type === 'competition' && ev.adversaire_nom) libelle += ' — ' + ev.adversaire_nom;
+    return {
+      id: ev.id,
+      date: dateDe(ev.date_debut),
+      heure: heureDe(ev.date_debut),
+      duree_min: DUREE_DEFAUT_MIN,
+      type: type,
+      libelle: libelle,
+      etat: ev.etat || 'prevu',
+      meta: ev
+    };
+  }
+  function evDetailRows(it) {
+    const ev = it.meta;
+    const d = parseDate(it.date);
+    const when = JOURS[(d.getDay() + 6) % 7] + ' ' + d.getDate() + ' ' + MOIS[d.getMonth()]
+      + (it.heure ? ' · ' + it.heure : ' · toute la journée');
+    const rows = [
+      { lbl: 'Type', val: typeLib(it.type) },
+      { lbl: 'Date · horaire', val: when }
+    ];
+    if (ev.adversaire_nom) rows.push({ lbl: 'Adversaire', val: ev.adversaire_nom });
+    if (ev.site_libelle_court) rows.push({ lbl: 'Lieu', val: ev.site_libelle_court });
+    else if (ev.rdv_lieu) rows.push({ lbl: 'Lieu', val: ev.rdv_lieu });
+    return rows;
+  }
+
+  // ---- Résolution des équipes d'une catégorie (avec cache) ----
+  async function equipesDe(catId) {
+    if (equipesParCat[catId]) return equipesParCat[catId];
+    let ids = [];
+    try {
+      const eqs = await SupabaseHub.listEquipes(catId);
+      ids = Array.isArray(eqs) ? eqs.map(function (e) { return e && e.id; }).filter(Boolean) : [];
+    } catch (e) { ids = []; }
+    equipesParCat[catId] = ids;
+    return ids;
+  }
+
+  // ---- fetchWindow du module : [debutISO, finISO] -> item[] ----
+  // Les RPC prennent un NOMBRE DE JOURS autour d'aujourd'hui (pas de bornes) :
+  // on convertit la fenêtre en jours passés / à venir (avec marge), on interroge
+  // par ÉQUIPE (union des équipes de toutes les catégories cochées), on fusionne
+  // et DÉDOUBLONNE PAR id d'évènement, puis on filtre client sur [debut, fin].
+  async function fetchWindow(debutISO, finISO) {
+    if (catsCochees.size === 0) return [];
+
+    // Équipes de toutes les catégories cochées (dédupliquées).
+    const listesEq = await Promise.all(Array.from(catsCochees).map(equipesDe));
+    const equipes = Array.from(new Set([].concat.apply([], listesEq)));
+    if (equipes.length === 0) return [];
+
+    // Bornes -> nombre de jours (borné à >= 0), marge de sécurité.
+    const auj = new Date(); auj.setHours(0, 0, 0, 0);
+    const debut = parseDate(debutISO);
+    const fin = parseDate(finISO);
+    const MS = 86400000;
+    const joursPasses = Math.max(0, Math.ceil((auj - debut) / MS)) + MARGE_JOURS;
+    const joursAVenir = Math.max(0, Math.ceil((fin - auj) / MS)) + MARGE_JOURS;
+
+    const appels = [];
+    equipes.forEach(function (eqId) {
+      appels.push(SupabaseHub.getEvenementsPasses(eqId, joursPasses, 500));
+      appels.push(SupabaseHub.getEvenementsAVenir(eqId, joursAVenir));
+    });
+    const listes = await Promise.all(appels);
+
+    // Fusion + dédup par id d'évènement.
+    const vus = new Set();
+    const items = [];
+    listes.forEach(function (liste) {
+      (Array.isArray(liste) ? liste : []).forEach(function (ev) {
+        if (!ev || !ev.id || vus.has(ev.id) || !ev.date_debut) return;
+        vus.add(ev.id);
+        const it = evMapRow(ev);
+        // Filtre client sur la fenêtre demandée (bornes inclusives).
+        if (it.date >= debutISO && it.date <= finISO) items.push(it);
+      });
+    });
+    return items;
+  }
+
+  function agCreate() {
+    agenda = HubAgenda.create($('agRoot'), {
+      titre: 'Agenda des évènements',
+      libelleVide: 'Aucun évènement cette semaine.',
+      fetchWindow: fetchWindow,
+      types: TYPES.concat([TYPE_DIVERS]).map(function (t) { return { code: t.code, lib: t.lib }; }),
+      detail: { titre: function (it) { return it.libelle || typeLib(it.type); }, rows: evDetailRows },
+      capacites: { pleinEcran: true, caseAnnulees: false },
+      plageFixe: [8, 22],          // AGENDA-MODULE-V1.1 P2 : grille stable 08-22 (modèle unique)
+      untimedEnRangee: true,       // AGENDA-MODULE-V1.1 R1 : évènements sans heure en rangée journée entière
+      estAnnulee: function (it) { return it.etat === 'annule'; },
+      etatMark: function () { return ''; },
+      onError: function (e) { flash('Agenda : ' + errMsg(e), 'err'); }
+    });
+  }
+
+  // ---- Sélecteur de catégories (cases groupées par pôle) ----
+  function renderPicker() {
+    const cats = perimetre.categories || [];
+    if (cats.length === 0) { $('eaPicker').style.display = 'none'; return; }
+    // Mono-catégorie : pas de sélecteur (UX inchangée), la seule catégorie est cochée.
+    if (cats.length === 1) { $('eaPicker').style.display = 'none'; return; }
+
+    // Groupement par pôle, dans l'ordre d'apparition des catégories (déjà triées
+    // par ordre_tri). Pôle inconnu -> groupe « Autres ».
+    const groupes = [];        // [{ poleId, titre, cats: [] }]
+    const idxByPole = {};
+    cats.forEach(function (c) {
+      const pid = c.pole_id || '__autres__';
+      if (idxByPole[pid] === undefined) {
+        const pole = polesById[c.pole_id];
+        idxByPole[pid] = groupes.length;
+        groupes.push({ poleId: pid, titre: pole ? (pole.libelle_court || pole.libelle_long || pole.code) : 'Autres', cats: [] });
+      }
+      groupes[idxByPole[pid]].cats.push(c);
+    });
+
+    const esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (ch) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]; }); };
+    let html = '';
+    groupes.forEach(function (g) {
+      html += '<div class="ea-pole"><p class="ea-pole-title">' + esc(g.titre) + '</p>';
+      g.cats.forEach(function (c) {
+        const checked = catsCochees.has(c.id) ? ' checked' : '';
+        const lbl = c.libelle_court || c.code || c.id;
+        html += '<label class="ea-cat"><input type="checkbox" data-cat="' + esc(c.id) + '"' + checked + '> ' + esc(lbl) + '</label>';
+      });
+      html += '</div>';
+    });
+    $('eaPoles').innerHTML = html;
+    $('eaPicker').style.display = '';
+
+    // Câblage des cases (délégué au conteneur).
+    $('eaPoles').querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        const id = cb.getAttribute('data-cat');
+        if (cb.checked) catsCochees.add(id); else catsCochees.delete(id);
+        rafraichirAgenda();
+      });
+    });
+  }
+
+  function cocherTout(val) {
+    const cats = perimetre.categories || [];
+    catsCochees = new Set(val ? cats.map(function (c) { return c.id; }) : []);
+    $('eaPoles').querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
+      cb.checked = catsCochees.has(cb.getAttribute('data-cat'));
+    });
+    rafraichirAgenda();
+  }
+
+  async function rafraichirAgenda() {
+    if (!agenda) return;
+    try { await agenda.refresh(); } catch (e) { flash('Agenda : ' + errMsg(e), 'err'); }
+  }
+
+  // ---- Boot ----
+  const so = $('btn-signout');
+  if (so) so.addEventListener('click', async function () { try { await SupabaseHub.signOut(); } catch (e) {} window.location.replace('login.html'); });
+
+  const session = await SupabaseHub.getSession();
+  if (!session) { window.location.replace('login.html'); return; }
+
+  saisonActive = await SupabaseHub.getSaisonActive();
+
+  // Périmètre catégories (garde de contenu : vide -> rien à afficher).
+  perimetre = await SupabaseHub.resoudrePerimetreCategories();
+
+  document.body.classList.remove('auth-pending');
+
+  if ($('season-pill') && saisonActive && saisonActive.libelle) {
+    $('season-pill').textContent = String(saisonActive.libelle).toUpperCase();
+  }
+
+  if (!perimetre || perimetre.vide || !Array.isArray(perimetre.categories) || perimetre.categories.length === 0) {
+    flash('Aucune catégorie accessible pour votre profil — agenda indisponible.', 'err');
+    return;
+  }
+
+  // Référentiels pour les libellés (catégories + pôles).
+  try {
+    const [cats, poles] = await Promise.all([SupabaseHub.getCategories(), SupabaseHub.getPoles()]);
+    (cats || []).forEach(function (c) { categoriesById[c.id] = c; });
+    (poles || []).forEach(function (p) { polesById[p.id] = p; });
+  } catch (e) { /* les libellés du périmètre suffisent en repli */ }
+
+  // Enrichit le périmètre avec pole_id / ordre_tri du référentiel (resoudre…
+  // renvoie déjà les catégories du référentiel, mais on sécurise le pole_id).
+  perimetre.categories.forEach(function (c) {
+    const ref = categoriesById[c.id];
+    if (ref) { if (c.pole_id == null) c.pole_id = ref.pole_id; if (c.libelle_court == null) c.libelle_court = ref.libelle_court; }
+  });
+
+  // Sélection initiale : catégorie active mémorisée si dans le périmètre, sinon
+  // la 1re. L'utilisateur ajoute/enlève ensuite (multi).
+  const active = perimetre.active && perimetre.categories.some(function (c) { return c.id === perimetre.active; })
+    ? perimetre.active
+    : perimetre.categories[0].id;
+  catsCochees = new Set([active]);
+
+  // Boutons tout cocher / décocher.
+  $('eaSelAll').addEventListener('click', function () { cocherTout(true); });
+  $('eaSelNone').addEventListener('click', function () { cocherTout(false); });
+
+  renderPicker();
+  agCreate();
+  try { await agenda.init(); } catch (e) { flash('Agenda : ' + errMsg(e), 'err'); }
+})();
+</script>
+</body>
+</html>
