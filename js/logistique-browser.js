@@ -144,6 +144,15 @@
     respCoches: [],        // uuid[] responsables cochés, ORDRE DE COCHE (T4)
     recurOn: false,
     recurJours: [],
+    // --- SURFACE-DEMANDEUR ----------------------------------------
+    // « Mes demandes » = celles dont je suis le responsable OFFICIEL
+    // (responsable_personne_id = qui_suis_je(), garde S2 des RPC).
+    moiPersonneId: null,     // personne_id reliée au compte, ou null
+    refById: {},             // uuid ressource -> { libelle, code } (toutes)
+    catByIdEdit: {},         // uuid catégorie -> libellé (référentiel complet)
+    editCtx: null,           // { src:'reservation'|'recurrence', row } édition
+    editJours: [],           // jours cochés dans la modale (règle)
+    editCats: [],            // uuid[] catégories cochées, ordre de coche (T4)
     // --- Calendrier d'occupation (v1) -----------------------------
     // Vue unifiée TOUTES ressources (≠ state.ressources qui est filtré
     // au type courant). Chargé une fois au boot, indexé par jour,
@@ -195,6 +204,17 @@
     applyUrlPrefill();
     await refreshAgenda();
     await refreshCalendar();
+
+    // SURFACE-DEMANDEUR : identité courante, référentiels de la modale
+    // (toutes ressources + toutes catégories), câblage de la modale,
+    // puis rendu de « Mes demandes ». Tout est fail-soft : un souci ici
+    // ne casse pas la saisie ni les agendas.
+    try {
+      state.moiPersonneId = await SupabaseHub.quiSuisJe();
+    } catch (e) { state.moiPersonneId = null; }
+    await loadRefEdition();
+    wireEdition();
+    await refreshMesDemandes();
 
     console.log('%c🏉 Logistique chargé', 'color:#2D7D46;font-weight:bold;',
       { type: state.type, ressources: state.ressources.length });
@@ -931,6 +951,395 @@
     wireCalendarNav();
     renderCalendarGrid();
     renderCalendarDetail();
+  }
+
+  // ============================================================
+  // SURFACE-DEMANDEUR — « Mes demandes » + modale d'édition demandeur
+  // (réplique fidèle de la modale du poste logistique-validation.html,
+  // scopée lmd-edit-*, D3=(i) : duplication assumée et tracée). « Mes »
+  // = responsable_personne_id = state.moiPersonneId (garde S2). Cohérence
+  // droit/visibilité STRICTE : la liste ne montre que ce que la garde
+  // des RPC autorise à modifier/annuler.
+  // ============================================================
+
+  // Référentiels de la modale : toutes les ressources (id -> {libelle,
+  // code}) et toutes les catégories (id -> libellé). Chargés une fois,
+  // fail-soft.
+  async function loadRefEdition() {
+    try {
+      const rs = await SupabaseHub.listRessourcesLogistiques() || [];
+      rs.forEach(function (r) {
+        state.refById[r.id] = { libelle: r.libelle || r.id, code: r.code || '' };
+      });
+    } catch (e) { /* fail-soft : modale ressource vide */ }
+    try {
+      const cs = await SupabaseHub.getCategories() || [];
+      cs.forEach(function (c) {
+        state.catByIdEdit[c.id] = c.libelle_court || c.libelle || c.code || c.id;
+      });
+    } catch (e) { /* fail-soft : cases catégories vides */ }
+  }
+
+  // Une demande est « mienne » si j'en suis le responsable officiel.
+  function estMienne(row) {
+    return !!state.moiPersonneId
+      && row && row.responsable_personne_id === state.moiPersonneId;
+  }
+
+  function badgeStatut(statut) {
+    var map = {
+      pending:  ['lmd-badge--pending',  'En attente'],
+      approved: ['lmd-badge--approved', 'Validée'],
+      rejected: ['lmd-badge--rejected', 'Refusée']
+    };
+    var m = map[statut] || ['', statut || ''];
+    return '<span class="lmd-badge ' + m[0] + '">' + escapeHtml(m[1]) + '</span>';
+  }
+
+  // Rendu tri-source. Statuts affichés : pending + approved + rejected
+  // (avec motif_refus enfin visible) ; cancelled masquées (D2). Fenêtre :
+  // à venir + 30 jours passés.
+  async function refreshMesDemandes() {
+    var host = el('logi-mes-demandes');
+    if (!host) return;
+
+    if (!state.moiPersonneId) {
+      host.innerHTML = '<div class="lmd-empty">Votre compte n\'est pas rattaché à une fiche : vos demandes ne peuvent pas être affichées ici.</div>';
+      return;
+    }
+
+    var bornePassee = new Date();
+    bornePassee.setDate(bornePassee.getDate() - 30);
+    var borneISO = bornePassee.getFullYear() + '-' +
+      String(bornePassee.getMonth() + 1).padStart(2, '0') + '-' +
+      String(bornePassee.getDate()).padStart(2, '0');
+    var STATUTS = ['pending', 'approved', 'rejected'];
+
+    var reservations = [], recurrences = [], bus = [];
+    try { reservations = await SupabaseHub.listReservations({}) || []; } catch (e) {}
+    try { recurrences  = await SupabaseHub.listRecurrences({})  || []; } catch (e) {}
+    try { bus          = await SupabaseHub.listDemandesBus({})  || []; } catch (e) {}
+
+    var items = [];
+    reservations.forEach(function (r) {
+      if (!estMienne(r) || STATUTS.indexOf(r.statut) === -1) return;
+      if (r.date && r.date < borneISO) return;
+      items.push({ src: 'reservation', id: r.id, statut: r.statut,
+        dateTri: r.date || '', row: r,
+        titre: (state.refById[r.ressource_id] || {}).libelle || 'Réservation',
+        creneau: (r.heure_debut || '').slice(0, 5) + '–' + (r.heure_fin || '').slice(0, 5),
+        motif: r.motif || '' });
+    });
+    recurrences.forEach(function (r) {
+      if (!estMienne(r) || STATUTS.indexOf(r.statut) === -1) return;
+      if (r.date_fin && r.date_fin < borneISO) return;
+      var jrs = (r.jours || []).map(function (j) { return JOURS_LBL[j]; }).join(' ');
+      items.push({ src: 'recurrence', id: r.id, statut: r.statut,
+        dateTri: r.date_debut || r.date_fin || '', row: r,
+        titre: '↻ ' + ((state.refById[r.ressource_id] || {}).libelle || 'Règle') +
+          (jrs ? ' · ' + jrs : ''),
+        creneau: (r.heure_debut || '').slice(0, 5) + '–' + (r.heure_fin || '').slice(0, 5),
+        motif: r.motif || '' });
+    });
+    bus.forEach(function (r) {
+      if (!estMienne(r) || STATUTS.indexOf(r.statut) === -1) return;
+      if (r.date && r.date < borneISO) return;
+      items.push({ src: 'bus', id: r.id, statut: r.statut,
+        dateTri: r.date || '', row: r,
+        titre: '🚌 ' + (r.destination || 'Demande de bus'),
+        creneau: '', motif: '' });
+    });
+
+    items.sort(function (a, b) { return a.dateTri < b.dateTri ? -1 : a.dateTri > b.dateTri ? 1 : 0; });
+
+    if (items.length === 0) {
+      host.innerHTML = '<div class="lmd-empty">Vous n\'avez aucune demande en cours.</div>';
+      return;
+    }
+
+    host.innerHTML = items.map(function (it) {
+      var srcLbl = it.src === 'recurrence' ? 'Règle récurrente'
+        : it.src === 'bus' ? 'Bus' : 'Réservation';
+      var dateLbl = it.dateTri ? formatDateLong(it.dateTri) : '';
+      var refus = (it.statut === 'rejected' && it.row.motif_refus)
+        ? '<div class="lmd-refus"><b>Motif du refus :</b> ' + escapeHtml(it.row.motif_refus) + '</div>'
+        : (it.statut === 'rejected'
+            ? '<div class="lmd-refus"><b>Refusée</b> — aucun motif précisé.</div>' : '');
+      return '<div class="lmd-card" data-src="' + it.src + '" data-id="' + escapeHtml(it.id) + '">' +
+        '<div class="lmd-src">' + escapeHtml(srcLbl) + '</div>' +
+        '<div class="lmd-line1">' +
+          '<span class="lmd-date">' + escapeHtml(dateLbl) + '</span>' +
+          (it.creneau ? '<span class="lmd-creneau">' + escapeHtml(it.creneau) + '</span>' : '') +
+          badgeStatut(it.statut) +
+        '</div>' +
+        '<div class="lmd-motif">' + escapeHtml(it.titre) + (it.motif ? ' — ' + escapeHtml(it.motif) : '') + '</div>' +
+        refus +
+        '<div class="lmd-actions">' +
+          '<button type="button" class="lmd-btn" data-act="modifier">Modifier</button>' +
+          '<button type="button" class="lmd-btn" data-act="annuler">Annuler</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+    Array.prototype.forEach.call(host.querySelectorAll('.lmd-card'), function (card) {
+      var src = card.getAttribute('data-src');
+      var id  = card.getAttribute('data-id');
+      var bMod = card.querySelector('[data-act="modifier"]');
+      var bAnn = card.querySelector('[data-act="annuler"]');
+      if (bMod) bMod.addEventListener('click', function () { ouvrirEditionDemandeur(src, id); });
+      if (bAnn) bAnn.addEventListener('click', function () { annulerDemandeur(src, id); });
+    });
+  }
+
+  // ------------------------------------------------------------------
+  // Modale d'édition demandeur (réplique lgv-edit-* → lmd-edit-*).
+  // ------------------------------------------------------------------
+  function renderEditCatsDemandeur() {
+    var host = el('lmd-edit-categorie');
+    if (!host) return;
+    host.innerHTML = '';
+    Object.keys(state.catByIdEdit).forEach(function (id) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'lmd-edit-day' + (state.editCats.indexOf(id) !== -1 ? ' is-on' : '');
+      b.textContent = state.catByIdEdit[id];
+      b.addEventListener('click', function () {
+        var pos = state.editCats.indexOf(id);
+        if (pos === -1) { state.editCats.push(id); b.classList.add('is-on'); }
+        else { state.editCats.splice(pos, 1); b.classList.remove('is-on'); }
+      });
+      host.appendChild(b);
+    });
+  }
+
+  function renderEditJoursDemandeur() {
+    var host = el('lmd-edit-jours');
+    if (!host) return;
+    host.innerHTML = '';
+    JOURS_LBL.forEach(function (lbl, idx) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'lmd-edit-day' + (state.editJours.indexOf(idx) !== -1 ? ' is-on' : '');
+      b.textContent = lbl;
+      b.addEventListener('click', function () {
+        var pos = state.editJours.indexOf(idx);
+        if (pos === -1) { state.editJours.push(idx); b.classList.add('is-on'); }
+        else { state.editJours.splice(pos, 1); b.classList.remove('is-on'); }
+      });
+      host.appendChild(b);
+    });
+  }
+
+  // Occurrences exclues (sql_155, E4/E5) — droit propriétaire (pt 153
+  // E2=B1). Les RPC dédiées ne repassent PAS la règle en pending (E3).
+  function renderEditExcluesDemandeur() {
+    var host = el('lmd-edit-exclues');
+    if (!host) return;
+    host.innerHTML = '';
+    var dates = ((state.editCtx && state.editCtx.row && state.editCtx.row.dates_exclues) || [])
+      .slice().sort();
+    if (dates.length === 0) {
+      host.innerHTML = '<span class="lmd-edit-exclues-vide">Aucune date exclue.</span>';
+      return;
+    }
+    dates.forEach(function (d) {
+      var chip = document.createElement('span');
+      chip.className = 'lmd-edit-exclue';
+      chip.title = formatDateLong(d);
+      chip.appendChild(document.createTextNode(formatDateLong(d)));
+      var x = document.createElement('button');
+      x.type = 'button';
+      x.textContent = '\u2715';
+      x.title = 'Réinclure cette date';
+      x.addEventListener('click', function () { reinclureDateDemandeur(d); });
+      chip.appendChild(x);
+      host.appendChild(chip);
+    });
+  }
+
+  async function exclureDateDemandeur() {
+    if (!state.editCtx || state.editCtx.src !== 'recurrence') return;
+    var inp = el('lmd-edit-exclure-date');
+    var d = inp ? inp.value : '';
+    if (!d) { showToast('Choisis une date à exclure', false); return; }
+    var btn = el('lmd-edit-exclure-btn');
+    if (btn) btn.disabled = true;
+    var res = await SupabaseHub.exclureOccurrence(state.editCtx.row.id, d);
+    if (btn) btn.disabled = false;
+    if (!res.ok) { showToast('Échec : ' + (res.error || ''), false); return; }
+    if (res.data) state.editCtx.row = res.data;
+    if (inp) inp.value = '';
+    renderEditExcluesDemandeur();
+    showToast('Occurrence exclue — le créneau redevient libre', true);
+    await refreshApresEdition();
+  }
+
+  async function reinclureDateDemandeur(d) {
+    if (!state.editCtx || state.editCtx.src !== 'recurrence') return;
+    var res = await SupabaseHub.reinclureOccurrence(state.editCtx.row.id, d);
+    if (!res.ok) { showToast('Échec : ' + (res.error || ''), false); return; }
+    if (res.data) state.editCtx.row = res.data;
+    renderEditExcluesDemandeur();
+    showToast('Occurrence réincluse', true);
+    await refreshApresEdition();
+  }
+
+  async function rechargerLigneDemandeur(src, id) {
+    var table = (src === 'recurrence')
+      ? 'reservations_recurrentes' : 'reservations_logistiques';
+    var q = await SupabaseHub.client.from(table).select('*').eq('id', id).single();
+    return q.error ? null : q.data;
+  }
+
+  async function ouvrirEditionDemandeur(src, id) {
+    // Bus : le mode ?edit= de bus.html porte déjà toute l'édition ;
+    // retour intelligent vers le guichet (D5).
+    if (src === 'bus') {
+      window.location.href = 'bus.html?edit=' + encodeURIComponent(id) + '&retour=logistique';
+      return;
+    }
+    var row = await rechargerLigneDemandeur(src, id);
+    if (!row) { showToast('Impossible de recharger la demande.', false); return; }
+    if (!estMienne(row)) { showToast('Cette demande ne vous appartient pas.', false); return; }
+    if (row.statut === 'cancelled') {
+      showToast('Demande annulée : non modifiable (re-créer).', false); return;
+    }
+    state.editCtx = { src: src, row: row };
+    var isRecur = (src === 'recurrence');
+    el('lmd-edit-titre').textContent = isRecur
+      ? 'Modifier la règle récurrente' : 'Modifier la réservation';
+
+    var sr = el('lmd-edit-ressource');
+    if (sr) {
+      sr.innerHTML = '';
+      Object.keys(state.refById).forEach(function (rid) {
+        var o = document.createElement('option');
+        o.value = rid; o.textContent = state.refById[rid].libelle;
+        sr.appendChild(o);
+      });
+      sr.value = row.ressource_id || '';
+    }
+    // MULTI : coches depuis categorie_ids, fallback scalaire (T4).
+    state.editCats = (Array.isArray(row.categorie_ids) && row.categorie_ids.length)
+      ? row.categorie_ids.slice()
+      : (row.categorie_id ? [row.categorie_id] : []);
+    renderEditCatsDemandeur();
+    el('lmd-edit-hdebut').value = row.heure_debut ? String(row.heure_debut).slice(0, 5) : '';
+    el('lmd-edit-hfin').value   = row.heure_fin   ? String(row.heure_fin).slice(0, 5)   : '';
+    el('lmd-edit-motif').value  = row.motif || '';
+    el('lmd-edit-f-date').style.display = isRecur ? 'none' : '';
+    el('lmd-edit-recur').style.display  = isRecur ? '' : 'none';
+    if (isRecur) {
+      el('lmd-edit-freq').value = row.freq || 'weekly';
+      state.editJours = (row.jours || []).slice();
+      renderEditJoursDemandeur();
+      el('lmd-edit-debut').value = row.date_debut || '';
+      el('lmd-edit-fin').value   = row.date_fin || '';
+      renderEditExcluesDemandeur();
+      var exd = el('lmd-edit-exclure-date');
+      if (exd) { exd.value = ''; exd.min = row.date_debut || ''; exd.max = row.date_fin || ''; }
+    } else {
+      el('lmd-edit-date').value = row.date || '';
+    }
+    el('lmd-edit-overlay').classList.add('is-open');
+  }
+
+  function fermerEditionDemandeur() {
+    state.editCtx = null;
+    el('lmd-edit-overlay').classList.remove('is-open');
+  }
+
+  async function enregistrerEditionDemandeur() {
+    if (!state.editCtx) return;
+    var btn = el('lmd-edit-enregistrer');
+    var hd = el('lmd-edit-hdebut').value || null;
+    var hf = el('lmd-edit-hfin').value || null;
+    if (!hd || !hf) { showToast('Renseigne le créneau', false); return; }
+    var res;
+    if (btn) btn.disabled = true;
+    if (state.editCtx.src === 'recurrence') {
+      if (state.editJours.length === 0) {
+        showToast('Choisis au moins un jour', false);
+        if (btn) btn.disabled = false; return;
+      }
+      if (!el('lmd-edit-fin').value) {
+        showToast('Renseigne une date de fin', false);
+        if (btn) btn.disabled = false; return;
+      }
+      res = await SupabaseHub.modifierRecurrence(state.editCtx.row.id, {
+        ressource_id: el('lmd-edit-ressource').value,
+        categorie_id: state.editCats[0] || null,
+        categorie_ids: state.editCats.slice(),
+        freq: el('lmd-edit-freq').value || 'weekly',
+        jours: state.editJours.slice(),
+        heure_debut: hd,
+        heure_fin: hf,
+        date_debut: el('lmd-edit-debut').value || null,
+        date_fin: el('lmd-edit-fin').value,
+        motif: el('lmd-edit-motif').value || null
+      });
+    } else {
+      if (!el('lmd-edit-date').value) {
+        showToast('Renseigne une date', false);
+        if (btn) btn.disabled = false; return;
+      }
+      res = await SupabaseHub.modifierReservation(state.editCtx.row.id, {
+        ressource_id: el('lmd-edit-ressource').value,
+        categorie_id: state.editCats[0] || null,
+        categorie_ids: state.editCats.slice(),
+        date: el('lmd-edit-date').value,
+        heure_debut: hd,
+        heure_fin: hf,
+        motif: el('lmd-edit-motif').value || null
+      });
+    }
+    if (btn) btn.disabled = false;
+    if (!res.ok) { showToast('Échec : ' + (res.error || ''), false); return; }
+    showToast('Demande modifiée — repassée en attente de validation', true);
+    fermerEditionDemandeur();
+    await refreshApresEdition();
+  }
+
+  async function annulerDemandeur(src, id) {
+    if (src === 'bus') {
+      // L'annulation d'un bus vit dans bus.html (mode ?edit=), retour guichet.
+      window.location.href = 'bus.html?edit=' + encodeURIComponent(id) + '&retour=logistique';
+      return;
+    }
+    if (!window.confirm('Annuler définitivement cette demande ? Elle disparaîtra des agendas (trace conservée).')) return;
+    var res = (src === 'recurrence')
+      ? await SupabaseHub.annulerRecurrence(id)
+      : await SupabaseHub.annulerReservation(id);
+    if (!res.ok) { showToast('Échec : ' + (res.error || ''), false); return; }
+    showToast('Demande annulée', true);
+    await refreshApresEdition();
+  }
+
+  // Rafraîchit les surfaces après une action demandeur.
+  async function refreshApresEdition() {
+    await refreshMesDemandes();
+    await refreshAgenda();
+    await refreshCalendar();
+  }
+
+  function wireEdition() {
+    var f = el('lmd-edit-fermer');
+    if (f) f.addEventListener('click', fermerEditionDemandeur);
+    var s = el('lmd-edit-enregistrer');
+    if (s) s.addEventListener('click', enregistrerEditionDemandeur);
+    var a = el('lmd-edit-annuler-demande');
+    if (a) a.addEventListener('click', function () {
+      if (!state.editCtx) return;
+      annulerDemandeur(state.editCtx.src, state.editCtx.row.id).then(function () {
+        fermerEditionDemandeur();
+      });
+    });
+    var ex = el('lmd-edit-exclure-btn');
+    if (ex) ex.addEventListener('click', exclureDateDemandeur);
+    var ov = el('lmd-edit-overlay');
+    if (ov) ov.addEventListener('click', function (e) {
+      if (e.target === ov) fermerEditionDemandeur();
+    });
   }
 
   // ============================================================
