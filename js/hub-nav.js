@@ -9,6 +9,15 @@
  * HUB-NAV v1.2 — ajout du thème « pedagogie » (chantier NAV-THEME-PEDAGOGIE,
  * FAIT FOI gelé le 07/07/2026, calé STATE/CARTE pt 159). Seule la table
  * THEMES gagne une entrée ; aucun comportement du module ne change.
+ * HUB-NAV v1.3 — ajout du thème « equipe » (chantier NAV-THEME-MON-EQUIPE,
+ * FAIT FOI gelé le 07/07/2026, calé STATE/CARTE pt 160) + PORTEUR SILENCIEUX :
+ * une page peut porter une barre thématique SANS être une destination du
+ * menu (attribut data-hub-nav-silent). Sur une page silencieuse, la barre
+ * complète du thème est rendue mais AUCUN lien n'est marqué courant (la page
+ * est une PROFONDEUR — éditeur/vue ouvert par deep-link — pas une destination).
+ * Seule extension de comportement depuis v1.0 ; thèmes existants inchangés
+ * (aucun porteur silencieux sur logistique/ecoles/pedagogie → marquage courant
+ * conservé à l'identique).
  *
  * UN SEUL POINT DE VÉRITÉ pour la navigation thématique du Hub.
  * Remplace le patron dupliqué HUB-NAV-LOGISTIQUE v2 (BLOCS A/B/C
@@ -45,7 +54,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.2';
+  var VERSION = '1.3';
 
   /* ------------------------------------------------------------------ *
    * TRONC COMMUN — présent en tête de chaque nav (lexique unifié).
@@ -99,6 +108,24 @@
         { label: 'Bibliothèque', href: 'bibliotheque.html' },
         { label: 'Séance', href: 'seance.html' },
         { label: 'Planification', href: 'planification.html' }
+      ])
+    },
+
+    'equipe': {
+      ariaLabel: 'Navigation mon équipe',
+      carrefour: false,
+      // 4 DESTINATIONS sans jeton (décision J1 gelée pt 160) : la barre
+      // reflète le thème, la garde de PAGE protège. joueurs/evenements
+      // n'ont pas de garde bloquante (consultables anonyme) → la barre s'y
+      // affiche aussi pour un non-connecté. Dette 🟠 ACCES-ANONYME-EQUIPE
+      // ouverte pour le fond (exposition + doctrine nav-anon globale).
+      // Les PROFONDEURS (compositions, pilotage, groupe-base) portent CE
+      // MÊME thème via data-hub-nav-silent — pas de lien propre ici.
+      liens: tronc().concat([
+        { label: 'Effectif', href: 'joueurs.html' },
+        { label: 'Compositions', href: 'mes-compos.html' },
+        { label: 'Évènements', href: 'evenements.html' },
+        { label: 'Statistiques', href: 'pilotage-categorie.html' }
       ])
     },
 
@@ -261,11 +288,19 @@
     return;
   }
 
+  // PORTEUR SILENCIEUX (v1.3) : une PROFONDEUR (éditeur/vue ouvert par
+  // deep-link) porte la barre pour naviguer/retourner, mais n'est PAS une
+  // destination du menu → aucun de ses liens ne doit s'allumer « courant »
+  // (sinon, p. ex., l'éditeur compositions.html allumerait à tort le lien
+  // « Compositions » qui vise mes-compos.html). Le drapeau est déclaratif
+  // sur le porteur : présence de l'attribut = silencieux (valeur ignorée).
+  var silencieux = porteur.hasAttribute('data-hub-nav-silent');
+
   construire(porteur, theme);
   injecterStyles(theme.carrefour);
-  marquerCourante(porteur);
+  if (!silencieux) { marquerCourante(porteur); }
   revelerFiltres(porteur);
 
   // Point de contrôle minimal (version consultable en console).
-  window.HubNav = { version: VERSION, theme: clef };
+  window.HubNav = { version: VERSION, theme: clef, silencieux: silencieux };
 })();
