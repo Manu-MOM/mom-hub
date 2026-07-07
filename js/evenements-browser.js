@@ -1866,22 +1866,25 @@
     if (!window.SupabaseHub || typeof SupabaseHub.getEvenementsAVenir !== 'function') {
       throw new Error('SupabaseHub.getEvenementsAVenir indisponible (v1.10+ requis)');
     }
-    const equipes = CTX_EQUIPES_ACTIVES || []; // plus de repli M14 (décision Manu)
-    const listes = await Promise.all(
-      equipes.map(eqId => SupabaseHub.getEvenementsAVenir(eqId, FENETRE_JOURS_AVENIR))
-    );
-    return _fusionnerEvenements(listes);
+    // EVT-RATTACHEMENT-CATEGORIE : chargement PAR CATÉGORIE active. Capte à
+    // la fois les entraînements/stages (equipe_id null, rattachés catégorie)
+    // ET les compétitions de la catégorie. L'ancien chargement par équipe
+    // ratait les entraînements sans équipe. Pas de catégorie active → liste
+    // vide (empty state honnête, plus de repli M14).
+    const catId = CTX_PERIMETRE && CTX_PERIMETRE.active;
+    if (!catId) return [];
+    const liste = await SupabaseHub.getEvenementsAVenir(null, FENETRE_JOURS_AVENIR, catId);
+    return _fusionnerEvenements([liste]);
   }
 
   async function loadEvenementsPasses() {
     if (!window.SupabaseHub || typeof SupabaseHub.getEvenementsPasses !== 'function') {
       throw new Error('SupabaseHub.getEvenementsPasses indisponible (v1.10+ requis)');
     }
-    const equipes = CTX_EQUIPES_ACTIVES || []; // plus de repli M14 (décision Manu)
-    const listes = await Promise.all(
-      equipes.map(eqId => SupabaseHub.getEvenementsPasses(eqId, FENETRE_JOURS_PASSES, PASSES_LIMIT))
-    );
-    return _fusionnerEvenements(listes);
+    const catId = CTX_PERIMETRE && CTX_PERIMETRE.active;
+    if (!catId) return [];
+    const liste = await SupabaseHub.getEvenementsPasses(null, FENETRE_JOURS_PASSES, PASSES_LIMIT, catId);
+    return _fusionnerEvenements([liste]);
   }
 
   function buildIndexes() {
