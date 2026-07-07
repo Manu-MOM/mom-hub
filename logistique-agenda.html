@@ -68,10 +68,13 @@
     .ag-sw.t-veo                 { background:#c7508a; }
     .ag-ev.t-bus,                 .ag-chip.t-bus                 { background:#eceff2; color:#333e4a; border-left-color:#52616f; }
     .ag-sw.t-bus                 { background:#52616f; }
-    /* Repères informatifs (AGENDA-VACANCES-FERIES) : styles discrets, ne doivent pas écraser les vrais événements */
-    .ag-ev.t-ferie,               .ag-chip.t-ferie               { background:#fdf3f3; color:#8a4a4a; border-left-color:#c98a8a; }
+    /* Repères informatifs (AGENDA-VACANCES-FERIES) : rendus en ÉTIQUETTES
+       (ajustement recette 07/07/2026, harmonisé sur logistique-validation)
+       — fond quasi transparent, liseré pointillé, italique compact.
+       Rendu INTÉRIM en attendant la rangée journée entière (chantier module). */
+    .ag-ev.t-ferie,               .ag-chip.t-ferie               { background:rgba(201,138,138,.08); color:#8a4a4a; border:1px dashed #c98a8a; font-size:10px; font-style:italic; line-height:1.2; padding:1px 6px; }
     .ag-sw.t-ferie               { background:#c98a8a; }
-    .ag-ev.t-vacances,            .ag-chip.t-vacances            { background:#f5f3ee; color:#7a746a; border-left-color:#c9c2b2; }
+    .ag-ev.t-vacances,            .ag-chip.t-vacances            { background:rgba(201,194,178,.12); color:#7a746a; border:1px dashed #c9c2b2; font-size:10px; font-style:italic; line-height:1.2; padding:1px 6px; }
     .ag-sw.t-vacances            { background:#c9c2b2; }
 
     /* ----------------------------------------------------------
