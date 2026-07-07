@@ -235,6 +235,126 @@
       .logi-cols { grid-template-columns: 1fr; }
       .logi-cal { position: static; }
     }
+
+    /* ==============================================================
+       SURFACE-DEMANDEUR — bloc « Mes demandes » + modale d'édition.
+       « Mes » = responsable_personne_id = qui_suis_je() (garde S2 des
+       RPC modifier_*/annuler_* : propriété portée par le SCALAIRE, le
+       responsable officiel/1er). Cohérence droit/visibilité stricte :
+       la liste ne montre QUE les demandes que la garde autorise à agir.
+       ============================================================== */
+    .lmd-card {
+      background: #fff; border: 1px solid var(--line); border-radius: 10px;
+      padding: 14px; margin-bottom: 12px;
+    }
+    .lmd-src {
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-mute);
+      margin-bottom: 4px;
+    }
+    .lmd-line1 { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+    .lmd-date { font-weight: 600; color: var(--ink); font-size: 14px; }
+    .lmd-creneau {
+      font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink-soft);
+    }
+    .lmd-motif { font-size: 13px; color: var(--ink-soft); margin-top: 2px; }
+    .lmd-badge {
+      font-family: 'Oswald', sans-serif; font-size: 10px; font-weight: 600;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line);
+    }
+    .lmd-badge--pending  { background: #fdf6e3; color: #8a6d1a; border-color: #e5d29a; }
+    .lmd-badge--approved { background: #e7f3ea; color: #1d5c33; border-color: #a9d3b8; }
+    .lmd-badge--rejected { background: #faeaea; color: #8a2b2b; border-color: #e0b0b0; }
+    .lmd-refus {
+      margin-top: 6px; padding: 6px 10px; border-left: 3px solid var(--rouge-alerte, #b23);
+      background: #fbf1f1; color: #7a2b2b; font-size: 12.5px; border-radius: 0 6px 6px 0;
+    }
+    .lmd-refus b { font-weight: 600; }
+    .lmd-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+    .lmd-btn {
+      font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 500;
+      border-radius: 6px; padding: 6px 12px; cursor: pointer;
+      border: 1px solid var(--line); background: #fff; color: var(--ink);
+    }
+    .lmd-btn:hover { border-color: var(--vert-prairie); }
+    .lmd-btn:disabled { opacity: 0.5; cursor: default; }
+    .lmd-empty {
+      text-align: center; padding: 20px 16px; color: var(--ink-mute);
+      font-size: 13px; background: #fff; border: 1px dashed var(--line); border-radius: 10px;
+    }
+
+    /* Modale d'édition demandeur — réplique fidèle de la modale du poste
+       (lgv-edit-*, logistique-validation.html), scopée lmd-edit-* pour
+       autonomie du guichet. Duplication assumée et tracée (D3=(i)) : le
+       demandeur exerce sur SES demandes exactement les mêmes leviers que
+       le bureau (édition ponctuelle/règle + occurrences exclues,
+       droit propriétaire pt 153 E2=B1). */
+    .lmd-edit-overlay {
+      position: fixed; inset: 0; background: rgba(20, 24, 28, 0.45);
+      display: none; align-items: center; justify-content: center;
+      z-index: 80; padding: 16px;
+    }
+    .lmd-edit-overlay.is-open { display: flex; }
+    .lmd-edit-modal {
+      background: #fff; border-radius: 12px; max-width: 480px; width: 100%;
+      max-height: 90vh; overflow: auto; padding: 20px;
+    }
+    .lmd-edit-modal h3 { margin: 0 0 14px; font-family: 'Oswald', sans-serif; }
+    .lmd-edit-avert {
+      margin: 0 0 14px; padding: 8px 10px; font-size: 12.5px; border-radius: 6px;
+      background: #fdf6e3; color: #7a5f14; border: 1px solid #e5d29a;
+    }
+    .lmd-edit-field { margin-bottom: 12px; }
+    .lmd-edit-field label {
+      display: block; font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-mute);
+      margin-bottom: 4px;
+    }
+    .lmd-edit-field input, .lmd-edit-field select {
+      width: 100%; box-sizing: border-box; padding: 8px 10px;
+      border: 1px solid var(--line); border-radius: 6px;
+      font-size: 14px; font-family: inherit; background: #fff;
+    }
+    .lmd-edit-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .lmd-edit-days { display: flex; gap: 6px; flex-wrap: wrap; }
+    .lmd-edit-day {
+      font-family: 'Oswald', sans-serif; font-size: 12px; padding: 6px 10px;
+      border: 1px solid var(--line); border-radius: 6px; background: #fff; cursor: pointer;
+    }
+    .lmd-edit-day.is-on {
+      background: var(--vert-prairie); color: #fff; border-color: var(--vert-prairie);
+    }
+    .lmd-edit-exclues { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+    .lmd-edit-exclues-vide { font-size: 12px; color: #888; }
+    .lmd-edit-exclue {
+      font-size: 12px; padding: 4px 8px; border: 1px solid var(--line);
+      border-radius: 6px; background: #f6f6f6; display: inline-flex;
+      align-items: center; gap: 6px;
+    }
+    .lmd-edit-exclue button {
+      border: none; background: none; cursor: pointer; padding: 0;
+      line-height: 1; font-weight: bold; color: var(--rouge-alerte, #b23);
+    }
+    .lmd-edit-exclure-row { display: flex; gap: 8px; align-items: center; }
+    .lmd-edit-exclure-row input { flex: 1; }
+    .lmd-edit-actions {
+      display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; flex-wrap: wrap;
+    }
+    .lmd-btn-ok, .lmd-btn-toggle {
+      font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 500;
+      border-radius: 6px; padding: 7px 14px; cursor: pointer; border: 1px solid var(--line);
+    }
+    .lmd-btn-ok { background: var(--vert-prairie); color: #fff; border-color: var(--vert-prairie); }
+    .lmd-btn-toggle { background: #fff; color: var(--ink-soft); }
+    .lmd-btn-ok:disabled, .lmd-btn-toggle:disabled { opacity: 0.5; cursor: default; }
+    .lmd-btn-annule {
+      background: #fff; color: var(--rouge-alerte, #b23);
+      font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 500;
+      border: 1px solid var(--line); border-radius: 6px; padding: 7px 14px;
+      cursor: pointer; margin-right: auto;
+    }
+    .lmd-btn-annule:disabled { opacity: 0.5; cursor: default; }
   </style>
 </head>
 <body class="auth-pending">
@@ -383,6 +503,16 @@
       <div id="logi-agenda"><div class="logi-empty">Chargement…</div></div>
     </section>
 
+    <!-- MES DEMANDES (SURFACE-DEMANDEUR) : le demandeur retrouve, là où il
+         dépose, l'ensemble de SES demandes (logistique + règles + bus) avec
+         leur statut et, enfin, le motif d'un refus. « Mes » = les demandes
+         dont il est le responsable officiel (garde S2). Modifier / Annuler
+         y sont offerts (droits existants, surface neuve). -->
+    <section class="logi-section" id="logi-mes-demandes-section">
+      <h3 class="logi-section__title">Mes demandes</h3>
+      <div id="logi-mes-demandes"><div class="lmd-empty">Chargement…</div></div>
+    </section>
+
     <!-- REFONTE-PARCOURS-LOGISTIQUE (FAIT FOI 777551e9…, arbitrage 5.5) :
          les sections « Validation » et « Règles récurrentes » (bureau|admin)
          ont DÉMÉNAGÉ au poste de validation tri-source
@@ -418,6 +548,85 @@
   </main>
 
   <div id="logi-toast" class="logi-toast"></div>
+
+  <!-- MODALE D'ÉDITION DEMANDEUR (SURFACE-DEMANDEUR D3=(i)) : réplique
+       fidèle de la modale du poste (lgv-edit-*), scopée lmd-edit-*.
+       L'avertissement D6 rappelle que toute modification repasse la
+       demande en attente de validation (garde S2 : statut → 'pending',
+       purge de l'approbation). Les occurrences exclues (règles) sont
+       incluses (droit propriétaire pt 153 E2=B1). -->
+  <div id="lmd-edit-overlay" class="lmd-edit-overlay">
+    <div class="lmd-edit-modal">
+      <h3 id="lmd-edit-titre">Modifier la demande</h3>
+      <p class="lmd-edit-avert">
+        Toute modification renvoie la demande en attente de validation :
+        vous perdez l'approbation en cours, le bureau devra la revalider.
+      </p>
+      <div class="lmd-edit-field">
+        <label for="lmd-edit-ressource">Ressource</label>
+        <select id="lmd-edit-ressource"></select>
+      </div>
+      <div class="lmd-edit-field">
+        <label>Catégorie(s)</label>
+        <div id="lmd-edit-categorie" class="lmd-edit-days"></div>
+      </div>
+      <div class="lmd-edit-field" id="lmd-edit-f-date">
+        <label for="lmd-edit-date">Date</label>
+        <input type="date" id="lmd-edit-date" />
+      </div>
+      <div id="lmd-edit-recur" style="display:none;">
+        <div class="lmd-edit-field">
+          <label for="lmd-edit-freq">Fréquence</label>
+          <select id="lmd-edit-freq">
+            <option value="weekly">Hebdomadaire</option>
+            <option value="biweekly">Une semaine sur deux</option>
+            <option value="monthly">Mensuelle</option>
+          </select>
+        </div>
+        <div class="lmd-edit-field">
+          <label>Jours</label>
+          <div id="lmd-edit-jours" class="lmd-edit-days"></div>
+        </div>
+        <div class="lmd-edit-2col">
+          <div class="lmd-edit-field">
+            <label for="lmd-edit-debut">À partir du</label>
+            <input type="date" id="lmd-edit-debut" />
+          </div>
+          <div class="lmd-edit-field">
+            <label for="lmd-edit-fin">Jusqu'au</label>
+            <input type="date" id="lmd-edit-fin" />
+          </div>
+        </div>
+        <div class="lmd-edit-field">
+          <label>Occurrences exclues</label>
+          <div id="lmd-edit-exclues" class="lmd-edit-exclues"></div>
+          <div class="lmd-edit-exclure-row">
+            <input type="date" id="lmd-edit-exclure-date" />
+            <button type="button" id="lmd-edit-exclure-btn" class="lmd-btn-toggle">Exclure cette date</button>
+          </div>
+        </div>
+      </div>
+      <div class="lmd-edit-2col">
+        <div class="lmd-edit-field">
+          <label for="lmd-edit-hdebut">Heure début</label>
+          <input type="time" id="lmd-edit-hdebut" />
+        </div>
+        <div class="lmd-edit-field">
+          <label for="lmd-edit-hfin">Heure fin</label>
+          <input type="time" id="lmd-edit-hfin" />
+        </div>
+      </div>
+      <div class="lmd-edit-field">
+        <label for="lmd-edit-motif">Motif</label>
+        <input type="text" id="lmd-edit-motif" />
+      </div>
+      <div class="lmd-edit-actions">
+        <button type="button" id="lmd-edit-annuler-demande" class="lmd-btn-annule">Annuler la demande</button>
+        <button type="button" id="lmd-edit-fermer" class="lmd-btn-toggle">Fermer</button>
+        <button type="button" id="lmd-edit-enregistrer" class="lmd-btn-ok">Enregistrer</button>
+      </div>
+    </div>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="js/supabase-client.js"></script>
