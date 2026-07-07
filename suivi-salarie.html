@@ -131,9 +131,6 @@
       la mesure terrain le justifie. Aujourd'hui : boucle list_mission_seances par mission (voie α).
 -->
 <link rel="stylesheet" href="css/hub.css">
-<!-- AGENDA-HUB-PATRON (pt 147) : CSS structurel du patron agenda, extrait de cette page.
-     Chargé AVANT le <style> inline (la palette .t-* de la page reste ici, FAIT FOI G3). -->
-<link rel="stylesheet" href="css/hub-agenda.css">
 <style>
   body.auth-pending { visibility: hidden; }
   .ss-wrap { max-width: 980px; margin: 0 auto; padding: 24px 24px 48px; }
@@ -340,31 +337,6 @@
   .ss-ponct-banner.on { display: block; }
 
   .ss-wrap svg, .ss-typehead svg { max-width: 22px; max-height: 22px; }
-  /* ===== SUIVI-AGENDA-TOUS-TYPES — PALETTE par type (métier, reste en page) =====
-     AGENDA-HUB-PATRON (pt 147) : le CSS STRUCTUREL ag-* a été extrait vers
-     css/hub-agenda.css (module partagé, correctifs recette 04/07 inclus).
-     Cette palette suit la convention du module : .ag-ev.t-X / .ag-chip.t-X /
-     .ag-sw.t-X — chaque page consommatrice fournit la sienne (FAIT FOI G3). */
-  .ag-ev.t-intervention_scolaire, .ag-chip.t-intervention_scolaire { background: #eaf1fa; color: #1f4a6b; border-left-color: #2f6fb0; }
-  .ag-sw.t-intervention_scolaire { background: #2f6fb0; }
-  .ag-ev.t-entrainement_section, .ag-chip.t-entrainement_section { background: #e7f3ec; color: #1f5a32; border-left-color: #2d7a3e; }
-  .ag-sw.t-entrainement_section { background: #2d7a3e; }
-  .ag-ev.t-entrainement_sr_m, .ag-chip.t-entrainement_sr_m { background: #e0f0f0; color: #125454; border-left-color: #1f8a8a; }
-  .ag-sw.t-entrainement_sr_m { background: #1f8a8a; }
-  .ag-ev.t-autre_entrainement_mom, .ag-chip.t-autre_entrainement_mom { background: #eef3df; color: #455f16; border-left-color: #6b8e23; }
-  .ag-sw.t-autre_entrainement_mom { background: #6b8e23; }
-  .ag-ev.t-reunion, .ag-chip.t-reunion { background: #efe8f8; color: #4a2d7a; border-left-color: #7a4fbf; }
-  .ag-sw.t-reunion { background: #7a4fbf; }
-  .ag-ev.t-suivi_competition, .ag-chip.t-suivi_competition { background: #fbf1dd; color: #83590c; border-left-color: #c08a1e; }
-  .ag-sw.t-suivi_competition { background: #c08a1e; }
-  .ag-ev.t-accompagnement_terrain, .ag-chip.t-accompagnement_terrain { background: #fbe7db; color: #8a4116; border-left-color: #cc6a2b; }
-  .ag-sw.t-accompagnement_terrain { background: #cc6a2b; }
-  .ag-ev.t-travail_personnel, .ag-chip.t-travail_personnel { background: #eaeef2; color: #333f4b; border-left-color: #556677; }
-  .ag-sw.t-travail_personnel { background: #556677; }
-  .ag-ev.t-stage, .ag-chip.t-stage { background: #f8e2ec; color: #7a2549; border-left-color: #b03a6e; }
-  .ag-sw.t-stage { background: #b03a6e; }
-  .ag-ev.t-divers, .ag-chip.t-divers { background: #eef0ef; color: #42504a; border-left-color: #6b7a74; }
-  .ag-sw.t-divers { background: #6b7a74; }
   }
 </style>
 </head>
@@ -469,12 +441,6 @@
       </div>
     </div>
   </section>
-  <!-- ============ AGENDA TOUS TYPES (SUIVI-AGENDA-TOUS-TYPES) ============
-       Toujours visible sous la grille des vignettes, au-dessus du compteur (Q2 :
-       pas d'onglet, pas d'etat de navigation). AGENDA-HUB-PATRON (pt 147) : le
-       squelette est désormais GÉNÉRÉ par js/hub-agenda.js dans ce container
-       (HubAgenda.create y ajoute la classe ag-root — DOM final inchangé). -->
-  <section id="agRoot"></section>
 
   <!-- ============ COMPTEUR (salarié) ============ -->
   <section class="ss-compteur" id="ssCompteur" hidden>
@@ -854,16 +820,8 @@
       <button class="ss-btn ss-btn-ghost" id="ssMisCancel" type="button">Annuler</button>
       <button class="ss-btn" id="ssMisSave" type="button">Enregistrer</button>
     </div>
-<!-- ============ MODALE DÉTAIL SÉANCE (agenda) ============
-     AGENDA-HUB-PATRON (pt 147) : générée par js/hub-agenda.js (classes ag-overlay/
-     ag-modal, z-index 60 conservé au-dessus du plein écran) ; contenu et action
-     « Modifier » (garde peutEcrire + verrou A2, flux pt 141) injectés par
-     l'adaptateur de cette page — voir section JS SUIVI-AGENDA-TOUS-TYPES. -->
-
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="js/supabase-client.js"></script>
-<!-- AGENDA-HUB-PATRON (pt 147) : module partagé du patron agenda (HubAgenda). -->
-<script src="js/hub-agenda.js"></script>
 <script src="js/season-pill.js"></script>
 <!-- EXPORT-BILAN-HEURES (pt 124+) : SheetJS pour generer le .xlsx du bilan d'heures cote navigateur. -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -1708,107 +1666,6 @@
     }
   }
 
-  // ============================================================
-  // ============================================================
-  // SUIVI-AGENDA-TOUS-TYPES — branché sur le MODULE PARTAGÉ js/hub-agenda.js
-  // (AGENDA-HUB-PATRON, pt 147). Le patron (grille horaire, mini-mois, plein
-  // écran, légende, modale de détail, repli mobile) vit dans HubAgenda ; cette
-  // page ne fournit que l'ADAPTATEUR :
-  //   - fetchWindow : UN appel agenda_seances_salarie par fenetre affichee
-  //     (union [semaine ∪ grille mini-mois]) via rpc(), mapping out_* -> item ;
-  //   - la palette .t-* (CSS de page) et l'ordre de légende (TYPES + DIVERS) ;
-  //   - la garde peutEcrire + verrou A2 et le CHEMIN D'ÉDITION pt 141 inchangé :
-  //     recharge la ligne COMPLETE via list_mission_seances(out_mission_id),
-  //     retrouve la seance par out_seance_id, puis ouvre la modale ssEditOverlay
-  //     EXISTANTE par son flux normal. L'agenda ne fabrique JAMAIS l'objet
-  //     d'edition depuis sa projection.
-  // ============================================================
-  var agenda = null;   // instance HubAgenda (créée au câblage, init au boot)
-
-  function agTypeLib(code) { var t = TYPE_BY_CODE[code]; return t ? t.lib : (code || '—'); }
-
-  // Mapping RPC -> modèle d'item neutre du module (meta = ligne brute, source
-  // de vérité pour le détail et l'édition).
-  function agMapRow(o) {
-    return {
-      id: o.out_seance_id,
-      date: String(o.out_date_seance).slice(0, 10),
-      heure: o.out_heure_debut ? String(o.out_heure_debut).slice(0, 5) : null,
-      duree_min: o.out_duree_min,
-      type: o.out_type_mission,
-      libelle: o.out_libelle || o.out_mission_libelle || null,
-      etat: o.out_etat,
-      meta: o
-    };
-  }
-
-  // Lignes de la modale de détail (Q4) — contenu identique à l'avant-factorisation.
-  function agDetailRows(it) {
-    var o = it.meta;
-    var d = parseDate(it.date);
-    var when = JOURS[(d.getDay() + 6) % 7] + ' ' + d.getDate() + ' ' + MOIS[d.getMonth()]
-      + (it.heure ? ' · ' + it.heure : '')
-      + (it.duree_min != null ? ' · ' + HubAgenda.dureeLabel(it.duree_min) : '');
-    return [
-      { lbl: 'Type — mission', val: agTypeLib(it.type) + (o.out_mission_libelle ? ' — ' + o.out_mission_libelle : '') },
-      { lbl: 'Date · horaire · durée', val: when },
-      { lbl: 'Lieu', val: o.out_lieu || '—' },
-      { lbl: 'État', val: ETAT_LABEL[it.etat] || it.etat }
-    ];
-  }
-
-  // Bouton « Modifier » : admin|bureau seulement (peutEcrire) ; A2 : desactive si
-  // validee/annulee. Voie 3 (salarie) : aucun bouton (consultation seule).
-  function agAction(it) {
-    if (!peutEcrire) return null;
-    var editable = (it.etat === 'prevue' || it.etat === 'realisee');
-    return {
-      label: 'Modifier',
-      disabled: !editable,
-      title: editable ? 'Éditer la séance'
-        : (it.etat === 'validee' ? 'Dévalider d’abord pour éditer' : 'Réactiver d’abord pour éditer'),
-      onClick: agModifier
-    };
-  }
-
-  // Chemin d'edition (critique, FAIT FOI pt 145 §4) : flux pt 141 INCHANGÉ.
-  async function agModifier(it, closeDetail) {
-    if (!it || !peutEcrire) return;
-    if (it.etat === 'validee' || it.etat === 'annulee') return; // A2 (bouton deja desactive)
-    var o = it.meta;
-    try {
-      var full = (await rpc('list_mission_seances', { p_mission_id: o.out_mission_id })) || [];
-      var ligne = full.filter(function (r) { return r.id === o.out_seance_id; })[0];
-      if (!ligne) { flash('Séance introuvable au rechargement.', 'err'); return; }
-      ligne._mission = missions.filter(function (m) { return m.id === ligne.mission_id; })[0]
-        || { id: ligne.mission_id, libelle: o.out_mission_libelle };
-      closeDetail();
-      openEditSeance(ligne);   // flux existant ; refreshAll (donc re-rendu agenda) au save
-    } catch (e) {
-      flash('Ouverture de l’édition impossible : ' + errMsg(e), 'err');
-    }
-  }
-
-  function agCreate() {
-    agenda = HubAgenda.create($('agRoot'), {
-      titre: 'Agenda — toutes les séances',
-      libelleVide: 'Aucune séance cette semaine.',
-      fetchWindow: async function (debutISO, finISO) {
-        var data = await rpc('agenda_seances_salarie', {
-          p_salarie_id: salarieId,
-          p_date_debut: debutISO,
-          p_date_fin: finISO
-        });
-        return (data || []).map(agMapRow);
-      },
-      types: TYPES.concat([TYPE_DIVERS]).map(function (t) { return { code: t.code, lib: t.lib }; }),
-      detail: { titre: function (it) { return it.libelle || agTypeLib(it.type); }, rows: agDetailRows, action: agAction },
-      capacites: { pleinEcran: true, caseAnnulees: true },
-      estAnnulee: function (it) { return it.etat === 'annulee'; },
-      etatMark: function (it) { return it.etat === 'validee' ? '✓✓' : (it.etat === 'realisee' ? '✓' : ''); },
-      onError: function (e) { flash('Agenda : ' + errMsg(e), 'err'); }
-    });
-  }
   async function refreshAll() {
     // SUIVI-SEANCES-ETAT-AFFICHAGE (D2) : le vidage de #ssList raccourcit le
     // document -> le navigateur clampe le scroll en tête de liste. On capture la
@@ -1820,7 +1677,6 @@
     await chargerOccurrences();
     renderGrid();
     if (currentType) { if (currentView === 'liste') renderListe(); else renderAgenda(); }
-    if (agenda) { try { await agenda.refresh(); } catch (e) { /* agenda best-effort ; no-op tant que init() n'a pas tourné */ } }
     window.scrollTo(0, scrollAvant);
   }
 
@@ -2766,8 +2622,6 @@
     $('ssMisSeancesMode').addEventListener('change', applySeancesModeUI);
     $('ssEntCancel').addEventListener('click', function () { $('ssEntCreate').classList.remove('open'); });
     $('ssEntSave').addEventListener('click', saveEntiteInline);
-    // SUIVI-AGENDA-TOUS-TYPES : creation de l'instance agenda (module partage).
-    agCreate();
     // Signout
     const so = $('btn-signout');
     if (so) so.addEventListener('click', async function () { try { await SupabaseHub.signOut(); } catch (e) {} window.location.replace('login.html'); });
@@ -2810,8 +2664,6 @@
     await chargerMissions();
     await chargerOccurrences();
     renderGrid();
-    // SUIVI-AGENDA-TOUS-TYPES : initialisation + 1er fetch de l'agenda global.
-    try { await agenda.init(); } catch (e) { flash('Agenda : ' + errMsg(e), 'err'); }
     await loadCompteur();
   } catch (e) {
     flash('Chargement impossible : ' + errMsg(e), 'err');
