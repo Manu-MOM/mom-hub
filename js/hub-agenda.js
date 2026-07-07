@@ -1,8 +1,24 @@
 /* ============================================================================
-   HUB-AGENDA v1.0 — module partagé du patron agenda (AGENDA-HUB-PATRON, pt 147)
+   HUB-AGENDA v1.1 — module partagé du patron agenda (AGENDA-HUB-PATRON, pt 147)
    ----------------------------------------------------------------------------
    Grille horaire hebdomadaire + mini-mois navigateur + plein écran + légende
    + modale de détail + repli mobile en liste empilée.
+
+   CHANGELOG
+   - v1.1 (07/07/2026, AGENDA-MODULE-V1.1) — DEUX options additives de config,
+     défaut BYTE-IDENTIQUE à v1.0 (sans elles, aucun changement pour personne) :
+       • plageFixe : [hMin, hMax] — borne la grille horaire à un MINIMUM garanti,
+         étendu automatiquement si une séance déborde (jamais d'événement caché).
+         Absente/nulle -> plage dynamique v1.0 (min-1 -> max+1, repli 08-19).
+       • untimedEnRangee : bool — rend les séances sans heure dans une RANGÉE
+         « journée entière » (soeur de .ag-daycol, entre l'en-tête des jours et la
+         grille horaire), hors de l'axe des heures. false/absente -> bandeau en
+         tête de colonne v1.0 (.ag-untimed). La rangée est SOEUR des colonnes :
+         l'origine de mapping du clic-créneau des pages (rect.top de .ag-daycol,
+         minH, AG_PXMIN) est INCHANGÉE — aucune adaptation de page requise.
+     Les deux options ne concernent QUE la vue semaine (liste mobile et mini-mois
+     inchangés). CSS structurel de la rangée : classes .ag-allday* additives.
+   - v1.0 (pt 147) — extraction sans changement de comportement (voir ci-dessous).
 
    ORIGINE : extraction SANS changement de comportement du bloc ag* de
    suivi-salarie.html (SUIVI-AGENDA-TOUS-TYPES, FAIT FOI pt 145 §4 + ADDENDUM 1,
@@ -35,6 +51,12 @@
                                               onClick(item, closeDetail) }
        },
        capacites    : { pleinEcran: bool, caseAnnulees: bool },
+       plageFixe    : [hMin, hMax] | null  — v1.1 : borne MINIMALE de la grille
+                                             horaire, étendue si débordement.
+                                             null/absente -> plage dynamique v1.0,
+       untimedEnRangee : bool  — v1.1 : séances sans heure en rangée « journée
+                                 entière » (soeur des colonnes). false/absente
+                                 -> bandeau en tête de colonne v1.0,
        estAnnulee   : function (item) -> bool   (défaut : etat === 'annulee'),
        etatMark     : function (item) -> str    (défaut : ''),
        onError      : function (error)          (défaut : silencieux)
@@ -133,8 +155,13 @@
       main.appendChild(weeknav);
       var week = el('div', 'ag-week');
       els.weekHd = el('div', 'ag-weekhd');
+      // v1.1 — rangée « journée entière » : SOEUR de la grille, entre l'en-tête
+      // des jours et le corps horaire. Toujours dans le DOM ; peuplée seulement
+      // si cfg.untimedEnRangee (sinon les untimed restent en tête de colonne et
+      // la rangée reste vide/masquée par .ag-allday:empty en CSS).
+      els.allday = el('div', 'ag-allday');
       els.weekBody = el('div', 'ag-weekbody');
-      week.appendChild(els.weekHd); week.appendChild(els.weekBody);
+      week.appendChild(els.weekHd); week.appendChild(els.allday); week.appendChild(els.weekBody);
       main.appendChild(week);
       els.list = el('div', 'ag-list');
       main.appendChild(els.list);
@@ -244,6 +271,16 @@
         });
       });
       if (!has) { minH = 8; maxH = 19; } else { minH = Math.max(0, minH - 1); maxH = Math.min(24, maxH + 1); }
+      // v1.1 — plage fixe (P4a) : MINIMUM garanti. La borne fixe élargit la
+      // plage si besoin ; une séance hors bornes l'étend quand même (jamais
+      // masquée). Sans config.plageFixe : bloc sans effet, comportement v1.0.
+      var pf = cfg.plageFixe;
+      if (pf && pf.length === 2) {
+        var pfMin = pf[0], pfMax = pf[1];
+        if (!has) { minH = pfMin; maxH = pfMax; }        // semaine vide -> plage fixe pleine
+        else { minH = Math.min(minH, pfMin); maxH = Math.max(maxH, pfMax); }
+        minH = Math.max(0, minH); maxH = Math.min(24, maxH);
+      }
       var rangeMin = (maxH - minH) * 60;
       var bodyH = rangeMin * AG_PXMIN;
       var todayIso = isoDate(new Date());
@@ -257,6 +294,25 @@
         c.textContent = JOURS[idx] + ' ' + dd.d.getDate();
         hd.appendChild(c);
       });
+
+      // v1.1 — Rangée « journée entière » (soeur, hors axe des heures). Peuplée
+      // seulement si cfg.untimedEnRangee ; sinon vidée (untimed en colonne).
+      // Gabarit identique à l'en-tête : cellule d'axe vide + 7 cellules-jour,
+      // puces empilables (>= 2/jour : férié + vacances possible).
+      if (els.allday) {
+        els.allday.innerHTML = '';
+        if (cfg.untimedEnRangee) {
+          var adAxis = document.createElement('div');
+          adAxis.className = 'ag-hcell ag-axis ag-allday-axis'; adAxis.textContent = '';
+          els.allday.appendChild(adAxis);
+          days.forEach(function (dd) {
+            var cell = document.createElement('div');
+            cell.className = 'ag-allday-cell';
+            dd.untimed.forEach(function (it) { cell.appendChild(buildEvent(it, false)); });
+            els.allday.appendChild(cell);
+          });
+        }
+      }
 
       // Corps : colonne d'axe (labels heures) + 7 colonnes-jour.
       var axis = document.createElement('div');
@@ -280,8 +336,9 @@
           line.style.top = ((h2 - minH) * 60 * AG_PXMIN) + 'px';
           col.appendChild(line);
         }
-        // Seances sans heure : bandeau en tete de colonne.
-        if (dd.untimed.length) {
+        // Seances sans heure : bandeau en tete de colonne (v1.0). Suspendu si
+        // cfg.untimedEnRangee : elles sont alors rendues dans la rangée soeur.
+        if (dd.untimed.length && !cfg.untimedEnRangee) {
           var ut = document.createElement('div');
           ut.className = 'ag-untimed';
           dd.untimed.forEach(function (it) { ut.appendChild(buildEvent(it, false)); });
@@ -542,7 +599,7 @@
   }
 
   window.HubAgenda = {
-    version: '1.0',
+    version: '1.1',
     create: create,
     dureeLabel: dureeLabel
   };
