@@ -41,8 +41,22 @@ Le Hub n'aura accès aux données nominatives que dans une **phase ultérieure**
 architecture qui préservera leur confidentialité (authentification, repo privé, ou backend
 séparé — décision à prendre Phase 3+).
 
+## 🗓️ Données saisonnières (hors miroir Drive)
+
+Par exception à la doctrine du miroir, ce dossier héberge aussi des **fichiers
+saisonniers** produits directement pour le Hub (pas de source Drive) :
+
+| Fichier | Contenu | Geste de rentrée |
+|---|---|---|
+| `vacances-feries-<saison>.json` | Fériés Alsace-Moselle + vacances scolaires zone B (académie de Strasbourg) de la saison, repères informatifs des agendas logistiques | Chaque été, générer le fichier de la saison suivante (fériés : calendrier.api.gouv.fr jeu alsace-moselle ; vacances : arrêté JORF via Service-Public), le commiter sous son nom millésimé — item de la checklist de bascule de saison |
+
+Convention interne : dates ISO, fin de période INCLUSIVE — documentée dans le champ
+`convention` du fichier lui-même. Les pages consommatrices sont fail-soft : fichier
+absent ou invalide → agendas fonctionnels sans les repères.
+
 ## 📅 Dernière synchronisation
 
 À mettre à jour à chaque commit qui touche ce dossier :
 
 - **2026-05-XX** — Première mise en place du miroir (référentiels v1.0/v1.1)
+- **2026-07-07** — Ajout `vacances-feries-2026-2027.json` (chantier AGENDA-VACANCES-FERIES)
