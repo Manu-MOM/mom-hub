@@ -47,6 +47,15 @@
  * INTERDIT depuis v1.6, hors chantier de généralisation. Seule la table THEMES
  * gagne une entrée ; aucun comportement du module ne change. Le module reste
  * INTERDIT.
+ * HUB-NAV v1.8 — ajout de la destination « Agenda des évènements »
+ * (equipe-agenda.html) au thème « equipe », en DERNIÈRE position (après
+ * « Statistiques ») — chantier AGENDA-EVENEMENTS (vue calendaire des évènements
+ * par catégorie, patron hub-agenda v1.1). Posée SANS jeton comme les 4 autres
+ * destinations du thème (décision J1 : la barre reflète le thème, la garde de
+ * PAGE / le périmètre catégorie protègent le contenu). ÉCART DE GOUVERNANCE
+ * ACTÉ par Manu : modification d'un module INTERDIT hors chantier de
+ * généralisation (précédent v1.7). Seule la table THEMES gagne une entrée ;
+ * aucun comportement du module ne change. Le module reste INTERDIT.
  *
  * ►► CLÔTURE DE LA GÉNÉRALISATION (G2, pt 163) : tous les thèmes sont
  * désormais migrés. À compter de v1.6, js/hub-nav.js devient INTERDIT
@@ -87,7 +96,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.7';
+  var VERSION = '1.8';
 
   /* ------------------------------------------------------------------ *
    * TRONC COMMUN — présent en tête de chaque nav (lexique unifié).
@@ -147,18 +156,21 @@
     'equipe': {
       ariaLabel: 'Navigation mon équipe',
       carrefour: false,
-      // 4 DESTINATIONS sans jeton (décision J1 gelée pt 160) : la barre
+      // 5 DESTINATIONS sans jeton (décision J1 gelée pt 160) : la barre
       // reflète le thème, la garde de PAGE protège. joueurs/evenements
       // n'ont pas de garde bloquante (consultables anonyme) → la barre s'y
       // affiche aussi pour un non-connecté. Dette 🟠 ACCES-ANONYME-EQUIPE
       // ouverte pour le fond (exposition + doctrine nav-anon globale).
       // Les PROFONDEURS (compositions, pilotage, groupe-base) portent CE
       // MÊME thème via data-hub-nav-silent — pas de lien propre ici.
+      // « Agenda des évènements » (v1.8, chantier AGENDA-EVENEMENTS) : vue
+      // calendaire par catégorie ; contenu protégé par le périmètre catégorie.
       liens: tronc().concat([
         { label: 'Effectif', href: 'joueurs.html' },
         { label: 'Compositions', href: 'mes-compos.html' },
         { label: 'Évènements', href: 'evenements.html' },
-        { label: 'Statistiques', href: 'pilotage-categorie.html' }
+        { label: 'Statistiques', href: 'pilotage-categorie.html' },
+        { label: 'Agenda des évènements', href: 'equipe-agenda.html' }
       ])
     },
 
