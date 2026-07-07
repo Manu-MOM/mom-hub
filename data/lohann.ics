@@ -145,30 +145,30 @@ STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
 UID:3af7a300-3b18-4267-a1cf-b6dea2c6b65a@mom-hub
-DTSTAMP:20260703T080444Z
-DTSTART;TZID=Europe/Paris:20260908T084500
-DTEND;TZID=Europe/Paris:20260908T094500
-SUMMARY:Ecole Schickelé MUTZIG - classe A
+DTSTAMP:20260706T151342Z
+DTSTART;TZID=Europe/Paris:20260908T081500
+DTEND;TZID=Europe/Paris:20260908T091500
+SUMMARY:Ecole GRIESHEIM - classe A - CP/CE1
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
 UID:01c68b14-13b5-47b0-bfaf-c3a15ae80ceb@mom-hub
-DTSTAMP:20260703T123447Z
-DTSTART;TZID=Europe/Paris:20260908T094500
-DTEND;TZID=Europe/Paris:20260908T104500
-SUMMARY:Ecole Schickelé MUTZIG - classe B
+DTSTAMP:20260706T152434Z
+DTSTART;TZID=Europe/Paris:20260908T091500
+DTEND;TZID=Europe/Paris:20260908T101500
+SUMMARY:Ecole GRIESHEIM - classe B - CP
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
 UID:f25607c4-eb7d-4e2b-8dd1-342a9775343e@mom-hub
-DTSTAMP:20260703T124123Z
-DTSTART;TZID=Europe/Paris:20260908T141500
-DTEND;TZID=Europe/Paris:20260908T151500
-SUMMARY:Ecole Schickelé MUTZIG - classe G
+DTSTAMP:20260706T155206Z
+DTSTART;TZID=Europe/Paris:20260908T101500
+DTEND;TZID=Europe/Paris:20260908T111500
+SUMMARY:Ecole GRIESHEIM - classe C - CE1/CE2
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
@@ -200,7 +200,7 @@ UID:85293bfc-34ab-4a02-b7dd-e8059f59e11b@mom-hub
 DTSTAMP:20260703T124403Z
 DTSTART;TZID=Europe/Paris:20260910T084500
 DTEND;TZID=Europe/Paris:20260910T094500
-SUMMARY:Ecole Schickelé MUTZIG - classe C
+SUMMARY:Ecole Tilleuls MOLSHEIM - classe A - CM2
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
@@ -210,7 +210,7 @@ UID:103e59ab-3899-4660-ac62-ed0125ab8d1f@mom-hub
 DTSTAMP:20260703T124545Z
 DTSTART;TZID=Europe/Paris:20260910T094500
 DTEND;TZID=Europe/Paris:20260910T104500
-SUMMARY:Ecole Schickelé MUTZIG - classe D
+SUMMARY:Ecole Tilleuls MOLSHEIM - classe B - CM2
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
@@ -300,30 +300,30 @@ STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
 UID:df8e27a0-e0e6-4d58-96ce-e499e1e0f2ae@mom-hub
-DTSTAMP:20260703T080444Z
-DTSTART;TZID=Europe/Paris:20260915T084500
-DTEND;TZID=Europe/Paris:20260915T094500
-SUMMARY:Ecole Schickelé MUTZIG - classe A
+DTSTAMP:20260706T151349Z
+DTSTART;TZID=Europe/Paris:20260915T081500
+DTEND;TZID=Europe/Paris:20260915T091500
+SUMMARY:Ecole GRIESHEIM - classe A - CP/CE1
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
 UID:88e89c2e-44f4-4aff-8ce0-bd2f9c85ede4@mom-hub
-DTSTAMP:20260703T123447Z
-DTSTART;TZID=Europe/Paris:20260915T094500
-DTEND;TZID=Europe/Paris:20260915T104500
-SUMMARY:Ecole Schickelé MUTZIG - classe B
+DTSTAMP:20260706T152450Z
+DTSTART;TZID=Europe/Paris:20260915T091500
+DTEND;TZID=Europe/Paris:20260915T101500
+SUMMARY:Ecole GRIESHEIM - classe B - CP
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
 UID:d23a227b-7431-4002-9382-a197eb2eeae6@mom-hub
-DTSTAMP:20260703T124123Z
-DTSTART;TZID=Europe/Paris:20260915T141500
-DTEND;TZID=Europe/Paris:20260915T151500
-SUMMARY:Ecole Schickelé MUTZIG - classe G
+DTSTAMP:20260706T155339Z
+DTSTART;TZID=Europe/Paris:20260915T101500
+DTEND;TZID=Europe/Paris:20260915T111500
+SUMMARY:Ecole GRIESHEIM - classe C - CE1/CE2
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
@@ -355,7 +355,7 @@ UID:7597df50-e694-4d1f-9550-33f5588ea3da@mom-hub
 DTSTAMP:20260703T124403Z
 DTSTART;TZID=Europe/Paris:20260917T084500
 DTEND;TZID=Europe/Paris:20260917T094500
-SUMMARY:Ecole Schickelé MUTZIG - classe C
+SUMMARY:Ecole Tilleuls MOLSHEIM - classe A - CM2
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
@@ -365,7 +365,7 @@ UID:cc863583-92b6-4b1f-8be2-2f79af1dcf55@mom-hub
 DTSTAMP:20260703T124545Z
 DTSTART;TZID=Europe/Paris:20260917T094500
 DTEND;TZID=Europe/Paris:20260917T104500
-SUMMARY:Ecole Schickelé MUTZIG - classe D
+SUMMARY:Ecole Tilleuls MOLSHEIM - classe B - CM2
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
@@ -466,30 +466,30 @@ STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
 UID:9e798d4d-d0e9-4247-9607-8934c87c8dcb@mom-hub
-DTSTAMP:20260703T080444Z
-DTSTART;TZID=Europe/Paris:20260922T084500
-DTEND;TZID=Europe/Paris:20260922T094500
-SUMMARY:Ecole Schickelé MUTZIG - classe A
+DTSTAMP:20260706T151405Z
+DTSTART;TZID=Europe/Paris:20260922T081500
+DTEND;TZID=Europe/Paris:20260922T091500
+SUMMARY:Ecole GRIESHEIM - classe A - CP/CE1
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
 UID:c37d70cd-f4ac-40c8-aca3-1c91f27b03a2@mom-hub
-DTSTAMP:20260703T123447Z
-DTSTART;TZID=Europe/Paris:20260922T094500
-DTEND;TZID=Europe/Paris:20260922T104500
-SUMMARY:Ecole Schickelé MUTZIG - classe B
+DTSTAMP:20260706T153925Z
+DTSTART;TZID=Europe/Paris:20260922T091500
+DTEND;TZID=Europe/Paris:20260922T101500
+SUMMARY:Ecole GRIESHEIM - classe B - CP
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
 UID:d446bfa3-de8d-46e1-ae4f-8eae75a8ac85@mom-hub
-DTSTAMP:20260703T124123Z
-DTSTART;TZID=Europe/Paris:20260922T141500
-DTEND;TZID=Europe/Paris:20260922T151500
-SUMMARY:Ecole Schickelé MUTZIG - classe G
+DTSTAMP:20260706T155329Z
+DTSTART;TZID=Europe/Paris:20260922T101500
+DTEND;TZID=Europe/Paris:20260922T111500
+SUMMARY:Ecole GRIESHEIM - classe C - CE1/CE2
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
@@ -521,7 +521,7 @@ UID:031dc42b-5366-45ed-8d3d-6f22437e487b@mom-hub
 DTSTAMP:20260703T124403Z
 DTSTART;TZID=Europe/Paris:20260924T084500
 DTEND;TZID=Europe/Paris:20260924T094500
-SUMMARY:Ecole Schickelé MUTZIG - classe C
+SUMMARY:Ecole Tilleuls MOLSHEIM - classe A - CM2
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
@@ -531,7 +531,7 @@ UID:738f1832-f096-4caa-9af0-9674f9c06d73@mom-hub
 DTSTAMP:20260703T124545Z
 DTSTART;TZID=Europe/Paris:20260924T094500
 DTEND;TZID=Europe/Paris:20260924T104500
-SUMMARY:Ecole Schickelé MUTZIG - classe D
+SUMMARY:Ecole Tilleuls MOLSHEIM - classe B - CM2
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
@@ -632,30 +632,30 @@ STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
 UID:15e204e1-5f81-4a48-9c2a-6a812bd8c713@mom-hub
-DTSTAMP:20260703T080444Z
-DTSTART;TZID=Europe/Paris:20260929T084500
-DTEND;TZID=Europe/Paris:20260929T094500
-SUMMARY:Ecole Schickelé MUTZIG - classe A
+DTSTAMP:20260706T151414Z
+DTSTART;TZID=Europe/Paris:20260929T081500
+DTEND;TZID=Europe/Paris:20260929T091500
+SUMMARY:Ecole GRIESHEIM - classe A - CP/CE1
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
 UID:4d62baa2-1c0a-4a12-9080-3aa45c2e85e0@mom-hub
-DTSTAMP:20260703T123447Z
-DTSTART;TZID=Europe/Paris:20260929T094500
-DTEND;TZID=Europe/Paris:20260929T104500
-SUMMARY:Ecole Schickelé MUTZIG - classe B
+DTSTAMP:20260706T153918Z
+DTSTART;TZID=Europe/Paris:20260929T091500
+DTEND;TZID=Europe/Paris:20260929T101500
+SUMMARY:Ecole GRIESHEIM - classe B - CP
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
 UID:3cb0768c-c3d9-4c76-9358-ca6fad68a062@mom-hub
-DTSTAMP:20260703T124123Z
-DTSTART;TZID=Europe/Paris:20260929T141500
-DTEND;TZID=Europe/Paris:20260929T151500
-SUMMARY:Ecole Schickelé MUTZIG - classe G
+DTSTAMP:20260706T155318Z
+DTSTART;TZID=Europe/Paris:20260929T101500
+DTEND;TZID=Europe/Paris:20260929T111500
+SUMMARY:Ecole GRIESHEIM - classe C - CE1/CE2
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
@@ -687,7 +687,7 @@ UID:519c1573-decd-47e1-86c9-2234b2638f6d@mom-hub
 DTSTAMP:20260703T124403Z
 DTSTART;TZID=Europe/Paris:20261001T084500
 DTEND;TZID=Europe/Paris:20261001T094500
-SUMMARY:Ecole Schickelé MUTZIG - classe C
+SUMMARY:Ecole Tilleuls MOLSHEIM - classe A - CM2
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
@@ -697,7 +697,7 @@ UID:ce85dbd9-e329-4f6d-9c16-2fe4fbc284b9@mom-hub
 DTSTAMP:20260703T124545Z
 DTSTART;TZID=Europe/Paris:20261001T094500
 DTEND;TZID=Europe/Paris:20261001T104500
-SUMMARY:Ecole Schickelé MUTZIG - classe D
+SUMMARY:Ecole Tilleuls MOLSHEIM - classe B - CM2
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
@@ -787,30 +787,30 @@ STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
 UID:71f628a1-9585-4296-921d-955861939c9d@mom-hub
-DTSTAMP:20260703T080444Z
-DTSTART;TZID=Europe/Paris:20261006T084500
-DTEND;TZID=Europe/Paris:20261006T094500
-SUMMARY:Ecole Schickelé MUTZIG - classe A
+DTSTAMP:20260706T151425Z
+DTSTART;TZID=Europe/Paris:20261006T081500
+DTEND;TZID=Europe/Paris:20261006T091500
+SUMMARY:Ecole GRIESHEIM - classe A - CP/CE1
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
 UID:5d4c9fb5-3363-4d33-8a1b-123313cec8cb@mom-hub
-DTSTAMP:20260703T123447Z
-DTSTART;TZID=Europe/Paris:20261006T094500
-DTEND;TZID=Europe/Paris:20261006T104500
-SUMMARY:Ecole Schickelé MUTZIG - classe B
+DTSTAMP:20260706T153941Z
+DTSTART;TZID=Europe/Paris:20261006T091500
+DTEND;TZID=Europe/Paris:20261006T101500
+SUMMARY:Ecole GRIESHEIM - classe B - CP
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
 UID:61f27c16-a5d3-4c0c-95e6-bff89dcca085@mom-hub
-DTSTAMP:20260703T124123Z
-DTSTART;TZID=Europe/Paris:20261006T141500
-DTEND;TZID=Europe/Paris:20261006T151500
-SUMMARY:Ecole Schickelé MUTZIG - classe G
+DTSTAMP:20260706T155400Z
+DTSTART;TZID=Europe/Paris:20261006T101500
+DTEND;TZID=Europe/Paris:20261006T111500
+SUMMARY:Ecole GRIESHEIM - classe C - CE1/CE2
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
@@ -842,7 +842,7 @@ UID:06ebf331-181f-45fc-95ff-d621bed28164@mom-hub
 DTSTAMP:20260703T124403Z
 DTSTART;TZID=Europe/Paris:20261008T084500
 DTEND;TZID=Europe/Paris:20261008T094500
-SUMMARY:Ecole Schickelé MUTZIG - classe C
+SUMMARY:Ecole Tilleuls MOLSHEIM - classe A - CM2
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
@@ -852,7 +852,7 @@ UID:065e79f6-91e8-400a-a4b2-8a1b5b77c6f2@mom-hub
 DTSTAMP:20260703T124545Z
 DTSTART;TZID=Europe/Paris:20261008T094500
 DTEND;TZID=Europe/Paris:20261008T104500
-SUMMARY:Ecole Schickelé MUTZIG - classe D
+SUMMARY:Ecole Tilleuls MOLSHEIM - classe B - CM2
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
 STATUS:TENTATIVE
@@ -2085,11 +2085,12 @@ DTEND;TZID=Europe/Paris:20270312T100000
 SUMMARY:Ecole BISCHOFFSHEIM - classe A
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
+LOCATION:stade de foot
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
 UID:40106a3f-5b73-4e6c-acec-770c65475cb1@mom-hub
-DTSTAMP:20260703T142116Z
+DTSTAMP:20260706T183143Z
 DTSTART;TZID=Europe/Paris:20270312T100000
 DTEND;TZID=Europe/Paris:20270312T110000
 SUMMARY:Ecole BISCHOFFSHEIM - classe B
@@ -2230,11 +2231,12 @@ DTEND;TZID=Europe/Paris:20270319T100000
 SUMMARY:Ecole BISCHOFFSHEIM - classe A
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
+LOCATION:stade de foot
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
 UID:7ae9eb9c-bbe8-4a5a-a613-551ea4bcbea5@mom-hub
-DTSTAMP:20260703T142116Z
+DTSTAMP:20260706T183129Z
 DTSTART;TZID=Europe/Paris:20270319T100000
 DTEND;TZID=Europe/Paris:20270319T110000
 SUMMARY:Ecole BISCHOFFSHEIM - classe B
@@ -2368,6 +2370,27 @@ DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
+UID:9eb8ddfa-525e-4649-9923-90dc447287be@mom-hub
+DTSTAMP:20260706T201254Z
+DTSTART;TZID=Europe/Paris:20270326T090000
+DTEND;TZID=Europe/Paris:20270326T100000
+SUMMARY:Ecole BISCHOFFSHEIM - classe A
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+LOCATION:stade de foot
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
+UID:1ed4b448-3f67-4ea0-88c8-c1d925c643a7@mom-hub
+DTSTAMP:20260706T183129Z
+DTSTART;TZID=Europe/Paris:20270326T100000
+DTEND;TZID=Europe/Paris:20270326T110000
+SUMMARY:Ecole BISCHOFFSHEIM - classe B
+DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
+ io/mom-hub/suivi-salarie.html
+STATUS:TENTATIVE
+END:VEVENT
+BEGIN:VEVENT
 UID:98679bc0-aad7-4ec0-b7d8-f7fe51cf7304@mom-hub
 DTSTAMP:20260702T072017Z
 DTSTART;TZID=Europe/Paris:20270326T190000
@@ -2478,11 +2501,12 @@ DTEND;TZID=Europe/Paris:20270402T100000
 SUMMARY:Ecole BISCHOFFSHEIM - classe A
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
+LOCATION:stade de foot
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
 UID:6cec6cf8-4e5a-4e44-9802-7227b84bff6c@mom-hub
-DTSTAMP:20260703T142116Z
+DTSTAMP:20260706T183129Z
 DTSTART;TZID=Europe/Paris:20270402T100000
 DTEND;TZID=Europe/Paris:20270402T110000
 SUMMARY:Ecole BISCHOFFSHEIM - classe B
@@ -2623,11 +2647,12 @@ DTEND;TZID=Europe/Paris:20270409T100000
 SUMMARY:Ecole BISCHOFFSHEIM - classe A
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
+LOCATION:stade de foot
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
 UID:b57b6037-120d-46bd-bf99-b8e65d948b00@mom-hub
-DTSTAMP:20260703T142116Z
+DTSTAMP:20260706T183129Z
 DTSTART;TZID=Europe/Paris:20270409T100000
 DTEND;TZID=Europe/Paris:20270409T110000
 SUMMARY:Ecole BISCHOFFSHEIM - classe B
@@ -2698,11 +2723,12 @@ DTEND;TZID=Europe/Paris:20270416T100000
 SUMMARY:Ecole BISCHOFFSHEIM - classe A
 DESCRIPTION:État : Prévue\nSéance dans le Hub : https://manu-mom.github.
  io/mom-hub/suivi-salarie.html
+LOCATION:stade de foot
 STATUS:TENTATIVE
 END:VEVENT
 BEGIN:VEVENT
 UID:5ee0ff6a-7f64-42d4-99e1-d407a700614e@mom-hub
-DTSTAMP:20260703T142140Z
+DTSTAMP:20260706T183129Z
 DTSTART;TZID=Europe/Paris:20270416T100000
 DTEND;TZID=Europe/Paris:20270416T110000
 SUMMARY:Ecole BISCHOFFSHEIM - classe B
