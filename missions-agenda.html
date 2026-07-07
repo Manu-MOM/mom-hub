@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agenda salarié — Planning des séances · MOM Hub</title>
+<link rel="icon" type="image/png" href="assets/logo-m2m.png">
+<!--
+  MOM Hub · Agenda salarié — surface DÉDIÉE (MISSIONS-AGENDA).
+  Née du déplacement (voie 1) de la vue agenda hors de suivi-salarie.html :
+  cette page est la SEULE surface de consultation calendaire des séances du
+  salarié. suivi-salarie.html conserve toute la SAISIE (missions, séances,
+  modales d'édition) mais n'affiche plus l'agenda (une destination = une surface,
+  doctrine nav thématique).
+
+  Garde : admin|bureau STRICT (tuile dashboard « Agenda salarié » = bureau-seul).
+  La voie 3 salarié (consultation de son propre planning) n'est PAS ouverte ici
+  en v1 — elle reste couverte par suivi-salarie.html côté salarié relié.
+
+  LECTURE SEULE (FAIT FOI option a) : l'agenda affiche le planning et le détail
+  au clic ; AUCUN bouton « Modifier ». Pour éditer une séance -> suivi-salarie.html.
+  Le module HubAgenda ne rend pas de bouton quand detail.action est absent.
+
+  Consomme, sans jamais les modifier, les modules INTERDIT :
+    - css/hub-agenda.css + js/hub-agenda.js (AGENDA-HUB-PATRON, pt 147)
+    - js/hub-nav.js (nav thématique, INTERDIT depuis v1.6 pt 163)
+  La palette .t-* (10 types + divers) est FOURNIE PAR CETTE PAGE (FAIT FOI G3),
+  copiée à l'identique de suivi-salarie.html.
+
+  RPC : agenda_seances_salarie(p_salarie_id, p_date_debut, p_date_fin) — pt 145,
+  déjà exposée. ZÉRO SQL pour cette page.
+  Helpers SupabaseHub : client, getSession, getMyRoles, getSaisonActive,
+  quiSuisJe, signOut.
+-->
+<link rel="stylesheet" href="css/hub.css">
+<!-- CSS structurel du patron agenda (INTERDIT, consommé). La palette .t-* de la
+     page reste dans le <style> ci-dessous (FAIT FOI G3). -->
+<link rel="stylesheet" href="css/hub-agenda.css">
+<style>
+  body.auth-pending { visibility: hidden; }
+  .ma-wrap { max-width: 980px; margin: 0 auto; padding: 24px 24px 48px; }
+  .ma-wrap h1 { font-size: 20px; margin: 0 0 4px; color: var(--ink, #0c3d24); }
+  .ma-sub { color: var(--ink-mute, #6b7a74); margin: 0 0 20px; font-size: 13px; }
+
+  .ma-msg { margin: 0 0 16px; }
+  .ma-flash { padding: 10px 14px; border-radius: 8px; font-size: 14px; margin-bottom: 10px; }
+  .ma-flash.ok  { background: var(--feedback-success-bg, #e7f3ec); color: var(--feedback-success-fg, #1f5a32); }
+  .ma-flash.err { background: var(--feedback-error-bg, #fdecea);   color: var(--feedback-error-fg, #8a1b14); }
+
+  /* ----- Palette des types (FAIT FOI G3) — copie à l'identique de suivi-salarie.html.
+     Convention du module : .ag-ev.t-X / .ag-chip.t-X / .ag-sw.t-X. ----- */
+  .ag-ev.t-intervention_scolaire, .ag-chip.t-intervention_scolaire { background: #eaf1fa; color: #1f4a6b; border-left-color: #2f6fb0; }
+  .ag-sw.t-intervention_scolaire { background: #2f6fb0; }
+  .ag-ev.t-entrainement_section, .ag-chip.t-entrainement_section { background: #e7f3ec; color: #1f5a32; border-left-color: #2d7a3e; }
+  .ag-sw.t-entrainement_section { background: #2d7a3e; }
+  .ag-ev.t-entrainement_sr_m, .ag-chip.t-entrainement_sr_m { background: #e0f0f0; color: #125454; border-left-color: #1f8a8a; }
+  .ag-sw.t-entrainement_sr_m { background: #1f8a8a; }
+  .ag-ev.t-autre_entrainement_mom, .ag-chip.t-autre_entrainement_mom { background: #eef3df; color: #455f16; border-left-color: #6b8e23; }
+  .ag-sw.t-autre_entrainement_mom { background: #6b8e23; }
+  .ag-ev.t-reunion, .ag-chip.t-reunion { background: #efe8f8; color: #4a2d7a; border-left-color: #7a4fbf; }
+  .ag-sw.t-reunion { background: #7a4fbf; }
+  .ag-ev.t-suivi_competition, .ag-chip.t-suivi_competition { background: #fbf1dd; color: #83590c; border-left-color: #c08a1e; }
+  .ag-sw.t-suivi_competition { background: #c08a1e; }
+  .ag-ev.t-accompagnement_terrain, .ag-chip.t-accompagnement_terrain { background: #fbe7db; color: #8a4116; border-left-color: #cc6a2b; }
+  .ag-sw.t-accompagnement_terrain { background: #cc6a2b; }
+  .ag-ev.t-travail_personnel, .ag-chip.t-travail_personnel { background: #eaeef2; color: #333f4b; border-left-color: #556677; }
+  .ag-sw.t-travail_personnel { background: #556677; }
+  .ag-ev.t-stage, .ag-chip.t-stage { background: #f8e2ec; color: #7a2549; border-left-color: #b03a6e; }
+  .ag-sw.t-stage { background: #b03a6e; }
+  .ag-ev.t-divers, .ag-chip.t-divers { background: #eef0ef; color: #42504a; border-left-color: #6b7a74; }
+  .ag-sw.t-divers { background: #6b7a74; }
+</style>
+</head>
+<body class="auth-pending">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo"><img src="assets/logo-m2m.png" alt="MOM Rugby"></div>
+      <div class="brand-text">
+        <h1>MOM Hub</h1>
+        <p>Mutzig Ovalie Molsheim</p>
+      </div>
+    </div>
+
+    <div class="season-pill" id="season-pill">SAISON</div>
+
+    <nav class="main-nav hub-nav" data-hub-nav="salarie"></nav>
+
+    <div class="icon-row">
+      <button class="icon-btn" title="Recherche" aria-label="Recherche">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      </button>
+    </div>
+
+    <div class="user-profile">
+      <div class="avatar">EJ</div>
+      <div class="user-info">
+        <div class="user-name">Emmanuel Jung</div>
+        <div class="user-role">Administrateur</div>
+      </div>
+      <a href="./" class="user-action" title="Retour au portail" aria-label="Retour au portail">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/></svg>
+      </a>
+      <button type="button" class="user-action" id="btn-signout" title="Se déconnecter" aria-label="Se déconnecter">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <script src="js/hub-nav.js"></script>
+
+  <div class="ma-wrap">
+    <h1>Agenda salarié</h1>
+    <p class="ma-sub">Planning des séances du salarié — toutes catégories de mission. Consultation seule ; l'édition d'une séance se fait depuis « Suivi salarié ».</p>
+
+    <div class="ma-msg" id="maMsg"></div>
+
+    <!-- Container du patron agenda : HubAgenda.create y génère la classe ag-root
+         et tout le squelette (grille horaire, mini-mois, plein écran, légende,
+         modale de détail, repli mobile). -->
+    <section id="agRoot"></section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/hub-agenda.js"></script>
+<script src="js/season-pill.js"></script>
+<script>
+(async function () {
+  'use strict';
+  const client = SupabaseHub.client;
+  const $ = function (id) { return document.getElementById(id); };
+
+  // ---- Référentiel des types (ordre + libellés = suivi-salarie.html) ----
+  const TYPES = [
+    { code: 'intervention_scolaire',   lib: 'Intervention scolaire' },
+    { code: 'entrainement_section',    lib: 'Entraînement section' },
+    { code: 'entrainement_sr_m',       lib: 'Entraînement SR-M' },
+    { code: 'autre_entrainement_mom',  lib: 'Autre entraînement MOM' },
+    { code: 'reunion',                 lib: 'Réunion' },
+    { code: 'suivi_competition',       lib: 'Suivi compétition' },
+    { code: 'accompagnement_terrain',  lib: 'Accompagnement terrain' },
+    { code: 'travail_personnel',       lib: 'Travail personnel' },
+    { code: 'stage',                   lib: 'Stage' }
+  ];
+  const TYPE_DIVERS = { code: 'divers', lib: 'Divers' };
+  const TYPE_BY_CODE = {};
+  TYPES.concat([TYPE_DIVERS]).forEach(function (t) { TYPE_BY_CODE[t.code] = t; });
+
+  const ETAT_LABEL = { prevue: 'Prévue', realisee: 'Réalisée', validee: 'Validée', annulee: 'Annulée' };
+  const JOURS = ['lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.', 'dim.'];
+  const MOIS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+
+  // ---- État ----
+  let saisonActive = null;
+  let monPersonneId = null;
+  let salarieId = null;
+  let agenda = null;
+
+  // ---- Helpers ----
+  async function rpc(name, params) {
+    const { data, error } = await client.rpc(name, params);
+    if (error) throw error;
+    return data;
+  }
+  function errMsg(e) {
+    if (!e) return 'erreur inconnue';
+    return e.message || e.error_description || e.msg || String(e);
+  }
+  function flash(msg, kind) {
+    const box = $('maMsg');
+    if (!box) return;
+    const div = document.createElement('div');
+    div.className = 'ma-flash ' + (kind === 'err' ? 'err' : 'ok');
+    div.textContent = msg;
+    box.innerHTML = '';
+    box.appendChild(div);
+  }
+  function parseDate(s) { const p = String(s).slice(0, 10).split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  function agTypeLib(code) { const t = TYPE_BY_CODE[code]; return t ? t.lib : (code || '—'); }
+
+  // ---- Adaptateur agenda (copié de suivi-salarie.html, SANS le chemin d'édition) ----
+  function agMapRow(o) {
+    return {
+      id: o.out_seance_id,
+      date: String(o.out_date_seance).slice(0, 10),
+      heure: o.out_heure_debut ? String(o.out_heure_debut).slice(0, 5) : null,
+      duree_min: o.out_duree_min,
+      type: o.out_type_mission,
+      libelle: o.out_libelle || o.out_mission_libelle || null,
+      etat: o.out_etat,
+      meta: o
+    };
+  }
+  function agDetailRows(it) {
+    const o = it.meta;
+    const d = parseDate(it.date);
+    const when = JOURS[(d.getDay() + 6) % 7] + ' ' + d.getDate() + ' ' + MOIS[d.getMonth()]
+      + (it.heure ? ' · ' + it.heure : '')
+      + (it.duree_min != null ? ' · ' + HubAgenda.dureeLabel(it.duree_min) : '');
+    return [
+      { lbl: 'Type — mission', val: agTypeLib(it.type) + (o.out_mission_libelle ? ' — ' + o.out_mission_libelle : '') },
+      { lbl: 'Date · horaire · durée', val: when },
+      { lbl: 'Lieu', val: o.out_lieu || '—' },
+      { lbl: 'État', val: ETAT_LABEL[it.etat] || it.etat }
+    ];
+  }
+  // LECTURE SEULE (option a) : detail SANS action -> le module ne rend pas de
+  // bouton « Modifier ». Aucun openEditSeance, aucune modale d'édition ici.
+  function agCreate() {
+    agenda = HubAgenda.create($('agRoot'), {
+      titre: 'Agenda — toutes les séances',
+      libelleVide: 'Aucune séance cette semaine.',
+      fetchWindow: async function (debutISO, finISO) {
+        const data = await rpc('agenda_seances_salarie', {
+          p_salarie_id: salarieId,
+          p_date_debut: debutISO,
+          p_date_fin: finISO
+        });
+        return (data || []).map(agMapRow);
+      },
+      types: TYPES.concat([TYPE_DIVERS]).map(function (t) { return { code: t.code, lib: t.lib }; }),
+      detail: { titre: function (it) { return it.libelle || agTypeLib(it.type); }, rows: agDetailRows },
+      capacites: { pleinEcran: true, caseAnnulees: true },
+      estAnnulee: function (it) { return it.etat === 'annulee'; },
+      etatMark: function (it) { return it.etat === 'validee' ? '✓✓' : (it.etat === 'realisee' ? '✓' : ''); },
+      onError: function (e) { flash('Agenda : ' + errMsg(e), 'err'); }
+    });
+  }
+
+  // ---- Garde d'accès : admin|bureau STRICT + résolution du salarié ----
+  // Cascade FIABLE (identique à suivi-salarie.html) : contrat actif -> 1re mission
+  // existante -> monPersonneId (dernier recours). La voie 3 salarié n'est PAS ouverte.
+  async function resoudreAcces() {
+    try { monPersonneId = await SupabaseHub.quiSuisJe(); } catch (e) { monPersonneId = null; }
+    const roles = await SupabaseHub.getMyRoles();
+    const peutVoir = (roles.indexOf('admin') !== -1 || roles.indexOf('bureau') !== -1);
+    if (!peutVoir) return false;
+
+    let resolu = null;
+    try {
+      const contrats = (await rpc('list_contrats_salaries', { p_inclure_inactifs: false })) || [];
+      if (contrats.length) resolu = contrats[0].personne_id || null;
+    } catch (e) { resolu = null; }
+    if (!resolu) {
+      try {
+        const all = (await rpc('list_missions', { p_saison_id: saisonActive.id, p_salarie_id: null, p_entite_id: null })) || [];
+        resolu = all.length ? all[0].salarie_id : monPersonneId;
+      } catch (e) { resolu = monPersonneId; }
+    }
+    salarieId = resolu;
+    return true;
+  }
+
+  // ---- Boot ----
+  const so = $('btn-signout');
+  if (so) so.addEventListener('click', async function () { try { await SupabaseHub.signOut(); } catch (e) {} window.location.replace('login.html'); });
+
+  const session = await SupabaseHub.getSession();
+  if (!session) { window.location.replace('login.html'); return; }
+
+  saisonActive = await SupabaseHub.getSaisonActive();
+
+  const ok = await resoudreAcces();
+  if (!ok) { window.location.replace('./'); return; }
+
+  document.body.classList.remove('auth-pending');
+
+  if ($('season-pill') && saisonActive && saisonActive.libelle) {
+    $('season-pill').textContent = String(saisonActive.libelle).toUpperCase();
+  }
+
+  if (!salarieId) {
+    flash('Aucun salarié résolu — agenda indisponible.', 'err');
+    return;
+  }
+
+  agCreate();
+})();
+</script>
+</body>
+</html>
