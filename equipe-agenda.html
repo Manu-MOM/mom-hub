@@ -56,12 +56,17 @@
   .ea-flash.err { background: var(--feedback-error-bg, #fdecea);   color: var(--feedback-error-fg, #8a1b14); }
 
   /* ----- Sélecteur de catégories (cases à cocher, groupées par pôle) ----- */
-  .ea-picker { border: 1px solid var(--line, #e2e8e4); border-radius: 10px; padding: 14px 16px; margin: 0 0 18px; background: var(--surface, #fff); }
-  .ea-picker-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+  .ea-picker { border: 1px solid var(--line, #e2e8e4); border-radius: 10px; padding: 10px 16px; margin: 0 0 18px; background: var(--surface, #fff); }
+  .ea-picker-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .ea-toggle { display: flex; align-items: center; gap: 8px; background: none; border: 0; padding: 4px 0; cursor: pointer; color: inherit; font: inherit; text-align: left; }
+  .ea-toggle-chevron { font-size: 11px; color: var(--ink-mute, #6b7a74); transition: transform .15s; }
+  .ea-toggle[aria-expanded="true"] .ea-toggle-chevron { transform: rotate(90deg); }
   .ea-picker-title { font-size: 13px; font-weight: 600; color: var(--ink, #0c3d24); }
+  .ea-summary { font-size: 13px; color: var(--ink-mute, #6b7a74); }
   .ea-picker-actions { display: flex; gap: 8px; }
   .ea-picker-actions button { font-size: 12px; padding: 3px 10px; border: 1px solid var(--line, #cabe9f); background: var(--surface-2, #f6f4ee); color: var(--ink, #0c3d24); border-radius: 6px; cursor: pointer; }
   .ea-picker-actions button:hover { background: #ece8dc; }
+  .ea-body { margin-top: 12px; }
   .ea-poles { display: flex; flex-wrap: wrap; gap: 16px 26px; }
   .ea-pole { min-width: 150px; }
   .ea-pole-title { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-mute, #6b7a74); margin: 0 0 6px; }
@@ -128,13 +133,19 @@
     <!-- Sélecteur de catégories (cases à cocher, groupées par pôle) -->
     <section class="ea-picker" id="eaPicker" style="display:none;">
       <div class="ea-picker-head">
-        <span class="ea-picker-title">Catégories affichées</span>
-        <div class="ea-picker-actions">
+        <button type="button" class="ea-toggle" id="eaToggle" aria-expanded="false">
+          <span class="ea-toggle-chevron" aria-hidden="true">▸</span>
+          <span class="ea-picker-title">Catégories affichées</span>
+          <span class="ea-summary" id="eaSummary"></span>
+        </button>
+        <div class="ea-picker-actions" id="eaActions" style="display:none;">
           <button type="button" id="eaSelAll">Tout cocher</button>
           <button type="button" id="eaSelNone">Tout décocher</button>
         </div>
       </div>
-      <div class="ea-poles" id="eaPoles"></div>
+      <div class="ea-body" id="eaBody" style="display:none;">
+        <div class="ea-poles" id="eaPoles"></div>
+      </div>
     </section>
 
     <!-- Container du patron agenda : HubAgenda.create y génère la classe ag-root
@@ -169,7 +180,22 @@
   // nombre de jours, pas des bornes exactes). On demande large puis on filtre
   // client sur [debut, fin] fournis par le module.
   const MARGE_JOURS = 7;
-  const DUREE_DEFAUT_MIN = 60;   // FAIT FOI E3 (décision déléguée) : durée par défaut v1.
+
+  // Durée d'un évènement AVEC heure : dérivée de debut_match/fin_prevue si les
+  // deux sont renseignés (même jour), sinon null (aucune durée inventée -> le
+  // module n'affiche pas de « 1 h » trompeur). Un évènement SANS heure (untimed,
+  // rangée journée entière) n'a jamais de durée affichée.
+  function dureeDe(ev, heure) {
+    if (!heure) return null;                 // untimed -> pas de durée
+    const dm = ev.debut_match, fp = ev.fin_prevue;
+    if (dm && fp) {
+      // debut_match / fin_prevue = champs TIME « HH:MM[:SS] ».
+      const p = function (t) { const a = String(t).split(':'); return (+a[0]) * 60 + (+(a[1] || 0)); };
+      const d = p(fp) - p(dm);
+      if (d > 0 && d < 24 * 60) return d;
+    }
+    return null;                             // heure de début connue, durée inconnue -> rien
+  }
 
   // ---- État ----
   let saisonActive = null;
@@ -217,21 +243,45 @@
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
 
-  // ---- Mapping évènement (ligne RPC) -> item du module ----
-  function evMapRow(ev) {
+  // ---- Mapping évènement (ligne RPC) -> item(s) du module ----
+  // Retourne un TABLEAU d'items : un évènement sur plusieurs jours (tournoi
+  // 27->28) donne une puce « journée entière » par jour couvert (id suffixé
+  // par la date pour la dédup). Un évènement d'un seul jour -> un seul item,
+  // qui conserve son heure et sa durée dérivée.
+  function evMapRows(ev) {
     const type = normType(ev.type_evenement);
     let libelle = ev.libelle || typeLib(type);
     if (type === 'competition' && ev.adversaire_nom) libelle += ' — ' + ev.adversaire_nom;
-    return {
-      id: ev.id,
-      date: dateDe(ev.date_debut),
-      heure: heureDe(ev.date_debut),
-      duree_min: DUREE_DEFAUT_MIN,
-      type: type,
-      libelle: libelle,
-      etat: ev.etat || 'prevu',
-      meta: ev
-    };
+    const etat = ev.etat || 'prevu';
+
+    const dDeb = dateDe(ev.date_debut);
+    const dFin = ev.date_fin ? dateDe(ev.date_fin) : dDeb;
+
+    // Un seul jour : item unique avec heure + durée dérivée.
+    if (!dFin || dFin <= dDeb) {
+      const heure = heureDe(ev.date_debut);
+      return [{
+        id: ev.id, date: dDeb, heure: heure, duree_min: dureeDe(ev, heure),
+        type: type, libelle: libelle, etat: etat, meta: ev
+      }];
+    }
+
+    // Plusieurs jours : une puce « journée entière » (untimed) par jour de la
+    // plage [date_debut, date_fin] inclusive. Garde-fou sur l'étendue (365 j).
+    const out = [];
+    let cur = parseDate(dDeb);
+    const fin = parseDate(dFin);
+    let garde = 0;
+    while (cur <= fin && garde < 366) {
+      const iso = cur.getFullYear() + '-' + String(cur.getMonth() + 1).padStart(2, '0') + '-' + String(cur.getDate()).padStart(2, '0');
+      out.push({
+        id: ev.id + '#' + iso, date: iso, heure: null, duree_min: null,
+        type: type, libelle: libelle, etat: etat, meta: ev
+      });
+      cur.setDate(cur.getDate() + 1);
+      garde++;
+    }
+    return out;
   }
   function evDetailRows(it) {
     const ev = it.meta;
@@ -301,9 +351,11 @@
         // Le détail des matchs reste consultable dans la fiche du tournoi.
         if (ev.evenement_parent_id) return;
         vus.add(ev.id);
-        const it = evMapRow(ev);
-        // Filtre client sur la fenêtre demandée (bornes inclusives).
-        if (it.date >= debutISO && it.date <= finISO) items.push(it);
+        // evMapRows peut retourner PLUSIEURS items (tournoi multi-jours).
+        evMapRows(ev).forEach(function (it) {
+          // Filtre client sur la fenêtre demandée (bornes inclusives).
+          if (it.date >= debutISO && it.date <= finISO) items.push(it);
+        });
       });
     });
     return items;
@@ -359,15 +411,49 @@
     });
     $('eaPoles').innerHTML = html;
     $('eaPicker').style.display = '';
+    $('eaActions').style.display = '';   // les boutons Tout cocher/décocher vivent dans le corps replié
 
     // Câblage des cases (délégué au conteneur).
     $('eaPoles').querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
       cb.addEventListener('change', function () {
         const id = cb.getAttribute('data-cat');
         if (cb.checked) catsCochees.add(id); else catsCochees.delete(id);
+        majResume();
         rafraichirAgenda();
       });
     });
+    majResume();
+  }
+
+  // Libellé court d'une catégorie (depuis le périmètre / référentiel).
+  function libCat(id) {
+    const c = (perimetre.categories || []).find(function (x) { return x.id === id; });
+    return c ? (c.libelle_court || c.code || id) : id;
+  }
+
+  // Résumé compact de la sélection dans le bandeau (replié).
+  function majResume() {
+    const el = $('eaSummary');
+    if (!el) return;
+    const ids = Array.from(catsCochees);
+    if (ids.length === 0) { el.textContent = ' — aucune'; return; }
+    // Ordonne selon l'ordre d'affichage du périmètre.
+    const ordre = (perimetre.categories || []).map(function (c) { return c.id; });
+    ids.sort(function (a, b) { return ordre.indexOf(a) - ordre.indexOf(b); });
+    const labels = ids.map(libCat);
+    let txt;
+    if (labels.length <= 3) txt = labels.join(', ');
+    else txt = labels.slice(0, 3).join(', ') + ' +' + (labels.length - 3);
+    el.textContent = ' : ' + txt;
+  }
+
+  // Repli / dépli du corps du sélecteur.
+  function toggleBody(force) {
+    const body = $('eaBody');
+    const btn = $('eaToggle');
+    const ouvert = force != null ? force : (body.style.display === 'none');
+    body.style.display = ouvert ? '' : 'none';
+    btn.setAttribute('aria-expanded', ouvert ? 'true' : 'false');
   }
 
   function cocherTout(val) {
@@ -376,6 +462,7 @@
     $('eaPoles').querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
       cb.checked = catsCochees.has(cb.getAttribute('data-cat'));
     });
+    majResume();
     rafraichirAgenda();
   }
 
@@ -431,6 +518,7 @@
   // Boutons tout cocher / décocher.
   $('eaSelAll').addEventListener('click', function () { cocherTout(true); });
   $('eaSelNone').addEventListener('click', function () { cocherTout(false); });
+  $('eaToggle').addEventListener('click', function () { toggleBody(); });
 
   renderPicker();
   agCreate();
