@@ -2570,11 +2570,19 @@
           // plus seulement si déjà engagée) afin que l'ajout d'une
           // 1re équipe fonctionne. Échec/silence = repli honnête
           // sur l'UUID côté renderFiche (jamais un faux).
-          if (typeof SupabaseHub.getCategorieEquipe === 'function'
-              && typeof SupabaseHub.listEquipes === 'function') {
-            const _cat = await SupabaseHub.getCategorieEquipe(M14_TEAM_UUID);
-            if (_cat && _cat.ok && _cat.data && _cat.data.categorie_id) {
-              const _liste = await SupabaseHub.listEquipes(_cat.data.categorie_id);
+          if (typeof SupabaseHub.listEquipes === 'function') {
+            // Catégorie de l'événement affiché (EVT-RATTACHEMENT-CATEGORIE :
+            // evt.categorie_id exposé par get_evenement_with_encadrants).
+            // Repli sur la catégorie de l'équipe racine si absent (fiches
+            // anciennes non rechargées), jamais M14 en dur.
+            let _catId = evt.categorie_id || null;
+            if (!_catId && evt.equipe_id
+                && typeof SupabaseHub.getCategorieEquipe === 'function') {
+              const _cat = await SupabaseHub.getCategorieEquipe(evt.equipe_id);
+              if (_cat && _cat.ok && _cat.data) _catId = _cat.data.categorie_id;
+            }
+            if (_catId) {
+              const _liste = await SupabaseHub.listEquipes(_catId);
               evt._equipesClub = Array.isArray(_liste) ? _liste : [];
               evt._equipesClub.forEach(function (e) {
                 if (e && e.id) {
@@ -4528,52 +4536,62 @@
    */
   async function loadModalContext() {
     try {
-      // 1. Saison + organisateur depuis le prochain évent
-      if (window.SupabaseHub && typeof SupabaseHub.getProchainEvenementParEquipe === 'function') {
-        const proch = await SupabaseHub.getProchainEvenementParEquipe(M14_TEAM_UUID);
-        if (proch) {
-          // saison_id n'est pas dans le retour de cette RPC (pas dans les 20 cols)
-          // On va donc le récupérer depuis EVENEMENTS_AVENIR[0] ou EVENEMENTS_PASSES[0]
-          // qui ne le retournent pas non plus en réalité !
-          // → Fallback : on lit directement depuis la table evenements via from()
+      // 1. Saison = saison ACTIVE (plus de dérivation depuis le dernier
+      // événement M14). Organisateur = personne courante (celle qui crée).
+      // EVT-RATTACHEMENT-CATEGORIE : contexte indépendant de toute équipe.
+      if (window.SupabaseHub && typeof SupabaseHub.getSaisonActive === 'function') {
+        try {
+          const saison = await SupabaseHub.getSaisonActive();
+          if (saison && saison.id) {
+            CTX_SAISON_ID = saison.id;
+            console.log('Modal context : saison active =', CTX_SAISON_ID);
+          }
+        } catch (e) {
+          console.warn('loadModalContext() getSaisonActive', e);
+        }
+      }
+      if (window.SupabaseHub && typeof SupabaseHub.quiSuisJe === 'function') {
+        try {
+          const pid = await SupabaseHub.quiSuisJe();  // renvoie directement l'UUID (ou null)
+          if (pid) {
+            CTX_ORGANISATEUR_ID = pid;
+            console.log('Modal context : organisateur =', CTX_ORGANISATEUR_ID);
+          }
+        } catch (e) {
+          console.warn('loadModalContext() quiSuisJe', e);
         }
       }
 
-      // Fallback fiable : lecture directe depuis la table evenements pour
-      // récupérer saison_id + organisateur_principal_id du dernier événement M14.
-      // Ces 2 champs ne sont pas dans le retour des RPC liste mais bien dans
-      // la table elle-même.
-      if (window.SupabaseHub && SupabaseHub.client) {
+      // Repli historique (si saison active ou identité indisponibles) :
+      // lecture du dernier événement connu, sans filtre équipe figé.
+      if ((!CTX_SAISON_ID || !CTX_ORGANISATEUR_ID)
+          && window.SupabaseHub && SupabaseHub.client) {
         const { data, error } = await SupabaseHub.client
           .from('evenements')
           .select('saison_id, organisateur_principal_id')
-          .eq('equipe_id', M14_TEAM_UUID)
           .order('date_debut', { ascending: false })
           .limit(1)
           .maybeSingle();
         if (!error && data) {
-          CTX_SAISON_ID       = data.saison_id;
-          CTX_ORGANISATEUR_ID = data.organisateur_principal_id;
-          console.log('Modal context : saison=', CTX_SAISON_ID, 'organisateur=', CTX_ORGANISATEUR_ID);
+          if (!CTX_SAISON_ID) CTX_SAISON_ID = data.saison_id;
+          if (!CTX_ORGANISATEUR_ID) CTX_ORGANISATEUR_ID = data.organisateur_principal_id;
+          console.log('Modal context (repli) : saison=', CTX_SAISON_ID, 'organisateur=', CTX_ORGANISATEUR_ID);
         } else if (error) {
           console.warn('loadModalContext() lecture saison/organisateur', error);
         }
       }
 
-      // v1.18 — Catégorie M14 (dérivée de M14_TEAM_UUID) pour peupler
-      // le Bloc 4a via listEquipes. Module M14-mono-équipe (décision
-      // périmètre option A). Défensif : un échec ici N'EMPÊCHE PAS la
-      // création de l'évènement de base ; seul le Bloc 4a affichera
-      // une erreur honnête (jamais une case fantôme).
-      if (window.SupabaseHub && typeof SupabaseHub.getCategorieEquipe === 'function') {
-        const catRes = await SupabaseHub.getCategorieEquipe(M14_TEAM_UUID);
-        if (catRes && catRes.ok && catRes.data) {
-          CTX_CATEGORIE_ID = catRes.data.categorie_id;
-          console.log('Modal context : categorie=', CTX_CATEGORIE_ID);
-        } else {
-          console.warn('loadModalContext() résolution catégorie M14',
-            catRes && catRes.error);
-        }
+      // Catégorie du contexte modal = catégorie ACTIVE du sélecteur
+      // (chantier EVT-RATTACHEMENT-CATEGORIE). Sert au filtrage du staff
+      // (peuplerStaff → listStaffDisponibles) et au Bloc 4a. Plus de
+      // dérivation depuis M14_TEAM_UUID figé. Défensif : un périmètre
+      // absent laisse CTX_CATEGORIE_ID à null (le staff en mode catégorie
+      // affichera une erreur honnête, jamais une case fantôme).
+      if (CTX_PERIMETRE && CTX_PERIMETRE.active) {
+        CTX_CATEGORIE_ID = CTX_PERIMETRE.active;
+        console.log('Modal context : categorie=', CTX_CATEGORIE_ID);
+      } else {
+        console.warn('loadModalContext() : aucune catégorie active dans le périmètre');
       }
 
       // 2. Sites actifs pour le dropdown
@@ -6078,12 +6096,25 @@
     if (_rdvHeure)   payload.rdv_heure   = _rdvHeure;
     if (_rdvLieu)    payload.rdv_lieu    = _rdvLieu;
 
-    // equipe_id racine : modes A1/A2 (entraînement/stage) → M14_TEAM_UUID
-    // requis par CHECK equipe_obligatoire_si_pas_parent. Modes A3/A4/A5
-    // (competition) → NULL (l'équipe est portée par les M3 evenement_
-    // equipes_engagees).
+    // Rattachement CATÉGORIE (chantier EVT-RATTACHEMENT-CATEGORIE).
+    // La catégorie active du sélecteur (CTX_PERIMETRE.active) est la
+    // source de vérité — plus de M14 figé. Requise pour entraînement/
+    // stage (CHECK categorie_obligatoire_si_pas_parent). equipe_id
+    // racine reste NULL : l'entraînement appartient à la catégorie,
+    // pas à une équipe précise (décision modèle 07/07/2026). Pour les
+    // compétitions, l'équipe est portée par les M3 equipes_engagees et
+    // la catégorie est déduite côté RPC.
+    const _catActive = CTX_PERIMETRE && CTX_PERIMETRE.active;
     if (familleEvt === 'entrainement' || familleEvt === 'stage') {
-      payload.equipe_id = M14_TEAM_UUID;
+      if (!_catActive) {
+        msg.innerHTML = '<div class="evt-form-error">Aucune catégorie active : impossible de rattacher l\'entraînement. Sélectionnez une catégorie en haut de page.</div>';
+        return;
+      }
+      payload.categorie_id = _catActive;
+    } else if (_catActive) {
+      // Compétition : on transmet la catégorie active en indication ;
+      // la RPC la recoupe/déduit des équipes engagées.
+      payload.categorie_id = _catActive;
     }
 
     // Mode A1 récurrence (JSONB recurrence brute, géré côté UI)
@@ -6356,12 +6387,24 @@
     submitBtn.textContent = 'Duplication…';
     msg.innerHTML = '';
 
+    // EVT-RATTACHEMENT-CATEGORIE : la copie hérite de la catégorie ACTIVE
+    // (plus de M14 figé). equipe_id racine null pour tous les types
+    // (l'entraînement appartient à la catégorie ; la compétition porte ses
+    // équipes via les M3). categorie_id requis pour entraînement/stage.
+    const _catActiveDup = CTX_PERIMETRE && CTX_PERIMETRE.active;
+    if ((familleEvt === 'entrainement' || familleEvt === 'stage') && !_catActiveDup) {
+      msg.innerHTML = '<div class="evt-form-error">Aucune catégorie active : impossible de dupliquer. Sélectionnez une catégorie en haut de page.</div>';
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Créer l'évènement";
+      return;
+    }
     const overrides = {
       code:                      generateEventCode(familleEvt, dateDebut),
       libelle:                   libelle,
       type_evenement:            familleEvt,
       date_debut:                new Date(dateDebut).toISOString(),
-      equipe_id:                 (familleEvt === 'competition') ? null : M14_TEAM_UUID,
+      equipe_id:                 null,
+      categorie_id:              _catActiveDup || null,
       saison_id:                 CTX_SAISON_ID,
       organisateur_principal_id: CTX_ORGANISATEUR_ID
     };
@@ -6700,6 +6743,12 @@
       if (!nouvelleCat || nouvelleCat === CTX_PERIMETRE.active) return;
       CTX_PERIMETRE.active = nouvelleCat;
       SupabaseHub.memoriserCategorieActive(nouvelleCat);
+      // EVT-RATTACHEMENT-CATEGORIE : le contexte modal (catégorie servant
+      // au filtrage du staff + au rattachement de l'entraînement) suit la
+      // catégorie active. Le cache staff est invalidé pour forcer un
+      // rechargement au prochain dépliage (sinon staff de l'ancienne cat).
+      CTX_CATEGORIE_ID = nouvelleCat;
+      _staffLoadedKey = null;
       select.disabled = true;
       try {
         CTX_EQUIPES_ACTIVES = await _resoudreEquipesCategorieActive();
