@@ -119,12 +119,16 @@
 
     <div class="season-pill">SAISON …</div>
 
-    <nav class="main-nav">
-      <a href="./">Tableau de bord</a>
-      <a class="active">Compositions</a>
-      <a>Annuaire</a>
-      <a>Configuration</a>
-    </nav>
+    <!-- Navigation thématique « Mon équipe » : porteur VIDE, contenu injecté
+         par le module partagé js/hub-nav.js (thème « equipe » ; la table des
+         thèmes est l'unique source de vérité — GENERALISATION-NAV-THEMATIQUE,
+         FAIT FOI gelé 07/07/2026, calé pt 160). La page décide de l'EMPLACEMENT,
+         le module du CONTENU. mes-compos = DESTINATION « Compositions » (lien
+         propre, marqué courant ici ; à distinguer de l'éditeur compositions.html
+         qui porte le même thème en mode silencieux). Remplace la main-nav
+         statique (Tableau de bord · Compositions(active) · Annuaire(mort) ·
+         Configuration(mort)), retraits tracés. -->
+    <nav class="main-nav hub-nav" data-hub-nav="equipe"></nav>
 
     <div class="icon-row">
       <button class="icon-btn" title="Recherche" aria-label="Recherche">
@@ -154,6 +158,8 @@
       </button>
     </div>
   </header>
+
+  <script src="js/hub-nav.js"></script>
 
   <main class="mc-layout">
     <div class="mc-head">
