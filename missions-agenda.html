@@ -276,6 +276,7 @@
   }
 
   agCreate();
+  try { await agenda.init(); } catch (e) { flash('Agenda : ' + errMsg(e), 'err'); }
 })();
 </script>
 </body>
