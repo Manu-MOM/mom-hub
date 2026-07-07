@@ -339,8 +339,6 @@
     padding: 8px 10px; margin: 0 0 12px; }
   .ss-ponct-banner.on { display: block; }
 
-  /* Garde-fou : tout SVG non explicitement dimensionné reste petit (évite le chevron géant). */
-  .hub-back-row .hub-back-btn svg { width: 16px; height: 16px; flex: 0 0 auto; }
   .ss-wrap svg, .ss-typehead svg { max-width: 22px; max-height: 22px; }
   /* ===== SUIVI-AGENDA-TOUS-TYPES — PALETTE par type (métier, reste en page) =====
      AGENDA-HUB-PATRON (pt 147) : le CSS STRUCTUREL ag-* a été extrait vers
@@ -383,13 +381,7 @@
 
     <div class="season-pill" id="season-pill">SAISON</div>
 
-    <nav class="main-nav">
-      <a href="dashboard.html">Tableau de bord</a>
-      <a href="evenements.html">Évènements</a>
-      <a href="u-admin.html">Collectif (admin)</a>
-      <a href="compositions.html">Compositions</a>
-      <a href="import-agenda-salarie.html">Importer mon agenda</a>
-    </nav>
+    <nav class="main-nav hub-nav" data-hub-nav="salarie"></nav>
 
     <div class="icon-row">
       <button class="icon-btn" title="Recherche" aria-label="Recherche">
@@ -412,12 +404,8 @@
     </div>
   </header>
 
-  <div class="hub-back-row">
-    <a class="hub-back-btn" href="dashboard.html">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 18l-6-6 6-6"/></svg>
-      Retour au tableau de bord
-    </a>
-  </div>
+  <script src="js/hub-nav.js"></script>
+
 
 <div class="ss-wrap">
   <h1>Saisie des missions &amp; séances</h1>
