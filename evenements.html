@@ -48,6 +48,18 @@
     .evt-side-col { display: none; }
   }
 
+  /* HUB-NAV E5 (pt 160) — cohabitation carcan fullscreen ↔ porteur thématique.
+     Sous 1000px, le module hub-nav bascule .main-nav.hub-nav en rangée pleine
+     largeur sous la marque (topbar → height:auto). Or .app impose
+     grid-template-rows:56px 1fr : la topbar élargie déborderait sur le contenu
+     (rangée 1 figée à 56px). On libère la rangée topbar au MÊME seuil que le
+     module (1000px, pas 1024) pour éviter toute bande morte. Desktop >1000px
+     STRICTEMENT inchangé. Additif, scopé fullscreen. Patron prouvé sur
+     joueurs.html (même carcan .app). */
+  @media (max-width: 1000px) {
+    .app { height: auto; grid-template-rows: auto 1fr; }
+  }
+
   /* ========== BANDEAU PAGE (en-tête du module) ========== */
   .evt-header {
     display: grid;
@@ -1647,12 +1659,15 @@
 
     <div class="season-pill">SAISON …</div>
 
-    <nav class="main-nav">
-      <a href="index.html">Tableau de bord</a>
-      <a class="active">Mes outils</a>
-      <a>Annuaire</a>
-      <a>Configuration</a>
-    </nav>
+    <!-- Navigation thématique « Mon équipe » : porteur VIDE, contenu injecté
+         par le module partagé js/hub-nav.js (thème « equipe » ; la table des
+         thèmes est l'unique source de vérité — GENERALISATION-NAV-THEMATIQUE,
+         FAIT FOI gelé 07/07/2026, calé pt 160). La page décide de l'EMPLACEMENT,
+         le module du CONTENU. evenements = DESTINATION « Évènements » (lien
+         propre, marqué courant ici). Remplace la main-nav statique (Tableau de
+         bord · Mes outils · Annuaire(mort) · Configuration(mort)), retraits
+         tracés. -->
+    <nav class="main-nav hub-nav" data-hub-nav="equipe"></nav>
 
     <div class="icon-row">
       <button class="icon-btn" title="Recherche">
@@ -1687,6 +1702,8 @@
       Se connecter
     </a>
   </header>
+
+  <script src="js/hub-nav.js"></script>
 
   <!-- ============ MAIN LAYOUT ============ -->
   <main class="evt-layout">
