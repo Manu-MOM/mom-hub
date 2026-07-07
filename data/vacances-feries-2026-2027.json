@@ -1,0 +1,34 @@
+{
+  "saison": "2026-2027",
+  "zone_scolaire": "Zone B — académie de Strasbourg",
+  "zone_feries": "Alsace-Moselle",
+  "convention": "Dates ISO YYYY-MM-DD. Vacances : debut = premier jour vacant (samedi de départ), fin = INCLUSIVE (veille de la reprise). Fenêtre du fichier = saison MOM 2026-08-01 → 2027-07-31, périodes débordantes bornées.",
+  "sources": {
+    "feries": "Dépôt etalab/jours-feries-france-data (alimente calendrier.api.gouv.fr), jeux 2026 et 2027, zone alsace-moselle",
+    "vacances": "Arrêté du 22 octobre 2025 fixant le calendrier scolaire 2026-2027 (JORF), via Légifrance/Service-Public"
+  },
+  "feries": [
+    { "date": "2026-08-15", "libelle": "Assomption" },
+    { "date": "2026-11-01", "libelle": "Toussaint" },
+    { "date": "2026-11-11", "libelle": "11 novembre" },
+    { "date": "2026-12-25", "libelle": "Jour de Noël" },
+    { "date": "2026-12-26", "libelle": "2ème jour de Noël" },
+    { "date": "2027-01-01", "libelle": "1er janvier" },
+    { "date": "2027-03-26", "libelle": "Vendredi saint" },
+    { "date": "2027-03-29", "libelle": "Lundi de Pâques" },
+    { "date": "2027-05-01", "libelle": "1er mai" },
+    { "date": "2027-05-06", "libelle": "Ascension" },
+    { "date": "2027-05-08", "libelle": "8 mai" },
+    { "date": "2027-05-17", "libelle": "Lundi de Pentecôte" },
+    { "date": "2027-07-14", "libelle": "14 juillet" }
+  ],
+  "vacances": [
+    { "libelle": "Vacances d'été", "debut": "2026-08-01", "fin": "2026-08-31" },
+    { "libelle": "Vacances de la Toussaint", "debut": "2026-10-17", "fin": "2026-11-01" },
+    { "libelle": "Vacances de Noël", "debut": "2026-12-19", "fin": "2027-01-03" },
+    { "libelle": "Vacances d'hiver", "debut": "2027-02-20", "fin": "2027-03-07" },
+    { "libelle": "Vacances de printemps", "debut": "2027-04-17", "fin": "2027-05-02" },
+    { "libelle": "Pont de l'Ascension", "debut": "2027-05-07", "fin": "2027-05-07" },
+    { "libelle": "Vacances d'été", "debut": "2027-07-03", "fin": "2027-07-31" }
+  ]
+}
