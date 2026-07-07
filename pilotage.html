@@ -38,16 +38,9 @@
     .ss-num { text-align: right; }
     .ss-table th.ss-num { text-align: right; }
     footer { max-width: 920px; margin: 2rem auto 0; color: var(--attente); font-size: .8rem; text-align: center; }
-    /* Bouton retour dédié (CSS reporté du patron pt 71 — absent de hub.css) */
-    .hub-back-row { max-width: 920px; margin: 0 auto; padding: 18px 24px 0; }
-    .hub-back-btn { display: inline-flex; align-items: center; gap: 8px;
-                    padding: 8px 16px; border: 1px solid var(--line, #cabe9f); border-radius: 999px;
-                    background: #fff; color: var(--ink, #0c3d24); font: inherit; font-size: 13px;
-                    font-weight: 600; text-decoration: none; cursor: pointer;
-                    transition: border-color .15s, color .15s, background-color .15s; }
-    .hub-back-btn:hover { border-color: var(--vert-prairie, #2d7a3e); color: var(--vert-prairie, #2d7a3e);
-                          background: var(--vert-light, rgba(45,122,62,0.06)); }
-    .hub-back-btn svg { width: 15px; height: 15px; }
+    /* E3 (pt 160) : CSS .hub-back-row / .hub-back-btn retiré — le bouton corps
+       « Retour au portail » qu'il stylait a été supprimé (redondant avec le
+       tronc « Accueil » de la barre thématique). Plus aucun consommateur. */
   </style>
 </head>
 <body class="auth-pending">
@@ -63,12 +56,18 @@
 
     <div class="season-pill" id="season-pill">SAISON …</div>
 
-    <nav class="main-nav">
-      <a href="index.html">Accueil</a>
-      <a href="evenements.html">Évènements</a>
-      <a href="joueurs.html">Joueurs</a>
-      <a href="pilotage-categorie.html">Statistiques</a>
-    </nav>
+    <!-- Navigation thématique « Mon équipe » : porteur VIDE, contenu injecté
+         par le module partagé js/hub-nav.js (thème « equipe » ; la table des
+         thèmes est l'unique source de vérité — GENERALISATION-NAV-THEMATIQUE,
+         FAIT FOI gelé 07/07/2026, calé pt 160). La page décide de l'EMPLACEMENT,
+         le module du CONTENU.
+         pilotage = PROFONDEUR (pilotage d'UNE compo, ?compo_base=&evenement=,
+         ouvert par deep-link depuis mes-compos) → porteur SILENCIEUX
+         (data-hub-nav-silent) : la barre complète du thème s'affiche pour
+         naviguer/retourner, mais AUCUN lien n'est marqué courant (la page
+         n'est pas une destination). Remplace la main-nav hors-thème (Accueil ·
+         Évènements · Joueurs · Statistiques), retraits tracés. -->
+    <nav class="main-nav hub-nav" data-hub-nav="equipe" data-hub-nav-silent></nav>
 
     <div class="icon-row">
       <button class="icon-btn" title="Recherche" aria-label="Recherche">
@@ -91,12 +90,10 @@
     </div>
   </header>
 
-  <div class="hub-back-row">
-    <a class="hub-back-btn" href="index.html">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 18l-6-6 6-6"/></svg>
-      Retour au portail
-    </a>
-  </div>
+  <script src="js/hub-nav.js"></script>
+
+  <!-- E3 (pt 160) : bouton corps « Retour au portail » (.hub-back-row) retiré
+       — redondant avec le tronc « Accueil » de la barre thématique. -->
 
   <div class="ss-wrap">
     <main id="ss-pilotage"><p class="ss-load">Initialisation…</p></main>
