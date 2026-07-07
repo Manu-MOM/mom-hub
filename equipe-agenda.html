@@ -237,8 +237,17 @@
     if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0) return null;
     return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
   }
-  // Date locale « YYYY-MM-DD » depuis date_debut ISO.
+  // Date « YYYY-MM-DD » d'un évènement : extraite DIRECTEMENT du texte ISO,
+  // sans passer par new Date()/composantes locales (une date-évènement stockée
+  // en UTC ne doit pas « reculer » d'un jour en heure de Paris). Cohérent avec
+  // l'adaptateur salarié (slice(0,10)).
   function dateDe(iso) {
+    return String(iso).slice(0, 10);
+  }
+  // Date « YYYY-MM-DD » en heure LOCALE : pour un évènement AVEC heure, la date
+  // affichée doit suivre l'heure de Paris (ex. match à 00h30 le 27 stocké en UTC
+  // le 26 -> on veut bien le 27).
+  function dateLocaleDe(iso) {
     const d = new Date(iso);
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
@@ -260,8 +269,11 @@
     // Un seul jour : item unique avec heure + durée dérivée.
     if (!dFin || dFin <= dDeb) {
       const heure = heureDe(ev.date_debut);
+      // Avec heure -> la date suit l'heure LOCALE (cohérent avec l'heure
+      // affichée, gère le cas limite après-minuit). Sans heure -> date ISO brute.
+      const dJour = heure ? dateLocaleDe(ev.date_debut) : dDeb;
       return [{
-        id: ev.id, date: dDeb, heure: heure, duree_min: dureeDe(ev, heure),
+        id: ev.id, date: dJour, heure: heure, duree_min: dureeDe(ev, heure),
         type: type, libelle: libelle, etat: etat, meta: ev
       }];
     }
