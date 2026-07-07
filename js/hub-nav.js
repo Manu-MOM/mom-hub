@@ -31,6 +31,17 @@
  * page fonctions-staff.html est conservée (orpheline de nav) ; aucune autre
  * destination ne change. Seule la table THEMES perd cette entrée ; aucun
  * comportement du module ne change.
+ * HUB-NAV v1.6 — ajout du thème « salarie » (chantier NAV-THEME-SALARIE,
+ * FAIT FOI gelé le 07/07/2026, calé STATE/CARTE pt 163). 3 destinations à
+ * jetons DIFFÉRENCIÉS calés sur les gardes réelles (Gestion salarié =
+ * 'admin bureau' ; Suivi salarié + Import agenda = 'staff'), patron mixte
+ * hérité du thème « ecoles ». Nav strictement additive sur suivi-salarie.html
+ * (agenda hub-agenda INTERDIT et flux d'édition NON touchés). Seule la table
+ * THEMES gagne une entrée ; aucun comportement du module ne change.
+ *
+ * ►► CLÔTURE DE LA GÉNÉRALISATION (G2, pt 163) : tous les thèmes sont
+ * désormais migrés. À compter de v1.6, js/hub-nav.js devient INTERDIT
+ * (patron hub-agenda) : plus aucune modification hors chantier dédié.
  *
  * UN SEUL POINT DE VÉRITÉ pour la navigation thématique du Hub.
  * Remplace le patron dupliqué HUB-NAV-LOGISTIQUE v2 (BLOCS A/B/C
@@ -67,7 +78,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.5';
+  var VERSION = '1.6';
 
   /* ------------------------------------------------------------------ *
    * TRONC COMMUN — présent en tête de chaque nav (lexique unifié).
@@ -158,6 +169,22 @@
         { label: 'Staff', href: 'staff.html' },
         { label: 'Collectif (admin)', href: 'u-admin.html' },
         { label: 'Import OVAL-E', href: 'import-oval-e.html' }
+      ])
+    },
+
+    'salarie': {
+      ariaLabel: 'Navigation salarié',
+      carrefour: false,
+      // Jetons DIFFÉRENCIÉS calés sur les gardes de page réelles (vérifiées
+      // à la source 07/07), patron mixte hérité du thème « ecoles » :
+      //  - Gestion salarié : garde admin|bureau (versant employeur) → 'admin bureau'
+      //  - Suivi salarié   : garde admin|bureau écriture + salarié relié lecture → 'staff'
+      //  - Import agenda    : garde admin|bureau OU salarié (suis_je_salarie) → 'staff'
+      // La nav reflète la garde : un salarié relié voit Suivi + Import, pas Gestion.
+      liens: tronc().concat([
+        { label: 'Gestion salarié', href: 'gestion-salarie.html', show: 'admin bureau' },
+        { label: 'Suivi salarié', href: 'suivi-salarie.html', show: 'staff' },
+        { label: 'Import agenda', href: 'import-agenda-salarie.html', show: 'staff' }
       ])
     },
 
