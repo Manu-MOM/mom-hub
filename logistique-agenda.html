@@ -68,6 +68,11 @@
     .ag-sw.t-veo                 { background:#c7508a; }
     .ag-ev.t-bus,                 .ag-chip.t-bus                 { background:#eceff2; color:#333e4a; border-left-color:#52616f; }
     .ag-sw.t-bus                 { background:#52616f; }
+    /* Repères informatifs (AGENDA-VACANCES-FERIES) : styles discrets, ne doivent pas écraser les vrais événements */
+    .ag-ev.t-ferie,               .ag-chip.t-ferie               { background:#fdf3f3; color:#8a4a4a; border-left-color:#c98a8a; }
+    .ag-sw.t-ferie               { background:#c98a8a; }
+    .ag-ev.t-vacances,            .ag-chip.t-vacances            { background:#f5f3ee; color:#7a746a; border-left-color:#c9c2b2; }
+    .ag-sw.t-vacances            { background:#c9c2b2; }
 
     /* ----------------------------------------------------------
        PENDING (rendu validé en maquette : hachuré + bordure
@@ -451,6 +456,63 @@
       // ------------------------------------------------------------------
       // fetchWindow — projection tri-source bornée [debutISO, finISO]
       // ------------------------------------------------------------------
+      // ------------------------------------------------------------------
+      // Repères fériés/vacances (AGENDA-VACANCES-FERIES, FAIT FOI 07/07/2026)
+      // JSON statique de saison, chargé UNE fois au boot. FAIL-SOFT intégral :
+      // fichier absent/invalide -> repères simplement absents, agenda intact.
+      // ------------------------------------------------------------------
+      var reperesData = { feries: [], vacances: [] };
+
+      async function chargerReperes() {
+        try {
+          var r = await fetch('data/vacances-feries-2026-2027.json');
+          if (!r.ok) return;
+          var d = await r.json();
+          if (d && Array.isArray(d.feries) && Array.isArray(d.vacances)) reperesData = d;
+        } catch (e) {
+          console.warn('Repères vacances/fériés indisponibles', e);
+        }
+      }
+
+      // Itère chaque jour ISO de [debISO, finISO] (fins INCLUSIVES, anti-UTC).
+      function chaqueJourISO(debISO, finISO, cb) {
+        var p = debISO.split('-'), q = finISO.split('-');
+        var d = new Date(+p[0], +p[1] - 1, +p[2]);
+        var fin = new Date(+q[0], +q[1] - 1, +q[2]);
+        while (d <= fin) {
+          cb(isoOf(d));
+          d.setDate(d.getDate() + 1);
+        }
+      }
+
+      // Items untimed de repère bornés à la fenêtre. etat 'repere' : hors
+      // pending|approved, inerte pour etatMark/estAnnulee (informatif pur).
+      function reperesFenetre(debutISO, finISO) {
+        var out = [];
+        (reperesData.feries || []).forEach(function (f) {
+          if (!f || !f.date || f.date < debutISO || f.date > finISO) return;
+          out.push({
+            id: 'fer-' + f.date, date: f.date, heure: null, duree_min: null,
+            type: 'ferie', libelle: 'Férié — ' + (f.libelle || ''),
+            etat: 'repere', meta: { src: 'repere', repere: f }
+          });
+        });
+        (reperesData.vacances || []).forEach(function (v, idx) {
+          if (!v || !v.debut || !v.fin) return;
+          var deb = v.debut > debutISO ? v.debut : debutISO;
+          var fin = v.fin < finISO ? v.fin : finISO;
+          if (deb > fin) return;
+          chaqueJourISO(deb, fin, function (iso) {
+            out.push({
+              id: 'vac-' + idx + '-' + iso, date: iso, heure: null, duree_min: null,
+              type: 'vacances', libelle: v.libelle || 'Vacances',
+              etat: 'repere', meta: { src: 'repere', repere: v }
+            });
+          });
+        });
+        return out;
+      }
+
       var lastWindow = null; // mémorisée pour résoudre l'année du clic créneau libre
 
       async function fetchWindow(debutISO, finISO) {
@@ -518,6 +580,9 @@
           });
         });
 
+        // 4) Repères fériés/vacances (informatifs, fail-soft)
+        reperesFenetre(debutISO, finISO).forEach(function (it) { items.push(it); });
+
         return items;
       }
 
@@ -525,10 +590,19 @@
       // Détail (modale du module) — catégorie + motif affichés (arbitrage)
       // ------------------------------------------------------------------
       function detailTitre(it) {
+        if (it.meta.src === 'repere') return it.libelle;
         if (it.meta.src === 'bus') return 'Bus · ' + (it.meta.row.destination || '—');
         return ressLbl(it.meta.row.ressource_id);
       }
       function detailRows(it) {
+        if (it.meta.src === 'repere') {
+          var rp = it.meta.repere || {};
+          var rrows = [{ lbl: 'Nature', val: it.type === 'ferie' ? 'Jour férié (Alsace-Moselle)' : 'Vacances scolaires (zone B — académie de Strasbourg)' }];
+          if (rp.debut && rp.fin) rrows.push({ lbl: 'Période', val: rp.debut + ' → ' + rp.fin });
+          else rrows.push({ lbl: 'Date', val: it.date });
+          rrows.push({ lbl: 'Info', val: 'Repère informatif — les réservations restent possibles.' });
+          return rrows;
+        }
         var r = it.meta.row;
         var rows = [];
         if (it.meta.src === 'bus') {
@@ -572,6 +646,8 @@
         showToast('Impossible de charger les ressources.', false);
       }
 
+      await chargerReperes(); // fail-soft interne : ne jette jamais
+
       // Légende (ordre = palette FAIT FOI 5.4) : libellés lus du
       // référentiel, repli sur les libellés connus si absent.
       var ORDRE_LEGENDE = [
@@ -590,6 +666,8 @@
         return { code: t.code, lib: libByCode[t.code] || t.repli };
       });
       types.push({ code: 'bus', lib: 'Bus (affrété)' });
+      types.push({ code: 'ferie', lib: 'Férié' });
+      types.push({ code: 'vacances', lib: 'Vacances scolaires' });
 
       var agRoot = el('agRoot');
       var agenda = HubAgenda.create(agRoot, {
