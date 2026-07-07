@@ -1133,12 +1133,14 @@
 
     <div class="season-pill">SAISON …</div>
 
-    <nav class="main-nav">
-      <a href="index.html">Tableau de bord</a>
-      <a class="active">Mes outils</a>
-      <a>Annuaire</a>
-      <a>Configuration</a>
-    </nav>
+    <!-- Navigation thématique « Mon équipe » : porteur VIDE, contenu injecté
+         par le module partagé js/hub-nav.js (thème « equipe » ; la table des
+         thèmes est l'unique source de vérité — GENERALISATION-NAV-THEMATIQUE,
+         FAIT FOI gelé 07/07/2026, calé pt 160). La page décide de l'EMPLACEMENT,
+         le module du CONTENU. joueurs = DESTINATION « Effectif » (lien propre,
+         marqué courant ici). Remplace la main-nav statique (Tableau de bord ·
+         Mes outils · Annuaire(mort) · Configuration(mort)), retraits tracés. -->
+    <nav class="main-nav hub-nav" data-hub-nav="equipe"></nav>
 
     <div class="icon-row">
       <button class="icon-btn" title="Recherche">
@@ -1173,6 +1175,8 @@
       Se connecter
     </a>
   </header>
+
+  <script src="js/hub-nav.js"></script>
 
   <!-- ============ MAIN LAYOUT ============ -->
   <main class="joueur-layout">
