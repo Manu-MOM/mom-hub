@@ -47,6 +47,17 @@
     .joueur-side-col { display: none; }
   }
 
+  /* HUB-NAV E5 (pt 160) — cohabitation carcan fullscreen ↔ porteur thématique.
+     Sous 1000px, le module hub-nav bascule .main-nav.hub-nav en rangée pleine
+     largeur sous la marque (topbar → height:auto). Or .app impose
+     grid-template-rows:56px 1fr : la topbar élargie déborderait sur le contenu
+     (rangée 1 figée à 56px). On libère la rangée topbar au MÊME seuil que le
+     module (1000px, pas 1024) pour éviter toute bande morte. Desktop >1000px
+     STRICTEMENT inchangé. Additif, scopé fullscreen. */
+  @media (max-width: 1000px) {
+    .app { height: auto; grid-template-rows: auto 1fr; }
+  }
+
   /* ========== BANDEAU PAGE (en-tête du module) ========== */
   .joueur-header {
     display: grid;
