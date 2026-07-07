@@ -68,13 +68,12 @@
     .ag-sw.t-veo                 { background:#c7508a; }
     .ag-ev.t-bus,                 .ag-chip.t-bus                 { background:#eceff2; color:#333e4a; border-left-color:#52616f; }
     .ag-sw.t-bus                 { background:#52616f; }
-    /* Repères informatifs (AGENDA-VACANCES-FERIES) : rendus en ÉTIQUETTES
-       (ajustement recette 07/07/2026, harmonisé sur logistique-validation)
-       — fond quasi transparent, liseré pointillé, italique compact.
-       Rendu INTÉRIM en attendant la rangée journée entière (chantier module). */
-    .ag-ev.t-ferie,               .ag-chip.t-ferie               { background:rgba(201,138,138,.08); color:#8a4a4a; border:1px dashed #c98a8a; font-size:10px; font-style:italic; line-height:1.2; padding:1px 6px; }
+    /* Repères informatifs (AGENDA-VACANCES-FERIES) rendus en RANGÉE journée
+       entière (chantier AGENDA-MODULE-V1.1, module v1.1) : puces normales dans
+       la rangée, plus d'étiquettes intérim (dette REPERES-RENDU-INTERIM soldée). */
+    .ag-ev.t-ferie,               .ag-chip.t-ferie               { background:#f6e9e9; color:#8a4a4a; border-left-color:#c98a8a; }
     .ag-sw.t-ferie               { background:#c98a8a; }
-    .ag-ev.t-vacances,            .ag-chip.t-vacances            { background:rgba(201,194,178,.12); color:#7a746a; border:1px dashed #c9c2b2; font-size:10px; font-style:italic; line-height:1.2; padding:1px 6px; }
+    .ag-ev.t-vacances,            .ag-chip.t-vacances            { background:#f3f1ea; color:#7a746a; border-left-color:#c9c2b2; }
     .ag-sw.t-vacances            { background:#c9c2b2; }
 
     /* ----------------------------------------------------------
@@ -684,6 +683,8 @@
           action: function () { return null; }   // consultation : lecture seule
         },
         capacites: { pleinEcran: true, caseAnnulees: false },
+        plageFixe: [8, 22],          // AGENDA-MODULE-V1.1 P2 : grille stable 08-22
+        untimedEnRangee: true,       // AGENDA-MODULE-V1.1 R1 : repères/bus en rangée journée entière
         estAnnulee: function () { return false; },   // statuts pending|approved seuls projetés
         etatMark: function (it) { return it.etat === 'pending' ? '⏳' : ''; },
         onError: function (e) {
