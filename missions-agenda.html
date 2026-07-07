@@ -221,6 +221,8 @@
       types: TYPES.concat([TYPE_DIVERS]).map(function (t) { return { code: t.code, lib: t.lib }; }),
       detail: { titre: function (it) { return it.libelle || agTypeLib(it.type); }, rows: agDetailRows },
       capacites: { pleinEcran: true, caseAnnulees: true },
+      plageFixe: [8, 22],          // AGENDA-MODULE-V1.1 P2 : grille stable 08-22 (modèle unique)
+      untimedEnRangee: true,       // AGENDA-MODULE-V1.1 R1 : séances sans heure en rangée journée entière
       estAnnulee: function (it) { return it.etat === 'annulee'; },
       etatMark: function (it) { return it.etat === 'validee' ? '✓✓' : (it.etat === 'realisee' ? '✓' : ''); },
       onError: function (e) { flash('Agenda : ' + errMsg(e), 'err'); }
