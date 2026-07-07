@@ -38,6 +38,15 @@
  * hérité du thème « ecoles ». Nav strictement additive sur suivi-salarie.html
  * (agenda hub-agenda INTERDIT et flux d'édition NON touchés). Seule la table
  * THEMES gagne une entrée ; aucun comportement du module ne change.
+ * HUB-NAV v1.7 — ajout de la destination « Agenda salarié »
+ * (missions-agenda.html) au thème « salarie », entre « Suivi salarié » et
+ * « Import agenda » (chantier MISSIONS-AGENDA, déplacement voie 1 de l'agenda
+ * hors de suivi-salarie.html vers sa surface dédiée). Jeton 'staff' (voie 3 :
+ * admin|bureau OU salarié relié, lecture seule — un salarié consulte son propre
+ * planning). ÉCART DE GOUVERNANCE ACTÉ par Manu : modification d'un module
+ * INTERDIT depuis v1.6, hors chantier de généralisation. Seule la table THEMES
+ * gagne une entrée ; aucun comportement du module ne change. Le module reste
+ * INTERDIT.
  *
  * ►► CLÔTURE DE LA GÉNÉRALISATION (G2, pt 163) : tous les thèmes sont
  * désormais migrés. À compter de v1.6, js/hub-nav.js devient INTERDIT
@@ -78,7 +87,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.6';
+  var VERSION = '1.7';
 
   /* ------------------------------------------------------------------ *
    * TRONC COMMUN — présent en tête de chaque nav (lexique unifié).
@@ -179,11 +188,13 @@
       // à la source 07/07), patron mixte hérité du thème « ecoles » :
       //  - Gestion salarié : garde admin|bureau (versant employeur) → 'admin bureau'
       //  - Suivi salarié   : garde admin|bureau écriture + salarié relié lecture → 'staff'
+      //  - Agenda salarié   : garde admin|bureau OU salarié relié (voie 3, lecture seule) → 'staff'
       //  - Import agenda    : garde admin|bureau OU salarié (suis_je_salarie) → 'staff'
-      // La nav reflète la garde : un salarié relié voit Suivi + Import, pas Gestion.
+      // La nav reflète la garde : un salarié relié voit Suivi + Agenda + Import, pas Gestion.
       liens: tronc().concat([
         { label: 'Gestion salarié', href: 'gestion-salarie.html', show: 'admin bureau' },
         { label: 'Suivi salarié', href: 'suivi-salarie.html', show: 'staff' },
+        { label: 'Agenda salarié', href: 'missions-agenda.html', show: 'staff' },
         { label: 'Import agenda', href: 'import-agenda-salarie.html', show: 'staff' }
       ])
     },
