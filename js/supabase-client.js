@@ -1916,7 +1916,11 @@
         p_debut_match:               payload.debut_match               ?? null,
         p_fin_prevue:                payload.fin_prevue                ?? null,
         p_rdv_heure:                 payload.rdv_heure                 ?? null,
-        p_rdv_lieu:                  payload.rdv_lieu                  ?? null
+        p_rdv_lieu:                  payload.rdv_lieu                  ?? null,
+        // EVT-RATTACHEMENT-CATEGORIE — rattachement principal (sql_171).
+        // Requis côté RPC pour entrainement/stage ; déduit des équipes
+        // engagées pour une compétition si non fourni.
+        p_categorie_id:              payload.categorie_id              ?? null
       };
 
       const { data, error } = await client.rpc('creer_evenement_complet', rpcParams);
@@ -2011,10 +2015,11 @@
       // 2. Construit le payload du nouvel évent (champs whitelistés)
       const fieldsToCopy = [
         'libelle', 'type_evenement', 'type_competition',
-        'equipe_id', 'saison_id', 'format_de_jeu',
+        'equipe_id', 'categorie_id', 'saison_id', 'format_de_jeu',
         'date_debut', 'date_fin', 'site_id',
         'organisateur_principal_id',
         'adversaire_nom', 'domicile_exterieur'
+        // categorie_id : rattachement principal (EVT-RATTACHEMENT-CATEGORIE).
         // NB : evenement_parent_id, phase_libelle, ordre_dans_phase NON copiés
         // (V1 ne duplique que les parents/orphelins). score, classement,
         // notes_resultat, logistique : ne pas copier non plus.
