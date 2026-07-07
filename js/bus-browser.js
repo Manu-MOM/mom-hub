@@ -44,6 +44,8 @@
   // ============================================================
   const state = {
     editId: null,        // mode édition ?edit=<id> (cycle de vie B4)
+    retour: null,        // provenance ?retour= (SURFACE-DEMANDEUR D5) :
+                         // 'logistique' → retour au guichet ; sinon poste bureau
     isTransverse: false,
     categories: [],
     catCoches: [],       // uuid[] catégories cochées, ORDRE DE COCHE (T4)
@@ -426,8 +428,9 @@
     if (!res.ok) { showToast('Échec : ' + (res.error || 'erreur'), false); return; }
     if (state.editId) {
       showToast('Demande modifiée — repassée en attente de validation', true);
-      // Retour au poste (l'entrée v1 de l'édition est le poste bureau).
-      setTimeout(function () { window.location.href = 'logistique-validation.html'; }, 900);
+      // Retour selon la provenance (D5) : guichet « Mes demandes » pour le
+      // demandeur, poste bureau sinon (entrée historique de l'édition).
+      setTimeout(function () { window.location.href = urlRetour(); }, 900);
       return;
     }
     showToast('Demande de bus envoyée (en attente)', true);
@@ -466,9 +469,26 @@
     } catch (e) { return null; }
   }
 
+  // Provenance de l'édition (SURFACE-DEMANDEUR D5). 'logistique' quand
+  // l'entrée est le guichet « Mes demandes » du demandeur ; absent quand
+  // l'entrée est le poste de validation bureau (comportement historique).
+  function getRetourParam() {
+    try {
+      return new URLSearchParams(window.location.search).get('retour') || null;
+    } catch (e) { return null; }
+  }
+
+  // Destination de retour après modification/annulation en mode édition.
+  function urlRetour() {
+    return state.retour === 'logistique'
+      ? 'logistique.html'
+      : 'logistique-validation.html';
+  }
+
   async function applyEditMode() {
     const editId = getEditParam();
     if (!editId || !/^[0-9a-f-]{36}$/i.test(editId)) return;
+    state.retour = getRetourParam();
     const q = await SupabaseHub.client
       .from('demandes_bus').select('*').eq('id', editId).single();
     if (q.error || !q.data) {
@@ -558,7 +578,7 @@
     if (ann) ann.disabled = false;
     if (!res.ok) { showToast('Échec : ' + (res.error || ''), false); return; }
     showToast('Demande annulée', true);
-    setTimeout(function () { window.location.href = 'logistique-validation.html'; }, 900);
+    setTimeout(function () { window.location.href = urlRetour(); }, 900);
   }
 
   // ============================================================
