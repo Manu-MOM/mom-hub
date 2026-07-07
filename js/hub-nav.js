@@ -18,6 +18,13 @@
  * Seule extension de comportement depuis v1.0 ; thèmes existants inchangés
  * (aucun porteur silencieux sur logistique/ecoles/pedagogie → marquage courant
  * conservé à l'identique).
+ * HUB-NAV v1.4 — ajout du thème « administration » (chantier NAV-THEME-
+ * ADMINISTRATION, FAIT FOI gelé le 07/07/2026, calé STATE/CARTE pt 162). Les
+ * 8 destinations (Équipes/Saisons/Sites/Rôles & accès/Staff/Fonctions staff/
+ * Collectif (admin)/Import OVAL-E) sont posées SANS jeton : ces pages sont
+ * admin-strict (garde de page redirige tout non-admin vers ./), la barre les
+ * reflète pour tous (« la nav MASQUE, la garde PROTÈGE » — J1 pt 160). Seule
+ * la table THEMES gagne une entrée ; aucun comportement du module ne change.
  *
  * UN SEUL POINT DE VÉRITÉ pour la navigation thématique du Hub.
  * Remplace le patron dupliqué HUB-NAV-LOGISTIQUE v2 (BLOCS A/B/C
@@ -54,7 +61,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.3';
+  var VERSION = '1.4';
 
   /* ------------------------------------------------------------------ *
    * TRONC COMMUN — présent en tête de chaque nav (lexique unifié).
@@ -126,6 +133,26 @@
         { label: 'Compositions', href: 'mes-compos.html' },
         { label: 'Évènements', href: 'evenements.html' },
         { label: 'Statistiques', href: 'pilotage-categorie.html' }
+      ])
+    },
+
+    'administration': {
+      ariaLabel: 'Navigation administration',
+      carrefour: false,
+      // 8 DESTINATIONS sans jeton (décision J1 gelée pt 160, reconduite
+      // pt 162) : les 8 pages du thème sont admin-strict (garde de PAGE
+      // has_role('admin') → redirect ./ pour tout non-admin, vérifié à la
+      // source 07/07). La barre les reflète pour tous ; la garde protège.
+      // « Import OVAL-E » (avec A) — nommage FFR canonique.
+      liens: tronc().concat([
+        { label: 'Équipes', href: 'admin-equipes.html' },
+        { label: 'Saisons', href: 'admin-saisons.html' },
+        { label: 'Sites', href: 'admin-sites.html' },
+        { label: 'Rôles & accès', href: 'roles-acces.html' },
+        { label: 'Staff', href: 'staff.html' },
+        { label: 'Fonctions staff', href: 'fonctions-staff.html' },
+        { label: 'Collectif (admin)', href: 'u-admin.html' },
+        { label: 'Import OVAL-E', href: 'import-oval-e.html' }
       ])
     },
 
