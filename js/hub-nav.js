@@ -3,6 +3,9 @@
  * =========================================
  * HUB-NAV v1.0 — naissance (chantier GENERALISATION-NAV-THEMATIQUE,
  * FAIT FOI gelé le 06/07/2026, calé STATE/CARTE pt 155).
+ * HUB-NAV v1.1 — ajout du thème « ecoles » (chantier NAV-THEME-ECOLES,
+ * FAIT FOI gelé le 07/07/2026, calé STATE/CARTE pt 158). Seule la table
+ * THEMES gagne une entrée ; aucun comportement du module ne change.
  *
  * UN SEUL POINT DE VÉRITÉ pour la navigation thématique du Hub.
  * Remplace le patron dupliqué HUB-NAV-LOGISTIQUE v2 (BLOCS A/B/C
@@ -39,7 +42,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.0';
+  var VERSION = '1.1';
 
   /* ------------------------------------------------------------------ *
    * TRONC COMMUN — présent en tête de chaque nav (lexique unifié).
@@ -73,6 +76,15 @@
         { label: 'Agenda', href: 'logistique-agenda.html' },
         { label: 'Bus', href: 'bus.html' },
         { label: 'Validation', href: 'logistique-validation.html', show: 'admin bureau' }
+      ])
+    },
+
+    'ecoles': {
+      ariaLabel: 'Navigation écoles',
+      carrefour: false,
+      liens: tronc().concat([
+        { label: 'Démarchage', href: 'demarchage-scolaire.html', show: 'staff' },
+        { label: 'Développement', href: 'developpement-scolaire.html', show: 'admin bureau' }
       ])
     },
 
