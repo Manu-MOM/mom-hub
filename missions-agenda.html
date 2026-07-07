@@ -13,9 +13,8 @@
   modales d'édition) mais n'affiche plus l'agenda (une destination = une surface,
   doctrine nav thématique).
 
-  Garde : admin|bureau STRICT (tuile dashboard « Agenda salarié » = bureau-seul).
-  La voie 3 salarié (consultation de son propre planning) n'est PAS ouverte ici
-  en v1 — elle reste couverte par suivi-salarie.html côté salarié relié.
+  Garde : VOIE 3 — admin|bureau OU salarié relié (lecture seule). Un salarié
+  relié consulte UNIQUEMENT son propre planning. Jeton nav/tuile = staff.
 
   LECTURE SEULE (FAIT FOI option a) : l'agenda affiche le planning et le détail
   au clic ; AUCUN bouton « Modifier ». Pour éditer une séance -> suivi-salarie.html.
@@ -228,28 +227,38 @@
     });
   }
 
-  // ---- Garde d'accès : admin|bureau STRICT + résolution du salarié ----
-  // Cascade FIABLE (identique à suivi-salarie.html) : contrat actif -> 1re mission
-  // existante -> monPersonneId (dernier recours). La voie 3 salarié n'est PAS ouverte.
+  // ---- Garde d'accès : VOIE 3 — admin|bureau OU salarié relié + résolution du salarié ----
+  // Patron suivi-salarie.html : admin|bureau voient le salarié v1 (cascade contrat ->
+  // 1re mission -> monPersonneId). Un salarié relié (dont qui_suis_je() est un
+  // missions.salarie_id) voit UNIQUEMENT SON propre planning (salarieId = monPersonneId).
+  // Lecture seule dans tous les cas (agenda sans action). La nav MASQUE (jeton staff),
+  // la garde PROTÈGE (cette fonction).
   async function resoudreAcces() {
     try { monPersonneId = await SupabaseHub.quiSuisJe(); } catch (e) { monPersonneId = null; }
     const roles = await SupabaseHub.getMyRoles();
-    const peutVoir = (roles.indexOf('admin') !== -1 || roles.indexOf('bureau') !== -1);
-    if (!peutVoir) return false;
+    const peutEcrire = (roles.indexOf('admin') !== -1 || roles.indexOf('bureau') !== -1);
 
-    let resolu = null;
-    try {
-      const contrats = (await rpc('list_contrats_salaries', { p_inclure_inactifs: false })) || [];
-      if (contrats.length) resolu = contrats[0].personne_id || null;
-    } catch (e) { resolu = null; }
-    if (!resolu) {
+    if (peutEcrire) {
+      let resolu = null;
       try {
-        const all = (await rpc('list_missions', { p_saison_id: saisonActive.id, p_salarie_id: null, p_entite_id: null })) || [];
-        resolu = all.length ? all[0].salarie_id : monPersonneId;
-      } catch (e) { resolu = monPersonneId; }
+        const contrats = (await rpc('list_contrats_salaries', { p_inclure_inactifs: false })) || [];
+        if (contrats.length) resolu = contrats[0].personne_id || null;
+      } catch (e) { resolu = null; }
+      if (!resolu) {
+        try {
+          const all = (await rpc('list_missions', { p_saison_id: saisonActive.id, p_salarie_id: null, p_entite_id: null })) || [];
+          resolu = all.length ? all[0].salarie_id : monPersonneId;
+        } catch (e) { resolu = monPersonneId; }
+      }
+      salarieId = resolu;
+      return true;
     }
-    salarieId = resolu;
-    return true;
+    // Non-admin/bureau : autorisé SEULEMENT si compte relié dont qui_suis_je() est un
+    // missions.salarie_id -> il voit son propre planning.
+    if (!monPersonneId) return false;
+    const mine = (await rpc('list_missions', { p_saison_id: saisonActive.id, p_salarie_id: monPersonneId, p_entite_id: null })) || [];
+    if (mine.length) { salarieId = monPersonneId; return true; }
+    return false;
   }
 
   // ---- Boot ----
