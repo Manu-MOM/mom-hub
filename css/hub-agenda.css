@@ -1,5 +1,11 @@
 /* ============================================================================
-   HUB-AGENDA v1.0 — CSS structurel du patron agenda (AGENDA-HUB-PATRON, pt 147)
+   HUB-AGENDA v1.1 — CSS structurel du patron agenda (AGENDA-HUB-PATRON, pt 147)
+   ----------------------------------------------------------------------------
+   v1.1 (07/07/2026, AGENDA-MODULE-V1.1) : classes structurelles ADDITIVES de la
+   rangée « journée entière » (.ag-allday / .ag-allday-axis / .ag-allday-cell),
+   soeur de .ag-weekbody, activée par cfg.untimedEnRangee côté JS. Sans l'option,
+   la rangée reste vide et invisible (:empty) — aucun impact sur v1.0. Le reste
+   du fichier est INCHANGÉ. La palette (.ag-chip.t-X) reste métier, aux pages.
    ----------------------------------------------------------------------------
    Extraction SANS changement des règles ag-* de suivi-salarie.html (déployé
    md5 14d7de7e9ff04d9d8bdf76c9fcffef39), correctifs recette du 04/07 inclus.
@@ -33,6 +39,14 @@
 .ag-daycol { position: relative; border-left: 1px solid var(--paper-warm, #e3e0d8); }
 .ag-hourline { position: absolute; left: 0; right: 0; border-top: 1px solid #f0ede4; pointer-events: none; }
 .ag-untimed { position: relative; z-index: 2; display: flex; flex-direction: column; gap: 2px; padding: 2px; }
+/* v1.1 — Rangée « journée entière » (soeur de .ag-weekhd/.ag-weekbody). Même
+   gabarit de colonnes ; hors de l'axe des heures. Vide quand untimedEnRangee
+   n'est pas activé (aucune cellule injectée -> :empty la masque). */
+.ag-allday { display: grid; grid-template-columns: 46px repeat(7, 1fr); border-bottom: 1px solid var(--paper-warm, #e3e0d8); background: var(--paper, #f8f5ec); }
+.ag-allday:empty { display: none; }
+.ag-allday .ag-allday-axis { border-left: 0; }
+.ag-allday .ag-allday-cell { border-left: 1px solid var(--paper-warm, #e3e0d8); padding: 3px; display: flex; flex-direction: column; gap: 2px; min-height: 20px; }
+.ag-allday .ag-chip { font-size: 11px; padding: 2px 6px; }
 .ag-ev { position: absolute; left: 0; overflow: hidden; border-radius: 5px; border-left: 3px solid #888; background: #eef; color: #234; padding: 2px 4px; font-size: 10px; line-height: 1.15; cursor: pointer; box-sizing: border-box; }
 .ag-ev .ag-ev-t { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ag-ev .ag-ev-l { overflow: hidden; text-overflow: ellipsis; }
