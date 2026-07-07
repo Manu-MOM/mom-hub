@@ -25,6 +25,12 @@
  * admin-strict (garde de page redirige tout non-admin vers ./), la barre les
  * reflète pour tous (« la nav MASQUE, la garde PROTÈGE » — J1 pt 160). Seule
  * la table THEMES gagne une entrée ; aucun comportement du module ne change.
+ * HUB-NAV v1.5 — retrait de la destination « Fonctions staff » du thème
+ * « administration » (recette pt 162 : doublon avec l'onglet FONCTIONS de
+ * staff.html, où la saisie des fonctions du staff se fait désormais). La
+ * page fonctions-staff.html est conservée (orpheline de nav) ; aucune autre
+ * destination ne change. Seule la table THEMES perd cette entrée ; aucun
+ * comportement du module ne change.
  *
  * UN SEUL POINT DE VÉRITÉ pour la navigation thématique du Hub.
  * Remplace le patron dupliqué HUB-NAV-LOGISTIQUE v2 (BLOCS A/B/C
@@ -61,7 +67,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.4';
+  var VERSION = '1.5';
 
   /* ------------------------------------------------------------------ *
    * TRONC COMMUN — présent en tête de chaque nav (lexique unifié).
@@ -150,7 +156,6 @@
         { label: 'Sites', href: 'admin-sites.html' },
         { label: 'Rôles & accès', href: 'roles-acces.html' },
         { label: 'Staff', href: 'staff.html' },
-        { label: 'Fonctions staff', href: 'fonctions-staff.html' },
         { label: 'Collectif (admin)', href: 'u-admin.html' },
         { label: 'Import OVAL-E', href: 'import-oval-e.html' }
       ])
