@@ -1654,9 +1654,9 @@
     // PHASE 4.2.C — RPC événements
     // ============================================================
 
-    async getEvenementsAVenir(equipeId = null, joursAVenir = 30) {
+    async getEvenementsAVenir(equipeId = null, joursAVenir = 30, categorieId = null) {
       const { data, error } = await client.rpc('get_evenements_a_venir', {
-        p_equipe_id: equipeId, p_jours_a_venir: joursAVenir
+        p_equipe_id: equipeId, p_jours_a_venir: joursAVenir, p_categorie_id: categorieId
       });
       if (error) { console.error('MOM Hub: getEvenementsAVenir()', error); return []; }
       return Array.isArray(data) ? data : [];
@@ -1689,11 +1689,12 @@
      * @param {number} [limit=50] Plafond résultats (cf. RPC p_limit)
      * @returns {Promise<Array>} 0..N événements passés, [] si erreur
      */
-    async getEvenementsPasses(equipeId = null, joursPasses = 30, limit = 50) {
+    async getEvenementsPasses(equipeId = null, joursPasses = 30, limit = 50, categorieId = null) {
       const { data, error } = await client.rpc('get_evenements_passes', {
         p_equipe_id:    equipeId,
         p_jours_passes: joursPasses,
-        p_limit:        limit
+        p_limit:        limit,
+        p_categorie_id: categorieId
       });
       if (error) { console.error('MOM Hub: getEvenementsPasses()', error); return []; }
       return Array.isArray(data) ? data : [];
