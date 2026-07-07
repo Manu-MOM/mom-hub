@@ -1387,12 +1387,19 @@
 
     <div class="season-pill">SAISON …</div>
 
-    <nav class="main-nav">
-      <a href="./">Tableau de bord</a>
-      <a class="active">Compositions</a>
-      <a>Annuaire</a>
-      <a>Configuration</a>
-    </nav>
+    <!-- Navigation thématique « Mon équipe » : porteur VIDE, contenu injecté
+         par le module partagé js/hub-nav.js (thème « equipe » ; la table des
+         thèmes est l'unique source de vérité — GENERALISATION-NAV-THEMATIQUE,
+         FAIT FOI gelé 07/07/2026, calé pt 160). La page décide de l'EMPLACEMENT,
+         le module du CONTENU.
+         compositions = PROFONDEUR (éditeur d'UNE compo, ouvert par deep-link
+         avec contexte) → porteur SILENCIEUX (data-hub-nav-silent) : la barre
+         complète du thème s'affiche pour naviguer/retourner, mais AUCUN lien
+         n'est marqué courant (l'éditeur n'est pas une destination ; en
+         particulier « Compositions » vise mes-compos.html, pas cette page).
+         Remplace la main-nav statique (Tableau de bord · Compositions(active) ·
+         Annuaire(mort) · Configuration(mort)), retraits tracés. -->
+    <nav class="main-nav hub-nav" data-hub-nav="equipe" data-hub-nav-silent></nav>
 
     <div class="icon-row">
       <button class="icon-btn" title="Recherche" aria-label="Recherche">
@@ -1422,6 +1429,8 @@
       </button>
     </div>
   </header>
+
+  <script src="js/hub-nav.js"></script>
 
   <main class="compo-layout">
     <button class="immersif-exit" id="btn-immersif-exit" type="button" title="Quitter le plein écran (Échap)" aria-label="Quitter le plein écran">✕</button>
