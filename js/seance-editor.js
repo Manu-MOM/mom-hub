@@ -443,6 +443,15 @@
     return State.equipeActive || null;
   }
 
+  /**
+   * Catégorie active du périmètre (chantier SEANCE-RATTACHEMENT-CATEGORIE).
+   * Rattachement principal des séances depuis le pt 180. null si périmètre
+   * non résolu (intersaison / droits non chargés).
+   */
+  function _catActive() {
+    return (State.perimetreCat && State.perimetreCat.active) || null;
+  }
+
   /** Équipes de la catégorie active → objets [{id,…}]. [] si indispo. */
   async function _seanceResoudreEquipesCategorieActive() {
     if (typeof SupabaseHub === 'undefined'
@@ -493,6 +502,12 @@
    * mémorise + recharge les données de l'écran.
    */
   function _monterSelecteurEquipe() {
+    // Chantier SEANCE-RATTACHEMENT-CATEGORIE — le sélecteur d'ÉQUIPE est
+    // retiré : les séances se rattachent à la CATÉGORIE, plus à l'équipe.
+    // On neutralise l'affichage par early-return (geste additif, code
+    // historique conservé dessous pour traçabilité / réversibilité).
+    return;
+    // eslint-disable-next-line no-unreachable
     const liste = State.equipesCategorieActive || [];
     if (liste.length <= 1) return; // mono-équipe : pas de sélecteur
 
@@ -3975,16 +3990,15 @@
   }
 
   async function onNouvelleSeance() {
-    // v1.19b — GARDE INTERSAISON : sans équipe active résolue
-    // (_equipeActive() === null : ententes non rattachées à la saison
-    // active), la création de séance échouerait côté RPC (equipe_id requis).
-    // On intercepte AVANT l'appel pour donner un message métier clair au
-    // lieu de l'erreur technique brute, et on ne crée rien.
-    if (!_equipeActive()) {
-      alert('Aucune équipe active pour cette catégorie : impossible de créer '
-        + 'une séance.\n\nLa saison a basculé mais les équipes ne sont pas '
-        + 'encore rattachées à la saison active. Reviens une fois les '
-        + 'ententes de la nouvelle saison en place.');
+    // Chantier SEANCE-RATTACHEMENT-CATEGORIE — le rattachement se fait
+    // désormais à la CATÉGORIE active (State.perimetreCat.active), plus à
+    // l'équipe. GARDE : sans catégorie active résolue, la création échouerait
+    // (categorie_id NOT NULL en base). On intercepte AVANT l'appel.
+    const _catActive = State.perimetreCat && State.perimetreCat.active;
+    if (!_catActive) {
+      alert('Aucune catégorie active : impossible de créer une séance.\n\n'
+        + 'Le périmètre de catégorie n\'est pas résolu (intersaison, ou '
+        + 'droits non chargés). Reviens une fois le périmètre en place.');
       return;
     }
 
@@ -3994,9 +4008,10 @@
     if (centerBtn)  centerBtn.disabled  = true;
 
     const res = await SupabaseHub.createSeance({
-      equipe_id: _equipeActive(),
+      categorie_id: _catActive,
       duree_totale_min: DUREE_DEFAULT_MIN,
       etat: 'brouillon'
+      // Pas d'equipe_id (D3) : rattachement catégorie seule.
       // Pas de date_seance par défaut : laisse le coach saisir
     });
 
@@ -4920,7 +4935,8 @@
     // Phase 5.10 : respecte le toggle "Afficher les archivées" et
     // rafraîchit en parallèle le compteur de brouillons vides
     const [seances] = await Promise.all([
-      SupabaseHub.listSeancesByEquipe(_equipeActive(), {
+      SupabaseHub.listSeancesByEquipe(null, {
+        categorieId: _catActive(),
         limit: NB_SEANCES_RECENTES,
         excludeArchivees: !State.showArchivees
       }),
@@ -4935,7 +4951,7 @@
    * en bas de sidebar par renderSidebar.
    */
   async function loadBrouillonsVides() {
-    State.brouillonsVides = await SupabaseHub.listBrouillonsVides(_equipeActive());
+    State.brouillonsVides = await SupabaseHub.listBrouillonsVides(null, _catActive());
   }
 
   async function loadSites() {
@@ -4945,7 +4961,7 @@
   async function loadEvenements() {
     // Fenêtre de 60 jours par défaut, élargie à l'usage : on couvre la
     // prochaine demi-saison sans submerger le dropdown.
-    State.evenements = await SupabaseHub.getEvenementsAVenir(_equipeActive(), 60);
+    State.evenements = await SupabaseHub.getEvenementsAVenir(null, 60, _catActive());
   }
 
   /**
@@ -5089,40 +5105,21 @@
    */
   async function loadStaffDisponibles() {
     try {
-      // v1.19 — GARDE INTERSAISON : si aucune équipe active n'est résolue
-      // (_equipeActive() === null : ententes non rattachées à la saison
-      // active, listEquipes []), on rend une pioche VIDE. On NE tombe PAS
-      // sur list_staff_disponibles(null) qui renverrait TOUT le staff du
-      // club (bug recette Manu : staff M14 proposé en M6). État honnête :
-      // pas d'équipe → personne à proposer (le champ libre du menu
-      // encadrants reste disponible pour un intervenant hors staff).
-      const eqActive = _equipeActive();
-      if (!eqActive) {
+      // Chantier SEANCE-RATTACHEMENT-CATEGORIE — la pioche staff se résout
+      // désormais DIRECTEMENT depuis la catégorie active (State.perimetreCat.
+      // active), sans détour par l'équipe (getCategorieEquipe supprimé ici).
+      // GARDE : pas de catégorie active → pioche VIDE (on ne tombe pas sur
+      // list_staff_disponibles(null) = tout le staff club, bug recette M6).
+      const categorieId = _catActive();
+      if (!categorieId) {
         State.staffDisponible = [];
-        console.log('SeanceEditor: aucune équipe active (intersaison) → pioche staff vide.');
+        console.log('SeanceEditor: aucune catégorie active → pioche staff vide.');
         return;
-      }
-      // v1.11 (recette terrain) — la pioche coach exige le VRAI categorie_id
-      // (uuid), pas la chaîne factice window.momSeanceContext.categorie_uuid
-      // ('cat-m14'). On le résout depuis l'équipe active via getCategorieEquipe
-      // (pont equipes -> ententes.categorie_id). Échec de résolution -> on
-      // retombe sur null = tout le staff du club (la RPC sql_109 l'accepte).
-      let categorieId = null;
-      try {
-        const eqId = _equipeActive();
-        if (eqId && typeof SupabaseHub.getCategorieEquipe === 'function') {
-          const catRes = await SupabaseHub.getCategorieEquipe(eqId);
-          if (catRes && catRes.ok && catRes.data && catRes.data.categorie_id) {
-            categorieId = catRes.data.categorie_id;
-          }
-        }
-      } catch (eCat) {
-        console.warn('SeanceEditor: résolution catégorie pour pioche coach KO, repli sur tout le staff', eCat);
       }
 
       const liste = await SupabaseHub.listStaffDisponibles(categorieId);
       State.staffDisponible = Array.isArray(liste) ? liste : [];
-      console.log('SeanceEditor: staff disponible chargé (' + State.staffDisponible.length + ' personnes assignables par bloc, categorie=' + (categorieId || 'tout le staff') + ')');
+      console.log('SeanceEditor: staff disponible chargé (' + State.staffDisponible.length + ' personnes assignables par bloc, categorie=' + categorieId + ')');
     } catch (e) {
       console.warn('SeanceEditor: loadStaffDisponibles() KO, sélecteur coach vide', e);
       State.staffDisponible = [];
@@ -5130,6 +5127,16 @@
   }
 
   async function loadVivierM14() {
+    // Chantier SEANCE-RATTACHEMENT-CATEGORIE — Q-A tranchée (c) : le vivier
+    // joueurs (getVivierCompo) est indexé ÉQUIPE ; sans équipe active, on le
+    // laisse VIDE. Hors périmètre « préparation de séance » — un chantier
+    // compo/vivier-catégorie dédié le traitera. On ne casse pas les
+    // consommateurs : State.vivier = [] et une Map vide.
+    State.vivier = [];
+    State.vivierById = new Map();
+    console.log('SeanceEditor: vivier non chargé (rattachement catégorie, Q-A c).');
+    return;
+    // eslint-disable-next-line no-unreachable
     try {
       State.vivier = await SupabaseHub.getVivierCompo(_equipeActive());
       State.vivierById = new Map();
