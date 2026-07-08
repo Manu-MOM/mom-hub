@@ -68,6 +68,12 @@
   .ag-sw.t-stage { background: #b03a6e; }
   .ag-ev.t-divers, .ag-chip.t-divers { background: #eef0ef; color: #42504a; border-left-color: #6b7a74; }
   .ag-sw.t-divers { background: #6b7a74; }
+  /* AGENDA-VACANCES-FERIES : repères informatifs (jours fériés + vacances scolaires),
+     patron logistique. Rangée journée entière via untimedEnRangee (déjà actif). */
+  .ag-ev.t-ferie, .ag-chip.t-ferie { background: #f6e9e9; color: #8a4a4a; border-left-color: #c98a8a; }
+  .ag-sw.t-ferie { background: #c98a8a; }
+  .ag-ev.t-vacances, .ag-chip.t-vacances { background: #f3f1ea; color: #7a746a; border-left-color: #c9c2b2; }
+  .ag-sw.t-vacances { background: #c9c2b2; }
 </style>
 </head>
 <body class="auth-pending">
@@ -178,6 +184,63 @@
   function parseDate(s) { const p = String(s).slice(0, 10).split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
   function agTypeLib(code) { const t = TYPE_BY_CODE[code]; return t ? t.lib : (code || '—'); }
 
+  // ---- AGENDA-VACANCES-FERIES : repères informatifs (patron logistique) ----
+  // Fériés Alsace-Moselle + vacances scolaires zone B, chargés depuis un JSON
+  // statique de saison. Fail-soft : fichier absent/invalide -> repères absents,
+  // agenda intact. Items etat 'repere' -> inertes (pas d'action, pas d'etatMark).
+  let reperesData = { feries: [], vacances: [] };
+
+  async function chargerReperes() {
+    try {
+      const r = await fetch('data/vacances-feries-2026-2027.json');
+      if (!r.ok) return;
+      const d = await r.json();
+      if (d && Array.isArray(d.feries) && Array.isArray(d.vacances)) reperesData = d;
+    } catch (e) {
+      console.warn('Repères vacances/fériés indisponibles', e);
+    }
+  }
+
+  // Itère chaque jour ISO de [debISO, finISO] (fins INCLUSIVES, anti-UTC).
+  function chaqueJourISO(debISO, finISO, cb) {
+    const d = parseDate(debISO);
+    const fin = parseDate(finISO);
+    while (d <= fin) {
+      const iso = d.getFullYear() + '-'
+        + String(d.getMonth() + 1).padStart(2, '0') + '-'
+        + String(d.getDate()).padStart(2, '0');
+      cb(iso);
+      d.setDate(d.getDate() + 1);
+    }
+  }
+
+  // Items untimed de repère bornés à la fenêtre. etat 'repere' : informatif pur.
+  function reperesFenetre(debutISO, finISO) {
+    const out = [];
+    (reperesData.feries || []).forEach(function (f) {
+      if (!f || !f.date || f.date < debutISO || f.date > finISO) return;
+      out.push({
+        id: 'fer-' + f.date, date: f.date, heure: null, duree_min: null,
+        type: 'ferie', libelle: 'Férié — ' + (f.libelle || ''),
+        etat: 'repere', meta: { src: 'repere', repere: f }
+      });
+    });
+    (reperesData.vacances || []).forEach(function (v, idx) {
+      if (!v || !v.debut || !v.fin) return;
+      const deb = v.debut > debutISO ? v.debut : debutISO;
+      const fin = v.fin < finISO ? v.fin : finISO;
+      if (deb > fin) return;
+      chaqueJourISO(deb, fin, function (iso) {
+        out.push({
+          id: 'vac-' + idx + '-' + iso, date: iso, heure: null, duree_min: null,
+          type: 'vacances', libelle: v.libelle || 'Vacances',
+          etat: 'repere', meta: { src: 'repere', repere: v }
+        });
+      });
+    });
+    return out;
+  }
+
   // ---- Adaptateur agenda (copié de suivi-salarie.html, SANS le chemin d'édition) ----
   function agMapRow(o) {
     return {
@@ -192,6 +255,14 @@
     };
   }
   function agDetailRows(it) {
+    if (it.meta && it.meta.src === 'repere') {
+      const rp = it.meta.repere || {};
+      const rrows = [{ lbl: 'Nature', val: it.type === 'ferie' ? 'Jour férié (Alsace-Moselle)' : 'Vacances scolaires (zone B — académie de Strasbourg)' }];
+      if (rp.debut && rp.fin) rrows.push({ lbl: 'Période', val: rp.debut + ' → ' + rp.fin });
+      else rrows.push({ lbl: 'Date', val: it.date });
+      rrows.push({ lbl: 'Info', val: 'Repère informatif.' });
+      return rrows;
+    }
     const o = it.meta;
     const d = parseDate(it.date);
     const when = JOURS[(d.getDay() + 6) % 7] + ' ' + d.getDate() + ' ' + MOIS[d.getMonth()]
@@ -216,9 +287,11 @@
           p_date_debut: debutISO,
           p_date_fin: finISO
         });
-        return (data || []).map(agMapRow);
+        return (data || []).map(agMapRow).concat(reperesFenetre(debutISO, finISO));
       },
-      types: TYPES.concat([TYPE_DIVERS]).map(function (t) { return { code: t.code, lib: t.lib }; }),
+      types: TYPES.concat([TYPE_DIVERS])
+        .concat([{ code: 'ferie', lib: 'Férié' }, { code: 'vacances', lib: 'Vacances scolaires' }])
+        .map(function (t) { return { code: t.code, lib: t.lib }; }),
       detail: { titre: function (it) { return it.libelle || agTypeLib(it.type); }, rows: agDetailRows },
       capacites: { pleinEcran: true, caseAnnulees: true },
       plageFixe: [8, 22],          // AGENDA-MODULE-V1.1 P2 : grille stable 08-22 (modèle unique)
@@ -286,6 +359,7 @@
     return;
   }
 
+  await chargerReperes(); // fail-soft interne : ne jette jamais
   agCreate();
   try { await agenda.init(); } catch (e) { flash('Agenda : ' + errMsg(e), 'err'); }
 })();
