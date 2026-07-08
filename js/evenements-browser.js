@@ -1858,6 +1858,204 @@
       && (evt.type_evenement === 'entrainement' || evt.type_evenement === 'stage');
   }
 
+  // EVT-SERIE-ECRAN : une MÈRE récurrente est une racine (pas de parent) de
+  // type entrainement/stage portant un objet recurrence avec une fréquence.
+  // C'est elle qui expose le bouton « Voir la série ».
+  function _estMereRecurrente(evt) {
+    return !!(evt && !evt.evenement_parent_id)
+      && (evt.type_evenement === 'entrainement' || evt.type_evenement === 'stage')
+      && !!(evt.recurrence && (evt.recurrence.frequence || evt.recurrence.mode === 'recurrent'));
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // EVT-SERIE-ECRAN — modale « voir la série » (V1, injectée en JS pour
+  // ne pas toucher evenements.html/hub.css). Liste TOUTES les occurrences
+  // d'une mère récurrente (au-delà de la fenêtre 90 j), permet de
+  // supprimer une séance, de supprimer la série entière, et d'éditer la
+  // date de fin de récurrence (prolongation/raccourcissement via
+  // modifierRecurrenceEvenement).
+  // ══════════════════════════════════════════════════════════════════
+  let SERIE_MERE_ID = null;
+
+  function _ensureModaleSerie() {
+    let ov = document.getElementById('evt-overlay-serie');
+    if (ov) return ov;
+    ov = document.createElement('div');
+    ov.className = 'evt-overlay';
+    ov.id = 'evt-overlay-serie';
+    ov.setAttribute('role', 'dialog');
+    ov.setAttribute('aria-modal', 'true');
+    ov.innerHTML =
+      '<div class="evt-modal">'
+      + '<div class="evt-modal-title" id="evt-serie-title">Série récurrente</div>'
+      + '<div class="evt-modal-body">'
+      + '<div id="evt-serie-msg"></div>'
+      + '<div class="evt-modal-info" id="evt-serie-info"><em>Chargement…</em></div>'
+      + '<div id="evt-serie-recurrence" style="margin:14px 0;padding:12px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);"></div>'
+      + '<div id="evt-serie-liste"></div>'
+      + '<div class="evt-modal-actions">'
+      + '<button type="button" class="evt-btn" data-action="serie-fermer">Fermer</button>'
+      + '<button type="button" class="evt-btn evt-fiche-suppr-occurrence" data-action="serie-supprimer-tout">🗑 Supprimer toute la série</button>'
+      + '</div>'
+      + '</div>';
+    document.body.appendChild(ov);
+    // Fermeture par clic sur le fond
+    ov.addEventListener('click', function (e) {
+      if (e.target === ov) fermerModaleSerie();
+    });
+    ov.querySelector('[data-action="serie-fermer"]')
+      .addEventListener('click', fermerModaleSerie);
+    ov.querySelector('[data-action="serie-supprimer-tout"]')
+      .addEventListener('click', _serieSupprimerTout);
+    return ov;
+  }
+
+  function fermerModaleSerie() {
+    const ov = document.getElementById('evt-overlay-serie');
+    if (ov) ov.classList.remove('show');
+    SERIE_MERE_ID = null;
+  }
+
+  async function ouvrirModaleSerie(mereId) {
+    SERIE_MERE_ID = mereId;
+    const ov = _ensureModaleSerie();
+    ov.classList.add('show');
+    const mere = EVENTS_BY_ID[mereId] || null;
+    const titre = document.getElementById('evt-serie-title');
+    if (titre) titre.textContent = 'Série : ' + ((mere && (mere.libelle || mere.code)) || '(récurrente)');
+    document.getElementById('evt-serie-msg').innerHTML = '';
+    document.getElementById('evt-serie-info').innerHTML = '<em>Chargement…</em>';
+    document.getElementById('evt-serie-liste').innerHTML = '';
+    document.getElementById('evt-serie-recurrence').innerHTML = '';
+    await _chargerSerie(mereId, mere);
+  }
+
+  async function _chargerSerie(mereId, mere) {
+    if (!window.SupabaseHub || typeof SupabaseHub.getOccurrencesSerie !== 'function') {
+      document.getElementById('evt-serie-info').innerHTML =
+        '<span class="evt-form-error">Fonction indisponible (client non chargé).</span>';
+      return;
+    }
+    const res = await SupabaseHub.getOccurrencesSerie(mereId);
+    if (!res || !res.ok) {
+      document.getElementById('evt-serie-info').innerHTML =
+        '<span class="evt-form-error">Erreur : ' + escHtml((res && res.error) || 'inconnue') + '</span>';
+      return;
+    }
+    // La mère est une séance de la série au même titre que les enfants.
+    const occ = res.data.slice();
+    const lignes = [];
+    if (mere) lignes.push({ ev: mere, estMere: true });
+    occ.forEach(o => lignes.push({ ev: o, estMere: false }));
+    lignes.sort((a, b) => String(a.ev.date_debut).localeCompare(String(b.ev.date_debut)));
+
+    document.getElementById('evt-serie-info').innerHTML =
+      '<strong>' + lignes.length + '</strong> séance' + (lignes.length > 1 ? 's' : '')
+      + ' dans la série (dont la séance mère).';
+
+    // Bloc d'édition de la fin de récurrence
+    const finRec = (mere && mere.recurrence && mere.recurrence.fin) ? String(mere.recurrence.fin).slice(0, 10) : '';
+    document.getElementById('evt-serie-recurrence').innerHTML =
+      '<label class="evt-form-label" for="evt-serie-fin" style="display:block;margin-bottom:6px;">Fin de récurrence</label>'
+      + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
+      + '<input type="date" class="evt-form-input" id="evt-serie-fin" value="' + escHtml(finRec) + '" style="max-width:180px;">'
+      + '<button type="button" class="evt-btn evt-btn-primary" data-action="serie-appliquer-fin">Appliquer</button>'
+      + '</div>'
+      + '<div style="font-size:11px;color:var(--ink-soft);margin-top:6px;">Allonger crée les séances manquantes ; raccourcir supprime les séances futures au-delà de la nouvelle date (jamais une séance passée).</div>';
+    const btnFin = document.querySelector('#evt-serie-recurrence [data-action="serie-appliquer-fin"]');
+    if (btnFin) btnFin.addEventListener('click', () => _serieAppliquerFin(mere));
+
+    // Liste des séances
+    const now = new Date();
+    let htmlL = '<div class="evt-serie-rows">';
+    lignes.forEach(({ ev, estMere }) => {
+      const d = ev.date_debut ? new Date(ev.date_debut) : null;
+      const dateTxt = d ? d.toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) : '(date ?)';
+      const heure = formatHeureOnly(ev.date_debut) || '';
+      const passe = d && d < now;
+      const badges = [];
+      if (estMere) badges.push('<span style="font-size:10px;background:var(--vert-prairie);color:var(--paper);padding:1px 6px;border-radius:3px;">mère</span>');
+      if (passe) badges.push('<span style="font-size:10px;color:var(--ink-soft);">passée</span>');
+      htmlL += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid var(--line);">'
+        + '<button type="button" class="evt-serie-lien" data-action="serie-ouvrir" data-evt-id="' + escHtml(ev.id) + '" style="background:none;border:none;padding:0;cursor:pointer;color:var(--ink);text-align:left;font-size:13px;">'
+        + escHtml(dateTxt) + (heure ? ' · ' + escHtml(heure) : '') + ' ' + badges.join(' ')
+        + '</button>';
+      if (!estMere) {
+        htmlL += '<button type="button" class="evt-btn" data-action="serie-suppr-occ" data-occ-id="' + escHtml(ev.id) + '" title="Supprimer cette séance" style="padding:3px 9px;font-size:11px;">🗑</button>';
+      }
+      htmlL += '</div>';
+    });
+    htmlL += '</div>';
+    document.getElementById('evt-serie-liste').innerHTML = htmlL;
+
+    // Câblage : ouvrir une séance (ferme la modale, ouvre la fiche)
+    document.querySelectorAll('#evt-serie-liste [data-action="serie-ouvrir"]').forEach(b => {
+      b.addEventListener('click', function () {
+        const id = this.getAttribute('data-evt-id');
+        if (!id) return;
+        fermerModaleSerie();
+        openFiche(id);
+      });
+    });
+    // Câblage : supprimer une occurrence
+    document.querySelectorAll('#evt-serie-liste [data-action="serie-suppr-occ"]').forEach(b => {
+      b.addEventListener('click', async function () {
+        const occId = this.getAttribute('data-occ-id');
+        if (!occId) return;
+        if (!window.confirm('Supprimer cette séance ? Elle ne réapparaîtra pas dans la série.')) return;
+        this.disabled = true;
+        const r = await SupabaseHub.supprimerOccurrenceEvenement(occId);
+        if (!r || !r.ok) {
+          window.alert('Suppression impossible : ' + ((r && r.error) || 'erreur inconnue'));
+          this.disabled = false;
+          return;
+        }
+        await _chargerSerie(SERIE_MERE_ID, EVENTS_BY_ID[SERIE_MERE_ID] || null);
+        await reloadEvents();
+      });
+    });
+  }
+
+  async function _serieAppliquerFin(mere) {
+    if (!SERIE_MERE_ID) return;
+    const input = document.getElementById('evt-serie-fin');
+    const msg = document.getElementById('evt-serie-msg');
+    const nouvelleFin = input && input.value ? input.value : null;
+    // Repartir de la recurrence existante, ne changer que la fin.
+    const recBase = (mere && mere.recurrence) ? Object.assign({}, mere.recurrence) : { mode: 'recurrent', frequence: 'hebdomadaire' };
+    recBase.fin = nouvelleFin;
+    if (msg) msg.innerHTML = '<em>Application…</em>';
+    const r = await SupabaseHub.modifierRecurrenceEvenement(SERIE_MERE_ID, recBase);
+    if (!r || !r.ok) {
+      if (msg) msg.innerHTML = '<span class="evt-form-error">Échec : ' + escHtml((r && r.error) || 'inconnue') + '</span>';
+      return;
+    }
+    if (msg) {
+      msg.innerHTML = '<span class="evt-form-success">✅ Série mise à jour ('
+        + (r.creees || 0) + ' créée(s), ' + (r.supprimees || 0) + ' supprimée(s)).</span>';
+    }
+    await reloadEvents();
+    await _chargerSerie(SERIE_MERE_ID, EVENTS_BY_ID[SERIE_MERE_ID] || null);
+  }
+
+  async function _serieSupprimerTout() {
+    if (!SERIE_MERE_ID) return;
+    if (!window.confirm('Supprimer TOUTE la série (la séance mère et toutes ses occurrences) ? Action irréversible.')) return;
+    const msg = document.getElementById('evt-serie-msg');
+    if (msg) msg.innerHTML = '<em>Suppression…</em>';
+    // Supprimer la mère → CASCADE emporte les enfants.
+    const r = (typeof SupabaseHub.supprimerEvenement === 'function')
+      ? await SupabaseHub.supprimerEvenement(SERIE_MERE_ID)
+      : { ok: false, error: 'supprimerEvenement indisponible' };
+    if (!r || !r.ok) {
+      if (msg) msg.innerHTML = '<span class="evt-form-error">Échec : ' + escHtml((r && r.error) || 'inconnue') + '</span>';
+      return;
+    }
+    fermerModaleSerie();
+    closeFiche();
+    await reloadEvents();
+  }
+
   // Fusionne des listes d'évènements en dédoublonnant par id (un même
   // évènement-racine peut remonter pour plusieurs équipes engagées).
   function _fusionnerEvenements(listes) {
@@ -3227,6 +3425,10 @@
         const parentLib = parent.libelle || parent.code || '(tournoi parent)';
         html += '<button type="button" class="evt-btn evt-fiche-back-parent" data-action="retour-parent" data-parent-id="' + escHtml(evt.evenement_parent_id) + '">↩ Retour à ' + escHtml(parentLib) + '</button>';
       }
+    } else if (_estMereRecurrente(evt)) {
+      // EVT-SERIE-ECRAN : mère récurrente → accès à la modale « voir la série »
+      // (toutes les occurrences, au-delà de la fenêtre 90 j).
+      html += '<button type="button" class="evt-btn evt-fiche-voir-serie" data-action="voir-serie" data-mere-id="' + escHtml(evt.id) + '">📅 Voir la série</button>';
     }
     html += '</div>';
 
@@ -4016,6 +4218,14 @@
         if (!parentId) return;
         closeFiche();
         openFiche(parentId);
+      });
+    });
+    // EVT-SERIE-ECRAN — ouvrir la modale « voir la série » depuis la mère.
+    document.querySelectorAll('[data-action="voir-serie"]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        const mereId = this.getAttribute('data-mere-id');
+        if (!mereId) return;
+        ouvrirModaleSerie(mereId);
       });
     });
     // EVT-RECURRENCE-OCCURRENCES — supprimer une séance (occurrence) : purge
