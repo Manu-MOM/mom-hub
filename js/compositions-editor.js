@@ -842,8 +842,9 @@
   // ============================================================
 
   // REPLI de dégradation honnête (mode legacy) : si le périmètre de
-  // catégories est indisponible, l'équipe active retombe sur M14.
-  const M14_TEAM_UUID = 'bfb83b83-83ef-4dde-b526-48ff87313044';
+  // catégories est indisponible, l'équipe active retombe sur null
+  // (dégradation propre côté wrappers) plutôt que sur une équipe M14
+  // en dur — cf. EVT-EDITEURS-CATEGORIE (fin du repli M14 résiduel).
   const M14_CATEGORIE_ID = '312ebb88-25e8-40c5-8a37-9dd2e3927e2e'; // UUID réel catégorie M14
   const NB_TITULAIRES_XV = 15;
   const NB_REMPLACANTS = 8;
@@ -915,9 +916,9 @@
   // Point dur 1, option (b) : sélecteur d'équipe si la catégorie
   // active a > 1 équipe ; mono-équipe (cas réel actuel) → rien.
 
-  /** UUID de l'équipe legacy courante (repli M14 honnête). */
+  /** UUID de l'équipe legacy courante (null si périmètre indisponible). */
   function _equipeActive() {
-    return State.equipeActive || M14_TEAM_UUID;
+    return State.equipeActive || null;
   }
 
   /** true si on est en mode legacy (pas de deep-link ?evenement_equipe=). */
@@ -942,10 +943,10 @@
     }
   }
 
-  /** Pose State.equipeActive : mémorisée si valide, sinon 1re ; repli M14. */
+  /** Pose State.equipeActive : mémorisée si valide, sinon 1re ; null si vide. */
   function _composChoisirEquipeActive() {
     const liste = State.equipesCategorieActive || [];
-    if (liste.length === 0) { State.equipeActive = M14_TEAM_UUID; return; }
+    if (liste.length === 0) { State.equipeActive = null; return; }
     let memorisee = null;
     try { memorisee = localStorage.getItem(CLE_EQUIPE_COMPO) || null; } catch (e) { /* honnête */ }
     const ok = memorisee && liste.some(function (eq) { return eq && eq.id === memorisee; });
