@@ -1505,6 +1505,13 @@
                   (s.etat === 'archivee' ? 'disabled title="Déjà archivée"' : 'title="Archiver cette séance"') + '>' +
             '📦 Archiver' +
           '</button>' +
+          // SEANCE-DUPLICATION v1 : dupliquer la séance (copie brouillon).
+          // Toujours actif, quel que soit l'état de la source.
+          '<button type="button" id="seance-btn-dupliquer-collapsed" ' +
+                  'class="seance-form__dupliquer-btn" ' +
+                  'title="Dupliquer cette séance (nouvelle copie en brouillon)">' +
+            '⧉ Dupliquer' +
+          '</button>' +
           '<button type="button" id="seance-btn-expand-form" class="seance-form-collapsed__edit-btn" title="Modifier les méta de la séance">' +
             '✏️ Modifier' +
           '</button>' +
@@ -1521,6 +1528,10 @@
         renderTrame(); // re-render pour rester en place
       });
     }
+
+    // SEANCE-DUPLICATION v1 : bind du bouton « ⧉ Dupliquer »
+    const btnDup = document.getElementById('seance-btn-dupliquer-collapsed');
+    if (btnDup) btnDup.addEventListener('click', onDupliquerSeance);
 
     // Phase 5.10 : bind du bouton "📦 Archiver" en mode collapsed
     const btnArchive = DOM.btnArchiveCollapsed();
@@ -3524,6 +3535,56 @@
     renderSidebar();
     renderEmptyEditor();
     showFeedback('Séance archivée ✓', 'success');
+  }
+
+  /**
+   * SEANCE-DUPLICATION v1 : duplique la séance courante.
+   * Appelle la RPC dupliquer_seance (méta + blocs + ateliers), qui crée
+   * une copie en 'brouillon' sans date (filiation modele_origine_id).
+   * Save préventif des modifs en cours, recharge la liste, PUIS ouvre la
+   * copie (patron onSelectSeance : blocs chargés, form déployé car pas de
+   * date). L'original n'est pas touché.
+   */
+  async function onDupliquerSeance() {
+    if (!State.currentSeance) return;
+
+    // Save préventif des modifs en cours (même pattern que onValiderSeance)
+    if (State.isDirty) {
+      await saveSeance({ silent: true });
+    }
+
+    const res = await SupabaseHub.dupliquerSeance(State.currentSeance.id);
+    if (!res.ok || !res.data) {
+      window.alert('Échec de la duplication :\n' + (res.error || 'erreur inconnue'));
+      return;
+    }
+    const newId = res.data;
+
+    // Recharge la liste (la copie doit y apparaître) puis ouvre la copie.
+    stopAutosave();
+    stopBlocAutosave();
+    await loadSeances();
+
+    const target = State.seances.find(function (s) { return s.id === newId; });
+    if (!target) {
+      // Sécurité : la copie existe en base mais pas dans le cache local.
+      showFeedback('Séance dupliquée ✓ (recharge la page pour l\'ouvrir)', 'success');
+      return;
+    }
+
+    State.currentSeance = target;
+    State.currentBloc = null;
+    State.view = 'trame';
+    State.blocIsDirty = false;
+    setDirty(false);
+    await loadBlocs();
+    // Copie sans date => form déployé (cohérent avec onSelectSeance).
+    State.formCollapsed = !!target.date_seance;
+    renderSidebar();
+    renderForm();
+    setAutosaveStatus('idle');
+    startAutosave();
+    showFeedback('Séance dupliquée ✓', 'success');
   }
 
   /**
