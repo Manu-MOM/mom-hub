@@ -845,7 +845,12 @@
   // catégories est indisponible, l'équipe active retombe sur null
   // (dégradation propre côté wrappers) plutôt que sur une équipe M14
   // en dur — cf. EVT-EDITEURS-CATEGORIE (fin du repli M14 résiduel).
-  const M14_CATEGORIE_ID = '312ebb88-25e8-40c5-8a37-9dd2e3927e2e'; // UUID réel catégorie M14
+  //
+  // COMPO-REPLI-M14-CATEGORIE : le dernier repli catégorie en dur
+  // (M14_CATEGORIE_ID) est supprimé. La catégorie de référence « hors
+  // catégorie » en legacy est désormais State.perimetreCat.active
+  // (résolue au boot AVANT loadVivier), repli null fail-safe — cf.
+  // _categorieReference() plus bas.
   const NB_TITULAIRES_XV = 15;
   const NB_REMPLACANTS = 8;
 
@@ -1285,7 +1290,27 @@
     const ctx = State.evenementEquipeContext;
     if (ctx && ctx.entente && ctx.entente.categorie_id) return ctx.entente.categorie_id;
     if (State.evenementEquipeId) return null; // U-N3 sans entente résolue : prudence
-    return M14_CATEGORIE_ID;                  // legacy : M14 partout (comme l'existant)
+    // legacy : catégorie active du périmètre (résolue au boot), repli null
+    // fail-safe — fin du repli M14 en dur (COMPO-REPLI-M14-CATEGORIE).
+    return (State.perimetreCat && State.perimetreCat.active) || null;
+  }
+
+  // Catégorie de référence pour le calcul « hors catégorie » en mode
+  // legacy (pose de joueur + rendu vivier). Point de vérité unique des
+  // 5 sites de comparaison, tous déjà gardés en amont par
+  // `if (State.evenementEquipeId)` (U-N3 lit `_horsGroupe`, pas ceci).
+  // Repli null fail-safe : catégorie non résolue → aucun warning inventé
+  // (cf. COMPO-REPLI-M14-CATEGORIE, variante A+).
+  function _categorieReference() {
+    return (State.perimetreCat && State.perimetreCat.active) || null;
+  }
+
+  // Vrai si `joueur` est hors de la catégorie de référence legacy.
+  // false si la catégorie n'est pas résolue (fail-safe) — on ne marque
+  // jamais un joueur « hors catégorie » sur une référence inconnue.
+  function _joueurHorsCategorieLegacy(joueur) {
+    const c = _categorieReference();
+    return c ? (joueur.categorie_id !== c) : false;
   }
 
   // Contrôle de validation de la compo (bannière).
@@ -4806,7 +4831,7 @@
     const etat = etatJoueurPourCompoCourante();
     const horsCat = State.evenementEquipeId
       ? !!joueur._horsGroupe
-      : (joueur.categorie_id !== M14_CATEGORIE_ID);
+      : _joueurHorsCategorieLegacy(joueur);
 
     // 1) Évincer l'occupant vers le banc (ou le vivier si banc plein).
     if (occupant) {
@@ -4873,7 +4898,7 @@
     const etat = etatJoueurPourCompoCourante();
     const horsCat = State.evenementEquipeId
       ? !!joueur._horsGroupe
-      : (joueur.categorie_id !== M14_CATEGORIE_ID);
+      : _joueurHorsCategorieLegacy(joueur);
 
     if (existant) {
       const r = await SupabaseHub.updateJoueurCompo(existant.id, {
@@ -5257,8 +5282,9 @@
           }
           html += '</li>';
         } else {
-          // Legacy : warning = hors catégorie M14 (byte-identique v3.7)
-          const horsCat = j.categorie_id !== M14_CATEGORIE_ID;
+          // Legacy : warning = hors catégorie de référence (perimetreCat.active),
+          // repli null fail-safe — cf. _joueurHorsCategorieLegacy.
+          const horsCat = _joueurHorsCategorieLegacy(j);
           const etq = etiquetteJoueur(j);
           const tagHtml = etq ? '<span class="effectif-item__tag effectif-item__tag--' + etq.kind + '">' + etq.label + '</span>' : '';
           html += '<li class="popover__item' + (horsCat ? ' popover__item--warning' : '') + '" data-joueur-id="' + escapeHtml(j.joueur_id) + '">';
@@ -5592,10 +5618,10 @@
     // v3.8 — en mode U-N3, est_depannage_hors_categorie reflète
     // « hors du groupe de base » (UN3-4, expose le champ EXISTANT
     // sql/18, non inventé). En legacy, comportement v3.7 préservé
-    // (comparaison categorie_id).
+    // (comparaison categorie_id, désormais via _joueurHorsCategorieLegacy).
     const horsCat = State.evenementEquipeId
       ? !!joueur._horsGroupe
-      : (joueur.categorie_id !== M14_CATEGORIE_ID);
+      : _joueurHorsCategorieLegacy(joueur);
     const params = {
       composition_id: State.selectedCompoId,
       joueur_id: joueurId,
@@ -5636,7 +5662,7 @@
     // v3.8 — idem onPickJoueurPourSlot ci-dessus : bascule par mode.
     const horsCat = State.evenementEquipeId
       ? !!joueur._horsGroupe
-      : (joueur.categorie_id !== M14_CATEGORIE_ID);
+      : _joueurHorsCategorieLegacy(joueur);
     const params = {
       composition_id: State.selectedCompoId,
       joueur_id: pv.joueurId,
