@@ -3878,6 +3878,25 @@
     },
 
     /**
+     * Duplique une séance (méta + blocs + ateliers) via la RPC
+     * dupliquer_seance (sql_184). La copie repart en 'brouillon', sans
+     * date, filiation tracée via modele_origine_id. Garde B5 serveur
+     * (admin|bureau|référent de la catégorie). Retourne l'uuid de la copie.
+     * SEANCE-DUPLICATION v1.
+     */
+    async dupliquerSeance(sourceId) {
+      if (!sourceId) return { ok: false, error: 'sourceId requis' };
+      const { data, error } = await client.rpc('dupliquer_seance', {
+        p_source_id: sourceId
+      });
+      if (error) {
+        console.error('MOM Hub: dupliquerSeance()', error);
+        return { ok: false, error: error.message };
+      }
+      return { ok: true, data };
+    },
+
+    /**
      * Supprime physiquement une séance (Phase 5.12).
      * Garde-fou métier : seuls les brouillons sont supprimables.
      * Le CASCADE FK supprime automatiquement les seances_blocs et
