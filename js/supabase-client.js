@@ -3290,16 +3290,23 @@
      * @returns {Promise<Array>} Tableau de séances, [] si erreur
      */
     async listSeancesByEquipe(equipeId, options) {
-      if (!equipeId) {
-        console.error('MOM Hub: listSeancesByEquipe() requiert un equipeId');
+      const opts = options || {};
+      // Chantier SEANCE-RATTACHEMENT-CATEGORIE : si opts.categorieId fourni,
+      // on filtre par catégorie (rattachement principal) ; sinon rétro-compat
+      // par equipe_id.
+      if (!equipeId && !opts.categorieId) {
+        console.error('MOM Hub: listSeancesByEquipe() requiert equipeId ou opts.categorieId');
         return [];
       }
-      const opts = options || {};
 
       let q = client
         .from('seances')
-        .select('*')
-        .eq('equipe_id', equipeId);
+        .select('*');
+      if (opts.categorieId) {
+        q = q.eq('categorie_id', opts.categorieId);
+      } else {
+        q = q.eq('equipe_id', equipeId);
+      }
 
       // Par défaut : exclut les modèles (vraies séances seulement)
       if (opts.includeModeles !== true) {
@@ -3358,15 +3365,18 @@
      * @param {number} [joursAVenir=14] Fenêtre en jours à partir d'aujourd'hui
      * @returns {Promise<Array>} Tableau de séances avec nb_blocs, [] si erreur
      */
-    async getSeancesAVenir(equipeId, joursAVenir) {
-      if (!equipeId) {
-        console.error('MOM Hub: getSeancesAVenir() requiert un equipeId');
+    async getSeancesAVenir(equipeId, joursAVenir, categorieId) {
+      // Chantier SEANCE-RATTACHEMENT-CATEGORIE : filtrage catégorie-first.
+      // Rétro-compat : si categorieId absent, on filtre encore par equipeId.
+      if (!equipeId && !categorieId) {
+        console.error('MOM Hub: getSeancesAVenir() requiert categorieId ou equipeId');
         return [];
       }
       const jours = (joursAVenir === undefined || joursAVenir === null) ? 14 : joursAVenir;
       const { data, error } = await client.rpc('get_seances_a_venir', {
-        p_equipe_id: equipeId,
-        p_jours_a_venir: jours
+        p_equipe_id: equipeId || null,
+        p_jours_a_venir: jours,
+        p_categorie_id: categorieId || null
       });
       if (error) {
         console.error('MOM Hub: getSeancesAVenir()', error);
@@ -3638,8 +3648,11 @@
      * @returns {Promise<{ok:boolean, data?:object, error?:string}>}
      */
     async createSeance(params) {
-      if (!params || !params.equipe_id) {
-        return { ok: false, error: 'equipe_id requis' };
+      // Chantier SEANCE-RATTACHEMENT-CATEGORIE : le rattachement principal est
+      // désormais categorie_id. equipe_id devient optionnel (nullable en base).
+      // On exige au moins un rattachement (catégorie OU équipe).
+      if (!params || (!params.categorie_id && !params.equipe_id)) {
+        return { ok: false, error: 'categorie_id (ou equipe_id) requis' };
       }
 
       const isModele = !!params.est_modele;
@@ -3648,14 +3661,15 @@
       }
 
       const payload = {
-        equipe_id: params.equipe_id,
         est_modele: isModele,
         etat: params.etat || 'brouillon',
         duree_totale_min: params.duree_totale_min || 75
       };
+      if (params.categorie_id) payload.categorie_id = params.categorie_id;
 
       // Champs optionnels (seulement si fournis explicitement)
       const optionalKeys = [
+        'equipe_id',
         'evenement_id', 'date_seance', 'heure_debut', 'effectif_prevu',
         'lieu_id', 'meteo_text', 'encadrants_text',
         'axe_travail_general', 'theme_principal', 'objectifs_text',
@@ -3957,19 +3971,22 @@
      * @returns {Promise<Array<{id:string, created_at:string}>>} brouillons
      *          éligibles à la suppression (peut être vide)
      */
-    async listBrouillonsVides(equipeId) {
-      if (!equipeId) {
-        console.error('MOM Hub: listBrouillonsVides() requiert un equipeId');
+    async listBrouillonsVides(equipeId, categorieId) {
+      // Chantier SEANCE-RATTACHEMENT-CATEGORIE : filtrage catégorie-first,
+      // rétro-compat equipe_id si categorieId absent.
+      if (!equipeId && !categorieId) {
+        console.error('MOM Hub: listBrouillonsVides() requiert equipeId ou categorieId');
         return [];
       }
       // Étape 1 : SELECT brouillons sans date_seance
-      const { data: brouillons, error: e1 } = await client
+      let q1 = client
         .from('seances')
         .select('id, created_at')
-        .eq('equipe_id', equipeId)
         .eq('etat', 'brouillon')
         .eq('est_modele', false)
         .is('date_seance', null);
+      q1 = categorieId ? q1.eq('categorie_id', categorieId) : q1.eq('equipe_id', equipeId);
+      const { data: brouillons, error: e1 } = await q1;
       if (e1) {
         console.error('MOM Hub: listBrouillonsVides() étape 1', e1);
         return [];
