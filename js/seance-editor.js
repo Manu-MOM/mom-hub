@@ -3597,7 +3597,21 @@
   async function onValiderSeance() {
     if (!State.currentSeance) return;
 
-    // Garde-fou : refuser de valider sans date_seance
+    // Save préventif AVANT le garde-fou : la date saisie au clavier n'est
+    // remontée dans State.currentSeance que par saveSeance (lecture du DOM).
+    // Sans ce save préalable, une date fraîchement tapée (ex. sur une séance
+    // dupliquée, née sans date) reste invisible au garde-fou ci-dessous et
+    // la validation est refusée à tort. Si le save échoue, on interrompt.
+    if (State.isDirty) {
+      const saved = await saveSeance({ silent: true });
+      if (!saved) {
+        window.alert('Échec de la sauvegarde avant validation.\n\n' +
+                     'Réessaie ou vérifie ta connexion.');
+        return;
+      }
+    }
+
+    // Garde-fou : refuser de valider sans date_seance (objet désormais à jour)
     if (!State.currentSeance.date_seance) {
       window.alert('Impossible de valider une séance sans date.\n\n' +
                    'Renseigne au moins la date avant de valider.');
@@ -3610,11 +3624,6 @@
       'Tu pourras toujours la modifier ou la repasser en brouillon ensuite.'
     );
     if (!ok) return;
-
-    // Save préventif des modifs en cours (même pattern que onArchiveSeance)
-    if (State.isDirty) {
-      await saveSeance({ silent: true });
-    }
 
     const res = await SupabaseHub.validerSeance(State.currentSeance.id);
     if (!res.ok) {
