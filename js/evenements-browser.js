@@ -2392,7 +2392,9 @@
     const eventsByDay = {};
     const all = EVENEMENTS_AVENIR.concat(EVENEMENTS_PASSES);
     all.forEach(e => {
-      if (e.evenement_parent_id) return;
+      // Masquer les enfants de tournoi, mais GARDER les occurrences
+      // d'entraînement récurrent (chaque séance = une pastille).
+      if (e.evenement_parent_id && !_estOccurrenceEntrainement(e)) return;
       const k = dateKey(e.date_debut);
       if (!eventsByDay[k]) eventsByDay[k] = [];
       eventsByDay[k].push(e);
