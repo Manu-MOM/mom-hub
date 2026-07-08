@@ -7,6 +7,16 @@
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
  * Version : 3.63 — Boot : deep-link ?vue=rapport (onglet Rapport via la vignette de la fiche évènement) (4 juin 2026)
+ *   v3.67 : FIX COMPO-MATCH-LIBRE-IDEMPOTENCE (pt 179). Le « + » (compo de
+ *           match libre, matchId=null) sautait la garde idempotente — réservée
+ *           au cas matchId fourni — et tentait un 2e INSERT sur le même triplet
+ *           (compo_base_origine_id, evenement_id=racine, cote) → violation de
+ *           idx_compositions_active_match_per_base_cote (« duplicate key »).
+ *           Correctif : cibleEvenementId calculé AVANT la garde, garde étendue
+ *           à cette cible (couvre match ET libre) + filtre compo_base_origine_id
+ *           aligné sur l'index. Le « + » rouvre l'existante au lieu de la
+ *           recréer. Cas U-N3 (onglets match) inchangé. ADDITIF (difflib +14/−5,
+ *           retraits 1:1 dont déplacement de la déclaration cibleEvenementId).
  *   v3.66 : VOIE 2 (lots 5/6) — validation via RPC valider_composition
  *           (capability valider_compo, remplace l'UPDATE direct validateCompo)
  *           + masquage fail-safe du bouton « Valider » par puisJeFaire.
@@ -5579,17 +5589,26 @@
     if (State.isCreatingMatch) return;
     const base = State.compos.find(c => c.type_compo === 'base');
     if (!base) { alert('Crée d\'abord la compo de base.'); return; }
-    // Si ce match a DÉJÀ une compo, on l'ouvre au lieu d'en recréer une.
-    if (matchId) {
+    // evenement_id de la future compo : le match (α) ou la racine (libre).
+    // Calculé AVANT la garde pour que la recherche d'existante porte sur la
+    // même cible que l'INSERT (sinon collision idx unique côté base).
+    const cibleEvenementId = matchId || State.selectedEvenementId;
+    // Si une compo de match existe DÉJÀ pour cette cible, on l'ouvre au lieu
+    // d'en recréer une. Couvre le cas match (matchId) ET le cas « libre »
+    // (matchId null → cible = racine) : l'index unique
+    // idx_compositions_active_match_per_base_cote interdit un 2e INSERT actif
+    // sur (compo_base_origine_id, evenement_id, cote), donc le « + » doit être
+    // idempotent dans les deux cas.
+    if (cibleEvenementId) {
       const existante = State.compos.find(
-        c => c.type_compo === 'match' && c.evenement_id === matchId
+        c => c.type_compo === 'match'
+          && c.evenement_id === cibleEvenementId
+          && c.compo_base_origine_id === base.id
       );
       if (existante) { selectCompo(existante.id); return; }
     }
     State.isCreatingMatch = true;
     try {
-      // evenement_id de la nouvelle compo : le match (α) ou la racine (libre).
-      const cibleEvenementId = matchId || State.selectedEvenementId;
       const r = await SupabaseHub.duplicateCompoFromBase(base.id, cibleEvenementId);
       if (!r || !r.ok) {
         alert('Erreur création compo de match : ' + ((r && r.error) || 'inconnue'));
