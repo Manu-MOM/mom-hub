@@ -2054,6 +2054,45 @@
     },
 
     /**
+     * EVT-RECURRENCE-OCCURRENCES — génère les occurrences (événements
+     * enfants) d'un entraînement récurrent sur une fenêtre. Idempotent
+     * (RPC generer_occurrences_evenement, garde admin|coach). En général
+     * inutile à appeler à la main : un trigger génère automatiquement à la
+     * création. Fourni pour prolonger la fenêtre.
+     * @param {string} mereId UUID de l'événement mère récurrent
+     * @param {string|null} [from=null] borne début (YYYY-MM-DD) ou null
+     * @param {string|null} [to=null] borne fin (YYYY-MM-DD) ou null
+     * @returns {Promise<{ok:boolean, creees?:number, existantes?:number, error?:string}>}
+     */
+    async genererOccurrencesEvenement(mereId, from = null, to = null) {
+      if (!mereId) return { ok: false, error: 'mereId manquant' };
+      const { data, error } = await client.rpc('generer_occurrences_evenement', {
+        p_evenement_mere_id: mereId, p_from: from, p_to: to
+      });
+      if (error) { console.error('MOM Hub: genererOccurrencesEvenement()', error); return { ok: false, error: error.message }; }
+      const row = Array.isArray(data) ? data[0] : data;
+      return { ok: true, creees: row && row.out_nb_creees, existantes: row && row.out_nb_existantes };
+    },
+
+    /**
+     * EVT-RECURRENCE-OCCURRENCES — supprime UNE occurrence (enfant) et
+     * exclut sa date de la série mère (anti-régénération). RPC
+     * supprimer_occurrence_evenement (garde admin|coach). Pour supprimer la
+     * série entière, supprimer la mère (CASCADE emporte les enfants).
+     * @param {string} occurrenceId UUID de l'occurrence enfant
+     * @returns {Promise<{ok:boolean, mereId?:string, dateExclue?:string, error?:string}>}
+     */
+    async supprimerOccurrenceEvenement(occurrenceId) {
+      if (!occurrenceId) return { ok: false, error: 'occurrenceId manquant' };
+      const { data, error } = await client.rpc('supprimer_occurrence_evenement', {
+        p_occurrence_id: occurrenceId
+      });
+      if (error) { console.error('MOM Hub: supprimerOccurrenceEvenement()', error); return { ok: false, error: error.message }; }
+      const row = Array.isArray(data) ? data[0] : data;
+      return { ok: true, mereId: row && row.out_mere_id, dateExclue: row && row.out_date_exclue };
+    },
+
+    /**
      * Ajoute un match enfant à une compétition racine existante (cas
      * tournoi/challenge à matchs). Convention M6 (v1.2 §4.4) : le parent
      * doit être type_evenement='competition' ET sans evenement_parent_id ;
