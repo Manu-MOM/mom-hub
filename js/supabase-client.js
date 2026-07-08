@@ -2093,6 +2093,81 @@
     },
 
     /**
+     * EVT-SERIE-ECRAN — liste TOUTES les occurrences (enfants) d'une série
+     * récurrente, indépendamment de la fenêtre 90 j de la liste principale.
+     * Lecture directe de la table evenements (evenement_parent_id = mereId),
+     * triée par date. Alimente la modale « voir la série ».
+     * @param {string} mereId UUID de l'événement mère récurrent
+     * @returns {Promise<{ok:boolean, data?:Array, error?:string}>}
+     */
+    async getOccurrencesSerie(mereId) {
+      if (!mereId) return { ok: false, error: 'mereId manquant' };
+      const { data, error } = await client
+        .from('evenements')
+        .select('id, code, libelle, type_evenement, date_debut, debut_match, fin_prevue, rdv_heure, etat, evenement_parent_id')
+        .eq('evenement_parent_id', mereId)
+        .order('date_debut', { ascending: true });
+      if (error) {
+        console.error('MOM Hub: getOccurrencesSerie()', error);
+        return { ok: false, error: error.message || 'Erreur lecture série' };
+      }
+      return { ok: true, data: Array.isArray(data) ? data : [] };
+    },
+
+    /**
+     * EVT-SERIE-ECRAN — modifie la récurrence d'une mère (Q4=B) : met à jour
+     * le champ recurrence puis PROLONGE (regénère, idempotent) et, si la fin
+     * est raccourcie, SUPPRIME les occurrences futures au-delà de la nouvelle
+     * borne (jamais une séance passée). RPC modifier_recurrence_evenement
+     * (garde admin|coach).
+     * NB : à ne pas confondre avec modifierRecurrence() (récurrence des
+     * réservations logistiques, RPC modifier_recurrence) — sujet distinct.
+     * @param {string} mereId UUID de l'événement mère récurrent
+     * @param {Object} recurrence objet JSONB { mode, frequence, fin }
+     * @returns {Promise<{ok:boolean, creees?:number, supprimees?:number, borneFin?:string, error?:string}>}
+     */
+    async modifierRecurrenceEvenement(mereId, recurrence) {
+      if (!mereId) return { ok: false, error: 'mereId manquant' };
+      const { data, error } = await client.rpc('modifier_recurrence_evenement', {
+        p_evenement_id: mereId,
+        p_recurrence: recurrence || null
+      });
+      if (error) {
+        console.error('MOM Hub: modifierRecurrenceEvenement()', error);
+        return { ok: false, error: error.message || 'Erreur RPC modifier_recurrence_evenement' };
+      }
+      const row = Array.isArray(data) ? data[0] : data;
+      return {
+        ok: true,
+        creees: row && row.out_nb_creees,
+        supprimees: row && row.out_nb_supprimees,
+        borneFin: row && row.out_borne_fin
+      };
+    },
+
+    /**
+     * EVT-SERIE-ECRAN — supprime un évènement (DELETE direct). Pour une mère
+     * récurrente, la FK enfant ON DELETE CASCADE emporte toutes les
+     * occurrences. Autorisation gérée par la RLS DELETE de evenements
+     * (admin / bureau / puis_je_ecrire_categorie). Utilisé pour « supprimer
+     * toute la série ».
+     * @param {string} evenementId UUID de l'évènement (mère) à supprimer
+     * @returns {Promise<{ok:boolean, error?:string}>}
+     */
+    async supprimerEvenement(evenementId) {
+      if (!evenementId) return { ok: false, error: 'evenementId manquant' };
+      const { error } = await client
+        .from('evenements')
+        .delete()
+        .eq('id', evenementId);
+      if (error) {
+        console.error('MOM Hub: supprimerEvenement()', error);
+        return { ok: false, error: error.message || 'Erreur suppression évènement' };
+      }
+      return { ok: true };
+    },
+
+    /**
      * Ajoute un match enfant à une compétition racine existante (cas
      * tournoi/challenge à matchs). Convention M6 (v1.2 §4.4) : le parent
      * doit être type_evenement='competition' ET sans evenement_parent_id ;
