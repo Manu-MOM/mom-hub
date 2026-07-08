@@ -2296,6 +2296,9 @@
     html += '<div class="evt-card-titre">';
     html += '<div class="evt-card-meta">' + escHtml(dateLib) + ' · ' + escHtml(typeLbl);
     if (badgeJours) html += ' · ' + badgeJours;
+    // EVT-SERIE-VISIBILITE — badge identifiant la mère d'une série récurrente
+    // dans la liste (repérage sans ouvrir la fiche).
+    if (_estMereRecurrente(evt)) html += ' <span class="evt-card-serie" title="Entraînement récurrent (série)">🔁 Série</span>';
     html += '</div>';
     html += '<div class="evt-card-libelle">' + escHtml(evt.libelle || '(sans libellé)') + '</div>';
     if (secondaire) html += '<div class="evt-card-secondaire">' + secondaire + '</div>';
@@ -3446,6 +3449,11 @@
     html += '<div class="evt-fiche-identite-libelle">' + escHtml(evt.libelle || '(sans libellé)') + '</div>';
     html += '<div class="evt-fiche-identite-row">';
     html += '<span class="evt-fiche-pill ' + etatPillCls + '">État : ' + escHtml(etatLbl) + '</span>';
+    // EVT-SERIE-VISIBILITE — pastille identifiant la fiche mère d'une série
+    // récurrente (visible même une fois la séance mère passée).
+    if (_estMereRecurrente(evt)) {
+      html += '<span class="evt-fiche-pill">🔁 Série récurrente</span>';
+    }
     if (evt.type_competition) {
       html += '<span class="evt-fiche-pill">' + escHtml(evt.type_competition) + '</span>';
     }
