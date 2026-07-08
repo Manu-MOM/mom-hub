@@ -2168,6 +2168,63 @@
     },
 
     /**
+     * EVT-SERIE-SUPPRESSION-MERE (Option B « mère détachée ») — retire la
+     * séance portée par la MÈRE d'une série récurrente SANS détruire la
+     * série : la mère passe etat='annule' et sa propre date est ajoutée à
+     * dates_exclues (idempotent). La mère reste l'ancrage invisible de la
+     * récurrence. Réversible via rattacherMereSerie().
+     * NB : DISTINCT de supprimerEvenement() (= supprimer TOUTE la série via
+     * CASCADE) et de supprimerOccurrenceEvenement() (= supprimer un ENFANT).
+     * RPC detacher_mere_serie (garde admin|bureau|gerer_evenements).
+     * @param {string} mereId UUID de l'événement mère récurrent
+     * @returns {Promise<{ok:boolean, mereId?:string, dateExclue?:string, nbExclues?:number, seancesRestantes?:number, error?:string}>}
+     */
+    async detacherMereSerie(mereId) {
+      if (!mereId) return { ok: false, error: 'mereId manquant' };
+      const { data, error } = await client.rpc('detacher_mere_serie', {
+        p_mere_id: mereId
+      });
+      if (error) {
+        console.error('MOM Hub: detacherMereSerie()', error);
+        return { ok: false, error: error.message || 'Erreur RPC detacher_mere_serie' };
+      }
+      const row = Array.isArray(data) ? data[0] : data;
+      return {
+        ok: true,
+        mereId: row && row.out_mere_id,
+        dateExclue: row && row.out_date_exclue,
+        nbExclues: row && row.out_nb_exclues,
+        seancesRestantes: row && row.out_nb_seances_restantes
+      };
+    },
+
+    /**
+     * EVT-SERIE-SUPPRESSION-MERE — miroir de detacherMereSerie() : réintègre
+     * la séance portée par la mère (etat='creation' + retrait de sa propre
+     * date de dates_exclues ; les AUTRES dates exclues sont préservées).
+     * RPC rattacher_mere_serie (garde admin|bureau|gerer_evenements).
+     * @param {string} mereId UUID de l'événement mère récurrent
+     * @returns {Promise<{ok:boolean, mereId?:string, dateReintegree?:string, nbExclues?:number, error?:string}>}
+     */
+    async rattacherMereSerie(mereId) {
+      if (!mereId) return { ok: false, error: 'mereId manquant' };
+      const { data, error } = await client.rpc('rattacher_mere_serie', {
+        p_mere_id: mereId
+      });
+      if (error) {
+        console.error('MOM Hub: rattacherMereSerie()', error);
+        return { ok: false, error: error.message || 'Erreur RPC rattacher_mere_serie' };
+      }
+      const row = Array.isArray(data) ? data[0] : data;
+      return {
+        ok: true,
+        mereId: row && row.out_mere_id,
+        dateReintegree: row && row.out_date_reintegree,
+        nbExclues: row && row.out_nb_exclues
+      };
+    },
+
+    /**
      * Ajoute un match enfant à une compétition racine existante (cas
      * tournoi/challenge à matchs). Convention M6 (v1.2 §4.4) : le parent
      * doit être type_evenement='competition' ET sans evenement_parent_id ;
