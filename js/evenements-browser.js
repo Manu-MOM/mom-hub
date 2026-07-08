@@ -1849,6 +1849,15 @@
     }
   }
 
+  // EVT-RECURRENCE-OCCURRENCES : une occurrence d'entraînement récurrent est
+  // un enfant (evenement_parent_id non nul) de type entrainement/stage. À
+  // distinguer des enfants de tournoi (compétition), qui restent regroupés
+  // sous leur racine.
+  function _estOccurrenceEntrainement(evt) {
+    return !!(evt && evt.evenement_parent_id)
+      && (evt.type_evenement === 'entrainement' || evt.type_evenement === 'stage');
+  }
+
   // Fusionne des listes d'évènements en dédoublonnant par id (un même
   // évènement-racine peut remonter pour plusieurs équipes engagées).
   function _fusionnerEvenements(listes) {
@@ -2180,7 +2189,13 @@
     const list = document.getElementById('evt-list');
     if (!list) return;
 
-    const filterRoot = evt => !evt.evenement_parent_id && pass(evt);
+    // EVT-RECURRENCE-OCCURRENCES : une racine s'affiche toujours. Une
+    // occurrence d'entraînement récurrent (enfant de type entrainement/
+    // stage) s'affiche AUSSI comme une séance à part entière — au contraire
+    // des enfants de tournoi (compétition : phases/matchs), qui restent
+    // masqués et regroupés sous leur racine. Distinction par type.
+    const filterRoot = evt =>
+      (!evt.evenement_parent_id || _estOccurrenceEntrainement(evt)) && pass(evt);
 
     const filteredAvenir = EVENEMENTS_AVENIR.filter(filterRoot);
     const filteredPasses = state.showPassed ? EVENEMENTS_PASSES.filter(filterRoot) : [];
@@ -2340,20 +2355,18 @@
   function renderKPIs() {
     const kpiAvenir = document.getElementById('kpi-avenir');
     const kpiPasses = document.getElementById('kpi-passes');
-    const avenirRoots = EVENEMENTS_AVENIR.filter(e => !e.evenement_parent_id);
-    const passesRoots = EVENEMENTS_PASSES.filter(e => !e.evenement_parent_id);
+    // Une ligne affichée = une racine OU une occurrence d'entraînement récurrent.
+    const estLigne = e => !e.evenement_parent_id || _estOccurrenceEntrainement(e);
+    const avenirRoots = EVENEMENTS_AVENIR.filter(estLigne);
+    const passesRoots = EVENEMENTS_PASSES.filter(estLigne);
     if (kpiAvenir) kpiAvenir.textContent = String(avenirRoots.length);
     if (kpiPasses) kpiPasses.textContent = String(passesRoots.length);
 
     const sub = document.getElementById('evt-header-sub');
     if (sub) {
-      // Compter les RACINES (ce que la liste affiche) et, séparément, les
-      // matchs enfants de tournoi (evenement_parent_id non nul). L'ancien
-      // libellé « N évènement(s) chargé(s) » comptait tout à plat
-      // (racines + enfants) et affichait « 30 » quand la liste ne montre
-      // que 2 racines — trompeur. On distingue désormais les deux.
-      const nbRacines = EVENEMENTS_AVENIR.filter(e => !e.evenement_parent_id).length
-                      + EVENEMENTS_PASSES.filter(e => !e.evenement_parent_id).length;
+      // Compter les lignes affichées (racines + occurrences d'entraînement)
+      // et, séparément, les matchs enfants de tournoi (compétition).
+      const nbRacines = avenirRoots.length + passesRoots.length;
       const nbMatchs  = (EVENEMENTS_AVENIR.length + EVENEMENTS_PASSES.length) - nbRacines;
       let txt = nbRacines + ' évènement(s)';
       if (nbMatchs > 0) txt += ' · ' + nbMatchs + ' match(s) de tournoi';
@@ -3199,7 +3212,16 @@
     // au tournoi parent » ci-dessous est conservé (action distincte).
     if (evt.evenement_parent_id) {
       const parent = EVENTS_BY_ID[evt.evenement_parent_id];
-      if (parent) {
+      if (_estOccurrenceEntrainement(evt)) {
+        // EVT-RECURRENCE-OCCURRENCES : occurrence d'un entraînement récurrent.
+        // Retour vers la série + suppression de CETTE séance uniquement.
+        if (parent) {
+          const serieLib = parent.libelle || parent.code || '(série récurrente)';
+          html += '<button type="button" class="evt-btn evt-fiche-back-parent" data-action="retour-parent" data-parent-id="' + escHtml(evt.evenement_parent_id) + '">↩ Série : ' + escHtml(serieLib) + '</button>';
+        }
+        html += '<button type="button" class="evt-btn evt-fiche-suppr-occurrence" data-action="supprimer-occurrence" data-occurrence-id="' + escHtml(evt.id) + '">🗑 Supprimer cette séance</button>';
+      } else if (parent) {
+        // Enfant de tournoi (compétition) : retour au tournoi parent.
         const parentLib = parent.libelle || parent.code || '(tournoi parent)';
         html += '<button type="button" class="evt-btn evt-fiche-back-parent" data-action="retour-parent" data-parent-id="' + escHtml(evt.evenement_parent_id) + '">↩ Retour à ' + escHtml(parentLib) + '</button>';
       }
@@ -3992,6 +4014,33 @@
         if (!parentId) return;
         closeFiche();
         openFiche(parentId);
+      });
+    });
+    // EVT-RECURRENCE-OCCURRENCES — supprimer une séance (occurrence) : purge
+    // l'enfant + exclut sa date de la série (anti-régénération). Confirmation
+    // explicite (action destructive).
+    document.querySelectorAll('[data-action="supprimer-occurrence"]').forEach(btn => {
+      btn.addEventListener('click', async function () {
+        const occId = this.getAttribute('data-occurrence-id');
+        if (!occId) return;
+        if (!window.confirm('Supprimer cette séance ? Elle ne réapparaîtra pas dans la série. Les autres séances sont conservées.')) {
+          return;
+        }
+        this.disabled = true;
+        try {
+          const res = await SupabaseHub.supprimerOccurrenceEvenement(occId);
+          if (!res || !res.ok) {
+            window.alert('Suppression impossible : ' + ((res && res.error) || 'erreur inconnue'));
+            this.disabled = false;
+            return;
+          }
+          closeFiche();
+          await reloadEvents();
+        } catch (e) {
+          console.error('supprimer-occurrence', e);
+          window.alert('Suppression impossible (erreur technique).');
+          this.disabled = false;
+        }
       });
     });
     // ── NEUF v1.25 (§3.2 chevron) : Toggle Niveau 2 dépliable.
