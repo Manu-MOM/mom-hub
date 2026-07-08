@@ -2159,7 +2159,7 @@
     return _fusionnerEvenements([liste]);
   }
 
-  function buildIndexes() {
+  async function buildIndexes() {
     EVENTS_BY_ID = {};
     CHILDREN_BY_PARENT = {};
 
@@ -2173,6 +2173,27 @@
         CHILDREN_BY_PARENT[e.evenement_parent_id].push(e);
       }
     });
+
+    // EVT-SERIE-SUPPRESSION-MERE : une mère DÉTACHÉE (etat='annule') sort des
+    // listes (get_evenements_a_venir exclut 'annule') mais ses occurrences
+    // enfants restent visibles. Sans la mère dans EVENTS_BY_ID, le bouton
+    // « ↩ Série » de l'enfant disparaît → plus aucun accès à la modale série
+    // → ré-attachement impossible. On HYDRATE donc les mères référencées par
+    // un enfant mais absentes du référentiel, par RPC directe (sans filtre
+    // etat). Injectées dans EVENTS_BY_ID uniquement (PAS dans les listes) :
+    // résolubles pour l'accès série, sans réapparaître comme carte-séance.
+    if (typeof SupabaseHub.getEvenementWithEncadrants === 'function') {
+      const meresManquantes = Object.keys(CHILDREN_BY_PARENT)
+        .filter(pid => pid && !EVENTS_BY_ID[pid]);
+      for (const pid of meresManquantes) {
+        try {
+          const m = await SupabaseHub.getEvenementWithEncadrants(pid);
+          if (m && m.id) EVENTS_BY_ID[m.id] = m;
+        } catch (e) {
+          console.warn('buildIndexes: hydratation mère % impossible', pid, e);
+        }
+      }
+    }
 
     Object.keys(CHILDREN_BY_PARENT).forEach(parentId => {
       CHILDREN_BY_PARENT[parentId].sort((a, b) => {
@@ -6999,7 +7020,7 @@
       ]);
       EVENEMENTS_AVENIR = evtAvenir;
       EVENEMENTS_PASSES = evtPasses;
-      buildIndexes();
+      await buildIndexes();
       renderKPIs();
       renderListe();
       renderMiniCal();
@@ -7476,7 +7497,7 @@
       EVENEMENTS_AVENIR = evtAvenir;
       EVENEMENTS_PASSES = evtPasses;
 
-      buildIndexes();
+      await buildIndexes();
 
       console.log('Évènements chargés :',
         EVENEMENTS_AVENIR.length, 'à venir,',
