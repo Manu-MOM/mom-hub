@@ -1936,6 +1936,14 @@
         '<span class="evt-form-error">Fonction indisponible (client non chargé).</span>';
       return;
     }
+    // EVT-SERIE-SUPPRESSION-MERE : une mère détachée passe etat='annule' et
+    // sort de EVENTS_BY_ID (get_evenements_a_venir exclut 'annule'). On la
+    // recharge donc par RPC directe (get_evenement_with_encadrants ne filtre
+    // pas sur etat) pour garder la ligne mère et le bouton « Ré-attacher ».
+    if ((!mere || mere.etat === 'annule') && typeof SupabaseHub.getEvenementWithEncadrants === 'function') {
+      const mFrais = await SupabaseHub.getEvenementWithEncadrants(mereId);
+      if (mFrais) mere = mFrais;
+    }
     const res = await SupabaseHub.getOccurrencesSerie(mereId);
     if (!res || !res.ok) {
       document.getElementById('evt-serie-info').innerHTML =
@@ -1975,6 +1983,7 @@
       const passe = d && d < now;
       const badges = [];
       if (estMere) badges.push('<span style="font-size:10px;background:var(--vert-prairie);color:var(--paper);padding:1px 6px;border-radius:3px;">mère</span>');
+      if (estMere && ev.etat === 'annule') badges.push('<span style="font-size:10px;background:var(--rouge-brique,#a33);color:var(--paper);padding:1px 6px;border-radius:3px;">détachée</span>');
       if (passe) badges.push('<span style="font-size:10px;color:var(--ink-soft);">passée</span>');
       htmlL += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid var(--line);">'
         + '<button type="button" class="evt-serie-lien" data-action="serie-ouvrir" data-evt-id="' + escHtml(ev.id) + '" style="background:none;border:none;padding:0;cursor:pointer;color:var(--ink);text-align:left;font-size:13px;">'
@@ -1982,6 +1991,15 @@
         + '</button>';
       if (!estMere) {
         htmlL += '<button type="button" class="evt-btn" data-action="serie-suppr-occ" data-occ-id="' + escHtml(ev.id) + '" title="Supprimer cette séance" style="padding:3px 9px;font-size:11px;">🗑</button>';
+      } else {
+        // Séance MÈRE : on ne la supprime pas (ce serait la série entière).
+        // On la « détache » (etat=annule + auto-exclusion) ou on la
+        // « ré-attache » selon son état courant. EVT-SERIE-SUPPRESSION-MERE.
+        if (ev.etat === 'annule') {
+          htmlL += '<button type="button" class="evt-btn" data-action="serie-rattacher-mere" title="Ré-attacher cette séance à la série" style="padding:3px 9px;font-size:11px;">↩ Ré-attacher</button>';
+        } else {
+          htmlL += '<button type="button" class="evt-btn" data-action="serie-detacher-mere" title="Retirer cette séance de la série (sans détruire la série)" style="padding:3px 9px;font-size:11px;">🗑 Détacher</button>';
+        }
       }
       htmlL += '</div>';
     });
@@ -2014,6 +2032,53 @@
         await reloadEvents();
       });
     });
+    // Câblage : détacher la séance mère (EVT-SERIE-SUPPRESSION-MERE)
+    const btnDet = document.querySelector('#evt-serie-liste [data-action="serie-detacher-mere"]');
+    if (btnDet) btnDet.addEventListener('click', _serieDetacherMere);
+    // Câblage : ré-attacher la séance mère
+    const btnRat = document.querySelector('#evt-serie-liste [data-action="serie-rattacher-mere"]');
+    if (btnRat) btnRat.addEventListener('click', _serieRattacherMere);
+  }
+
+  // EVT-SERIE-SUPPRESSION-MERE — retire la séance portée par la mère SANS
+  // détruire la série (etat=annule + auto-exclusion de sa date). Réversible.
+  async function _serieDetacherMere() {
+    if (!SERIE_MERE_ID) return;
+    if (typeof SupabaseHub.detacherMereSerie !== 'function') {
+      window.alert('Fonction indisponible (client non chargé).');
+      return;
+    }
+    if (!window.confirm('Retirer la séance mère de la série ?\n\nLa série est conservée ; seule cette date disparaît. Vous pourrez la ré-attacher ensuite.')) return;
+    const msg = document.getElementById('evt-serie-msg');
+    if (msg) msg.innerHTML = '<em>Détachement…</em>';
+    const r = await SupabaseHub.detacherMereSerie(SERIE_MERE_ID);
+    if (!r || !r.ok) {
+      if (msg) msg.innerHTML = '<span class="evt-form-error">Échec : ' + escHtml((r && r.error) || 'inconnue') + '</span>';
+      return;
+    }
+    if (msg) msg.innerHTML = '<span class="evt-form-success">✅ Séance mère détachée ('
+      + (r.seancesRestantes != null ? r.seancesRestantes + ' séance(s) restante(s))' : 'série conservée)') + '.</span>';
+    await reloadEvents();
+    await _chargerSerie(SERIE_MERE_ID, EVENTS_BY_ID[SERIE_MERE_ID] || null);
+  }
+
+  // EVT-SERIE-SUPPRESSION-MERE — miroir : réintègre la séance mère.
+  async function _serieRattacherMere() {
+    if (!SERIE_MERE_ID) return;
+    if (typeof SupabaseHub.rattacherMereSerie !== 'function') {
+      window.alert('Fonction indisponible (client non chargé).');
+      return;
+    }
+    const msg = document.getElementById('evt-serie-msg');
+    if (msg) msg.innerHTML = '<em>Ré-attachement…</em>';
+    const r = await SupabaseHub.rattacherMereSerie(SERIE_MERE_ID);
+    if (!r || !r.ok) {
+      if (msg) msg.innerHTML = '<span class="evt-form-error">Échec : ' + escHtml((r && r.error) || 'inconnue') + '</span>';
+      return;
+    }
+    if (msg) msg.innerHTML = '<span class="evt-form-success">✅ Séance mère ré-attachée à la série.</span>';
+    await reloadEvents();
+    await _chargerSerie(SERIE_MERE_ID, EVENTS_BY_ID[SERIE_MERE_ID] || null);
   }
 
   async function _serieAppliquerFin(mere) {
