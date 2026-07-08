@@ -330,11 +330,6 @@
   async function fetchWindow(debutISO, finISO) {
     if (catsCochees.size === 0) return [];
 
-    // Équipes de toutes les catégories cochées (dédupliquées).
-    const listesEq = await Promise.all(Array.from(catsCochees).map(equipesDe));
-    const equipes = Array.from(new Set([].concat.apply([], listesEq)));
-    if (equipes.length === 0) return [];
-
     // Bornes -> nombre de jours (borné à >= 0), marge de sécurité.
     const auj = new Date(); auj.setHours(0, 0, 0, 0);
     const debut = parseDate(debutISO);
@@ -343,10 +338,14 @@
     const joursPasses = Math.max(0, Math.ceil((auj - debut) / MS)) + MARGE_JOURS;
     const joursAVenir = Math.max(0, Math.ceil((fin - auj) / MS)) + MARGE_JOURS;
 
+    // EVT-RATTACHEMENT-CATEGORIE : chargement PAR CATÉGORIE cochée. Capte à
+    // la fois les entraînements/stages (equipe_id null, rattachés catégorie)
+    // ET les compétitions de la catégorie. L'ancien chargement par équipe
+    // ratait les entraînements sans équipe.
     const appels = [];
-    equipes.forEach(function (eqId) {
-      appels.push(SupabaseHub.getEvenementsPasses(eqId, joursPasses, 500));
-      appels.push(SupabaseHub.getEvenementsAVenir(eqId, joursAVenir));
+    Array.from(catsCochees).forEach(function (catId) {
+      appels.push(SupabaseHub.getEvenementsPasses(null, joursPasses, 500, catId));
+      appels.push(SupabaseHub.getEvenementsAVenir(null, joursAVenir, catId));
     });
     const listes = await Promise.all(appels);
 
@@ -356,12 +355,13 @@
     listes.forEach(function (liste) {
       (Array.isArray(liste) ? liste : []).forEach(function (ev) {
         if (!ev || !ev.id || vus.has(ev.id) || !ev.date_debut) return;
-        // Racine seule : un tournoi est décomposé en hiérarchie (racine ->
-        // phases -> matchs), chaque niveau = une ligne evenements distincte.
-        // On n'affiche QUE les évènements-racines (evenement_parent_id null) —
-        // sinon les N matchs/poules d'un tournoi s'empilent sur un même jour.
-        // Le détail des matchs reste consultable dans la fiche du tournoi.
-        if (ev.evenement_parent_id) return;
+        // On affiche les RACINES, MAIS on garde les occurrences d'entraînement
+        // récurrent (enfant de type entrainement/stage = une séance à part
+        // entière). Les enfants de tournoi (compétition) restent masqués :
+        // le détail des matchs reste consultable dans la fiche du tournoi.
+        const estOccurrenceEntrainement = !!ev.evenement_parent_id
+          && (ev.type_evenement === 'entrainement' || ev.type_evenement === 'stage');
+        if (ev.evenement_parent_id && !estOccurrenceEntrainement) return;
         vus.add(ev.id);
         // evMapRows peut retourner PLUSIEURS items (tournoi multi-jours).
         evMapRows(ev).forEach(function (it) {
