@@ -3597,22 +3597,38 @@
   async function onValiderSeance() {
     if (!State.currentSeance) return;
 
-    // Save préventif AVANT le garde-fou : la date saisie au clavier n'est
-    // remontée dans State.currentSeance que par saveSeance (lecture du DOM).
-    // Sans ce save préalable, une date fraîchement tapée (ex. sur une séance
-    // dupliquée, née sans date) reste invisible au garde-fou ci-dessous et
-    // la validation est refusée à tort. Si le save échoue, on interrompt.
-    if (State.isDirty) {
-      const saved = await saveSeance({ silent: true });
-      if (!saved) {
-        window.alert('Échec de la sauvegarde avant validation.\n\n' +
-                     'Réessaie ou vérifie ta connexion.');
+    // D4-bis : le garde-fou de date ne peut PAS se fier à State.isDirty ni à
+    // State.currentSeance.date_seance seuls. Sur une séance dupliquée, la
+    // pastille reste "Sauvé" après saisie de la date (isDirty non déclenché) —
+    // saveSeance refuse alors de tourner (garde `if (!isDirty) return`) et
+    // l'objet mémoire garde date_seance=null. On lit donc la date DIRECTEMENT
+    // dans le champ du formulaire (comme le fait saveSeance) et on la persiste
+    // via updateSeance, sans dépendre de isDirty.
+    if (!State.formCollapsed) {
+      const champDate = (DOM.inputDate() && DOM.inputDate().value) || '';
+      if (!champDate) {
+        window.alert('Impossible de valider une séance sans date.\n\n' +
+                     'Renseigne au moins la date avant de valider.');
         return;
       }
-    }
-
-    // Garde-fou : refuser de valider sans date_seance (objet désormais à jour)
-    if (!State.currentSeance.date_seance) {
+      // Persister la date (et l'objet mémoire) si elle diffère de la base.
+      if (champDate !== State.currentSeance.date_seance) {
+        const up = await SupabaseHub.updateSeance(State.currentSeance.id, {
+          date_seance: champDate
+        });
+        if (!up.ok) {
+          window.alert('Échec de la sauvegarde de la date avant validation :\n' +
+                       (up.error || 'erreur inconnue'));
+          return;
+        }
+        State.currentSeance = up.data;
+        const i = State.seances.findIndex(function (s) { return s.id === up.data.id; });
+        if (i !== -1) State.seances[i] = up.data;
+        setDirty(false);
+      }
+    } else if (!State.currentSeance.date_seance) {
+      // Formulaire replié : la séance est censée être déjà datée. Garde-fou
+      // conservé par sécurité.
       window.alert('Impossible de valider une séance sans date.\n\n' +
                    'Renseigne au moins la date avant de valider.');
       return;
