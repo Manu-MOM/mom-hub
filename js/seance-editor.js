@@ -370,10 +370,6 @@
   // 1. CONSTANTES + ÉTAT
   // ============================================================
 
-  // REPLI de dégradation honnête : si le périmètre de catégories est
-  // indisponible (socle ancien, droits vides, catégorie sans équipe),
-  // l'équipe active retombe sur M14 = comportement d'origine.
-  const M14_TEAM_UUID = 'bfb83b83-83ef-4dde-b526-48ff87313044';
   const NB_SEANCES_RECENTES = 10;
   const DUREE_DEFAULT_MIN = 75;
   const AUTOSAVE_INTERVAL_MS = 30000; // 30 secondes (Phase 5.5.B2)
@@ -467,7 +463,7 @@
   /**
    * Choisit l'équipe active dans la liste des équipes de la catégorie
    * active : équipe mémorisée si elle est dans la liste, sinon la 1re ;
-   * repli M14 si la liste est vide. Pose State.equipeActive.
+   * null si la liste est vide (v1.19). Pose State.equipeActive.
    */
   function _seanceChoisirEquipeActive() {
     const liste = State.equipesCategorieActive || [];
