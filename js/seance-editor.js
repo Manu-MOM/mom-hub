@@ -1508,9 +1508,9 @@
           // SEANCE-DUPLICATION v1 : dupliquer la séance (copie brouillon).
           // Toujours actif, quel que soit l'état de la source.
           '<button type="button" id="seance-btn-dupliquer-collapsed" ' +
-                  'class="seance-form__dupliquer-btn" ' +
+                  'class="seance-form-collapsed__edit-btn" ' +
                   'title="Dupliquer cette séance (nouvelle copie en brouillon)">' +
-            '⧉ Dupliquer' +
+            '📋 Dupliquer' +
           '</button>' +
           '<button type="button" id="seance-btn-expand-form" class="seance-form-collapsed__edit-btn" title="Modifier les méta de la séance">' +
             '✏️ Modifier' +
@@ -1529,7 +1529,7 @@
       });
     }
 
-    // SEANCE-DUPLICATION v1 : bind du bouton « ⧉ Dupliquer »
+    // SEANCE-DUPLICATION v1 : bind du bouton « 📋 Dupliquer »
     const btnDup = document.getElementById('seance-btn-dupliquer-collapsed');
     if (btnDup) btnDup.addEventListener('click', onDupliquerSeance);
 
