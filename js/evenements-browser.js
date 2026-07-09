@@ -7526,7 +7526,15 @@
       // openFiche opérationnel). Id inconnu → ignoré silencieusement (liste).
       try {
         const ficheId = new URLSearchParams(window.location.search).get('fiche');
-        if (ficheId && EVENTS_BY_ID[ficheId]) {
+        if (ficheId) {
+          // EVT-AGENDA-EDITION (A+) : openFiche() charge l'évènement par RPC
+          // directe (getEvenementWithEncadrants) et gère « introuvable »
+          // proprement — il ne dépend PAS de EVENTS_BY_ID. On l'appelle donc
+          // dès qu'un id est fourni, MÊME hors fenêtre 90 j : le deep-link
+          // depuis l'agenda des évènements (equipe-agenda.html, qui montre
+          // toute la saison) doit pouvoir ouvrir une occurrence lointaine.
+          // Historique conservé : un id présent dans EVENTS_BY_ID s'ouvre à
+          // l'identique (openFiche re-fetche de toute façon la fiche fraîche).
           openFiche(ficheId);
         }
       } catch (e) {
