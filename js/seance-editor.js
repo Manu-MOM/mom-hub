@@ -272,7 +272,7 @@
  *          la section "Ateliers rattachés". 3 groupes fixes alimentés par
  *          data/groupes-joueur.json (Performance / Développement /
  *          Initiation, couleurs respectives bordeaux / orange / bleu).
- *          Joueurs sélectionnables depuis le vivier M14 via RPC
+ *          Joueurs sélectionnables depuis le vivier catégorie via RPC
  *          get_vivier_compo (wrapper getVivierCompo v1.6, 62 joueurs).
  *          UX : 3 popovers indépendants (un par groupe, calque sur
  *          pattern Compositions v3.4). Un joueur déjà placé dans un
@@ -405,7 +405,7 @@
     fichePicker: null,      // état modale picker ({open: bool, query: string})
     // Phase 5.9 : groupes G1/G2/G3 par bloc
     groupesRef: null,       // miroir data/groupes-joueur.json ({_meta, groupes:[...]})
-    vivier: [],             // vivier M14 via getVivierCompo (62 joueurs)
+    vivier: [],             // vivier de la catégorie active via getVivierCompoCategorie
     vivierById: null,       // Map (joueur_id → joueur) pour lookup rapide
     groupePicker: null,     // état popover groupe ({open: bool, nomGroupe: 'G1'|'G2'|'G3', query: string})
     // Phase 5.10 : sidebar enrichie + nettoyage brouillons
@@ -574,7 +574,7 @@
     await Promise.all([
       loadSeances(),
       loadEvenements(),
-      loadVivierM14(),
+      loadVivier(),
       // v1.17 — recharger le staff de la NOUVELLE catégorie (sinon la pioche
       // coachs des blocs ET la pioche encadrants méta restent figées sur la
       // catégorie initiale — bug : coachs M14 proposés après passage en M10).
@@ -3078,7 +3078,7 @@
     if (!State.vivier || State.vivier.length === 0) {
       html +=
         '<p class="seance-groupes-section__empty seance-groupes-section__empty--warn">' +
-          '⚠️ Vivier M14 vide ou non chargé — vérifier la RPC get_vivier_compo.' +
+          '⚠️ Vivier vide ou non chargé — vérifier la RPC get_vivier_compo_categorie.' +
         '</p>';
       return html;
     }
@@ -3176,7 +3176,7 @@
    */
   function openGroupePicker(nomGroupe) {
     if (!State.vivier || State.vivier.length === 0) {
-      window.alert('Vivier M14 non chargé — impossible d\'ouvrir le sélecteur.');
+      window.alert('Vivier non chargé — impossible d\'ouvrir le sélecteur.');
       return;
     }
     State.groupePicker = { open: true, nomGroupe: nomGroupe, query: '' };
@@ -5065,7 +5065,7 @@
   }
 
   /**
-   * Charge le vivier M14 (Phase 5.9) via la RPC get_vivier_compo.
+   * Charge le vivier de la catégorie active via la RPC get_vivier_compo_categorie.
    * Indexe les joueurs par joueur_id dans une Map pour lookup rapide.
    * Pattern identique à compositions-editor.js (Phase 4.4).
    */
@@ -5126,26 +5126,27 @@
     }
   }
 
-  async function loadVivierM14() {
-    // Chantier SEANCE-RATTACHEMENT-CATEGORIE — Q-A tranchée (c) : le vivier
-    // joueurs (getVivierCompo) est indexé ÉQUIPE ; sans équipe active, on le
-    // laisse VIDE. Hors périmètre « préparation de séance » — un chantier
-    // compo/vivier-catégorie dédié le traitera. On ne casse pas les
-    // consommateurs : State.vivier = [] et une Map vide.
-    State.vivier = [];
-    State.vivierById = new Map();
-    console.log('SeanceEditor: vivier non chargé (rattachement catégorie, Q-A c).');
-    return;
-    // eslint-disable-next-line no-unreachable
+  async function loadVivier() {
+    // Chantier VIVIER-COMPO-CATEGORIE — vivier joueurs indexé CATÉGORIE
+    // (rattachement séances→catégorie, pt 181), plus l'équipe. Source de la
+    // catégorie : _catActive() (= State.perimetreCat.active), peuplé avant cet
+    // appel dans la séquence d'init. RPC get_vivier_compo_categorie.
+    const catId = _catActive();
+    if (!catId) {
+      State.vivier = [];
+      State.vivierById = new Map();
+      console.log('SeanceEditor: vivier non chargé (aucune catégorie active).');
+      return;
+    }
     try {
-      State.vivier = await SupabaseHub.getVivierCompo(_equipeActive());
+      State.vivier = await SupabaseHub.getVivierCompoCategorie(catId);
       State.vivierById = new Map();
       (State.vivier || []).forEach(function (j) {
         if (j && j.joueur_id) State.vivierById.set(j.joueur_id, j);
       });
-      console.log('SeanceEditor: vivier M14 chargé (' + (State.vivier ? State.vivier.length : 0) + ' joueurs)');
+      console.log('SeanceEditor: vivier chargé (' + (State.vivier ? State.vivier.length : 0) + ' joueurs)');
     } catch (e) {
-      console.error('SeanceEditor: loadVivierM14() KO', e);
+      console.error('SeanceEditor: loadVivier() KO', e);
       State.vivier = [];
       State.vivierById = new Map();
     }
@@ -5187,7 +5188,7 @@
     // compteur de brouillons vides Phase 5.10), sites et événements pour
     // les dropdowns du formulaire, types-blocs.json pour la trame (5.6.A),
     // vocabulaire-seance.json pour le détail bloc (5.7), fiches-all.json
-    // pour le picker ateliers (5.8), groupes-joueur.json + vivier M14 pour
+    // pour le picker ateliers (5.8), groupes-joueur.json + vivier catégorie pour
     // les groupes G1/G2/G3 par bloc (5.9), propositions-seance.json pour
     // les datalist + matériel (5.12)
     await Promise.all([
@@ -5198,7 +5199,7 @@
       loadVocabulaireRef(),
       loadFichesRef(),
       loadGroupesRef(),
-      loadVivierM14(),
+      loadVivier(),
       loadPropositionsRef(),
       loadEncadrantsForCategorie(),
       loadStaffDisponibles()
