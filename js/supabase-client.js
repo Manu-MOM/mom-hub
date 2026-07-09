@@ -18,7 +18,18 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.77 — juillet 2026
+ * Version : 1.78 — juillet 2026
+ *   v1.78 : COMPO-RATTACHEMENT-CATEGORIE (D3 option a — pur front).
+ *          Wrapper ADDITIF listCompositionsByCategorie(categorieId) :
+ *          voie CATÉGORIE du listing compos (jointure evenements!inner
+ *          sur categorie_id). Couvre les compos d'évènements rattachés-
+ *          catégorie (equipe_id NULL, post-pt 169) que la jointure
+ *          equipe_id de listCompositionsByEquipe excluait (H1 confirmée
+ *          en base le 09/07 : 5 compos actives invisibles). Policies
+ *          SELECT authenticated inchangées (relues pg_policies), ZÉRO
+ *          SQL. listCompositionsByEquipe et getVivierCompo CONSERVÉS
+ *          intacts mais DÉPRÉCIÉS (plus aucun consommateur après la
+ *          bascule de compositions-editor.js v3.68 — D5).
  *   v1.77 : LOGISTIQUE-MULTI-CATEGORIES (FAIT FOI gelé 05/07/2026).
  *           3 mappings ADDITIFS p_categorie_ids (uuid[]) sur les wrappers
  *           modifierReservation / modifierRecurrence / modifierBus, alignés
@@ -2825,6 +2836,10 @@
     // PHASE 4.3 — RPC vivier compo
     // ============================================================
 
+    // DÉPRÉCIÉ (v1.78, COMPO-RATTACHEMENT-CATEGORIE, D5) : plus aucun
+    // consommateur (grep dépôt 09/07 : seul compositions-editor.js l.5924,
+    // basculé sur getVivierCompoCategorie en v3.68). Conservé intact pour
+    // réversibilité — ne pas réutiliser pour du neuf, préférer la voie catégorie.
     async getVivierCompo(equipeId) {
       if (!equipeId) {
         console.error('MOM Hub: getVivierCompo() requiert un equipeId');
@@ -2879,6 +2894,11 @@
      * @param {boolean} [options.onlyActive=true] Filtre est_active=TRUE
      * @returns {Promise<Array>} compositions avec leur événement (joint), [] si erreur
      */
+    // DÉPRÉCIÉ (v1.78, COMPO-RATTACHEMENT-CATEGORIE) : plus aucun
+    // consommateur après la bascule de compositions-editor.js v3.68 (la
+    // jointure evenements.equipe_id exclut les évènements rattachés-
+    // catégorie, equipe_id NULL). Conservé intact pour réversibilité —
+    // préférer listCompositionsByCategorie.
     async listCompositionsByEquipe(equipeId, options) {
       if (!equipeId) {
         console.error('MOM Hub: listCompositionsByEquipe() requiert un equipeId');
@@ -2904,6 +2924,50 @@
       const { data, error } = await q;
       if (error) {
         console.error('MOM Hub: listCompositionsByEquipe()', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * Liste les compositions d'une CATÉGORIE (toutes versions actives
+     * confondues), via la jointure evenements!inner sur categorie_id.
+     * Voie catégorie du tableau de bord E1 — COMPO-RATTACHEMENT-CATEGORIE,
+     * D3 option (a) : pur front, aucune RPC neuve, policies SELECT
+     * authenticated inchangées sur compositions et evenements.
+     * Couvre les évènements rattachés-catégorie (equipe_id NULL,
+     * post-pt 169) invisibles de listCompositionsByEquipe.
+     *
+     * @param {string} categorieId UUID de la catégorie
+     * @param {object} [options]
+     * @param {boolean} [options.onlyActive=true] Filtre est_active=TRUE
+     * @returns {Promise<Array>} compositions avec leur événement (joint), [] si erreur
+     */
+    async listCompositionsByCategorie(categorieId, options) {
+      if (!categorieId) {
+        console.error('MOM Hub: listCompositionsByCategorie() requiert un categorieId');
+        return [];
+      }
+      const opts = options || {};
+      const onlyActive = opts.onlyActive !== false;
+
+      let q = client
+        .from('compositions')
+        .select(`
+          id, evenement_id, cote, etat, version, est_active,
+          type_compo, compo_base_origine_id, notes_compo,
+          created_at, updated_at,
+          evenements!inner ( id, code, libelle, type_evenement,
+                             date_debut, equipe_id, categorie_id, format_de_jeu )
+        `)
+        .eq('evenements.categorie_id', categorieId)
+        .order('created_at', { ascending: false });
+
+      if (onlyActive) q = q.eq('est_active', true);
+
+      const { data, error } = await q;
+      if (error) {
+        console.error('MOM Hub: listCompositionsByCategorie()', error);
         return [];
       }
       return Array.isArray(data) ? data : [];
