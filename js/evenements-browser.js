@@ -5192,6 +5192,40 @@
     const rdvLieuEl = document.getElementById('evt-create-rdv-lieu');
     if (rdvLieuEl && evt.rdv_lieu) rdvLieuEl.value = evt.rdv_lieu;
 
+    // EVT-EDITION-READBACK — RÉCURRENCE (série récurrente).
+    //   `evt.recurrence` (jsonb) EST porté par les listings
+    //   (get_evenements_a_venir/passes) → présent sur EVENTS_BY_ID, mais le
+    //   prefill ne le relisait pas : à la réouverture, « Série récurrente »
+    //   ressortait décochée et fréquence/jusqu'au vides. La zone récurrence
+    //   n'est visible qu'en mode A1 (entraînement) — updateCreateConditionalFields()
+    //   ci-dessus l'a déjà posée. On coche le toggle, on révèle les détails
+    //   (comme le ferait le handler change) et on repose fréquence + fin.
+    if (evt.recurrence && evt.recurrence.mode === 'recurrent') {
+      const _recToggle = document.getElementById('evt-create-recurrence-toggle');
+      const _recDetails = document.getElementById('evt-create-recurrence-details');
+      if (_recToggle) _recToggle.checked = true;
+      if (_recDetails) _recDetails.style.display = '';
+      const _recFreq = document.getElementById('evt-create-recurrence-frequence');
+      if (_recFreq && evt.recurrence.frequence) _recFreq.value = evt.recurrence.frequence;
+      const _recFin = document.getElementById('evt-create-recurrence-fin');
+      if (_recFin && evt.recurrence.fin) _recFin.value = String(evt.recurrence.fin).slice(0, 10);
+    }
+
+    // EVT-EDITION-READBACK — MULTI-JOURS (date de fin).
+    //   `evt.date_fin` EST porté par les listings et posé sur le champ ci-dessus,
+    //   mais la CASE « Sur plusieurs jours » (#evt-create-multijours-toggle) et
+    //   la révélation du groupe date-fin ne l'étaient pas : sur un évènement
+    //   multi-jours (ex. tournoi 2 jours), la case ressortait décochée et le
+    //   champ date-fin masqué. La case n'existe qu'en A4/A5 (multi-équipes) —
+    //   updateMultiEquipesUI() (dans le _waitFor équipes) finira de recaler le
+    //   mode ; on prépare ici l'état « coché + révélé » pour qu'il survive.
+    if (evt.date_fin) {
+      const _mjToggle = document.getElementById('evt-create-multijours-toggle');
+      const _mjGroup  = document.getElementById('evt-create-date-fin-group');
+      if (_mjToggle) _mjToggle.checked = true;
+      if (_mjGroup)  _mjGroup.style.display = '';
+    }
+
     // Compétition : cocher équipes engagées + reconstruire phases/matchs.
     // Les équipes sont DÉDUITES des equipe_id des phases enfants (l'objet
     // evt n'a PAS de _equipesEngagees — getEvenementWithEncadrants ne le
@@ -5220,6 +5254,28 @@
           const cb = document.querySelector('#evt-create-equipes .evt-eng-equipe-cb[value="' + eqId + '"]');
           if (cb) cb.checked = true;
         });
+        // EVT-EDITION-READBACK — recaler le MODE après cochage. Le mode A3→A4/A5
+        //   dépend du nombre d'équipes cochées (_nbEqCochees) : au 1er passage
+        //   de updateCreateConditionalFields() (avant ce _waitFor), aucune case
+        //   n'était encore cochée → mode figé en A3, blocs multi-équipes/phases
+        //   non révélés. On rappelle donc updateCreateConditionalFields() une
+        //   fois les cases cochées, puis on RE-POSE l'état multi-jours (le
+        //   recalcul a pu re-masquer le groupe date-fin selon l'état du toggle).
+        if (eqIds.length > 0) updateCreateConditionalFields();
+        // Re-cocher par sécurité : updateCreateConditionalFields est idempotent
+        //   (peuplerEquipesEngagees garde-fou = pas de re-render si déjà peuplé
+        //   pour la catégorie), mais on repose les coches défensivement au cas
+        //   où un re-render surviendrait (aucun coût si déjà cochées).
+        eqIds.forEach(function (eqId) {
+          const cb2 = document.querySelector('#evt-create-equipes .evt-eng-equipe-cb[value="' + eqId + '"]');
+          if (cb2) cb2.checked = true;
+        });
+        if (evt.date_fin) {
+          const _mjToggle2 = document.getElementById('evt-create-multijours-toggle');
+          const _mjGroup2  = document.getElementById('evt-create-date-fin-group');
+          if (_mjToggle2) _mjToggle2.checked = true;
+          if (_mjGroup2)  _mjGroup2.style.display = '';
+        }
         updateMultiEquipesUI();   // construit l'éditeur de phases par équipe
         // 2) Attendre que les blocs équipe soient construits, puis pré-remplir.
         _waitFor(function () {
