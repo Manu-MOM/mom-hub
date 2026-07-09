@@ -382,6 +382,38 @@
     return rows;
   }
 
+  // ---- EVT-AGENDA-EDITION (Option A+) : action de la modale de détail ----
+  // Le module hub-agenda rend un bouton si config.detail.action(it) renvoie
+  // { label, onClick } ; il ne rend RIEN si l'action renvoie null.
+  //
+  // Doctrine : l'agenda CONSULTE, l'édition vit sur evenements.html (revirement
+  // assumé du pt 167 « lecture seule » — le besoin terrain a évolué). Le bouton
+  // deep-linke vers la fiche de l'évènement sur evenements.html (patron ?fiche=,
+  // pt 37), où toutes les gardes série/rôle (RPC B5) existent déjà. Aucune
+  // action d'écriture n'est portée ici : ouvrir une fiche est une navigation,
+  // pas une modification — inoffensif quel que soit le rôle. La barrière réelle
+  // reste la garde RPC sur evenements.html.
+  //
+  // Garde-fous :
+  //   - repère (vacances/férié, etat='repere', meta.src==='repere') → null :
+  //     jamais de bouton sur un item informatif inerte (pt 182) ;
+  //   - item sans id d'évènement résoluble → null (sécurité).
+  // NB : pour un multi-jours, it.id est suffixé « #iso » mais it.meta.id reste
+  // l'id nu de l'évènement — c'est lui qu'on deep-linke.
+  function evDetailAction(it) {
+    if (!it || (it.meta && it.meta.src === 'repere')) return null;
+    var evId = it.meta && it.meta.id;
+    if (!evId) return null;
+    return {
+      label: 'Modifier / Ouvrir la fiche',
+      title: 'Ouvre la fiche de l\u2019\u00e9v\u00e8nement sur la page \u00c9v\u00e8nements',
+      onClick: function (item, closeDetail) {
+        try { if (typeof closeDetail === 'function') closeDetail(); } catch (e) {}
+        window.location.href = 'evenements.html?fiche=' + encodeURIComponent(evId);
+      }
+    };
+  }
+
   // ---- Résolution des équipes d'une catégorie (avec cache) ----
   async function equipesDe(catId) {
     if (equipesParCat[catId]) return equipesParCat[catId];
@@ -455,7 +487,7 @@
       types: TYPES.concat([TYPE_DIVERS])
         .concat([{ code: 'ferie', lib: 'Férié' }, { code: 'vacances', lib: 'Vacances scolaires' }])
         .map(function (t) { return { code: t.code, lib: t.lib }; }),
-      detail: { titre: function (it) { return it.libelle || typeLib(it.type); }, rows: evDetailRows },
+      detail: { titre: function (it) { return it.libelle || typeLib(it.type); }, rows: evDetailRows, action: evDetailAction },
       capacites: { pleinEcran: true, caseAnnulees: false },
       plageFixe: [8, 22],          // AGENDA-MODULE-V1.1 P2 : grille stable 08-22 (modèle unique)
       untimedEnRangee: true,       // AGENDA-MODULE-V1.1 R1 : évènements sans heure en rangée journée entière
