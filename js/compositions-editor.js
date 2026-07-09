@@ -7,6 +7,22 @@
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
  * Version : 3.63 — Boot : deep-link ?vue=rapport (onglet Rapport via la vignette de la fiche évènement) (4 juin 2026)
+ *   v3.68 : COMPO-RATTACHEMENT-CATEGORIE — l'ANCRE du mode legacy passe
+ *           de l'ÉQUIPE à la CATÉGORIE (dernier volet de la migration
+ *           équipe→catégorie, patron Option B des pts 169/171/181/186).
+ *           Les 3 consommateurs legacy lisent _catActive() (=
+ *           State.perimetreCat.active, D1) : évènements via
+ *           getEvenementsAVenir(null, 60, catId) (filtre RPC natif pt 169),
+ *           listing compos via listCompositionsByCategorie (wrapper v1.78),
+ *           vivier via getVivierCompoCategorie (RPC pt 186). Corrige H1
+ *           (érosion sondée 09/07 : 5 compos actives sur évènements
+ *           equipe_id NULL invisibles du tableau de bord ; évènements
+ *           rattachés-catégorie absents de la liste — la RPC n'a pas d'OR
+ *           de transition). Sélecteur d'équipe inline neutralisé par
+ *           early-return, code + localStorage conservés inertes pour
+ *           réversibilité (D2, patron pt 181). Résolution boot des équipes
+ *           conservée (réversibilité). Mode U-N3 (?evenement_equipe=) et
+ *           équipes ENGAGÉES strictement intacts. ZÉRO SQL. node --check OK.
  *   v3.67 : FIX COMPO-MATCH-LIBRE-IDEMPOTENCE (pt 179). Le « + » (compo de
  *           match libre, matchId=null) sautait la garde idempotente — réservée
  *           au cas matchId fourni — et tentait un 2e INSERT sur le même triplet
@@ -930,10 +946,20 @@
   // les 3 appels legacy lisent _equipeActive() au lieu de M14.
   // Point dur 1, option (b) : sélecteur d'équipe si la catégorie
   // active a > 1 équipe ; mono-équipe (cas réel actuel) → rien.
+  // v3.68 (COMPO-RATTACHEMENT-CATEGORIE) : l'ancre legacy est désormais
+  // la CATÉGORIE — les 3 appels legacy lisent _catActive(). _equipeActive()
+  // et le sélecteur d'équipe sont conservés inertes (réversibilité).
 
   /** UUID de l'équipe legacy courante (null si périmètre indisponible). */
   function _equipeActive() {
     return State.equipeActive || null;
+  }
+
+  /** UUID de la CATÉGORIE active du périmètre (ancre legacy v3.68,
+   *  patron _catActive() du pt 181 côté séances). Repli null fail-safe :
+   *  périmètre non résolu → les wrappers gardent le falsy et renvoient []. */
+  function _catActive() {
+    return (State.perimetreCat && State.perimetreCat.active) || null;
   }
 
   /** true si on est en mode legacy (pas de deep-link ?evenement_equipe=). */
@@ -997,6 +1023,12 @@
 
   /** Monte un sélecteur d'ÉQUIPE (mode legacy, > 1 équipe). */
   function _monterSelecteurEquipeCompo() {
+    // v3.68 (COMPO-RATTACHEMENT-CATEGORIE, D2) : ancre legacy = CATÉGORIE,
+    // le sélecteur d'équipe n'a plus d'objet. NEUTRALISÉ par early-return,
+    // code historique + mémoire localStorage (_memoriserEquipeCompo)
+    // conservés inertes pour réversibilité (patron pt 181).
+    return;
+    /* eslint-disable no-unreachable */
     if (!_estModeLegacy()) return;
     const liste = State.equipesCategorieActive || [];
     if (liste.length <= 1) return;
@@ -1048,6 +1080,7 @@
     wrap.appendChild(label);
     wrap.appendChild(select);
     ancre.parentNode.insertBefore(wrap, ancre);
+    /* eslint-enable no-unreachable */
   }
 
   function _retirerSelecteurEquipeCompo() {
@@ -5789,7 +5822,11 @@
       }] : [];
       return State.evenements;
     }
-    State.evenements = await SupabaseHub.getEvenementsAVenir(_equipeActive(), 60);
+    // v3.68 (COMPO-RATTACHEMENT-CATEGORIE) : ancre CATÉGORIE — p_equipe_id
+    // null, p_categorie_id = _catActive() (filtre natif de la RPC, pt 169).
+    // Couvre les évènements rattachés-catégorie (equipe_id NULL) que
+    // l'ancre équipe excluait (H1 : pas d'OR de transition dans la RPC).
+    State.evenements = await SupabaseHub.getEvenementsAVenir(null, 60, _catActive());
     return State.evenements;
   }
   async function loadComposForCurrentEvent() {
@@ -5837,7 +5874,10 @@
       State.selectedCompoId = base.id;
       return;
     }
-    const all = await SupabaseHub.listCompositionsByEquipe(_equipeActive());
+    // v3.68 (COMPO-RATTACHEMENT-CATEGORIE, D3a) : listing par CATÉGORIE
+    // (wrapper v1.78) — les compos d'évènements equipe_id NULL redeviennent
+    // visibles (5 compos actives invisibles sondées au 09/07, H1 confirmée).
+    const all = await SupabaseHub.listCompositionsByCategorie(_catActive());
     State.compos = all.filter(c => c.evenement_id === State.selectedEvenementId);
     const compoBase = State.compos.find(c => c.type_compo === 'base');
     if (compoBase)                       State.selectedCompoId = compoBase.id;
@@ -5921,7 +5961,10 @@
       for (const j of State.vivier) State.vivierById.set(j.joueur_id, j);
       return State.vivier;
     }
-    State.vivier = await SupabaseHub.getVivierCompo(_equipeActive());
+    // v3.68 (COMPO-RATTACHEMENT-CATEGORIE) : vivier par CATÉGORIE — RPC
+    // get_vivier_compo_categorie (pt 186, authenticated only). Même forme
+    // de sortie que la voie équipe (colonnes equipe_joueurs à NULL).
+    State.vivier = await SupabaseHub.getVivierCompoCategorie(_catActive());
     State.vivierById = new Map();
     for (const j of State.vivier) State.vivierById.set(j.joueur_id, j);
     return State.vivier;
