@@ -5118,6 +5118,37 @@
     const evt = EVENTS_BY_ID[evtId];
     if (!evt) { console.error('openModalEditComplet : évènement introuvable', evtId); return; }
 
+    // EVT-EDITION-READBACK — READ-BACK FRAIS avant pré-cochage.
+    //   L'objet `evt` provient d'EVENTS_BY_ID, peuplé par les LISTINGS
+    //   (get_evenements_a_venir/passes) qui NE portent NI `encadrants` NI les
+    //   équipes engagées. Résultat historique : à la réouverture de l'édition,
+    //   les cases « staff » et « équipe engagée » ressortaient DÉCOCHÉES alors
+    //   que les liaisons EXISTENT en base (evenement_encadrants +
+    //   evenement_equipes_engagees) — bug d'affichage, PAS de perte de données.
+    //   On enrichit donc `evt` ici, comme le fait déjà openFiche : (1)
+    //   getEvenementWithEncadrants → `encadrants` (jsonb, clé personne_id) ;
+    //   (2) getEquipesEngagees → équipes engagées RÉELLES (source
+    //   evenement_equipes_engagees, indépendante des phases enfants → couvre le
+    //   match simple sans phase). Non bloquant : tout échec = repli honnête
+    //   (on garde ce que le cache portait), jamais un faux.
+    try {
+      if (window.SupabaseHub
+          && typeof SupabaseHub.getEvenementWithEncadrants === 'function') {
+        const _frais = await SupabaseHub.getEvenementWithEncadrants(evtId);
+        if (_frais && Array.isArray(_frais.encadrants)) {
+          evt.encadrants = _frais.encadrants;
+        }
+      }
+      if (evt.type_evenement === 'competition'
+          && window.SupabaseHub
+          && typeof SupabaseHub.getEquipesEngagees === 'function') {
+        const _eqs = await SupabaseHub.getEquipesEngagees(evtId);
+        evt._equipesEngagees = Array.isArray(_eqs) ? _eqs : [];
+      }
+    } catch (e) {
+      console.error('MOM Hub: openModalEditComplet() read-back', e);
+    }
+
     openModalCreate();              // reset complet + ouverture
     MODAL_CREATE_EDIT_ID = evtId;   // bascule mode édition
 
@@ -5168,8 +5199,18 @@
     // robuste face au peuplement asynchrone des cases équipes.
     if (fam === 'competition') {
       const enfants = CHILDREN_BY_PARENT[evtId] || [];   // phase-boîtes
+      // EVT-EDITION-READBACK — UNION de deux sources d'équipes engagées :
+      //   (a) equipe_id déduits des phases enfants (cas tournoi multi-équipes,
+      //       comportement historique) ; (b) equipe_id du read-back frais
+      //       evt._equipesEngagees (source evenement_equipes_engagees, cas
+      //       match simple SANS phase enfant → l'ensemble (a) est vide). Sans
+      //       (b), la case équipe engagée d'un match simple n'était jamais
+      //       re-cochée à l'édition.
+      const _eqEng = Array.isArray(evt._equipesEngagees) ? evt._equipesEngagees : [];
       const eqIds = Array.from(new Set(
-        enfants.map(function (e) { return e.equipe_id; }).filter(Boolean)));
+        enfants.map(function (e) { return e.equipe_id; })
+          .concat(_eqEng.map(function (x) { return x.equipe_id; }))
+          .filter(Boolean)));
 
       // 1) Attendre que les cases équipes existent, puis cocher.
       _waitFor(function () {
