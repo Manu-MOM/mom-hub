@@ -21,6 +21,19 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
+ * Version : 1.63 — EVT-CREATION-HEURE-MINUIT : date_debut composée avec l'heure de début au submit (9 juillet 2026)
+ *   v1.63 : CAUSE RACINE DU BUG MINUIT RÉSORBÉE. submitModalCreate (chemin
+ *           partagé création + édition) envoyait date_debut =
+ *           new Date(<input date>).toISOString() → date-seule parsée minuit
+ *           UTC par la spec JS, alors que debut_match était lu et envoyé
+ *           SÉPARÉMENT (TIME) : la racine naissait « sans heure » (convention
+ *           pt 167) et toute ÉDITION re-calait à minuit une mère réparée
+ *           (pt 183). Correctif : si debut_match est saisi, date_debut =
+ *           new Date(dateDebut + 'T' + heure).toISOString() (parsing LOCAL →
+ *           fuseau navigateur, 19:15 Paris été = 17:15Z). Sans heure :
+ *           inchangé. Sites voulus tels quels et NON touchés : date_fin
+ *           (borne date-seule), dates de phase, duplication (debut_match non
+ *           copié), submitModalEdit (code mort). Purement additif (+N/−0).
  * Version : 1.62 — Vignette « Statistiques » câblée (deep-link pilotage.html?evenement_equipe=) (4 juin 2026)
  *   v1.62 : VIGNETTE #8 STATISTIQUES CÂBLÉE. La fonctionnalité Pilotage de
  *           saison existe (pilotage.html, pt 62) ; la vignette #8, jusqu'ici
@@ -6550,6 +6563,25 @@
     if (_finPrevue)  payload.fin_prevue  = _finPrevue;
     if (_rdvHeure)   payload.rdv_heure   = _rdvHeure;
     if (_rdvLieu)    payload.rdv_lieu    = _rdvLieu;
+
+    // EVT-CREATION-HEURE-MINUIT (v1.63) — composition date + heure.
+    // Convention pt 167 : « minuit UTC pile = heure NON saisie ». Or la
+    // racine naissait (création) et était RE-CALÉE (édition, même submit)
+    // à minuit UTC alors que debut_match était renseigné → mère « sans
+    // heure » aux agendas (cause racine du bug minuit tracé pt 183).
+    // Si l'heure de début est saisie, on la compose avec la date en
+    // parsing LOCAL (spec JS : 'YYYY-MM-DDTHH:MM' SANS suffixe Z = heure
+    // locale du navigateur, qui porte le bon fuseau — témoin : 19:15
+    // Paris été → 17:15Z) puis toISOString(). Même patron que l'ajout de
+    // match à un tournoi (setHours local + toISOString). Sans heure
+    // saisie : comportement inchangé, la convention minuit reste vraie.
+    // Occurrences : aucun impact (le générateur lit debut_match, pas
+    // l'heure de la mère — prouvé S3 du chantier). Duplication : rien à
+    // faire (duplicateEvenement ne copie pas debut_match → la copie est
+    // légitimement « sans heure »).
+    if (_debutMatch) {
+      payload.date_debut = new Date(dateDebut + 'T' + _debutMatch).toISOString();
+    }
 
     // Rattachement CATÉGORIE (chantier EVT-RATTACHEMENT-CATEGORIE).
     // La catégorie active du sélecteur (CTX_PERIMETRE.active) est la
