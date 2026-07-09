@@ -2835,6 +2835,21 @@
       return Array.isArray(data) ? data : [];
     },
 
+    // Chantier VIVIER-COMPO-CATEGORIE — variante catégorielle de getVivierCompo.
+    // Le vivier est celui de la CATÉGORIE (rattachement séances→catégorie, pt 181),
+    // plus de l'équipe. RPC get_vivier_compo_categorie(p_categorie_id) : mêmes
+    // colonnes que get_vivier_compo, statut_attache/niveau_profil/date_affectation
+    // renvoyés NULL (pas d'équipe). Règle F15/M14 préservée côté RPC.
+    async getVivierCompoCategorie(categorieId) {
+      if (!categorieId) {
+        console.error('MOM Hub: getVivierCompoCategorie() requiert un categorieId');
+        return [];
+      }
+      const { data, error } = await client.rpc('get_vivier_compo_categorie', { p_categorie_id: categorieId });
+      if (error) { console.error('MOM Hub: getVivierCompoCategorie()', error); return []; }
+      return Array.isArray(data) ? data : [];
+    },
+
     // ============================================================
     // PHASE 4.4 UI — WRAPPERS ÉCRITURE COMPOSITIONS (v1.7)
     // ============================================================
