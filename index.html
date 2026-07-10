@@ -1433,18 +1433,27 @@
       var sec = document.getElementById('sec-equipe');
       var titre = document.getElementById('sec-equipe-title');
       if (!sec || !titre) return;
+      // v1.x (ACCES-ANONYME-EQUIPE, doctrine anonyme) : la section « Mon
+      // équipe » s'affiche COMME les autres sections (01 Pédagogie, 03
+      // Logistique), y compris pour un visiteur sans session. Ses vignettes
+      // sont des liens standards : la garde de PAGE protège à l'arrivée
+      // (joueurs/evenements affichent « Connectez-vous… »). Le titre reste
+      // « Mon équipe » SANS catégorie tant qu'il n'y a pas de contexte staff
+      // (jamais de « M14 » mensonger) ; il est enrichi de la catégorie
+      // seulement pour un connecté dont le contexte est résolu.
+      // NB : comportement transitoire en attendant REFONTE-ENROLEMENT.
+      sec.style.display = '';
       if (typeof SupabaseHub === 'undefined'
           || typeof SupabaseHub.monContexteStaff !== 'function') {
-        return; // client < v1.73 : section masquée, pas de mensonge
+        return; // section visible, titre par défaut « Mon équipe »
       }
       var session = null;
       try { session = await SupabaseHub.getSession(); } catch (e) { /* honnête */ }
-      if (!session) return;
+      if (!session) return; // anonyme : section visible, titre par défaut
       var ctx = null;
       try { ctx = await SupabaseHub.monContexteStaff(); } catch (e) { /* honnête */ }
-      if (!ctx || !ctx.categorie_libelle_court) return;
+      if (!ctx || !ctx.categorie_libelle_court) return; // pas de catégorie : titre par défaut
       titre.textContent = 'Mon équipe — ' + ctx.categorie_libelle_court;
-      sec.style.display = '';
     }
 
     _remplirSectionEquipe();
