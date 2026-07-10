@@ -113,27 +113,32 @@ window.JoueursBrowser = (function () {
 
   /**
    * Équipes de la catégorie active → [equipeId, …].
-   * Repli [M14_TEAM_UUID] : socle absent, périmètre vide, aucune
-   * équipe (jamais de liste muette par construction).
+   * PERSONA-NON-STAFF (régression pt 194) : PLUS DE REPLI M14. Un membre
+   * ordinaire sans catégorie (ex : Jules, joueur relié) avait `active=null`
+   * et se voyait servir l'effectif M14 complet. Décision Manu déjà appliquée
+   * au module Événements (evenements-browser.js « plus de repli M14 ») :
+   * pas de catégorie active → liste VIDE, empty-state honnête. La sécurité
+   * n'a jamais été en cause (RPC authenticated + périmètre), c'est un
+   * correctif d'AFFICHAGE.
    */
   async function _joueursResoudreEquipesActives() {
     if (typeof SupabaseHub === 'undefined'
         || typeof SupabaseHub.listEquipes !== 'function') {
-      return [M14_TEAM_UUID];
+      return []; // socle absent → liste vide (plus de repli M14)
     }
     const catId = CTX_PERIMETRE && CTX_PERIMETRE.active;
-    if (!catId) return [M14_TEAM_UUID];
+    if (!catId) return []; // pas de catégorie active → vide (plus de repli M14)
     let equipes;
     try {
       equipes = await SupabaseHub.listEquipes(catId);
     } catch (e) {
-      console.warn('Joueurs: listEquipes indisponible, repli M14.', e);
-      return [M14_TEAM_UUID];
+      console.warn('Joueurs: listEquipes indisponible.', e);
+      return []; // échec de résolution → vide (plus de repli M14 trompeur)
     }
     const ids = (Array.isArray(equipes) ? equipes : [])
       .map(function (eq) { return eq && eq.id; })
       .filter(Boolean);
-    return ids.length > 0 ? ids : [M14_TEAM_UUID];
+    return ids; // vide si la catégorie n'a aucune équipe (plus de repli M14)
   }
 
   /**
@@ -665,7 +670,17 @@ window.JoueursBrowser = (function () {
     if (!listEl) return;
 
     if (ALL_JOUEURS.length === 0) {
-      listEl.innerHTML = '<div class="joueur-list-loading">Aucune donnée chargée — backend muet ?</div>';
+      // PERSONA-NON-STAFF : un membre sans catégorie autorisée (ex : Jules,
+      // joueur relié sans fonction encadrant) n'a AUCUN effectif à voir.
+      // Ce n'est pas une panne : message honnête, distinct du cas backend.
+      var perimetreVide = !CTX_PERIMETRE
+        || CTX_PERIMETRE.vide === true
+        || !(CTX_PERIMETRE.active);
+      if (perimetreVide) {
+        listEl.innerHTML = '<div class="joueur-list-empty">Aucune catégorie ne vous est rattachée. Cet écran est réservé aux encadrants d\'une catégorie.</div>';
+      } else {
+        listEl.innerHTML = '<div class="joueur-list-loading">Aucune donnée chargée — backend muet ?</div>';
+      }
       return;
     }
 
@@ -1819,8 +1834,21 @@ window.JoueursBrowser = (function () {
           });
         }
       } catch (e) {
-        console.warn('Joueurs: résolution périmètre catégorie échouée, repli M14.', e);
+        console.warn('Joueurs: résolution périmètre catégorie échouée.', e);
       }
+    }
+
+    // PERSONA-NON-STAFF (décision Manu) : un membre connecté SANS catégorie
+    // rattachée (ex : Jules) ne doit pas voir le geste de création. On masque
+    // le FAB « + Ajouter » si le périmètre est vide. Entorse assumée à D4
+    // (« tout visible ») : ici l'utilisateur est identifié et sans catégorie
+    // cible, le bouton n'aurait aucun sens. La sécurité reste au niveau SQL.
+    var _perimetreVide = !CTX_PERIMETRE
+      || CTX_PERIMETRE.vide === true
+      || !(CTX_PERIMETRE.active);
+    if (_perimetreVide) {
+      var _fabAdd = document.getElementById('joueur-fab-add');
+      if (_fabAdd) _fabAdd.style.display = 'none';
     }
 
     // 2. Référentiels JSON (en parallèle de la liste joueurs)
