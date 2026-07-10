@@ -1471,8 +1471,20 @@
     refreshAuthState();
 
     // Démarrage du module Joueurs
+    // GARDE-ANON-JOUEURS : on résout la session AVANT init() pour lui signaler
+    // l'anonymat. Un visiteur sans session obtient un état vide gracieux (pas
+    // d'appel RPC voué au DENIED, pas d'erreur rouge technique). Patron aligné
+    // sur evenements.html (applyState(false, true) = repli anonyme).
     try {
-      await window.JoueursBrowser.init();
+      let estAnonyme = true;
+      try {
+        const session = await SupabaseHub.getSession();
+        estAnonyme = !session;
+      } catch (e) {
+        // Repli anonyme (sûr) si la résolution de session échoue.
+        console.warn('Joueurs: résolution session échouée, repli anonyme.', e);
+      }
+      await window.JoueursBrowser.init(estAnonyme);
     } catch (err) {
       console.error('Joueurs: échec init', err);
       const list = document.getElementById('joueur-list');
