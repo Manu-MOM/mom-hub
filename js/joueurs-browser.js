@@ -1644,7 +1644,7 @@ window.JoueursBrowser = (function () {
   // INIT
   // ============================================================
 
-  async function init() {
+  async function init(estAnonyme) {
     console.log('Joueurs: init() — v1.3 (P2-J.1 FFR + P2-J.2 mobile + P2-J.3 polish)');
 
     // 1. Préfs + bindings UI
@@ -1653,6 +1653,22 @@ window.JoueursBrowser = (function () {
     bindFilters();
     bindSearch();
     bindModalClosers();
+
+    // 1ter. GARDE-ANON-JOUEURS : un visiteur sans session ne peut pas lire
+    // l'effectif (les RPC get_joueurs_* sont `authenticated` only). Plutôt
+    // que de lancer des appels voués à un DENIED (qui s'affichait en erreur
+    // rouge technique), on rend un état vide gracieux et on court-circuite
+    // AVANT toute RPC. Effet de bord voulu : le seul `null` qui peut encore
+    // survenir plus bas provient d'une session valide + RPC en échec = une
+    // VRAIE panne, qui mérite alors un message d'erreur (dégradation honnête).
+    if (estAnonyme) {
+      const listEl = document.getElementById('joueur-list');
+      if (listEl) {
+        listEl.innerHTML = '<div class="joueur-list-empty">Connectez-vous pour consulter l\'effectif.</div>';
+      }
+      console.log('Joueurs: init() — visiteur anonyme, effectif non chargé (état vide gracieux).');
+      return;
+    }
 
     // 1bis. Périmètre de catégorie active + sélecteur (multi-cat).
     // Résolu AVANT le chargement pour que _chargerJoueursCategorieActive
@@ -1691,7 +1707,7 @@ window.JoueursBrowser = (function () {
     if (!joueurs) {
       const listEl = document.getElementById('joueur-list');
       if (listEl) {
-        listEl.innerHTML = '<div class="joueur-list-error">Échec du chargement de l\'effectif (RPC get_joueurs_equipe / get_joueurs_f15). Vérifie la console.</div>';
+        listEl.innerHTML = '<div class="joueur-list-error">Impossible de charger l\'effectif pour le moment.</div>';
       }
       return;
     }
