@@ -2514,6 +2514,16 @@
         body.classList.add('auth-user');
       }
       body.classList.add('auth-resolved');
+      // Le titre porte un suffixe catégorie EN DUR dans le gabarit
+      // (« Mes évènements — M14 SAR×MOM ») normalement remplacé par le
+      // libellé de catégorie. Pour un visiteur sans session, on réécrit le
+      // h2 sans suffixe (pas de catégorie affichée à un non-connecté ;
+      // cohérent avec l'index qui masque « Mon équipe » sans session).
+      // Réécriture complète = pas de tiret « — » orphelin.
+      if (isAnon) {
+        var h2El = document.querySelector('.evt-header h2');
+        if (h2El) h2El.textContent = 'Mes évènements';
+      }
     }
     async function refreshAuthState() {
       try {
