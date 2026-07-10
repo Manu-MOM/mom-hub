@@ -79,6 +79,16 @@
     }
 
     await loadCategories();
+    // PERSONA-NON-STAFF (décision Manu, régression pt 194) : un membre
+    // connecté SANS catégorie (ex : Jules) ne doit pas voir le formulaire de
+    // demande de bus (geste d'écriture réservé au staff d'une catégorie).
+    // Si périmètre vide → bandeau honnête + on court-circuite le reste du
+    // câblage du formulaire. Sécurité déjà assurée en base (policy au submit).
+    if (_perimetreVideBus()) {
+      _afficherBandeauPerimetreVide();
+      console.log('Bus : périmètre vide (membre sans catégorie) — formulaire masqué.');
+      return;
+    }
     wireForm();
     renderArrets('aller');
     renderArrets('retour');
@@ -103,6 +113,30 @@
       state.categories = all.filter(function (c) { return ids.indexOf(c.id) !== -1; });
     }
     renderCategorieOptions();
+  }
+
+  // PERSONA-NON-STAFF : périmètre vide = non-transverse ET aucune catégorie
+  // rattachée (membre ordinaire connecté, ex : Jules).
+  function _perimetreVideBus() {
+    return !state.isTransverse
+      && (!Array.isArray(state.categories) || state.categories.length === 0);
+  }
+
+  // Masque toutes les cartes du formulaire et affiche un bandeau honnête.
+  function _afficherBandeauPerimetreVide() {
+    var cards = document.querySelectorAll('.bus-card');
+    cards.forEach(function (c) { c.style.display = 'none'; });
+    var host = cards.length ? cards[0].parentNode : document.body;
+    if (host && !document.getElementById('bus-perimetre-vide')) {
+      var box = document.createElement('div');
+      box.id = 'bus-perimetre-vide';
+      box.className = 'bus-card';
+      box.style.display = '';
+      box.innerHTML = '<h3 class="bus-card__title">Accès réservé</h3>'
+        + '<p class="bus-card__hint">Aucune catégorie ne vous est rattachée. '
+        + 'La demande de bus est réservée aux encadrants d\'une catégorie.</p>';
+      host.insertBefore(box, cards.length ? cards[0] : null);
+    }
   }
 
   async function fetchCategories() {
