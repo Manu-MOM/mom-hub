@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
-<title>MOM Hub · Évènements M14</title>
+<title>MOM Hub · Évènements</title>
 <link rel="icon" type="image/png" href="assets/logo-m2m.png">
 <link rel="stylesheet" href="css/hub.css">
 <style>
@@ -90,6 +90,13 @@
   .evt-header h2 .evt-team {
     color: var(--vert-prairie);
     font-weight: 600;
+  }
+  /* PERSONA-NON-STAFF : séparateur affiché seulement si une catégorie est
+     réellement injectée (encadrant). Membre sans catégorie → « Mes évènements ». */
+  .evt-header h2 .evt-team:not(:empty)::before {
+    content: " — ";
+    color: var(--ink);
+    font-weight: 800;
   }
   .evt-header-sub {
     font-size: 12.5px;
@@ -1715,7 +1722,7 @@
       <div class="evt-header">
         <div>
           <div class="evt-header-meta" id="evt-header-meta">SAISON … · MES ÉVÈNEMENTS</div>
-          <h2>Mes évènements — <span class="evt-team">M14 SAR×MOM</span></h2>
+          <h2>Mes évènements<span class="evt-team"></span></h2>
           <div class="evt-header-sub" id="evt-header-sub">Chargement…</div>
         </div>
         <div class="evt-header-kpis">
@@ -2514,12 +2521,12 @@
         body.classList.add('auth-user');
       }
       body.classList.add('auth-resolved');
-      // Le titre porte un suffixe catégorie EN DUR dans le gabarit
-      // (« Mes évènements — M14 SAR×MOM ») normalement remplacé par le
-      // libellé de catégorie. Pour un visiteur sans session, on réécrit le
-      // h2 sans suffixe (pas de catégorie affichée à un non-connecté ;
-      // cohérent avec l'index qui masque « Mon équipe » sans session).
-      // Réécriture complète = pas de tiret « — » orphelin.
+      // PERSONA-NON-STAFF : le suffixe catégorie du titre est désormais un
+      // span VIDE dans le gabarit (plus de « M14 SAR×MOM » en dur), rempli
+      // par le libellé de catégorie via _majTitreCategorie SI une catégorie
+      // active existe. Séparateur « — » ajouté en CSS (:not(:empty)). Pour un
+      // visiteur sans session OU un membre sans catégorie, le titre reste
+      // « Mes évènements » sans suffixe (cohérent index / doctrine).
       if (isAnon) {
         var h2El = document.querySelector('.evt-header h2');
         if (h2El) h2El.textContent = 'Mes évènements';
