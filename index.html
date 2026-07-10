@@ -1396,10 +1396,14 @@
       // étiqueté « Encadrant » à tort. Repli sensible à l'état.
       // Suffixe : libellé normalisé (libelleCourt) pour éviter le
       // doublon « saison Saison ».
+      // PERSONA-NON-STAFF (régression pt 194) : depuis l'ouverture de
+      // l'enrôlement, un membre ORDINAIRE (joueur, ex : Jules) peut se
+      // relier et n'a NI fonction NI rôle staff. Le repli « Encadrant »/
+      // « Bureau » ne doit JAMAIS s'appliquer à lui. On ne préfixe un rôle
+      // que si l'utilisateur a une vraie fonction OU est staff (auth-staff).
+      var estStaff = document.body.classList.contains('auth-staff');
       if (libelleFonction || libelleCourt) {
-        var prefixeRepli = document.body.classList.contains('auth-staff')
-          ? 'Bureau'
-          : 'Encadrant';
+        var prefixeRepli = estStaff ? 'Bureau' : 'Encadrant';
         var prefixe = libelleFonction || prefixeRepli;
         var suffixe = libelleCourt ? ('saison ' + libelleCourt) : 'saison en cours';
         // On n'écrase que si on a au moins une vraie donnée.
@@ -1407,9 +1411,14 @@
           sub.textContent = prefixe + ' · ' + suffixe;
         } else if (libelleFonction) {
           sub.textContent = prefixe + ' · saison en cours';
-        } else if (libelleCourt) {
+        } else if (libelleCourt && estStaff) {
+          // Repli de rôle UNIQUEMENT pour un membre du staff sans fonction
+          // fine (ex : bureau sans fonction_staff). Un membre ordinaire
+          // garde le sous-titre neutre par défaut (« Portail du club… »).
           sub.textContent = prefixeRepli + ' · ' + suffixe;
         }
+        // else (libelleCourt && !estStaff) : membre ordinaire → on ne
+        // touche pas au sous-titre (reste « Portail du club · saison… »).
       }
     }
 
