@@ -504,60 +504,10 @@
   function _monterSelecteurEquipe() {
     // Chantier SEANCE-RATTACHEMENT-CATEGORIE — le sélecteur d'ÉQUIPE est
     // retiré : les séances se rattachent à la CATÉGORIE, plus à l'équipe.
-    // On neutralise l'affichage par early-return (geste additif, code
-    // historique conservé dessous pour traçabilité / réversibilité).
+    // Fonction neutralisée par early-return (l'ancien corps historique de
+    // montage du sélecteur, jamais atteint, a été retiré au chantier
+    // HYGIENE-CODE-MORT). Conservée pour préserver ses appelants inchangés.
     return;
-    // eslint-disable-next-line no-unreachable
-    const liste = State.equipesCategorieActive || [];
-    if (liste.length <= 1) return; // mono-équipe : pas de sélecteur
-
-    const header = document.querySelector('.seance-header');
-    if (!header || !header.parentNode) return;
-    if (document.getElementById('seance-equipe-selecteur-wrap')) return; // anti-doublon
-
-    const wrap = document.createElement('div');
-    wrap.id = 'seance-equipe-selecteur-wrap';
-    wrap.style.cssText = 'display:flex; align-items:center; gap:8px; margin:0 0 14px 0; ' +
-      'font-family:\'JetBrains Mono\',monospace; font-size:10px; letter-spacing:0.10em; ' +
-      'text-transform:uppercase; color:var(--ink-mute);';
-
-    const label = document.createElement('label');
-    label.setAttribute('for', 'seance-equipe-selecteur');
-    label.textContent = 'Équipe :';
-    label.style.cssText = 'flex-shrink:0;';
-
-    const select = document.createElement('select');
-    select.id = 'seance-equipe-selecteur';
-    select.style.cssText = 'padding:6px 10px; border:1px solid var(--line); border-radius:6px; ' +
-      'background:var(--paper-warm); color:var(--ink); font-family:inherit; font-size:11px; ' +
-      'letter-spacing:0.06em; cursor:pointer;';
-
-    liste.forEach(function (eq) {
-      const opt = document.createElement('option');
-      opt.value = eq.id;
-      opt.textContent = eq.libelle_court || eq.nom_officiel || eq.code || eq.id;
-      if (eq.id === State.equipeActive) opt.selected = true;
-      select.appendChild(opt);
-    });
-
-    select.addEventListener('change', async function () {
-      const nouvelle = this.value;
-      if (!nouvelle || nouvelle === State.equipeActive) return;
-      State.equipeActive = nouvelle;
-      _memoriserEquipeSeance(nouvelle);
-      select.disabled = true;
-      try {
-        await _seanceRechargerDonnees();
-      } catch (e) {
-        console.error('SeanceEditor: rechargement après changement d\'équipe échoué', e);
-      } finally {
-        select.disabled = false;
-      }
-    });
-
-    wrap.appendChild(label);
-    wrap.appendChild(select);
-    header.parentNode.insertBefore(wrap, header.nextSibling);
   }
 
   /** Retire le sélecteur d'équipe (avant remontage après changement de catégorie). */
