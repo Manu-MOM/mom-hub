@@ -1666,6 +1666,14 @@ window.JoueursBrowser = (function () {
       if (listEl) {
         listEl.innerHTML = '<div class="joueur-list-empty">Connectez-vous pour consulter l\'effectif.</div>';
       }
+      // Le titre porte un suffixe catégorie EN DUR dans le gabarit
+      // (« Mes joueurs — M14 SAR×MOM ») normalement remplacé par le
+      // sélecteur de catégorie — jamais monté ici (court-circuit anonyme).
+      // On réécrit le h2 sans suffixe pour ne pas afficher une catégorie à
+      // un non-connecté (cohérent avec l'index qui masque « Mon équipe »
+      // sans session). Réécriture complète = pas de tiret « — » orphelin.
+      const h2El = document.querySelector('.joueur-header h2');
+      if (h2El) h2El.textContent = 'Mes joueurs';
       console.log('Joueurs: init() — visiteur anonyme, effectif non chargé (état vide gracieux).');
       return;
     }
