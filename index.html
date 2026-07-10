@@ -1466,11 +1466,14 @@
     //     renvoie la personne_id reliée, ou null si compte orphelin.
     //   - relier_ma_fiche(p_personne_id) → wrapper relierMaFiche() : seul
     //     écrivain de auth_personne, matérialise les rôles pré-attribués.
-    //   - listFichesEnrolables() (v1.72) : pioche DÉDIÉE de la modale —
-    //     personnes en attente (roles_en_attente) non reliées. Remplace
-    //     listStaffDisponibles(), dont la garde par rôle (retrofit
-    //     u-admin) excluait les comptes orphelins (œuf-et-poule,
-    //     recette 03/07/2026 — FAIT FOI ENROLEMENT-REPARATION).
+    //   - listMesFichesParEmail() (REFONTE-ENROLEMENT, sql_194) : pioche
+    //     de la modale — fiches dont l'email principal = adresse du compte
+    //     connecté (Niveau strict), non déjà reliées (option A). Remplace
+    //     listFichesEnrolables() (circuit allowlist roles_en_attente) :
+    //     désormais TOUT licencié dont l'email correspond peut se relier,
+    //     la pré-attribution ne conditionne plus l'entrée mais seulement
+    //     le jeton de rôle (FAIT FOI 10/07/2026). 0 = adresse sans
+    //     correspondance ; 1 = auto ; N = désambiguïsation famille-email.
     //   - get_noms_personnes() (via greeting) : prénom réel post-liaison.
     //   - Admin Manu n'a pas de pont auth_personne (déjà fonctionnel via
     //     son rôle) → jamais bloqué par la modale.
@@ -1542,17 +1545,22 @@
 
       let staff = [];
       try {
-        // ENROLEMENT-REPARATION : voie dédiée (personnes attendues
-        // uniquement). Le nommage `staff` est conservé (portée locale).
-        staff = await SupabaseHub.listFichesEnrolables();
+        // REFONTE-ENROLEMENT (sql_194) : pioche = résolution email→fiche(s)
+        // du compte connecté (Niveau strict). Remplace listFichesEnrolables()
+        // (ancien circuit allowlist roles_en_attente). Le nommage `staff`
+        // est conservé (portée locale). 0 fiche = adresse sans correspondance
+        // (D1) ; 1 = rattachement direct (D2-cas1) ; N = famille-email (D2-cas2).
+        staff = await SupabaseHub.listMesFichesParEmail();
       } catch (err) {
-        console.error('MOM Hub portail: listFichesEnrolables() échouée', err);
+        console.error('MOM Hub portail: listMesFichesParEmail() échouée', err);
       }
 
       if (!Array.isArray(staff) || staff.length === 0) {
+        // D1 : l'adresse du compte ne correspond à aucune fiche du club.
         list.innerHTML =
-          '<li class="enrol-empty">Aucune fiche disponible. ' +
-          'Contactez l\'administrateur du club pour être rattaché.</li>';
+          '<li class="enrol-empty">Votre adresse e-mail ne correspond à ' +
+          'aucune fiche du club. Contactez l\'administrateur pour être ' +
+          'rattaché(e).</li>';
         return;
       }
 
