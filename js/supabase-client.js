@@ -18,7 +18,16 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.78 — juillet 2026
+ * Version : 1.79 — juillet 2026
+ *   v1.79 : REFONTE-ENROLEMENT (FAIT FOI gelé 10/07/2026, pt 193).
+ *          Wrapper ADDITIF listMesFichesParEmail() → RPC sql_194
+ *          list_mes_fiches_par_email() : résolution email→fiche(s) du
+ *          compte connecté (Niveau strict), pioche de la modale
+ *          « Qui êtes-vous ? » en remplacement de listFichesEnrolables().
+ *          Miroir exact du wrapper existant (mapping personne_id/nom/prenom,
+ *          dégradation honnête []). Aucune ligne existante touchée.
+ *          node --check OK. (console.log boot NON touché — décalage
+ *          header/boot préexistant, hors périmètre.)
  *   v1.78 : COMPO-RATTACHEMENT-CATEGORIE (D3 option a — pur front).
  *          Wrapper ADDITIF listCompositionsByCategorie(categorieId) :
  *          voie CATÉGORIE du listing compos (jointure evenements!inner
@@ -6726,6 +6735,37 @@
       const { data, error } = await client.rpc('list_fiches_enrolables');
       if (error) {
         console.error('MOM Hub: listFichesEnrolables()', error);
+        return [];
+      }
+      if (!Array.isArray(data)) return [];
+      return data.map(function (r) {
+        return {
+          personne_id: r.personne_id,
+          nom:    r.nom || '',
+          prenom: r.prenom || ''
+        };
+      });
+    },
+
+    /**
+     * REFONTE-ENROLEMENT (sql_194) — résolution email -> fiche(s).
+     *
+     * Renvoie les fiches dont l'email principal correspond EXACTEMENT à
+     * l'adresse du compte connecté (auth.email()), en excluant les fiches
+     * déjà reliées à un compte (option A). Remplace listFichesEnrolables()
+     * comme pioche de la modale « Qui êtes-vous ? » :
+     *   - 0 fiche  -> l'adresse ne correspond à aucune fiche (D1, refus poli).
+     *   - 1 fiche  -> rattachement direct possible (D2-cas1).
+     *   - N fiches -> désambiguïsation famille-email (D2-cas2).
+     *
+     * @returns {Promise<Array>} [{personne_id, nom, prenom}] trié
+     *   nom/prenom ; [] si erreur (dégradation honnête, miroir
+     *   listFichesEnrolables).
+     */
+    async listMesFichesParEmail() {
+      const { data, error } = await client.rpc('list_mes_fiches_par_email');
+      if (error) {
+        console.error('MOM Hub: listMesFichesParEmail()', error);
         return [];
       }
       if (!Array.isArray(data)) return [];
