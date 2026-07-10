@@ -841,6 +841,10 @@ window.JoueursBrowser = (function () {
         <div style="font-size:11px; color:var(--ink-mute); line-height:1.5;">
           📌 L'identité (nom, licence, contacts) s'édite dans l'Annuaire global (module à venir).
         </div>
+        <!-- EDITION-EMAIL-FICHE : bouton révélé seulement pour bureau/admin
+             par bindEmailEdit() (miroir client, la RPC reste la vérité). -->
+        <button type="button" class="joueur-btn" id="joueur-email-edit-btn"
+                style="display:none; margin-top:10px;">✎ Modifier l'e-mail</button>
       </div>
     `;
   }
@@ -1211,6 +1215,9 @@ window.JoueursBrowser = (function () {
     // v1.7 : révélation + câblage du bloc Section rugby (asynchrone,
     // n'entrave pas le rendu de la fiche).
     bindSectionToggle();
+    // EDITION-EMAIL-FICHE : révélation + câblage du bouton « Modifier
+    // l'e-mail » (bureau/admin seulement, asynchrone, non bloquant).
+    bindEmailEdit();
   }
 
   /**
@@ -1279,6 +1286,43 @@ window.JoueursBrowser = (function () {
       }
       cbEl.disabled = false;
     });
+  }
+
+  /**
+   * EDITION-EMAIL-FICHE — révèle et câble le bouton « Modifier l'e-mail »
+   * de la fiche si et seulement si :
+   *   (a) le socle expose le wrapper majIdentiteFiche + mesCategoriesAutorisees ;
+   *   (b) le droit est TRANSVERSE (admin/bureau) — miroir client de la garde
+   *       SQL maj_identite_fiche, qui reste la vérité (la RPC refuse même si
+   *       l'UI est forcée). Contrairement à Section rugby, on N'ouvre PAS aux
+   *       référents de catégorie : l'identité (dont e-mail) est réservée
+   *       bureau/admin (doctrine D1).
+   * Sinon : bouton invisible (dégradation honnête, aucun message).
+   */
+  async function bindEmailEdit() {
+    const btn = document.getElementById('joueur-email-edit-btn');
+    if (!btn) return;
+    if (typeof SupabaseHub === 'undefined'
+        || typeof SupabaseHub.majIdentiteFiche !== 'function'
+        || typeof SupabaseHub.mesCategoriesAutorisees !== 'function') {   // (a)
+      return;
+    }
+    let transverse = false;
+    try {
+      const rows = await SupabaseHub.mesCategoriesAutorisees();
+      transverse = Array.isArray(rows) && rows.some(function (r) {
+        return r && r.est_transverse === true;
+      });
+    } catch (err) {
+      console.error('Joueurs: bindEmailEdit() droits', err);
+      return;                                                             // (b)
+    }
+    if (!transverse) return;                                              // (b)
+
+    btn.style.display = '';
+    btn.onclick = function () {
+      if (currentEditDetail) openModalEmail(currentEditDetail);
+    };
   }
 
   // ============================================================
@@ -1635,6 +1679,78 @@ window.JoueursBrowser = (function () {
     } catch (err) {
       console.error('Joueurs: submitModalNotes()', err);
       showModalMessage('joueur-notes-msg', 'joueur-notes-body', 'error',
+        'Erreur inattendue : ' + (err.message || err));
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  }
+
+  // ------------------------------------------------------------
+  // EDITION-EMAIL-FICHE — Modale J6 : édition e-mail (bureau/admin)
+  // ------------------------------------------------------------
+  function openModalEmail(d) {
+    const overlay = document.getElementById('joueur-overlay-email');
+    if (!overlay) return;
+
+    clearModalMessage('joueur-email-msg');
+
+    const infoEl = document.getElementById('joueur-email-info');
+    if (infoEl) {
+      infoEl.innerHTML = '<span class="joueur-modal-info-strong">'
+        + esc(d.prenom) + ' ' + esc(d.nom) + '</span>'
+        + ' · l\'e-mail principal sert au rattachement du compte membre';
+    }
+
+    const inPri = document.getElementById('joueur-email-principal');
+    const inSec = document.getElementById('joueur-email-secondaire');
+    if (inPri) inPri.value = d.email_principal || '';
+    if (inSec) inSec.value = d.email_secondaire || '';
+
+    const submitBtn = document.getElementById('joueur-email-submit');
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.onclick = submitModalEmail;
+    }
+
+    overlay.classList.add('show');
+  }
+
+  async function submitModalEmail() {
+    if (!currentEditPersonneId) return;
+    clearModalMessage('joueur-email-msg');
+
+    const submitBtn = document.getElementById('joueur-email-submit');
+    if (submitBtn) submitBtn.disabled = true;
+
+    try {
+      const inPri = document.getElementById('joueur-email-principal');
+      const inSec = document.getElementById('joueur-email-secondaire');
+      // '' est significatif : efface le champ (NULL côté RPC). On envoie donc
+      // toujours les deux champs (patch complet des e-mails de la fiche).
+      const patch = {
+        email_principal: inPri ? inPri.value.trim() : '',
+        email_secondaire: inSec ? inSec.value.trim() : ''
+      };
+
+      const res = await SupabaseHub.majIdentiteFiche(currentEditPersonneId, patch);
+      if (!res || !res.ok) {
+        showModalMessage('joueur-email-msg', 'joueur-email-body', 'error',
+          'Échec : ' + ((res && res.error) || 'erreur inconnue'));
+        if (submitBtn) submitBtn.disabled = false;
+        return;
+      }
+
+      showModalMessage('joueur-email-msg', 'joueur-email-body', 'success',
+        '✅ E-mail mis à jour');
+
+      setTimeout(async () => {
+        document.getElementById('joueur-overlay-email').classList.remove('show');
+        await reloadJoueurs();
+        await reopenFicheCurrent();
+      }, 700);
+
+    } catch (err) {
+      console.error('Joueurs: submitModalEmail()', err);
+      showModalMessage('joueur-email-msg', 'joueur-email-body', 'error',
         'Erreur inattendue : ' + (err.message || err));
       if (submitBtn) submitBtn.disabled = false;
     }
