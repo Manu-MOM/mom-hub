@@ -56,6 +56,16 @@
  * ACTÉ par Manu : modification d'un module INTERDIT hors chantier de
  * généralisation (précédent v1.7). Seule la table THEMES gagne une entrée ;
  * aucun comportement du module ne change. Le module reste INTERDIT.
+ * HUB-NAV v1.10 — chantier REFONTE-ENROLEMENT (FAIT FOI gelé 10/07/2026).
+ * Sous DÉROGATION EXPLICITE de Manu (module INTERDIT). RETRAIT du flag
+ * « sessionRequise » sur le thème « equipe » (posé en v1.9) : la doctrine
+ * « tout visible, tout verrouillé » actée à l'enrôlement veut qu'un visiteur
+ * non connecté voie TOUTES les barres/sections, la sécurité restant au
+ * niveau des données (coffres fermés, sql_193). La barre « equipe » retombe
+ * dans le montage SYNCHRONE normal, à l'identique des autres thèmes. Le
+ * mécanisme sessionRequise est CONSERVÉ (outil générique) mais n'a plus
+ * aucun porteur. ÉCART DE GOUVERNANCE ACTÉ. Le module reste INTERDIT ;
+ * md5 re-figé (remplace v1.9 6529cdb0 dans la liste des INTERDITS).
  * HUB-NAV v1.9 — chantier ACCES-ANONYME-EQUIPE (volet B, doctrine nav-anon).
  * Sous DÉROGATION EXPLICITE de Manu (module INTERDIT, précédents v1.7/v1.8) :
  * ajout d'un flag DÉCLARATIF « sessionRequise » sur un thème. Un thème qui le
@@ -106,7 +116,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.9';
+  var VERSION = '1.10';
 
   /* ------------------------------------------------------------------ *
    * TRONC COMMUN — présent en tête de chaque nav (lexique unifié).
@@ -166,10 +176,15 @@
     'equipe': {
       ariaLabel: 'Navigation mon équipe',
       carrefour: false,
-      // v1.9 (ACCES-ANONYME-EQUIPE volet B) : thème réservé aux connectés.
-      // Un anonyme ne monte pas cette barre (doctrine nav-anon ; la fuite de
-      // données est déjà fermée en base au volet A, sql_193).
-      sessionRequise: true,
+      // v1.10 (REFONTE-ENROLEMENT, dérogation explicite Manu 10/07/2026) :
+      // le flag sessionRequise (posé en v1.9) est RETIRÉ. Doctrine « tout
+      // visible, tout verrouillé » actée au FAIT FOI enrôlement : un
+      // visiteur non connecté voit TOUTES les sections/barres, la sécurité
+      // restant entièrement au niveau des données (coffres fermés, sql_193).
+      // La barre « equipe » retombe donc dans le montage SYNCHRONE normal,
+      // à l'identique des autres thèmes. (La fuite de données était déjà
+      // fermée au volet A pt 193 ; ce masquage n'était que de la
+      // présentation, désormais alignée sur la doctrine.)
       // 5 DESTINATIONS sans jeton (décision J1 gelée pt 160) : la barre
       // reflète le thème, la garde de PAGE protège. joueurs/evenements
       // n'ont pas de garde bloquante (consultables anonyme) → la barre s'y
@@ -408,6 +423,10 @@
   // client Supabase n'est pas là), la barre n'est pas montée — fail-safe :
   // rien de faux n'est affiché. Les thèmes ordinaires montent de façon
   // SYNCHRONE et INCHANGÉE (aucun await sur leur chemin).
+  // v1.10 (REFONTE-ENROLEMENT) : le thème « equipe » a PERDU son flag
+  // (doctrine « tout visible »). Ce mécanisme est CONSERVÉ comme outil
+  // générique réutilisable, mais n'a plus AUCUN porteur aujourd'hui — la
+  // branche ci-dessous n'est donc plus empruntée en l'état. Volontaire.
   if (theme.sessionRequise) {
     document.addEventListener('DOMContentLoaded', async function () {
       try {
