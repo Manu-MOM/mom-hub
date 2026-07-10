@@ -1024,63 +1024,11 @@
   /** Monte un sélecteur d'ÉQUIPE (mode legacy, > 1 équipe). */
   function _monterSelecteurEquipeCompo() {
     // v3.68 (COMPO-RATTACHEMENT-CATEGORIE, D2) : ancre legacy = CATÉGORIE,
-    // le sélecteur d'équipe n'a plus d'objet. NEUTRALISÉ par early-return,
-    // code historique + mémoire localStorage (_memoriserEquipeCompo)
-    // conservés inertes pour réversibilité (patron pt 181).
+    // le sélecteur d'équipe n'a plus d'objet. Fonction neutralisée par
+    // early-return (l'ancien corps historique de montage du sélecteur,
+    // jamais atteint, a été retiré au chantier HYGIENE-CODE-MORT).
+    // Conservée pour préserver ses appelants inchangés.
     return;
-    /* eslint-disable no-unreachable */
-    if (!_estModeLegacy()) return;
-    const liste = State.equipesCategorieActive || [];
-    if (liste.length <= 1) return;
-
-    const ancre = document.querySelector('.event-banner');
-    if (!ancre || !ancre.parentNode) return;
-    if (document.getElementById('compo-equipe-selecteur-wrap')) return;
-
-    const wrap = document.createElement('div');
-    wrap.id = 'compo-equipe-selecteur-wrap';
-    wrap.style.cssText = 'display:flex; align-items:center; gap:8px; margin:0 0 14px 0; ' +
-      'font-family:\'JetBrains Mono\',monospace; font-size:10px; letter-spacing:0.10em; ' +
-      'text-transform:uppercase; color:var(--ink-mute);';
-
-    const label = document.createElement('label');
-    label.setAttribute('for', 'compo-equipe-selecteur');
-    label.textContent = 'Équipe :';
-    label.style.cssText = 'flex-shrink:0;';
-
-    const select = document.createElement('select');
-    select.id = 'compo-equipe-selecteur';
-    select.style.cssText = 'padding:6px 10px; border:1px solid var(--line); border-radius:6px; ' +
-      'background:var(--paper-warm); color:var(--ink); font-family:inherit; font-size:11px; ' +
-      'letter-spacing:0.06em; cursor:pointer;';
-
-    liste.forEach(function (eq) {
-      const opt = document.createElement('option');
-      opt.value = eq.id;
-      opt.textContent = eq.libelle_court || eq.nom_officiel || eq.code || eq.id;
-      if (eq.id === State.equipeActive) opt.selected = true;
-      select.appendChild(opt);
-    });
-
-    select.addEventListener('change', async function () {
-      const nouvelle = this.value;
-      if (!nouvelle || nouvelle === State.equipeActive) return;
-      State.equipeActive = nouvelle;
-      _memoriserEquipeCompo(nouvelle);
-      select.disabled = true;
-      try {
-        await _composRechargerDonnees();
-      } catch (e) {
-        console.error('CompositionsEditor: rechargement après changement d\'équipe échoué', e);
-      } finally {
-        select.disabled = false;
-      }
-    });
-
-    wrap.appendChild(label);
-    wrap.appendChild(select);
-    ancre.parentNode.insertBefore(wrap, ancre);
-    /* eslint-enable no-unreachable */
   }
 
   function _retirerSelecteurEquipeCompo() {
