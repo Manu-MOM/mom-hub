@@ -7649,6 +7649,21 @@
       // mis à jour seulement si une catégorie active est résolue.
       _monterSelecteurCategorie();
       _majTitreCategorie();
+      // PERSONA-NON-STAFF (décision Manu) : membre connecté SANS catégorie
+      // (ex : Jules) → on masque le geste de création « + Nouvel événement ».
+      // Entorse assumée à D4 : utilisateur identifié sans catégorie cible,
+      // le bouton n'a pas de sens. Sécurité inchangée (garde SQL
+      // creer_evenement_complet : admin|bureau|gerer_evenements).
+      (function _masquerFabSiPerimetreVide() {
+        var vide = !CTX_PERIMETRE
+          || CTX_PERIMETRE.vide === true
+          || !(CTX_PERIMETRE.active);
+        if (!vide) return;
+        var fab = document.getElementById('evt-fab-new');
+        if (fab) fab.style.display = 'none';
+        var topBtn = document.getElementById('evt-btn-create-top');
+        if (topBtn) topBtn.style.display = 'none';
+      })();
       // directement la fiche de cet évènement au chargement (permet à la
       // page Groupe de base / Compositions de revenir SUR la fiche, pas
       // seulement sur la liste). Ouverture après le rendu (EVENTS_BY_ID prêt,
