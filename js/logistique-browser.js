@@ -200,7 +200,17 @@
     if (el('logi-subtitle')) el('logi-subtitle').textContent = ctx.sousTitre;
 
     await Promise.all([loadRessources(), loadCategories()]);
-    wireForm();
+    // PERSONA-NON-STAFF (décision Manu, régression pt 194) : un membre
+    // connecté SANS catégorie (ex : Jules) ne doit pas voir le formulaire de
+    // NOUVELLE demande (geste d'écriture réservé au staff d'une catégorie).
+    // On masque la zone de saisie + on affiche un bandeau honnête ; les
+    // agendas et « Mes demandes » (consultation) restent intacts. Sécurité
+    // déjà assurée en base (la policy tranche au submit).
+    if (_perimetreVideLogi()) {
+      _masquerSaisieLogi();
+    } else {
+      wireForm();
+    }
     applyUrlPrefill();
     await refreshAgenda();
     await refreshCalendar();
@@ -289,6 +299,27 @@
       });
     }
     renderCategorieOptions();
+  }
+
+  // PERSONA-NON-STAFF : périmètre vide = non-transverse ET aucune catégorie
+  // rattachée (membre ordinaire connecté sans fonction, ex : Jules).
+  function _perimetreVideLogi() {
+    return !state.isTransverse
+      && (!Array.isArray(state.categories) || state.categories.length === 0);
+  }
+
+  // Masque la section « Nouvelle demande » (ressources + champs) et affiche
+  // un bandeau honnête à la place. Les agendas et « Mes demandes »
+  // (consultation) ne sont PAS touchés.
+  function _masquerSaisieLogi() {
+    var ress = el('logi-ressources');
+    var section = ress ? ress.closest('.logi-section') : null;
+    if (section) {
+      section.innerHTML = '<h3 class="logi-section__title">Nouvelle demande</h3>'
+        + '<div class="logi-empty" style="line-height:1.5;">'
+        + 'Aucune catégorie ne vous est rattachée. La réservation est '
+        + 'réservée aux encadrants d\'une catégorie.</div>';
+    }
   }
 
   // Catégories : SELECT direct sur la table `categories` (RLS lecture
