@@ -18,7 +18,14 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.79 — juillet 2026
+ * Version : 1.80 — juillet 2026
+ *   v1.80 : EDITION-EMAIL-FICHE (FAIT FOI gelé 10/07/2026). Wrapper ADDITIF
+ *          majIdentiteFiche(personneId, patch) → RPC sql_196
+ *          maj_identite_fiche() : canal identité e-mail réservé bureau/admin
+ *          (email_principal / email_secondaire), même pattern de retour que
+ *          updateJoueurMetier. Débloque la saisie d'e-mail des fiches sans
+ *          adresse (39 M14 sondés). Aucune ligne existante touchée.
+ *          node --check OK.
  *   v1.79 : REFONTE-ENROLEMENT (FAIT FOI gelé 10/07/2026, pt 193).
  *          Wrapper ADDITIF listMesFichesParEmail() → RPC sql_194
  *          list_mes_fiches_par_email() : résolution email→fiche(s) du
@@ -4793,6 +4800,47 @@
       if (error) {
         console.error('MOM Hub: updateJoueurMetier()', error);
         return { ok: false, error: error.message || 'Erreur update_joueur_metier' };
+      }
+      // La RPC retourne SETOF personnes : prendre la 1ère ligne
+      const row = Array.isArray(data) && data.length > 0 ? data[0] : null;
+      return { ok: true, data: row };
+    },
+
+    /**
+     * EDITION-EMAIL-FICHE (sql_196) — canal identité réservé bureau/admin.
+     * Patch partiel de l'identité e-mail d'une fiche (email_principal /
+     * email_secondaire). La garde d'autorisation (admin | bureau) est portée
+     * par la RPC SECURITY DEFINER maj_identite_fiche : l'UI ne fait que
+     * refléter le droit, la RPC reste la vérité (refuse même si l'UI est
+     * forcée). Retour homogène { ok, data|error } (même pattern que
+     * updateJoueurMetier). Valeur '' ou null sur un champ ⇒ efface (NULL).
+     */
+    async majIdentiteFiche(personneId, patch) {
+      if (!personneId) {
+        return { ok: false, error: 'personneId requis' };
+      }
+      if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
+        return { ok: false, error: 'patch doit être un objet JSON' };
+      }
+      // Validation de forme minimale côté client (présence '@' si non vide),
+      // pour un message clair avant l'aller-retour RPC. La RPC re-valide.
+      const champs = ['email_principal', 'email_secondaire'];
+      for (const c of champs) {
+        if (patch[c] !== undefined && patch[c] !== null && patch[c] !== '') {
+          if (typeof patch[c] !== 'string' || patch[c].indexOf('@') === -1) {
+            return { ok: false, error: c + ' invalide (adresse e-mail attendue)' };
+          }
+        }
+      }
+
+      const { data, error } = await client.rpc('maj_identite_fiche', {
+        p_personne_id: personneId,
+        p_patch: patch
+      });
+
+      if (error) {
+        console.error('MOM Hub: majIdentiteFiche()', error);
+        return { ok: false, error: error.message || 'Erreur maj_identite_fiche' };
       }
       // La RPC retourne SETOF personnes : prendre la 1ère ligne
       const row = Array.isArray(data) && data.length > 0 ? data[0] : null;
