@@ -1290,8 +1290,8 @@
         <div class="joueur-sb-title">Aide</div>
         <div class="joueur-sb-placeholder" style="text-align: left; font-style: normal;">
           Cliquez sur une carte pour ouvrir la fiche détaillée.<br><br>
-          Édition réservée aux champs métier (postes, aptitudes, indispo, blessure, suspension, notes).<br><br>
-          L'identité (nom, licence, contacts) s'édite dans l'Annuaire.
+          Édition des champs métier (postes, aptitudes, indispo, blessure, suspension, notes).<br><br>
+          L'e-mail est modifiable par le bureau/admin depuis la fiche. Le reste de l'identité (nom, licence) s'éditera dans l'Annuaire.
         </div>
       </div>
     </aside>
@@ -1399,6 +1399,35 @@
     <div class="joueur-modal-actions">
       <button type="button" class="joueur-btn" data-action="close-notes">Annuler</button>
       <button type="button" class="joueur-btn joueur-btn-primary" id="joueur-notes-submit">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- J6 — Modale Édition e-mail (EDITION-EMAIL-FICHE, réservée bureau/admin) -->
+<div class="joueur-overlay" id="joueur-overlay-email" role="dialog" aria-modal="true" aria-labelledby="joueur-email-title">
+  <div class="joueur-modal">
+    <div class="joueur-modal-title" id="joueur-email-title">Modifier l'e-mail</div>
+    <div class="joueur-modal-body" id="joueur-email-body">
+      <div id="joueur-email-msg"></div>
+      <div class="joueur-modal-info" id="joueur-email-info">
+        <em>Chargement…</em>
+      </div>
+      <form class="joueur-modal-form" id="joueur-email-form" onsubmit="return false;">
+        <div class="joueur-form-group">
+          <label class="joueur-form-label" for="joueur-email-principal">E-mail principal</label>
+          <input type="email" class="joueur-form-input" id="joueur-email-principal" name="email_principal" placeholder="Ex : prenom.nom@mail.com" autocomplete="off">
+          <div class="joueur-form-hint">Sert au rattachement du compte membre. Laisser vide pour effacer.</div>
+        </div>
+        <div class="joueur-form-group">
+          <label class="joueur-form-label" for="joueur-email-secondaire">E-mail secondaire</label>
+          <input type="email" class="joueur-form-input" id="joueur-email-secondaire" name="email_secondaire" placeholder="Ex : email d'un parent" autocomplete="off">
+          <div class="joueur-form-hint">Optionnel. Laisser vide pour effacer.</div>
+        </div>
+      </form>
+    </div>
+    <div class="joueur-modal-actions">
+      <button type="button" class="joueur-btn" data-action="close-email">Annuler</button>
+      <button type="button" class="joueur-btn joueur-btn-primary" id="joueur-email-submit">Enregistrer</button>
     </div>
   </div>
 </div>
