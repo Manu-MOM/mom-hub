@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
-<title>MOM Hub · Joueurs M14</title>
+<title>MOM Hub · Joueurs</title>
 <link rel="icon" type="image/png" href="assets/logo-m2m.png">
 <link rel="stylesheet" href="css/hub.css">
 <style>
@@ -88,6 +88,14 @@
   .joueur-header h2 .joueur-team {
     color: var(--vert-prairie);
     font-weight: 600;
+  }
+  /* PERSONA-NON-STAFF : le séparateur « — » n'apparaît que si une
+     catégorie est réellement injectée dans le span (encadrant). Pour un
+     membre sans catégorie (span vide), le titre reste « Mes joueurs ». */
+  .joueur-header h2 .joueur-team:not(:empty)::before {
+    content: " — ";
+    color: var(--ink);
+    font-weight: 800;
   }
   .joueur-header-sub {
     font-size: 12.5px;
@@ -1199,7 +1207,7 @@
       <div class="joueur-header">
         <div>
           <div class="joueur-header-meta" id="joueur-header-meta">SAISON … · MES JOUEURS</div>
-          <h2>Mes joueurs — <span class="joueur-team">M14 SAR×MOM</span></h2>
+          <h2>Mes joueurs<span class="joueur-team" id="joueur-team-label"></span></h2>
           <div class="joueur-header-sub" id="joueur-header-sub">Chargement…</div>
         </div>
         <div class="joueur-header-kpis">
