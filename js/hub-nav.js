@@ -56,6 +56,16 @@
  * ACTÉ par Manu : modification d'un module INTERDIT hors chantier de
  * généralisation (précédent v1.7). Seule la table THEMES gagne une entrée ;
  * aucun comportement du module ne change. Le module reste INTERDIT.
+ * HUB-NAV v1.9 — chantier ACCES-ANONYME-EQUIPE (volet B, doctrine nav-anon).
+ * Sous DÉROGATION EXPLICITE de Manu (module INTERDIT, précédents v1.7/v1.8) :
+ * ajout d'un flag DÉCLARATIF « sessionRequise » sur un thème. Un thème qui le
+ * porte n'est PAS monté pour un visiteur sans session (fail-safe : barre vide,
+ * rien de faux affiché). Appliqué au thème « equipe » : un anonyme ne voit plus
+ * la barre « Mon équipe ». NB : la fuite de DONNÉES anonyme est fermée en base
+ * au volet A (sql_193, REVOKE anon) — ce geste est de l'hygiène de présentation,
+ * pas de la sécurité. Le boot devient async UNIQUEMENT pour les thèmes
+ * sessionRequise ; les autres thèmes montent de façon SYNCHRONE et INCHANGÉE.
+ * ÉCART DE GOUVERNANCE ACTÉ par Manu. Le module reste INTERDIT ; md5 re-figé.
  *
  * ►► CLÔTURE DE LA GÉNÉRALISATION (G2, pt 163) : tous les thèmes sont
  * désormais migrés. À compter de v1.6, js/hub-nav.js devient INTERDIT
@@ -96,7 +106,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.8';
+  var VERSION = '1.9';
 
   /* ------------------------------------------------------------------ *
    * TRONC COMMUN — présent en tête de chaque nav (lexique unifié).
@@ -156,6 +166,10 @@
     'equipe': {
       ariaLabel: 'Navigation mon équipe',
       carrefour: false,
+      // v1.9 (ACCES-ANONYME-EQUIPE volet B) : thème réservé aux connectés.
+      // Un anonyme ne monte pas cette barre (doctrine nav-anon ; la fuite de
+      // données est déjà fermée en base au volet A, sql_193).
+      sessionRequise: true,
       // 5 DESTINATIONS sans jeton (décision J1 gelée pt 160) : la barre
       // reflète le thème, la garde de PAGE protège. joueurs/evenements
       // n'ont pas de garde bloquante (consultables anonyme) → la barre s'y
@@ -378,11 +392,32 @@
   // sur le porteur : présence de l'attribut = silencieux (valeur ignorée).
   var silencieux = porteur.hasAttribute('data-hub-nav-silent');
 
-  construire(porteur, theme);
-  injecterStyles(theme.carrefour);
-  if (!silencieux) { marquerCourante(porteur); }
-  revelerFiltres(porteur);
+  // Montage effectif de la barre — inchangé depuis v1.8, encapsulé (v1.9)
+  // pour pouvoir être différé derrière une garde de session sans dupliquer
+  // la logique. Point de contrôle posé ICI (après montage réel).
+  function monter() {
+    construire(porteur, theme);
+    injecterStyles(theme.carrefour);
+    if (!silencieux) { marquerCourante(porteur); }
+    revelerFiltres(porteur);
+    window.HubNav = { version: VERSION, theme: clef, silencieux: silencieux };
+  }
 
-  // Point de contrôle minimal (version consultable en console).
-  window.HubNav = { version: VERSION, theme: clef, silencieux: silencieux };
+  // v1.9 (ACCES-ANONYME-EQUIPE volet B) : un thème « sessionRequise » n'est
+  // monté QUE pour un visiteur ayant une session. Sans session (ou si le
+  // client Supabase n'est pas là), la barre n'est pas montée — fail-safe :
+  // rien de faux n'est affiché. Les thèmes ordinaires montent de façon
+  // SYNCHRONE et INCHANGÉE (aucun await sur leur chemin).
+  if (theme.sessionRequise) {
+    document.addEventListener('DOMContentLoaded', async function () {
+      try {
+        if (typeof SupabaseHub === 'undefined') { return; } // fail-safe : pas monté
+        var session = await SupabaseHub.getSession();
+        if (!session) { return; }                            // anonyme : pas de barre
+        monter();
+      } catch (e) { /* honnête : sans certitude de session, on ne monte pas */ }
+    });
+  } else {
+    monter();
+  }
 })();
