@@ -254,9 +254,16 @@
       // Catégorie active courante (null = toutes). Filtre client : on ne
       // recharge pas la liste au changement, on la re-rend filtrée.
       let categorieActiveId = null;
+      // PERSONA-NON-STAFF (régression pt 194) : distingue « null car
+      // transverse (admin/bureau, voir tout) » de « null car AUCUNE
+      // catégorie rattachée (membre ordinaire, ex : Jules) ». Dans ce
+      // dernier cas, on ne montre RIEN (le SELECT RLS large exposait sinon
+      // toutes les compos du club — durcissement RLS tracé en dette).
+      let perimetreEstVide = false;
 
       function lignesFiltrees() {
-        if (!categorieActiveId) return usable;
+        if (perimetreEstVide) return []; // membre sans catégorie → aucune compo
+        if (!categorieActiveId) return usable; // transverse / non résolu → tout
         return usable.filter(function (r) {
           return r && r.equipe && r.equipe.categorie_id === categorieActiveId;
         });
@@ -264,6 +271,14 @@
 
       function rendreLignes() {
         const liste = lignesFiltrees();
+        if (perimetreEstVide) {
+          host.innerHTML =
+            '<div class="mc-empty">' +
+              'Aucune catégorie ne vous est rattachée.' +
+              '<div class="mc-empty__hint">Les compositions sont réservées aux encadrants d\'une catégorie.</div>' +
+            '</div>';
+          return;
+        }
         if (usable.length === 0) {
           host.innerHTML =
             '<div class="mc-empty">' +
@@ -327,6 +342,12 @@
           const ctx = await UXSelecteurCategorie.resoudre();
           if (ctx && ctx.perimetre) {
             categorieActiveId = ctx.active || null;
+            // PERSONA-NON-STAFF : périmètre explicitement vide (non
+            // transverse, aucune catégorie) → on ne montrera rien.
+            perimetreEstVide = (ctx.perimetre.vide === true)
+              || (ctx.perimetre.transverse !== true
+                  && Array.isArray(ctx.perimetre.categories)
+                  && ctx.perimetre.categories.length === 0);
             UXSelecteurCategorie.monter({
               perimetre: ctx.perimetre,
               ancreSelector: '.mc-head',
