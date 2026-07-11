@@ -695,6 +695,24 @@
     display: inline-flex;
   }
 
+  /* ------------------------------------------------------------
+   * PERSONA-NON-STAFF-GENERALISATION-D4 (juil. 2026) — masquage du
+   * tableau de bord STAFF pour un membre ordinaire connecté (auth-user :
+   * session valide mais aucun rôle qualifiant, ex. Jules JUNG). Les KPI
+   * club (.kpi-row) et la sidebar (.sidebar : OVAL-E, qualité des données,
+   * prochain événement, raccourcis) sont du contexte administratif/staff.
+   * Doctrine héritée pt 196 : un compte sans périmètre ne voit rien de
+   * staff. Garde d'AFFICHAGE (la garde de DONNÉES est dans
+   * dashboard-stats.js v2.4, qui ne peuple pas hors porte staff). Ne
+   * concerne QUE auth-user : admin/bureau/salarié (auth-admin/auth-staff)
+   * gardent le tableau de bord complet ; l'anonyme (auth-anon) est régi
+   * par les règles existantes.
+   * ------------------------------------------------------------ */
+  body.auth-user .kpi-row,
+  body.auth-user .sidebar {
+    display: none;
+  }
+
 </style>
 </head>
 <body class="fullscreen-app">
