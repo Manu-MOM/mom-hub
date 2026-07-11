@@ -2102,6 +2102,30 @@
     },
 
     /**
+     * EVT-RECURRENCE-OCCURRENCES — propage le libellé de la mère à TOUTES
+     * ses occurrences (enfants directs, evenement_parent_id = mereId).
+     * Volontairement limité au SEUL champ libelle (D2 pt 201, validé Manu) :
+     * date/site/etc. restent propres à chaque occurrence, une occurrence
+     * ponctuelle (ex. tournoi remplaçant une séance) reste éditable seule
+     * via updateEvenement (case à cocher décochée). UPDATE direct (pas de
+     * RPC, RLS + policy UPDATE existante sur evenements suffit).
+     * @param {string} mereId UUID de l'événement mère récurrent
+     * @param {string} libelle Nouveau libellé à appliquer à toute la série
+     * @returns {Promise<{ok:boolean, count?:number, error?:string}>}
+     */
+    async updateLibelleSerie(mereId, libelle) {
+      if (!mereId) return { ok: false, error: 'mereId manquant' };
+      if (!libelle || !libelle.trim()) return { ok: false, error: 'Libellé manquant' };
+      const { data, error } = await client
+        .from('evenements')
+        .update({ libelle: libelle.trim() })
+        .eq('evenement_parent_id', mereId)
+        .select('id');
+      if (error) { console.error('MOM Hub: updateLibelleSerie()', error); return { ok: false, error: error.message }; }
+      return { ok: true, count: Array.isArray(data) ? data.length : 0 };
+    },
+
+    /**
      * EVT-RECURRENCE-OCCURRENCES — supprime UNE occurrence (enfant) et
      * exclut sa date de la série mère (anti-régénération). RPC
      * supprimer_occurrence_evenement (garde admin|coach). Pour supprimer la
