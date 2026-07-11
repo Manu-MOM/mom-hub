@@ -610,7 +610,17 @@
   }
 
   if (!perimetre || perimetre.vide || !Array.isArray(perimetre.categories) || perimetre.categories.length === 0) {
-    flash('Aucune catégorie accessible pour votre profil — agenda indisponible.', 'err');
+    // EMPTY-STATES-REFUS (D1) : lecture stricte comme logistique-agenda. Un
+    // membre sans périmètre (parent relié) ne voyait qu'un bandeau ROUGE
+    // « agenda indisponible » ressemblant à une panne. On révèle la page avec
+    // un refus NEUTRE (ni err rouge, ni ok vert). Le picker ne peut pas être
+    // rendu sans catégorie → on n'initialise pas l'agenda, mais la page s'ouvre
+    // proprement. RLS = la vraie barrière côté données.
+    var _box = $('eaMsg');
+    if (_box) {
+      _box.innerHTML = '<div class="ea-flash" style="background:#f6f4ee;color:#4a4a44;">'
+        + 'Ces informations sont réservées aux encadrants d\'une catégorie.</div>';
+    }
     return;
   }
 
