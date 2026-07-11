@@ -609,6 +609,7 @@
     showToast('Demande envoyée (en attente de validation)', true);
     resetForm();
     await refreshAgenda();
+    await refreshMesDemandes();
   }
 
   function resetForm() {
