@@ -2515,7 +2515,17 @@
       // créées) → message honnête, pas « élargissez les filtres » ; (b)
       // il y a des équipes mais aucun évènement passe les filtres.
       const sansEquipe = Array.isArray(CTX_EQUIPES_ACTIVES) && CTX_EQUIPES_ACTIVES.length === 0;
-      if (sansEquipe) {
+      // EMPTY-STATES-REFUS : distinguer (0) un membre SANS périmètre (parent
+      // relié, mes_categories_autorisees()=0) → refus canon DONNÉES, de (a) un
+      // encadrant AVEC périmètre dont la catégorie n'a pas encore d'équipe
+      // engagée → message légitime « apparaîtront une fois l'équipe engagée ».
+      const perimetreVide = !CTX_PERIMETRE
+        || CTX_PERIMETRE.vide === true
+        || !(CTX_PERIMETRE.active);
+      if (perimetreVide) {
+        list.innerHTML =
+          '<div class="evt-list-empty">Ces informations sont réservées aux encadrants d\'une catégorie.</div>';
+      } else if (sansEquipe) {
         const lib = (typeof _libelleCategorieActive === 'function' && _libelleCategorieActive()) || 'cette catégorie';
         list.innerHTML =
           '<div class="evt-list-empty">Aucune équipe pour ' + escHtml(lib) + ' sur la saison active.'
