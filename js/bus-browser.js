@@ -133,8 +133,7 @@
       box.className = 'bus-card';
       box.style.display = '';
       box.innerHTML = '<h3 class="bus-card__title">Accès réservé</h3>'
-        + '<p class="bus-card__hint">Aucune catégorie ne vous est rattachée. '
-        + 'La demande de bus est réservée aux encadrants d\'une catégorie.</p>';
+        + '<p class="bus-card__hint">La demande de bus est réservée aux encadrants d\'une catégorie.</p>';
       host.insertBefore(box, cards.length ? cards[0] : null);
     }
   }
