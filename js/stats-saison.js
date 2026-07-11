@@ -663,9 +663,8 @@
     var el = (typeof mount === 'string') ? document.getElementById(mount) : mount;
     if (!el) return Promise.resolve();
     if (!categorieId) {
-      el.innerHTML = _bloc('Catégorie indéterminée',
-        '<p>Aucune catégorie n\'a pu être déterminée pour votre compte. ' +
-        'Le pilotage de saison est réservé au référent d\'une catégorie.</p>');
+      el.innerHTML = _bloc('Accès réservé',
+        '<p>Ces informations sont réservées aux encadrants d\'une catégorie.</p>');
       return Promise.resolve();
     }
     el.innerHTML = '<p class="ss-load">Chargement du pilotage de saison…</p>';
