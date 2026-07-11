@@ -5131,6 +5131,14 @@
     if (titleEl0) titleEl0.textContent = 'Nouvel évènement';
     MODAL_CREATE_EDIT_ID = null;
 
+    // EVT-RECURRENCE-OCCURRENCES pt 202 : reset anti-résidu (masquée +
+    // décochée). Reposée visible uniquement par openModalEditComplet si la
+    // mère éditée est récurrente.
+    const propagerGroup0 = document.getElementById('evt-create-propager-serie-group');
+    const propagerCheckbox0 = document.getElementById('evt-create-propager-libelle-serie');
+    if (propagerGroup0) propagerGroup0.style.display = 'none';
+    if (propagerCheckbox0) propagerCheckbox0.checked = false;
+
     // v1.16 — reset des zones répétables U1/U2 (form.reset() ne vide
     // pas le DOM injecté). Anti-résidu entre 2 ouvertures de modale.
     const advLines = document.getElementById('evt-create-adv-lines');
@@ -5251,6 +5259,12 @@
       if (_recFreq && evt.recurrence.frequence) _recFreq.value = evt.recurrence.frequence;
       const _recFin = document.getElementById('evt-create-recurrence-fin');
       if (_recFin && evt.recurrence.fin) _recFin.value = String(evt.recurrence.fin).slice(0, 10);
+
+      // EVT-RECURRENCE-OCCURRENCES pt 202 : mère récurrente en édition →
+      // révèle la case de propagation du libellé aux occurrences déjà
+      // générées (décochée par défaut, cf. reset openModalCreate).
+      const _propagerGroup = document.getElementById('evt-create-propager-serie-group');
+      if (_propagerGroup) _propagerGroup.style.display = '';
     }
 
     // EVT-EDITION-READBACK — MULTI-JOURS (date de fin).
@@ -6859,9 +6873,27 @@
       }
 
       const resultId = res.evenementId || MODAL_CREATE_EDIT_ID;
-      msg.innerHTML = '<div class="evt-form-success">✅ '
-        + (isEdit ? 'Modifications enregistrées.' : 'Évènement créé (transaction atomique).')
-        + '</div>';
+      let successMsg = isEdit ? 'Modifications enregistrées.' : 'Évènement créé (transaction atomique).';
+
+      // EVT-RECURRENCE-OCCURRENCES pt 202 : propagation du libellé aux
+      // occurrences déjà générées, si la case est cochée (édition d'une
+      // mère récurrente uniquement — case masquée sinon). Échec de
+      // propagation signalé sans annuler la modification mère déjà
+      // persistée (déjà en transaction atomique côté RPC).
+      if (isEdit) {
+        const propagerCheckbox = document.getElementById('evt-create-propager-libelle-serie');
+        if (propagerCheckbox && propagerCheckbox.checked) {
+          const propRes = await SupabaseHub.updateLibelleSerie(MODAL_CREATE_EDIT_ID, payload.libelle);
+          if (propRes && propRes.ok) {
+            successMsg += ' Libellé propagé à ' + propRes.count + ' occurrence(s).';
+          } else {
+            successMsg += ' ⚠️ Échec de la propagation aux occurrences : '
+              + ((propRes && propRes.error) || 'erreur inconnue');
+          }
+        }
+      }
+
+      msg.innerHTML = '<div class="evt-form-success">✅ ' + escHtml(successMsg) + '</div>';
 
       const modalBody = document.querySelector('#evt-overlay-create .evt-modal-body');
       if (modalBody) modalBody.scrollTop = 0;
