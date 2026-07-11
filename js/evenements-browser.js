@@ -4653,6 +4653,14 @@
     if (formatGroup) formatGroup.style.display = showFormat ? '' : 'none';
     if (dateFinGroup) dateFinGroup.style.display = showDateFin ? '' : 'none';
 
+    // EVT-RECURRENCE-OCCURRENCES pt 201 : case "propager aux occurrences"
+    // visible seulement pour une mère récurrente ; toujours réinitialisée
+    // décochée à l'ouverture (D1 — pas de propagation implicite).
+    const propagerGroup = document.getElementById('evt-edit-propager-group');
+    const propagerCheckbox = document.getElementById('evt-edit-propager-libelle');
+    if (propagerGroup) propagerGroup.style.display = _estMereRecurrente(evt) ? '' : 'none';
+    if (propagerCheckbox) propagerCheckbox.checked = false;
+
     // Reset submit button
     const btn = document.getElementById('evt-edit-submit');
     if (btn) { btn.disabled = false; btn.textContent = 'Enregistrer'; }
@@ -4712,7 +4720,18 @@
         submitBtn.textContent = 'Enregistrer';
         return;
       }
-      msg.innerHTML = '<div class="evt-form-success">✅ Évènement mis à jour.</div>';
+      let successMsg = '✅ Évènement mis à jour.';
+      const propagerCheckbox = document.getElementById('evt-edit-propager-libelle');
+      if (propagerCheckbox && propagerCheckbox.checked) {
+        const propRes = await SupabaseHub.updateLibelleSerie(MODAL_EDIT_EVENT_ID, libelle);
+        if (propRes && propRes.ok) {
+          successMsg = '✅ Évènement mis à jour, libellé propagé à ' + propRes.count + ' occurrence(s).';
+        } else {
+          successMsg = '✅ Évènement mère mis à jour, mais échec de la propagation aux occurrences : '
+            + escHtml((propRes && propRes.error) || 'erreur inconnue');
+        }
+      }
+      msg.innerHTML = '<div class="evt-form-success">' + successMsg + '</div>';
       const mb = document.querySelector('#evt-overlay-edit .evt-modal-body');
       if (mb) mb.scrollTop = 0;
       const evtId = MODAL_EDIT_EVENT_ID;
