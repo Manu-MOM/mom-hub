@@ -713,6 +713,28 @@
     display: none;
   }
 
+  /* ------------------------------------------------------------
+   * DECONNEXION-MEMBRE (juil. 2026) — un membre identifié SANS rôle
+   * (auth-user : Valérie, Jules) doit pouvoir se voir connecté et se
+   * déconnecter. Deux règles de hub.css (INTERDIT `19ceeaf8`) l'en
+   * empêchent : `.auth-user .user-profile{display:none}` masque toute
+   * la carte, et `:not(.auth-admin) .user-action{display:none}` masque
+   * les boutons. On les surcharge LOCALEMENT (hub.css non modifié,
+   * 11 pages en dépendent), motif identique au bloc `.auth-staff
+   * .user-action` ci-dessus. On révèle la carte profil ET le SEUL
+   * bouton de déconnexion — PAS `#action-admin` (tableau de bord),
+   * réservé admin/staff (doctrine persona non-staff pt 196/198).
+   * Révéler la carte est un AFFICHAGE, pas un droit : la sécurité
+   * reste en base (RLS). Se déconnecter ramène à l'état anonyme
+   * (pilule « Se connecter ») via signOut → SIGNED_OUT.
+   * ------------------------------------------------------------ */
+  body.auth-resolved.auth-user .user-profile {
+    display: flex;
+  }
+  body.auth-user #btn-signout {
+    display: inline-flex;
+  }
+
 </style>
 </head>
 <body class="fullscreen-app">
