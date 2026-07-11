@@ -1019,8 +1019,8 @@
     if (area) {
       area.innerHTML =
         '<div class="editor-area__empty">' +
-          '<p class="editor-area__empty-title">Aucune catégorie ne vous est rattachée.</p>' +
-          '<p class="editor-area__empty-text">Les compositions sont réservées aux encadrants ' +
+          '<p class="editor-area__empty-title">Accès réservé</p>' +
+          '<p class="editor-area__empty-text">Ces informations sont réservées aux encadrants ' +
           'd\'une catégorie. Si vous pensez que c\'est une erreur, contactez un administrateur du club.</p>' +
         '</div>';
     }
