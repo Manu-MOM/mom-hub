@@ -2311,6 +2311,18 @@
           <input type="text" class="evt-form-input" id="evt-edit-libelle" name="libelle" required>
         </div>
 
+        <!-- EVT-RECURRENCE-OCCURRENCES pt 201 : visible seulement si la mère
+             éditée est une mère récurrente (voir _estMereRecurrente / JS).
+             Décochée par défaut → comportement inchangé (édition de la
+             ligne seule). Cochée → propage le libellé à toutes les
+             occurrences via updateLibelleSerie. -->
+        <div class="evt-form-group" id="evt-edit-propager-group" style="display:none;">
+          <label class="evt-form-label" style="display:flex;align-items:center;gap:8px;font-weight:normal;">
+            <input type="checkbox" id="evt-edit-propager-libelle" name="propager_libelle_serie">
+            Appliquer aussi ce libellé aux occurrences de la série
+          </label>
+        </div>
+
         <div class="evt-form-group-row">
           <div class="evt-form-group">
             <label class="evt-form-label required" for="evt-edit-date-debut">Date début</label>
