@@ -203,11 +203,15 @@
   // 2. CONSTANTES
   // ============================================================
 
-  // UUID de l'équipe pilote M14 (résolu en base le 13/05/2026).
-  // Conservé comme REPLI de dégradation honnête : si le périmètre de
-  // catégories est indisponible (socle ancien, droits vides, aucune
-  // équipe), la carte 3 retombe sur l'équipe M14 — comportement d'origine.
-  const M14_TEAM_UUID = 'bfb83b83-83ef-4dde-b526-48ff87313044';
+  // PERSONA-NON-STAFF-GENERALISATION-D4 (juil. 2026) : le repli en dur
+  // sur l'équipe pilote M14 (UUID bfb83b83…, résolu 13/05/2026) est RETIRÉ.
+  // Il refaisait surface comme « contexte encadrant M14 » (carte 3 +
+  // greeting J-N) pour un compte identifié SANS périmètre (ex. Jules JUNG,
+  // mes_categories_autorisees()=0) sur le PORTAIL — jumeau du repli fantôme
+  // corrigé dans joueurs-browser.js au pt 196. Doctrine héritée pt 196 :
+  // dégradation HONNÊTE (aucune équipe → carte 3 « AUCUN ÉVÉNEMENT »),
+  // jamais de repli M14, quelle que soit la cause de la dégradation
+  // (droits vides OU incident technique). Décision Manu D-a : retrait TOTAL.
 
   // ------------------------------------------------------------
   // Périmètre catégorie active → équipes (propagation multi-cat)
@@ -227,36 +231,36 @@
   // Garde-fou non-régression : catégorie mono-équipe (cas réel
   // actuel : M14 = 1 équipe) → 1 appel → résultat identique à avant.
   async function _dashResoudreEquipesActives() {
-    // Socle absent / ancien → repli M14 (dégradation honnête).
+    // Socle absent / ancien → aucune équipe (dégradation honnête, plus de M14).
     if (typeof SupabaseHub === 'undefined'
         || typeof SupabaseHub.resoudrePerimetreCategories !== 'function'
         || typeof SupabaseHub.listEquipes !== 'function') {
-      return [M14_TEAM_UUID];
+      return [];
     }
     let perimetre;
     try {
       perimetre = await SupabaseHub.resoudrePerimetreCategories();
     } catch (e) {
-      console.warn('MOM Hub Dashboard: périmètre catégories indisponible, repli M14.', e);
-      return [M14_TEAM_UUID];
+      console.warn('MOM Hub Dashboard: périmètre catégories indisponible.', e);
+      return [];
     }
-    // Aucun droit / pas de catégorie active → repli M14.
+    // Aucun droit / pas de catégorie active → aucune équipe (honnête).
     if (!perimetre || perimetre.vide || !perimetre.active) {
-      return [M14_TEAM_UUID];
+      return [];
     }
     let equipes;
     try {
       equipes = await SupabaseHub.listEquipes(perimetre.active);
     } catch (e) {
-      console.warn('MOM Hub Dashboard: listEquipes indisponible, repli M14.', e);
-      return [M14_TEAM_UUID];
+      console.warn('MOM Hub Dashboard: listEquipes indisponible.', e);
+      return [];
     }
     const ids = (Array.isArray(equipes) ? equipes : [])
       .map(function (eq) { return eq && eq.id; })
       .filter(Boolean);
-    // Catégorie active sans équipe en base → repli M14 (jamais de
-    // carte 3 muette par construction).
-    return ids.length > 0 ? ids : [M14_TEAM_UUID];
+    // Catégorie active sans équipe en base → aucune équipe (carte 3 honnête
+    // « AUCUN ÉVÉNEMENT » plutôt qu'un repli M14 trompeur).
+    return ids;
   }
 
   // Prochain événement parmi N équipes de la catégorie active :
@@ -310,6 +314,30 @@
 
   (async function () {
     try {
+      // PERSONA-NON-STAFF-GENERALISATION-D4 (défense en profondeur, volet A2) :
+      // ce tableau de bord (KPI club + sidebar OVAL-E / qualité des données /
+      // prochain événement) est un contexte STAFF. Un compte identifié sans
+      // rôle qualifiant (ex. Jules JUNG, membre ordinaire) n'a rien à y voir.
+      // La garde d'AFFICHAGE est portée par index.html (CSS body.auth-user
+      // masque .kpi-row + .sidebar) ; ici on ajoute la garde de DONNÉES : on
+      // ne lance pas les RPC de peuplement si le compte ne passe pas la porte
+      // staff (admin | bureau | salarié — mêmes prédicats que la porte de
+      // dashboard.html et qu'applyState d'index.html). Le body.auth-user
+      // n'étant pas encore posé à ce stade (applyState est async, script
+      // inline exécuté APRÈS ce fichier), on résout la porte nous-mêmes.
+      // Dégradation honnête : pas de session / erreur → prédicats false →
+      // sortie silencieuse (les « … » du HTML restent, masqués par le CSS).
+      var _porteStaff = false;
+      try {
+        var _p = await Promise.all([
+          SupabaseHub.isAdmin(),
+          SupabaseHub.hasRole('bureau'),
+          SupabaseHub.suisJeSalarie()
+        ]);
+        _porteStaff = _p[0] || _p[1] || _p[2];
+      } catch (_) { _porteStaff = false; }
+      if (!_porteStaff) { return; }
+
       // 8 appels en parallèle pour minimiser la latence perçue
       const results = await Promise.all([
         SupabaseHub.client.rpc('get_dashboard_stats').then(function (r) { return r.data; }).catch(function () { return null; }),
@@ -397,7 +425,7 @@
       }
 
       console.log(
-        '%c✅ MOM Hub Dashboard v2.3: stats mises à jour depuis Supabase',
+        '%c✅ MOM Hub Dashboard v2.4: stats mises à jour depuis Supabase',
         'color: #2d7a3e; font-weight: bold;',
         {
           nbPersonnes:     nbPersonnes,
