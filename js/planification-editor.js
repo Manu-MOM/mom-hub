@@ -637,10 +637,8 @@
   }
 
   function messageIndetermine() {
-    State.mount.innerHTML = bloc('Périmètre indéterminé',
-      '<p>Aucune catégorie ni pôle n\'a pu être déterminé pour votre compte. ' +
-      'La planification annuelle est réservée aux encadrants (leur catégorie) ' +
-      'et aux responsables de pôle (trames de leur pôle).</p>');
+    State.mount.innerHTML = bloc('Accès réservé',
+      '<p>Cet espace est réservé aux encadrants et responsables de pôle.</p>');
   }
 
   // Référent / lien direct : on connaît la catégorie, droit d'écriture présumé
