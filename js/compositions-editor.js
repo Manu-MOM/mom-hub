@@ -999,6 +999,43 @@
     try { localStorage.setItem(CLE_EQUIPE_COMPO, String(equipeId)); } catch (e) { /* honnête */ }
   }
 
+  /** PERSONA-NON-STAFF-GENERALISATION-D4 — true si le compte connecté n'a
+   *  AUCUNE catégorie rattachée (resoudrePerimetreCategories → {vide:true}).
+   *  Patron _perimetreVide*() de logistique-browser.js / bus-browser.js.
+   *  Fail-safe : périmètre non résolu (null) → NON vide, on laisse le flux
+   *  legacy normal se dérouler (dégradation honnête déjà gérée en aval :
+   *  _catActive() renvoie null → wrappers renvoient [] → empty-state
+   *  « Aucune composition »). On ne bloque QUE sur le cas prouvé vide. */
+  function _composPerimetreEstVide() {
+    return !!(State.perimetreCat && State.perimetreCat.vide === true);
+  }
+
+  /** Peint un empty-state honnête à la place de l'éditeur (mode legacy,
+   *  périmètre vide). Neutralise les zones qui, autrement, porteraient des
+   *  gestes d'écriture : bandeau, onglets, indicateur, panneau effectif.
+   *  Aucun bouton de création n'est câblé (on ne rend rien de l'éditeur). */
+  function _composPeindreEmptyStatePerimetre() {
+    const area = DOM.editorArea();
+    if (area) {
+      area.innerHTML =
+        '<div class="editor-area__empty">' +
+          '<p class="editor-area__empty-title">Aucune catégorie ne vous est rattachée.</p>' +
+          '<p class="editor-area__empty-text">Les compositions sont réservées aux encadrants ' +
+          'd\'une catégorie. Si vous pensez que c\'est une erreur, contactez un administrateur du club.</p>' +
+        '</div>';
+    }
+    // Zones latérales/hautes vidées pour ne rien laisser d'un contexte
+    // d'édition (onglets, indicateur de remplissage, effectif).
+    const tabs = DOM.compoTabs();
+    if (tabs) tabs.innerHTML = '';
+    const fill = DOM.fillIndicator();
+    if (fill) fill.textContent = '';
+    const eff = DOM.effectifBody();
+    if (eff) eff.innerHTML = '';
+    const effTitle = DOM.effectifTitle();
+    if (effTitle) effTitle.textContent = '';
+  }
+
   /** Recharge les données legacy dépendantes de l'équipe + re-render. */
   async function _composRechargerDonnees() {
     await loadEvenements();
@@ -5958,12 +5995,29 @@
         try {
           State.perimetreCat = await SupabaseHub.resoudrePerimetreCategories();
         } catch (e) {
-          console.warn('CompositionsEditor: périmètre catégories indisponible, repli M14.', e);
+          console.warn('CompositionsEditor: périmètre catégories indisponible.', e);
           State.perimetreCat = null;
         }
       }
+      // PERSONA-NON-STAFF-GENERALISATION-D4 (juil. 2026) — garde périmètre
+      // vide (MODE LEGACY UNIQUEMENT). Un compte identifié sans catégorie
+      // rattachée (mes_categories_autorisees()=0 → resoudrePerimetreCategories
+      // renvoie {vide:true}, ex. Jules JUNG) ne doit voir AUCUN geste
+      // d'écriture de l'éditeur (CTA « Créer la compo de base », onglet « + »,
+      // onglet « à faire » cliquable=créer) ni de repli sur une catégorie qui
+      // n'est pas la sienne. Doctrine héritée pt 196 : empty-state honnête,
+      // jamais de repli. On sort AVANT tout load*/render* : ces gestes naissent
+      // dans renderEditorArea/renderCompoTabs, donc ne rien rendre = tout
+      // masquer d'un coup. La lecture est déjà fermée en base (RLS sql_197) ;
+      // cette garde est la bretelle d'affichage (front cesse de mentir).
+      // Le mode U-N3 (?evenement_equipe=) n'entre PAS dans ce bloc : équipe
+      // imposée par l'URL, périmètre légitime (capitaine/staff) — intact.
+      if (_composPerimetreEstVide()) {
+        _composPeindreEmptyStatePerimetre();
+        return;
+      }
       State.equipesCategorieActive = await _composResoudreEquipesCategorieActive();
-      _composChoisirEquipeActive(); // pose State.equipeActive (repli M14)
+      _composChoisirEquipeActive(); // pose State.equipeActive (null si vide)
     }
 
     await Promise.all([ loadEvenements(), loadVivier(), loadPostes() ]);
