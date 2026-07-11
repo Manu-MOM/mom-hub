@@ -317,8 +317,7 @@
     if (section) {
       section.innerHTML = '<h3 class="logi-section__title">Nouvelle demande</h3>'
         + '<div class="logi-empty" style="line-height:1.5;">'
-        + 'Aucune catégorie ne vous est rattachée. La réservation est '
-        + 'réservée aux encadrants d\'une catégorie.</div>';
+        + 'La réservation est réservée aux encadrants d\'une catégorie.</div>';
     }
   }
 
