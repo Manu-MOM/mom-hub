@@ -1513,7 +1513,23 @@
       // (le rôle 'coach' n'est plus utilisé ; la porte voie 2 'referent' a été
       //  renommée 'encadrant'). Les encadrants portent encadrant|bureau.
       const isAdminOrCoach = roles.indexOf('admin') !== -1 || roles.indexOf('bureau') !== -1 || roles.indexOf('encadrant') !== -1;
-      if (!isAdminOrCoach) { window.location.replace('./'); return; }
+      // EMPTY-STATES-REFUS (doctrine pt 194 « tout visible, tout verrouillé ») :
+      // au lieu d'éjecter vers l'accueil (replace('./'), opaque pour l'usager),
+      // on révèle la page et on affiche un refus lisible dans le <main>. Aucune
+      // donnée n'est chargée (return avant l'init du module ; la RLS reste la
+      // vraie barrière). Canon DONNÉES (les compositions sont une donnée catégorielle).
+      if (!isAdminOrCoach) {
+        document.body.classList.remove('auth-pending');
+        document.body.classList.add('auth-resolved');
+        var _main = document.querySelector('main');
+        if (_main) {
+          _main.innerHTML = '<div class="access-denied" style="max-width:640px;margin:48px auto;padding:24px 28px;'
+            + 'background:#fff;border:1px solid #e3e0d4;border-radius:14px;line-height:1.5;">'
+            + '<h2 style="margin:0 0 8px;color:#1f4d2e;">Accès réservé</h2>'
+            + '<p style="margin:0;color:#4a4a44;">Ces informations sont réservées aux encadrants d\'une catégorie.</p></div>';
+        }
+        return;
+      }
 
       document.body.classList.remove('auth-pending');
       document.body.classList.add('auth-resolved');
