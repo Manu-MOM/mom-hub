@@ -677,7 +677,7 @@ window.JoueursBrowser = (function () {
         || CTX_PERIMETRE.vide === true
         || !(CTX_PERIMETRE.active);
       if (perimetreVide) {
-        listEl.innerHTML = '<div class="joueur-list-empty">Aucune catégorie ne vous est rattachée. Cet écran est réservé aux encadrants d\'une catégorie.</div>';
+        listEl.innerHTML = '<div class="joueur-list-empty">Ces informations sont réservées aux encadrants d\'une catégorie.</div>';
       } else {
         listEl.innerHTML = '<div class="joueur-list-loading">Aucune donnée chargée — backend muet ?</div>';
       }
@@ -1855,6 +1855,21 @@ window.JoueursBrowser = (function () {
     const refPromise = loadReferentiels();
 
     // 3. Liste joueurs de la catégorie active (agrégée multi-équipes)
+    // PERSONA-NON-STAFF (EMPTY-STATES-REFUS) : un membre sans catégorie
+    // (_perimetreVide, résolu plus haut) fait retomber _chargerJoueurs… sur la
+    // boucle équipes, qui renvoie null ([].every===true). Ce null n'est PAS une
+    // panne backend : c'est l'absence de périmètre. On l'intercepte ICI, avant
+    // le test !joueurs, pour afficher le refus honnête (canon DONNÉES) au lieu
+    // de l'erreur rouge « Impossible de charger » qui ressemblait à un bug.
+    if (_perimetreVide) {
+      const listEl = document.getElementById('joueur-list');
+      if (listEl) {
+        listEl.innerHTML = '<div class="joueur-list-empty">Ces informations sont réservées aux encadrants d\'une catégorie.</div>';
+      }
+      const subEl = document.getElementById('joueur-header-sub');
+      if (subEl) subEl.textContent = '';
+      return;
+    }
     const joueurs = await _chargerJoueursCategorieActive();
     if (!joueurs) {
       const listEl = document.getElementById('joueur-list');
