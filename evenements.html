@@ -2072,6 +2072,21 @@
           </div>
         </div>
 
+        <!-- EVT-RECURRENCE-OCCURRENCES pt 202 : visible SEULEMENT en édition
+             d'une mère récurrente (posé par openModalEditComplet), masquée
+             et décochée par défaut sinon (reset par openModalCreate). La
+             modification (RPC modifier_evenement_complet, sql_188) préserve
+             les occurrences mais ne les met PAS à jour (par design pour les
+             compétitions ; pas de recréation pour entraînement/stage) → sans
+             cette case, le libellé des occurrences déjà générées reste
+             périmé après édition de la mère. -->
+        <div class="evt-form-group" id="evt-create-propager-serie-group" style="display:none;">
+          <label class="evt-form-label" style="display:flex;align-items:center;gap:8px;font-weight:normal;">
+            <input type="checkbox" id="evt-create-propager-libelle-serie" name="propager_libelle_serie">
+            Appliquer aussi ce libellé aux occurrences déjà générées de la série
+          </label>
+        </div>
+
         <!-- ====================================================
              BLOC 8 — ENGAGEMENT (Équipes engagées + Formats +
              Adversaires + Phases). Visible modes A3/A4/A5.
