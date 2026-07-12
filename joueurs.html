@@ -40,6 +40,12 @@
   }
   .joueur-main-col { overflow-y: auto; padding-right: 4px; }
   .joueur-side-col { overflow-y: auto; }
+  /* KIT-UX-RESPONSIVE-URGENT (suite) — alignement sur le correctif déjà
+     appliqué à .evt-layout/.evt-main-col (evenements.html, pt75) : sans
+     min-width:0, la piste 1fr a min-width:auto et s'étire au-delà de
+     l'écran si un enfant (ex. .joueur-header-kpis) est intrinsèquement
+     large — débordement alors coupé sans scroll par overflow:hidden. */
+  .joueur-layout, .joueur-main-col { min-width: 0; }
 
   /* Responsive : sidebar masquée sous 1024px */
   @media (max-width: 1024px) {
