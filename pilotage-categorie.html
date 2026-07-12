@@ -16,6 +16,11 @@
     /* body géré par hub.css (fond papier + texture + topbar). On ne
        redéfinit que la couleur de texte du contenu pilotage. */
     body { color: #1c232b; }
+    /* KIT-UX-RESPONSIVE-URGENT (suite, doctrine pt194 EMPTY-STATES-REFUS) :
+       masque tout le body tant que la session n'est pas vérifiée, pour éviter
+       un flash de contenu avant la redirection anonyme vers login.html.
+       Pattern déjà utilisé sur ~24 autres pages (bibliotheque.html, etc.). */
+    body.auth-pending { visibility: hidden; }
     .ss-wrap { max-width: 920px; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
     .ss-pilot-head { border-bottom: 3px solid var(--vert); padding-bottom: .75rem; margin-bottom: 1.25rem; }
     .ss-pilot-head h1 { margin: 0; font-size: 1.9rem; color: var(--vert-fonce); }
@@ -131,6 +136,15 @@
        admin (hub.css masque alors les fonctions admin-only aux autres). */
     (async function () {
       'use strict';
+      // KIT-UX-RESPONSIVE-URGENT (suite) : anonyme → redirection login.html
+      // au lieu du message "Accès réservé" affiché sur place (doctrine pt194
+      // EMPTY-STATES-REFUS inchangée pour un connecté sans droit de catégorie,
+      // qui garde le message inline plus bas — seule l'absence de session
+      // change de traitement).
+      if (window.SupabaseHub && SupabaseHub.getSession) {
+        var _session = await SupabaseHub.getSession();
+        if (!_session) { window.location.replace('login.html'); return; }
+      }
       try {
         if (window.SupabaseHub && SupabaseHub.getMyRoles) {
           var roles = await SupabaseHub.getMyRoles();
@@ -142,6 +156,7 @@
           document.body.classList.add('auth-resolved');
         }
       } catch (_) { document.body.classList.add('auth-resolved'); }
+      document.body.classList.remove('auth-pending');
 
       var _so = document.getElementById('btn-signout');
       if (_so && window.SupabaseHub && SupabaseHub.signOut) {
