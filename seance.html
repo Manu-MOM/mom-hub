@@ -1165,6 +1165,14 @@
       padding-top: 24px;
       border-top: 2px solid var(--line);
       position: relative; /* nécessaire pour positionner le popover en absolute */
+      overflow-x: auto; /* KIT-UX-RESPONSIVE-URGENT-P1b : le tableau .seance-trame__table
+        a des colonnes en largeur fixe (130px + 90px + 110px + bloc) qui dépassent un
+        viewport mobile portrait. Sans ce scroll local, le débordement est silencieusement
+        clippé par la règle globale html,body{overflow-x:hidden} (pt75, css/hub.css) et
+        les colonnes de droite (durée, actions) deviennent inaccessibles. Neutre en
+        desktop : la table tient déjà dans .seance-layout (max-width:1280px), donc pas
+        de scrollbar visible. */
+      -webkit-overflow-scrolling: touch; /* inertie tactile iOS */
     }
     .seance-trame__header {
       display: flex;
