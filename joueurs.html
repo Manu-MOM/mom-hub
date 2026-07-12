@@ -69,12 +69,16 @@
      body.fullscreen-app{overflow:hidden} (css/hub.css, INTERDIT, non modifié
      ici) empêchait alors tout scroll, page entièrement figée. On rend le body
      scrollable VERTICALEMENT SEUL sous ce seuil (overflow-x reste hidden pour
-     ne pas exposer le débordement horizontal de la nav topbar scrollable —
-     cf. correctif précédent overflow:auto trop large, corrigé). Page-scopé,
-     spécificité égale, après le <link> hub.css → l'emporte dans la cascade.
-     Desktop >1000px STRICTEMENT inchangé. */
+     ne pas exposer le débordement horizontal de la nav topbar scrollable).
+     Diagnostic DevTools terrain : html,body{height:100%} (hub.css L92,
+     INTERDIT) fige aussi la hauteur de <html> à la fenêtre ; sans overflow-y
+     déclaré dessus, le navigateur ne propageait pas le scroll du body vers
+     le viewport dans ce layout grid imbriqué — d'où la page figée malgré le
+     overflow-y:auto posé sur body seul au commit précédent. Ajout de la
+     même règle sur <html>. Page-scopé, après le <link> hub.css → l'emporte
+     dans la cascade. Desktop >1000px STRICTEMENT inchangé. */
   @media (max-width: 1000px) {
-    body.fullscreen-app { overflow-y: auto; overflow-x: hidden; }
+    html, body.fullscreen-app { overflow-y: auto; overflow-x: hidden; }
   }
 
   /* ========== BANDEAU PAGE (en-tête du module) ========== */
