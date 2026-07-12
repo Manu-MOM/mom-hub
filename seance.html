@@ -68,6 +68,15 @@
       gap: 20px;
       align-items: start;
     }
+    /* KIT-UX-RESPONSIVE-URGENT (suite P1b) : par défaut une cellule de grille CSS a
+       min-width:auto, càd qu'elle prend la largeur minimale de son contenu (ex: un
+       bouton min-width:220px, un menu min-width:280px). Sur mobile, .seance-grid passe
+       en colonne unique (1fr) mais sans ce min-width:0 le contenu forçait toute la
+       grille à dépasser le viewport, débordement clippé silencieusement à droite par
+       html,body{overflow-x:hidden}. Neutre en desktop (colonnes déjà assez larges). */
+    .seance-sidebar, .seance-editor-area {
+      min-width: 0;
+    }
 
     /* ----------------------------------------------------------
      * Sidebar gauche : "Mes séances récentes" + CTA nouvelle séance
