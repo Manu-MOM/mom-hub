@@ -16,6 +16,11 @@
     * { box-sizing: border-box; }
     /* body géré par hub.css (fond papier + texture + topbar). */
     body { color: var(--ink); }
+    /* KIT-UX-RESPONSIVE-URGENT (suite, doctrine pt194 EMPTY-STATES-REFUS) :
+       masque tout le body tant que la session n'est pas vérifiée, pour éviter
+       un flash de contenu avant la redirection anonyme vers login.html.
+       Pattern déjà utilisé sur ~24 autres pages (bibliotheque.html, etc.). */
+    body.auth-pending { visibility: hidden; }
     .pa-wrap { max-width: 980px; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
 
     .pa-load { color: var(--gris); }
@@ -177,6 +182,15 @@
     /* Boot topbar — SANS garde admin (page accessible aux référents). */
     (async function () {
       'use strict';
+      // KIT-UX-RESPONSIVE-URGENT (suite) : anonyme → redirection login.html
+      // au lieu du message "Accès réservé" affiché sur place (doctrine pt194
+      // EMPTY-STATES-REFUS inchangée pour un connecté sans droit de catégorie,
+      // qui garde le message inline plus bas — seule l'absence de session
+      // change de traitement).
+      if (window.SupabaseHub && SupabaseHub.getSession) {
+        var _session = await SupabaseHub.getSession();
+        if (!_session) { window.location.replace('login.html'); return; }
+      }
       try {
         if (window.SupabaseHub && SupabaseHub.getMyRoles) {
           var roles = await SupabaseHub.getMyRoles();
@@ -188,6 +202,7 @@
           document.body.classList.add('auth-resolved');
         }
       } catch (_) { document.body.classList.add('auth-resolved'); }
+      document.body.classList.remove('auth-pending');
 
       var _so = document.getElementById('btn-signout');
       if (_so && window.SupabaseHub && SupabaseHub.signOut) {
