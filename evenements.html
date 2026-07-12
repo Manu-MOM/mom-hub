@@ -533,6 +533,10 @@
   /* Corps de carte */
   .evt-card-body {
     flex: 1;
+    min-width: 0; /* KIT-UX-RESPONSIVE-URGENT (suite) : sans ça, la ligne de
+      badges .evt-card-line1 (flex sans wrap : date, type, J+n, SÉRIE) force
+      .evt-card-body — et donc toute la carte .evt-card — au-delà du viewport
+      sur mobile/fenêtre réduite. Neutre en desktop (assez de largeur). */
     padding: 10px 14px;
   }
   .evt-card-line1 {
