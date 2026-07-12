@@ -63,6 +63,17 @@
   @media (max-width: 1000px) {
     .app { height: auto; grid-template-rows: auto 1fr; }
   }
+  /* KIT-UX-RESPONSIVE-URGENT (suite) : sous ce même seuil, .app{height:auto}
+     casse le chemin de hauteur défini que réclame .joueur-main-col{overflow-y:auto}
+     pour scroller en interne (100% d'un parent auto ne se résout à rien).
+     body.fullscreen-app{overflow:hidden} (css/hub.css, INTERDIT, non modifié
+     ici) empêchait alors tout scroll, page entièrement figée. On rend le body
+     scrollable UNIQUEMENT sous ce seuil (page-scopé, spécificité égale, après
+     le <link> hub.css → l'emporte dans la cascade). Desktop >1000px
+     STRICTEMENT inchangé. */
+  @media (max-width: 1000px) {
+    body.fullscreen-app { overflow: auto; }
+  }
 
   /* ========== BANDEAU PAGE (en-tête du module) ========== */
   .joueur-header {
