@@ -266,9 +266,18 @@
    * (spécificité .main-nav.hub-nav) et devient une rangée pleine largeur
    * défilable sous la marque (pages-outils).
    * ------------------------------------------------------------------ */
+  /* KIT-UX-RESPONSIVE-URGENT (suite, dérogation explicite Manu) : ajout de
+   * min-width:0 sur .main-nav.hub-nav ci-dessous. Sans ça, white-space:nowrap
+   * fixe le min-content de cet élément à la largeur totale des liens non
+   * repliés — un item flex/grid ne peut jamais rétrécir en dessous de ce
+   * plancher par défaut (min-width:auto). overflow-x:auto (déjà présent) ne
+   * pouvait donc jamais s'activer : toute la chaîne topbar → .app →
+   * .evt-layout/.joueur-layout → cartes était forcée à cette largeur,
+   * débordement mesuré à 752px pour 236px de viewport (recette terrain). */
   var CSS_OUTILS = [
     '.main-nav.hub-nav {',
     '  gap: 20px;',
+    '  min-width: 0;',
     '  overflow-x: auto;',
     '  -webkit-overflow-scrolling: touch;',
     '  white-space: nowrap;',
