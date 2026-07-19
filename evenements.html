@@ -1686,9 +1686,18 @@
     opacity: 0.55;
     cursor: not-allowed;
   }
+
+  /* ACCES-ANONYME-EVT-JOUEURS-LOGIN (uniformisation demandée par Manu 19/07) :
+     un visiteur sans session est désormais redirigé vers login.html au lieu
+     du repli « tout visible » (doctrine ACCES-ANONYME-EQUIPE pt 161→193,
+     revue à la demande de Manu pour homogénéité avec les ~24 autres pages).
+     Masque tout le body tant que la session n'est pas confirmée, pour éviter
+     un flash de contenu avant la redirection — pattern déjà en place sur
+     seance.html/planification.html/pilotage.html/pilotage-categorie.html. */
+  body.auth-pending { visibility: hidden; }
 </style>
 </head>
-<body class="fullscreen-app">
+<body class="fullscreen-app auth-pending">
 <div class="app">
 
   <!-- ============ TOPBAR (héritée Phase 3, calquée sur index.html) ============ -->
@@ -2572,6 +2581,18 @@
       return;
     }
 
+    // ACCES-ANONYME-EVT-JOUEURS-LOGIN (uniformisation demandée par Manu 19/07) :
+    // gate unique et immédiat, avant tout rendu — un visiteur sans session est
+    // redirigé vers login.html, comme sur les ~24 autres pages du Hub. Remplace
+    // le repli « tout visible » de la doctrine ACCES-ANONYME-EQUIPE (pt 161→193),
+    // dont les branches auth-anon plus bas deviennent inertes (non supprimées,
+    // sans effet : ce gate redirige avant qu'elles ne soient atteintes).
+    const _gateSession = await SupabaseHub.getSession();
+    if (!_gateSession) {
+      window.location.replace('login.html');
+      return;
+    }
+
     // Gestion classe auth-* sur body pour bouton signout
     const body = document.body;
     // Voie 2 (lot 6b) — modèle d'auth à 3 états aligné sur index.html (pt 86) :
@@ -2589,6 +2610,7 @@
         body.classList.add('auth-user');
       }
       body.classList.add('auth-resolved');
+      body.classList.remove('auth-pending');
       // PERSONA-NON-STAFF : le suffixe catégorie du titre est désormais un
       // span VIDE dans le gabarit (plus de « M14 SAR×MOM » en dur), rempli
       // par le libellé de catégorie via _majTitreCategorie SI une catégorie
