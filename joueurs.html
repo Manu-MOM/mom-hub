@@ -1174,9 +1174,18 @@
     transform: translateY(-2px);
     box-shadow: 0 5px 16px rgba(0,0,0,0.22);
   }
+
+  /* ACCES-ANONYME-EVT-JOUEURS-LOGIN (uniformisation demandée par Manu 19/07) :
+     un visiteur sans session est désormais redirigé vers login.html au lieu
+     du repli « tout visible » (doctrine ACCES-ANONYME-EQUIPE pt 161→193,
+     revue à la demande de Manu pour homogénéité avec les ~24 autres pages).
+     Masque tout le body tant que la session n'est pas confirmée, pour éviter
+     un flash de contenu avant la redirection — pattern déjà en place sur
+     seance.html/planification.html/pilotage.html/pilotage-categorie.html. */
+  body.auth-pending { visibility: hidden; }
 </style>
 </head>
-<body class="fullscreen-app">
+<body class="fullscreen-app auth-pending">
 <div class="app">
 
   <!-- ============ TOPBAR (héritée Phase 3, identique evenements.html / index.html) ============ -->
@@ -1514,6 +1523,19 @@
       return;
     }
 
+    // ACCES-ANONYME-EVT-JOUEURS-LOGIN (uniformisation demandée par Manu 19/07) :
+    // gate unique et immédiat, avant tout rendu — un visiteur sans session est
+    // redirigé vers login.html, comme sur les ~24 autres pages du Hub. Remplace
+    // le repli « tout visible » de GARDE-ANON-JOUEURS (pt 193), dont les
+    // branches anon plus bas (applyState(false), estAnonyme) deviennent
+    // inertes (non supprimées, sans effet : ce gate redirige avant qu'elles
+    // ne soient atteintes).
+    const _gateSession = await SupabaseHub.getSession();
+    if (!_gateSession) {
+      window.location.replace('login.html');
+      return;
+    }
+
     // Gestion classe auth-* sur body pour bouton signout
     const body = document.body;
     function applyState(isAdmin) {
@@ -1525,6 +1547,7 @@
         body.classList.remove('auth-admin');
       }
       body.classList.add('auth-resolved');
+      body.classList.remove('auth-pending');
     }
     async function refreshAuthState() {
       try {
