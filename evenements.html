@@ -59,6 +59,24 @@
   @media (max-width: 1000px) {
     .app { height: auto; grid-template-rows: auto 1fr; }
   }
+
+  /* KIT-UX-RESPONSIVE-URGENT (suite, dérogation explicite Manu) : .topbar est
+     l'unique item de la grille implicite de .app (grid-template-rows SEUL,
+     pas de colonnes) et hérite donc du min-width:auto par défaut des items
+     de grille — MEME piège que celui déjà corrigé sur .main-nav.hub-nav,
+     un cran au-dessus : sans ce correctif, .topbar s'étire à son min-content
+     (mesuré 600px pour 320px de viewport, recette Playwright) au lieu de se
+     contraindre à la largeur réelle de .app — la nav thématique hérite alors
+     d'une topbar déjà trop large et n'a plus rien à défiler en interne : le
+     débordement se produit et se clippe une rangée plus haut (overflow-x:hidden
+     global html,body, hub.css INTERDIT, non modifié ici), invisible et non
+     scrollable. Constaté uniquement sur evenements.html/joueurs.html : seules
+     pages du lot à placer topbar dans un carcan .app en grid (les autres pages
+     du kit, body.auth-pending, ont topbar en enfant de bloc normal, non concerné).
+     Desktop >1000px STRICTEMENT inchangé. */
+  @media (max-width: 1000px) {
+    .app .topbar { min-width: 0; }
+  }
   /* KIT-UX-RESPONSIVE-URGENT (suite) : sous ce même seuil, .app{height:auto}
      casse le chemin de hauteur défini que réclame .evt-main-col{overflow-y:auto}
      pour scroller en interne (100% d'un parent auto ne se résout à rien).
