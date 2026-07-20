@@ -1293,6 +1293,19 @@
                       State.evenementEquipeContext.equipe.code || '';
       if (eqLabel) labelText += ' — ' + eqLabel;
     }
+    // ADVERSAIRE-MATCH-SIMPLE (demande Manu 20/07) : pour un match à un
+    // SEUL adversaire (mono-adversaire, sans match enfant — le nom vit sur
+    // evenement_adversaires, jamais affiché nulle part dans ce cas), on
+    // l'ajoute au bandeau. Si plusieurs adversaires (plateau/poule), on
+    // n'affiche rien ici : déjà visible correctement match par match sur
+    // les onglets (appendMatchTab, inchangé).
+    if (State.evenementEquipeId && State.evenementEquipeContext &&
+        State.evenementEquipeContext.evenement_equipe &&
+        Array.isArray(State.evenementEquipeContext.evenement_equipe.adversaires) &&
+        State.evenementEquipeContext.evenement_equipe.adversaires.length === 1) {
+      const advNom = State.evenementEquipeContext.evenement_equipe.adversaires[0].adversaire_nom;
+      if (advNom && advNom.trim()) labelText += ' · vs ' + advNom.trim();
+    }
     DOM.eventBannerLabel().textContent = labelText;
     DOM.eventBannerMeta().textContent  = evt.site_libelle_court || '';
 
