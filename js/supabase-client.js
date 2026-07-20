@@ -18,14 +18,6 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.81 — juillet 2026
- *   v1.81 : ACCES-COMPO-LEGACY-DEEPLINK (demande Manu 19/07). Ajout du
- *          champ evenement_equipe_id au SELECT de listCompositionsByCategorie
- *          (v3.68 existante) — permet à mes-compos.html de distinguer les
- *          compos legacy (NULL) des compos N3 (renseigné) pour lister les
- *          premières, jusqu'ici invisibles depuis le menu. Aucune méthode
- *          existante retirée, aucun filtre WHERE changé, 1 champ ajouté au
- *          SELECT. node --check OK.
  * Version : 1.80 — juillet 2026
  *   v1.80 : EDITION-EMAIL-FICHE (FAIT FOI gelé 10/07/2026). Wrapper ADDITIF
  *          majIdentiteFiche(personneId, patch) → RPC sql_196
@@ -3004,7 +2996,6 @@
         .select(`
           id, evenement_id, cote, etat, version, est_active,
           type_compo, compo_base_origine_id, notes_compo,
-          evenement_equipe_id,
           created_at, updated_at,
           evenements!inner ( id, code, libelle, type_evenement,
                              date_debut, equipe_id, categorie_id, format_de_jeu )
