@@ -967,6 +967,73 @@
     return !State.evenementEquipeId;
   }
 
+  /** ACCES-COMPO-LEGACY-DEEPLINK (juil. 2026, demande Manu) — charge
+   *  directement UNE composition précise par son ID (State.deepLinkCompoId),
+   *  peu importe sa date (passé/futur) ou son ancrage (legacy ou N3).
+   *  Réutilise EXCLUSIVEMENT des wrappers déjà en prod :
+   *    - getCompoComplete(compoId)          → compo + joueurs
+   *    - getEvenementWithEncadrants(evtId)  → détail évènement (RPC)
+   *  AUCUNE nouvelle RPC/SQL. Repli honnête si la compo est introuvable ou
+   *  la lecture échoue (RLS fait foi) : State reste vide, l'éditeur affiche
+   *  son empty-state standard (aucune compo chargée), jamais d'erreur. */
+  async function _composChargerDeepLink() {
+    let complet = null;
+    try {
+      complet = await SupabaseHub.getCompoComplete(State.deepLinkCompoId);
+    } catch (e) {
+      console.warn('CompositionsEditor: deep-link compo — lecture échouée.', e);
+      complet = null;
+    }
+    if (!complet || !complet.compo) {
+      State.evenements = [];
+      State.compos = [];
+      State.selectedEvenementId = null;
+      State.selectedCompoId = null;
+      State.compoJoueurs = [];
+      return;
+    }
+    const compo = complet.compo;
+    // Reflète l'ancrage réel de LA compo ouverte (legacy → null, N3 →
+    // renseigné) — cohérent avec _estModeLegacy() pour le reste du flux
+    // (ex. montage des sélecteurs, déjà neutralisé/no-op par ailleurs).
+    State.evenementEquipeId = compo.evenement_equipe_id || null;
+
+    let evt = null;
+    try {
+      evt = await SupabaseHub.getEvenementWithEncadrants(compo.evenement_id);
+    } catch (e) {
+      console.warn('CompositionsEditor: deep-link évènement — lecture échouée.', e);
+      evt = null;
+    }
+    State.evenements = evt ? [{
+      id:             evt.id,
+      code:           evt.code,
+      libelle:        evt.libelle,
+      date_debut:     evt.date_debut,
+      type_evenement: evt.type_evenement
+    }] : [{ id: compo.evenement_id, code: null, libelle: null, date_debut: null, type_evenement: null }];
+    State.selectedEvenementId = compo.evenement_id;
+    State.compos = [compo];
+    State.selectedCompoId = compo.id;
+    State.compoJoueurs = complet.joueurs || [];
+
+    // loadVivier() (legacy) lit _catActive() → State.perimetreCat.active.
+    // evenements.categorie_id est TOUJOURS renseigné (vérifié en base,
+    // y compris pour les évènements ancrés équipe), donc fiable ici même
+    // sans passer par resoudrePerimetreCategories(). Forme minimale :
+    // seul .active est lu par _catActive() dans ce flux ; les autres
+    // champs restent cohérents avec la forme habituelle (non transverse,
+    // non vide) pour ne perturber aucun autre lecteur éventuel de State.
+    if (evt && evt.categorie_id) {
+      State.perimetreCat = {
+        active: evt.categorie_id,
+        categories: [evt.categorie_id],
+        transverse: false,
+        vide: false
+      };
+    }
+  }
+
   /** Équipes de la catégorie active → objets [{id,…}]. [] si indispo. */
   async function _composResoudreEquipesCategorieActive() {
     if (typeof SupabaseHub === 'undefined'
@@ -5985,11 +6052,27 @@
       if (raw && raw.trim()) State.evenementEquipeId = raw.trim();
     } catch (_) { /* SSR ou contexte sans window — laisser null */ }
 
+    // ACCES-COMPO-LEGACY-DEEPLINK (juil. 2026, demande Manu) : ?compo=<uuid>
+    // ouvre directement UNE composition précise (legacy OU N3), peu importe
+    // la date, sans dépendre de la résolution "équipe/évènement courant".
+    // Branche ADDITIVE et PRIORITAIRE : si absent, tout le flux existant
+    // (evenement_equipe / legacy par défaut / match=) reste strictement
+    // inchangé et continue de s'exécuter exactement comme avant.
+    try {
+      const compoParam = new URLSearchParams(window.location.search).get('compo');
+      if (compoParam && compoParam.trim()) State.deepLinkCompoId = compoParam.trim();
+    } catch (_) { /* contexte sans window — laisser null */ }
+
     // Multi-cat — MODE LEGACY UNIQUEMENT : en U-N3 l'équipe est imposée
     // par l'URL, on ne propage rien. En legacy, on résout la catégorie
     // active + son équipe AVANT les chargements (les 3 appels legacy
     // liront _equipeActive()). Repli M14 si socle absent.
-    if (_estModeLegacy()) {
+    if (State.deepLinkCompoId) {
+      // ACCES-COMPO-LEGACY-DEEPLINK : court-circuite la résolution
+      // équipe/évènement courant ci-dessous (bloc legacy classique) — charge
+      // directement LA compo ciblée + son évènement, peu importe la date.
+      await _composChargerDeepLink();
+    } else if (_estModeLegacy()) {
       if (typeof SupabaseHub !== 'undefined'
           && typeof SupabaseHub.resoudrePerimetreCategories === 'function') {
         try {
@@ -6020,12 +6103,19 @@
       _composChoisirEquipeActive(); // pose State.equipeActive (null si vide)
     }
 
-    await Promise.all([ loadEvenements(), loadVivier(), loadPostes() ]);
+    if (State.deepLinkCompoId) {
+      // Référentiels quand même nécessaires à l'affichage de l'éditeur
+      // (postes/vivier) — seule la résolution évènement/compo est
+      // court-circuitée par _composChargerDeepLink() ci-dessus.
+      await Promise.all([ loadVivier(), loadPostes() ]);
+    } else {
+      await Promise.all([ loadEvenements(), loadVivier(), loadPostes() ]);
 
-    if (State.evenements.length > 0) {
-      State.selectedEvenementId = State.evenements[0].id;
-      await loadComposForCurrentEvent();
-      if (State.selectedCompoId) await loadCompoJoueurs();
+      if (State.evenements.length > 0) {
+        State.selectedEvenementId = State.evenements[0].id;
+        await loadComposForCurrentEvent();
+        if (State.selectedCompoId) await loadCompoJoueurs();
+      }
     }
 
     // v3.60 — Deep-link match : ?match=<id> cible la compo de match dont
