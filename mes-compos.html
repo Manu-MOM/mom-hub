@@ -273,15 +273,19 @@
 
       /** ACCES-COMPO-LEGACY-DEEPLINK — charge les compos LEGACY de la
        *  catégorie active via listCompositionsByCategorie (déjà en prod,
-       *  v3.68). Filtre : type_compo='base' (1 ligne par match, cohérent
-       *  avec la liste N3 ci-dessus) ET evenement_equipe_id absent (sinon
-       *  doublon avec la liste N3). Repli honnête : erreur/vide → []. */
+       *  v3.68). Filtre : evenement_equipe_id absent (sinon doublon avec
+       *  la liste N3 ci-dessus). PAS de filtre sur type_compo : en mode
+       *  legacy chaque match a sa propre compo type_compo='match' (pas de
+       *  "base" séparée comme en N3) — vérifié en base (13 compos réelles
+       *  M14, toutes type_compo='match'). Un filtre 'base' seul les
+       *  excluait quasi toutes (bug signalé par Manu, capture 2e recette).
+       *  Repli honnête : erreur/vide → []. */
       async function chargerLegacyRows(catId) {
         if (!catId) { legacyRows = []; return; }
         try {
           const brut = await SupabaseHub.listCompositionsByCategorie(catId, { onlyActive: true });
           legacyRows = (brut || []).filter(function (c) {
-            return c && c.type_compo === 'base' && !c.evenement_equipe_id && c.evenements;
+            return c && !c.evenement_equipe_id && c.evenements;
           });
         } catch (e) {
           console.warn('MOM Hub: mes-compos legacy chargement', e);
