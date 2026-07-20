@@ -5866,6 +5866,14 @@
      *   evenement:Object, equipe:Object, entente:Object},
      *   error?:string}>}
      */
+    /**
+     * v1.82 — ADVERSAIRE-MATCH-SIMPLE (demande Manu 20/07). Ajout du champ
+     * evenement_adversaires au SELECT existant : pour un match simple
+     * (1 seule équipe engagée, mono-adversaire, pas de match enfant), le
+     * nom de l'adversaire vit sur cette table liée à l'engagement — la
+     * bannière compositions-editor.js n'y avait jamais accès. Additif pur
+     * (1 embed ajouté), aucun champ retiré, aucun filtre changé.
+     */
     async getEvenementEquipeContext(evenementEquipeId) {
       if (!evenementEquipeId) {
         return { ok: false, error: 'evenementEquipeId requis' };
@@ -5879,7 +5887,8 @@
             id, code, libelle_court, nom_officiel, entente_id,
             ententes ( id, code, libelle_court, libelle_moyen,
                         categorie_id, saison_id )
-          )
+          ),
+          evenement_adversaires ( adversaire_nom, ordre, notes )
         `)
         .eq('id', evenementEquipeId)
         .maybeSingle();
@@ -5897,6 +5906,9 @@
       if (!ent || !ent.id) {
         return { ok: false, error: "Entente introuvable pour cette équipe engagée (chaîne équipe→entente)" };
       }
+      const adversaires = Array.isArray(eq.evenement_adversaires)
+        ? eq.evenement_adversaires.slice().sort((a, b) => (a.ordre || 0) - (b.ordre || 0))
+        : [];
       return {
         ok: true,
         data: {
@@ -5905,7 +5917,8 @@
             evenement_id:  eq.evenement_id,
             equipe_id:     eq.equipe_id,
             format_de_jeu: eq.format_de_jeu,
-            notes:         eq.notes
+            notes:         eq.notes,
+            adversaires:   adversaires
           },
           evenement: evt,
           equipe: team ? {
