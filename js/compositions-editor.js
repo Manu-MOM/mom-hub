@@ -1508,6 +1508,33 @@
       } else {
         matchs.forEach(appendMatchTab);
       }
+
+      // ADVERSAIRE-MATCH-SIMPLE (suite, demande Manu 20/07) : quand il n'y a
+      // AUCUN match enfant (matchs.length === 0 — cas mono-adversaire créé
+      // via le « + » libre, cf. onCreateMatchCompo(null)), la ou les compo(s)
+      // de match existantes restaient jusqu'ici invisibles (compoParMatch
+      // n'est consulté que par appendMatchTab, jamais appelé dans ce cas).
+      // On leur donne un onglet, nommé avec l'adversaire mono-résolu si
+      // disponible (même source que le bandeau), repli « Match » sinon.
+      if (matchs.length === 0) {
+        const advCtx = State.evenementEquipeContext && State.evenementEquipeContext.evenement_equipe
+          ? State.evenementEquipeContext.evenement_equipe.adversaires : null;
+        const advNomUnique = (Array.isArray(advCtx) && advCtx.length === 1 && advCtx[0].adversaire_nom
+          && advCtx[0].adversaire_nom.trim()) ? advCtx[0].adversaire_nom.trim() : null;
+        compoMatchs
+          .filter(function (c) { return c.evenement_id === State.selectedEvenementId; })
+          .forEach(function (c) {
+            const tab = document.createElement('button');
+            tab.type = 'button';
+            tab.className = 'compo-tabs__tab';
+            const lib = advNomUnique ? ('vs ' + advNomUnique) : 'Match';
+            if (c.id === State.selectedCompoId) tab.classList.add('is-active');
+            tab.textContent = lib;
+            tab.title = 'Compo de match : ' + lib;
+            tab.addEventListener('click', function () { selectCompo(c.id); });
+            container.appendChild(tab);
+          });
+      }
     } else {
       // Mode legacy (pas d'équipe engagée) : onglets compos de match bruts
       compoMatchs.sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
