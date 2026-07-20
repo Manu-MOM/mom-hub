@@ -170,6 +170,20 @@
     <div id="mc-list" class="mc-list">
       <div class="mc-loading">Chargement…</div>
     </div>
+
+    <!-- ACCES-COMPO-LEGACY-DEEPLINK (juil. 2026, demande Manu) : section
+         additive listant les compos LEGACY (evenement_equipe_id NULL),
+         invisibles ci-dessus. Alimentée par listCompositionsByCategorie
+         (wrapper déjà en prod), ouvre via compositions.html?compo=<id>
+         (nouveau deep-link, cf. compositions-editor.js). La liste N3
+         ci-dessus n'est pas touchée. -->
+    <div class="mc-head" style="margin-top:36px;">
+      <h2 class="mc-title">Compositions (mode classique)</h2>
+      <p class="mc-subtitle">Matchs sans engagement multi-équipes</p>
+    </div>
+    <div id="mc-list-legacy" class="mc-list">
+      <div class="mc-loading">Chargement…</div>
+    </div>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -254,6 +268,69 @@
       }
 
       const host = document.getElementById('mc-list');
+      const hostLegacy = document.getElementById('mc-list-legacy');
+      let legacyRows = [];
+
+      /** ACCES-COMPO-LEGACY-DEEPLINK — charge les compos LEGACY de la
+       *  catégorie active via listCompositionsByCategorie (déjà en prod,
+       *  v3.68). Filtre : type_compo='base' (1 ligne par match, cohérent
+       *  avec la liste N3 ci-dessus) ET evenement_equipe_id absent (sinon
+       *  doublon avec la liste N3). Repli honnête : erreur/vide → []. */
+      async function chargerLegacyRows(catId) {
+        if (!catId) { legacyRows = []; return; }
+        try {
+          const brut = await SupabaseHub.listCompositionsByCategorie(catId, { onlyActive: true });
+          legacyRows = (brut || []).filter(function (c) {
+            return c && c.type_compo === 'base' && !c.evenement_equipe_id && c.evenements;
+          });
+        } catch (e) {
+          console.warn('MOM Hub: mes-compos legacy chargement', e);
+          legacyRows = [];
+        }
+      }
+
+      function rendreLignesLegacy() {
+        if (perimetreEstVide) { hostLegacy.innerHTML = ''; return; }
+        if (legacyRows.length === 0) {
+          hostLegacy.innerHTML =
+            '<div class="mc-empty">' +
+              'Aucune composition classique pour le moment.' +
+            '</div>';
+          return;
+        }
+        hostLegacy.innerHTML = '';
+        legacyRows.forEach(function (c) {
+          const evt = c.evenements;
+          const meta = formatDateLong(evt.date_debut);
+
+          const row = document.createElement('div');
+          row.className = 'mc-row';
+
+          const main = document.createElement('a');
+          main.className = 'mc-row__open';
+          main.href = 'compositions.html?compo=' + encodeURIComponent(c.id);
+          main.innerHTML =
+            '<span class="mc-row__type">' + escapeHtml(libelleType(evt.type_evenement)) + '</span>' +
+            '<span class="mc-row__main">' +
+              '<span class="mc-row__label">' + escapeHtml(evt.libelle || 'Évènement') + '</span>' +
+              '<span class="mc-row__meta">' + escapeHtml(meta) + '</span>' +
+            '</span>' +
+            '<span class="mc-row__state state-' + escapeHtml(c.etat || '') + '">' + escapeHtml(libelleEtat(c.etat)) + '</span>' +
+            '<span class="mc-row__chev" aria-hidden="true">›</span>';
+          row.appendChild(main);
+
+          if (c.id) {
+            const pilot = document.createElement('a');
+            pilot.className = 'mc-row__pilot';
+            pilot.href = 'pilotage.html?compo_base=' + encodeURIComponent(c.id);
+            pilot.title = 'Statistiques de saison (pilotage d\'équipe)';
+            pilot.innerHTML = '📊 Pilotage';
+            row.appendChild(pilot);
+          }
+
+          hostLegacy.appendChild(row);
+        });
+      }
 
       let rows = [];
       try {
@@ -368,9 +445,11 @@
               ancreSelector: '.mc-head',
               wrapId: 'mc-cat-selecteur-wrap',
               selectId: 'mc-cat-selecteur',
-              onChange: function (nouvelleCatId) {
+              onChange: async function (nouvelleCatId) {
                 categorieActiveId = nouvelleCatId || null;
                 rendreLignes();
+                if (!perimetreEstVide) await chargerLegacyRows(categorieActiveId);
+                rendreLignesLegacy();
               }
             });
           }
@@ -380,6 +459,8 @@
       }
 
       rendreLignes();
+      if (!perimetreEstVide) await chargerLegacyRows(categorieActiveId);
+      rendreLignesLegacy();
 
       console.log(
         '%c🏉 Mes compositions chargé',
