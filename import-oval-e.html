@@ -81,6 +81,7 @@
   table.imp-tbl tr:last-child td { border-bottom: 0; }
   .imp-section-title { font-size: 13px; font-weight: 700; margin: 18px 0 8px; color: var(--ink, #0c3d24); }
   .imp-empty { color: var(--ink-mute, #6b7a74); font-size: 14px; padding: 6px 0; }
+  .imp-ok { color: #2D7D46; font-weight: 600; font-size: 14px; }
 
 </style>
 </head>
@@ -300,8 +301,21 @@
           + "Colonnes détectées : " + rows[0].join(' · '), 'err');
         return;
       }
+      // Colonnes identité (optionnelles) — pour la création éventuelle des cas 2 (pt 210).
+      // Détection tolérante : findIndex sur libellés normalisés (sans accents/casse).
+      const idxNom      = headers.findIndex(h => h === 'nom');
+      const idxPrenom   = headers.findIndex(h => h.includes('prenom'));
+      const idxEmail    = headers.findIndex(h => h.includes('email') || h.includes('mail'));
+      const idxTel      = headers.findIndex(h => h.includes('telephone') || h === 'tel');
+      const idxAdresse  = headers.findIndex(h => h.includes('adresse'));
+      const idxCP       = headers.findIndex(h => h === 'cp' || h.includes('code postal'));
+      const idxVille    = headers.findIndex(h => h.includes('ville'));
+      const idxNaiss    = headers.findIndex(h => h.includes('date naissance') || h.includes('naissance'));
+      const idxNat      = headers.findIndex(h => h.includes('nationalite'));
+      const idxFinAff   = headers.findIndex(h => h.includes('fin d affiliation') || h.includes('fin affiliation'));
+      const cellAt = (row, idx) => idx === -1 ? '' : String(row[idx] == null ? '' : row[idx]).trim();
 
-      // Agrégation : { licence -> Set(codes) }.
+      // Agrégation : { licence -> { codes:Set, ...identité } }.
       const map = new Map();
       let nbLignes = 0;
       for (let i = 1; i < rows.length; i++) {
@@ -309,8 +323,23 @@
         const code = String(rows[i][idxQual] == null ? '' : rows[i][idxQual]).trim().toUpperCase();
         if (!lic || !code) continue;
         nbLignes++;
-        if (!map.has(lic)) map.set(lic, new Set());
-        map.get(lic).add(code);
+        if (!map.has(lic)) {
+          // Identité captée sur la 1re ligne rencontrée pour cette licence.
+          map.set(lic, {
+            codes: new Set(),
+            nom:      cellAt(rows[i], idxNom),
+            prenom:   cellAt(rows[i], idxPrenom),
+            email:    cellAt(rows[i], idxEmail),
+            tel:      cellAt(rows[i], idxTel),
+            adresse:  cellAt(rows[i], idxAdresse),
+            cp:       cellAt(rows[i], idxCP),
+            ville:    cellAt(rows[i], idxVille),
+            date_naissance: cellAt(rows[i], idxNaiss),
+            nationalite:    cellAt(rows[i], idxNat),
+            date_fin_affiliation: cellAt(rows[i], idxFinAff)
+          });
+        }
+        map.get(lic).codes.add(code);
       }
       if (map.size === 0) {
         flash("Aucune ligne exploitable (licence + qualité) dans l'export.", 'err');
@@ -318,12 +347,20 @@
       }
 
       // Construction du payload trié + collecte des codes vus.
+      // Chaque entrée : { lic, codes, + champs identité } — les champs identité servent
+      // uniquement à la création des cas 2 ; import_qualites_ffr n'utilise que lic+codes.
       const tousCodes = new Set();
       payload = [];
-      for (const [lic, set] of map) {
-        const codes = Array.from(set).sort();
+      for (const [lic, obj] of map) {
+        const codes = Array.from(obj.codes).sort();
         codes.forEach(c => tousCodes.add(c));
-        payload.push({ lic, codes });
+        payload.push({
+          lic, codes,
+          nom: obj.nom, prenom: obj.prenom, email: obj.email, tel: obj.tel,
+          adresse: obj.adresse, cp: obj.cp, ville: obj.ville,
+          date_naissance: obj.date_naissance, nationalite: obj.nationalite,
+          date_fin_affiliation: obj.date_fin_affiliation
+        });
       }
       payload.sort((a, b) => a.lic.localeCompare(b.lic));
 
@@ -381,6 +418,41 @@
       }
     }
 
+    // ---------- Création d'un cas 2 (pt 210) ----------
+    // Appelle creer_personne_depuis_import avec l'identité captée au parsing (payload).
+    // Idempotent côté RPC : une licence déjà en base renvoie 'existe_deja'.
+    async function creerCas2(lic, btn) {
+      const p = payload.find(function (e) { return String(e.lic) === String(lic); });
+      if (!p) { flash('Données introuvables pour cette licence (recharge le fichier).', 'err'); return; }
+      if (!p.nom || !p.prenom) {
+        flash('Nom/prénom manquants dans l\'export pour ' + lic + ' — création impossible.', 'err');
+        return;
+      }
+      btn.disabled = true; btn.textContent = 'Création…';
+      try {
+        const { data, error } = await client.rpc('creer_personne_depuis_import', { p_payload: {
+          lic: p.lic, codes: p.codes || [],
+          nom: p.nom, prenom: p.prenom, email: p.email, tel: p.tel,
+          adresse: p.adresse, cp: p.cp, ville: p.ville,
+          date_naissance: p.date_naissance, nationalite: p.nationalite,
+          date_fin_affiliation: p.date_fin_affiliation
+        }});
+        if (error) throw error;
+        const r = Array.isArray(data) ? data[0] : data;
+        const row = btn.closest('tr');
+        if (r && r.statut === 'cree') {
+          if (row) row.querySelector('td:last-child').innerHTML = '<span class="imp-ok">✓ fiche créée</span>';
+          flash('Fiche créée : ' + (r.prenom || '') + ' ' + (r.nom || '') + '.', 'ok');
+        } else {
+          if (row) row.querySelector('td:last-child').innerHTML = '<span class="imp-ok">déjà en base</span>';
+          flash('Cette licence a déjà une fiche (aucune création).', 'warn');
+        }
+      } catch (e) {
+        btn.disabled = false; btn.textContent = 'Créer la fiche';
+        flash('Échec de la création : ' + errMsg(e), 'err');
+      }
+    }
+
     function asArray(v) {
       if (Array.isArray(v)) return v;
       if (typeof v === 'string') { try { return JSON.parse(v); } catch (_) { return []; } }
@@ -396,12 +468,29 @@
       $('rpCas2').textContent = cas2.length;
       $('rpCas3').textContent = cas3.length;
 
-      // Cas 2
+      // Cas 2 — croisement avec le payload enrichi (identité) + bouton de création (pt 210).
       if (cas2.length) {
+        // Index licence -> entrée payload (identité captée au parsing).
+        const byLic = new Map();
+        for (const p of payload) byLic.set(String(p.lic), p);
         $('rpCas2List').innerHTML =
-          '<table class="imp-tbl"><thead><tr><th>Numéro de licence</th></tr></thead><tbody>' +
-          cas2.map(x => '<tr><td>' + escapeHtml(x.lic) + '</td></tr>').join('') +
+          '<table class="imp-tbl"><thead><tr><th>Nom</th><th>Prénom</th><th>Licence</th><th>Qualités</th><th></th></tr></thead><tbody>' +
+          cas2.map(x => {
+            const p = byLic.get(String(x.lic)) || {};
+            const codes = (p.codes || []).join(', ');
+            return '<tr data-lic="' + escapeHtml(x.lic) + '">'
+              + '<td>' + escapeHtml(p.nom || '—') + '</td>'
+              + '<td>' + escapeHtml(p.prenom || '—') + '</td>'
+              + '<td>' + escapeHtml(x.lic) + '</td>'
+              + '<td>' + escapeHtml(codes) + '</td>'
+              + '<td><button type="button" class="imp-btn imp-btn-creer" data-lic="' + escapeHtml(x.lic) + '">Créer la fiche</button></td>'
+              + '</tr>';
+          }).join('') +
           '</tbody></table>';
+        // Branche chaque bouton sur la création (une fiche = un clic).
+        $('rpCas2List').querySelectorAll('.imp-btn-creer').forEach(function (b) {
+          b.addEventListener('click', function () { creerCas2(this.getAttribute('data-lic'), this); });
+        });
       } else {
         $('rpCas2List').innerHTML = '<p class="imp-empty">Aucune — toutes les licences de l\'export ont une fiche.</p>';
       }
