@@ -8,8 +8,9 @@
 --   - ANDREI Ciprian  : joueur etranger pur -> categorie_personne 'joueur', type 'licencie_competition'.
 --   - COLSON Gregory  : joueur etranger pur -> categorie_personne 'joueur', type 'licencie_competition'.
 --   - RULFO  Vivien   : ne joue pas         -> categorie_personne 'parent_et_staff' (type educateur inchange).
---   - AMANI  Ali Y.   : rustine devenue inutile apres retrait de 'B' du socle -> staff_exclu false.
---                       (type_personne NON touche : hors demande explicite.)
+--   - AMANI  Ali Y.   : joueur etranger pur (B) -> staff_exclu false (rustine levee apres retrait
+--                       de 'B' du socle) ET type_personne 'licencie_competition' (etait a tort
+--                       'licencie_dirigeant', meme cas qu'ANDREI/COLSON — confirme Manu).
 --
 -- Chaque UPDATE porte une garde WHERE sur l'etat AVANT attendu (idempotence + securite :
 -- si une fiche a deja ete corrigee ou differe de l'etat sonde, l'UPDATE ne fait rien).
@@ -37,11 +38,13 @@ set categorie_personne = 'parent_et_staff'
 where id = 'de6a71f3-12e2-45de-a677-eb8c25d8fc50'
   and categorie_personne = 'joueur_et_parent_et_staff';
 
--- AMANI Ali Yannick (id 12f26df7-e09e-4b5d-b6d9-5479f23a2031) — rustine levee
+-- AMANI Ali Yannick (id 12f26df7-e09e-4b5d-b6d9-5479f23a2031) — joueur etranger pur (B) :
+-- rustine levee + type corrige (meme cas qu'ANDREI/COLSON).
 update public.personnes
-set staff_exclu = false
+set staff_exclu   = false,
+    type_personne = 'licencie_competition'
 where id = '12f26df7-e09e-4b5d-b6d9-5479f23a2031'
-  and staff_exclu = true;
+  and (staff_exclu = true or type_personne = 'licencie_dirigeant');
 
 -- ============================================================================
 -- VÉRIFICATION fail-loud — etat CIBLE atteint sur les 4 fiches
@@ -58,11 +61,11 @@ begin
       or (id = 'de6a71f3-12e2-45de-a677-eb8c25d8fc50'
             and categorie_personne <> 'parent_et_staff')
       or (id = '12f26df7-e09e-4b5d-b6d9-5479f23a2031'
-            and staff_exclu <> false);
+            and not (staff_exclu = false and type_personne = 'licencie_competition'));
   if v_ko > 0 then
     raise exception 'DATA KO : % fiche(s) hors etat cible.', v_ko;
   end if;
-  raise notice 'DATA OK : ANDREI/COLSON en joueur+competition, RULFO en parent_et_staff, AMANI staff_exclu=false.';
+  raise notice 'DATA OK : ANDREI/COLSON/AMANI en joueur+competition (staff_exclu=false), RULFO en parent_et_staff.';
 end;
 $verif$;
 
