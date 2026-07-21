@@ -4689,6 +4689,29 @@
     },
 
     /**
+     * Archive ou réactive une fiche personne via RPC archiver_personne()
+     * (sql_202, pt 211 — cycle de vie licence). Réversible.
+     * @param {string} personneId UUID de la personne.
+     * @param {boolean} archive true = archiver, false = réactiver.
+     * @returns {Promise<Object>} { personne_id, est_archive }.
+     * @throws si la RPC échoue (garde admin, introuvable…), pour affichage front.
+     */
+    async archiverPersonne(personneId, archive) {
+      if (!personneId || typeof archive !== 'boolean') {
+        throw new Error('archiverPersonne() requiert (personneId, boolean)');
+      }
+      const { data, error } = await client.rpc('archiver_personne', {
+        p_id: personneId,
+        p_archive: archive
+      });
+      if (error) {
+        console.error('MOM Hub: archiverPersonne()', error);
+        throw error;
+      }
+      return Array.isArray(data) ? data[0] : data;
+    },
+
+    /**
      * Récupère l'effectif d'une catégorie via RPC get_joueurs_categorie()
      * (sql_112). Jumelle de getJoueursEquipe/getJoueursF15 : MÊME shape
      * de sortie (32 colonnes) → cartes et fiche inchangées.
