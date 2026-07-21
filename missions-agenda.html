@@ -346,7 +346,6 @@
   saisonActive = await SupabaseHub.getSaisonActive();
 
   const ok = await resoudreAcces();
-  if (!ok) { window.location.replace('./'); return; }
 
   document.body.classList.remove('auth-pending');
 
@@ -354,8 +353,27 @@
     $('season-pill').textContent = String(saisonActive.libelle).toUpperCase();
   }
 
+  // MISSIONS-AGENDA-REFUS (canon EMPTY-STATES-REFUS D1, pt 199, aligné sur
+  // equipe-agenda.html) : avant, un compte sans accès agenda salarié était
+  // éjecté vers l'accueil (garde dure, ressemblant à une panne) ; un
+  // salarié non résolu affichait un flash ROUGE (« erreur »). Dans les deux
+  // cas ce n'est pas une panne : la page s'ouvre proprement avec un refus
+  // NEUTRE (ni err rouge, ni ok vert). RLS = la vraie barrière côté données.
+  if (!ok) {
+    const _box = $('maMsg');
+    if (_box) {
+      _box.innerHTML = '<div class="ma-flash" style="background:#f6f4ee;color:#4a4a44;">'
+        + 'Cet agenda est réservé aux salariés concernés (ou aux profils admin/bureau).</div>';
+    }
+    return;
+  }
+
   if (!salarieId) {
-    flash('Aucun salarié résolu — agenda indisponible.', 'err');
+    const _box = $('maMsg');
+    if (_box) {
+      _box.innerHTML = '<div class="ma-flash" style="background:#f6f4ee;color:#4a4a44;">'
+        + 'Aucun agenda salarié à afficher pour le moment.</div>';
+    }
     return;
   }
 
