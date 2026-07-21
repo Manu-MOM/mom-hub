@@ -268,14 +268,21 @@ as $function$
   LEFT JOIN categories c ON c.id = p.categorie_id
   LEFT JOIN poles po ON po.id = p.pole_attache_id
   UNION ALL
-  -- Branche ENCADRANTS (pt 209) — archive si est_archive, sinon actif.
+  -- Branche ENCADRANTS (pt 209) — MEME cycle de renouvellement que les joueurs (Vision A,
+  -- pt 211 affinage) : un coach a une licence FFR (DC4/EDU...) qui se renouvelle chaque saison.
+  -- archive > a_renouveler (licence non reimportee saison active) > actif.
   SELECT p.id, p.nom, p.prenom, p.sexe, p.date_naissance, p.type_personne, p.f15_integree,
     p.numero_licence_ffr, p.qualite_ffr, p.club_principal_id, cp.code, cp.nom_court,
     cible.id, cible.libelle_court, p.pole_attache_id, po.libelle_court,
     NULL::text[], NULL::text[], NULL::smallint, NULL::integer,
     p.indisponibilite, p.blessure_resume, p.suspension_jusqu_au,
     NULL::text, NULL::text, NULL::uuid, NULL::text, NULL::text, NULL::date, NULL::date,
-    'coach'::text, CASE WHEN p.est_archive THEN 'archive' ELSE 'actif' END, fs.fonction
+    'coach'::text,
+    CASE WHEN p.est_archive THEN 'archive'
+      WHEN p.numero_licence_ffr IS NOT NULL AND btrim(p.numero_licence_ffr) <> ''
+           AND p.derniere_saison_importee IS DISTINCT FROM (SELECT id FROM sa) THEN 'a_renouveler'
+      ELSE 'actif' END,
+    fs.fonction
   FROM fonction_staff fs
   JOIN personnes p ON p.id = fs.personne_id
   JOIN categories cible ON cible.id = fs.categorie_id
