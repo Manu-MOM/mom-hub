@@ -185,8 +185,12 @@
       const ended = !!r.date_fin;
       const tr = document.createElement('tr');
       if (ended) tr.className = 'st-ended';
+      // pt 212 : le nom vient désormais directement de la RPC (r.nom/r.prenom),
+      // ce qui résout aussi les joueurs-encadrants absents de la pioche staff
+      // (ex. Voegeli, référente F15). Replis : Map staffNames, puis UUID.
+      const nomLigne = [r.prenom, r.nom].filter(Boolean).join(' ').trim() || fnNameFor(r.personne_id);
       tr.innerHTML =
-        '<td>' + escapeHtml(fnNameFor(r.personne_id)) + '</td>' +
+        '<td>' + escapeHtml(nomLigne) + '</td>' +
         '<td>' + escapeHtml(r.fonction) + '</td>' +
         '<td>' + (r.date_debut || '') + '</td>' +
         '<td>' + (ended
