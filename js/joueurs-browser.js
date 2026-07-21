@@ -647,7 +647,7 @@ window.JoueursBrowser = (function () {
                 ${j.club_principal_code ? `<span class="joueur-badge joueur-badge-club">${esc(j.club_principal_code)}</span>` : ''}
                 ${j.categorie_libelle_court ? `<span class="joueur-badge joueur-badge-cat">${esc(j.categorie_libelle_court)}</span>` : ''}
                 ${j.profil === 'f15' ? `<span class="joueur-badge joueur-badge-f15">F-15</span>` : ''}
-                ${j.profil === 'coach' ? `<span class="joueur-badge joueur-badge-coach">Coach</span>` : ''}
+                ${j.profil === 'coach' ? `<span class="joueur-badge joueur-badge-coach">${j.fonction_staff ? esc(j.fonction_staff) : 'Coach'}</span>` : ''}
                 ${j.profil === 'staff' ? `<span class="joueur-badge joueur-badge-staff">Staff</span>` : ''}
               </div>
             </div>
