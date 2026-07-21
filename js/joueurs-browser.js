@@ -248,7 +248,9 @@ window.JoueursBrowser = (function () {
     indisponible: 'Indisponible',
     blesse: 'Blessé',
     suspendu: 'Suspendu',
-    inactif: 'Inactif'
+    inactif: 'Inactif',
+    a_renouveler: 'À renouveler',
+    archive: 'Archivé'
   };
 
   // ============================================================
@@ -1187,6 +1189,10 @@ window.JoueursBrowser = (function () {
           <button type="button" class="joueur-btn joueur-btn-edit" data-edit="etat">Modifier état</button>
           <button type="button" class="joueur-btn joueur-btn-edit" data-edit="notes">Notes coach</button>
         </div>
+        <div class="joueur-fiche-actions-row">
+          <button type="button" class="joueur-btn joueur-btn-archive" id="joueur-btn-archive"></button>
+          <span id="joueur-archive-msg" aria-live="polite"></span>
+        </div>
         <!-- v1.7 · CATEGORIE-SECTION-RUGBY : bloc masqué par défaut,
              révélé par bindSectionToggle() si le droit est ouvert
              (miroir client de puis_je_ecrire_categorie(SECTION)). -->
@@ -1221,6 +1227,43 @@ window.JoueursBrowser = (function () {
         else if (which === 'notes') openModalNotes(currentEditDetail);
       });
     });
+    // pt 211 — Archiver / Réactiver (cycle de vie licence). Libellé selon l'état
+    // courant, lu depuis ALL_JOUEURS (etat_calcule='archive'), sans RPC de lecture
+    // supplémentaire. Réversible : archiver_personne(id, bool).
+    (function bindArchive() {
+      const btn = document.getElementById('joueur-btn-archive');
+      if (!btn) return;
+      const setArchiveMsg = function (txt, isErr) {
+        const el = document.getElementById('joueur-archive-msg');
+        if (!el) return;
+        el.textContent = txt;
+        el.style.color = isErr ? '#b3261e' : '#2D7D46';
+      };
+      const j = ALL_JOUEURS.find(x => x.id === currentEditPersonneId);
+      const estArchive = !!(j && j.etat_calcule === 'archive');
+      btn.textContent = estArchive ? 'Réactiver la fiche' : 'Archiver la fiche';
+      btn.classList.toggle('is-reactiver', estArchive);
+      btn.addEventListener('click', async function () {
+        if (!currentEditPersonneId) return;
+        if (typeof SupabaseHub.archiverPersonne !== 'function') {
+          setArchiveMsg('Action indisponible.', true); return;
+        }
+        const cible = !estArchive;
+        if (!window.confirm(cible
+          ? 'Archiver cette fiche ? La personne sera retirée des listes actives et du vivier de compo (réversible).'
+          : 'Réactiver cette fiche ? La personne redeviendra active.')) return;
+        btn.disabled = true;
+        try {
+          await SupabaseHub.archiverPersonne(currentEditPersonneId, cible);
+          setArchiveMsg(cible ? 'Fiche archivée.' : 'Fiche réactivée.', false);
+          if (typeof reloadJoueurs === 'function') { await reloadJoueurs(); }
+          closeAllOverlays();
+        } catch (e) {
+          btn.disabled = false;
+          setArchiveMsg('Échec : ' + (e && e.message ? e.message : 'erreur'), true);
+        }
+      });
+    })();
     // P2-J.2 : toggle collapsible mobile (FFR, coordonnées, scolarité, RGPD, meta)
     document.querySelectorAll('.joueur-fiche-collapsible .joueur-fiche-section-title').forEach(title => {
       title.addEventListener('click', function () {
