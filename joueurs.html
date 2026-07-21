@@ -392,6 +392,10 @@
     color: var(--paper);
     border-color: var(--clay, #c8896a);
   }
+  .joueur-btn-archive { border-color: #b98a2e; color: #8a6420; }
+  .joueur-btn-archive:hover { background: rgba(185, 138, 46, 0.08); }
+  .joueur-btn-archive.is-reactiver { border-color: #2D7D46; color: #2D7D46; }
+  .joueur-btn-archive.is-reactiver:hover { background: rgba(45, 125, 70, 0.08); }
   .joueur-btn[disabled] {
     opacity: 0.55;
     cursor: not-allowed;
@@ -432,6 +436,8 @@
   .joueur-card.is-blesse        { background: rgba(200, 137, 106, 0.06); }
   .joueur-card.is-suspendu      { background: rgba(107, 63, 160, 0.06); }
   .joueur-card.is-inactif       { opacity: 0.55; }
+  .joueur-card.is-a_renouveler  { opacity: 0.72; background: rgba(200, 160, 60, 0.05); }
+  .joueur-card.is-archive       { opacity: 0.45; background: rgba(95, 107, 117, 0.07); }
 
   .joueur-card-stripe {
     flex-shrink: 0;
@@ -527,6 +533,8 @@
   .joueur-badge-etat-blesse       { background: #8b3a1a; }
   .joueur-badge-etat-suspendu     { background: #6b3fa0; }
   .joueur-badge-etat-inactif      { background: #5f6b75; }
+  .joueur-badge-etat-a_renouveler { background: #b98a2e; }
+  .joueur-badge-etat-archive      { background: #4a5560; }
 
   /* Postes pills (multi-postes) */
   .joueur-card-postes {
@@ -1307,6 +1315,8 @@
         <span class="joueur-chip etat-blesse"   data-etat="blesse">Blessé</span>
         <span class="joueur-chip etat-suspendu" data-etat="suspendu">Suspendu</span>
         <span class="joueur-chip etat-inactif"  data-etat="inactif">Inactif</span>
+        <span class="joueur-chip etat-a_renouveler" data-etat="a_renouveler">À renouveler</span>
+        <span class="joueur-chip etat-archive"   data-etat="archive">Archivé</span>
       </div>
 
       <!-- FILTRES POSTE (regroupés — postes.json v1.1) -->
