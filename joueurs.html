@@ -1537,14 +1537,26 @@
     }
 
     // Gestion classe auth-* sur body pour bouton signout
+    // AUTH-USER-JOUEURS-ALIGNEMENT (demande Manu 20/07) : avant, tout
+    // connecté non-admin recevait la classe auth-anon (modèle binaire),
+    // ce qui affichait à tort la pilule « Se connecter » (hub.css,
+    // body.auth-resolved.auth-anon .login-pill) à un membre pourtant déjà
+    // connecté. Aligné sur le modèle à 3 états d'evenements.html (pt 86) :
+    // auth-admin / auth-user (connecté non-admin) / auth-anon (répli
+    // d'erreur uniquement — un vrai anonyme est désormais redirigé vers
+    // login.html avant d'atteindre ce code, cf. gate ACCES-ANONYME-EVT-
+    // JOUEURS-LOGIN plus haut). hub.css masque login-pill ET profil pour
+    // auth-user (comme pour un admin non affiché) : plus de "Se connecter"
+    // affiché à un membre connecté.
     const body = document.body;
-    function applyState(isAdmin) {
+    function applyState(isAdmin, isAnon) {
+      body.classList.remove('auth-admin', 'auth-user', 'auth-anon');
       if (isAdmin) {
         body.classList.add('auth-admin');
-        body.classList.remove('auth-anon');
-      } else {
+      } else if (isAnon) {
         body.classList.add('auth-anon');
-        body.classList.remove('auth-admin');
+      } else {
+        body.classList.add('auth-user');
       }
       body.classList.add('auth-resolved');
       body.classList.remove('auth-pending');
@@ -1552,12 +1564,12 @@
     async function refreshAuthState() {
       try {
         const session = await SupabaseHub.getSession();
-        if (!session) { applyState(false); return; }
+        if (!session) { applyState(false, true); return; }
         const admin = await SupabaseHub.isAdmin();
-        applyState(admin);
+        applyState(admin, false);
       } catch (err) {
         console.error('Joueurs: erreur résolution auth', err);
-        applyState(false);
+        applyState(false, true);
       }
     }
     const btnSignout = document.getElementById('btn-signout');
