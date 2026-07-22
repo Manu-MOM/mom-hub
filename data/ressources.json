@@ -392,5 +392,65 @@
       "pptx": "1yef5VGwE0nZq63GIK-Pgr9F60uyuBF0R",
       "drive": "1t4olDKLCw8BeUiRYGRBrf2XgSKy-reAb"
     }
+  },
+  {
+    "type": "plan_formation",
+    "titre": "M8 — Plan de formation FFR",
+    "themes": [
+      "plaquage",
+      "libération",
+      "soutien"
+    ],
+    "etiquette_age": "M8",
+    "fileId_dossier": "1O6GYwkM3yuZpsxvtQYba6pNAxI-3xuyY",
+    "liens": {
+      "pdf": "1yLwjzQccru3qgSMNUXMYf-Sc_qMYwuTT",
+      "drive": "1O6GYwkM3yuZpsxvtQYba6pNAxI-3xuyY"
+    }
+  },
+  {
+    "type": "plan_formation",
+    "titre": "M10 — Plan de formation FFR",
+    "themes": [
+      "plaquage",
+      "libération",
+      "soutien"
+    ],
+    "etiquette_age": "M10",
+    "fileId_dossier": "1EeEpaRFAbieilNzUdntIKdl2bzxqrQsz",
+    "liens": {
+      "pdf": "1JsQ8Gv44vtzCpAqnV7CpCro2CzfcXIrS",
+      "drive": "1EeEpaRFAbieilNzUdntIKdl2bzxqrQsz"
+    }
+  },
+  {
+    "type": "plan_formation",
+    "titre": "M12 — Plan de formation FFR",
+    "themes": [
+      "duel",
+      "contact",
+      "plaquage"
+    ],
+    "etiquette_age": "M12",
+    "fileId_dossier": "1wgwZ2wwbxc01JRYOiGrZc7D6JDltjAND",
+    "liens": {
+      "pdf": "1z6C5lj9TMsG3psEeEnG-OP0xmW5GjQJm",
+      "drive": "1wgwZ2wwbxc01JRYOiGrZc7D6JDltjAND"
+    }
+  },
+  {
+    "type": "plan_formation",
+    "titre": "M14 — Plan de formation FFR",
+    "themes": [
+      "duel",
+      "contact",
+      "plaquage"
+    ],
+    "etiquette_age": "M14",
+    "fileId_dossier": "1KjTDmPXgEoL1vN8RE9kqLBgqljbpzHfu",
+    "liens": {
+      "pdf": "1BC7e1R0Pkkydy4xHJk-bI-YwGVXx495h",
+      "drive": "1KjTDmPXgEoL1vN8RE9kqLBgqljbpzHfu"
+    }
   }
 ]
