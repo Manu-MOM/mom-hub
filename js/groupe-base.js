@@ -143,7 +143,8 @@
   }
 
   async function loadVivier() {
-    State.vivier = await SupabaseHub.listCollectifMembres(State.ctx.entente.id) || [];
+    // pt 213 : vivier FUSIONNÉ (collectif_membre + encadrants fonction_staff).
+    State.vivier = await SupabaseHub.listVivierCollectif(State.ctx.entente.id) || [];
   }
 
   async function loadGroupe() {
@@ -242,13 +243,15 @@
       if (dansCeGroupe) {
         html += '<span class="gb-check" title="Déjà dans ce groupe">✓</span>';
       } else {
-        html += '<button type="button" class="gb-btn gb-add" data-add="' + escapeHtml(m.id) + '" title="Ajouter au groupe de base">→</button>';
+        // pt 213 : réf par index dans State.vivier (m.id peut être null pour un
+        // encadrant fonction_staff à matérialiser). onAdd retrouve l'objet membre.
+        html += '<button type="button" class="gb-btn gb-add" data-add-idx="' + State.vivier.indexOf(m) + '" title="Ajouter au groupe de base">→</button>';
       }
       html += '</li>';
     });
     host.innerHTML = html;
-    host.querySelectorAll('[data-add]').forEach(function (b) {
-      b.addEventListener('click', function () { onAdd(b.getAttribute('data-add')); });
+    host.querySelectorAll('[data-add-idx]').forEach(function (b) {
+      b.addEventListener('click', function () { onAdd(State.vivier[Number(b.getAttribute('data-add-idx'))]); });
     });
   }
 
@@ -298,15 +301,19 @@
   // ----------------------------------------------------------
   // Actions (anti-double-tap : State.busy ; erreur non bloquante)
   // ----------------------------------------------------------
-  async function onAdd(collectifMembreId) {
-    if (State.busy || !collectifMembreId) return;
+  async function onAdd(membre) {
+    if (State.busy || !membre) return;
     State.busy = true;
-    const r = await SupabaseHub.addGroupeMembre(State.evtEqId, collectifMembreId);
+    // pt 213 : convoquer_membre gère les 2 origines (collectif direct OU
+    // matérialisation d'un encadrant fonction_staff avant l'attache N2).
+    const r = await SupabaseHub.convoquerMembre(State.evtEqId, membre);
     State.busy = false;
     if (!r || !r.ok) {
       alert('Ajout impossible : ' + ((r && r.error) || 'erreur inconnue'));
       return;
     }
+    // Recharge vivier (un membre matérialisé change d'origine) + groupe.
+    await loadVivier();
     await loadGroupe();
     renderAll();
   }
