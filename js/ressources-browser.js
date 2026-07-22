@@ -63,6 +63,10 @@
     carte_mentale: {
       label: 'Carte mentale', short: 'Carte', icon: '🧠',
       color: '#4a1a7a', bg: '#f0e8ff', bloc: 'carte', ordre: 4
+    },
+    plan_formation: {
+      label: 'Plans de formation FFR', short: 'Plan FFR', icon: '🎓',
+      color: '#7a2e1a', bg: '#fdece6', bloc: 'data', ordre: 5
     }
   };
 
