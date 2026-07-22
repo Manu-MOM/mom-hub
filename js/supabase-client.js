@@ -4742,7 +4742,27 @@
         console.error('MOM Hub: getJoueursCategorie()', error);
         return null;
       }
-      return Array.isArray(data) ? data : [];
+      // DEDUP-EFFECTIF-JOUEUR-ENCADRANT (FAIT FOI, priorité STAFF) :
+      // get_joueurs_categorie fait un UNION ALL (branche licencié 'mom' +
+      // branche fonction_staff 'coach') SANS dédup. Une personne à la fois
+      // licenciée ET encadrante de SA catégorie sort donc 2× (même id).
+      // On fusionne par id en gardant la ligne au profil le plus
+      // prioritaire (coach/staff porte le badge fonction_staff), fidèle à
+      // la doctrine « 1 carte, priorité staff ». Aucune autre voie
+      // (équipe/F15/section) n'est concernée : correctif local à ce wrapper.
+      if (!Array.isArray(data)) return [];
+      var PRIORITE_PROFIL = { coach: 0, staff: 1, partenaire: 2, f15: 3, mom: 4, autre: 5 };
+      function rangProfil(j) {
+        var r = PRIORITE_PROFIL[j && j.profil];
+        return (r === undefined) ? 9 : r;
+      }
+      var parId = new Map();
+      data.forEach(function (j) {
+        if (!j || !j.id) return;
+        var existant = parId.get(j.id);
+        if (!existant || rangProfil(j) < rangProfil(existant)) parId.set(j.id, j);
+      });
+      return Array.from(parId.values());
     },
 
     /**
