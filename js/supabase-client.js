@@ -5461,6 +5461,69 @@
     },
 
     /**
+     * N1+ — Vivier du collectif FUSIONNÉ (pt 213, chantier
+     * UNIFICATION-STAFF-COLLECTIF-FONCTION). RPC list_vivier_collectif :
+     * membres collectif_membre existants UNION encadrants fonction_staff
+     * de la catégorie de l'entente (dédup personne_id). Chaque membre porte
+     * `origine` ('collectif' | 'fonction_staff') ; ceux de fonction_staff
+     * ont id=null (à matérialiser à la convocation via convoquerMembre).
+     * Réinjecte `.personnes {id,nom,prenom}` comme listCollectifMembres.
+     * @param {string} ententeId
+     * @returns {Promise<Array>} [] si erreur
+     */
+    async listVivierCollectif(ententeId) {
+      if (!ententeId) {
+        console.error('MOM Hub: listVivierCollectif() requiert un ententeId');
+        return [];
+      }
+      const { data, error } = await client.rpc('list_vivier_collectif', {
+        p_entente_id: ententeId
+      });
+      if (error) {
+        console.error('MOM Hub: listVivierCollectif()', error);
+        return [];
+      }
+      if (!Array.isArray(data)) return [];
+      const noms = await SupabaseHub._resolveNoms(
+        data.map(function (r) { return r.personne_id; })
+      );
+      data.forEach(function (r) {
+        const n = noms.get(r.personne_id);
+        r.personnes = n
+          ? { id: r.personne_id, nom: n.nom, prenom: n.prenom }
+          : { id: r.personne_id, nom: '', prenom: '' };
+      });
+      return data;
+    },
+
+    /**
+     * N2 — Convoque un membre (pt 213). RPC convoquer_membre atomique :
+     * si le membre vient de fonction_staff (pas de collectif_membre_id),
+     * matérialise d'abord sa ligne collectif_membre role='staff'
+     * (idempotent), puis insère en N2. Sinon insère directement en N2.
+     * @param {string} evenementEquipeId
+     * @param {Object} membre { id (collectif_membre_id|null), personne_id,
+     *   entente_id, role, origine }
+     * @returns {Promise<{ok:boolean, data?:Object, error?:string}>}
+     */
+    async convoquerMembre(evenementEquipeId, membre) {
+      if (!evenementEquipeId) return { ok: false, error: 'evenementEquipeId requis' };
+      if (!membre || typeof membre !== 'object') return { ok: false, error: 'membre requis' };
+      const { data, error } = await client.rpc('convoquer_membre', {
+        p_evenement_equipe_id: evenementEquipeId,
+        p_collectif_membre_id: membre.id || null,
+        p_personne_id: membre.personne_id || null,
+        p_entente_id: membre.entente_id || null,
+        p_role: membre.role || 'staff'
+      });
+      if (error) {
+        console.error('MOM Hub: convoquerMembre()', error);
+        return { ok: false, error: error.message || 'Erreur convoquer_membre' };
+      }
+      return { ok: true, data: Array.isArray(data) ? data[0] : data };
+    },
+
+    /**
      * N1 — Ajoute un membre au collectif (U-admin, INSERT
      * collectif_membre ; RLS admin|coach, l'UX gate admin UA-1).
      * date_debut défaut = aujourd'hui si absent (miroir intention
