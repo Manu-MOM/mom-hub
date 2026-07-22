@@ -136,6 +136,31 @@
     }
     .bus-toast.is-show { opacity: 1; transform: translateX(-50%) translateY(0); }
     .bus-toast.is-err { background: var(--rouge-alerte, #b23); }
+
+    /* BUG-BUS-RAMASSAGE-MOBILE (recette terrain smartphone) : sous 560px,
+       les lignes de champs en flex ne pouvaient pas se replier. Sur une
+       ligne de ramassage (.bus-arret-row : Lieu flex:1 + Heure/Nb MOM en
+       flex:0 0 120px + bouton 38px + gaps), la largeur incompressible des
+       champs --sm écrasait le champ Lieu à ~0 et faisait chevaucher les
+       libellés, empêchant la saisie (l'encart retour, avec un champ de
+       moins, restait fragile). Correctif purement additif : flex-wrap sur
+       les rangées, Lieu en pleine largeur, Heure/Nb MOM répartis dessous.
+       Aucune règle existante modifiée, aucun JS touché. */
+    @media (max-width: 560px) {
+      .bus-row { flex-wrap: wrap; }
+      .bus-row > .bus-field { flex: 1 1 100%; }
+
+      .bus-arret-row, .bus-deleg-row { flex-wrap: wrap; align-items: flex-start; }
+      /* Le champ Lieu / Club (premier .bus-field, non --sm) prend toute
+         la largeur ; les champs courts (Heure, Nb MOM, Nb passagers) se
+         partagent la ligne suivante ; le bouton retirer reste à sa taille. */
+      .bus-arret-row > .bus-field:not(.bus-field--sm),
+      .bus-deleg-row > .bus-field:not(.bus-field--sm) { flex: 1 1 100%; }
+      .bus-arret-row > .bus-field--sm,
+      .bus-deleg-row > .bus-field--sm { flex: 1 1 0; }
+      .bus-arret-row > .bus-del-btn,
+      .bus-deleg-row > .bus-del-btn { align-self: flex-end; margin-top: 4px; }
+    }
   </style>
 </head>
 <body class="auth-pending">
