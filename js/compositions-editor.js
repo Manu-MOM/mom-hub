@@ -896,6 +896,7 @@
     postes: [],
     postesById: new Map(),
     compoJoueurs: [],
+    staffConvoque: [],   // pt 214 : staff du groupe N2 (role='staff'), lecture seule en vue Liste
     popover: null,
     // ────────────────────────────────────────────────────────
     // v3.8 — état U-N3 (mode « éditeur étendu pas dupliqué »).
@@ -1049,6 +1050,7 @@
       State.selectedCompoId = null;
     }
     await loadVivier();
+    await loadStaffConvoque();
     renderEventBanner();
     renderEventSelector();
     renderCompoTabs();
@@ -1654,6 +1656,24 @@
     }
     html +=   '</ul>';
     html += '</section>';
+
+    // pt 214 — Section STAFF (lecture seule) : le staff convoqué au groupe N2
+    // ne joue pas (pas de numéro, pas de poste, pas de DnD), on l'affiche en
+    // fin de feuille. Masquée si aucun staff convoqué (hors U-N3 notamment).
+    if (State.staffConvoque && State.staffConvoque.length > 0) {
+      html += '<section class="view-liste__section view-liste__section--staff">';
+      html +=   '<h3 class="view-liste__title">Staff <span class="view-liste__count">(' + State.staffConvoque.length + ')</span></h3>';
+      html +=   '<ul class="view-liste__slots view-liste__slots--staff">';
+      State.staffConvoque.forEach(function (s) {
+        var nomAff = ((s.prenom || '') + ' ' + (s.nom || '')).trim() || '(sans nom)';
+        html += '<li class="view-liste__slot view-liste__slot--staff">'
+              +   '<span class="view-liste__staff-name">' + escapeHtml(nomAff) + '</span>'
+              + '</li>';
+      });
+      html +=   '</ul>';
+      html += '</section>';
+    }
+
     html += '</div>';
     el.innerHTML = html;
 
@@ -5930,6 +5950,27 @@
       State.baseJoueurs = [];
     }
   }
+
+  // pt 214 — Staff convoqué du groupe N2 (role='staff'), pour la section Staff
+  // de la vue Liste. Disponible uniquement en mode U-N3 (evenementEquipeId).
+  // Dégradation propre : hors U-N3 ou sans staff → liste vide, section masquée.
+  async function loadStaffConvoque() {
+    State.staffConvoque = [];
+    if (!State.evenementEquipeId) return;
+    const rows = await SupabaseHub.listGroupeEngage(State.evenementEquipeId) || [];
+    State.staffConvoque = rows
+      .filter(function (r) {
+        return r && r.collectif_membre && r.collectif_membre.role === 'staff';
+      })
+      .map(function (r) {
+        var cm = r.collectif_membre;
+        var p = cm.personnes || {};
+        return { collectif_membre_id: cm.id, personne_id: cm.personne_id,
+                 nom: p.nom || '', prenom: p.prenom || '' };
+      })
+      .sort(function (a, b) { return (a.nom + a.prenom).localeCompare(b.nom + b.prenom); });
+  }
+
   async function loadVivier() {
     // v3.8 — En mode U-N3, la pioche = groupe N2 de l'équipe engagée
     // (UN3-1), avec filtre role='joueur' (UN3-6, le staff ne joue
@@ -6061,6 +6102,7 @@
     }
 
     await Promise.all([ loadEvenements(), loadVivier(), loadPostes() ]);
+    await loadStaffConvoque();  // pt 214 : staff N2 pour la section Staff (vue Liste)
 
     if (State.evenements.length > 0) {
       State.selectedEvenementId = State.evenements[0].id;
