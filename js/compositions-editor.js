@@ -4735,26 +4735,45 @@
     'AD':  { x: 87.5, y: 75.9 },
     'AR':  { x: 50.0, y: 93.4 }
   };
+  // COMPO-MULTI-FORMAT (pt 225) — table X ALIGNÉE sur les postes réels.
+  // Elle référençait 2LG/2LD/CG/AD, retirés du format X par sql_207 (le X se
+  // joue avec des postes UNIQUES : 2LU, 3LU, CTU, AIU). Ces 4 postes n'étaient
+  // donc jamais placés, et les 4 nouveaux n'avaient aucune coordonnée.
+  // La consigne antérieure de Manu « 2L sur l'extérieur » est préservée et
+  // reportée sur le poste unique 2LU (côté gauche, l'unique deuxième ligne).
+  // Occupation resserrée par rapport au XV : y de 20 à 88 pour 10 joueurs.
   const TERRAIN_POS_X = {
-    'PG':  { x: 30.0, y: 8.5 },
-    'TAL': { x: 45.0, y: 8.5 },
-    'PD':  { x: 60.0, y: 8.5 },
-    '2LG': { x: 14.0, y: 20.0 },   // 2L sur l'extérieur gauche (consigne Manu)
-    '2LD': { x: 86.0, y: 20.0 },   // 2L sur l'extérieur droit
-    'DM':  { x: 34.0, y: 46.0 },
-    'DO':  { x: 55.0, y: 55.0 },
-    'CG':  { x: 32.0, y: 78.0 },
-    'AD':  { x: 78.0, y: 78.0 },
-    'AR':  { x: 45.0, y: 93.0 }
+    'PG':  { x: 34.0, y: 20.0 },
+    'TAL': { x: 47.0, y: 20.0 },
+    'PD':  { x: 60.0, y: 20.0 },
+    '2LU': { x: 18.0, y: 30.0 },   // 2L sur l'extérieur (consigne Manu, v3.22)
+    '3LU': { x: 47.0, y: 33.0 },
+    'DM':  { x: 36.0, y: 46.0 },
+    'DO':  { x: 54.0, y: 55.0 },
+    'CTU': { x: 40.0, y: 68.0 },
+    'AIU': { x: 72.0, y: 72.0 },
+    'AR':  { x: 47.0, y: 88.0 }
   };
+  // COMPO-MULTI-FORMAT (pt 225) — table VII REFAITE. Deux défauts corrigés :
+  //   (1) POSTES PÉRIMÉS — elle référençait 'CG' et 'AG', qui ne font plus
+  //       partie du format 7 depuis sql_207 (le VII se joue avec une 3e ligne
+  //       unique 3LU et un ailier unique AIU, cf. COMPOS_FORMATS SAR×MOM).
+  //       Ces deux postes n'étaient donc jamais placés.
+  //   (2) DISPERSION — les coordonnées étaient héritées du XV et s'étalaient
+  //       de y=8.5 à y=80, soit 72 % de la hauteur du terrain, pour 7 joueurs.
+  //       Le VII se joue sur un terrain réduit avec un bloc resserré
+  //       (remontée terrain Manu : « l'équipe devrait être plus resserrée »).
+  // Nouvelle occupation : y de 26 à 68 (42 % de la hauteur), largeur bornée
+  // à 30-70 %. Structure conservée : 1re ligne groupée devant, 3e ligne en
+  // relais, demis en diagonale, ailier écarté, arrière en couverture.
   const TERRAIN_POS_7 = {
-    'PG':  { x: 30.0, y: 8.5 },
-    'TAL': { x: 45.0, y: 8.5 },
-    'PD':  { x: 60.0, y: 8.5 },
-    'DM':  { x: 30.0, y: 42.0 },
-    'DO':  { x: 52.0, y: 52.0 },
-    'CG':  { x: 30.0, y: 80.0 },
-    'AG':  { x: 62.0, y: 80.0 }
+    'PG':  { x: 38.0, y: 26.0 },
+    'TAL': { x: 50.0, y: 26.0 },
+    'PD':  { x: 62.0, y: 26.0 },
+    '3LU': { x: 50.0, y: 37.0 },
+    'DM':  { x: 40.0, y: 47.0 },
+    'DO':  { x: 55.0, y: 56.0 },
+    'AIU': { x: 70.0, y: 68.0 }
   };
 
   // v3.22 — Sélecteur de table par format. Les vocabulaires NE SONT PAS
@@ -4778,14 +4797,16 @@
 
   // v3.22 — Table de coordonnées à utiliser pour la compo courante.
   // Lit le format de l'équipe engagée (mode U-N3) ; défaut XV sinon.
+  // v3.22 / pt 225 — Table de coordonnées de la compo courante.
+  // Délègue désormais à _formatCourant() (source UNIQUE, partagée avec la vue
+  // Liste) : elle gère la surcharge, l'héritage depuis equipes.format_jeu_code
+  // et les libellés en clair. Avant, ce helper avait sa propre lecture du
+  // format et ignorait l'héritage → Terrain et Liste pouvaient diverger.
+  // Formats sans table dédiée (12, 9, 8, 5) → repli XV, dégradation honnête
+  // (dette tracée : coordonnées de ces 4 formats à produire).
   function terrainPosCourant() {
-    const ctx = State.evenementEquipeContext;
-    const fmt = ctx && ctx.evenement_equipe && ctx.evenement_equipe.format_de_jeu;
-    if (fmt != null) {
-      const key = String(fmt).trim().toUpperCase();
-      if (TERRAIN_POS_PAR_FORMAT[key]) return TERRAIN_POS_PAR_FORMAT[key];
-    }
-    return TERRAIN_POS_XV; // legacy / NULL / format inconnu
+    const fmt = _formatCourant();
+    return TERRAIN_POS_PAR_FORMAT[fmt] || TERRAIN_POS_XV;
   }
 
   // SVG du terrain de rugby (fond) : en-buts, lignes 22m / 10m / médiane,
@@ -4826,12 +4847,22 @@
     // Pastilles positionnées en absolu (left/top %) par-dessus le terrain.
     // v3.22 — table de coordonnées selon le format de l'équipe (défaut XV).
     const TERRAIN_POS = terrainPosCourant();
+    // COMPO-MULTI-FORMAT (pt 225) — numérotation ALIGNÉE sur la vue Liste
+    // (décision Manu A : séquence 1..N selon le rang du poste dans le format).
+    // Avant : la pastille affichait poste.numero_xv, donc 1,2,3,9,10 en VII
+    // pendant que la Liste affichait 1..7 — deux numérotations pour la même
+    // compo. On construit ici le même index rang→numéro que la Liste, à
+    // partir de _postesCourants() (source unique de l'ordre des postes).
+    const _numParPosteId = new Map();
+    _postesCourants().forEach(function (p, idx) { _numParPosteId.set(p.id, idx + 1); });
     for (const code in TERRAIN_POS) {
       const pos = TERRAIN_POS[code];
       const poste = posteParCode.get(code);
       if (!poste) continue; // robustesse : code absent du référentiel
       const cj = joueurDuPoste(poste.id);
-      const num = poste.numero_xv || '';
+      const num = _numParPosteId.has(poste.id)
+        ? _numParPosteId.get(poste.id)
+        : (poste.numero_xv || '');
       const style = 'left:' + pos.x + '%;top:' + pos.y + '%;';
       const libellePoste = poste.libelle_long || poste.libelle_court || poste.code;
       if (!cj) {
