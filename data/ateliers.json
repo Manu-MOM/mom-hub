@@ -8006,6 +8006,1991 @@
    "cross": "",
    "video": false,
    "ss_id": "ti-zones-1"
+  },
+  {
+   "rub_num": "2",
+   "rub_label": "Technique individuelle",
+   "rub_id": "ti",
+   "rub_icon": "👤",
+   "sub_label": "2a — Passer et Receptionner",
+   "sub_id": "ti-passes",
+   "sub_color": "#0a4a1a",
+   "sub_badge": "#c4efd4",
+   "sub_badge_text": "#0a3a1a",
+   "sub_icon": "🏉",
+   "sub_sub": "Manipulation de balle et transmissions",
+   "sub_comp": [
+    "Tenir le ballon a 2 mains",
+    "Passes courtes sans erreur",
+    "Passes longues aplatissantes",
+    "Regard avant la passe",
+    "Receptionner en courant"
+   ],
+   "ss_label": "Manipulation de balle",
+   "famille": "technique",
+   "n": "17",
+   "t": "Technique individuelle de passes seq 1",
+   "s": "Etre capable de réaliser des passes des deux côtés",
+   "id": "15-lpqAwemcZV-AJZY8fCs3SQAxJBBDUT",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "ti-passes-1"
+  },
+  {
+   "rub_num": "2",
+   "rub_label": "Technique individuelle",
+   "rub_id": "ti",
+   "rub_icon": "👤",
+   "sub_label": "2a — Passer et Receptionner",
+   "sub_id": "ti-passes",
+   "sub_color": "#0a4a1a",
+   "sub_badge": "#c4efd4",
+   "sub_badge_text": "#0a3a1a",
+   "sub_icon": "🏉",
+   "sub_sub": "Manipulation de balle et transmissions",
+   "sub_comp": [
+    "Tenir le ballon a 2 mains",
+    "Passes courtes sans erreur",
+    "Passes longues aplatissantes",
+    "Regard avant la passe",
+    "Receptionner en courant"
+   ],
+   "ss_label": "Manipulation de balle",
+   "famille": "technique",
+   "n": "18",
+   "t": "Technique individuelle de passes seq 2",
+   "s": "Etre capable de réaliser des passes des deux côtés",
+   "id": "1thwJ2bXSUjg6aT2vRw7G1_WG2ZGdFYZG",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "ti-passes-1"
+  },
+  {
+   "rub_num": "2",
+   "rub_label": "Technique individuelle",
+   "rub_id": "ti",
+   "rub_icon": "👤",
+   "sub_label": "2a — Passer et Receptionner",
+   "sub_id": "ti-passes",
+   "sub_color": "#0a4a1a",
+   "sub_badge": "#c4efd4",
+   "sub_badge_text": "#0a3a1a",
+   "sub_icon": "🏉",
+   "sub_sub": "Manipulation de balle et transmissions",
+   "sub_comp": [
+    "Tenir le ballon a 2 mains",
+    "Passes courtes sans erreur",
+    "Passes longues aplatissantes",
+    "Regard avant la passe",
+    "Receptionner en courant"
+   ],
+   "ss_label": "Manipulation de balle",
+   "famille": "technique",
+   "n": "19",
+   "t": "Technique individuelle de passes seq 3",
+   "s": "Etre capable de réaliser des passes des deux côtés",
+   "id": "16G8UEBckAtqk1sdtqYlpuLloeC8rtpCi",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "ti-passes-1"
+  },
+  {
+   "rub_num": "2",
+   "rub_label": "Technique individuelle",
+   "rub_id": "ti",
+   "rub_icon": "👤",
+   "sub_label": "2a — Passer et Receptionner",
+   "sub_id": "ti-passes",
+   "sub_color": "#0a4a1a",
+   "sub_badge": "#c4efd4",
+   "sub_badge_text": "#0a3a1a",
+   "sub_icon": "🏉",
+   "sub_sub": "Manipulation de balle et transmissions",
+   "sub_comp": [
+    "Tenir le ballon a 2 mains",
+    "Passes courtes sans erreur",
+    "Passes longues aplatissantes",
+    "Regard avant la passe",
+    "Receptionner en courant"
+   ],
+   "ss_label": "Manipulation de balle",
+   "famille": "technique",
+   "n": "20",
+   "t": "Technique individuelle de passes seq 4",
+   "s": "Etre capable de réaliser des passes des deux côtés",
+   "id": "1fQKC6QW3JS0FZOzvBHFnzzJ2kKNAyIto",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "ti-passes-1"
+  },
+  {
+   "rub_num": "2",
+   "rub_label": "Technique individuelle",
+   "rub_id": "ti",
+   "rub_icon": "👤",
+   "sub_label": "2a — Passer et Receptionner",
+   "sub_id": "ti-passes",
+   "sub_color": "#0a4a1a",
+   "sub_badge": "#c4efd4",
+   "sub_badge_text": "#0a3a1a",
+   "sub_icon": "🏉",
+   "sub_sub": "Manipulation de balle et transmissions",
+   "sub_comp": [
+    "Tenir le ballon a 2 mains",
+    "Passes courtes sans erreur",
+    "Passes longues aplatissantes",
+    "Regard avant la passe",
+    "Receptionner en courant"
+   ],
+   "ss_label": "Manipulation de balle",
+   "famille": "technique",
+   "n": "21",
+   "t": "Technique individuelle de passes seq 5",
+   "s": "Etre capable de réaliser des passes des deux côtés",
+   "id": "13U-4CP_4g9WnTM7x4dSTHBarQfHNVi0_",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "ti-passes-1"
+  },
+  {
+   "rub_num": "2",
+   "rub_label": "Technique individuelle",
+   "rub_id": "ti",
+   "rub_icon": "👤",
+   "sub_label": "2a — Passer et Receptionner",
+   "sub_id": "ti-passes",
+   "sub_color": "#0a4a1a",
+   "sub_badge": "#c4efd4",
+   "sub_badge_text": "#0a3a1a",
+   "sub_icon": "🏉",
+   "sub_sub": "Manipulation de balle et transmissions",
+   "sub_comp": [
+    "Tenir le ballon a 2 mains",
+    "Passes courtes sans erreur",
+    "Passes longues aplatissantes",
+    "Regard avant la passe",
+    "Receptionner en courant"
+   ],
+   "ss_label": "Manipulation de balle",
+   "famille": "technique",
+   "n": "22",
+   "t": "Technique individuelle de passes seq 6",
+   "s": "Etre capable de réaliser des passes des deux côtés",
+   "id": "1ibjEBmREhLUZmIXKW-ktKHlIf4imVm8O",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "ti-passes-1"
+  },
+  {
+   "rub_num": "2",
+   "rub_label": "Technique individuelle",
+   "rub_id": "ti",
+   "rub_icon": "👤",
+   "sub_label": "2a — Passer et Receptionner",
+   "sub_id": "ti-passes",
+   "sub_color": "#0a4a1a",
+   "sub_badge": "#c4efd4",
+   "sub_badge_text": "#0a3a1a",
+   "sub_icon": "🏉",
+   "sub_sub": "Manipulation de balle et transmissions",
+   "sub_comp": [
+    "Tenir le ballon a 2 mains",
+    "Passes courtes sans erreur",
+    "Passes longues aplatissantes",
+    "Regard avant la passe",
+    "Receptionner en courant"
+   ],
+   "ss_label": "Manipulation de balle",
+   "famille": "technique",
+   "n": "23",
+   "t": "Technique individuelle de passes seq 7",
+   "s": "Etre capable de réaliser des passes des deux côtés",
+   "id": "1a2ADhoG5XY1rAFCAqYKt6ZvsPxdSfbFv",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "ti-passes-1"
+  },
+  {
+   "rub_num": "2",
+   "rub_label": "Technique individuelle",
+   "rub_id": "ti",
+   "rub_icon": "👤",
+   "sub_label": "2a — Passer et Receptionner",
+   "sub_id": "ti-passes",
+   "sub_color": "#0a4a1a",
+   "sub_badge": "#c4efd4",
+   "sub_badge_text": "#0a3a1a",
+   "sub_icon": "🏉",
+   "sub_sub": "Manipulation de balle et transmissions",
+   "sub_comp": [
+    "Tenir le ballon a 2 mains",
+    "Passes courtes sans erreur",
+    "Passes longues aplatissantes",
+    "Regard avant la passe",
+    "Receptionner en courant"
+   ],
+   "ss_label": "Manipulation de balle",
+   "famille": "technique",
+   "n": "24",
+   "t": "Technique individuelle de passes seq 8",
+   "s": "Etre capable de réaliser des passes des deux côtés",
+   "id": "1CWXyYoo5sQ5D3XV3PvxB3XQfuGlDYh02",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "ti-passes-1"
+  },
+  {
+   "rub_num": "2",
+   "rub_label": "Technique individuelle",
+   "rub_id": "ti",
+   "rub_icon": "👤",
+   "sub_label": "2a — Passer et Receptionner",
+   "sub_id": "ti-passes",
+   "sub_color": "#0a4a1a",
+   "sub_badge": "#c4efd4",
+   "sub_badge_text": "#0a3a1a",
+   "sub_icon": "🏉",
+   "sub_sub": "Manipulation de balle et transmissions",
+   "sub_comp": [
+    "Tenir le ballon a 2 mains",
+    "Passes courtes sans erreur",
+    "Passes longues aplatissantes",
+    "Regard avant la passe",
+    "Receptionner en courant"
+   ],
+   "ss_label": "Manipulation de balle",
+   "famille": "technique",
+   "n": "25",
+   "t": "Technique individuelle de passes seq 9",
+   "s": "Etre capable de réaliser des passes des deux côtés",
+   "id": "1TsVAA0Y0F_oJHJkUX6O-NEmc1kW9FiaL",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "ti-passes-1"
+  },
+  {
+   "rub_num": "1",
+   "rub_label": "Organisation collective",
+   "rub_id": "oc",
+   "rub_icon": "🧠",
+   "sub_label": "1a — Attaquer",
+   "sub_id": "oc-att",
+   "sub_color": "#b06010",
+   "sub_badge": "#fdf3d0",
+   "sub_badge_text": "#7c4200",
+   "sub_icon": "⚡",
+   "sub_sub": "S'organiser sur nos possessions",
+   "sub_comp": [
+    "Lire la defense avant d'agir",
+    "Choisir la bonne forme de jeu",
+    "Gagner la ligne d'avantage",
+    "Enchainer les actions",
+    "Jouer ou c'est facile"
+   ],
+   "ss_label": "Jeu deploye — Defense groupee",
+   "famille": "tactique",
+   "n": "30",
+   "t": "2 vs 1 seq 1",
+   "s": "Etre capable de marquer en situation de surnombre",
+   "id": "105WbieTydSUaA7K1DbKJ2vpFUfaxH5F9",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "oc-att-dep"
+  },
+  {
+   "rub_num": "1",
+   "rub_label": "Organisation collective",
+   "rub_id": "oc",
+   "rub_icon": "🧠",
+   "sub_label": "1a — Attaquer",
+   "sub_id": "oc-att",
+   "sub_color": "#b06010",
+   "sub_badge": "#fdf3d0",
+   "sub_badge_text": "#7c4200",
+   "sub_icon": "⚡",
+   "sub_sub": "S'organiser sur nos possessions",
+   "sub_comp": [
+    "Lire la defense avant d'agir",
+    "Choisir la bonne forme de jeu",
+    "Gagner la ligne d'avantage",
+    "Enchainer les actions",
+    "Jouer ou c'est facile"
+   ],
+   "ss_label": "Jeu deploye — Defense groupee",
+   "famille": "tactique",
+   "n": "31",
+   "t": "2 vs 1 seq 2",
+   "s": "Etre capable de marquer en situation de surnombre",
+   "id": "1DnUZUa8V_3XGVJ7K7u2LPyxXJCsBuswk",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "oc-att-dep"
+  },
+  {
+   "rub_num": "1",
+   "rub_label": "Organisation collective",
+   "rub_id": "oc",
+   "rub_icon": "🧠",
+   "sub_label": "1a — Attaquer",
+   "sub_id": "oc-att",
+   "sub_color": "#b06010",
+   "sub_badge": "#fdf3d0",
+   "sub_badge_text": "#7c4200",
+   "sub_icon": "⚡",
+   "sub_sub": "S'organiser sur nos possessions",
+   "sub_comp": [
+    "Lire la defense avant d'agir",
+    "Choisir la bonne forme de jeu",
+    "Gagner la ligne d'avantage",
+    "Enchainer les actions",
+    "Jouer ou c'est facile"
+   ],
+   "ss_label": "Jeu deploye — Defense groupee",
+   "famille": "tactique",
+   "n": "32",
+   "t": "2 vs 1 seq 3",
+   "s": "Etre capable de marquer en situation de surnombre",
+   "id": "1HLiz6NLu1YpkUs8ZUppPEAKlpEaP7ZdX",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "oc-att-dep"
+  },
+  {
+   "rub_num": "1",
+   "rub_label": "Organisation collective",
+   "rub_id": "oc",
+   "rub_icon": "🧠",
+   "sub_label": "1a — Attaquer",
+   "sub_id": "oc-att",
+   "sub_color": "#b06010",
+   "sub_badge": "#fdf3d0",
+   "sub_badge_text": "#7c4200",
+   "sub_icon": "⚡",
+   "sub_sub": "S'organiser sur nos possessions",
+   "sub_comp": [
+    "Lire la defense avant d'agir",
+    "Choisir la bonne forme de jeu",
+    "Gagner la ligne d'avantage",
+    "Enchainer les actions",
+    "Jouer ou c'est facile"
+   ],
+   "ss_label": "Jeu deploye — Defense groupee",
+   "famille": "tactique",
+   "n": "33",
+   "t": "2 vs 1 seq 4",
+   "s": "Etre capable de marquer en situation de surnombre",
+   "id": "1KnXXP2xW2wchKIf53GFzyJ1qzR5DmkUp",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "oc-att-dep"
+  },
+  {
+   "rub_num": "1",
+   "rub_label": "Organisation collective",
+   "rub_id": "oc",
+   "rub_icon": "🧠",
+   "sub_label": "1a — Attaquer",
+   "sub_id": "oc-att",
+   "sub_color": "#b06010",
+   "sub_badge": "#fdf3d0",
+   "sub_badge_text": "#7c4200",
+   "sub_icon": "⚡",
+   "sub_sub": "S'organiser sur nos possessions",
+   "sub_comp": [
+    "Lire la defense avant d'agir",
+    "Choisir la bonne forme de jeu",
+    "Gagner la ligne d'avantage",
+    "Enchainer les actions",
+    "Jouer ou c'est facile"
+   ],
+   "ss_label": "Jeu deploye — Defense groupee",
+   "famille": "tactique",
+   "n": "34",
+   "t": "3 vs 2 seq 1",
+   "s": "Etre capable de marquer en situation de surnombre",
+   "id": "1-HxtPKrZdT2cfW_W9fTdxm7HOEKZcAmS",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "oc-att-dep"
+  },
+  {
+   "rub_num": "1",
+   "rub_label": "Organisation collective",
+   "rub_id": "oc",
+   "rub_icon": "🧠",
+   "sub_label": "1a — Attaquer",
+   "sub_id": "oc-att",
+   "sub_color": "#b06010",
+   "sub_badge": "#fdf3d0",
+   "sub_badge_text": "#7c4200",
+   "sub_icon": "⚡",
+   "sub_sub": "S'organiser sur nos possessions",
+   "sub_comp": [
+    "Lire la defense avant d'agir",
+    "Choisir la bonne forme de jeu",
+    "Gagner la ligne d'avantage",
+    "Enchainer les actions",
+    "Jouer ou c'est facile"
+   ],
+   "ss_label": "Jeu deploye — Defense groupee",
+   "famille": "tactique",
+   "n": "35",
+   "t": "3 vs 2 seq 2",
+   "s": "Etre capable de marquer en situation de surnombre",
+   "id": "16nRbyNzMOjlFIgfYYyf-BIuvutbyXys4",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "oc-att-dep"
+  },
+  {
+   "rub_num": "1",
+   "rub_label": "Organisation collective",
+   "rub_id": "oc",
+   "rub_icon": "🧠",
+   "sub_label": "1a — Attaquer",
+   "sub_id": "oc-att",
+   "sub_color": "#b06010",
+   "sub_badge": "#fdf3d0",
+   "sub_badge_text": "#7c4200",
+   "sub_icon": "⚡",
+   "sub_sub": "S'organiser sur nos possessions",
+   "sub_comp": [
+    "Lire la defense avant d'agir",
+    "Choisir la bonne forme de jeu",
+    "Gagner la ligne d'avantage",
+    "Enchainer les actions",
+    "Jouer ou c'est facile"
+   ],
+   "ss_label": "Jeu deploye — Defense groupee",
+   "famille": "tactique",
+   "n": "36",
+   "t": "3 vs 2 seq 3",
+   "s": "Etre capable de marquer en situation de surnombre",
+   "id": "1a5Hs1Anmb-LO63MQhfkTXkebydT6evZv",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "oc-att-dep"
+  },
+  {
+   "rub_num": "1",
+   "rub_label": "Organisation collective",
+   "rub_id": "oc",
+   "rub_icon": "🧠",
+   "sub_label": "1a — Attaquer",
+   "sub_id": "oc-att",
+   "sub_color": "#b06010",
+   "sub_badge": "#fdf3d0",
+   "sub_badge_text": "#7c4200",
+   "sub_icon": "⚡",
+   "sub_sub": "S'organiser sur nos possessions",
+   "sub_comp": [
+    "Lire la defense avant d'agir",
+    "Choisir la bonne forme de jeu",
+    "Gagner la ligne d'avantage",
+    "Enchainer les actions",
+    "Jouer ou c'est facile"
+   ],
+   "ss_label": "Jeu deploye — Defense groupee",
+   "famille": "tactique",
+   "n": "37",
+   "t": "3 vs 2 seq 4",
+   "s": "Etre capable de marquer en situation de surnombre",
+   "id": "1Sm6yP3IDEon3XTDhQb6uSdaYNGs3mT8G",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "oc-att-dep"
+  },
+  {
+   "rub_num": "1",
+   "rub_label": "Organisation collective",
+   "rub_id": "oc",
+   "rub_icon": "🧠",
+   "sub_label": "1a — Attaquer",
+   "sub_id": "oc-att",
+   "sub_color": "#b06010",
+   "sub_badge": "#fdf3d0",
+   "sub_badge_text": "#7c4200",
+   "sub_icon": "⚡",
+   "sub_sub": "S'organiser sur nos possessions",
+   "sub_comp": [
+    "Lire la defense avant d'agir",
+    "Choisir la bonne forme de jeu",
+    "Gagner la ligne d'avantage",
+    "Enchainer les actions",
+    "Jouer ou c'est facile"
+   ],
+   "ss_label": "Jeu deploye — Defense groupee",
+   "famille": "tactique",
+   "n": "38",
+   "t": "3 vs 2 seq 5",
+   "s": "Etre capable de marquer en situation de surnombre",
+   "id": "1q6ahj5a8q8wOU24h5mfCl5Pkf4HDyh_K",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "oc-att-dep"
+  },
+  {
+   "rub_num": "1",
+   "rub_label": "Organisation collective",
+   "rub_id": "oc",
+   "rub_icon": "🧠",
+   "sub_label": "1a — Attaquer",
+   "sub_id": "oc-att",
+   "sub_color": "#b06010",
+   "sub_badge": "#fdf3d0",
+   "sub_badge_text": "#7c4200",
+   "sub_icon": "⚡",
+   "sub_sub": "S'organiser sur nos possessions",
+   "sub_comp": [
+    "Lire la defense avant d'agir",
+    "Choisir la bonne forme de jeu",
+    "Gagner la ligne d'avantage",
+    "Enchainer les actions",
+    "Jouer ou c'est facile"
+   ],
+   "ss_label": "Jeu deploye — Defense groupee",
+   "famille": "tactique",
+   "n": "39",
+   "t": "3 vs 2 seq 6",
+   "s": "Etre capable de marquer en situation de surnombre",
+   "id": "1AWZ7ZZsVR89d6x0zAj77mqN2JI-Ji4zj",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "oc-att-dep"
+  },
+  {
+   "rub_num": "1",
+   "rub_label": "Organisation collective",
+   "rub_id": "oc",
+   "rub_icon": "🧠",
+   "sub_label": "1a — Attaquer",
+   "sub_id": "oc-att",
+   "sub_color": "#b06010",
+   "sub_badge": "#fdf3d0",
+   "sub_badge_text": "#7c4200",
+   "sub_icon": "⚡",
+   "sub_sub": "S'organiser sur nos possessions",
+   "sub_comp": [
+    "Lire la defense avant d'agir",
+    "Choisir la bonne forme de jeu",
+    "Gagner la ligne d'avantage",
+    "Enchainer les actions",
+    "Jouer ou c'est facile"
+   ],
+   "ss_label": "Jeu deploye — Defense groupee",
+   "famille": "tactique",
+   "n": "40",
+   "t": "3 vs 2 seq 7",
+   "s": "Etre capable de marquer en situation de surnombre",
+   "id": "1mkNwAfgQ3-Jcsj8Qf0FWNehUBFLdWL8S",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "oc-att-dep"
+  },
+  {
+   "rub_num": "2",
+   "rub_label": "Technique individuelle",
+   "rub_id": "ti",
+   "rub_icon": "👤",
+   "sub_label": "2b — Plaquer",
+   "sub_id": "ti-plaq",
+   "sub_color": "#5a1a1a",
+   "sub_badge": "#ffeaea",
+   "sub_badge_text": "#5a1a1a",
+   "sub_icon": "💪",
+   "sub_sub": "Technique de plaquage securise",
+   "sub_comp": [
+    "Plaquer bas",
+    "Entourer les hanches",
+    "Se relever rapidement",
+    "Plaquer en securite",
+    "Plaquer lateral et frontal"
+   ],
+   "ss_label": "Plaquages",
+   "famille": "technique",
+   "n": "03",
+   "t": "Technique de plaquage seq 1",
+   "s": "Etre capable de réaliser un plaquage en avançant",
+   "id": "1eEj9Qn8ZtYHCD-UHv1LhYjaSvqciD6HK",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "ti-plaq-1"
+  },
+  {
+   "rub_num": "2",
+   "rub_label": "Technique individuelle",
+   "rub_id": "ti",
+   "rub_icon": "👤",
+   "sub_label": "2b — Plaquer",
+   "sub_id": "ti-plaq",
+   "sub_color": "#5a1a1a",
+   "sub_badge": "#ffeaea",
+   "sub_badge_text": "#5a1a1a",
+   "sub_icon": "💪",
+   "sub_sub": "Technique de plaquage securise",
+   "sub_comp": [
+    "Plaquer bas",
+    "Entourer les hanches",
+    "Se relever rapidement",
+    "Plaquer en securite",
+    "Plaquer lateral et frontal"
+   ],
+   "ss_label": "Plaquages",
+   "famille": "technique",
+   "n": "04",
+   "t": "Technique de plaquage seq 2",
+   "s": "Etre capable de prendre la cible sur l’attaquant en vue de réaliser un",
+   "id": "19ABGNaWEvxFsB7az9jxNBafrnDfSrPn4",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "ti-plaq-1"
+  },
+  {
+   "rub_num": "2",
+   "rub_label": "Technique individuelle",
+   "rub_id": "ti",
+   "rub_icon": "👤",
+   "sub_label": "2b — Plaquer",
+   "sub_id": "ti-plaq",
+   "sub_color": "#5a1a1a",
+   "sub_badge": "#ffeaea",
+   "sub_badge_text": "#5a1a1a",
+   "sub_icon": "💪",
+   "sub_sub": "Technique de plaquage securise",
+   "sub_comp": [
+    "Plaquer bas",
+    "Entourer les hanches",
+    "Se relever rapidement",
+    "Plaquer en securite",
+    "Plaquer lateral et frontal"
+   ],
+   "ss_label": "Plaquages",
+   "famille": "technique",
+   "n": "05",
+   "t": "Technique de plaquage seq 3",
+   "s": "Etre capable de réaliser un plaquage en se déplaçant",
+   "id": "1bhBUDSYC121E2_CQrq5MZ9iKPdXusekq",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "ti-plaq-1"
+  },
+  {
+   "rub_num": "2",
+   "rub_label": "Technique individuelle",
+   "rub_id": "ti",
+   "rub_icon": "👤",
+   "sub_label": "2b — Plaquer",
+   "sub_id": "ti-plaq",
+   "sub_color": "#5a1a1a",
+   "sub_badge": "#ffeaea",
+   "sub_badge_text": "#5a1a1a",
+   "sub_icon": "💪",
+   "sub_sub": "Technique de plaquage securise",
+   "sub_comp": [
+    "Plaquer bas",
+    "Entourer les hanches",
+    "Se relever rapidement",
+    "Plaquer en securite",
+    "Plaquer lateral et frontal"
+   ],
+   "ss_label": "Plaquages",
+   "famille": "technique",
+   "n": "06",
+   "t": "Technique de plaquage seq 4",
+   "s": "Etre capable de réaliser un plaquage en se déplaçant",
+   "id": "11G1vUoFP7Om20qOweDsT0eO15tl2hgEf",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "ti-plaq-1"
+  },
+  {
+   "rub_num": "2",
+   "rub_label": "Technique individuelle",
+   "rub_id": "ti",
+   "rub_icon": "👤",
+   "sub_label": "2d — Zones de blocage",
+   "sub_id": "ti-zones",
+   "sub_color": "#2a4a10",
+   "sub_badge": "#edfada",
+   "sub_badge_text": "#1a3a0a",
+   "sub_icon": "🔒",
+   "sub_sub": "Comportement au contact et au sol",
+   "sub_comp": [
+    "Tomber en appui ballon securise",
+    "Liberer le ballon bras tendus",
+    "Se relever rapidement",
+    "Proteger le ballon au sol",
+    "Presenter dans le bon sens"
+   ],
+   "ss_label": "Liberation et comportement au sol",
+   "famille": "tactique",
+   "n": "05",
+   "t": "Travail au sol du porteur de balle",
+   "s": "Etre capable d’être actif une fois au sol",
+   "id": "1Wb0PmIhFvf4ruIBlfOrga8FIMZos4daV",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "ti-zones-1"
+  },
+  {
+   "rub_num": "2",
+   "rub_label": "Technique individuelle",
+   "rub_id": "ti",
+   "rub_icon": "👤",
+   "sub_label": "2d — Zones de blocage",
+   "sub_id": "ti-zones",
+   "sub_color": "#2a4a10",
+   "sub_badge": "#edfada",
+   "sub_badge_text": "#1a3a0a",
+   "sub_icon": "🔒",
+   "sub_sub": "Comportement au contact et au sol",
+   "sub_comp": [
+    "Tomber en appui ballon securise",
+    "Liberer le ballon bras tendus",
+    "Se relever rapidement",
+    "Proteger le ballon au sol",
+    "Presenter dans le bon sens"
+   ],
+   "ss_label": "Liberation et comportement au sol",
+   "famille": "tactique",
+   "n": "06",
+   "t": "Attitudes au contact du porteur de balle seq 1",
+   "s": "Etre capable de gagner des duels",
+   "id": "1uCESjohRHfyY__vkl4mUNrI4ASSAK9in",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "ti-zones-1"
+  },
+  {
+   "rub_num": "2",
+   "rub_label": "Technique individuelle",
+   "rub_id": "ti",
+   "rub_icon": "👤",
+   "sub_label": "2d — Zones de blocage",
+   "sub_id": "ti-zones",
+   "sub_color": "#2a4a10",
+   "sub_badge": "#edfada",
+   "sub_badge_text": "#1a3a0a",
+   "sub_icon": "🔒",
+   "sub_sub": "Comportement au contact et au sol",
+   "sub_comp": [
+    "Tomber en appui ballon securise",
+    "Liberer le ballon bras tendus",
+    "Se relever rapidement",
+    "Proteger le ballon au sol",
+    "Presenter dans le bon sens"
+   ],
+   "ss_label": "Liberation et comportement au sol",
+   "famille": "tactique",
+   "n": "07",
+   "t": "Attitudes au contact du porteur de balle seq 2",
+   "s": "Etre capable de gagner des duels",
+   "id": "1W1bX8Msk1EjMmNC0MxHcYxnMOicxbGu8",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "ti-zones-1"
+  },
+  {
+   "rub_num": "2",
+   "rub_label": "Technique individuelle",
+   "rub_id": "ti",
+   "rub_icon": "👤",
+   "sub_label": "2d — Zones de blocage",
+   "sub_id": "ti-zones",
+   "sub_color": "#2a4a10",
+   "sub_badge": "#edfada",
+   "sub_badge_text": "#1a3a0a",
+   "sub_icon": "🔒",
+   "sub_sub": "Comportement au contact et au sol",
+   "sub_comp": [
+    "Tomber en appui ballon securise",
+    "Liberer le ballon bras tendus",
+    "Se relever rapidement",
+    "Proteger le ballon au sol",
+    "Presenter dans le bon sens"
+   ],
+   "ss_label": "Liberation et comportement au sol",
+   "famille": "tactique",
+   "n": "08",
+   "t": "Attaque en sous nombre et attitudes du porteur de",
+   "s": "Etre capable d’être actif une fois au sol",
+   "id": "1V4cMvWqZRhghmRFeQIF_rSlCL-tVLWii",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "ti-zones-1"
+  },
+  {
+   "rub_num": "1",
+   "rub_label": "Organisation collective",
+   "rub_id": "oc",
+   "rub_icon": "🧠",
+   "sub_label": "1c — Conserver",
+   "sub_id": "oc-cons",
+   "sub_color": "#2a4a10",
+   "sub_badge": "#edfada",
+   "sub_badge_text": "#1a3a0a",
+   "sub_icon": "🔒",
+   "sub_sub": "Zones de blocage et Rucks",
+   "sub_comp": [
+    "Arriver dans le bon couloir",
+    "Pousser dans l'axe",
+    "Securiser le ballon",
+    "Sortir vite du ruck",
+    "Choisir ruck ou continuite"
+   ],
+   "ss_label": "Organisation autour des rucks",
+   "famille": "tactique",
+   "n": "11",
+   "t": "Attitudes des soutiens seq 1",
+   "s": "Etre capable de réaliser un déblayage",
+   "id": "1oh7kDQZYw6U-UxEawAh-W89i9p-cnVLD",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "oc-cons-ruck"
+  },
+  {
+   "rub_num": "1",
+   "rub_label": "Organisation collective",
+   "rub_id": "oc",
+   "rub_icon": "🧠",
+   "sub_label": "1c — Conserver",
+   "sub_id": "oc-cons",
+   "sub_color": "#2a4a10",
+   "sub_badge": "#edfada",
+   "sub_badge_text": "#1a3a0a",
+   "sub_icon": "🔒",
+   "sub_sub": "Zones de blocage et Rucks",
+   "sub_comp": [
+    "Arriver dans le bon couloir",
+    "Pousser dans l'axe",
+    "Securiser le ballon",
+    "Sortir vite du ruck",
+    "Choisir ruck ou continuite"
+   ],
+   "ss_label": "Organisation autour des rucks",
+   "famille": "tactique",
+   "n": "12",
+   "t": "Attitudes des soutiens seq 2",
+   "s": "Etre capable de réaliser un déblayage",
+   "id": "167KCvqv-2fXAWCM3OdIWkixdYkZHl9lD",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "oc-cons-ruck"
+  },
+  {
+   "rub_num": "1",
+   "rub_label": "Organisation collective",
+   "rub_id": "oc",
+   "rub_icon": "🧠",
+   "sub_label": "1c — Conserver",
+   "sub_id": "oc-cons",
+   "sub_color": "#2a4a10",
+   "sub_badge": "#edfada",
+   "sub_badge_text": "#1a3a0a",
+   "sub_icon": "🔒",
+   "sub_sub": "Zones de blocage et Rucks",
+   "sub_comp": [
+    "Arriver dans le bon couloir",
+    "Pousser dans l'axe",
+    "Securiser le ballon",
+    "Sortir vite du ruck",
+    "Choisir ruck ou continuite"
+   ],
+   "ss_label": "Organisation autour des rucks",
+   "famille": "tactique",
+   "n": "13",
+   "t": "Attitudes des soutiens seq 3",
+   "s": "Etre capable de réaliser un déblayage",
+   "id": "11O31goQY78QXEYB9KhYOgX44v-tSa5VE",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "oc-cons-ruck"
+  },
+  {
+   "rub_num": "1",
+   "rub_label": "Organisation collective",
+   "rub_id": "oc",
+   "rub_icon": "🧠",
+   "sub_label": "1c — Conserver",
+   "sub_id": "oc-cons",
+   "sub_color": "#2a4a10",
+   "sub_badge": "#edfada",
+   "sub_badge_text": "#1a3a0a",
+   "sub_icon": "🔒",
+   "sub_sub": "Zones de blocage et Rucks",
+   "sub_comp": [
+    "Arriver dans le bon couloir",
+    "Pousser dans l'axe",
+    "Securiser le ballon",
+    "Sortir vite du ruck",
+    "Choisir ruck ou continuite"
+   ],
+   "ss_label": "Organisation autour des rucks",
+   "famille": "tactique",
+   "n": "14",
+   "t": "Travail de repères sur les branches et le ballon",
+   "s": "Etre capable de réaliser un déblayage",
+   "id": "1MMBHtKb9mY1GzwaaCN9phO4Fz8bty4D4",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "oc-cons-ruck"
+  },
+  {
+   "rub_num": "1",
+   "rub_label": "Organisation collective",
+   "rub_id": "oc",
+   "rub_icon": "🧠",
+   "sub_label": "1c — Conserver",
+   "sub_id": "oc-cons",
+   "sub_color": "#2a4a10",
+   "sub_badge": "#edfada",
+   "sub_badge_text": "#1a3a0a",
+   "sub_icon": "🔒",
+   "sub_sub": "Zones de blocage et Rucks",
+   "sub_comp": [
+    "Arriver dans le bon couloir",
+    "Pousser dans l'axe",
+    "Securiser le ballon",
+    "Sortir vite du ruck",
+    "Choisir ruck ou continuite"
+   ],
+   "ss_label": "Organisation autour des rucks",
+   "famille": "tactique",
+   "n": "15",
+   "t": "Attitudes de la cellule offensive",
+   "s": "Etre capable de réaliser un déblayage",
+   "id": "1KmLUfsLZGl_0Jnvkxb_APc_wUmTLP0aC",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "oc-cons-ruck"
+  },
+  {
+   "rub_num": "1",
+   "rub_label": "Organisation collective",
+   "rub_id": "oc",
+   "rub_icon": "🧠",
+   "sub_label": "1b — Défendre",
+   "sub_id": "oc-def",
+   "sub_color": "#5a1a1a",
+   "sub_badge": "#ffeaea",
+   "sub_badge_text": "#5a1a1a",
+   "sub_icon": "🛡️",
+   "sub_sub": "Attaquer l'attaque adverse",
+   "sub_comp": [
+    "S'aligner sur la ligne defensive",
+    "Avancer ensemble",
+    "Plaquer bas et securise",
+    "Defendre autour du ruck",
+    "Rush defense presser ensemble"
+   ],
+   "ss_label": "Rush defense et Defense collective",
+   "famille": "tactique",
+   "n": "07",
+   "t": "Organisation défensive",
+   "s": "Etre capable d’organiser une défense collective",
+   "id": "1W0_oXdeC47O9NKodMsSiWUPozwKFyVIk",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "oc-def-rush"
+  },
+  {
+   "rub_num": "1",
+   "rub_label": "Organisation collective",
+   "rub_id": "oc",
+   "rub_icon": "🧠",
+   "sub_label": "1b — Défendre",
+   "sub_id": "oc-def",
+   "sub_color": "#5a1a1a",
+   "sub_badge": "#ffeaea",
+   "sub_badge_text": "#5a1a1a",
+   "sub_icon": "🛡️",
+   "sub_sub": "Attaquer l'attaque adverse",
+   "sub_comp": [
+    "S'aligner sur la ligne defensive",
+    "Avancer ensemble",
+    "Plaquer bas et securise",
+    "Defendre autour du ruck",
+    "Rush defense presser ensemble"
+   ],
+   "ss_label": "Rush defense et Defense collective",
+   "famille": "tactique",
+   "n": "08",
+   "t": "Organisation défensive collective seq 1",
+   "s": "Etre capable d’organiser une défense collective",
+   "id": "1LzEilm1DzQhhJd9nKacNPeygmd-LlRGZ",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "oc-def-rush"
+  },
+  {
+   "rub_num": "1",
+   "rub_label": "Organisation collective",
+   "rub_id": "oc",
+   "rub_icon": "🧠",
+   "sub_label": "1b — Défendre",
+   "sub_id": "oc-def",
+   "sub_color": "#5a1a1a",
+   "sub_badge": "#ffeaea",
+   "sub_badge_text": "#5a1a1a",
+   "sub_icon": "🛡️",
+   "sub_sub": "Attaquer l'attaque adverse",
+   "sub_comp": [
+    "S'aligner sur la ligne defensive",
+    "Avancer ensemble",
+    "Plaquer bas et securise",
+    "Defendre autour du ruck",
+    "Rush defense presser ensemble"
+   ],
+   "ss_label": "Rush defense et Defense collective",
+   "famille": "tactique",
+   "n": "09",
+   "t": "Organisation défensive collective seq 2",
+   "s": "Etre capable d’analyser la situation (surnombre, sous nombre)",
+   "id": "1zrCXfRVpTqDzsYavny0juADKygUZp3Mb",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "oc-def-rush"
+  },
+  {
+   "rub_num": "1",
+   "rub_label": "Organisation collective",
+   "rub_id": "oc",
+   "rub_icon": "🧠",
+   "sub_label": "1b — Défendre",
+   "sub_id": "oc-def",
+   "sub_color": "#5a1a1a",
+   "sub_badge": "#ffeaea",
+   "sub_badge_text": "#5a1a1a",
+   "sub_icon": "🛡️",
+   "sub_sub": "Attaquer l'attaque adverse",
+   "sub_comp": [
+    "S'aligner sur la ligne defensive",
+    "Avancer ensemble",
+    "Plaquer bas et securise",
+    "Defendre autour du ruck",
+    "Rush defense presser ensemble"
+   ],
+   "ss_label": "Rush defense et Defense collective",
+   "famille": "tactique",
+   "n": "10",
+   "t": "Organisation défensive collective seq 3",
+   "s": "Etre capable d’analyser la situation et le rapport de force",
+   "id": "11BS83fVROcyhziRKe6akdjZS4esmPIl6",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "oc-def-rush"
+  },
+  {
+   "rub_num": "1",
+   "rub_label": "Organisation collective",
+   "rub_id": "oc",
+   "rub_icon": "🧠",
+   "sub_label": "1e — Jouer ou c'est facile",
+   "sub_id": "oc-choix",
+   "sub_color": "#1a4a8a",
+   "sub_badge": "#ddeaff",
+   "sub_badge_text": "#1a3a7a",
+   "sub_icon": "🎯",
+   "sub_sub": "Choix de la forme de jeu",
+   "sub_comp": [
+    "Lire le rapport de force",
+    "Identifier la forme de jeu adaptee",
+    "Decider vite",
+    "Adapter son jeu a la zone du terrain"
+   ],
+   "ss_label": "Choix de la forme de jeu",
+   "famille": "tactique",
+   "n": "21",
+   "t": "Créativité, 2 contre 2",
+   "s": "Etre capable d’analyser la situation et le rapport de force",
+   "id": "1SfjRQrEoXzAXwluAiMq1MFQMHfiAi35S",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "oc-choix-1"
+  },
+  {
+   "rub_num": "2",
+   "rub_label": "Technique individuelle",
+   "rub_id": "ti",
+   "rub_icon": "👤",
+   "sub_label": "2c — Jouer des duels",
+   "sub_id": "ti-duel",
+   "sub_color": "#b06010",
+   "sub_badge": "#fdf3d0",
+   "sub_badge_text": "#7c4200",
+   "sub_icon": "⚡",
+   "sub_sub": "Technique du duel offensif individuel",
+   "sub_comp": [
+    "Accelerer dans le contact",
+    "Raffut ou crochet",
+    "Lire le defenseur",
+    "Liberer les bras apres impact",
+    "Gagner la ligne d'avantage"
+   ],
+   "ss_label": "Duels offensifs",
+   "famille": "tactique",
+   "n": "15",
+   "t": "Créativité, 1 contre 1 orienté seq 1",
+   "s": "Etre capable d’analyser la situation et le rapport de force",
+   "id": "17PQXnQbuMNAhN66KYrYCWEzfVciH8Jb2",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "ti-duel-1"
+  },
+  {
+   "rub_num": "2",
+   "rub_label": "Technique individuelle",
+   "rub_id": "ti",
+   "rub_icon": "👤",
+   "sub_label": "2c — Jouer des duels",
+   "sub_id": "ti-duel",
+   "sub_color": "#b06010",
+   "sub_badge": "#fdf3d0",
+   "sub_badge_text": "#7c4200",
+   "sub_icon": "⚡",
+   "sub_sub": "Technique du duel offensif individuel",
+   "sub_comp": [
+    "Accelerer dans le contact",
+    "Raffut ou crochet",
+    "Lire le defenseur",
+    "Liberer les bras apres impact",
+    "Gagner la ligne d'avantage"
+   ],
+   "ss_label": "Duels offensifs",
+   "famille": "tactique",
+   "n": "16",
+   "t": "Créativité, 1 contre 2 + 2",
+   "s": "Etre capable d’analyser la situation et le rapport de force",
+   "id": "1qiFPOS9EQe9Z3kUuJ-9Ly1Wi2jDALK36",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "ti-duel-1"
+  },
+  {
+   "rub_num": "2",
+   "rub_label": "Technique individuelle",
+   "rub_id": "ti",
+   "rub_icon": "👤",
+   "sub_label": "2c — Jouer des duels",
+   "sub_id": "ti-duel",
+   "sub_color": "#b06010",
+   "sub_badge": "#fdf3d0",
+   "sub_badge_text": "#7c4200",
+   "sub_icon": "⚡",
+   "sub_sub": "Technique du duel offensif individuel",
+   "sub_comp": [
+    "Accelerer dans le contact",
+    "Raffut ou crochet",
+    "Lire le defenseur",
+    "Liberer les bras apres impact",
+    "Gagner la ligne d'avantage"
+   ],
+   "ss_label": "Duels offensifs",
+   "famille": "tactique",
+   "n": "17",
+   "t": "Créativité, 1 contre 1 orienté seq 2",
+   "s": "Etre capable d’analyser la situation et le rapport de force",
+   "id": "1059tVpUolTl0CDuxH-H41YQo_BOJuUf4",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "ti-duel-1"
+  },
+  {
+   "rub_num": "1",
+   "rub_label": "Organisation collective",
+   "rub_id": "oc",
+   "rub_icon": "🧠",
+   "sub_label": "1c — Conserver",
+   "sub_id": "oc-cons",
+   "sub_color": "#2a4a10",
+   "sub_badge": "#edfada",
+   "sub_badge_text": "#1a3a0a",
+   "sub_icon": "🔒",
+   "sub_sub": "Zones de blocage et Rucks",
+   "sub_comp": [
+    "Arriver dans le bon couloir",
+    "Pousser dans l'axe",
+    "Securiser le ballon",
+    "Sortir vite du ruck",
+    "Choisir ruck ou continuite"
+   ],
+   "ss_label": "Organisation autour des rucks",
+   "famille": "tactique",
+   "n": "16",
+   "t": "Créativité, 1 + 1 contre 1",
+   "s": "Etre capable d’analyser la situation et le rapport de force",
+   "id": "1su5vrplWISlvpZJcX524wjx-BpQdMFzO",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "oc-cons-ruck"
+  },
+  {
+   "rub_num": "2",
+   "rub_label": "Technique individuelle",
+   "rub_id": "ti",
+   "rub_icon": "👤",
+   "sub_label": "2c — Jouer des duels",
+   "sub_id": "ti-duel",
+   "sub_color": "#b06010",
+   "sub_badge": "#fdf3d0",
+   "sub_badge_text": "#7c4200",
+   "sub_icon": "⚡",
+   "sub_sub": "Technique du duel offensif individuel",
+   "sub_comp": [
+    "Accelerer dans le contact",
+    "Raffut ou crochet",
+    "Lire le defenseur",
+    "Liberer les bras apres impact",
+    "Gagner la ligne d'avantage"
+   ],
+   "ss_label": "Duels offensifs",
+   "famille": "tactique",
+   "n": "18",
+   "t": "Créativité, duel et soutien axial seq 1",
+   "s": "Etre capable de gagner son duel",
+   "id": "1OaaXSvXaHLmHPgevlSZ_NkuHC5p0z5WN",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "ti-duel-1"
+  },
+  {
+   "rub_num": "2",
+   "rub_label": "Technique individuelle",
+   "rub_id": "ti",
+   "rub_icon": "👤",
+   "sub_label": "2c — Jouer des duels",
+   "sub_id": "ti-duel",
+   "sub_color": "#b06010",
+   "sub_badge": "#fdf3d0",
+   "sub_badge_text": "#7c4200",
+   "sub_icon": "⚡",
+   "sub_sub": "Technique du duel offensif individuel",
+   "sub_comp": [
+    "Accelerer dans le contact",
+    "Raffut ou crochet",
+    "Lire le defenseur",
+    "Liberer les bras apres impact",
+    "Gagner la ligne d'avantage"
+   ],
+   "ss_label": "Duels offensifs",
+   "famille": "tactique",
+   "n": "19",
+   "t": "Créativité, dextérité, duel",
+   "s": "Etre capable de gagner son duel",
+   "id": "1ulENLb3KnvYkdczZm4Xjw1yNvCGk_K3b",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "ti-duel-1"
+  },
+  {
+   "rub_num": "2",
+   "rub_label": "Technique individuelle",
+   "rub_id": "ti",
+   "rub_icon": "👤",
+   "sub_label": "2c — Jouer des duels",
+   "sub_id": "ti-duel",
+   "sub_color": "#b06010",
+   "sub_badge": "#fdf3d0",
+   "sub_badge_text": "#7c4200",
+   "sub_icon": "⚡",
+   "sub_sub": "Technique du duel offensif individuel",
+   "sub_comp": [
+    "Accelerer dans le contact",
+    "Raffut ou crochet",
+    "Lire le defenseur",
+    "Liberer les bras apres impact",
+    "Gagner la ligne d'avantage"
+   ],
+   "ss_label": "Duels offensifs",
+   "famille": "tactique",
+   "n": "20",
+   "t": "Créativité, duel et soutien axial seq 2",
+   "s": "Etre capable de gagner son duel",
+   "id": "1IHhflsOGFAotZ6RoYtmSA2voEOqkXoGm",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "ti-duel-1"
+  },
+  {
+   "rub_num": "1",
+   "rub_label": "Organisation collective",
+   "rub_id": "oc",
+   "rub_icon": "🧠",
+   "sub_label": "1c — Conserver",
+   "sub_id": "oc-cons",
+   "sub_color": "#2a4a10",
+   "sub_badge": "#edfada",
+   "sub_badge_text": "#1a3a0a",
+   "sub_icon": "🔒",
+   "sub_sub": "Zones de blocage et Rucks",
+   "sub_comp": [
+    "Arriver dans le bon couloir",
+    "Pousser dans l'axe",
+    "Securiser le ballon",
+    "Sortir vite du ruck",
+    "Choisir ruck ou continuite"
+   ],
+   "ss_label": "Organisation autour des rucks",
+   "famille": "tactique",
+   "n": "17",
+   "t": "Créativité, duel et soutien axial seq 3",
+   "s": "Etre capable de gagner son duel",
+   "id": "1xIMwnTv9CMhbrZSjvxFQ1k0DIyJ7cvD9",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "oc-cons-ruck"
+  },
+  {
+   "rub_num": "2",
+   "rub_label": "Technique individuelle",
+   "rub_id": "ti",
+   "rub_icon": "👤",
+   "sub_label": "2c — Jouer des duels",
+   "sub_id": "ti-duel",
+   "sub_color": "#b06010",
+   "sub_badge": "#fdf3d0",
+   "sub_badge_text": "#7c4200",
+   "sub_icon": "⚡",
+   "sub_sub": "Technique du duel offensif individuel",
+   "sub_comp": [
+    "Accelerer dans le contact",
+    "Raffut ou crochet",
+    "Lire le defenseur",
+    "Liberer les bras apres impact",
+    "Gagner la ligne d'avantage"
+   ],
+   "ss_label": "Duels offensifs",
+   "famille": "tactique",
+   "n": "21",
+   "t": "Créativité, duel et soutien axial seq 4",
+   "s": "Etre capable de gagner son duel",
+   "id": "18Y7Y94w-0OjhGL92-Lks2o7WjwzWFz-k",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "ti-duel-1"
+  },
+  {
+   "rub_num": "1",
+   "rub_label": "Organisation collective",
+   "rub_id": "oc",
+   "rub_icon": "🧠",
+   "sub_label": "1d — Contre-attaquer",
+   "sub_id": "oc-contre",
+   "sub_color": "#6a1010",
+   "sub_badge": "#ffeaea",
+   "sub_badge_text": "#6a1010",
+   "sub_icon": "🚀",
+   "sub_sub": "Transition Defense-Attaque",
+   "sub_comp": [
+    "Recuperer rapidement",
+    "Jouer vite en avancant",
+    "Identifier le couloir libre",
+    "Communiquer en vitesse"
+   ],
+   "ss_label": "Contre-attaques",
+   "famille": "tactique",
+   "n": "03",
+   "t": "Contre attaque seq 1",
+   "s": "Etre capable de récupérer un ballon",
+   "id": "1WhV6_YbDcIzDLEuC8L8zco0wfuh3gLMM",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "oc-contre-1"
+  },
+  {
+   "rub_num": "1",
+   "rub_label": "Organisation collective",
+   "rub_id": "oc",
+   "rub_icon": "🧠",
+   "sub_label": "1d — Contre-attaquer",
+   "sub_id": "oc-contre",
+   "sub_color": "#6a1010",
+   "sub_badge": "#ffeaea",
+   "sub_badge_text": "#6a1010",
+   "sub_icon": "🚀",
+   "sub_sub": "Transition Defense-Attaque",
+   "sub_comp": [
+    "Recuperer rapidement",
+    "Jouer vite en avancant",
+    "Identifier le couloir libre",
+    "Communiquer en vitesse"
+   ],
+   "ss_label": "Contre-attaques",
+   "famille": "tactique",
+   "n": "04",
+   "t": "Contre attaque seq 2",
+   "s": "Etre capable de récupérer un ballon",
+   "id": "1BtOcDnY8o1nL89ZFSwBxeyYTtLBKOkPH",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "oc-contre-1"
+  },
+  {
+   "rub_num": "1",
+   "rub_label": "Organisation collective",
+   "rub_id": "oc",
+   "rub_icon": "🧠",
+   "sub_label": "1d — Contre-attaquer",
+   "sub_id": "oc-contre",
+   "sub_color": "#6a1010",
+   "sub_badge": "#ffeaea",
+   "sub_badge_text": "#6a1010",
+   "sub_icon": "🚀",
+   "sub_sub": "Transition Defense-Attaque",
+   "sub_comp": [
+    "Recuperer rapidement",
+    "Jouer vite en avancant",
+    "Identifier le couloir libre",
+    "Communiquer en vitesse"
+   ],
+   "ss_label": "Contre-attaques",
+   "famille": "tactique",
+   "n": "05",
+   "t": "Contre attaque seq 3",
+   "s": "Etre capable de récupérer un ballon",
+   "id": "16F62nB2-AdWbpfvM2f1aknkwX1PdyyAd",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "oc-contre-1"
+  },
+  {
+   "rub_num": "1",
+   "rub_label": "Organisation collective",
+   "rub_id": "oc",
+   "rub_icon": "🧠",
+   "sub_label": "1a — Attaquer",
+   "sub_id": "oc-att",
+   "sub_color": "#b06010",
+   "sub_badge": "#fdf3d0",
+   "sub_badge_text": "#7c4200",
+   "sub_icon": "⚡",
+   "sub_sub": "S'organiser sur nos possessions",
+   "sub_comp": [
+    "Lire la defense avant d'agir",
+    "Choisir la bonne forme de jeu",
+    "Gagner la ligne d'avantage",
+    "Enchainer les actions",
+    "Jouer ou c'est facile"
+   ],
+   "ss_label": "Jeu au pied — Pas de 2e rideau",
+   "famille": "tactique",
+   "n": "02",
+   "t": "Jeu au pied",
+   "s": "Etre capable de taper dans la bonne zone du ballon",
+   "id": "18mWgQV7OqgnKtVz3rK-AdqgOe-5UlVgE",
+   "ages": [
+    "M14F15",
+    "M16",
+    "M18",
+    "SENF",
+    "SENM"
+   ],
+   "tags": [
+    "SECTION-PALOISE"
+   ],
+   "cross": "",
+   "video": false,
+   "ss_id": "oc-att-pied"
   }
  ]
 }
