@@ -880,6 +880,71 @@
   const NB_TITULAIRES_XV = 15;
   const NB_REMPLACANTS = 8;
 
+  // ────────────────────────────────────────────────────────────────
+  // COMPO-MULTI-FORMAT (pt 225) — table des formats de jeu.
+  //
+  // Transposée de COMPOS_FORMATS (app SAR×MOM, Manu-MOM/sarmom-compos),
+  // en production depuis une saison. Les EFFECTIFS DE BANC viennent de là ;
+  // la COMPOSITION EN POSTES vient de la base (postes.formats_applicables,
+  // sql_207) — le front ne code aucune liste de postes en dur.
+  //
+  // `subs`     : nombre de remplaçants du format.
+  // `label`    : libellé court affiché dans le titre de la feuille.
+  // Les clés couvrent les vocabulaires réels : la base porte 'XV','13','12',
+  // 'X','9','8','7','5' ; le dropdown Évènements envoie les mêmes valeurs.
+  // Alias numériques ('15','10') tolérés en lecture (legacy).
+  const COMPO_FORMATS = {
+    'XV': { subs: 8,  label: 'XV',  fmtBase: 'XV' },
+    '15': { subs: 8,  label: 'XV',  fmtBase: 'XV' },
+    '13': { subs: 6,  label: 'XIII', fmtBase: '13' },
+    '12': { subs: 4,  label: 'XII', fmtBase: '12' },
+    'X':  { subs: 10, label: 'X',   fmtBase: 'X'  },
+    '10': { subs: 10, label: 'X',   fmtBase: 'X'  },
+    '9':  { subs: 3,  label: 'IX',  fmtBase: '9'  },
+    '8':  { subs: 2,  label: 'VIII', fmtBase: '8' },
+    '7':  { subs: 6,  label: 'VII', fmtBase: '7'  },
+    'VII':{ subs: 6,  label: 'VII', fmtBase: '7'  },
+    '5':  { subs: 4,  label: 'V',   fmtBase: '5'  }
+  };
+
+  // Format de la compo courante. Même source que terrainPosCourant() :
+  // l'équipe engagée (mode U-N3). Repli XV en legacy / NULL / inconnu
+  // (dégradation honnête, jamais d'écran vide).
+  function _formatCourant() {
+    const ctx = State.evenementEquipeContext;
+    const fmt = ctx && ctx.evenement_equipe && ctx.evenement_equipe.format_de_jeu;
+    if (fmt != null) {
+      const key = String(fmt).trim().toUpperCase();
+      if (COMPO_FORMATS[key]) return COMPO_FORMATS[key].fmtBase;
+    }
+    return 'XV';
+  }
+
+  // Métadonnées (subs/label) du format courant, repli XV.
+  function _metaFormatCourant() {
+    return COMPO_FORMATS[_formatCourant()] || COMPO_FORMATS['XV'];
+  }
+
+  // Postes titulaires du format courant, filtrés sur postes.formats_applicables.
+  // sql_207 garantit que chaque format a exactement son effectif de postes.
+  // Garde honnête : si le filtre ne rend rien (donnée incomplète), on retombe
+  // sur l'intégralité de State.postes plutôt que d'afficher une feuille vide.
+  function _postesCourants() {
+    const fmt = _formatCourant();
+    const all = Array.isArray(State.postes) ? State.postes : [];
+    const filtres = all.filter(function (p) {
+      return Array.isArray(p.formats_applicables)
+        && p.formats_applicables.indexOf(fmt) !== -1;
+    });
+    return filtres.length > 0 ? filtres : all;
+  }
+
+  // Nombre de remplaçants du format courant.
+  function _nbRemplacantsCourant() {
+    const m = _metaFormatCourant();
+    return (m && typeof m.subs === 'number') ? m.subs : NB_REMPLACANTS;
+  }
+
   // Clé localStorage de l'équipe active de Compositions (mode legacy
   // multi-équipes). En mode U-N3 (?evenement_equipe=) l'équipe est
   // imposée par l'URL → cette mécanique ne s'active PAS.
@@ -1571,14 +1636,18 @@
       return;
     }
     const c = compteurs();
-    const ratio = c.titulaires / NB_TITULAIRES_XV;
+    // COMPO-MULTI-FORMAT (pt 225) — les dénominateurs suivent le format de la
+    // rencontre (15/8 en XV, 7/6 en VII, 5/4 en V…) au lieu des constantes XV.
+    const _nbTit   = _postesCourants().length || NB_TITULAIRES_XV;
+    const _nbRempl = _nbRemplacantsCourant();
+    const ratio = c.titulaires / _nbTit;
     let colorClass = 'fill-low';
     if (ratio >= 0.9)      colorClass = 'fill-high';
     else if (ratio >= 0.6) colorClass = 'fill-mid';
     el.className = 'fill-indicator ' + colorClass;
     el.innerHTML =
-      '<strong>' + c.titulaires + ' / ' + NB_TITULAIRES_XV + ' postes pourvus</strong>' +
-      '&nbsp;·&nbsp; ' + c.remplacants + ' / ' + NB_REMPLACANTS + ' remplaçants' +
+      '<strong>' + c.titulaires + ' / ' + _nbTit + ' postes pourvus</strong>' +
+      '&nbsp;·&nbsp; ' + c.remplacants + ' / ' + _nbRempl + ' remplaçants' +
       (compo.type_compo === 'match' ? '&nbsp;·&nbsp; ' + c.modifs + ' modification' + (c.modifs > 1 ? 's' : '') + ' vs base' : '');
   }
 
@@ -1638,21 +1707,38 @@
       return;
     }
 
+    // COMPO-MULTI-FORMAT (pt 225) — la feuille suit le format de la rencontre.
+    // Avant : titre « XV de départ » en dur + boucle sur TOUS les postes
+    // chargés + NB_REMPLACANTS figé à 8. Depuis sql_207 la table postes porte
+    // 24 lignes de terrain (15 latéralisés + 4 génériques + 5 neutres du V) :
+    // sans filtre, la feuille affichait 24 slots titulaires quel que soit le
+    // format. Décision Manu (Q2) : titre NEUTRE « Titulaires (n) », qui vaut
+    // pour tout format y compris le V sans nomenclature de postes.
+    const _postesFmt   = _postesCourants();
+    const _metaFmt     = _metaFormatCourant();
+    const _nbRempl     = _nbRemplacantsCourant();
+    const _numDepart   = _postesFmt.length + 1;   // 1er numéro de remplaçant
+
     let html = '<div class="view-liste">';
     html += '<section class="view-liste__section">';
-    html +=   '<h3 class="view-liste__title">XV de départ</h3>';
+    html +=   '<h3 class="view-liste__title">Titulaires '
+            +   '<span class="view-liste__count">(' + _postesFmt.length + ')</span>'
+            +   ' <span class="view-liste__fmt">· ' + escapeHtml(_metaFmt.label) + '</span>'
+            + '</h3>';
     html +=   '<ul class="view-liste__slots">';
-    for (const poste of State.postes) html += renderSlotPoste(poste);
+    for (const poste of _postesFmt) html += renderSlotPoste(poste);
     html +=   '</ul>';
     html += '</section>';
 
     const remplacants = State.compoJoueurs.filter(cj => cj.role === 'remplacant')
       .sort((a, b) => (a.ordre_remplacement || a.numero_maillot || 99) - (b.ordre_remplacement || b.numero_maillot || 99));
     html += '<section class="view-liste__section">';
-    html +=   '<h3 class="view-liste__title">Remplaçants <span class="view-liste__count">(' + remplacants.length + '/' + NB_REMPLACANTS + ')</span></h3>';
+    html +=   '<h3 class="view-liste__title">Remplaçants <span class="view-liste__count">(' + remplacants.length + '/' + _nbRempl + ')</span></h3>';
     html +=   '<ul class="view-liste__slots view-liste__slots--remplacants">';
-    for (let i = 0; i < NB_REMPLACANTS; i++) {
-      html += renderSlotRemplacant(i + 16, remplacants[i]);
+    for (let i = 0; i < _nbRempl; i++) {
+      // Numérotation continue après les titulaires du format (16+ en XV,
+      // 8+ en VII, 6+ en V…) au lieu d'un 16 codé en dur.
+      html += renderSlotRemplacant(_numDepart + i, remplacants[i]);
     }
     html +=   '</ul>';
     html += '</section>';
