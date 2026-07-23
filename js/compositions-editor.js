@@ -907,15 +907,40 @@
     '5':  { subs: 4,  label: 'V',   fmtBase: '5'  }
   };
 
-  // Format de la compo courante. Même source que terrainPosCourant() :
-  // l'équipe engagée (mode U-N3). Repli XV en legacy / NULL / inconnu
-  // (dégradation honnête, jamais d'écran vide).
+  // Normalise une valeur de format vers une clé de COMPO_FORMATS.
+  // Quatre vocabulaires coexistent dans le Hub (dette MODELE-FORMAT-VOCAB) :
+  //   • evenement_equipes_engagees.format_de_jeu : 'XV','13','12','X','9','8','7','5'
+  //   • postes.formats_applicables                : idem (sql_207)
+  //   • dropdown Évènements                        : idem
+  //   • equipes.format_jeu_code                    : LIBELLÉS EN CLAIR
+  //     (« Jeu à 7 », « Jeu à XV », « Jeu à X »…) — 4e vocabulaire, non aligné.
+  // On absorbe ici les libellés en clair en extrayant leur partie signifiante.
+  function _normFormat(v) {
+    if (v == null) return null;
+    let s = String(v).trim().toUpperCase();
+    if (COMPO_FORMATS[s]) return COMPO_FORMATS[s].fmtBase;
+    // « JEU À 7 » / « JEU A XV » / « JEU À X » → on retient le dernier token
+    s = s.replace(/^JEU\s+[AÀ]\s+/, '').trim();
+    if (COMPO_FORMATS[s]) return COMPO_FORMATS[s].fmtBase;
+    return null;
+  }
+
+  // Format de la compo courante. Deux niveaux, dans cet ordre :
+  //   1. SURCHARGE de l'équipe engagée (evenement_equipe.format_de_jeu) ;
+  //   2. HÉRITÉ — format propre de l'équipe (equipes.format_jeu_code) quand
+  //      aucune surcharge n'est posée. Sans ce 2e niveau, « — Hérité — »
+  //      retombait sur XV alors que l'équipe est déclarée « Jeu à 7 » en
+  //      admin-équipes : le choix « hérité » n'héritait de rien.
+  // Repli XV en legacy / NULL / inconnu (dégradation honnête).
   function _formatCourant() {
     const ctx = State.evenementEquipeContext;
-    const fmt = ctx && ctx.evenement_equipe && ctx.evenement_equipe.format_de_jeu;
-    if (fmt != null) {
-      const key = String(fmt).trim().toUpperCase();
-      if (COMPO_FORMATS[key]) return COMPO_FORMATS[key].fmtBase;
+    if (ctx) {
+      const surcharge = ctx.evenement_equipe && ctx.evenement_equipe.format_de_jeu;
+      const fs = _normFormat(surcharge);
+      if (fs) return fs;
+      const herite = ctx.equipe && ctx.equipe.format_jeu_code;
+      const fh = _normFormat(herite);
+      if (fh) return fh;
     }
     return 'XV';
   }
@@ -1726,7 +1751,7 @@
             +   ' <span class="view-liste__fmt">· ' + escapeHtml(_metaFmt.label) + '</span>'
             + '</h3>';
     html +=   '<ul class="view-liste__slots">';
-    for (const poste of _postesFmt) html += renderSlotPoste(poste);
+    _postesFmt.forEach(function (poste, idx) { html += renderSlotPoste(poste, idx + 1); });
     html +=   '</ul>';
     html += '</section>';
 
@@ -5101,12 +5126,20 @@
   }
 
   // v3.2 : lookup joueur depuis State.vivierById (RLS-safe via RPC get_vivier_compo)
-  function renderSlotPoste(poste) {
+  function renderSlotPoste(poste, numeroAffiche) {
+    // COMPO-MULTI-FORMAT (pt 225) — décision Manu (A) : la feuille est
+    // numérotée EN SÉQUENCE 1..N selon le rang du poste dans le format, et
+    // non selon poste.numero_xv. En VII, numero_xv donnait 1,2,3,8,9,10,11
+    // (numéros du XV, avec des trous) et entrait en COLLISION avec les
+    // remplaçants démarrant à 8 — deux numéros 8 sur la même feuille.
+    // `numeroAffiche` est fourni par l'appelant (rang+1) ; repli sur
+    // numero_xv si absent, pour les appels legacy éventuels.
+    const _num = (numeroAffiche != null) ? numeroAffiche : (poste.numero_xv || '');
     const cj = joueurDuPoste(poste.id);
     if (!cj) {
       return (
         '<li class="slot slot--vide" data-poste-id="' + escapeHtml(poste.id) + '" data-role="titulaire">' +
-          '<span class="slot__num">' + escapeHtml(poste.numero_xv || '') + '</span>' +
+          '<span class="slot__num">' + escapeHtml(_num) + '</span>' +
           '<span class="slot__poste-label">' + escapeHtml(poste.libelle_court || poste.code) + '</span>' +
           '<span class="slot__add">+ Ajouter</span>' +
         '</li>'
@@ -5115,7 +5148,7 @@
     const j = getJoueurVivier(cj.joueur_id) || {};
     return (
       '<li class="slot slot--occupe ' + cssClassEtatJoueur(etatDeriveJoueur(cj)) + '" data-compo-joueur-id="' + escapeHtml(cj.id) + '" data-poste-id="' + escapeHtml(poste.id) + '">' +
-        '<span class="slot__num">' + escapeHtml(cj.numero_maillot != null ? cj.numero_maillot : poste.numero_xv || '') + '</span>' +
+        '<span class="slot__num">' + escapeHtml(cj.numero_maillot != null ? cj.numero_maillot : _num) + '</span>' +
         '<span class="slot__poste-label">' + escapeHtml(poste.libelle_court || poste.code) + '</span>' +
         '<span class="slot__joueur">' +
           '<span class="slot__nom">' + escapeHtml(j.nom || '?') + '</span>' +
