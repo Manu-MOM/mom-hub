@@ -5819,6 +5819,16 @@
   function buildFormatParEquipeLines(checkedCbs) {
     const wrap = document.getElementById('evt-create-format-lines');
     if (!wrap) return;
+    // COMPO-MULTI-FORMAT (pt 226) — ajout du JEU À 5. Il manquait depuis
+    // l'origine : c'était le « bug 1 » de la remontée terrain M10 (plateaux
+    // JCO/T2S de début de saison joués à 5x5, impossibles à saisir).
+    // sql_207 a posé les 5 postes neutres J1..J5 en base, compositions-editor
+    // sait les afficher — restait la SAISIE, corrigée ici.
+    // Ordre : décroissant par effectif, cohérent avec l'existant.
+    // NB dette MODELE-FORMAT-VOCAB : cette liste est EN DUR et doit rester
+    // alignée sur postes.formats_applicables (base). Un dropdown alimenté
+    // par la base serait plus sûr mais imposerait un appel supplémentaire
+    // dans le flux de création — écarté au titre de P1, dette tracée.
     const FORMATS = [
       { v: '',   l: '— Hérité —' },
       { v: 'XV', l: 'XV (15)' },
@@ -5827,7 +5837,8 @@
       { v: 'X',  l: 'X' },
       { v: '9',  l: 'IX' },
       { v: '8',  l: 'VIII' },
-      { v: '7',  l: 'VII' }
+      { v: '7',  l: 'VII' },
+      { v: '5',  l: 'V (5)' }
     ];
     const html = Array.prototype.map.call(checkedCbs, function (cb) {
       const equipeId = cb.value;
@@ -6278,6 +6289,16 @@
     // que submitModalCreate lise le format SANS modification.
     // Pré-sélection du format réel (data-format = format_jeu_code,
     // listEquipes v1.34 L2028) avec garde de dégradation honnête.
+    // COMPO-MULTI-FORMAT (pt 226) — ajout du JEU À 5. Il manquait depuis
+    // l'origine : c'était le « bug 1 » de la remontée terrain M10 (plateaux
+    // JCO/T2S de début de saison joués à 5x5, impossibles à saisir).
+    // sql_207 a posé les 5 postes neutres J1..J5 en base, compositions-editor
+    // sait les afficher — restait la SAISIE, corrigée ici.
+    // Ordre : décroissant par effectif, cohérent avec l'existant.
+    // NB dette MODELE-FORMAT-VOCAB : cette liste est EN DUR et doit rester
+    // alignée sur postes.formats_applicables (base). Un dropdown alimenté
+    // par la base serait plus sûr mais imposerait un appel supplémentaire
+    // dans le flux de création — écarté au titre de P1, dette tracée.
     const FORMATS = [
       { v: '',   l: '— Hérité —' },
       { v: 'XV', l: 'XV (15)' },
@@ -6286,7 +6307,8 @@
       { v: 'X',  l: 'X' },
       { v: '9',  l: 'IX' },
       { v: '8',  l: 'VIII' },
-      { v: '7',  l: 'VII' }
+      { v: '7',  l: 'VII' },
+      { v: '5',  l: 'V (5)' }
     ];
     const html = equipes.map(function (eq) {
       const label = escHtml(
