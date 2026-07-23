@@ -904,6 +904,10 @@
     '8':  { subs: 2,  label: 'VIII', fmtBase: '8' },
     '7':  { subs: 6,  label: 'VII', fmtBase: '7'  },
     'VII':{ subs: 6,  label: 'VII', fmtBase: '7'  },
+    // Banc du format 5 = 4 (DÉCISION MANU, pt 226). Les sources divergeaient :
+    // règlement FFR rugby éducatif = 9 joueurs max par équipe, soit 5 sur le
+    // terrain + 4 sur le banc ; cadre UNSS scolaire = 5 remplaçants. Le Hub
+    // sert des plateaux FFR (M6/M8/M10 en JCO/T2S), pas de l'UNSS → 4 retenu.
     '5':  { subs: 4,  label: 'V',   fmtBase: '5'  }
   };
 
