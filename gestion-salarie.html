@@ -1315,9 +1315,9 @@
   const MOIS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin',
                    'Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
 
-  // VENTILATION-TYPE (02/07/2026) : libellés des 10 types canoniques
-  // (CHECK missions.type_mission, sql_114), REPRIS À L'IDENTIQUE du
-  // référentiel TYPES de suivi-salarie.html. Repli = jeton brut.
+  // VENTILATION-TYPE (02/07/2026) : libellés des 11 types canoniques
+  // (CHECK missions.type_mission, sql_114 puis sql_209), REPRIS À
+  // L'IDENTIQUE du référentiel TYPES de suivi-salarie.html. Repli = jeton brut.
   const GC_TYPE_LBL = {
     intervention_scolaire:  'Intervention scolaire',
     entrainement_section:   'Entraînement section',
@@ -1328,6 +1328,7 @@
     accompagnement_terrain: 'Accompagnement terrain',
     travail_personnel:      'Travail personnel',
     stage:                  'Stage',
+    evenement_extra_sportif: 'Évènement extra-sportif',
     divers:                 'Divers'
   };
   function gcTypeLbl(code) {
