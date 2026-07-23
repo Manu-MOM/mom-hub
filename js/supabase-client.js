@@ -6028,11 +6028,17 @@
           },
           evenement: evt,
           equipe: team ? {
-            id:            team.id,
-            code:          team.code,
-            libelle_court: team.libelle_court,
-            nom_officiel:  team.nom_officiel,
-            entente_id:    team.entente_id
+            id:              team.id,
+            code:            team.code,
+            libelle_court:   team.libelle_court,
+            nom_officiel:    team.nom_officiel,
+            entente_id:      team.entente_id,
+            // COMPO-MULTI-FORMAT (pt 225) — format PROPRE de l'équipe, source
+            // du « — Hérité — » quand aucune surcharge n'est posée sur
+            // l'évènement. L'objet equipe est reconstruit champ par champ :
+            // ajouter la colonne au SELECT ne suffit pas, il faut aussi
+            // l'exposer ici sous peine qu'elle soit jetée silencieusement.
+            format_jeu_code: team.format_jeu_code
           } : null,
           entente: ent
         }
