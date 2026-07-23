@@ -8397,5 +8397,2886 @@
    "fiche_origine_pptx_id": "",
    "videos": []
   }
+ },
+ "15-lpqAwemcZV-AJZY8fCs3SQAxJBBDUT": {
+  "source": {
+   "nom_fiche": "Section Paloise - 01 - Technique individuelle de passes seq 1",
+   "fileId_origine": "1_Jjie2mkIGUJi0WoHhDMTSYgrY8hEnxy",
+   "fileId_dossier": "15-lpqAwemcZV-AJZY8fCs3SQAxJBBDUT",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Technique individuelle de passes seq 1",
+   "theme": "Manipulation de balle",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballon",
+   "effectif": "12 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de réaliser des passes des deux côtés",
+    "Etre capable de réaliser des passes avec des courses droites"
+   ],
+   "but": "",
+   "lancement": "Les joueurs réalisent des passes par vague et les joueurs des vagues arrières rechargent. Le joueur en bout de ligne fait la passe à la colonne intérieure. Les joueurs se repositionnent sur les plots et l’exercice continue.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Décaler les temps de départ",
+    "Courses droites",
+    "Qualité de passes",
+    "Mettre les mains pour montrer la cible"
+   ],
+   "variantes": {
+    "plus": "",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1_Jjie2mkIGUJi0WoHhDMTSYgrY8hEnxy",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1thwJ2bXSUjg6aT2vRw7G1_WG2ZGdFYZG": {
+  "source": {
+   "nom_fiche": "Section Paloise - 02 - Technique individuelle de passes seq 2",
+   "fileId_origine": "1QIU70azJ5iz1gAK-Rhj9eATife_9_nmX",
+   "fileId_dossier": "1thwJ2bXSUjg6aT2vRw7G1_WG2ZGdFYZG",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Technique individuelle de passes seq 2",
+   "theme": "Manipulation de balle",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballon",
+   "effectif": "9 à 12 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de réaliser des passes des deux côtés",
+    "Etre capable de réaliser des passes avec des courses droites",
+    "Etre capable d’alterner les différentes formes de passes (longues ou petites)",
+    "Etre capable de juger la distance en vue de réaliser sa passe"
+   ],
+   "but": "",
+   "lancement": "Les joueurs réalisent des passes par vague. Le dernier joueur de la vague fait la passe à la vague en attente et ainsi de suite. A l’annonce de l’entraîneur, les joueurs changent de plot et donc de largeur de passes.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Maintien de la profondeur",
+    "Courses droites",
+    "Qualité de passes",
+    "Mettre les mains pour montrer la cible",
+    "Adaptation des passes par rapport à la distance"
+   ],
+   "variantes": {
+    "plus": "Ajouter un nouveau carré avec un espace différent",
+    "moins": "",
+    "progression": "Adaptation des joueurs à la distance des passes"
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1QIU70azJ5iz1gAK-Rhj9eATife_9_nmX",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "16G8UEBckAtqk1sdtqYlpuLloeC8rtpCi": {
+  "source": {
+   "nom_fiche": "Section Paloise - 03 - Technique individuelle de passes seq 3",
+   "fileId_origine": "1RqIlZABVT66zkp5LO_9MUJC5LEdor0C4",
+   "fileId_dossier": "16G8UEBckAtqk1sdtqYlpuLloeC8rtpCi",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Technique individuelle de passes seq 3",
+   "theme": "Manipulation de balle",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballon",
+   "effectif": "12 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de réaliser des passes des deux côtés",
+    "Etre capable de réaliser des passes avec des courses droites",
+    "Etre capable d’alterner les différentes formes de passes",
+    "Etre capable de juger la distance en vue de réaliser sa passe"
+   ],
+   "but": "",
+   "lancement": "Les joueurs réalisent des passes par vague. Les joueurs des vagues suivantes rechargent. Le joueur en bout de ligne donne à la colonne intérieure. Les joueurs se repositionnent sur les plots et l’exercice continue.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Maintien de la profondeur",
+    "Courses droites",
+    "Qualité de passes",
+    "Mettre les mains pour montrer la cible",
+    "Qualité du travail après la passe (continuer sa course)"
+   ],
+   "variantes": {
+    "plus": "Augmenterla largeur des passes",
+    "moins": "",
+    "progression": "Passes plus longues"
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1RqIlZABVT66zkp5LO_9MUJC5LEdor0C4",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1fQKC6QW3JS0FZOzvBHFnzzJ2kKNAyIto": {
+  "source": {
+   "nom_fiche": "Section Paloise - 04 - Technique individuelle de passes seq 4",
+   "fileId_origine": "1G0lrj3ZJnZFNNjjyGZiuny5pF07TjtrW",
+   "fileId_dossier": "1fQKC6QW3JS0FZOzvBHFnzzJ2kKNAyIto",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Technique individuelle de passes seq 4",
+   "theme": "Manipulation de balle",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballon",
+   "effectif": "3 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de réaliser des passes des deux côtés",
+    "Etre capable de réaliser des passes avec des appuis ouverts ou fermés",
+    "Etre capable de juger la distance en vue de réaliser sa passe"
+   ],
+   "but": "",
+   "lancement": "3 joueurs à l’arrêt sur la même ligne positionnés face au terrain. Travail de passes 1 à 2 mains. Répétitions de passes.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Buste et hanche droite",
+    "Départ du ballon des hanches avec appuis ouverts ou fermés",
+    "Finition du geste",
+    "Qualité de la passe",
+    "Vitesse du ballon",
+    "Qualité de la position des appuis"
+   ],
+   "variantes": {
+    "plus": "Augmenterla largeur des passes",
+    "moins": "",
+    "progression": "Passes plus longues"
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1G0lrj3ZJnZFNNjjyGZiuny5pF07TjtrW",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "13U-4CP_4g9WnTM7x4dSTHBarQfHNVi0_": {
+  "source": {
+   "nom_fiche": "Section Paloise - 05 - Technique individuelle de passes seq 5",
+   "fileId_origine": "1PMEG7rBqPaO2LqbTJFTIp8BbyqlFY2ST",
+   "fileId_dossier": "13U-4CP_4g9WnTM7x4dSTHBarQfHNVi0_",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Technique individuelle de passes seq 5",
+   "theme": "Manipulation de balle",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballon",
+   "effectif": "3 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de réaliser des passes des deux côtés",
+    "Etre capable de réaliser des passes avec des appuis ouverts ou fermés",
+    "Etre capable de juger la distance en vue de réaliser sa passe"
+   ],
+   "but": "",
+   "lancement": "3 joueurs se font des passes en mouvements. Travail de passes 1 à 2 mains. Répétitions de passes.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Buste et hanche droite",
+    "Départ du ballon des hanches avec appuis ouverts ou fermés",
+    "Finition du geste",
+    "Qualité de la passe",
+    "Vitesse du ballon",
+    "Qualité de la position des appuis",
+    "Courses droites",
+    "Fluidité"
+   ],
+   "variantes": {
+    "plus": "Augmenterla largeur des passes / Augmenterla vitesse des courses",
+    "moins": "",
+    "progression": "Passes plus longues"
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1PMEG7rBqPaO2LqbTJFTIp8BbyqlFY2ST",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1ibjEBmREhLUZmIXKW-ktKHlIf4imVm8O": {
+  "source": {
+   "nom_fiche": "Section Paloise - 06 - Technique individuelle de passes seq 6",
+   "fileId_origine": "1SUNBKU9zGkUnKUNiEqOihhquU1C27YEX",
+   "fileId_dossier": "1ibjEBmREhLUZmIXKW-ktKHlIf4imVm8O",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Technique individuelle de passes seq 6",
+   "theme": "Manipulation de balle",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballon",
+   "effectif": "4 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de réaliser des passes des deux côtés",
+    "Etre capable de réaliser des passes avec des appuis ouverts ou fermés",
+    "Etre capable de juger la distance en vue de réaliser sa passe"
+   ],
+   "but": "",
+   "lancement": "4 joueurs sur une même ligne face à 4 piquets disposés en escaliers. Le joueur va chercher le piquet et effectue une passe sur la latéralité avant le piquet.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Buste et hanche droite",
+    "Départ du ballon des hanches avec appuis ouverts ou fermés",
+    "Finition du geste",
+    "Qualité de la passe",
+    "Vitesse du ballon",
+    "Qualité de la position des appuis",
+    "Courses droites",
+    "Fluidité"
+   ],
+   "variantes": {
+    "plus": "Augmenterla largeur des passes / Augmenterla vitesse des courses",
+    "moins": "",
+    "progression": "Passes plus longues"
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1SUNBKU9zGkUnKUNiEqOihhquU1C27YEX",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1a2ADhoG5XY1rAFCAqYKt6ZvsPxdSfbFv": {
+  "source": {
+   "nom_fiche": "Section Paloise - 07 - Technique individuelle de passes seq 7",
+   "fileId_origine": "1K2tl2CdOJjg45kTlPYXxg9iZ3OxcAbyx",
+   "fileId_dossier": "1a2ADhoG5XY1rAFCAqYKt6ZvsPxdSfbFv",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Technique individuelle de passes seq 7",
+   "theme": "Manipulation de balle",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballon",
+   "effectif": "4 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de réaliser des passes des deux côtés",
+    "Etre capable de réaliser des passes avec des appuis ouverts ou fermés",
+    "Etre capable de juger la distance en vue de réaliser sa passe"
+   ],
+   "but": "",
+   "lancement": "Départ à 4 joueurs sur les plots noirs. Les joueurs réalisent des passes courtes. Ils rejoignent ensuite les plots jaunes et effectuent le retour en passes longues.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Buste et hanche droite",
+    "Départ du ballon des hanches avec appuis ouverts ou fermés",
+    "Finition du geste",
+    "Qualité de la passe",
+    "Vitesse du ballon",
+    "Qualité de la position des appuis",
+    "Courses droites",
+    "Fluidité",
+    "Précision"
+   ],
+   "variantes": {
+    "plus": "Augmenterla largeur des passes / Augmenterla vitesse des courses",
+    "moins": "",
+    "progression": "Passes plus longues"
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1K2tl2CdOJjg45kTlPYXxg9iZ3OxcAbyx",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1CWXyYoo5sQ5D3XV3PvxB3XQfuGlDYh02": {
+  "source": {
+   "nom_fiche": "Section Paloise - 08 - Technique individuelle de passes seq 8",
+   "fileId_origine": "1bVXxct6zsKpztFGrVg1fvppqjP2t26a4",
+   "fileId_dossier": "1CWXyYoo5sQ5D3XV3PvxB3XQfuGlDYh02",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Technique individuelle de passes seq 8",
+   "theme": "Manipulation de balle",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballon",
+   "effectif": "4 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de réaliser des passes des deux côtés",
+    "Etre capable de réaliser des passes avec des appuis ouverts ou fermés",
+    "Etre capable de réaliser de réceptionner un ballon et de le passer en mouvement"
+   ],
+   "but": "",
+   "lancement": "Le joueur qui « travaille » est sur le plot rouge. Il reçoit le ballon d’un joueur bleu et le passe en mouvement à l’autre joueur bleu.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Buste et hanche droite",
+    "Départ du ballon des hanches avec appuis ouverts ou fermés",
+    "Finition du geste",
+    "Qualité de la passe en mouvement",
+    "Vitesse du ballon",
+    "Qualité de la position des appuis",
+    "Courses droites",
+    "Fluidité",
+    "Précision"
+   ],
+   "variantes": {
+    "plus": "Augmenterla largeur des passes / Augmenterla vitesse des courses",
+    "moins": "",
+    "progression": "Passes plus longues"
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1bVXxct6zsKpztFGrVg1fvppqjP2t26a4",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1TsVAA0Y0F_oJHJkUX6O-NEmc1kW9FiaL": {
+  "source": {
+   "nom_fiche": "Section Paloise - 09 - Technique individuelle de passes seq 9",
+   "fileId_origine": "1OQ-zSjJnjmzljIvTWrtMmVIbHbVvEMal",
+   "fileId_dossier": "1TsVAA0Y0F_oJHJkUX6O-NEmc1kW9FiaL",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Technique individuelle de passes seq 9",
+   "theme": "Manipulation de balle",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballon",
+   "effectif": "4 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de réaliser des passes des deux côtés",
+    "Etre capable de réaliser des passes avec des appuis ouverts ou fermés",
+    "Etre capable de réaliser de réceptionner un ballon et de le passer en mouvement"
+   ],
+   "but": "",
+   "lancement": "Le joueur qui « travaille » est sur le plot rouge. Il reçoit le ballon d’un joueur bleu et le passe en mouvement à l’autre joueur bleu. Le joueur gris vient exercer une pression défensive.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Buste et hanche droite",
+    "Départ du ballon des hanches avec appuis ouverts ou fermés",
+    "Finition du geste",
+    "Qualité de la passe en mouvement",
+    "Vitesse du ballon",
+    "Qualité de la position des appuis",
+    "Courses droites",
+    "Fluidité",
+    "Précision"
+   ],
+   "variantes": {
+    "plus": "Augmenterla largeur des passes / Augmenterla vitesse des courses / Augmenterlapressiondu défenseur",
+    "moins": "",
+    "progression": "Passes plus longues / Moins de temps pour réaliser sa passe / Se rapprocher des conditions de match"
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1OQ-zSjJnjmzljIvTWrtMmVIbHbVvEMal",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "105WbieTydSUaA7K1DbKJ2vpFUfaxH5F9": {
+  "source": {
+   "nom_fiche": "Section Paloise - 10 - 2 vs 1 seq 1",
+   "fileId_origine": "1E3s0sVqwOOwosAQYBDUnen5KjMCnyriF",
+   "fileId_dossier": "105WbieTydSUaA7K1DbKJ2vpFUfaxH5F9",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "2 vs 1 seq 1",
+   "theme": "Jeu deploye — Defense groupee",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballon, chasubles",
+   "effectif": "7 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de marquer en situation de surnombre",
+    "Etre capable de décaler un coéquipier dans une zone libre",
+    "Etre capable de réaliser avec une pression défensive importante"
+   ],
+   "but": "",
+   "lancement": "Les attaquants doivent négocier le surnombre et marquer le plus rapidement possible. Le défenseur reste sur une ligne latérale pour empêcher les attaquants de marquer.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Course droite",
+    "Vitesse du porteur de balle",
+    "Capacité à fixer",
+    "Qualité de la passe",
+    "Communication"
+   ],
+   "variantes": {
+    "plus": "",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1E3s0sVqwOOwosAQYBDUnen5KjMCnyriF",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1DnUZUa8V_3XGVJ7K7u2LPyxXJCsBuswk": {
+  "source": {
+   "nom_fiche": "Section Paloise - 11 - 2 vs 1 seq 2",
+   "fileId_origine": "1VMVHIbRKjLMfePlgsLMnqcr_DWhW9xzy",
+   "fileId_dossier": "1DnUZUa8V_3XGVJ7K7u2LPyxXJCsBuswk",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "2 vs 1 seq 2",
+   "theme": "Jeu deploye — Defense groupee",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballon, chasubles",
+   "effectif": "5 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de marquer en situation de surnombre",
+    "Etre capable de décaler un coéquipier dans une zone libre",
+    "Etre capable de réaliser avec une pression défensive importante"
+   ],
+   "but": "",
+   "lancement": "Les attaquants doivent négocier le surnombre et marquer le plus rapidement possible. Le défenseur est libre de mettre la pression qu’il souhaite.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Course droite",
+    "Vitesse du porteur de balle",
+    "Capacité à fixer",
+    "Qualité de la passe",
+    "Communication"
+   ],
+   "variantes": {
+    "plus": "Le défenseur lance leballonàl’attaquant qu’il souhaite",
+    "moins": "",
+    "progression": "Adaptationetréorganisation offensive"
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1VMVHIbRKjLMfePlgsLMnqcr_DWhW9xzy",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1HLiz6NLu1YpkUs8ZUppPEAKlpEaP7ZdX": {
+  "source": {
+   "nom_fiche": "Section Paloise - 12 - 2 vs 1 seq 3",
+   "fileId_origine": "1LZYtQ7Tx7ZH1TqiFRDOnJ_5bM7dcqADi",
+   "fileId_dossier": "1HLiz6NLu1YpkUs8ZUppPEAKlpEaP7ZdX",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "2 vs 1 seq 3",
+   "theme": "Jeu deploye — Defense groupee",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballon, chasubles",
+   "effectif": "6 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de marquer en situation de surnombre",
+    "Etre capable de décaler un coéquipier dans une zone libre",
+    "Etre capable de réaliser avec une pression défensive importante"
+   ],
+   "but": "",
+   "lancement": "Les attaquants doivent négocier le surnombre et marquer le plus rapidement possible. Le défenseur est libre de mettre la pression qu’il souhaite.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Course droite",
+    "Vitesse du porteur de balle",
+    "Capacité à fixer",
+    "Qualité de la passe",
+    "Communication"
+   ],
+   "variantes": {
+    "plus": "Le défenseur lance leballonàl’attaquant qu’il souhaite",
+    "moins": "",
+    "progression": "Adaptationetréorganisation offensive"
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1LZYtQ7Tx7ZH1TqiFRDOnJ_5bM7dcqADi",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1KnXXP2xW2wchKIf53GFzyJ1qzR5DmkUp": {
+  "source": {
+   "nom_fiche": "Section Paloise - 13 - 2 vs 1 seq 4",
+   "fileId_origine": "1MvPOZVdDbRIHGHuEsK0ousIIxaOT51NE",
+   "fileId_dossier": "1KnXXP2xW2wchKIf53GFzyJ1qzR5DmkUp",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "2 vs 1 seq 4",
+   "theme": "Jeu deploye — Defense groupee",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballon, chasuble",
+   "effectif": "6 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de marquer en situation de surnombre",
+    "Etre capable de décaler un coéquipier dans une zone libre",
+    "Etre capable de réaliser avec une pression défensive importante"
+   ],
+   "but": "",
+   "lancement": "Les attaquants doivent négocier les surnombres et marquer le plus rapidement possible. Un premier défenseur va monter et un second est en retard après avoir fait le tour du plot jaune avant d’agir.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Course droite",
+    "Vitesse du porteur de balle",
+    "Capacité à fixer",
+    "Qualité de la passe",
+    "Qualité de replacement",
+    "Communication"
+   ],
+   "variantes": {
+    "plus": "",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1MvPOZVdDbRIHGHuEsK0ousIIxaOT51NE",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1-HxtPKrZdT2cfW_W9fTdxm7HOEKZcAmS": {
+  "source": {
+   "nom_fiche": "Section Paloise - 14 - 3 vs 2 seq 1",
+   "fileId_origine": "1nhAcSucZKAl13b7FSLBpgp2i07AJtQtK",
+   "fileId_dossier": "1-HxtPKrZdT2cfW_W9fTdxm7HOEKZcAmS",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "3 vs 2 seq 1",
+   "theme": "Jeu deploye — Defense groupee",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballon, chasuble",
+   "effectif": "8 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de marquer en situation de surnombre",
+    "Etre capable de décaler un coéquipier dans une zone libre",
+    "Etre capable de réaliser avec une pression défensive importante"
+   ],
+   "but": "",
+   "lancement": "Jeu de surnombre extérieur. Défenseurs défendent droit. Les attaquants doivent négocier le surnombre et marquer le plus rapidement possible.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Course droite",
+    "Vitesse du porteur de balle",
+    "Capacité à fixer",
+    "Qualité et précision des passes",
+    "Prise de profondeur",
+    "Qualité des temps de départ",
+    "Communication"
+   ],
+   "variantes": {
+    "plus": "Rajouterun défenseur et un attaquantpour réaliser un 4 vs 3",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1nhAcSucZKAl13b7FSLBpgp2i07AJtQtK",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "16nRbyNzMOjlFIgfYYyf-BIuvutbyXys4": {
+  "source": {
+   "nom_fiche": "Section Paloise - 15 - 3 vs 2 seq 2",
+   "fileId_origine": "1bSr_W2NMPTR6UxdE926bAU5tPjkwo-5I",
+   "fileId_dossier": "16nRbyNzMOjlFIgfYYyf-BIuvutbyXys4",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "3 vs 2 seq 2",
+   "theme": "Jeu deploye — Defense groupee",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballon, chasuble",
+   "effectif": "8 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de marquer en situation de surnombre",
+    "Etre capable de décaler un coéquipier dans une zone libre",
+    "Etre capable de réaliser avec une pression défensive importante"
+   ],
+   "but": "",
+   "lancement": "Les attaquants ont un 3 vs 2 à négocier avec une défense en contrôle.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Attaquer très vite le premier attaquant pour maintenir le déséquilibre défensif",
+    "Course droite",
+    "Vitesse du porteur de balle",
+    "Capacité à fixer",
+    "Qualité et précision des passes",
+    "Gestion de la ligne de passe",
+    "Qualité des temps de départ",
+    "Communication"
+   ],
+   "variantes": {
+    "plus": "Rajouterun défenseur et un attaquantpour réaliser un 4 vs 3",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1bSr_W2NMPTR6UxdE926bAU5tPjkwo-5I",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1a5Hs1Anmb-LO63MQhfkTXkebydT6evZv": {
+  "source": {
+   "nom_fiche": "Section Paloise - 16 - 3 vs 2 seq 3",
+   "fileId_origine": "1m84vW-YX577qWFrTVFEIJDHJSP2Br7Ba",
+   "fileId_dossier": "1a5Hs1Anmb-LO63MQhfkTXkebydT6evZv",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "3 vs 2 seq 3",
+   "theme": "Jeu deploye — Defense groupee",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballon, chasuble",
+   "effectif": "8 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de marquer en situation de surnombre",
+    "Etre capable de décaler un coéquipier dans une zone libre",
+    "Etre capable de réaliser avec une pression défensive importante"
+   ],
+   "but": "",
+   "lancement": "Jeu de surnombre extérieur. Défenseurs défendent droit. Les attaquants doivent négocier le surnombre et marquer le plus rapidement possible.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Course droite",
+    "Vitesse du porteur de balle",
+    "Capacité à fixer",
+    "Qualité et précision des passes",
+    "Prise de profondeur",
+    "Qualité des temps de départ",
+    "Communication"
+   ],
+   "variantes": {
+    "plus": "Rajouterun défenseur et un attaquantpour réaliser un 4 vs 3",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1m84vW-YX577qWFrTVFEIJDHJSP2Br7Ba",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1Sm6yP3IDEon3XTDhQb6uSdaYNGs3mT8G": {
+  "source": {
+   "nom_fiche": "Section Paloise - 17 - 3 vs 2 seq 4",
+   "fileId_origine": "1-moO4E7QUhkvleaA2jV2ZcRP2M_evCh1",
+   "fileId_dossier": "1Sm6yP3IDEon3XTDhQb6uSdaYNGs3mT8G",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "3 vs 2 seq 4",
+   "theme": "Jeu deploye — Defense groupee",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballon, chasuble",
+   "effectif": "5 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de marquer en situation de surnombre",
+    "Etre capable de décaler un coéquipier dans une zone libre",
+    "Etre capable de réaliser avec une pression défensive importante"
+   ],
+   "but": "",
+   "lancement": "Jeu de surnombre. Défenseurs et attaquants démarrent du carré bleu mélangés. Une fois placés sur les plots au signal de l’entraîneur, les attaquants doivent marquer. Défenseurs défendent droit. Au TOP de l’entraîneur, attaquants se placent sur les plots noirs et les défenseurs sur les plots jaunes. Le jeu est lancé par un demi de mêlée ou l’entraîneur lui même.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Course droite",
+    "Vitesse du porteur de balle",
+    "Capacité à fixer",
+    "Qualité et précision des passes",
+    "Prise de profondeur",
+    "Qualité des temps de départ",
+    "Communication"
+   ],
+   "variantes": {
+    "plus": "",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1-moO4E7QUhkvleaA2jV2ZcRP2M_evCh1",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1q6ahj5a8q8wOU24h5mfCl5Pkf4HDyh_K": {
+  "source": {
+   "nom_fiche": "Section Paloise - 18 - 3 vs 2 seq 5",
+   "fileId_origine": "1RkZnSx6vziU3J0vedyi-DHkLiyQRZpvG",
+   "fileId_dossier": "1q6ahj5a8q8wOU24h5mfCl5Pkf4HDyh_K",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "3 vs 2 seq 5",
+   "theme": "Jeu deploye — Defense groupee",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballon, chasubles",
+   "effectif": "8 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de marquer en situation de surnombre",
+    "Etre capable de décaler un coéquipier dans une zone libre",
+    "Etre capable de réaliser avec une pression défensive importante"
+   ],
+   "but": "",
+   "lancement": "Les 5 joueurs se font des passes jusqu’en bout de ligne avant les plots bleus. Une fois le ballon donné les deux joueurs plots jaunes vont toucher le plot jaune face à eux avant d’intervenir sur un 3 vs 2. Les joueurs effectuent des passes avant les plots bleus. Une fois le ballon en bout de ligne, un second ballon est mis en jeu pour jouer un 3 vs 2.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Course droite",
+    "Recharge des attaquants pour jouer le 3 vs 2",
+    "Qualité de la recharge",
+    "Analyse de la situation",
+    "Vitesse du porteur de balle",
+    "Capacité à fixer",
+    "Qualité et précision des passes",
+    "Prise de profondeur",
+    "Qualité des temps de départ",
+    "Communication"
+   ],
+   "variantes": {
+    "plus": "Rajouterun défenseur et un attaquantpour réaliser un 4 vs 3",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1RkZnSx6vziU3J0vedyi-DHkLiyQRZpvG",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1AWZ7ZZsVR89d6x0zAj77mqN2JI-Ji4zj": {
+  "source": {
+   "nom_fiche": "Section Paloise - 19 - 3 vs 2 seq 6",
+   "fileId_origine": "1bpYqv5Cjh9_La5VDOZlRFxZgEeVhAARN",
+   "fileId_dossier": "1AWZ7ZZsVR89d6x0zAj77mqN2JI-Ji4zj",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "3 vs 2 seq 6",
+   "theme": "Jeu deploye — Defense groupee",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballon, chasubles",
+   "effectif": "8 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de marquer en situation de surnombre",
+    "Etre capable de décaler un coéquipier dans une zone libre",
+    "Etre capable de repérer une zone libre",
+    "Etre capable de réaliser avec une pression défensive importante"
+   ],
+   "but": "",
+   "lancement": "3 couloirs, 1 attaquant par couloir. 2 défenseurs sont « cachés » derrière les boucliers entre deux zones. Au TOP de l’entraîneur, les défenseurs se positionnent chacun dans la zone 1, 2 ou 3. Les attaquants repèrent le couloir laissé libre et l’utilisent",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Course droite",
+    "Repérer la zone libre",
+    "Analyse de la situation",
+    "Vitesse du porteur de balle",
+    "Capacité à fixer",
+    "Qualité et précision des passes",
+    "Prise de profondeur",
+    "Qualité des temps de départ",
+    "Convergence du soutien",
+    "Communication"
+   ],
+   "variantes": {
+    "plus": "Rajouterun défenseur et un attaquantpour réaliser un 4 vs 3",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1bpYqv5Cjh9_La5VDOZlRFxZgEeVhAARN",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1mkNwAfgQ3-Jcsj8Qf0FWNehUBFLdWL8S": {
+  "source": {
+   "nom_fiche": "Section Paloise - 20 - 3 vs 2 seq 7",
+   "fileId_origine": "13EbGtBeHHF0rq2gzlh9SsN6fhy1AD6zU",
+   "fileId_dossier": "1mkNwAfgQ3-Jcsj8Qf0FWNehUBFLdWL8S",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "3 vs 2 seq 7",
+   "theme": "Jeu deploye — Defense groupee",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballon, chasubles",
+   "effectif": "8 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de marquer en situation de surnombre",
+    "Etre capable de décaler un coéquipier dans une zone libre",
+    "Etre capable de réaliser avec une pression défensive importante"
+   ],
+   "but": "",
+   "lancement": "Au TOP de l’entraîneur, les défenseurs se déplacent vers les plots noirs. Un défenseur reste au sol et les 2 autres interviennent en défense contre les 3 attaquants.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Course droite",
+    "Recharge des attaquants pour jouer le 3 vs 2",
+    "Qualité de la recharge",
+    "Analyse de la situation",
+    "Vitesse du porteur de balle",
+    "Capacité à fixer",
+    "Qualité et précision des passes",
+    "Prise de profondeur",
+    "Qualité des temps de départ",
+    "Communication"
+   ],
+   "variantes": {
+    "plus": "Laisser intervenir le défenseur au sol une foislepremier rideau traversé / Rajouterun défenseur et un attaquantpour réaliser un 4 vs 3",
+    "moins": "",
+    "progression": "Finir les coups et s’obliger à marquer une fois la défense traversé. Difficultés dujeudansla défense"
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "13EbGtBeHHF0rq2gzlh9SsN6fhy1AD6zU",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1eEj9Qn8ZtYHCD-UHv1LhYjaSvqciD6HK": {
+  "source": {
+   "nom_fiche": "Section Paloise - 21 - Technique de plaquage seq 1",
+   "fileId_origine": "17HXprIvHV2C3xUJEiVBFwoDDYThgYVwc",
+   "fileId_dossier": "1eEj9Qn8ZtYHCD-UHv1LhYjaSvqciD6HK",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Technique de plaquage seq 1",
+   "theme": "Plaquages",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballon",
+   "effectif": "8 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de réaliser un plaquage en avançant",
+    "Etre capable d’effectuer un serrage des bras",
+    "Etre capable de se mettre en position d’avancée à l’aide de ses jambes"
+   ],
+   "but": "",
+   "lancement": "Le défenseur vient impacter l’attaquant avec un bouclier. Le défenseur aura son épaule droite/ gauche positionnée au départ ainsi que les appuis nécessaires (jambe droite/épaule droite, jambe gauche/ épaule gauche). Le défenseur doit impacter et serrer fort l’attaquant tout en ayant une action vers l’avant avec ses jambes.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Prise de la cible sur l’attaquant",
+    "Explosivité au plaquage",
+    "Maintien de la fréquence d’appuis avec les jambes",
+    "Qualité du serrage avec les bras",
+    "Posture du dos et du bassin"
+   ],
+   "variantes": {
+    "plus": "",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "17HXprIvHV2C3xUJEiVBFwoDDYThgYVwc",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "19ABGNaWEvxFsB7az9jxNBafrnDfSrPn4": {
+  "source": {
+   "nom_fiche": "Section Paloise - 22 - Technique de plaquage seq 2",
+   "fileId_origine": "1TOXuykeHVfz4sxaYkM3QtK11bPWsmc_l",
+   "fileId_dossier": "19ABGNaWEvxFsB7az9jxNBafrnDfSrPn4",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Technique de plaquage seq 2",
+   "theme": "Plaquages",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, boucliers",
+   "effectif": "2 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de prendre la cible sur l’attaquant en vue de réaliser un plaquage",
+    "Etre capable de réaliser un plaquage de côté",
+    "Etre capable d’effectuer un serrage des bras",
+    "Etre capable de se mettre en position d’avancée à l’aide de ses jambes"
+   ],
+   "but": "",
+   "lancement": "L’attaquant choisit soit le terrain jaune soit noir pour se mettre en action. Le défenseur s’adapte et doit le repousser avec l’épaule sans le faire tomber. L’attaquant avec bouclier démarre quand il souhaite.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Prise de la cible sur l’attaquant",
+    "Déplacement du défenseur à l’intérieur de l’attaquant",
+    "Explosivité au plaquage",
+    "Maintien de la fréquence d’appuis avec les jambes",
+    "Qualité du serrage avec les bras",
+    "Posture du dos et du bassin",
+    "Garder l’attaquant sur l’extérieur",
+    "Position haute des mains pour la réactivité"
+   ],
+   "variantes": {
+    "plus": "Fairetomberl’attaquant / Semettreenpositionde grattage sur le bouclier suite au passage au sol",
+    "moins": "",
+    "progression": "Intensitésupérieureet situation de match / Grattage de suite après le plaquage. Enchaînement des tâches"
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1TOXuykeHVfz4sxaYkM3QtK11bPWsmc_l",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1bhBUDSYC121E2_CQrq5MZ9iKPdXusekq": {
+  "source": {
+   "nom_fiche": "Section Paloise - 23 - Technique de plaquage seq 3",
+   "fileId_origine": "1r2hLUTrAVw2NC77sSNhmeuOSaO4nlj9Z",
+   "fileId_dossier": "1bhBUDSYC121E2_CQrq5MZ9iKPdXusekq",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Technique de plaquage seq 3",
+   "theme": "Plaquages",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, piquets, bouclier",
+   "effectif": "2 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de réaliser un plaquage en se déplaçant",
+    "Etre capable de réaliser un plaquage de côté",
+    "Etre capable d’effectuer un serrage des bras",
+    "Etre capable de se mettre en position d’avancée à l’aide de ses jambes"
+   ],
+   "but": "",
+   "lancement": "Le défenseur gris passe sous un piquet horizontal et engage une action défensive sur l’attaquant rouge. L’attaquant choisit le côté souhaité pour faire travailler le défenseur. Le défenseur démarre quand il souhaite.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Coordination épaule/appuis",
+    "Qualité de l’impact du serrage",
+    "Préparation des mains et bras hauts",
+    "Fréquence des appuis avant et pendant l’impact"
+   ],
+   "variantes": {
+    "plus": "Sortir le bouclier / Fairetomberl’attaquant au sol",
+    "moins": "",
+    "progression": "Intensitésupérieureet situation de match"
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1r2hLUTrAVw2NC77sSNhmeuOSaO4nlj9Z",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "11G1vUoFP7Om20qOweDsT0eO15tl2hgEf": {
+  "source": {
+   "nom_fiche": "Section Paloise - 24 - Technique de plaquage seq 4",
+   "fileId_origine": "1Ztj1BGnRGcuPlVskLTHiyf_q3Bj8rS9d",
+   "fileId_dossier": "11G1vUoFP7Om20qOweDsT0eO15tl2hgEf",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Technique de plaquage seq 4",
+   "theme": "Plaquages",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballon",
+   "effectif": "4 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de réaliser un plaquage en se déplaçant",
+    "Etre capable de réaliser un plaquage de côté",
+    "Etre capable d’effectuer un serrage des bras",
+    "Etre capable de s’adapter face à l’incertitude proposée par l’attaquant"
+   ],
+   "but": "",
+   "lancement": "Un attaquant au départ de l’aire de jeu. 3 défenseurs se trouvent sur le côté à des emplacements différents. L’attaquant doit aller marquer. Au signal de l’entraîneur, le défenseur dont la couleur du plot a été annoncée entre sur le terrain pour aller plaquer l’attaquant.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Réactivité des appuis",
+    "Anticipation",
+    "Adaptation",
+    "Réorganisation pour effectuer un plaquage de qualité",
+    "Bras haut",
+    "Dos placé"
+   ],
+   "variantes": {
+    "plus": "Modifierles emplacements des plotsdes défenseurs",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1Ztj1BGnRGcuPlVskLTHiyf_q3Bj8rS9d",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1Wb0PmIhFvf4ruIBlfOrga8FIMZos4daV": {
+  "source": {
+   "nom_fiche": "Section Paloise - 25 - Travail au sol du porteur de balle",
+   "fileId_origine": "1tVBH1f3ezTWh1N-q95dluqDj3QwJWWVu",
+   "fileId_dossier": "1Wb0PmIhFvf4ruIBlfOrga8FIMZos4daV",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Travail au sol du porteur de balle",
+   "theme": "Liberation et comportement au sol",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballon",
+   "effectif": "2 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable d’être actif une fois au sol",
+    "Etre capable de réaliser un chesting",
+    "Etre capable d’effectuer une roulade"
+   ],
+   "but": "",
+   "lancement": "Un attaquant au sol sur le ventre avec un ballon au milieu des plots. Le défenseur est en position quatre appuis sur l’attaquant prêt à gratter. L’attaquant doit au signal de l’entraîneur poser le ballon sur la couleur demandée avec le défenseur au dessus de lui.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Travail au sol",
+    "Gainage",
+    "Chesting (ballon « caché » sous le buste entre les coudes)",
+    "Roulade",
+    "Explosivité",
+    "Libération du ballon"
+   ],
+   "variantes": {
+    "plus": "",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1tVBH1f3ezTWh1N-q95dluqDj3QwJWWVu",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1uCESjohRHfyY__vkl4mUNrI4ASSAK9in": {
+  "source": {
+   "nom_fiche": "Section Paloise - 26 - Attitudes au contact du porteur de balle seq 1",
+   "fileId_origine": "1PoqYjNjbcmyOYoSwRzfYhLTY5bCWfKYh",
+   "fileId_dossier": "1uCESjohRHfyY__vkl4mUNrI4ASSAK9in",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Attitudes au contact du porteur de balle seq 1",
+   "theme": "Liberation et comportement au sol",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballon, chasubles",
+   "effectif": "4 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de gagner des duels",
+    "Etre capable de se mettre en action positive"
+   ],
+   "but": "",
+   "lancement": "L’attaquant au départ de l’aire de jeu doit aller marquer malgré la pression des deux défenseurs situés sur les plots bleus.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Capacité à franchir avec un ballon à deux mains",
+    "Posture",
+    "Qualité des appuis",
+    "Fréquence des appuis",
+    "Attitudes au contact",
+    "Chesting lors du passage par le sol"
+   ],
+   "variantes": {
+    "plus": "",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1PoqYjNjbcmyOYoSwRzfYhLTY5bCWfKYh",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1W1bX8Msk1EjMmNC0MxHcYxnMOicxbGu8": {
+  "source": {
+   "nom_fiche": "Section Paloise - 27 - Attitudes au contact du porteur de balle seq 2",
+   "fileId_origine": "1HGD8VAIAzoWNkpD8IJ0FQyX8YWwAAR63",
+   "fileId_dossier": "1W1bX8Msk1EjMmNC0MxHcYxnMOicxbGu8",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Attitudes au contact du porteur de balle seq 2",
+   "theme": "Liberation et comportement au sol",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballon, bouclier",
+   "effectif": "3 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de gagner des duels",
+    "Etre capable de se mettre en action positive"
+   ],
+   "but": "",
+   "lancement": "Des attaquants sont placés de part et d’autre d’un défenseur au milieu. Un attaquant démarre avec le ballon et va jouer un duel sur le défenseur. Et ainsi de suite.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Répétition de duels",
+    "Capacité à franchir avec un ballon à deux mains",
+    "Posture",
+    "Qualité des appuis",
+    "Qualité de l’impact sur le défenseur avec boucliers",
+    "Impact de face et non de biais",
+    "Attitudes au contact",
+    "Chesting lors du passage par le sol"
+   ],
+   "variantes": {
+    "plus": "",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1HGD8VAIAzoWNkpD8IJ0FQyX8YWwAAR63",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1V4cMvWqZRhghmRFeQIF_rSlCL-tVLWii": {
+  "source": {
+   "nom_fiche": "Section Paloise - 28 - Attaque en sous nombre et attitudes du porteur de",
+   "fileId_origine": "1QRR6MTrVLTlSHnXtFoeEt23laCCOQeKN",
+   "fileId_dossier": "1V4cMvWqZRhghmRFeQIF_rSlCL-tVLWii",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Attaque en sous nombre et attitudes du porteur de",
+   "theme": "Liberation et comportement au sol",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballon, bouclier",
+   "effectif": "10 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable d’être actif une fois au sol",
+    "Etre capable de réaliser un chesting",
+    "Etre capable d’effectuer une roulade"
+   ],
+   "but": "",
+   "lancement": "Attaque fonctionne par binôme et par aire de jeu. Au signal de l’entraîneur, le porteur de balle va défier les défenseurs avec boucliers dans sa zone. Soutien démarre lorsque le contact est établi et donne les consigne à son coéquipier. Les attaquants effectuent des passes sur la latéralité en état fixe et le porteur de balle lance le jeu au signal de l’entraîneur.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Signal « roule » ou « chest » du soutien axial",
+    "Capacité d’adaptation et de duel",
+    "Fréquence des appuis",
+    "Attitude basse au contact",
+    "Ballon à deux mains",
+    "Aller chercher l’épaule faible des boucliers",
+    "Qualité du travail au sol"
+   ],
+   "variantes": {
+    "plus": "Ajouterun attaquant demi de mêlée capable de changer de zone pour répéter les duels",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1QRR6MTrVLTlSHnXtFoeEt23laCCOQeKN",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1oh7kDQZYw6U-UxEawAh-W89i9p-cnVLD": {
+  "source": {
+   "nom_fiche": "Section Paloise - 29 - Attitudes des soutiens seq 1",
+   "fileId_origine": "1nnDdtINX-n31C4wkzFFOMFcmb9utImn_",
+   "fileId_dossier": "1oh7kDQZYw6U-UxEawAh-W89i9p-cnVLD",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Attitudes des soutiens seq 1",
+   "theme": "Organisation autour des rucks",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballon, chasuble",
+   "effectif": "4 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de réaliser un déblayage",
+    "Etre capable d’analyser mon action de soutien",
+    "Etre capable d’avoir la bonne attitude par rapport à mon soutien"
+   ],
+   "but": "",
+   "lancement": "Porteur de balle joue son duel contre le défenseur. Ses soutiens viennent protéger le ballon. Le premier annonce « CLEAN », il fait un rucking. Le second annonce « STAY », il reste sur le ballon en 4 appuis.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Communication",
+    "Posture",
+    "Ciblage de la menace",
+    "Fréquence et changement de rythme",
+    "Qualité des déblayages des soutiens",
+    "Qualité du duel du porteur de balle"
+   ],
+   "variantes": {
+    "plus": "Ajouter un un second défenseur",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1nnDdtINX-n31C4wkzFFOMFcmb9utImn_",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "167KCvqv-2fXAWCM3OdIWkixdYkZHl9lD": {
+  "source": {
+   "nom_fiche": "Section Paloise - 30 - Attitudes des soutiens seq 2",
+   "fileId_origine": "1pmgRHwS-6RM2Fz68nJqBAcamHavZCD1f",
+   "fileId_dossier": "167KCvqv-2fXAWCM3OdIWkixdYkZHl9lD",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Attitudes des soutiens seq 2",
+   "theme": "Organisation autour des rucks",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballon, chasuble",
+   "effectif": "4 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de réaliser un déblayage",
+    "Etre capable d’analyser mon action de soutien",
+    "Etre capable d’avoir la bonne attitude par rapport à mon soutien"
+   ],
+   "but": "",
+   "lancement": "Porteur de balle joue son duel contre le défenseur. Ses soutiens viennent protéger le ballon après avoir fait le tour du plot. Soutiens en retard volontairement.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Reprise de l’axe des soutiens",
+    "Communication (Clean, Stay, Chesting, Roule)",
+    "Posture",
+    "Ciblage de la menace",
+    "Fréquence et changement de rythme",
+    "Qualité des déblayages des soutiens",
+    "Qualité du duel du porteur de balle"
+   ],
+   "variantes": {
+    "plus": "Ajouter un un second défenseur",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1pmgRHwS-6RM2Fz68nJqBAcamHavZCD1f",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "11O31goQY78QXEYB9KhYOgX44v-tSa5VE": {
+  "source": {
+   "nom_fiche": "Section Paloise - 31 - Attitudes des soutiens seq 3",
+   "fileId_origine": "1VoM4BQLC34IzpyzeD05PE00n3ZAkki8r",
+   "fileId_dossier": "11O31goQY78QXEYB9KhYOgX44v-tSa5VE",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Attitudes des soutiens seq 3",
+   "theme": "Organisation autour des rucks",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballon",
+   "effectif": "4 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de réaliser un déblayage",
+    "Etre capable d’analyser la situation et le rapport de force",
+    "Etre capable d’analyser mon action de soutien",
+    "Etre capable d’avoir la bonne attitude par rapport à mon soutien"
+   ],
+   "but": "",
+   "lancement": "Situation de mise en avant ou mise en retard des soutiens. Ballon situé côté attaque derrière un bouclier au sol. Selon la situation proposée, attaquant doit protéger le ballon. L’entraîneur annonce la couleur de plot autour duquel l’attaquant et le défenseur doivent aller tourner avant d’intervenir sur la situation.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Analyse de la situation avant d’intervenir",
+    "Capacité à casser les branches et à gagner les épaules pour éviter que le ballon soit gratté",
+    "Posture basse"
+   ],
+   "variantes": {
+    "plus": "",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1VoM4BQLC34IzpyzeD05PE00n3ZAkki8r",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1MMBHtKb9mY1GzwaaCN9phO4Fz8bty4D4": {
+  "source": {
+   "nom_fiche": "Section Paloise - 32 - Travail de repères sur les branches et le ballon",
+   "fileId_origine": "1_JVTsFoEFW5dGpfZMt7NHBg-6XlKnoY-",
+   "fileId_dossier": "1MMBHtKb9mY1GzwaaCN9phO4Fz8bty4D4",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Travail de repères sur les branches et le ballon",
+   "theme": "Organisation autour des rucks",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballon",
+   "effectif": "4 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de réaliser un déblayage",
+    "Etre capable d’empêcher un défenseur de gratter le ballon"
+   ],
+   "but": "",
+   "lancement": "Le défenseur est en position quatre appuis sur le ballon. L’attaquant est face à lui en quatre appuis position basse, il doit passer sous les épaules pour gagner la place au dessus du ballon.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Ciblage de l’espace au dessus du ballon",
+    "Explosivité",
+    "Position basse tout le temps",
+    "Regard droit devant",
+    "Objectif de casser les branches"
+   ],
+   "variantes": {
+    "plus": "",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1_JVTsFoEFW5dGpfZMt7NHBg-6XlKnoY-",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1KmLUfsLZGl_0Jnvkxb_APc_wUmTLP0aC": {
+  "source": {
+   "nom_fiche": "Section Paloise - 33 - Attitudes de la cellule offensive",
+   "fileId_origine": "1JLI6L6JahQSUjTi-k0mT1IYVEtY3MnjZ",
+   "fileId_dossier": "1KmLUfsLZGl_0Jnvkxb_APc_wUmTLP0aC",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Attitudes de la cellule offensive",
+   "theme": "Organisation autour des rucks",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballon, boucliers",
+   "effectif": "7 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de réaliser un déblayage",
+    "Etre capable d’analyser la situation et le rapport de force",
+    "Etre capable d’analyser mon action de soutien",
+    "Etre capable d’avoir la bonne attitude par rapport à mon soutien"
+   ],
+   "but": "",
+   "lancement": "Ballon situé au centre d’une zone de 4 plots. 1 attaquant à chaque plot. 3 défenseurs avec boucliers vont venir mettre la pression sur les attaquants. Au signal de l’entraîneur, le joueur va ramasser le ballon et jouer un duel contre les déf. L’entraîneur annonce la couleur de plot du joueur qui lance le jeu. Les autres joueurs s’organisent pour la conservation du ballon (clean, stay).",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Réactivité",
+    "Posture",
+    "Travail du porteur de balle",
+    "Chesting, roule, clean, stay",
+    "Ciblage des menaces",
+    "Reprise de l’axe",
+    "Analyse de la situation",
+    "Réorganisation"
+   ],
+   "variantes": {
+    "plus": "",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1JLI6L6JahQSUjTi-k0mT1IYVEtY3MnjZ",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1W0_oXdeC47O9NKodMsSiWUPozwKFyVIk": {
+  "source": {
+   "nom_fiche": "Section Paloise - 34 - Organisation défensive",
+   "fileId_origine": "1dckbC62q85Pp56OzKof5cKFZLi8ojzu7",
+   "fileId_dossier": "1W0_oXdeC47O9NKodMsSiWUPozwKFyVIk",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Organisation défensive",
+   "theme": "Rush defense et Defense collective",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, boucliers",
+   "effectif": "6 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable d’organiser une défense collective",
+    "Etre capable d’organiser une défense en mouvement",
+    "Etre capable de s’adapter par rapport aux actions des attaquants",
+    "Etre capable de cibler et d’impacter les attaquants"
+   ],
+   "but": "",
+   "lancement": "3 attaquants/3 défenseurs. Attaquants ont un bouclier chacun et doivent choisir une couleur de plot au signal de l’entraîneur. La défense réagit en conséquence et impact chacun un bouclier. L’entraîneur lance le jeu.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Déplacement ensemble",
+    "Préparation à l’impact",
+    "Communication",
+    "Ciblage"
+   ],
+   "variantes": {
+    "plus": "Peut se faire à 4, 5, 6 joueurs…",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1dckbC62q85Pp56OzKof5cKFZLi8ojzu7",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1LzEilm1DzQhhJd9nKacNPeygmd-LlRGZ": {
+  "source": {
+   "nom_fiche": "Section Paloise - 35 - Organisation défensive collective seq 1",
+   "fileId_origine": "1wM-B7BsDX5geYOqZVLmyioJm4ss356Hr",
+   "fileId_dossier": "1LzEilm1DzQhhJd9nKacNPeygmd-LlRGZ",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Organisation défensive collective seq 1",
+   "theme": "Rush defense et Defense collective",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballons, chasubles",
+   "effectif": "16 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable d’organiser une défense collective",
+    "Etre capable d’organiser une défense en mouvement",
+    "Etre capable de s’adapter par rapport aux actions des attaquants",
+    "Etre capable de cibler et d’impacter les attaquants"
+   ],
+   "but": "",
+   "lancement": "8 attaquants contre un nb de défenseurs donné par l’entraîneur. 3 ballons à défendre sur 3 rucks différents. Déf reviennent dans leur zone de départ à chaque ballon. L’entraîneur lance le jeu en donnant le nb de défenseurs et le ruck de départ.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Travail ensemble",
+    "Communication",
+    "Rester dans les zones",
+    "Analyser le rapport de force",
+    "Garder de l’espace pour occuper toute la zone",
+    "Rôle des joueurs intérieurs"
+   ],
+   "variantes": {
+    "plus": "Varier le nombre de défenseurs / Plusieurs temps de jeu sur chaque ballon",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1wM-B7BsDX5geYOqZVLmyioJm4ss356Hr",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1zrCXfRVpTqDzsYavny0juADKygUZp3Mb": {
+  "source": {
+   "nom_fiche": "Section Paloise - 36 - Organisation défensive collective seq 2",
+   "fileId_origine": "1H_9obrvAUq2ArChpcYVINFlzyMuXprsJ",
+   "fileId_dossier": "1zrCXfRVpTqDzsYavny0juADKygUZp3Mb",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Organisation défensive collective seq 2",
+   "theme": "Rush defense et Defense collective",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballon, chasubles",
+   "effectif": "11 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable d’analyser la situation (surnombre, sous nombre)",
+    "Etre capable d’organiser une défense en mouvement",
+    "Etre capable de s’adapter par rapport aux actions des attaquants",
+    "Etre capable de cibler et d’impacter les attaquants"
+   ],
+   "but": "",
+   "lancement": "Attaquants effectuent des mouvements et la défense agit en miroir. L’attaque doit marquer et la défense repousser l’attaque. Tous les mouvements sont autorisés pour l’attaque (croisées, sautées,…) Au signal de l’entraîneur, attaquants et défenseurs entrent en jeu.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Grosse communication",
+    "Respect des zones pour être efficace sur les mouvements de l’attaque",
+    "Préparation et efficacité du plaquage",
+    "Travail du contre ruck si besoin"
+   ],
+   "variantes": {
+    "plus": "",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1H_9obrvAUq2ArChpcYVINFlzyMuXprsJ",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "11BS83fVROcyhziRKe6akdjZS4esmPIl6": {
+  "source": {
+   "nom_fiche": "Section Paloise - 37 - Organisation défensive collective seq 3",
+   "fileId_origine": "1xVXqpvkIX92fI9vcCPLBkRMTSNU56jt4",
+   "fileId_dossier": "11BS83fVROcyhziRKe6akdjZS4esmPIl6",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Organisation défensive collective seq 3",
+   "theme": "Rush defense et Defense collective",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballons",
+   "effectif": "9 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable d’analyser la situation et le rapport de force",
+    "Etre capable d’organiser une défense en mouvement",
+    "Etre capable de s’adapter par rapport aux actions des attaquants",
+    "Etre capable de cibler et d’impacter les attaquants"
+   ],
+   "but": "",
+   "lancement": "2 zones de jeu et une zone avec un attaquant uniquement passeur au milieu. Les défenseurs enchaînent la défense dans les zones noires et bleues. Le jeu est lancé au signal de l’entraîneur, il donne également le nombre d’attaquants qui entrent en jeu selon la zone jouée.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Se réorganiser rapidement",
+    "Lire la situation et agir en fonction",
+    "Travailler ensemble",
+    "Induire l’attaque au maximum à faire un choix",
+    "Déplacement",
+    "Garde intérieur",
+    "Préparation au plaquage"
+   ],
+   "variantes": {
+    "plus": "Augmenterlenombred’attaquants et ajouter un à deux défenseurs",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1xVXqpvkIX92fI9vcCPLBkRMTSNU56jt4",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1SfjRQrEoXzAXwluAiMq1MFQMHfiAi35S": {
+  "source": {
+   "nom_fiche": "Section Paloise - 38 - Créativité, 2 contre 2",
+   "fileId_origine": "1uflz-ETXazapQ6ncuFbkBb5aNl-8kruB",
+   "fileId_dossier": "1SfjRQrEoXzAXwluAiMq1MFQMHfiAi35S",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Créativité, 2 contre 2",
+   "theme": "Choix de la forme de jeu",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballons",
+   "effectif": "4 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable d’analyser la situation et le rapport de force",
+    "Etre capable de prendre une initiative",
+    "Etre capable de créer"
+   ],
+   "but": "",
+   "lancement": "2 contre 2. Laisser les attaquants prendre des initiatives et créer. Le jeu est lancé par un demi de mêlée ou l’entraîneur qui met en action les attaquants.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Travail d’appuis",
+    "Changement de rythme",
+    "Créativité",
+    "Jeu sans ballon du second attaquant"
+   ],
+   "variantes": {
+    "plus": "Peut se jouer à 3 contre 3",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1uflz-ETXazapQ6ncuFbkBb5aNl-8kruB",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "17PQXnQbuMNAhN66KYrYCWEzfVciH8Jb2": {
+  "source": {
+   "nom_fiche": "Section Paloise - 39 - Créativité, 1 contre 1 orienté seq 1",
+   "fileId_origine": "1WYuH3Z2rQNkMpcndefUrT4StaeznfcsD",
+   "fileId_dossier": "17PQXnQbuMNAhN66KYrYCWEzfVciH8Jb2",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Créativité, 1 contre 1 orienté seq 1",
+   "theme": "Duels offensifs",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballons",
+   "effectif": "2 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable d’analyser la situation et le rapport de force",
+    "Etre capable de prendre une initiative",
+    "Etre capable de créer"
+   ],
+   "but": "",
+   "lancement": "1 contre 1 avec beaucoup d’avance pour l’attaquant. Il doit aller marquer dans l’en but en face de lui. Le jeu est lancé par un demi de mêlée ou l’entraîneur qui met en action les attaquants.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Travail d’appuis",
+    "Changement de rythme",
+    "Créativité",
+    "Duel 1 vs 1",
+    "Ballon à 2 mains"
+   ],
+   "variantes": {
+    "plus": "",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1WYuH3Z2rQNkMpcndefUrT4StaeznfcsD",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1qiFPOS9EQe9Z3kUuJ-9Ly1Wi2jDALK36": {
+  "source": {
+   "nom_fiche": "Section Paloise - 40 - Créativité, 1 contre 2 + 2",
+   "fileId_origine": "1BJYG2hOJxjPJF6kBaQ0Y2fKUP3GJBZCN",
+   "fileId_dossier": "1qiFPOS9EQe9Z3kUuJ-9Ly1Wi2jDALK36",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Créativité, 1 contre 2 + 2",
+   "theme": "Duels offensifs",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballons",
+   "effectif": "5 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable d’analyser la situation et le rapport de force",
+    "Etre capable de prendre un intervalle",
+    "Etre capable d’éviter les défenseurs en tenant le ballon à deux mains"
+   ],
+   "but": "",
+   "lancement": "1 contre 2 + 2. L’attaquant va se trouver face à des défenseurs en mouvement sur la latéralité (pas chassés, mains sur les hanches). Il doit par ses appuis ne pas se faire toucher par les défenseurs et aller marcquer. Le jeu est lancé par un demi de mêlée ou l’entraîneur qui met en action les attaquants.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Travail d’appuis et de reprise d’appuis",
+    "Vitesse",
+    "Prise d’intervalle",
+    "Changement de rythme",
+    "Ballon à 2 mains"
+   ],
+   "variantes": {
+    "plus": "",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1BJYG2hOJxjPJF6kBaQ0Y2fKUP3GJBZCN",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1059tVpUolTl0CDuxH-H41YQo_BOJuUf4": {
+  "source": {
+   "nom_fiche": "Section Paloise - 41 - Créativité, 1 contre 1 orienté seq 2",
+   "fileId_origine": "1dZpACE18ahSnhRg8-AAdlMBYuS89Lt7W",
+   "fileId_dossier": "1059tVpUolTl0CDuxH-H41YQo_BOJuUf4",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Créativité, 1 contre 1 orienté seq 2",
+   "theme": "Duels offensifs",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballons",
+   "effectif": "2 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable d’analyser la situation et le rapport de force",
+    "Etre capable d’accélérer vers et dans l’espace libre",
+    "Etre capable de gagner ce rapport de force"
+   ],
+   "but": "",
+   "lancement": "L’entraîneur donne la couleur de plot que doit aller toucher le défenseur avant d’intervenir. Le jeu est ensuite lancé par un demi de mêlée ou par l’entraîneur lui même pour mettre en action l’attaquant.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Travail d’appuis",
+    "Changement de rythme",
+    "Réactivité",
+    "Aller vite dans l’espace libre",
+    "Vitesse de départ",
+    "Pré action",
+    "Duel 1 vs 1",
+    "Ballon à 2 mains"
+   ],
+   "variantes": {
+    "plus": "",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1dZpACE18ahSnhRg8-AAdlMBYuS89Lt7W",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1su5vrplWISlvpZJcX524wjx-BpQdMFzO": {
+  "source": {
+   "nom_fiche": "Section Paloise - 42 - Créativité, 1 + 1 contre 1",
+   "fileId_origine": "1TXtEsVILtO3JsCbapWlXo1LrywJaR7mW",
+   "fileId_dossier": "1su5vrplWISlvpZJcX524wjx-BpQdMFzO",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Créativité, 1 + 1 contre 1",
+   "theme": "Organisation autour des rucks",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballons",
+   "effectif": "3 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable d’analyser la situation et le rapport de force",
+    "Etre capable de gagner son duel"
+   ],
+   "but": "",
+   "lancement": "2 attaquants rouges dont un hors de la zone de jeu. Après la passe du soutien, un 1 contre 1 se met en place avec un attaquant soutien axial en retard. Le passeur doit rentrer dans la zone de jeu en faisant le tour du plot. L’entraîneur donne la couleur de plot que doit aller toucher le défenseur avant d’intervenir. Le jeu est ensuite lancé par un demi de mêlée ou par l’entraîneur lui même pour mettre en action l’attaquant.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Le soutien axial n’est pas là que si le duel est perdu",
+    "L’objectif est de marquer dès le premier duel",
+    "Vitesse",
+    "Changement de zone sur les appuis",
+    "Dextérité",
+    "Communication",
+    "Qualité du soutien si besoin"
+   ],
+   "variantes": {
+    "plus": "Ajouter un second défenseur pour orienterles courses du porteur de balle et du soutien",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1TXtEsVILtO3JsCbapWlXo1LrywJaR7mW",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1OaaXSvXaHLmHPgevlSZ_NkuHC5p0z5WN": {
+  "source": {
+   "nom_fiche": "Section Paloise - 43 - Créativité, duel et soutien axial seq 1",
+   "fileId_origine": "1AivnE3Aqfy-ohaACqWHF485I2T0ehGFX",
+   "fileId_dossier": "1OaaXSvXaHLmHPgevlSZ_NkuHC5p0z5WN",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Créativité, duel et soutien axial seq 1",
+   "theme": "Duels offensifs",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballons, chasubles",
+   "effectif": "12 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de gagner son duel",
+    "Etre capable de faire jouer dans le duel",
+    "Etre capable de se replacer axialement pour les soutiens"
+   ],
+   "but": "",
+   "lancement": "4 attaquants se font des passes à l’arrêt. Au top de l’entraîneur, le duel est lancé et les 3 soutiens doivent se repositionner dans la zone de jeu pour permettre au porteur de balle de jouer les duels. L’entraîneur donne son signal sur un joueur en bout de ligne face à des défenseurs pour que le jeu se lance.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Réorganisation offensive",
+    "Communication",
+    "Dextérité",
+    "Qualité des soutiens",
+    "Travail de duels répétés"
+   ],
+   "variantes": {
+    "plus": "Ajouterdes défenseurs",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1AivnE3Aqfy-ohaACqWHF485I2T0ehGFX",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1ulENLb3KnvYkdczZm4Xjw1yNvCGk_K3b": {
+  "source": {
+   "nom_fiche": "Section Paloise - 44 - Créativité, dextérité, duel",
+   "fileId_origine": "1LG116K8a2gKL7V6rsdv4CMVR0UL4PsUz",
+   "fileId_dossier": "1ulENLb3KnvYkdczZm4Xjw1yNvCGk_K3b",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Créativité, dextérité, duel",
+   "theme": "Duels offensifs",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballons",
+   "effectif": "4 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de gagner son duel",
+    "Etre capable de faire preuve de dextérité"
+   ],
+   "but": "",
+   "lancement": "L’attaquant part avec deux ballons dans les mains. Ses deux soutiens doivent faire le tour des plots noirs avant d’intervenir. L’attaquant doit jouer le duel et donner les deux ballons après contact. Le jeu est lancé par l’attaquant qui a les deux ballons.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Communication",
+    "Dextérité",
+    "Reprise de l’axe des soutiens",
+    "Capacité à jouer un duel avec de la difficulté (2 ballons en main)"
+   ],
+   "variantes": {
+    "plus": "Ajouter un second défenseur pour orienterles courses du porteur de balle et du soutien",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1LG116K8a2gKL7V6rsdv4CMVR0UL4PsUz",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1IHhflsOGFAotZ6RoYtmSA2voEOqkXoGm": {
+  "source": {
+   "nom_fiche": "Section Paloise - 45 - Créativité, duel et soutien axial seq 2",
+   "fileId_origine": "1ScDXtxMX6aYiAzuXDMM5ngKOps5OUx6T",
+   "fileId_dossier": "1IHhflsOGFAotZ6RoYtmSA2voEOqkXoGm",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Créativité, duel et soutien axial seq 2",
+   "theme": "Duels offensifs",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballons, chasubles",
+   "effectif": "3 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de gagner son duel",
+    "Etre capable de repérer et d’aller dans les espaces libres",
+    "Etre capable de faire jouer dans le duel",
+    "Etre capable de se replacer axialement pour les soutiens"
+   ],
+   "but": "",
+   "lancement": "Attaquant avec ballon effectue un slalom entre les plots avant de jouer ses duels. Le second attaquant est au sol sur le dos et démarre au signal de l’entraîneur. Défenseurs se déplacent uniquement sur la latéralité. L’entraîneur donne son signal pour le départ du jeu. Le second attaquant effectue également le slalom entre les plots.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Réactivité du soutien",
+    "Qualité des appuis",
+    "Communication",
+    "Reprise de l’espace libre",
+    "Maintien de la vitesse"
+   ],
+   "variantes": {
+    "plus": "Ajouterdes défenseurs",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1ScDXtxMX6aYiAzuXDMM5ngKOps5OUx6T",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1xIMwnTv9CMhbrZSjvxFQ1k0DIyJ7cvD9": {
+  "source": {
+   "nom_fiche": "Section Paloise - 46 - Créativité, duel et soutien axial seq 3",
+   "fileId_origine": "1R0fLZAQmi_bagoWGOdGEfnKp13SVhTBw",
+   "fileId_dossier": "1xIMwnTv9CMhbrZSjvxFQ1k0DIyJ7cvD9",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Créativité, duel et soutien axial seq 3",
+   "theme": "Organisation autour des rucks",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballons, chasubles",
+   "effectif": "6 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de gagner son duel",
+    "Etre capable de repérer et d’aller dans les espaces libres",
+    "Etre capable de faire jouer dans le duel",
+    "Etre capable de se replacer axialement pour les soutiens"
+   ],
+   "but": "",
+   "lancement": "3 zones de jeu. Les défenseurs n’ont pas le droit de changer de zone alors que l’attaque oui. Au signal de l’entraîneur, le jeu est lancé et les attaquants doivent utiliser l’espace libre et marquer. L’entraîneur donne la couleur du défenseur qui doit aller toucher le plot derrière lui avant d’intervenir.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Jouer dans l’espace libre",
+    "Qualité de passes",
+    "Maintien de la vitesse",
+    "Réorganisation des soutiens",
+    "Qualité des joueurs qui convergent",
+    "Finir l’action sur le dernier défenseur"
+   ],
+   "variantes": {
+    "plus": "",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1R0fLZAQmi_bagoWGOdGEfnKp13SVhTBw",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "18Y7Y94w-0OjhGL92-Lks2o7WjwzWFz-k": {
+  "source": {
+   "nom_fiche": "Section Paloise - 47 - Créativité, duel et soutien axial seq 4",
+   "fileId_origine": "1qV6aaF8d8tZPauh_MWq0xmPAb3E5__KX",
+   "fileId_dossier": "18Y7Y94w-0OjhGL92-Lks2o7WjwzWFz-k",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Créativité, duel et soutien axial seq 4",
+   "theme": "Duels offensifs",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballons, chasubles, boucliers",
+   "effectif": "20 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de gagner son duel",
+    "Etre capable de faire jouer dans le duel",
+    "Etre capable de se replacer axialement pour les soutiens",
+    "Etre capable de maintenir la vitesse dans le duel"
+   ],
+   "but": "",
+   "lancement": "4 zones de jeu, att et déf restent dans leur zone. Att se font des places sur la latéralité et au signal le jeu est lancé. Dans chaque zone, les att doivent gagner leurs duels face aux 3 défenseurs. Passage terminé lorsque chaque att a marqué dans sa zone. L’entraîneur donne le signal de la zone de départ de l’exercice. Le demi de mêlée lance le jeu et continue à distribuer entre les zones et uniquement distribuer. La zone qui a marqué sort du jeu.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Organisation face à 3 défenseurs",
+    "Maximum de vitesse et d’appuis même contre les boucliers",
+    "Recharge des joueurs si échec et pas de marque de la part des attaquants",
+    "Apprendre à marquer et finir les coups",
+    "Qualité des duels",
+    "Qualité des attitudes au contact"
+   ],
+   "variantes": {
+    "plus": "",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1qV6aaF8d8tZPauh_MWq0xmPAb3E5__KX",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1WhV6_YbDcIzDLEuC8L8zco0wfuh3gLMM": {
+  "source": {
+   "nom_fiche": "Section Paloise - 48 - Contre attaque seq 1",
+   "fileId_origine": "1U6ifO3A_BbOZpB2OXjsWrJmKc4lTEg7l",
+   "fileId_dossier": "1WhV6_YbDcIzDLEuC8L8zco0wfuh3gLMM",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Contre attaque seq 1",
+   "theme": "Contre-attaques",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballons, chasubles",
+   "effectif": "18 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de récupérer un ballon",
+    "Etre capable de repérer et d’aller dans les espaces libres",
+    "Etre capable d’occuper la largeur du terrain"
+   ],
+   "but": "",
+   "lancement": "3 zones de jeu. Attaquants et défenseurs sont en miroir. Au signal de l’entraîneur, la défense récupère le ballon et joue dans l’espace libre.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Jouer dans l’espace libre",
+    "Capacité à prendre vite la largeur",
+    "Qualité de passe",
+    "Communication",
+    "Se démarquer"
+   ],
+   "variantes": {
+    "plus": "",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1U6ifO3A_BbOZpB2OXjsWrJmKc4lTEg7l",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1BtOcDnY8o1nL89ZFSwBxeyYTtLBKOkPH": {
+  "source": {
+   "nom_fiche": "Section Paloise - 49 - Contre attaque seq 2",
+   "fileId_origine": "1TGmsD4wFOHfAr7F68-4r_Bgjtbh2PO_a",
+   "fileId_dossier": "1BtOcDnY8o1nL89ZFSwBxeyYTtLBKOkPH",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Contre attaque seq 2",
+   "theme": "Contre-attaques",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballons, chasubles",
+   "effectif": "10 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de récupérer un ballon",
+    "Etre capable de recharger rapidement",
+    "Etre capable de repérer et d’aller dans les espaces libres",
+    "Etre capable d’occuper la largeur du terrain"
+   ],
+   "but": "",
+   "lancement": "Les défenseurs récupèrent un ballon joué au pied par les attaquants. Suite à ce turnover, les joueurs rouges n’ont pas le droit d’intervenir défensivement dans les zones jaunes et bleues. Les joueurs gris ont le droit de jouer sur tout le terrain.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Recharge des joueurs gris sur le jeu au pied",
+    "Capacité à prendre tout l’espace",
+    "Jouer rapidement dans les zones jaunes ou bleues",
+    "Maintien de la vitesse",
+    "Qualité de passe",
+    "Courses droites"
+   ],
+   "variantes": {
+    "plus": "",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1TGmsD4wFOHfAr7F68-4r_Bgjtbh2PO_a",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "16F62nB2-AdWbpfvM2f1aknkwX1PdyyAd": {
+  "source": {
+   "nom_fiche": "Section Paloise - 50 - Contre attaque seq 3",
+   "fileId_origine": "13mB3JLjy96OAgroy26cFNqC5xuXBrGnT",
+   "fileId_dossier": "16F62nB2-AdWbpfvM2f1aknkwX1PdyyAd",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Contre attaque seq 3",
+   "theme": "Contre-attaques",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "plots, ballons, chasubles",
+   "effectif": "5 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de récupérer un ballon",
+    "Etre capable de recharger rapidement",
+    "Etre capable de repérer et d’aller dans les espaces libres",
+    "Etre capable d’occuper la largeur du terrain"
+   ],
+   "but": "",
+   "lancement": "Les joueurs rouges tapent sur un joueur gris situés sur les plots jaunes. La contre attaque s’effectue à partir de la récupération du ballon.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Recharge des joueurs gris sur le jeu au pied",
+    "Capacité à prendre tout l’espace",
+    "Maintien de la vitesse",
+    "Qualité de passe",
+    "Courses droites"
+   ],
+   "variantes": {
+    "plus": "",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "13mB3JLjy96OAgroy26cFNqC5xuXBrGnT",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "18mWgQV7OqgnKtVz3rK-AdqgOe-5UlVgE": {
+  "source": {
+   "nom_fiche": "Section Paloise - 51 - Jeu au pied",
+   "fileId_origine": "1dKc7WAIuEkNaSHZ_rll8jNC2cei5aqpx",
+   "fileId_dossier": "18mWgQV7OqgnKtVz3rK-AdqgOe-5UlVgE",
+   "generated_at": "2026-07-23T00:00:00Z",
+   "converter_version": "sp-pdf-1.0"
+  },
+  "cartouche": {
+   "titre": "Jeu au pied",
+   "theme": "Jeu au pied — Pas de 2e rideau",
+   "niveau": "",
+   "rapport_de_force": "",
+   "format": "",
+   "duree": "",
+   "materiel": "ballon rugby, foot, hand",
+   "effectif": "2 joueurs mini",
+   "categorie": ""
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Etre capable de taper dans la bonne zone du ballon",
+    "Etre capable de mettre le ballon dans une zone précise"
+   ],
+   "but": "",
+   "lancement": "2 joueurs de face sur la même ligne, travail en binôme. Coup de pied de face et coup de pied à 45°.",
+   "consignes": [],
+   "critere_reussite": [],
+   "comportements_attendus": [
+    "Lâcher du ballon",
+    "Relâchement",
+    "Maîtrise du corps",
+    "Equilibre",
+    "Cheville verrouillée",
+    "Bassin",
+    "Epaules vers la cible"
+   ],
+   "variantes": {
+    "plus": "Changerles ballons / Augmenterla distance entre les deux joueurs",
+    "moins": "",
+    "progression": ""
+   }
+  },
+  "media": {
+   "videos_count": 0,
+   "photos": 1,
+   "videos_size_mo": 0.0
+  },
+  "files": {
+   "fiche_json_id": "",
+   "fiche_pdf_id": "1dKc7WAIuEkNaSHZ_rll8jNC2cei5aqpx",
+   "fiche_pptx_id": "",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
  }
 }
