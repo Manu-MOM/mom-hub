@@ -5990,7 +5990,7 @@
           id, evenement_id, equipe_id, format_de_jeu, notes,
           evenements ( id, code, libelle, date_debut, type_evenement ),
           equipes (
-            id, code, libelle_court, nom_officiel, entente_id,
+            id, code, libelle_court, nom_officiel, entente_id, format_jeu_code,
             ententes ( id, code, libelle_court, libelle_moyen,
                         categorie_id, saison_id )
           ),
