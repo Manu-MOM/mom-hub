@@ -5326,6 +5326,45 @@
           const cb2 = document.querySelector('#evt-create-equipes .evt-eng-equipe-cb[value="' + eqId + '"]');
           if (cb2) cb2.checked = true;
         });
+        // EVT-FORMAT-EDITION-READBACK — RÉVÉLATION + RÉHYDRATATION du select
+        //   format par équipe. Deux défauts corrigés ici :
+        //   (1) RÉVÉLATION — le cochage ci-dessus est PROGRAMMATIQUE
+        //       (`cb.checked = true`), or l'affichage du select est branché sur
+        //       un `addEventListener('change')` (cf. peuplerEquipesEngagees) :
+        //       une assignation JS de `.checked` NE déclenche PAS l'évènement
+        //       `change`. Le select restait donc `display:none` à l'édition —
+        //       il fallait décocher/recocher à la main pour le faire
+        //       apparaître (remontée terrain M10, évènement du 19/09).
+        //   (2) RÉHYDRATATION — aucun code ne reposait la valeur ENREGISTRÉE
+        //       (`evt._equipesEngagees[].format_de_jeu`, bien remontée par
+        //       getEquipesEngagees dont le SELECT porte la colonne) dans le
+        //       select. Combiné à (1) et à la lecture conditionnelle de
+        //       submitModalCreate (`if (formatRow && formatRow.value)`), le
+        //       format partait VIDE du payload à chaque ré-enregistrement ;
+        //       la RPC modifier_evenement_complet faisant un UPDATE SEC
+        //       (`format_de_jeu = v_engagement->>'format_de_jeu'`, sans garde),
+        //       une clé absente = NULL en base → PERTE de la surcharge, puis
+        //       dégradation honnête vers XV côté compositions-editor.
+        //   D1 (Manu) : format NULL/absent en base → select sur '— Hérité —'
+        //   (fidélité à l'état stocké), et NON pré-sélection du format réel de
+        //   l'équipe qui laisserait croire à une surcharge inexistante.
+        //   Robustesse : si la valeur stockée n'existe pas dans la liste
+        //   FORMATS (legacy, format retiré), on retombe sur '— Hérité —' sans
+        //   erreur plutôt que de laisser un select incohérent.
+        _eqEng.forEach(function (eng) {
+          if (!eng || !eng.equipe_id) return;
+          const line = document.querySelector(
+            '#evt-create-equipes .evt-eng-format-row[data-equipe-id="' + eng.equipe_id + '"]');
+          if (!line) return;
+          line.style.display = 'inline-flex';
+          const sel = line.querySelector('.evt-eng-format-select');
+          if (!sel) return;
+          const stored = eng.format_de_jeu ? String(eng.format_de_jeu) : '';
+          const exists = Array.prototype.some.call(sel.options, function (o) {
+            return o.value === stored;
+          });
+          sel.value = exists ? stored : '';
+        });
         if (evt.date_fin) {
           const _mjToggle2 = document.getElementById('evt-create-multijours-toggle');
           const _mjGroup2  = document.getElementById('evt-create-date-fin-group');
@@ -6696,8 +6735,20 @@
           '#evt-create-equipes .evt-eng-format-row[data-equipe-id="' + eqId + '"] .evt-eng-format-select')
           || document.querySelector(
           '#evt-create-format-lines .evt-eng-format-row[data-equipe-id="' + eqId + '"] .evt-eng-format-select');
-        if (formatRow && formatRow.value) {
-          eng.format_de_jeu = formatRow.value;
+        // EVT-FORMAT-EDITION-READBACK — D2 (Manu) : la clé est TOUJOURS posée,
+        //   `null` quand '— Hérité —' est sélectionné (au lieu d'être omise).
+        //   Motif : la RPC modifier_evenement_complet applique un UPDATE SEC
+        //   (`format_de_jeu = v_engagement->>'format_de_jeu'`) — une clé
+        //   ABSENTE y vaut déjà NULL, donc omettre la clé n'a jamais « préservé »
+        //   la valeur, il l'effaçait silencieusement. En la posant
+        //   explicitement, le retour '— Hérité —' devient un geste VOLONTAIRE
+        //   et réversible : on peut annuler une surcharge de format après
+        //   l'avoir choisie, ce qui était impossible auparavant.
+        //   Le sélecteur étant désormais révélé ET réhydraté à l'édition
+        //   (cf. bloc EVT-FORMAT-EDITION-READBACK dans openModalEditComplet),
+        //   `formatRow.value` reflète fidèlement l'état affiché à l'écran.
+        if (formatRow) {
+          eng.format_de_jeu = formatRow.value ? formatRow.value : null;
         }
 
         // Adversaires de cette équipe : A3 mono, ou A4 plateau par équipe.
