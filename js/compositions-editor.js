@@ -908,20 +908,50 @@
   };
 
   // Normalise une valeur de format vers une clé de COMPO_FORMATS.
-  // Quatre vocabulaires coexistent dans le Hub (dette MODELE-FORMAT-VOCAB) :
+  // CINQ vocabulaires coexistent dans le Hub (dette MODELE-FORMAT-VOCAB) :
   //   • evenement_equipes_engagees.format_de_jeu : 'XV','13','12','X','9','8','7','5'
   //   • postes.formats_applicables                : idem (sql_207)
   //   • dropdown Évènements                        : idem
-  //   • equipes.format_jeu_code                    : LIBELLÉS EN CLAIR
-  //     (« Jeu à 7 », « Jeu à XV », « Jeu à X »…) — 4e vocabulaire, non aligné.
-  // On absorbe ici les libellés en clair en extrayant leur partie signifiante.
+  //   • equipes.format_jeu_code                    : libellé libre, recopié de…
+  //   • categories.formats_autorises               : …la liste par catégorie,
+  //     qui porte des libellés PÉDAGOGIQUES combinant forme de pratique ET
+  //     effectif : « Premiers pas EDR (Jeu à 5) », « Toucher + 2 sec (Jeu à 5) »,
+  //     « Jouer au contact (Jeu à 7) », « Format 13 (M14 pédago FFR) »,
+  //     « Rugby à XV », « Rugby à 5 (mixte) »…
+  // Seul l'EFFECTIF intéresse la composition (la forme de pratique — T+2s,
+  // contact — ne change pas le nombre de joueurs sur le terrain). On extrait
+  // donc l'effectif où qu'il se trouve : entre parenthèses en priorité, sinon
+  // dans le corps du libellé.
+  // Sans cette extraction, paramétrer « Premiers pas EDR (Jeu à 5) » en
+  // admin-équipes retombait SILENCIEUSEMENT sur XV — le paramétrage semblait
+  // fait et ne produisait aucun effet.
   function _normFormat(v) {
     if (v == null) return null;
-    let s = String(v).trim().toUpperCase();
-    if (COMPO_FORMATS[s]) return COMPO_FORMATS[s].fmtBase;
-    // « JEU À 7 » / « JEU A XV » / « JEU À X » → on retient le dernier token
-    s = s.replace(/^JEU\s+[AÀ]\s+/, '').trim();
-    if (COMPO_FORMATS[s]) return COMPO_FORMATS[s].fmtBase;
+    const brut = String(v).trim().toUpperCase();
+    if (COMPO_FORMATS[brut]) return COMPO_FORMATS[brut].fmtBase;
+
+    // Candidats, du plus spécifique au plus général :
+    //   1. contenu des parenthèses — « … (Jeu à 5) » → « JEU À 5 »
+    //   2. libellé entier, parenthèses ôtées — « Rugby à XV » → « RUGBY À XV »
+    const cands = [];
+    const paren = brut.match(/\(([^)]*)\)/);
+    if (paren) cands.push(paren[1]);
+    cands.push(brut.replace(/\([^)]*\)/g, ' '));
+
+    for (const c of cands) {
+      // Retire le préfixe de pratique (« JEU À », « RUGBY À », « FORMAT »)
+      // et tout ce qui précède, puis isole le token d'effectif.
+      const s = c.replace(/^.*?(?:JEU|RUGBY)\s+[AÀ]\s+/, '')
+                 .replace(/^FORMAT\s+/, '')
+                 .replace(/[^A-Z0-9]+$/, '')
+                 .trim();
+      if (COMPO_FORMATS[s]) return COMPO_FORMATS[s].fmtBase;
+      // Dernier recours : premier token alphanumérique reconnu du candidat.
+      const toks = c.split(/[^A-Z0-9]+/).filter(Boolean);
+      for (const t of toks) {
+        if (COMPO_FORMATS[t]) return COMPO_FORMATS[t].fmtBase;
+      }
+    }
     return null;
   }
 
