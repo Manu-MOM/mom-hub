@@ -4818,26 +4818,111 @@
   // On réconcilie ici par un mapping front explicite. '12' → structure XV
   // (effectif réduit, placement XV conservé — décision Manu). Tout format
   // inconnu / NULL / legacy → XV (dégradation honnête, jamais d'écran vide).
+  // ────────────────────────────────────────────────────────────────
+  // COMPO-MULTI-FORMAT (pt 227) — tables des formats 12, 9, 8 et 5.
+  // Solde la dernière dette technique du chantier : ces 4 formats n'avaient
+  // AUCUNE table et retombaient sur TERRAIN_POS_XV — remontée terrain Manu
+  // (« la vue terrain pour le jeu à 5 montre un XV »).
+  //
+  // Postes vérifiés en base (postes.formats_applicables, sql_207) :
+  //   12 : PG TAL PD 2LU 3LU DM DO AG CG CD AD AR
+  //    9 : PG TAL PD 2LU 3LU DM DO AIU CTU
+  //    8 : PG TAL PD 3LU DM DO AIU CTU
+  //    5 : J1 J2 J3 J4 J5
+  //
+  // Principe de placement, cohérent avec les tables existantes : occupation
+  // décroissante avec l'effectif (XV 85 %, X 68 %, VII 42 % de la hauteur),
+  // 1re ligne groupée devant, relais au centre, ligne de trois-quarts étalée,
+  // arrière en couverture quand le format en porte un.
+  //
+  // NB : dispositions PROPOSÉES par l'agent, à corriger en recette — le
+  // placement des joueurs est une décision de coach, pas de développeur.
+
+  // Format 12 — mêlée à 5 (1re ligne + 2LU + 3LU), ligne de trois-quarts
+  // complète et latéralisée. Occupation ~72 %.
+  const TERRAIN_POS_12 = {
+    'PG':  { x: 34.0, y: 16.0 },
+    'TAL': { x: 47.0, y: 16.0 },
+    'PD':  { x: 60.0, y: 16.0 },
+    '2LU': { x: 18.0, y: 27.0 },   // 2L sur l'extérieur (consigne Manu, v3.22)
+    '3LU': { x: 47.0, y: 29.0 },
+    'DM':  { x: 36.0, y: 42.0 },
+    'DO':  { x: 52.0, y: 51.0 },
+    'CG':  { x: 34.0, y: 64.0 },
+    'CD':  { x: 55.0, y: 66.0 },
+    'AG':  { x: 15.0, y: 74.0 },
+    'AD':  { x: 76.0, y: 74.0 },
+    'AR':  { x: 47.0, y: 88.0 }
+  };
+
+  // Format 9 — le X sans l'arrière. Occupation ~55 %.
+  const TERRAIN_POS_9 = {
+    'PG':  { x: 36.0, y: 22.0 },
+    'TAL': { x: 48.0, y: 22.0 },
+    'PD':  { x: 60.0, y: 22.0 },
+    '2LU': { x: 22.0, y: 32.0 },
+    '3LU': { x: 48.0, y: 34.0 },
+    'DM':  { x: 38.0, y: 46.0 },
+    'DO':  { x: 54.0, y: 55.0 },
+    'CTU': { x: 42.0, y: 67.0 },
+    'AIU': { x: 72.0, y: 71.0 }
+  };
+
+  // Format 8 — le 9 sans la deuxième ligne. Occupation ~48 %.
+  const TERRAIN_POS_8 = {
+    'PG':  { x: 37.0, y: 24.0 },
+    'TAL': { x: 49.0, y: 24.0 },
+    'PD':  { x: 61.0, y: 24.0 },
+    '3LU': { x: 49.0, y: 35.0 },
+    'DM':  { x: 39.0, y: 46.0 },
+    'DO':  { x: 55.0, y: 55.0 },
+    'CTU': { x: 43.0, y: 65.0 },
+    'AIU': { x: 72.0, y: 70.0 }
+  };
+
+  // Format 5 — postes NEUTRES (ni mêlée ni touche en JCO/T2S, cf. sql_207 D-C).
+  // Disposition en 3 + 2 : trois joueurs en ligne devant, deux en soutien
+  // décalé derrière. Bloc TRÈS resserré (occupation ~30 %) — le 5x5 se joue
+  // sur 30x25 m, un étalement de type XV n'aurait aucun sens.
+  // SAR×MOM tronque FXY7 pour les petits effectifs, ce qui placerait 3 piliers
+  // et 2 demis ; le Hub ayant des postes neutres, une disposition propre est
+  // possible et préférée.
+  const TERRAIN_POS_5 = {
+    'J1': { x: 32.0, y: 38.0 },
+    'J2': { x: 50.0, y: 34.0 },
+    'J3': { x: 68.0, y: 38.0 },
+    'J4': { x: 40.0, y: 62.0 },
+    'J5': { x: 60.0, y: 62.0 }
+  };
+
   const TERRAIN_POS_PAR_FORMAT = {
     'XV': TERRAIN_POS_XV,
     '15': TERRAIN_POS_XV,
-    '12': TERRAIN_POS_XV,   // rugby à XII = structure XV, effectif réduit
     '13': TERRAIN_POS_13,
+    // pt 227 — le '12' pointait sur TERRAIN_POS_XV (repli « structure XV,
+    // effectif réduit », v3.22). Il a désormais sa propre table : le repli
+    // n'a plus lieu d'être et plaçait des postes absents du format.
+    '12': TERRAIN_POS_12,
     'X':  TERRAIN_POS_X,
     '10': TERRAIN_POS_X,
+    '9':  TERRAIN_POS_9,
+    '8':  TERRAIN_POS_8,
     '7':  TERRAIN_POS_7,
-    'VII': TERRAIN_POS_7
+    'VII': TERRAIN_POS_7,
+    '5':  TERRAIN_POS_5
   };
 
   // v3.22 — Table de coordonnées à utiliser pour la compo courante.
   // Lit le format de l'équipe engagée (mode U-N3) ; défaut XV sinon.
-  // v3.22 / pt 225 — Table de coordonnées de la compo courante.
+
+
   // Délègue désormais à _formatCourant() (source UNIQUE, partagée avec la vue
   // Liste) : elle gère la surcharge, l'héritage depuis equipes.format_jeu_code
   // et les libellés en clair. Avant, ce helper avait sa propre lecture du
   // format et ignorait l'héritage → Terrain et Liste pouvaient diverger.
-  // Formats sans table dédiée (12, 9, 8, 5) → repli XV, dégradation honnête
-  // (dette tracée : coordonnées de ces 4 formats à produire).
+  // Formats SANS table dédiée → repli XV (dégradation honnête). Depuis le
+  // pt 227 les 8 formats ont tous leur table : ce repli ne joue plus que pour
+  // une valeur inconnue ou un contexte legacy.
   function terrainPosCourant() {
     const fmt = _formatCourant();
     return TERRAIN_POS_PAR_FORMAT[fmt] || TERRAIN_POS_XV;
