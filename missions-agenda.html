@@ -66,6 +66,8 @@
   .ag-sw.t-travail_personnel { background: #556677; }
   .ag-ev.t-stage, .ag-chip.t-stage { background: #f8e2ec; color: #7a2549; border-left-color: #b03a6e; }
   .ag-sw.t-stage { background: #b03a6e; }
+  .ag-ev.t-absence, .ag-chip.t-absence { background: #f4f4f2; color: #6b6b66; border-left-color: #a8a8a2; font-style: italic; }
+  .ag-sw.t-absence { background: #a8a8a2; }
   .ag-ev.t-evenement_extra_sportif, .ag-chip.t-evenement_extra_sportif { background: #e8eafa; color: #2c3782; border-left-color: #4a5fc1; }
   .ag-sw.t-evenement_extra_sportif { background: #4a5fc1; }
   .ag-ev.t-divers, .ag-chip.t-divers { background: #eef0ef; color: #42504a; border-left-color: #6b7a74; }
@@ -244,6 +246,60 @@
     return out;
   }
 
+  // ABSENCES-SALARIE (pt 229) : temps de repos et congés, source SÉPARÉE des
+  // missions (table absences_salarie). Une période de congés est UNE ligne en
+  // base (D6) : on l'éclate ici par jour, exactement comme reperesFenetre le
+  // fait déjà pour les vacances scolaires.
+  let absContratId = null;
+  async function absencesFenetre(debutISO, finISO) {
+    if (!absContratId) return [];
+    let rows = [];
+    try {
+      rows = (await rpc('list_absences_salarie', {
+        p_contrat_id: absContratId,
+        p_date_debut: debutISO,
+        p_date_fin: finISO
+      })) || [];
+    } catch (e) { return []; }
+    const out = [];
+    rows.forEach(function (a) {
+      const lib = a.out_nature === 'conges_payes' ? 'Congés' : 'Repos';
+      const suffixe = a.out_motif ? ' — ' + a.out_motif : '';
+      if (a.out_journee_entiere) {
+        const deb = a.out_date_debut > debutISO ? a.out_date_debut : debutISO;
+        const fin = a.out_date_fin < finISO ? a.out_date_fin : finISO;
+        if (deb > fin) return;
+        chaqueJourISO(deb, fin, function (iso) {
+          out.push({
+            id: 'abs-' + a.out_id + '-' + iso, date: iso, heure: null, duree_min: null,
+            type: 'absence', libelle: lib + suffixe,
+            etat: 'repere', meta: { src: 'absence', absence: a }
+          });
+        });
+        return;
+      }
+      // Créneau horaire : une entrée par jour couvert, bornes réelles.
+      const deb = a.out_date_debut > debutISO ? a.out_date_debut : debutISO;
+      const fin = a.out_date_fin < finISO ? a.out_date_fin : finISO;
+      if (deb > fin) return;
+      chaqueJourISO(deb, fin, function (iso) {
+        const estPremier = (iso === String(a.out_date_debut).slice(0, 10));
+        const estDernier = (iso === String(a.out_date_fin).slice(0, 10));
+        let h = null;
+        if (estPremier && a.out_heure_debut) h = String(a.out_heure_debut).slice(0, 5);
+        let txt = lib;
+        if (estPremier && a.out_heure_debut) txt += ' dès ' + String(a.out_heure_debut).slice(0, 5);
+        else if (estDernier && a.out_heure_fin) txt += ' jusqu\u2019à ' + String(a.out_heure_fin).slice(0, 5);
+        out.push({
+          id: 'abs-' + a.out_id + '-' + iso, date: iso, heure: h, duree_min: null,
+          type: 'absence', libelle: txt + suffixe,
+          etat: 'repere', meta: { src: 'absence', absence: a }
+        });
+      });
+    });
+    return out;
+  }
+
   // ---- Adaptateur agenda (copié de suivi-salarie.html, SANS le chemin d'édition) ----
   function agMapRow(o) {
     return {
@@ -258,6 +314,22 @@
     };
   }
   function agDetailRows(it) {
+    if (it.meta && it.meta.src === 'absence') {
+      const a = it.meta.absence || {};
+      const rows = [{ lbl: 'Nature', val: a.out_nature === 'conges_payes' ? 'Congés payés' : 'Repos' }];
+      const bd = String(a.out_date_debut || '').slice(0, 10);
+      const bf = String(a.out_date_fin || '').slice(0, 10);
+      if (a.out_journee_entiere) {
+        rows.push({ lbl: 'Période', val: bd === bf ? bd : bd + ' → ' + bf });
+        rows.push({ lbl: 'Horaires', val: 'Journée(s) entière(s)' });
+      } else {
+        rows.push({ lbl: 'Début', val: bd + ' ' + String(a.out_heure_debut || '').slice(0, 5) });
+        rows.push({ lbl: 'Fin', val: bf + ' ' + String(a.out_heure_fin || '').slice(0, 5) });
+      }
+      if (a.out_motif) rows.push({ lbl: 'Motif', val: a.out_motif });
+      rows.push({ lbl: 'Compteur', val: 'Aucune heure décomptée.' });
+      return rows;
+    }
     if (it.meta && it.meta.src === 'repere') {
       const rp = it.meta.repere || {};
       const rrows = [{ lbl: 'Nature', val: it.type === 'ferie' ? 'Jour férié (Alsace-Moselle)' : 'Vacances scolaires (zone B — académie de Strasbourg)' }];
@@ -290,10 +362,17 @@
           p_date_debut: debutISO,
           p_date_fin: finISO
         });
-        return (data || []).map(agMapRow).concat(reperesFenetre(debutISO, finISO));
+        // ABSENCES-SALARIE (pt 229) : 3e source, concaténée comme les repères.
+        // js/hub-agenda.js (INTERDIT) n'est PAS touché : il reçoit ses données
+        // par ce callback, il ne va pas les chercher.
+        const abs = await absencesFenetre(debutISO, finISO);
+        return (data || []).map(agMapRow)
+          .concat(reperesFenetre(debutISO, finISO))
+          .concat(abs);
       },
       types: TYPES.concat([TYPE_DIVERS])
-        .concat([{ code: 'ferie', lib: 'Férié' }, { code: 'vacances', lib: 'Vacances scolaires' }])
+        .concat([{ code: 'ferie', lib: 'Férié' }, { code: 'vacances', lib: 'Vacances scolaires' },
+                 { code: 'absence', lib: 'Repos / congés' }])
         .map(function (t) { return { code: t.code, lib: t.lib }; }),
       detail: { titre: function (it) { return it.libelle || agTypeLib(it.type); }, rows: agDetailRows },
       capacites: { pleinEcran: true, caseAnnulees: true },
@@ -303,6 +382,18 @@
       etatMark: function (it) { return it.etat === 'validee' ? '✓✓' : (it.etat === 'realisee' ? '✓' : ''); },
       onError: function (e) { flash('Agenda : ' + errMsg(e), 'err'); }
     });
+  }
+
+  // ABSENCES-SALARIE (pt 229) : résolution de l'id de CONTRAT (et non de
+  // personne) dont list_absences_salarie a besoin. Vaut pour les deux voies
+  // d'accès (admin|bureau et salarié relié) : on retient le contrat actif
+  // correspondant au salarié affiché.
+  async function resoudreContratAbsences() {
+    try {
+      const contrats = (await rpc('list_contrats_salaries', { p_inclure_inactifs: false })) || [];
+      const c = contrats.find(function (x) { return x.personne_id === salarieId; }) || contrats[0];
+      absContratId = c ? c.id : null;
+    } catch (e) { absContratId = null; }
   }
 
   // ---- Garde d'accès : VOIE 3 — admin|bureau OU salarié relié + résolution du salarié ----
@@ -349,6 +440,8 @@
   saisonActive = await SupabaseHub.getSaisonActive();
 
   const ok = await resoudreAcces();
+  // ABSENCES-SALARIE (pt 229) : le contrat se résout APRÈS salarieId.
+  if (ok) { await resoudreContratAbsences(); }
 
   document.body.classList.remove('auth-pending');
 
