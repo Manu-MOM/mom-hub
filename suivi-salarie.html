@@ -2730,6 +2730,10 @@
       await rpc('supprimer_absence_salarie', { p_id: id });
       flash('Créneau supprimé.', 'ok');
       await absCharger();
+      // Le compteur « Créneaux » de la série et le panneau déplié doivent
+      // être redessinés, sinon la ligne supprimée reste affichée et rien ne
+      // semble s'être passé.
+      await regCharger();
     } catch (e) { flash(errMsg(e), 'err'); }
   }
 
@@ -2801,6 +2805,10 @@
   // autonomes. Supprimer une occurrence ne casse pas la série.
   const REG_JOURS_LIB = { 1:'lun', 2:'mar', 3:'mer', 4:'jeu', 5:'ven', 6:'sam', 7:'dim' };
   let regEditId = null;
+  // Séries actuellement dépliées : mémorisées pour être rouvertes après un
+  // rechargement (sinon supprimer une occurrence refermait le panneau et
+  // donnait l'impression que rien ne s'était passé).
+  let regOuvertes = {};
 
   function regJoursCoches() {
     const out = [];
@@ -2977,8 +2985,17 @@
         trDet.hidden = ouvert;
         bT.textContent = ouvert ? '▸' : '▾';
         bT.setAttribute('aria-expanded', ouvert ? 'false' : 'true');
-        if (!ouvert) { regRendreOccurrences(r.out_id, tdDet); }
+        if (ouvert) { delete regOuvertes[r.out_id]; }
+        else { regOuvertes[r.out_id] = true; regRendreOccurrences(r.out_id, tdDet); }
       });
+
+      // Restauration de l'état déplié après un rechargement.
+      if (regOuvertes[r.out_id]) {
+        trDet.hidden = false;
+        bT.textContent = '▾';
+        bT.setAttribute('aria-expanded', 'true');
+        regRendreOccurrences(r.out_id, tdDet);
+      }
     });
   }
 
