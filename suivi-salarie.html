@@ -444,9 +444,13 @@
   <!-- ============ COMPTEUR (salarié) ============ -->
   <section class="ss-compteur" id="ssCompteur" hidden>
     <h2>Mon compteur d'heures</h2>
-    <div class="ss-export-row" style="margin:0 0 12px;">
-      <button type="button" id="ssExportXlsx" class="ss-back" style="cursor:pointer;">
-        Exporter le bilan d'heures (.xlsx)
+    <div class="ss-grid" style="margin:0 0 18px;">
+      <button type="button" id="ssExportXlsx" class="ss-tile">
+        <span class="ss-tile-ic" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+        </span>
+        <span class="ss-tile-lib">Exporter le bilan d'heures</span>
+        <span class="ss-tile-count">Fichier .xlsx</span>
       </button>
     </div>
     <div class="ss-cards" id="ssCards"></div>
@@ -467,12 +471,20 @@
     <p class="ss-sub" style="margin:0 0 12px;">
       Ces créneaux ne comptent aucune heure au compteur d'annualisation.
     </p>
-    <div class="ss-export-row" style="margin:0 0 12px;">
-      <button type="button" id="ssAbsNew" class="ss-back" style="cursor:pointer;" hidden>
-        + Nouveau créneau off
+    <div class="ss-grid" id="ssAbsActions" style="margin:0 0 18px;">
+      <button type="button" id="ssAbsNew" class="ss-tile" hidden>
+        <span class="ss-tile-ic" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        </span>
+        <span class="ss-tile-lib">Nouveau créneau off</span>
+        <span class="ss-tile-count">Repos ou congés, ponctuel</span>
       </button>
-      <button type="button" id="ssRegNew" class="ss-back" style="cursor:pointer;margin-left:8px;" hidden>
-        + Règle récurrente
+      <button type="button" id="ssRegNew" class="ss-tile" hidden>
+        <span class="ss-tile-ic" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 2v4M7 2v4M3 9h18M5 5h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z"/></svg>
+        </span>
+        <span class="ss-tile-lib">Nouveau créneau off récurrent</span>
+        <span class="ss-tile-count">Rythme hebdomadaire</span>
       </button>
     </div>
 
@@ -2622,6 +2634,9 @@
   // 1 582 h est nette de congés et de repos, un jour off vaut 0 h.
   const ABS_NATURES = { repos: 'Repos', conges_payes: 'Congés payés' };
   let absEditId = null;
+  // Cache des créneaux chargés : sert au dépliage des occurrences d'une règle
+  // (évite un aller-retour réseau par série ouverte).
+  let absCache = [];
 
   function absContratId() {
     return exportContrat ? exportContrat.id : null;
@@ -2766,11 +2781,16 @@
 
   async function absCharger() {
     const cid = absContratId();
-    if (!cid) { absRendre([]); return; }
+    if (!cid) { absCache = []; absRendre([]); return; }
     try {
       const rows = (await rpc('list_absences_salarie', { p_contrat_id: cid })) || [];
-      absRendre(rows);
+      absCache = rows;
+      // Les créneaux issus d'une règle ne sont PAS listés ici : ils
+      // apparaissent au dépliage de leur série, sinon la liste des créneaux
+      // ponctuels serait noyée sous 40 lundis.
+      absRendre(rows.filter(function (a) { return !a.out_regle_id; }));
     } catch (e) {
+      absCache = [];
       absRendre([]);
       flash('Temps de repos : ' + errMsg(e), 'err');
     }
@@ -2904,12 +2924,24 @@
       const tr = document.createElement('tr');
       const per = String(r.out_date_debut).slice(8,10) + '/' + String(r.out_date_debut).slice(5,7)
                 + ' → ' + String(r.out_date_fin).slice(8,10) + '/' + String(r.out_date_fin).slice(5,7);
-      [regRythmeLabel(r.out_recurrence) + (r.out_motif ? ' — ' + r.out_motif : ''),
-       per,
-       String(r.out_nb_occurrences)
-      ].forEach(function (v) {
+
+      // Cellule 1 : chevron de repli + rythme.
+      const tdLib = document.createElement('td');
+      const bT = document.createElement('button');
+      bT.type = 'button';
+      bT.className = 'ss-btn ss-btn-ghost';
+      bT.style.marginRight = '8px';
+      bT.setAttribute('aria-expanded', 'false');
+      bT.textContent = '▸';
+      tdLib.appendChild(bT);
+      tdLib.appendChild(document.createTextNode(
+        regRythmeLabel(r.out_recurrence) + (r.out_motif ? ' — ' + r.out_motif : '')));
+      tr.appendChild(tdLib);
+
+      [per, String(r.out_nb_occurrences)].forEach(function (v) {
         const td = document.createElement('td'); td.textContent = v; tr.appendChild(td);
       });
+
       const tdAct = document.createElement('td');
       if (peutEcrire) {
         const bG = document.createElement('button');
@@ -2930,7 +2962,52 @@
       }
       tr.appendChild(tdAct);
       tb.appendChild(tr);
+
+      // Ligne de détail repliée : les occurrences de cette règle.
+      const trDet = document.createElement('tr');
+      trDet.hidden = true;
+      const tdDet = document.createElement('td');
+      tdDet.colSpan = 4;
+      tdDet.className = 'ss-hint';
+      trDet.appendChild(tdDet);
+      tb.appendChild(trDet);
+
+      bT.addEventListener('click', function () {
+        const ouvert = !trDet.hidden;
+        trDet.hidden = ouvert;
+        bT.textContent = ouvert ? '▸' : '▾';
+        bT.setAttribute('aria-expanded', ouvert ? 'false' : 'true');
+        if (!ouvert) { regRendreOccurrences(r.out_id, tdDet); }
+      });
     });
+  }
+
+  // Occurrences d'une règle : chargées au dépliage (pas au rendu initial).
+  function regRendreOccurrences(regleId, cible) {
+    const lignes = absCache.filter(function (a) { return a.out_regle_id === regleId; });
+    cible.textContent = '';
+    if (!lignes.length) {
+      cible.textContent = 'Aucun créneau généré pour cette règle.';
+      return;
+    }
+    const ul = document.createElement('ul');
+    ul.style.margin = '0'; ul.style.paddingLeft = '18px';
+    lignes.forEach(function (a) {
+      const li = document.createElement('li');
+      const d = String(a.out_date_debut).slice(8,10) + '/' + String(a.out_date_debut).slice(5,7);
+      const h = a.out_heure_debut ? ' ' + String(a.out_heure_debut).slice(0,5)
+                + '–' + String(a.out_heure_fin || '').slice(0,5) : '';
+      li.textContent = d + h;
+      if (peutEcrire) {
+        const b = document.createElement('button');
+        b.type='button'; b.className='ss-btn ss-btn-ghost'; b.textContent='Supprimer';
+        b.style.marginLeft='8px';
+        b.addEventListener('click', function () { absSupprimer(a.out_id); });
+        li.appendChild(b);
+      }
+      ul.appendChild(li);
+    });
+    cible.appendChild(ul);
   }
 
   async function regCharger() {
