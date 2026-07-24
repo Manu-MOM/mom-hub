@@ -471,7 +471,18 @@
       <button type="button" id="ssAbsNew" class="ss-back" style="cursor:pointer;" hidden>
         + Nouveau créneau off
       </button>
+      <button type="button" id="ssRegNew" class="ss-back" style="cursor:pointer;margin-left:8px;" hidden>
+        + Règle récurrente
+      </button>
     </div>
+
+    <!-- Règles récurrentes : la règle décrit un rythme, les créneaux générés
+         sont des lignes autonomes (supprimables une par une sans casser la
+         série). La règle elle-même n'apparaît PAS à l'agenda. -->
+    <table class="ss-releve" id="ssReglesTable" hidden>
+      <thead><tr><th>Règle</th><th>Période</th><th>Créneaux</th><th></th></tr></thead>
+      <tbody id="ssReglesListe"></tbody>
+    </table>
     <table class="ss-releve">
       <thead><tr><th>Nature</th><th>Du</th><th>Au</th><th>Motif</th><th></th></tr></thead>
       <tbody id="ssAbsListe"></tbody>
@@ -490,6 +501,75 @@
     <div class="ss-modal-act">
       <button class="ss-btn ss-btn-ghost" id="ssConfirmCancel" type="button">Retour</button>
       <button class="ss-btn" id="ssConfirmOk" type="button">Confirmer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODALE RÈGLE RÉCURRENTE (pt 230) ============ -->
+<div class="ss-overlay" id="ssRegOverlay">
+  <div class="ss-modal">
+    <h3 id="ssRegTitle">Nouvelle règle récurrente</h3>
+    <div class="ss-modal-flash" aria-live="polite"></div>
+    <p class="ss-sub" style="margin-bottom:14px;">
+      Décris un rythme de repos. Les créneaux qui tombent sur une mission
+      existante ne seront pas créés — ils te seront signalés.
+    </p>
+
+    <div class="ss-field">
+      <label>Jours *</label>
+      <div id="ssRegJours" style="display:flex;flex-wrap:wrap;gap:6px;">
+        <label class="ss-hint"><input type="checkbox" value="1" style="width:auto;"> Lun</label>
+        <label class="ss-hint"><input type="checkbox" value="2" style="width:auto;"> Mar</label>
+        <label class="ss-hint"><input type="checkbox" value="3" style="width:auto;"> Mer</label>
+        <label class="ss-hint"><input type="checkbox" value="4" style="width:auto;"> Jeu</label>
+        <label class="ss-hint"><input type="checkbox" value="5" style="width:auto;"> Ven</label>
+        <label class="ss-hint"><input type="checkbox" value="6" style="width:auto;"> Sam</label>
+        <label class="ss-hint"><input type="checkbox" value="7" style="width:auto;"> Dim</label>
+      </div>
+    </div>
+
+    <div class="ss-row2">
+      <div class="ss-field">
+        <label for="ssRegHDebut">Heure de début *</label>
+        <input type="time" id="ssRegHDebut" value="08:00">
+      </div>
+      <div class="ss-field">
+        <label for="ssRegHFin">Heure de fin *</label>
+        <input type="time" id="ssRegHFin" value="13:00">
+      </div>
+    </div>
+
+    <div class="ss-row2">
+      <div class="ss-field">
+        <label for="ssRegDDebut">À partir du *</label>
+        <input type="date" id="ssRegDDebut">
+      </div>
+      <div class="ss-field">
+        <label for="ssRegDFin">Jusqu'au *</label>
+        <input type="date" id="ssRegDFin">
+      </div>
+    </div>
+
+    <div class="ss-field">
+      <label for="ssRegMotif">Motif (optionnel)</label>
+      <input type="text" id="ssRegMotif" placeholder="ex. Lundi matin off">
+    </div>
+
+    <div class="ss-modal-act">
+      <button class="ss-btn ss-btn-ghost" id="ssRegCancel" type="button">Annuler</button>
+      <button class="ss-btn" id="ssRegSave" type="button">Créer et générer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODALE RAPPORT DE GÉNÉRATION (pt 230) ============ -->
+<div class="ss-overlay" id="ssGenOverlay">
+  <div class="ss-modal">
+    <h3>Génération des créneaux</h3>
+    <p class="ss-sub" id="ssGenResume" style="margin-bottom:12px;"></p>
+    <div id="ssGenConflits"></div>
+    <div class="ss-modal-act">
+      <button class="ss-btn" id="ssGenOk" type="button">Fermer</button>
     </div>
   </div>
 </div>
@@ -2696,6 +2776,172 @@
     }
   }
 
+  // ---- Règles récurrentes (pt 230) ----
+  // La règle décrit un rythme ; les créneaux générés sont des lignes
+  // autonomes. Supprimer une occurrence ne casse pas la série.
+  const REG_JOURS_LIB = { 1:'lun', 2:'mar', 3:'mer', 4:'jeu', 5:'ven', 6:'sam', 7:'dim' };
+  let regEditId = null;
+
+  function regJoursCoches() {
+    const out = [];
+    Array.prototype.forEach.call(
+      $('ssRegJours').querySelectorAll('input[type=checkbox]'),
+      function (c) { if (c.checked) out.push(parseInt(c.value, 10)); });
+    return out;
+  }
+
+  function regOuvrir(row) {
+    regEditId = row ? row.out_id : null;
+    $('ssRegTitle').textContent = row ? 'Modifier la règle' : 'Nouvelle règle récurrente';
+    $('ssRegSave').textContent = row ? 'Enregistrer et regénérer' : 'Créer et générer';
+    const rec = row && row.out_recurrence ? row.out_recurrence : null;
+    const jours = rec && rec.jours ? rec.jours : [];
+    Array.prototype.forEach.call(
+      $('ssRegJours').querySelectorAll('input[type=checkbox]'),
+      function (c) { c.checked = jours.indexOf(parseInt(c.value, 10)) !== -1; });
+    $('ssRegHDebut').value = row && row.out_heure_debut ? String(row.out_heure_debut).slice(0,5) : '08:00';
+    $('ssRegHFin').value   = row && row.out_heure_fin   ? String(row.out_heure_fin).slice(0,5)   : '13:00';
+    $('ssRegDDebut').value = row ? String(row.out_date_debut).slice(0,10) : '';
+    $('ssRegDFin').value   = row ? String(row.out_date_fin).slice(0,10)   : '';
+    $('ssRegMotif').value  = row && row.out_motif ? row.out_motif : '';
+    $('ssRegOverlay').classList.add('open');
+  }
+
+  function regFermer() {
+    $('ssRegOverlay').classList.remove('open');
+    regEditId = null;
+  }
+
+  function regRythmeLabel(rec) {
+    if (!rec) return '—';
+    const j = (rec.jours || []).map(function (n) { return REG_JOURS_LIB[n] || n; }).join(', ');
+    return j + ' · ' + (rec.heure_debut || '') + '–' + (rec.heure_fin || '');
+  }
+
+  // Rapport de génération : les créneaux en conflit avec une mission ne sont
+  // pas créés, ils sont listés ici. Un conflit ne bloque pas les autres dates.
+  function regRapport(lignes) {
+    const creees  = lignes.filter(function (l) { return l.out_statut === 'creee'; });
+    const exist   = lignes.filter(function (l) { return l.out_statut === 'existante'; });
+    const ignores = lignes.filter(function (l) { return l.out_statut === 'ignoree_conflit'; });
+    let resume = creees.length + ' créneau(x) créé(s)';
+    if (exist.length)   resume += ' · ' + exist.length + ' déjà présent(s)';
+    if (ignores.length) resume += ' · ' + ignores.length + ' ignoré(s) pour conflit';
+    $('ssGenResume').textContent = resume + '.';
+
+    const box = $('ssGenConflits');
+    box.textContent = '';
+    if (ignores.length) {
+      const t = document.createElement('p');
+      t.className = 'ss-hint';
+      t.style.marginBottom = '6px';
+      t.textContent = 'Non créés — une mission occupe déjà ces créneaux :';
+      box.appendChild(t);
+      const ul = document.createElement('ul');
+      ul.style.margin = '0'; ul.style.paddingLeft = '18px';
+      ignores.forEach(function (l) {
+        const li = document.createElement('li');
+        li.className = 'ss-hint';
+        const d = String(l.out_date).slice(8,10) + '/' + String(l.out_date).slice(5,7);
+        li.textContent = d + (l.out_detail ? ' — ' + l.out_detail : '');
+        ul.appendChild(li);
+      });
+      box.appendChild(ul);
+    }
+    $('ssGenOverlay').classList.add('open');
+  }
+
+  async function regGenerer(regleId, dd, df) {
+    const lignes = (await rpc('generer_absences_recurrentes', {
+      p_regle_id: regleId, p_from: dd, p_to: df
+    })) || [];
+    regRapport(lignes);
+    await absCharger();
+    await regCharger();
+  }
+
+  async function regEnregistrer() {
+    const cid = absContratId();
+    if (!cid) { flash('Contrat salarié introuvable.', 'err'); return; }
+    const jours = regJoursCoches();
+    if (!jours.length) { flash('Sélectionne au moins un jour.', 'err'); return; }
+    const dd = $('ssRegDDebut').value, df = $('ssRegDFin').value;
+    if (!dd || !df) { flash('Les deux bornes de période sont requises.', 'err'); return; }
+    try {
+      const reg = await rpc('upsert_regle_absence', {
+        p_id: regEditId,
+        p_contrat_id: cid,
+        p_date_debut: dd,
+        p_date_fin: df,
+        p_jours: jours,
+        p_heure_debut: $('ssRegHDebut').value,
+        p_heure_fin: $('ssRegHFin').value,
+        p_motif: $('ssRegMotif').value || null
+      });
+      const rid = reg && reg.id ? reg.id : (Array.isArray(reg) && reg[0] ? reg[0].id : null);
+      regFermer();
+      if (rid) { await regGenerer(rid, dd, df); }
+      else { flash('Règle enregistrée.', 'ok'); await regCharger(); }
+    } catch (e) { flash(errMsg(e), 'err'); }
+  }
+
+  async function regSupprimer(id) {
+    // La règle est une ligne d'absences_salarie : la RPC de suppression du
+    // pt 229 s'applique. ON DELETE CASCADE retire ses occurrences.
+    try {
+      await rpc('supprimer_absence_salarie', { p_id: id });
+      flash('Règle et créneaux supprimés.', 'ok');
+      await absCharger();
+      await regCharger();
+    } catch (e) { flash(errMsg(e), 'err'); }
+  }
+
+  function regRendre(rows) {
+    const tb = $('ssReglesListe');
+    tb.textContent = '';
+    $('ssReglesTable').hidden = !rows.length;
+    rows.forEach(function (r) {
+      const tr = document.createElement('tr');
+      const per = String(r.out_date_debut).slice(8,10) + '/' + String(r.out_date_debut).slice(5,7)
+                + ' → ' + String(r.out_date_fin).slice(8,10) + '/' + String(r.out_date_fin).slice(5,7);
+      [regRythmeLabel(r.out_recurrence) + (r.out_motif ? ' — ' + r.out_motif : ''),
+       per,
+       String(r.out_nb_occurrences)
+      ].forEach(function (v) {
+        const td = document.createElement('td'); td.textContent = v; tr.appendChild(td);
+      });
+      const tdAct = document.createElement('td');
+      if (peutEcrire) {
+        const bG = document.createElement('button');
+        bG.type='button'; bG.className='ss-btn ss-btn-ghost'; bG.textContent='Regénérer';
+        bG.addEventListener('click', function () {
+          regGenerer(r.out_id, String(r.out_date_debut).slice(0,10), String(r.out_date_fin).slice(0,10))
+            .catch(function (e) { flash(errMsg(e), 'err'); });
+        });
+        const bE = document.createElement('button');
+        bE.type='button'; bE.className='ss-btn ss-btn-ghost'; bE.textContent='Modifier';
+        bE.style.marginLeft='6px';
+        bE.addEventListener('click', function () { regOuvrir(r); });
+        const bD = document.createElement('button');
+        bD.type='button'; bD.className='ss-btn ss-btn-ghost'; bD.textContent='Supprimer';
+        bD.style.marginLeft='6px';
+        bD.addEventListener('click', function () { regSupprimer(r.out_id); });
+        tdAct.appendChild(bG); tdAct.appendChild(bE); tdAct.appendChild(bD);
+      }
+      tr.appendChild(tdAct);
+      tb.appendChild(tr);
+    });
+  }
+
+  async function regCharger() {
+    const cid = absContratId();
+    if (!cid) { regRendre([]); return; }
+    try {
+      const rows = (await rpc('list_regles_absence', { p_contrat_id: cid })) || [];
+      regRendre(rows);
+    } catch (e) { regRendre([]); }
+  }
+
   async function loadCompteur() {
     try {
       const contrats = (await rpc('list_contrats_salaries', { p_inclure_inactifs: false })) || [];
@@ -2809,6 +3055,18 @@
       $('ssAbsHeureDebut').addEventListener('change', absControle);
       $('ssAbsHeureFin').addEventListener('change', absControle);
     }
+    // RÉCURRENCE (pt 230)
+    if ($('ssRegNew')) {
+      $('ssRegNew').addEventListener('click', function () { regOuvrir(null); });
+      $('ssRegCancel').addEventListener('click', regFermer);
+      $('ssRegSave').addEventListener('click', regEnregistrer);
+      $('ssGenOk').addEventListener('click', function () {
+        $('ssGenOverlay').classList.remove('open');
+      });
+      $('ssRegDDebut').addEventListener('change', function () {
+        if (!$('ssRegDFin').value) $('ssRegDFin').value = $('ssRegDDebut').value;
+      });
+    }
     // EXPORT-BILAN-HEURES : bouton d'export .xlsx (garde d'existence).
     if ($('ssExportXlsx')) { $('ssExportXlsx').addEventListener('click', exportBilanHeures); }
     // Déclaration
@@ -2908,7 +3166,7 @@
   // ABSENCES-SALARIE (pt 229) : section visible pour tous (doctrine D4
   // « tout visible, tout verrouillé ») ; seule l'écriture est gardée.
   $('ssAbsences').hidden = false;
-  if (peutEcrire) { $('ssAbsNew').hidden = false; }
+  if (peutEcrire) { $('ssAbsNew').hidden = false; $('ssRegNew').hidden = false; }
 
   if ($('season-pill') && saisonActive && saisonActive.libelle) {
     $('season-pill').textContent = String(saisonActive.libelle).toUpperCase();
@@ -2925,6 +3183,8 @@
     // ABSENCES-SALARIE (pt 229) : APRÈS loadCompteur, qui résout et mémorise
     // le contrat (exportContrat) dont absCharger a besoin.
     await absCharger();
+    // RÉCURRENCE (pt 230) : même dépendance à exportContrat.
+    await regCharger();
   } catch (e) {
     flash('Chargement impossible : ' + errMsg(e), 'err');
   }
