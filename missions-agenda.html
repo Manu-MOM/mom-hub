@@ -282,16 +282,41 @@
       const deb = a.out_date_debut > debutISO ? a.out_date_debut : debutISO;
       const fin = a.out_date_fin < finISO ? a.out_date_fin : finISO;
       if (deb > fin) return;
+      // La DURÉE doit être fournie : hub-agenda.js retombe sur 60 min par
+      // défaut quand duree_min est null, ce qui écrasait un 08:00–12:00
+      // en bloc d'une heure.
+      function minutesDe(hhmm) {
+        if (!hhmm) return null;
+        const p = String(hhmm).slice(0, 5).split(':');
+        return (parseInt(p[0], 10) * 60) + parseInt(p[1], 10);
+      }
+      const mDeb = minutesDe(a.out_heure_debut);
+      const mFin = minutesDe(a.out_heure_fin);
       chaqueJourISO(deb, fin, function (iso) {
         const estPremier = (iso === String(a.out_date_debut).slice(0, 10));
         const estDernier = (iso === String(a.out_date_fin).slice(0, 10));
-        let h = null;
-        if (estPremier && a.out_heure_debut) h = String(a.out_heure_debut).slice(0, 5);
+        let h = null, dur = null;
+        if (estPremier && estDernier) {
+          // Créneau dans la journée : bornes exactes.
+          h = a.out_heure_debut ? String(a.out_heure_debut).slice(0, 5) : null;
+          if (mDeb != null && mFin != null && mFin > mDeb) dur = mFin - mDeb;
+        } else if (estPremier) {
+          // Premier jour d'un créneau multi-jours : du début à minuit.
+          h = a.out_heure_debut ? String(a.out_heure_debut).slice(0, 5) : null;
+          if (mDeb != null) dur = (24 * 60) - mDeb;
+        } else if (estDernier) {
+          // Dernier jour : de minuit à l'heure de fin.
+          h = '00:00';
+          if (mFin != null) dur = mFin;
+        } else {
+          // Jour intermédiaire entièrement couvert.
+          h = '00:00'; dur = 24 * 60;
+        }
         let txt = lib;
         if (estPremier && a.out_heure_debut) txt += ' dès ' + String(a.out_heure_debut).slice(0, 5);
         else if (estDernier && a.out_heure_fin) txt += ' jusqu\u2019à ' + String(a.out_heure_fin).slice(0, 5);
         out.push({
-          id: 'abs-' + a.out_id + '-' + iso, date: iso, heure: h, duree_min: null,
+          id: 'abs-' + a.out_id + '-' + iso, date: iso, heure: h, duree_min: dur,
           type: 'absence', libelle: txt + suffixe,
           etat: 'repere', meta: { src: 'absence', absence: a }
         });
