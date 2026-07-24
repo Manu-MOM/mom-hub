@@ -456,6 +456,28 @@
     </table>
   </section>
 
+  <!-- ============ SAISIE DES TEMPS DE REPOS ET CONGÉS ============ -->
+  <!-- ABSENCES-SALARIE (pt 229) : section AUTONOME, volontairement HORS de la
+       grille des types de mission. Un repos n'est pas une mission : il vit dans
+       sa propre table (absences_salarie, sql_210) et ne doit pas réapparaître
+       parmi les vignettes de types, sinon on reproduirait à l'écran l'amalgame
+       qu'on a éliminé en base. -->
+  <section class="ss-compteur" id="ssAbsences" hidden>
+    <h2>Saisie des temps de repos et congés</h2>
+    <p class="ss-sub" style="margin:0 0 12px;">
+      Ces créneaux ne comptent aucune heure au compteur d'annualisation.
+    </p>
+    <div class="ss-export-row" style="margin:0 0 12px;">
+      <button type="button" id="ssAbsNew" class="ss-back" style="cursor:pointer;" hidden>
+        + Nouveau créneau off
+      </button>
+    </div>
+    <table class="ss-releve">
+      <thead><tr><th>Nature</th><th>Du</th><th>Au</th><th>Motif</th><th></th></tr></thead>
+      <tbody id="ssAbsListe"></tbody>
+    </table>
+  </section>
+
 </div>
 
 <!-- ============ MODALE CONFIRMATION (annuler / réactiver) ============ -->
@@ -468,6 +490,63 @@
     <div class="ss-modal-act">
       <button class="ss-btn ss-btn-ghost" id="ssConfirmCancel" type="button">Retour</button>
       <button class="ss-btn" id="ssConfirmOk" type="button">Confirmer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODALE TEMPS DE REPOS / CONGÉS (pt 229) ============ -->
+<div class="ss-overlay" id="ssAbsOverlay">
+  <div class="ss-modal">
+    <h3 id="ssAbsTitle">Nouveau créneau off</h3>
+    <div class="ss-modal-flash" aria-live="polite"></div>
+
+    <div class="ss-field">
+      <label for="ssAbsNature">Nature *</label>
+      <select id="ssAbsNature">
+        <option value="repos">Repos</option>
+        <option value="conges_payes">Congés payés</option>
+      </select>
+    </div>
+
+    <div class="ss-field">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+        <input type="checkbox" id="ssAbsJournee" style="width:auto;">
+        Journée(s) entière(s) — sans horaires
+      </label>
+    </div>
+
+    <div class="ss-row2">
+      <div class="ss-field">
+        <label for="ssAbsDateDebut">Du *</label>
+        <input type="date" id="ssAbsDateDebut">
+      </div>
+      <div class="ss-field" id="ssAbsHDebutWrap">
+        <label for="ssAbsHeureDebut">Heure de début *</label>
+        <input type="time" id="ssAbsHeureDebut">
+      </div>
+    </div>
+
+    <div class="ss-row2">
+      <div class="ss-field">
+        <label for="ssAbsDateFin">Au *</label>
+        <input type="date" id="ssAbsDateFin">
+      </div>
+      <div class="ss-field" id="ssAbsHFinWrap">
+        <label for="ssAbsHeureFin">Heure de fin *</label>
+        <input type="time" id="ssAbsHeureFin">
+      </div>
+    </div>
+
+    <div class="ss-field">
+      <label for="ssAbsMotif">Motif (optionnel)</label>
+      <input type="text" id="ssAbsMotif" placeholder="ex. Compensateur dimanche 20/09">
+    </div>
+
+    <p class="ss-hint" id="ssAbsControle" style="margin:10px 0 0;"></p>
+
+    <div class="ss-modal-act">
+      <button class="ss-btn ss-btn-ghost" id="ssAbsCancel" type="button">Annuler</button>
+      <button class="ss-btn" id="ssAbsSave" type="button">Enregistrer</button>
     </div>
   </div>
 </div>
@@ -2457,6 +2536,166 @@
     }
   }
 
+  // ================= TEMPS DE REPOS ET CONGÉS (pt 229) =================
+  // Table DÉDIÉE absences_salarie (sql_210), strictement découplée des
+  // missions. Ces créneaux ne créent AUCUNE ligne de relevé : la cible de
+  // 1 582 h est nette de congés et de repos, un jour off vaut 0 h.
+  const ABS_NATURES = { repos: 'Repos', conges_payes: 'Congés payés' };
+  let absEditId = null;
+
+  function absContratId() {
+    return exportContrat ? exportContrat.id : null;
+  }
+
+  function absMajChamps() {
+    const entier = $('ssAbsJournee').checked;
+    $('ssAbsHDebutWrap').style.display = entier ? 'none' : '';
+    $('ssAbsHFinWrap').style.display = entier ? 'none' : '';
+  }
+
+  function absOuvrir(row) {
+    absEditId = row ? row.out_id : null;
+    $('ssAbsTitle').textContent = row ? 'Modifier le créneau' : 'Nouveau créneau off';
+    $('ssAbsNature').value = row ? row.out_nature : 'repos';
+    $('ssAbsJournee').checked = row ? !!row.out_journee_entiere : false;
+    $('ssAbsDateDebut').value = row ? String(row.out_date_debut).slice(0, 10) : '';
+    $('ssAbsDateFin').value = row ? String(row.out_date_fin).slice(0, 10) : '';
+    $('ssAbsHeureDebut').value = row && row.out_heure_debut ? String(row.out_heure_debut).slice(0, 5) : '';
+    $('ssAbsHeureFin').value = row && row.out_heure_fin ? String(row.out_heure_fin).slice(0, 5) : '';
+    $('ssAbsMotif').value = row && row.out_motif ? row.out_motif : '';
+    $('ssAbsControle').textContent = '';
+    absMajChamps();
+    $('ssAbsOverlay').classList.add('open');
+  }
+
+  function absFermer() {
+    $('ssAbsOverlay').classList.remove('open');
+    absEditId = null;
+  }
+
+  // Contrôle des 35 h : le repos hebdomadaire est CALCULÉ, jamais saisi.
+  // On interroge controle_repos_hebdo sur la semaine du créneau saisi.
+  async function absControle() {
+    const cid = absContratId();
+    const d = $('ssAbsDateDebut').value;
+    if (!cid || !d) { $('ssAbsControle').textContent = ''; return; }
+    try {
+      const lundi = isoDate(mondayOf(parseDate(d)));
+      const r = (await rpc('controle_repos_hebdo', { p_contrat_id: cid, p_lundi: lundi })) || [];
+      const c = r[0];
+      if (!c) { $('ssAbsControle').textContent = ''; return; }
+      const h = Math.floor((c.out_repos_max_min || 0) / 60);
+      const m = (c.out_repos_max_min || 0) % 60;
+      const lbl = h + ' h ' + pad2(m);
+      $('ssAbsControle').textContent = c.out_conforme
+        ? '✓ Repos hebdomadaire : ' + lbl + ' consécutives sur cette semaine.'
+        : '⚠ Repos hebdomadaire : ' + lbl + ' seulement — 35 h requises.';
+      $('ssAbsControle').style.color = c.out_conforme ? '' : '#a32d2d';
+    } catch (e) {
+      $('ssAbsControle').textContent = '';
+    }
+  }
+
+  async function absEnregistrer() {
+    const cid = absContratId();
+    if (!cid) { flash('Contrat salarié introuvable.', 'err'); return; }
+    const entier = $('ssAbsJournee').checked;
+    const dd = $('ssAbsDateDebut').value;
+    const df = $('ssAbsDateFin').value || dd;
+    if (!dd) { flash('La date de début est obligatoire.', 'err'); return; }
+    if (!entier && (!$('ssAbsHeureDebut').value || !$('ssAbsHeureFin').value)) {
+      flash('Renseigne les heures, ou coche « journée(s) entière(s) ».', 'err');
+      return;
+    }
+    try {
+      await rpc('upsert_absence_salarie', {
+        p_id: absEditId,
+        p_contrat_id: cid,
+        p_nature: $('ssAbsNature').value,
+        p_date_debut: dd,
+        p_heure_debut: entier ? null : $('ssAbsHeureDebut').value,
+        p_date_fin: df,
+        p_heure_fin: entier ? null : $('ssAbsHeureFin').value,
+        p_journee_entiere: entier,
+        p_motif: $('ssAbsMotif').value || null,
+        p_notes: null
+      });
+      absFermer();
+      flash('Créneau enregistré.', 'ok');
+      await absCharger();
+    } catch (e) {
+      // Le refus anti-chevauchement remonte ici : la RPC nomme la ou les
+      // missions en conflit. On l'affiche tel quel, c'est l'information utile.
+      flash(errMsg(e), 'err');
+    }
+  }
+
+  async function absSupprimer(id) {
+    try {
+      await rpc('supprimer_absence_salarie', { p_id: id });
+      flash('Créneau supprimé.', 'ok');
+      await absCharger();
+    } catch (e) { flash(errMsg(e), 'err'); }
+  }
+
+  function absLigneLabel(d, h) {
+    const jour = String(d).slice(8, 10) + '/' + String(d).slice(5, 7);
+    return h ? jour + ' ' + String(h).slice(0, 5) : jour;
+  }
+
+  function absRendre(rows) {
+    const tb = $('ssAbsListe');
+    tb.textContent = '';
+    if (!rows.length) {
+      const tr = document.createElement('tr');
+      const td = document.createElement('td');
+      td.colSpan = 5;
+      td.className = 'ss-hint';
+      td.textContent = 'Aucun créneau off enregistré.';
+      tr.appendChild(td); tb.appendChild(tr);
+      return;
+    }
+    rows.forEach(function (r) {
+      const tr = document.createElement('tr');
+      [ABS_NATURES[r.out_nature] || r.out_nature,
+       absLigneLabel(r.out_date_debut, r.out_journee_entiere ? null : r.out_heure_debut),
+       absLigneLabel(r.out_date_fin, r.out_journee_entiere ? null : r.out_heure_fin),
+       r.out_motif || '—'
+      ].forEach(function (v) {
+        const td = document.createElement('td');
+        td.textContent = v;
+        tr.appendChild(td);
+      });
+      const tdAct = document.createElement('td');
+      if (peutEcrire) {
+        const bE = document.createElement('button');
+        bE.type = 'button'; bE.className = 'ss-btn ss-btn-ghost';
+        bE.textContent = 'Modifier';
+        bE.addEventListener('click', function () { absOuvrir(r); });
+        const bD = document.createElement('button');
+        bD.type = 'button'; bD.className = 'ss-btn ss-btn-ghost';
+        bD.textContent = 'Supprimer';
+        bD.style.marginLeft = '6px';
+        bD.addEventListener('click', function () { absSupprimer(r.out_id); });
+        tdAct.appendChild(bE); tdAct.appendChild(bD);
+      }
+      tr.appendChild(tdAct);
+      tb.appendChild(tr);
+    });
+  }
+
+  async function absCharger() {
+    const cid = absContratId();
+    if (!cid) { absRendre([]); return; }
+    try {
+      const rows = (await rpc('list_absences_salarie', { p_contrat_id: cid })) || [];
+      absRendre(rows);
+    } catch (e) {
+      absRendre([]);
+      flash('Temps de repos : ' + errMsg(e), 'err');
+    }
+  }
+
   async function loadCompteur() {
     try {
       const contrats = (await rpc('list_contrats_salaries', { p_inclure_inactifs: false })) || [];
@@ -2557,6 +2796,19 @@
       weekStart = new Date(weekStart); weekStart.setDate(weekStart.getDate() + 7); renderAgenda();
     });
     $('ssNewMission').addEventListener('click', openMission);
+    // ABSENCES-SALARIE (pt 229) : câblage de la section temps de repos.
+    if ($('ssAbsNew')) {
+      $('ssAbsNew').addEventListener('click', function () { absOuvrir(null); });
+      $('ssAbsCancel').addEventListener('click', absFermer);
+      $('ssAbsSave').addEventListener('click', absEnregistrer);
+      $('ssAbsJournee').addEventListener('change', absMajChamps);
+      $('ssAbsDateDebut').addEventListener('change', function () {
+        if (!$('ssAbsDateFin').value) $('ssAbsDateFin').value = $('ssAbsDateDebut').value;
+        absControle();
+      });
+      $('ssAbsHeureDebut').addEventListener('change', absControle);
+      $('ssAbsHeureFin').addEventListener('change', absControle);
+    }
     // EXPORT-BILAN-HEURES : bouton d'export .xlsx (garde d'existence).
     if ($('ssExportXlsx')) { $('ssExportXlsx').addEventListener('click', exportBilanHeures); }
     // Déclaration
@@ -2653,6 +2905,10 @@
   }
   $('ssCompteur').hidden = false;
   $('ssMisBenefCreate').hidden = false;
+  // ABSENCES-SALARIE (pt 229) : section visible pour tous (doctrine D4
+  // « tout visible, tout verrouillé ») ; seule l'écriture est gardée.
+  $('ssAbsences').hidden = false;
+  if (peutEcrire) { $('ssAbsNew').hidden = false; }
 
   if ($('season-pill') && saisonActive && saisonActive.libelle) {
     $('season-pill').textContent = String(saisonActive.libelle).toUpperCase();
@@ -2666,6 +2922,9 @@
     await chargerOccurrences();
     renderGrid();
     await loadCompteur();
+    // ABSENCES-SALARIE (pt 229) : APRÈS loadCompteur, qui résout et mémorise
+    // le contrat (exportContrat) dont absCharger a besoin.
+    await absCharger();
   } catch (e) {
     flash('Chargement impossible : ' + errMsg(e), 'err');
   }
