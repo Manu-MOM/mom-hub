@@ -7679,6 +7679,146 @@
       return Array.isArray(data) ? data : [];
     },
 
+    // =================================================================
+    // BIBLIOTHEQUE — FAVORIS (portee user) & REFERENCE (portee role)
+    // (pt 233) atelier_id = ID dossier Drive (a.id cote biblio).
+    // SQL : sql_233_bibliotheque_favoris_reference.sql.
+    // =================================================================
+
+    /**
+     * (pt 233) Liste des atelier_id marques favoris par le compte
+     * connecte. RPC mes_favoris() (SECURITY DEFINER, authenticated,
+     * setof text). Un compte non relie a une fiche -> [] (pas d'erreur).
+     *
+     * @returns {Promise<string[]>} atelier_id favoris ; [] si aucun/erreur.
+     */
+    async mesFavoris() {
+      const { data, error } = await client.rpc('mes_favoris');
+      if (error) {
+        console.error('MOM Hub: mesFavoris() / mes_favoris', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * (pt 233) Ajoute un atelier aux favoris du compte connecte.
+     * RPC favori_ajouter(p_atelier_id). Idempotent cote SQL.
+     *
+     * @param {string} atelierId  ID dossier Drive de l'atelier.
+     * @returns {Promise<{ok:boolean, error?:string}>}
+     */
+    async favoriAjouter(atelierId) {
+      if (!atelierId || typeof atelierId !== 'string') {
+        return { ok: false, error: 'atelier_id manquant' };
+      }
+      const { error } = await client.rpc('favori_ajouter', {
+        p_atelier_id: atelierId
+      });
+      if (error) {
+        console.error('MOM Hub: favoriAjouter() / favori_ajouter', error);
+        return { ok: false, error: error.message };
+      }
+      return { ok: true };
+    },
+
+    /**
+     * (pt 233) Retire un atelier des favoris du compte connecte.
+     * RPC favori_retirer(p_atelier_id). Idempotent cote SQL.
+     *
+     * @param {string} atelierId  ID dossier Drive de l'atelier.
+     * @returns {Promise<{ok:boolean, error?:string}>}
+     */
+    async favoriRetirer(atelierId) {
+      if (!atelierId || typeof atelierId !== 'string') {
+        return { ok: false, error: 'atelier_id manquant' };
+      }
+      const { error } = await client.rpc('favori_retirer', {
+        p_atelier_id: atelierId
+      });
+      if (error) {
+        console.error('MOM Hub: favoriRetirer() / favori_retirer', error);
+        return { ok: false, error: error.message };
+      }
+      return { ok: true };
+    },
+
+    /**
+     * (pt 233) Liste des atelier_id marques "de reference" (portee
+     * club, visibles de tous). RPC ateliers_reference_ids()
+     * (SECURITY DEFINER, authenticated, setof text).
+     *
+     * @returns {Promise<string[]>} atelier_id de reference ; [] si erreur.
+     */
+    async ateliersReferenceIds() {
+      const { data, error } = await client.rpc('ateliers_reference_ids');
+      if (error) {
+        console.error('MOM Hub: ateliersReferenceIds() / ateliers_reference_ids', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * (pt 233) Droit de poser/retirer le tag "atelier de reference".
+     * RPC puis_je_tagger_reference() = has_role('admin') OR
+     * est_responsable_edr(). Sert a conditionner l'affichage du
+     * bouton de reference dans la modale.
+     *
+     * @returns {Promise<boolean>} true si autorise ; false sinon/erreur.
+     */
+    async puisJeTaggerReference() {
+      const { data, error } = await client.rpc('puis_je_tagger_reference');
+      if (error) {
+        console.error('MOM Hub: puisJeTaggerReference() / puis_je_tagger_reference', error);
+        return false;
+      }
+      return data === true;
+    },
+
+    /**
+     * (pt 233) Marque un atelier comme "de reference". Garde de role
+     * cote SQL (admin OU responsable EDR) : un appel non autorise
+     * renvoie {ok:false} avec l'erreur insufficient_privilege.
+     *
+     * @param {string} atelierId  ID dossier Drive de l'atelier.
+     * @returns {Promise<{ok:boolean, error?:string}>}
+     */
+    async referenceAjouter(atelierId) {
+      if (!atelierId || typeof atelierId !== 'string') {
+        return { ok: false, error: 'atelier_id manquant' };
+      }
+      const { error } = await client.rpc('reference_ajouter', {
+        p_atelier_id: atelierId
+      });
+      if (error) {
+        console.error('MOM Hub: referenceAjouter() / reference_ajouter', error);
+        return { ok: false, error: error.message };
+      }
+      return { ok: true };
+    },
+
+    /**
+     * (pt 233) Retire le tag "de reference" d'un atelier. Garde de
+     * role cote SQL (admin OU responsable EDR). Idempotent.
+     *
+     * @param {string} atelierId  ID dossier Drive de l'atelier.
+     * @returns {Promise<{ok:boolean, error?:string}>}
+     */
+    async referenceRetirer(atelierId) {
+      if (!atelierId || typeof atelierId !== 'string') {
+        return { ok: false, error: 'atelier_id manquant' };
+      }
+      const { error } = await client.rpc('reference_retirer', {
+        p_atelier_id: atelierId
+      });
+      if (error) {
+        console.error('MOM Hub: referenceRetirer() / reference_retirer', error);
+        return { ok: false, error: error.message };
+      }
+      return { ok: true };
+    },
+
     /**
      * Référentiel des axes de planification (sql/73). Lecture ouverte
      * aux authentifiés (RLS planification_axes_select). Renvoie les
