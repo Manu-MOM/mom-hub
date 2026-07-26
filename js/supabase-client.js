@@ -4228,7 +4228,8 @@
     _validTypesBloc: [
       'accueil', 'mise_en_train', 'echauffement', 'echauffement_specifique',
       'corps_seance', 'jeu_application', 'match_application',
-      'retour_au_calme', 'bilan', 'pause_boisson', 'bloc_libre'
+      'retour_au_calme', 'bilan', 'pause_boisson', 'bloc_libre',
+      'atelier'
     ],
 
     // 4 niveaux d'intensité autorisés (mirror CHECK SQL seances_blocs.intensite)
@@ -4242,7 +4243,7 @@
      *
      * @param {string} seanceId
      * @param {object} params
-     * @param {string} params.type_bloc (requis, 1 des 11 valeurs)
+     * @param {string} params.type_bloc (requis, 1 des 12 valeurs)
      * @param {number} params.duree_min (requis)
      * @param {number} [params.ordre] Auto-calculé si absent
      * @param {string} [params.titre_precision]
