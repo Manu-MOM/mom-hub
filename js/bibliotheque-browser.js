@@ -456,47 +456,45 @@
       document.getElementById('m-cross-sec').style.display = 'none';
     }
 
-    // === Vidéo principale (depuis files.videos) ===
-    // Chargement à la demande : un poster cliquable remplace l'iframe auto
-    // (l'embed /preview de Drive échoue au chargement automatique dans une
-    // iframe tierce ; le clic utilisateur le fait passer de façon fiable).
-    // Repli permanent : lien /view "Ouvrir dans Drive".
-    const videos   = (fiche && fiche.files && fiche.files.videos) || [];
-    const vSec      = document.getElementById('m-video-sec');
-    const vBox      = document.getElementById('m-video-box');
-    const vFallback = document.getElementById('m-video-fallback');
-    const vExtras   = document.getElementById('m-video-extras');
+    // === Vidéos principales (depuis files.videos) ===
+    // Chargement à la demande : chaque vidéo du dossier a son propre poster
+    // cliquable empilé verticalement (l'embed /preview de Drive échoue au
+    // chargement automatique dans une iframe tierce ; le clic utilisateur le
+    // fait passer de façon fiable). Repli permanent : lien /view sous chacun.
+    const videos    = (fiche && fiche.files && fiche.files.videos) || [];
+    const vSec       = document.getElementById('m-video-sec');
+    const vList      = document.getElementById('m-video-list');
     if (videos.length > 0) {
       vSec.style.display = '';
-      const mainId = videos[0];
-      vBox.innerHTML =
-        '<button type="button" class="m-video-poster" aria-label="Lire la vidéo">' +
-          '<span class="m-video-play">▶</span>' +
-          '<span class="m-video-poster-label">Lire la vidéo</span>' +
-        '</button>';
-      vBox.querySelector('.m-video-poster').onclick = () => {
-        const f = document.createElement('iframe');
-        f.id = 'm-video-frame';
-        f.src = `https://drive.google.com/file/d/${mainId}/preview`;
-        f.allow = 'autoplay';
-        f.allowFullscreen = true;
-        vBox.innerHTML = '';
-        vBox.appendChild(f);
-      };
-      vFallback.innerHTML =
-        `<a href="https://drive.google.com/file/d/${mainId}/view" target="_blank" rel="noopener">Ouvrir dans Drive ↗</a>`;
-      if (videos.length > 1) {
-        vExtras.innerHTML = videos.slice(1).map((vid, i) =>
-          `<a class="m-video-btn" href="https://drive.google.com/file/d/${vid}/view" target="_blank" rel="noopener">▶ Vidéo ${i + 2}</a>`
-        ).join('');
-      } else {
-        vExtras.innerHTML = '';
-      }
+      vList.innerHTML = '';
+      videos.forEach((vid, i) => {
+        const item = document.createElement('div');
+        item.className = 'm-video-item';
+        const label = videos.length > 1 ? `Lire la vidéo ${i + 1}` : 'Lire la vidéo';
+        item.innerHTML =
+          '<div class="m-video-box">' +
+            '<button type="button" class="m-video-poster" aria-label="' + label + '">' +
+              '<span class="m-video-play">▶</span>' +
+              '<span class="m-video-poster-label">' + label + '</span>' +
+            '</button>' +
+          '</div>' +
+          '<div class="m-video-fallback">' +
+            `<a href="https://drive.google.com/file/d/${vid}/view" target="_blank" rel="noopener">Ouvrir dans Drive ↗</a>` +
+          '</div>';
+        item.querySelector('.m-video-poster').onclick = () => {
+          const box = item.querySelector('.m-video-box');
+          const f = document.createElement('iframe');
+          f.src = `https://drive.google.com/file/d/${vid}/preview`;
+          f.allow = 'autoplay';
+          f.allowFullscreen = true;
+          box.innerHTML = '';
+          box.appendChild(f);
+        };
+        vList.appendChild(item);
+      });
     } else {
       vSec.style.display = 'none';
-      vBox.innerHTML = '';
-      vFallback.innerHTML = '';
-      vExtras.innerHTML = '';
+      vList.innerHTML = '';
     }
 
     // === Pédagogie ===
@@ -550,9 +548,9 @@
   function closeModal() {
     document.getElementById('overlay').classList.remove('open');
     // Stopper la lecture vidéo (sinon elle continue en arrière-plan).
-    // L'iframe n'existe que si l'utilisateur a cliqué le poster : on vide le box.
-    const vb = document.getElementById('m-video-box');
-    if (vb) vb.innerHTML = '';
+    // Les iframes n'existent que si l'utilisateur a cliqué un poster : on vide
+    // chaque box vidéo (plusieurs possibles si le dossier a plusieurs vidéos).
+    document.querySelectorAll('#m-video-list .m-video-box').forEach(b => { b.innerHTML = ''; });
   }
 
   // ============================================================
