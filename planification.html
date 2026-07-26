@@ -129,6 +129,169 @@
         clip-path: none; border-radius: 8px; }
       .pa-frise__bloc:first-child { clip-path: none; }
     }
+
+    /* =================================================================
+       PLANIF-FRISE-COSMETIQUE-EXPORT
+       Cartouche + frise horizontale (chevrons alternés, scrollable,
+       cliquables) + frise verticale (détail) + export PDF paysage.
+       Additif : n'altère aucun style existant.
+       ================================================================= */
+    :root {
+      --clay: #b8451f; --clayd: #8a3113;
+      --goldd: #a67c1a; --gold-fonce: #a67c1a;
+    }
+
+    /* ---- Cartouche (en-tête type club) ---- */
+    .pa-cartouche {
+      display: flex; align-items: center; gap: 1rem;
+      background: linear-gradient(135deg, var(--vert-fonce), var(--vert));
+      color: #fff; border-radius: 12px; padding: 1rem 1.3rem;
+      margin-bottom: 1.25rem; position: relative; overflow: hidden;
+    }
+    .pa-cartouche::after {
+      content: ""; position: absolute; right: -40px; top: -40px;
+      width: 180px; height: 180px; border-radius: 50%;
+      background: rgba(255, 255, 255, .05);
+    }
+    .pa-cartouche__ecusson {
+      width: 64px; height: 64px; flex: 0 0 auto; z-index: 1;
+      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .3));
+    }
+    .pa-cartouche__txt { z-index: 1; }
+    .pa-cartouche__club {
+      font-size: .76rem; text-transform: uppercase; letter-spacing: .14em;
+      opacity: .85; margin: 0;
+    }
+    .pa-cartouche__titre { font-size: 1.5rem; font-weight: 800; margin: .1rem 0 0; line-height: 1.1; }
+    .pa-cartouche__sous { font-size: .82rem; opacity: .9; margin: .15rem 0 0; }
+    .pa-cartouche__saison { margin-left: auto; z-index: 1; text-align: right; }
+    .pa-cartouche__pill {
+      display: inline-block; background: var(--gold); color: var(--vert-fonce);
+      font-weight: 800; font-size: .82rem; padding: .3rem .8rem;
+      border-radius: 20px; letter-spacing: .02em; white-space: nowrap;
+    }
+
+    /* ---- Barre d'outils (export) ---- */
+    .pa-frise-tools { display: flex; justify-content: flex-end; margin-bottom: 1rem; }
+    .pa-frise-export {
+      background: var(--vert); color: #fff; border: none; border-radius: 8px;
+      padding: .5rem .9rem; font-size: .9rem; font-weight: 600; cursor: pointer;
+    }
+    .pa-frise-export:hover { background: var(--vert-fonce); }
+
+    /* ---- Frise HORIZONTALE : chevrons alternés, scrollable ---- */
+    .pa-fh-scroll { overflow-x: auto; overflow-y: hidden; padding-bottom: .5rem; }
+    .pa-fh-scroll::-webkit-scrollbar { height: 8px; }
+    .pa-fh-scroll::-webkit-scrollbar-thumb { background: var(--bord); border-radius: 4px; }
+    .pa-fh { display: flex; gap: 0; min-width: min-content; }
+    .pa-fh__bloc {
+      position: relative; flex: 0 0 190px; color: #fff;
+      padding: .8rem 1.6rem; margin-right: -16px;
+      clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%, 16px 50%);
+      cursor: pointer; transition: transform .12s, filter .12s;
+      box-shadow: 0 2px 5px rgba(12, 61, 36, .18);
+    }
+    .pa-fh__bloc:hover { filter: brightness(1.08); transform: translateY(-2px); }
+    .pa-fh__bloc:first-child {
+      padding-left: 1.1rem;
+      clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%);
+    }
+    .pa-fh__bloc:last-child {
+      padding-right: 1.1rem; margin-right: 0;
+      clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 16px 50%);
+    }
+    .pa-fh__bloc.c-vertf { background: var(--vert-fonce); }
+    .pa-fh__bloc.c-gold  { background: var(--gold); color: var(--vert-fonce); }
+    .pa-fh__bloc.c-vert  { background: var(--vert); }
+    .pa-fh__bloc.c-clay  { background: var(--clay); }
+    .pa-fh__bloc--inter {
+      background: repeating-linear-gradient(45deg, var(--gold), var(--gold) 10px, var(--goldd) 10px, var(--goldd) 20px);
+      color: var(--vert-fonce);
+    }
+    .pa-fh__head { display: flex; align-items: center; gap: .45rem; margin-bottom: .3rem; }
+    .pa-fh__num {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 22px; height: 22px; border-radius: 50%;
+      background: rgba(255, 255, 255, .28); font-size: .74rem; font-weight: 800;
+      flex: 0 0 auto;
+    }
+    .pa-fh__bloc.c-gold .pa-fh__num, .pa-fh__bloc--inter .pa-fh__num { background: rgba(12, 61, 36, .22); }
+    .pa-fh__titre { font-weight: 800; font-size: .98rem; }
+    .pa-fh__date { font-size: .74rem; opacity: .9; padding-left: calc(22px + .45rem); }
+
+    /* ---- Frise VERTICALE (détail) ---- */
+    .pa-fv-titre {
+      font-size: .92rem; text-transform: uppercase; letter-spacing: .03em;
+      color: var(--vert-fonce); font-weight: 700; margin: 1.5rem 0 1.1rem;
+    }
+    .pa-fv { position: relative; padding-left: 2.3rem; }
+    .pa-fv__rail { position: absolute; left: 10px; top: 6px; bottom: 6px; width: 2px; background: var(--bord); }
+    .pa-fv__item { position: relative; margin-bottom: 1rem; scroll-margin-top: 1rem; }
+    .pa-fv__item:last-child { margin-bottom: 0; }
+    .pa-fv__num {
+      position: absolute; left: -2.3rem; top: 1px; width: 22px; height: 22px;
+      border-radius: 50%; color: #fff; display: flex; align-items: center;
+      justify-content: center; font-size: .74rem; font-weight: 800; background: var(--vert);
+    }
+    .pa-fv__num.c-vertf { background: var(--vert-fonce); }
+    .pa-fv__num.c-gold  { background: var(--goldd); }
+    .pa-fv__num.c-vert  { background: var(--vert); }
+    .pa-fv__num.c-clay  { background: var(--clay); }
+    .pa-fv__card {
+      background: var(--carte); border: 1px solid var(--bord);
+      border-left: 3px solid var(--vert); border-radius: 8px; padding: .7rem .9rem;
+    }
+    .pa-fv__card.c-vertf { border-left-color: var(--vert-fonce); }
+    .pa-fv__card.c-gold  { border-left-color: var(--goldd); }
+    .pa-fv__card.c-vert  { border-left-color: var(--vert); }
+    .pa-fv__card.c-clay  { border-left-color: var(--clay); }
+    .pa-fv__item--inter .pa-fv__num { background: var(--goldd); }
+    .pa-fv__item--inter .pa-fv__card { background: #fdf7e6; border: 1px solid var(--gold); border-left: 3px solid var(--goldd); }
+    .pa-fv__bar { display: flex; justify-content: space-between; align-items: baseline; gap: .5rem; flex-wrap: wrap; margin-bottom: .4rem; }
+    .pa-fv__titre { font-weight: 700; color: var(--vert-fonce); font-size: .95rem; }
+    .pa-fv__titre em { font-weight: 400; font-style: italic; font-size: .72rem; color: var(--gris); }
+    .pa-fv__date { font-size: .72rem; color: var(--gris); }
+    .pa-fv__card ul { margin: 0; padding-left: 1.1rem; font-size: .78rem; color: var(--ink); line-height: 1.55; }
+    .pa-fv__card p { margin: 0; font-size: .78rem; color: var(--ink); font-style: italic; }
+    @keyframes pa-flash { 0% { background: #fff6d8; } 100% { background: var(--carte); } }
+    .pa-fv__card.is-target { animation: pa-flash 1.6s ease-out; }
+
+    @media (max-width: 640px) {
+      .pa-fh__bloc { flex: 0 0 160px; }
+    }
+
+    /* ---- IMPRESSION : 1 page A4 paysage, condensé, cartouche visible ---- */
+    @media print {
+      @page { size: A4 landscape; margin: 8mm; }
+      html, body {
+        background: #fff !important; padding: 0; margin: 0;
+        -webkit-print-color-adjust: exact; print-color-adjust: exact;
+      }
+      .topbar, .hub-nav, footer, .pa-frise-tools,
+      .pa-head, .pa-bloc, .pa-btn--add,
+      section.pa-card:not(.pa-frise-card) { display: none !important; }
+      .pa-frise-card { border: none !important; box-shadow: none; padding: 0; margin: 0; background: #fff; }
+      .pa-cartouche { margin-bottom: .5rem; padding: .5rem .9rem; border-radius: 8px; }
+      .pa-cartouche__ecusson { width: 46px; height: 46px; }
+      .pa-cartouche__titre { font-size: 1.15rem; }
+      .pa-cartouche__sous { font-size: .7rem; }
+      /* frise horizontale : wrap + tout visible, compacte */
+      .pa-fh-scroll { overflow: visible; }
+      .pa-fh { flex-wrap: wrap; min-width: 0; }
+      .pa-fh__bloc { flex: 1 1 150px; padding: .45rem 1.1rem; box-shadow: none; break-inside: avoid; }
+      .pa-fh__titre { font-size: .82rem; }
+      .pa-fh__date { font-size: .64rem; }
+      /* détail : 3 colonnes pour tenir en hauteur sur une page */
+      .pa-fv-titre { margin: .5rem 0 .4rem; }
+      .pa-fv { padding-left: 0; }
+      .pa-fv__rail { display: none; }
+      .pa-fv-grid { column-count: 3; column-gap: 8mm; }
+      .pa-fv__item { margin: 0 0 4mm; break-inside: avoid; padding-left: 0; }
+      .pa-fv__num { position: static; display: inline-flex; margin-right: .3rem; vertical-align: middle; width: 18px; height: 18px; font-size: .68rem; }
+      .pa-fv__card { padding: .4rem .6rem; }
+      .pa-fv__card ul { font-size: .68rem; line-height: 1.4; }
+      .pa-fv__titre { font-size: .82rem; }
+    }
   </style>
 </head>
 <body class="auth-pending">
