@@ -48,6 +48,10 @@
     cibleId: null,       // categorie_id OU pole_id selon portee
     cibleLabel: '',
     peutEditer: false,   // droit d'écriture sur la cible courante
+    // PLANIF-FRISE-COSMETIQUE-EXPORT : référent(s)/responsable(s) résolus
+    // pour le cartouche d'export. [{prenom, nom}] ; [] si non résolu
+    // (cartouche affiché sans nom, dégradation honnête).
+    referents: [],
     axes: { collectif: [], physique: [], poste: [] },
     blocs: [],           // blocs chargés (objets DB) + brouillons locaux
     // Multi-catégories (portée catégorie d'un encadrant N>1) : liste des
@@ -127,9 +131,65 @@
           b.axe_indiv = Array.isArray(b.axe_indiv) ? b.axe_indiv : [];
           return b;
         });
-        render();
+        // PLANIF-FRISE-COSMETIQUE-EXPORT : résout le(s) référent(s) pour le
+        // cartouche d'export. Non bloquant : en cas d'échec ou d'absence,
+        // State.referents reste [] et le cartouche s'affiche sans nom.
+        return chargerReferents().then(render);
       });
     });
+  }
+
+  // Résout le(s) nom(s) de référent/responsable de la cible courante pour
+  // le cartouche d'export. Catégorie → RPC referent_de_categorie (multi-
+  // référent possible). Pôle → responsables désignés (données pôle).
+  // Dégradation honnête : toute erreur laisse State.referents = [].
+  function chargerReferents() {
+    State.referents = [];
+    var h = hub();
+    if (!h) return Promise.resolve();
+    if (State.portee === 'categorie'
+        && typeof h.referentDeCategorie === 'function') {
+      return Promise.resolve(h.referentDeCategorie(State.cibleId))
+        .then(function (rows) {
+          State.referents = (Array.isArray(rows) ? rows : []).map(function (r) {
+            return { prenom: r.prenom || '', nom: r.nom || '' };
+          });
+        })
+        .catch(function () { State.referents = []; });
+    }
+    if (State.portee === 'pole' && typeof h.getPoles === 'function') {
+      return Promise.resolve(h.getPoles())
+        .then(function (liste) {
+          var p = (liste || []).filter(function (x) { return x.id === State.cibleId; })[0];
+          var ids = [];
+          if (p) {
+            if (p.responsable_principal_id) ids.push(p.responsable_principal_id);
+            if (p.co_responsable_id) ids.push(p.co_responsable_id);
+          }
+          if (!ids.length || typeof h._resolveNoms !== 'function') return;
+          return Promise.resolve(h._resolveNoms(ids)).then(function (map) {
+            var out = [];
+            if (map && typeof map.forEach === 'function') {
+              ids.forEach(function (id) {
+                var v = map.get(id);
+                if (v) out.push({ prenom: v.prenom || '', nom: v.nom || '' });
+              });
+            }
+            State.referents = out;
+          });
+        })
+        .catch(function () { State.referents = []; });
+    }
+    return Promise.resolve();
+  }
+
+  // Libellé « Prénom NOM » concaténé des référents (pour le cartouche).
+  // '' si aucun → le cartouche masque alors la ligne.
+  function libelleReferents() {
+    var noms = (State.referents || []).map(function (r) {
+      return ((r.prenom || '') + ' ' + (r.nom || '')).trim();
+    }).filter(function (s) { return s; });
+    return noms.join(' · ');
   }
 
   // ---- Rendu : enveloppe ----
@@ -253,36 +313,134 @@
     return h;
   }
 
-  // ---- Rendu : frise (lecture, blocs emboîtés) ----
+  // Cycle de couleurs des chevrons (alternance contrastée : 3 teintes MOM).
+  // Un bloc intercalé sort du cycle (rendu hachuré or, classe dédiée).
+  var FRISE_CYCLE = ['c-vertf', 'c-gold', 'c-vert', 'c-clay'];
+
+  // Agrège les axes d'un bloc en une liste de libellés (ordre : individuel,
+  // collectif, physique, poste). Utilisé par les deux frises.
+  function axesDuBloc(b) {
+    var axes = [];
+    (b.axe_indiv || []).forEach(function (id) {
+      var it = AXE_INDIV_ITEMS.filter(function (x) { return x.id === id; })[0];
+      if (it) axes.push(it.label);
+    });
+    if (b.axe_collectif) axes.push(b.axe_collectif);
+    if (b.axe_physique) axes.push(b.axe_physique);
+    if (b.axe_poste) axes.push(b.axe_poste);
+    return axes;
+  }
+
+  // Cartouche d'en-tête (type club) : écusson MOM, catégorie/pôle, saison,
+  // référent(s) résolu(s). Visible à l'écran ET repris en tête d'export PDF.
+  function renderCartouche() {
+    var s = State.saison || {};
+    var saisonLbl = esc(s.libelle || s.code || '');
+    var cible = esc(State.cibleLabel || '');
+    var typeLbl = State.portee === 'pole' ? 'Trame de pôle' : 'Catégorie';
+    var refs = libelleReferents();
+    var ligneRef = refs
+      ? '<p class="pa-cartouche__sous">' +
+          (State.portee === 'pole' ? 'Responsable : ' : 'Référent : ') +
+          esc(refs) + '</p>'
+      : '';
+    return '<div class="pa-cartouche">' +
+      '<img class="pa-cartouche__ecusson" src="assets/ecusson-mom.png" alt="Écusson MOM">' +
+      '<div class="pa-cartouche__txt">' +
+        '<p class="pa-cartouche__club">Mutzig Ovalie Molsheim</p>' +
+        '<p class="pa-cartouche__titre">Planification saison — ' + cible + '</p>' +
+        '<p class="pa-cartouche__sous">' + esc(typeLbl) + '</p>' +
+        ligneRef +
+      '</div>' +
+      (saisonLbl
+        ? '<div class="pa-cartouche__saison"><span class="pa-cartouche__pill">SAISON ' + saisonLbl + '</span></div>'
+        : '') +
+      '</div>';
+  }
+
+  // ---- Rendu : frise (lecture) — 2 vues complémentaires ----
+  //   1. Frise HORIZONTALE : chevrons emboîtés, couleurs alternées,
+  //      scrollable (overflow-x), titre + dates seulement, cliquables
+  //      (goBloc → saut au détail). À l'impression : wrap + tout visible.
+  //   2. Frise VERTICALE : détail des contenus (axes, commentaires),
+  //      toujours visible sous l'horizontale, mêmes codes couleur.
+  //   + Cartouche + bouton d'export.
   function renderFrise() {
     var persistes = State.blocs.filter(function (b) { return !b._draft; });
+    var h = '<section class="pa-card pa-frise-card">';
+    h += renderCartouche();
+
     if (persistes.length === 0) {
-      return bloc('Frise de la saison', '<p class="pa-attente">Aucun bloc enregistré pour l\'instant. La frise s\'affichera ici.</p>');
+      h += '<p class="pa-attente">Aucun bloc enregistré pour l\'instant. La frise s\'affichera ici.</p>';
+      h += '</section>';
+      return h;
     }
-    var h = '<section class="pa-card"><h2>Frise de la saison</h2><div class="pa-frise">';
+
+    // Barre d'outils (export) — masquée à l'impression via @media print.
+    h += '<div class="pa-frise-tools">' +
+      '<button type="button" class="pa-btn pa-frise-export" data-act="export">' +
+      'Exporter / Imprimer (PDF)</button></div>';
+
+    // 1) Frise horizontale (chevrons alternés, scrollable, cliquables).
+    h += '<div class="pa-fh-scroll"><div class="pa-fh">';
     persistes.forEach(function (b, i) {
-      var axes = [];
-      (b.axe_indiv || []).forEach(function (id) {
-        var it = AXE_INDIV_ITEMS.filter(function (x) { return x.id === id; })[0];
-        if (it) axes.push(it.label);
-      });
-      if (b.axe_collectif) axes.push(b.axe_collectif);
-      if (b.axe_physique) axes.push(b.axe_physique);
-      if (b.axe_poste) axes.push(b.axe_poste);
-      var periode = '';
-      if (b.date_debut || b.date_fin) {
-        periode = '<div class="pa-frise__date">' + esc(b.date_debut || '?') + ' → ' + esc(b.date_fin || '?') + '</div>';
-      }
-      h += '<div class="pa-frise__bloc' + (b.intercale ? ' pa-frise__bloc--inter' : '') + '">' +
-        '<div class="pa-frise__num">' + (i + 1) + '</div>' +
-        '<div class="pa-frise__titre">' + esc(b.titre || 'Sans titre') + '</div>' +
-        periode +
-        (axes.length ? '<ul class="pa-frise__axes"><li>' + axes.map(esc).join('</li><li>') + '</li></ul>' : '') +
-        (b.commentaires ? '<div class="pa-frise__comm">' + esc(b.commentaires) + '</div>' : '') +
+      var couleur = b.intercale ? 'pa-fh__bloc--inter'
+        : FRISE_CYCLE[i % FRISE_CYCLE.length];
+      var periode = (b.date_debut || b.date_fin)
+        ? esc(b.date_debut || '?') + ' → ' + esc(b.date_fin || '?')
+        : '';
+      h += '<div class="pa-fh__bloc ' + couleur + '" data-act="gobloc" data-n="' + (i + 1) + '">' +
+        '<div class="pa-fh__head">' +
+          '<span class="pa-fh__num">' + (i + 1) + '</span>' +
+          '<span class="pa-fh__titre">' + esc(b.titre || 'Sans titre') + '</span>' +
+        '</div>' +
+        (periode ? '<div class="pa-fh__date">' + periode + '</div>' : '') +
         '</div>';
     });
-    h += '</div></section>';
+    h += '</div></div>';
+
+    // 2) Frise verticale (détail), toujours visible.
+    h += '<div class="pa-fv-titre">Détail des blocs</div>';
+    h += '<div class="pa-fv"><div class="pa-fv__rail"></div><div class="pa-fv-grid">';
+    persistes.forEach(function (b, i) {
+      var inter = !!b.intercale;
+      var couleur = inter ? '' : FRISE_CYCLE[i % FRISE_CYCLE.length];
+      var axes = axesDuBloc(b);
+      var periode = (b.date_debut || b.date_fin)
+        ? esc(b.date_debut || '?') + ' → ' + esc(b.date_fin || '?')
+        : '';
+      h += '<div class="pa-fv__item' + (inter ? ' pa-fv__item--inter' : '') + '" id="pa-bloc-' + (i + 1) + '">' +
+        '<div class="pa-fv__num ' + couleur + '">' + (i + 1) + '</div>' +
+        '<div class="pa-fv__card ' + couleur + '">' +
+          '<div class="pa-fv__bar">' +
+            '<span class="pa-fv__titre">' + esc(b.titre || 'Sans titre') +
+              (inter ? ' <em>· intercalé</em>' : '') + '</span>' +
+            (periode ? '<span class="pa-fv__date">' + periode + '</span>' : '') +
+          '</div>' +
+          (axes.length
+            ? '<ul>' + axes.map(function (a) { return '<li>' + esc(a) + '</li>'; }).join('') + '</ul>'
+            : '') +
+          (b.commentaires ? '<p>' + esc(b.commentaires) + '</p>' : '') +
+        '</div>' +
+        '</div>';
+    });
+    h += '</div></div>';
+
+    h += '</section>';
     return h;
+  }
+
+  // Saut doux vers le bloc de détail n (clic sur un chevron), + flash.
+  function goBloc(n) {
+    var el = document.getElementById('pa-bloc-' + n);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    var card = el.querySelector('.pa-fv__card');
+    if (!card) return;
+    card.classList.remove('is-target');
+    // reflow pour relancer l'animation même si déjà ciblé
+    void card.offsetWidth;
+    card.classList.add('is-target');
   }
 
   // ---- Rendu global ----
@@ -378,6 +536,8 @@
       el.addEventListener('click', function () {
         var act = el.getAttribute('data-act');
         if (act === 'add') return onAdd();
+        if (act === 'gobloc') return goBloc(el.getAttribute('data-n'));
+        if (act === 'export') return window.print();
         var id = el.getAttribute('data-id');
         if (act === 'save') return onSave(id);
         if (act === 'del') return onDelete(id);
