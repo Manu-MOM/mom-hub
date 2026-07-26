@@ -798,6 +798,12 @@
       letter-spacing: .02em;
       opacity: .92;
     }
+    .m-video-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .m-video-item { display: block; }
     .m-video-fallback {
       margin-top: 6px;
       font-size: 11px;
@@ -808,24 +814,6 @@
       font-weight: 600;
     }
     .m-video-fallback a:hover { text-decoration: underline; }
-    .m-video-extras {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-      margin-top: 8px;
-    }
-    .m-video-btn {
-      font-size: 11px;
-      padding: 5px 10px;
-      border-radius: 6px;
-      background: #fff0ed;
-      color: var(--clay);
-      border: 1px solid #fad6cf;
-      cursor: pointer;
-      font-weight: 600;
-      text-decoration: none;
-    }
-    .m-video-btn:hover { background: #fde3dc; }
 
     .m-list {
       margin: 0;
@@ -1169,9 +1157,7 @@
         <!-- Vidéo principale (embed) -->
         <div class="m-sec" id="m-video-sec" style="display:none">
           <div class="m-lbl">Vidéo</div>
-          <div class="m-video-box" id="m-video-box"></div>
-          <div class="m-video-fallback" id="m-video-fallback"></div>
-          <div class="m-video-extras" id="m-video-extras"></div>
+          <div class="m-video-list" id="m-video-list"></div>
         </div>
 
         <!-- Message si fiches-all.json absent -->
