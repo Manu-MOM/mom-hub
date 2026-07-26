@@ -337,6 +337,22 @@
   .ss-ponct-banner.on { display: block; }
 
   .ss-wrap svg, .ss-typehead svg { max-width: 22px; max-height: 22px; }
+
+  /* === Responsive smartphone (RELEVE-RESPONSIVE-SMARTPHONE) ===
+     Les tables .ss-releve (missions, règles récurrentes, absences/repos)
+     débordaient à droite sur petit écran : la colonne d'actions poussait
+     les boutons Modifier/Supprimer hors du viewport. On fait rentrer le
+     contenu — motif qui revient à la ligne, boutons d'action empilés en
+     pleine largeur — plutôt que d'imposer un scroll horizontal qui
+     masquerait justement les boutons. */
+  @media (max-width: 560px) {
+    .ss-releve { font-size: 12px; }
+    .ss-releve th, .ss-releve td { padding: 7px 6px; }
+    .ss-releve td { word-break: break-word; overflow-wrap: anywhere; }
+    .ss-releve td:last-child { width: 1%; white-space: nowrap; }
+    .ss-releve td:last-child .ss-btn { display: block; width: 100%; margin: 0 0 4px; }
+    .ss-releve td:last-child .ss-btn:last-child { margin-bottom: 0; margin-left: 0; }
+  }
 </style>
 </head>
 <body class="auth-pending">
