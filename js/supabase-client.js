@@ -7655,6 +7655,31 @@
     },
 
     /**
+     * Référent(s) de catégorie ACTIF(S) d'une catégorie, résolu(s) en
+     * prénom/nom, via la RPC referent_de_categorie (sql_212). Le référent
+     * n'est PAS une FK : c'est une fonction métier portée dans
+     * fonction_staff (normalisée _b5_norm côté SQL). Une catégorie peut
+     * avoir PLUSIEURS référents actifs (multi-référent constaté en base)
+     * → renvoie un tableau (0..N). Sert au cartouche d'export de la
+     * planification. RLS : RPC SECURITY DEFINER, authenticated-only.
+     *
+     * @param {string} categorieId  UUID de la catégorie.
+     * @returns {Promise<Array>} [{personne_id, prenom, nom}] ; [] si
+     *   aucun référent, entrée vide, ou erreur (dégradation honnête).
+     */
+    async referentDeCategorie(categorieId) {
+      if (!categorieId) return [];
+      const { data, error } = await client.rpc('referent_de_categorie', {
+        p_categorie_id: categorieId
+      });
+      if (error) {
+        console.error('MOM Hub: referentDeCategorie() / referent_de_categorie', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
      * Référentiel des axes de planification (sql/73). Lecture ouverte
      * aux authentifiés (RLS planification_axes_select). Renvoie les
      * axes actifs, communs (categorie_id NULL) en v1, triés par type
