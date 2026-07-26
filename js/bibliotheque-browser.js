@@ -457,13 +457,34 @@
     }
 
     // === Vidéo principale (depuis files.videos) ===
-    const videos = (fiche && fiche.files && fiche.files.videos) || [];
-    const vSec    = document.getElementById('m-video-sec');
-    const vFrame  = document.getElementById('m-video-frame');
-    const vExtras = document.getElementById('m-video-extras');
+    // Chargement à la demande : un poster cliquable remplace l'iframe auto
+    // (l'embed /preview de Drive échoue au chargement automatique dans une
+    // iframe tierce ; le clic utilisateur le fait passer de façon fiable).
+    // Repli permanent : lien /view "Ouvrir dans Drive".
+    const videos   = (fiche && fiche.files && fiche.files.videos) || [];
+    const vSec      = document.getElementById('m-video-sec');
+    const vBox      = document.getElementById('m-video-box');
+    const vFallback = document.getElementById('m-video-fallback');
+    const vExtras   = document.getElementById('m-video-extras');
     if (videos.length > 0) {
       vSec.style.display = '';
-      vFrame.src = `https://drive.google.com/file/d/${videos[0]}/preview`;
+      const mainId = videos[0];
+      vBox.innerHTML =
+        '<button type="button" class="m-video-poster" aria-label="Lire la vidéo">' +
+          '<span class="m-video-play">▶</span>' +
+          '<span class="m-video-poster-label">Lire la vidéo</span>' +
+        '</button>';
+      vBox.querySelector('.m-video-poster').onclick = () => {
+        const f = document.createElement('iframe');
+        f.id = 'm-video-frame';
+        f.src = `https://drive.google.com/file/d/${mainId}/preview`;
+        f.allow = 'autoplay';
+        f.allowFullscreen = true;
+        vBox.innerHTML = '';
+        vBox.appendChild(f);
+      };
+      vFallback.innerHTML =
+        `<a href="https://drive.google.com/file/d/${mainId}/view" target="_blank" rel="noopener">Ouvrir dans Drive ↗</a>`;
       if (videos.length > 1) {
         vExtras.innerHTML = videos.slice(1).map((vid, i) =>
           `<a class="m-video-btn" href="https://drive.google.com/file/d/${vid}/view" target="_blank" rel="noopener">▶ Vidéo ${i + 2}</a>`
@@ -473,7 +494,8 @@
       }
     } else {
       vSec.style.display = 'none';
-      vFrame.src = '';
+      vBox.innerHTML = '';
+      vFallback.innerHTML = '';
       vExtras.innerHTML = '';
     }
 
@@ -527,9 +549,10 @@
 
   function closeModal() {
     document.getElementById('overlay').classList.remove('open');
-    // Stopper la lecture vidéo (sinon elle continue en arrière-plan)
-    const vf = document.getElementById('m-video-frame');
-    if (vf) vf.src = '';
+    // Stopper la lecture vidéo (sinon elle continue en arrière-plan).
+    // L'iframe n'existe que si l'utilisateur a cliqué le poster : on vide le box.
+    const vb = document.getElementById('m-video-box');
+    if (vb) vb.innerHTML = '';
   }
 
   // ============================================================
