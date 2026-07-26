@@ -219,6 +219,46 @@
       border-color: var(--vert-prairie);
     }
 
+    /* ===== BOUTONS DE TAG DANS LA MODALE (favoris / référence) (pt 233) ===== */
+    /* Le head de modale est sur fond vert sombre : boutons clairs/translucides. */
+    .m-tag-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+    .m-tag-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255,255,255,0.14);
+      border: 1px solid rgba(255,255,255,0.35);
+      border-radius: 14px;
+      padding: 5px 12px;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      color: #fff;
+      cursor: pointer;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .m-tag-btn:hover { background: rgba(255,255,255,0.24); }
+    .m-tag-btn:disabled { opacity: .55; cursor: default; }
+    .m-tag-btn .m-tag-ico { font-size: 14px; line-height: 1; }
+    /* Favori actif : or plein. */
+    .m-tag-fav.on {
+      background: var(--gold);
+      border-color: var(--gold);
+      color: #3a2a00;
+    }
+    /* Référence active : blanc plein, texte vert. */
+    .m-tag-ref.on {
+      background: #fff;
+      border-color: #fff;
+      color: var(--vert-bouteille-deep, #0f4f28);
+    }
+
     /* ===== PASTILLE ICÔNES (sémantiques par rubrique) ===== */
     .pastille {
       display: inline-flex;
@@ -1094,6 +1134,10 @@
         <button class="biblio-f-btn on" data-vid="all" type="button">Tout</button>
         <button class="biblio-f-btn" data-vid="fiches" type="button">Fiches</button>
         <button class="biblio-f-btn" data-vid="videos" type="button">Vidéos</button>
+        <span class="biblio-f-label">Tags</span>
+        <button class="biblio-f-btn on" data-tag="all" type="button">Tous</button>
+        <button class="biblio-f-btn" data-tag="favoris" type="button">★ Mes favoris</button>
+        <button class="biblio-f-btn" data-tag="reference" type="button">✓ Ateliers de référence</button>
       </div>
     </section>
 
@@ -1118,6 +1162,7 @@
           <div class="biblio-modal-title" id="m-title">Titre atelier</div>
           <div class="biblio-modal-sub" id="m-sub">Sous-rubrique</div>
           <div class="biblio-m-orig" id="m-orig" style="display:none">Nom de fiche : <span id="m-orig-name"></span></div>
+          <div class="m-tag-actions" id="m-tag-actions"></div>
         </div>
         <button class="biblio-modal-close" type="button" aria-label="Fermer">×</button>
       </div>
