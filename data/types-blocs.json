@@ -1,8 +1,9 @@
 {
   "_meta": {
-    "version": "1.1",
+    "version": "1.2",
     "date_publication": "2026-05-14",
     "changelog": [
+      "v1.2 (26 juillet) \u2014 Ajout d'un 12e type de bloc 'atelier' (libelle \"Atelier\", ordre_natif 12, additif pur). Miroir SQL : sql_212 (contrainte seances_blocs_type_bloc_check portee a 12 slugs). Arbitrages Manu : affiche_intensite=true / intensite_defaut=contact_controle (comme corps de seance), etiquettes_proposees=[axe_2], duree_min_defaut=15, emoji \ud83d\udee0.",
       "v1.1 (14 mai soir) — Arbitrages Manu post-livraison v1.0 : (1) Mise en train passe affiche_intensite=false intensite_defaut=null (cohérent avec autres blocs non-sportifs, friction inutile sinon). (2) Bloc libre durée 10 min confirmée. (3) Axe 4 'CR' et 'Critère de réalisation' conservés tous les deux (distinction pédagogique : CR = mesurable, Critère de réalisation = consigne d'exécution).",
       "v1.0 (14 mai) — Version initiale construite à partir du Brief §Q4 et §Q5."
     ],
@@ -47,8 +48,8 @@
   },
 
   "types_blocs": {
-    "libelle": "11 types de bloc disponibles dans la trame chronologique",
-    "nb_termes": 11,
+    "libelle": "12 types de bloc disponibles dans la trame chronologique",
+    "nb_termes": 12,
     "note_etiquettes": "Le champ etiquettes_proposees indique quels axes (axe_2 / axe_3) sont proposés dans le détail du bloc. L'Axe 4 (champs FFR) est universel : il structure le contenu pédagogique de tous les blocs via seances_blocs.contenu_pedagogique_axe4.",
     "valeurs": [
       {
@@ -171,6 +172,17 @@
         "affiche_intensite": false,
         "intensite_defaut": null,
         "etiquettes_proposees": []
+      },
+      {
+        "slug": "atelier",
+        "libelle": "Atelier",
+        "emoji": "\ud83d\udee0",
+        "ordre_natif": 12,
+        "duree_min_defaut": 15,
+        "description": "Atelier de travail cible (technique / situation), a cote du corps de seance",
+        "affiche_intensite": true,
+        "intensite_defaut": "contact_controle",
+        "etiquettes_proposees": ["axe_2"]
       }
     ]
   }
