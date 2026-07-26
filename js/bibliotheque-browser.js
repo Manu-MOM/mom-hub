@@ -41,6 +41,12 @@
   let FICHES    = {};                                // détails depuis data/fiches-all.json
   let FICHES_LOADED = false;                         // flag : fiches chargées ou pas
 
+  // (pt 233) Tags Bibliothèque. FAVORIS = portée user (mes lignes) ;
+  // REFERENCE = portée club (visible de tous). Sets d'atelier_id (= a.id).
+  let FAVORIS   = new Set();                          // mes atelier_id favoris
+  let REFERENCE = new Set();                          // atelier_id "de référence"
+  let CAN_TAG_REF = false;                            // droit de poser le tag référence
+
   const AGE_LABELS = {
     M6:     'M6 (4-5 ans)',
     M8:     'M8 (6-7 ans)',
@@ -58,7 +64,7 @@
   const RUB_COLORS = { oc: '#0f4f28', ti: '#4a1a7a', ap: '#5a3a00', jp: '#1a3a7a' };
   const RUB_BG     = { oc: '#edf9f2', ti: '#f0e8ff', ap: '#fdf3d0', jp: '#ddeaff' };
 
-  const state = { age: 'all', fam: 'all', vid: 'all', view: 'cards', search: '' };
+  const state = { age: 'all', fam: 'all', vid: 'all', tag: 'all', view: 'cards', search: '' };
 
   // ============================================================
   // 2. CHARGEMENT DES DONNÉES
@@ -89,6 +95,25 @@
     }
   }
 
+  // (pt 233) Charge les tags favoris (user) + référence (club) + le droit
+  // de tagger en référence. Dégradation honnête : en cas d'erreur ou hors
+  // session, les sets restent vides et les filtres n'affichent rien.
+  async function loadTags() {
+    if (typeof SupabaseHub === 'undefined') return;
+    try {
+      const [fav, ref, can] = await Promise.all([
+        SupabaseHub.mesFavoris(),
+        SupabaseHub.ateliersReferenceIds(),
+        SupabaseHub.puisJeTaggerReference()
+      ]);
+      FAVORIS   = new Set(Array.isArray(fav) ? fav : []);
+      REFERENCE = new Set(Array.isArray(ref) ? ref : []);
+      CAN_TAG_REF = can === true;
+    } catch (e) {
+      console.warn('Bibliothèque : tags favoris/référence non chargés : ' + e.message);
+    }
+  }
+
   // ============================================================
   // 3. HELPERS
   // ============================================================
@@ -105,6 +130,8 @@
     if (state.fam !== 'all' && a.famille !== state.fam) return false;
     if (state.vid === 'videos' && !a.video) return false;
     if (state.vid === 'fiches' && a.video) return false;
+    if (state.tag === 'favoris'   && !FAVORIS.has(a.id))   return false;
+    if (state.tag === 'reference' && !REFERENCE.has(a.id)) return false;
     if (state.search) {
       const s = state.search.toLowerCase();
       if (a.t.toLowerCase().indexOf(s) === -1 && (a.s || '').toLowerCase().indexOf(s) === -1) return false;
@@ -542,7 +569,76 @@
     // Bouton footer "Ouvrir dans Drive"
     document.getElementById('m-open-drive').onclick = () => window.open(`https://drive.google.com/drive/folders/${a.id}`, '_blank');
 
+    // === Boutons de tag (favoris user + référence rôle) (pt 233) ===
+    renderTagButtons(a.id);
+
     document.getElementById('overlay').classList.add('open');
+  }
+
+  // (pt 233) Peint les deux boutons de tag dans le head de la modale pour
+  // l'atelier courant (par son a.id = ID dossier Drive). Le cœur (favori)
+  // est visible de tous ; le bouton "référence" n'apparaît que si le compte
+  // a le droit (CAN_TAG_REF). Chaque clic appelle le RPC puis met à jour le
+  // set local + le rendu (pas de re-fetch réseau).
+  function renderTagButtons(atelierId) {
+    const host = document.getElementById('m-tag-actions');
+    if (!host) return;
+    host.innerHTML = '';
+
+    // --- Favori (cœur) : tous les comptes reliés ---
+    const isFav = FAVORIS.has(atelierId);
+    const favBtn = document.createElement('button');
+    favBtn.type = 'button';
+    favBtn.className = 'm-tag-btn m-tag-fav' + (isFav ? ' on' : '');
+    favBtn.setAttribute('aria-pressed', isFav ? 'true' : 'false');
+    favBtn.title = isFav ? 'Retirer des favoris' : 'Ajouter à mes favoris';
+    favBtn.innerHTML = '<span class="m-tag-ico">' + (isFav ? '★' : '☆') + '</span>' +
+                       '<span class="m-tag-lbl">' + (isFav ? 'Favori' : 'Favori') + '</span>';
+    favBtn.onclick = async () => {
+      favBtn.disabled = true;
+      const nowFav = !FAVORIS.has(atelierId);
+      const res = nowFav
+        ? await SupabaseHub.favoriAjouter(atelierId)
+        : await SupabaseHub.favoriRetirer(atelierId);
+      if (res && res.ok) {
+        if (nowFav) FAVORIS.add(atelierId); else FAVORIS.delete(atelierId);
+        renderTagButtons(atelierId);
+        // Si on filtre sur les favoris, la liste doit refléter le retrait.
+        if (state.tag === 'favoris') render();
+      } else {
+        favBtn.disabled = false;
+        alert('Action favori impossible : ' + ((res && res.error) || 'erreur inconnue'));
+      }
+    };
+    host.appendChild(favBtn);
+
+    // --- Référence : admin OU responsable EDR uniquement ---
+    if (CAN_TAG_REF) {
+      const isRef = REFERENCE.has(atelierId);
+      const refBtn = document.createElement('button');
+      refBtn.type = 'button';
+      refBtn.className = 'm-tag-btn m-tag-ref' + (isRef ? ' on' : '');
+      refBtn.setAttribute('aria-pressed', isRef ? 'true' : 'false');
+      refBtn.title = isRef ? 'Retirer des ateliers de référence' : 'Marquer comme atelier de référence';
+      refBtn.innerHTML = '<span class="m-tag-ico">' + (isRef ? '✓' : '◎') + '</span>' +
+                         '<span class="m-tag-lbl">Référence</span>';
+      refBtn.onclick = async () => {
+        refBtn.disabled = true;
+        const nowRef = !REFERENCE.has(atelierId);
+        const res = nowRef
+          ? await SupabaseHub.referenceAjouter(atelierId)
+          : await SupabaseHub.referenceRetirer(atelierId);
+        if (res && res.ok) {
+          if (nowRef) REFERENCE.add(atelierId); else REFERENCE.delete(atelierId);
+          renderTagButtons(atelierId);
+          if (state.tag === 'reference') render();
+        } else {
+          refBtn.disabled = false;
+          alert('Action référence impossible : ' + ((res && res.error) || 'erreur inconnue'));
+        }
+      };
+      host.appendChild(refBtn);
+    }
   }
 
   function closeModal() {
@@ -579,6 +675,14 @@
         document.querySelectorAll('[data-vid]').forEach(x => x.classList.remove('on'));
         b.classList.add('on');
         state.vid = b.dataset.vid;
+        render();
+      };
+    });
+    document.querySelectorAll('[data-tag]').forEach(b => {
+      b.onclick = () => {
+        document.querySelectorAll('[data-tag]').forEach(x => x.classList.remove('on'));
+        b.classList.add('on');
+        state.tag = b.dataset.tag;
         render();
       };
     });
@@ -619,13 +723,17 @@
     try {
       // Charge la taxonomie d'abord (bloquant), puis les fiches détaillées en parallèle au rendu
       await loadAteliers();
-      // Lance le fetch des fiches en arrière-plan
+      // Lance le fetch des fiches ET des tags en arrière-plan
       const fichesPromise = loadFiches();
+      const tagsPromise = loadTags();
       // Premier rendu (sans fiches détaillées si pas encore chargées — modal en mode dégradé)
       bindEvents();
       render();
       // Quand les fiches arrivent, re-render pour les badges de comptage (pas obligatoire mais propre)
       await fichesPromise;
+      // Quand les tags arrivent, re-render pour que les filtres favoris/référence soient exploitables.
+      await tagsPromise;
+      render();
     } catch (err) {
       console.error('Bibliothèque : erreur d\'initialisation', err);
       const content = document.getElementById('content');
