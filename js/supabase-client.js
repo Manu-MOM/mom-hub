@@ -7925,6 +7925,85 @@
     },
 
     /**
+     * Jours d'entraînement d'un bloc de planification (sql_234).
+     * Un bloc peut porter plusieurs sous-blocs, un par jour (1=lundi …
+     * 7=dimanche), chacun avec son titre et ses 4 axes. La RLS
+     * planification_jours_select fait foi (déléguée au bloc parent :
+     * on ne voit les jours que d'un bloc qu'on a le droit de voir).
+     * Triés par (jour, created_at) — tri d'affichage stable.
+     *
+     * @param {string} blocId UUID du bloc parent
+     * @returns {Promise<Array>} jours ; [] si erreur ou blocId absent.
+     */
+    async listPlanificationJours(blocId) {
+      if (!blocId) {
+        console.error('MOM Hub: listPlanificationJours() requiert blocId');
+        return [];
+      }
+      const { data, error } = await client
+        .from('planification_jours')
+        .select('*')
+        .eq('bloc_id', blocId)
+        .order('jour', { ascending: true })
+        .order('created_at', { ascending: true });
+      if (error) {
+        console.error('MOM Hub: listPlanificationJours()', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * Crée ou met à jour un jour d'entraînement (upsert par id).
+     * L'écriture est soumise aux policies RLS planification_jours,
+     * déléguées au bloc parent (pôle ⇒ admin|bureau|responsable ;
+     * catégorie ⇒ puis_je_ecrire_categorie). Le payload doit porter
+     * bloc_id + jour (1..7, garanti côté base par la CHECK). Renvoie
+     * le jour persisté.
+     *
+     * @param {object} payload champs de planification_jours
+     * @returns {Promise<{ok:boolean, data?:object, error?:string}>}
+     */
+    async savePlanificationJour(payload) {
+      if (!payload || !payload.bloc_id || payload.jour == null) {
+        return { ok: false, error: 'bloc_id + jour requis' };
+      }
+      const { data, error } = await client
+        .from('planification_jours')
+        .upsert(payload)
+        .select()
+        .single();
+      if (error) {
+        console.error('MOM Hub: savePlanificationJour()', error);
+        return { ok: false, error: error.message || 'Erreur enregistrement jour' };
+      }
+      return { ok: true, data: data };
+    },
+
+    /**
+     * Supprime un jour d'entraînement par id. Soumis à la policy RLS
+     * planification_jours_delete (même garde que l'écriture, déléguée
+     * au bloc parent).
+     *
+     * @param {string} id UUID du jour
+     * @returns {Promise<{ok:boolean, error?:string}>}
+     */
+    async deletePlanificationJour(id) {
+      if (!id) {
+        return { ok: false, error: 'id requis' };
+      }
+      const { error } = await client
+        .from('planification_jours')
+        .delete()
+        .eq('id', id);
+      if (error) {
+        console.error('MOM Hub: deletePlanificationJour()', error);
+        return { ok: false, error: error.message || 'Erreur suppression jour' };
+      }
+      return { ok: true };
+    },
+
+    /**
      * Voie 2 — modèle rôles encadrants S1 (lot 6). Prédicat d'affichage :
      * la personne connectée peut-elle réaliser <action> sur la catégorie
      * <categorieId> ? Délègue à la RPC B5 puis_je_faire(action, cat) (sql_88,
