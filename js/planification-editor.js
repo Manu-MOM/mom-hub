@@ -427,11 +427,9 @@
       '<textarea rows="2" data-jour-f="commentaire" data-jid="' + esc(j.id) + '"' + dis +
       ' placeholder="Objectifs spécifiques, notes, remarques…">' + esc(j.commentaire || '') + '</textarea></label>';
 
+    // Auto-save : plus de bouton, seulement un indicateur d'état discret.
     if (State.peutEditer) {
-      h += '<div class="pa-bloc__save">' +
-        '<button type="button" class="pa-btn" data-jouract="save" data-jid="' + esc(j.id) + '">' +
-        (j._draft ? 'Enregistrer ce jour' : 'Mettre à jour') + '</button>' +
-        '<span class="pa-bloc__state" data-jstate="' + esc(j.id) + '"></span></div>';
+      h += '<div class="pa-jour__foot"><span class="pa-bloc__state" data-jstate="' + esc(j.id) + '"></span></div>';
     }
 
     h += '</div>';
@@ -761,62 +759,70 @@
     });
 
     // ── PLANIF-SOUSBLOCS-PAR-JOUR : handlers dédiés « jour » (additifs) ──
-    // Champs simples du jour (select jour / titre).
+    // Champs simples du jour (select jour / titre). Auto-save au changement.
     root.querySelectorAll('[data-jour-f]').forEach(function (el) {
       var evt = (el.tagName === 'SELECT') ? 'change' : 'input';
       el.addEventListener(evt, function () {
-        var j = findJour(el.getAttribute('data-jid'));
+        var jid = el.getAttribute('data-jid');
+        var j = findJour(jid);
         if (!j) return;
         var f = el.getAttribute('data-jour-f');
         j[f] = (f === 'jour') ? Number(el.value) : el.value;
+        scheduleAutosaveJour(jid);
       });
     });
 
-    // Axe individuel du jour (cases).
+    // Axe individuel du jour (cases). Auto-save au changement.
     root.querySelectorAll('[data-jour-indiv]').forEach(function (el) {
       el.addEventListener('change', function () {
-        var j = findJour(el.getAttribute('data-jid'));
+        var jid = el.getAttribute('data-jid');
+        var j = findJour(jid);
         if (!j) return;
         var id = el.getAttribute('data-jour-indiv');
         j.axe_indiv = j.axe_indiv || [];
         var pos = j.axe_indiv.indexOf(id);
         if (el.checked && pos < 0) j.axe_indiv.push(id);
         if (!el.checked && pos >= 0) j.axe_indiv.splice(pos, 1);
+        scheduleAutosaveJour(jid);
       });
     });
 
-    // Pioches axes du jour (select) → bascule champ libre.
+    // Pioches axes du jour (select) → bascule champ libre. Auto-save.
     root.querySelectorAll('[data-jouraxe]').forEach(function (el) {
       el.addEventListener('change', function () {
-        var j = findJour(el.getAttribute('data-jid'));
+        var jid = el.getAttribute('data-jid');
+        var j = findJour(jid);
         if (!j) return;
         var champ = el.getAttribute('data-jouraxe');
-        var custom = root.querySelector('[data-jouraxecustom="' + champ + '"][data-jid="' + el.getAttribute('data-jid') + '"]');
+        var custom = root.querySelector('[data-jouraxecustom="' + champ + '"][data-jid="' + jid + '"]');
         if (el.value === AUTRE) {
           if (custom) { custom.style.display = ''; j[champ] = custom.value || ''; }
         } else {
           if (custom) custom.style.display = 'none';
           j[champ] = el.value;
         }
+        scheduleAutosaveJour(jid);
       });
     });
 
-    // Champs libres axes du jour.
+    // Champs libres axes du jour. Auto-save à la frappe.
     root.querySelectorAll('[data-jouraxecustom]').forEach(function (el) {
       el.addEventListener('input', function () {
-        var j = findJour(el.getAttribute('data-jid'));
+        var jid = el.getAttribute('data-jid');
+        var j = findJour(jid);
         if (!j) return;
         j[el.getAttribute('data-jouraxecustom')] = el.value;
+        scheduleAutosaveJour(jid);
       });
     });
 
-    // Boutons d'action « jour ».
+    // Boutons d'action « jour » (ajout / suppression / duplication).
+    // Plus de bouton « save » : l'enregistrement est automatique.
     root.querySelectorAll('[data-jouract]').forEach(function (el) {
       el.addEventListener('click', function () {
         var act = el.getAttribute('data-jouract');
         if (act === 'add') return onAddJour(el.getAttribute('data-bloc'));
         var jid = el.getAttribute('data-jid');
-        if (act === 'save') return onSaveJour(jid);
         if (act === 'del') return onDeleteJour(jid);
         if (act === 'dup') return onDupJour(el.getAttribute('data-bloc'), jid);
       });
@@ -975,25 +981,73 @@
     render();
   }
 
-  function onSaveJour(jid) {
+  // ── PLANIF-SOUSBLOCS-PAR-JOUR (recette) : AUTO-SAVE des jours ──
+  // Plus de bouton « Mettre à jour » : chaque modif d'un champ jour programme
+  // un enregistrement differé (debounce). L'auto-save est SILENCIEUX (pas de
+  // render()) pour ne pas voler le focus pendant la saisie ; seul l'indicateur
+  // d'état est mis à jour. Un draft (tmpj-*) est d'abord inséré (récupère son
+  // uuid), puis les modifs suivantes passent en update.
+  var AUTOSAVE_DELAY = 800;
+  var _jourTimers = {};   // jid -> timeout
+  var _jourSaving = {};   // jid -> bool (verrou anti double-insert)
+  var _jourRedo = {};     // jid -> bool (une modif est survenue pendant un save)
+
+  function scheduleAutosaveJour(jid) {
+    if (!State.peutEditer) return;
+    setStateJour(jid, 'Modifié…', null);
+    if (_jourTimers[jid]) clearTimeout(_jourTimers[jid]);
+    _jourTimers[jid] = setTimeout(function () { flushAutosaveJour(jid); }, AUTOSAVE_DELAY);
+  }
+
+  function flushAutosaveJour(jid) {
     var j = findJour(jid);
     var b = blocDeJour(jid);
     if (!j || !b) return;
+    // Verrou : si un save est déjà en cours pour ce jour, on note qu'il faudra
+    // resauver après (évite deux inserts concurrents d'un même draft).
+    if (_jourSaving[jid]) { _jourRedo[jid] = true; return; }
+    _jourSaving[jid] = true;
     setStateJour(jid, 'Enregistrement…', null);
+
+    var etaitDraft = !!j._draft;
     hub().savePlanificationJour(payloadJour(j)).then(function (res) {
+      _jourSaving[jid] = false;
       if (!res || !res.ok) {
         setStateJour(jid, 'Échec : ' + ((res && res.error) || 'erreur'), false);
         return;
       }
-      // Remplace le brouillon par l'objet persisté (récupère l'uuid réel).
-      var arr = b._jours || [];
-      var i = arr.findIndex(function (x) { return String(x.id) === String(jid); });
-      if (i >= 0 && res.data) {
-        res.data.axe_indiv = Array.isArray(res.data.axe_indiv) ? res.data.axe_indiv : [];
-        arr[i] = res.data;
+      // Draft inséré : on récupère l'uuid réel et on ré-étiquette l'objet +
+      // les éléments DOM du jour (sans render, pour garder le focus).
+      if (etaitDraft && res.data && res.data.id) {
+        var nouvelId = res.data.id;
+        j.id = nouvelId;
+        j._draft = false;
+        reetiqueterJourDom(jid, nouvelId);
+        // bascule les timers/verrous éventuels sur le nouvel id
+        if (_jourRedo[jid]) { delete _jourRedo[jid]; _jourRedo[nouvelId] = true; }
+        jid = nouvelId;
       }
-      render();
+      setStateJour(jid, 'Enregistré ✓', true);
+      // Une modif est arrivée pendant l'enregistrement : on resauve.
+      if (_jourRedo[jid]) { delete _jourRedo[jid]; scheduleAutosaveJour(jid); }
+    }).catch(function () {
+      _jourSaving[jid] = false;
+      setStateJour(jid, 'Échec réseau', false);
     });
+  }
+
+  // Après insertion d'un draft, remplace l'id temporaire par l'uuid réel sur
+  // tous les éléments DOM du jour, pour que les modifs suivantes ciblent bien
+  // la ligne en base (sans re-render complet).
+  function reetiqueterJourDom(ancienId, nouvelId) {
+    var root = State.mount;
+    if (!root) return;
+    var esc1 = (window.CSS && CSS.escape) ? CSS.escape(ancienId) : ancienId;
+    root.querySelectorAll('[data-jid="' + esc1 + '"]').forEach(function (el) {
+      el.setAttribute('data-jid', nouvelId);
+    });
+    var st = root.querySelector('[data-jstate="' + esc1 + '"]');
+    if (st) st.setAttribute('data-jstate', nouvelId);
   }
 
   function onDeleteJour(jid) {
