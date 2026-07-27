@@ -49,14 +49,14 @@
   // s'ajoutent EN PLUS, dans une sous-section dédiée. Un bloc sans jour =
   // comportement historique inchangé.
   var JOURS_SEMAINE = [
-    { v: 0, label: 'Toute la semaine' },
-    { v: 1, label: 'Lundi' },
-    { v: 2, label: 'Mardi' },
-    { v: 3, label: 'Mercredi' },
-    { v: 4, label: 'Jeudi' },
-    { v: 5, label: 'Vendredi' },
-    { v: 6, label: 'Samedi' },
-    { v: 7, label: 'Dimanche' }
+    { v: 0, label: 'Tous les entraînements du bloc' },
+    { v: 1, label: 'Les lundis' },
+    { v: 2, label: 'Les mardis' },
+    { v: 3, label: 'Les mercredis' },
+    { v: 4, label: 'Les jeudis' },
+    { v: 5, label: 'Les vendredis' },
+    { v: 6, label: 'Les samedis' },
+    { v: 7, label: 'Les dimanches' }
   ];
 
   function libelleJour(v) {
@@ -909,6 +909,10 @@
       var i = State.blocs.findIndex(function (x) { return String(x.id) === String(id); });
       if (i >= 0 && res.data) {
         res.data.axe_indiv = Array.isArray(res.data.axe_indiv) ? res.data.axe_indiv : [];
+        // Preserve les jours deja charges en memoire : res.data vient de
+        // planification_blocs et ne porte PAS _jours (autre table). Sans ca,
+        // les jours disparaissent a l'ecran jusqu'au prochain rechargement.
+        res.data._jours = Array.isArray(State.blocs[i]._jours) ? State.blocs[i]._jours : [];
         State.blocs[i] = res.data;
       }
       render();
