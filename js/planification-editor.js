@@ -72,7 +72,8 @@
       axe_indiv: [],
       axe_collectif: '',
       axe_physique: '',
-      axe_poste: ''
+      axe_poste: '',
+      commentaire: ''
     };
   }
 
@@ -317,20 +318,10 @@
       '<input type="date" value="' + esc(b.date_fin || '') + '" data-f="date_fin" data-id="' + esc(b.id) + '"' + dis + '></label>';
     h += '</div>';
 
-    // Axe individuel (cases fixes)
-    h += '<div class="pa-axe"><div class="pa-axe__lbl">🧍 Axe de travail individuel <em>(Technique individuelle)</em></div>';
-    h += '<div class="pa-indiv">';
-    AXE_INDIV_ITEMS.forEach(function (it) {
-      var ck = (b.axe_indiv || []).indexOf(it.id) >= 0 ? ' checked' : '';
-      h += '<label class="pa-check"><input type="checkbox"' + ck + dis +
-        ' data-indiv="' + esc(it.id) + '" data-id="' + esc(b.id) + '"> ' + esc(it.label) + '</label>';
-    });
-    h += '</div></div>';
-
-    // Axes pioche (collectif / physique / poste)
-    h += renderAxeSelect(b, 'axe_collectif', '🧠 Axe de travail collectif', State.axes.collectif, dis);
-    h += renderAxeSelect(b, 'axe_physique', '💪 Axe de travail physique', State.axes.physique, dis);
-    h += renderAxeSelect(b, 'axe_poste', '🏟️ Axe jeu au poste', State.axes.poste, dis);
+    // PLANIF-SOUSBLOCS-PAR-JOUR (recette) : les 4 axes ne se saisissent plus au
+    // niveau du bloc (doublon avec les jours). Ils vivent desormais uniquement
+    // dans la section « Jours d'entrainement » ci-dessous. Les axes des blocs
+    // existants ont ete migres vers un 1er jour (sql_235).
 
     // Bloc intercalé
     var ck = b.intercale ? ' checked' : '';
@@ -427,6 +418,11 @@
     h += renderAxeSelectJour(j, 'axe_collectif', '🧠 Axe de travail collectif', State.axes.collectif, dis);
     h += renderAxeSelectJour(j, 'axe_physique', '💪 Axe de travail physique', State.axes.physique, dis);
     h += renderAxeSelectJour(j, 'axe_poste', '🏟️ Axe jeu au poste', State.axes.poste, dis);
+
+    // Commentaire libre du jour.
+    h += '<label class="pa-field pa-field--full"><span>💬 Commentaires libres</span>' +
+      '<textarea rows="2" data-jour-f="commentaire" data-jid="' + esc(j.id) + '"' + dis +
+      ' placeholder="Objectifs spécifiques, notes, remarques…">' + esc(j.commentaire || '') + '</textarea></label>';
 
     if (State.peutEditer) {
       h += '<div class="pa-bloc__save">' +
@@ -532,6 +528,7 @@
         (axes.length
           ? '<ul>' + axes.map(function (a) { return '<li>' + esc(a) + '</li>'; }).join('') + '</ul>'
           : '') +
+        (j.commentaire ? '<p class="pa-fv-jour__comm">' + esc(j.commentaire) + '</p>' : '') +
         '</div>';
     });
     h += '</div>';
@@ -936,7 +933,8 @@
       axe_indiv: j.axe_indiv || [],
       axe_collectif: j.axe_collectif || null,
       axe_physique: j.axe_physique || null,
-      axe_poste: j.axe_poste || null
+      axe_poste: j.axe_poste || null,
+      commentaire: j.commentaire || null
     };
     if (!j._draft) p.id = j.id;
     return p;
@@ -962,6 +960,7 @@
     copie.axe_collectif = src.axe_collectif || '';
     copie.axe_physique = src.axe_physique || '';
     copie.axe_poste = src.axe_poste || '';
+    copie.commentaire = src.commentaire || '';
     b._jours = b._jours || [];
     b._jours.push(copie);
     render();
