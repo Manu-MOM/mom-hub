@@ -85,6 +85,22 @@
     .pa-bloc__state--ok { color: var(--vert); }
     .pa-bloc__state--err { color: var(--clay); }
 
+    /* ---- PLANIF-SOUSBLOCS-PAR-JOUR : jours d'entraînement (édition) ---- */
+    /* Section additive sous le bloc. Réutilise les variables MOM existantes,
+       aucune couleur hors charte. hub.css INTERDIT non touché. */
+    .pa-jours { margin-top: .9rem; padding-top: .7rem; border-top: 1px solid var(--bord); }
+    .pa-jours__lbl { font-size: .85rem; font-weight: 700; color: var(--vert); text-transform: uppercase; letter-spacing: .02em; margin-bottom: .5rem; }
+    .pa-jours__lbl em { font-weight: 400; font-style: italic; text-transform: none; color: var(--gris); }
+    .pa-jours__hint { font-size: .82rem; color: var(--gris); margin: .2rem 0 .5rem; }
+    .pa-jours__add { font-size: .86rem; }
+    /* Un jour : le trait de séparation (option B validée) délimite chaque jour. */
+    .pa-jour { border-top: 1px solid var(--bord); padding-top: .7rem; margin-top: .7rem; }
+    .pa-jour:first-of-type { border-top: none; padding-top: .2rem; margin-top: .2rem; }
+    .pa-jour__bar { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin-bottom: .4rem; }
+    .pa-jour__select { font: inherit; padding: .35rem .5rem; border: 1px solid var(--bord); border-radius: 6px; background: #fff; color: var(--ink); }
+    .pa-jour__titre { flex: 1 1 200px; font: inherit; padding: .4rem .55rem; border: 1px solid var(--bord); border-radius: 6px; background: #fff; color: var(--ink); }
+    .pa-jour__actions { display: flex; gap: .35rem; margin-left: auto; }
+
     /* ---- Frise emboîtée (lecture) ---- */
     .pa-frise { display: flex; flex-wrap: wrap; gap: 0; }
     .pa-frise__bloc {
@@ -253,6 +269,12 @@
     .pa-fv__date { font-size: .72rem; color: var(--gris); }
     .pa-fv__card ul { margin: 0; padding-left: 1.1rem; font-size: .78rem; color: var(--ink); line-height: 1.55; }
     .pa-fv__card p { margin: 0; font-size: .78rem; color: var(--ink); font-style: italic; }
+    /* PLANIF-SOUSBLOCS-PAR-JOUR : jours dans la frise (lecture). Additif. */
+    .pa-fv-jours { margin-top: .4rem; }
+    .pa-fv-jour { margin-top: .35rem; padding-top: .35rem; border-top: 1px dashed var(--bord); }
+    .pa-fv-jour:first-child { border-top: none; padding-top: 0; margin-top: .2rem; }
+    .pa-fv-jour__tete { display: block; font-size: .74rem; font-weight: 700; color: var(--vert-fonce); text-transform: uppercase; letter-spacing: .02em; }
+    .pa-fv-jour ul { margin: .15rem 0 0; padding-left: 1.1rem; font-size: .76rem; color: var(--ink); line-height: 1.5; }
     @keyframes pa-flash { 0% { background: #fff6d8; } 100% { background: var(--carte); } }
     .pa-fv__card.is-target { animation: pa-flash 1.6s ease-out; }
 
