@@ -609,7 +609,13 @@
     persistes.forEach(function (b, i) {
       var inter = !!b.intercale;
       var couleur = inter ? '' : FRISE_CYCLE[i % FRISE_CYCLE.length];
-      var axes = axesDuBloc(b);
+      // PLANIF-SOUSBLOCS-PAR-JOUR (recette) : les axes vivent au niveau du jour.
+      // On n'affiche les axes génériques du bloc QUE s'il n'a aucun jour
+      // (fallback résiduel) ; sinon la frise ne montre que les jours, pour
+      // éviter le doublon bloc/jour.
+      var joursPersistes = (Array.isArray(b._jours) ? b._jours : [])
+        .filter(function (j) { return !j._draft; });
+      var axes = (joursPersistes.length > 0) ? [] : axesDuBloc(b);
       var periode = (b.date_debut || b.date_fin)
         ? esc(b.date_debut || '?') + ' → ' + esc(b.date_fin || '?')
         : '';
