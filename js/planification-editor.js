@@ -41,6 +41,41 @@
     { id: 'ti-zones',  label: 'Se comporter sur les zones de blocage' }
   ];
 
+  // PLANIF-SOUSBLOCS-PAR-JOUR (sql_234) : jours d'entraînement d'un bloc.
+  // Liste fermée 1=lundi … 7=dimanche (aligné CHECK planification_jours_jour_chk).
+  // Additif : le bloc conserve son rendu/axes actuels intacts ; les jours
+  // s'ajoutent EN PLUS, dans une sous-section dédiée. Un bloc sans jour =
+  // comportement historique inchangé.
+  var JOURS_SEMAINE = [
+    { v: 1, label: 'Lundi' },
+    { v: 2, label: 'Mardi' },
+    { v: 3, label: 'Mercredi' },
+    { v: 4, label: 'Jeudi' },
+    { v: 5, label: 'Vendredi' },
+    { v: 6, label: 'Samedi' },
+    { v: 7, label: 'Dimanche' }
+  ];
+
+  function libelleJour(v) {
+    var j = JOURS_SEMAINE.filter(function (x) { return x.v === Number(v); })[0];
+    return j ? j.label : '';
+  }
+
+  // Un jour « brouillon » (non encore en base) a un id temporaire tmpj-*.
+  function newJourDraft(blocId) {
+    return {
+      id: 'tmpj-' + Date.now() + '-' + Math.round(Math.random() * 1e6),
+      _draft: true,
+      bloc_id: blocId,
+      jour: 1,
+      titre: '',
+      axe_indiv: [],
+      axe_collectif: '',
+      axe_physique: '',
+      axe_poste: ''
+    };
+  }
+
   var State = {
     mount: null,
     saison: null,        // { id, code, libelle, date_debut, date_fin }
@@ -131,10 +166,15 @@
           b.axe_indiv = Array.isArray(b.axe_indiv) ? b.axe_indiv : [];
           return b;
         });
-        // PLANIF-FRISE-COSMETIQUE-EXPORT : résout le(s) référent(s) pour le
-        // cartouche d'export. Non bloquant : en cas d'échec ou d'absence,
-        // State.referents reste [] et le cartouche s'affiche sans nom.
-        return chargerReferents().then(render);
+        // PLANIF-SOUSBLOCS-PAR-JOUR : hydrate les jours de chaque bloc
+        // persisté (b._jours). Non bloquant : en cas d'échec, b._jours = []
+        // et le bloc affiche sa saisie historique (dégradation honnête).
+        return chargerJoursDesBlocs().then(function () {
+          // PLANIF-FRISE-COSMETIQUE-EXPORT : résout le(s) référent(s) pour le
+          // cartouche d'export. Non bloquant : en cas d'échec ou d'absence,
+          // State.referents reste [] et le cartouche s'affiche sans nom.
+          return chargerReferents().then(render);
+        });
       });
     });
   }
@@ -181,6 +221,29 @@
         .catch(function () { State.referents = []; });
     }
     return Promise.resolve();
+  }
+
+  // PLANIF-SOUSBLOCS-PAR-JOUR : hydrate b._jours pour chaque bloc PERSISTÉ
+  // (les brouillons tmp-* n'ont pas encore d'id base → jours en mémoire seule).
+  // Chargement en parallèle ; dégradation honnête (b._jours = [] si échec).
+  function chargerJoursDesBlocs() {
+    var h = hub();
+    if (!h || typeof h.listPlanificationJours !== 'function') {
+      State.blocs.forEach(function (b) { if (!Array.isArray(b._jours)) b._jours = []; });
+      return Promise.resolve();
+    }
+    var proms = State.blocs.map(function (b) {
+      if (b._draft) { b._jours = Array.isArray(b._jours) ? b._jours : []; return Promise.resolve(); }
+      return Promise.resolve(h.listPlanificationJours(b.id))
+        .then(function (rows) {
+          b._jours = (Array.isArray(rows) ? rows : []).map(function (j) {
+            j.axe_indiv = Array.isArray(j.axe_indiv) ? j.axe_indiv : [];
+            return j;
+          });
+        })
+        .catch(function () { b._jours = []; });
+    });
+    return Promise.all(proms);
   }
 
   // Libellé « Prénom NOM » concaténé des référents (pour le cartouche).
@@ -279,6 +342,10 @@
       '<textarea rows="2" data-f="commentaires" data-id="' + esc(b.id) + '"' + dis +
       ' placeholder="Objectifs spécifiques, notes, remarques…">' + esc(b.commentaires || '') + '</textarea></label>';
 
+    // PLANIF-SOUSBLOCS-PAR-JOUR : section « Jours d'entraînement » (additive).
+    // Le bloc ci-dessus reste inchangé ; les jours s'affichent EN DESSOUS.
+    h += renderJoursSection(b, dis);
+
     if (State.peutEditer) {
       h += '<div class="pa-bloc__save">' +
         '<button type="button" class="pa-btn" data-act="save" data-id="' + esc(b.id) + '">' +
@@ -286,6 +353,110 @@
         '<span class="pa-bloc__state" data-state="' + esc(b.id) + '"></span></div>';
     }
 
+    h += '</div>';
+    return h;
+  }
+
+  // ---- Rendu : section « Jours d'entraînement » d'un bloc (additif) ----
+  // Réutilise STRICTEMENT le markup axes existant (pa-axe / pa-indiv / pa-check
+  // / renderAxeSelect). Seule nouveauté visuelle : le conteneur .pa-jour (trait
+  // de séparation, défini dans planification.html — hub.css INTERDIT intact).
+  // Un bloc brouillon (tmp-*) ne peut pas encore recevoir de jours (il faut son
+  // id base) : on invite à enregistrer le bloc d'abord.
+  function renderJoursSection(b, dis) {
+    var jours = Array.isArray(b._jours) ? b._jours : [];
+    var h = '<div class="pa-jours" data-jours-of="' + esc(b.id) + '">';
+    h += '<div class="pa-jours__lbl">📅 Jours d\'entraînement <em>(axes déclinés par jour)</em></div>';
+
+    if (b._draft) {
+      h += '<p class="pa-jours__hint">Enregistrez d\'abord le bloc pour lui ajouter des jours d\'entraînement.</p>';
+      h += '</div>';
+      return h;
+    }
+
+    if (jours.length === 0) {
+      h += '<p class="pa-jours__hint">Aucun jour défini. Le bloc utilise ses axes ci-dessus. ' +
+        'Ajoutez des jours pour décliner une thématique différente par séance.</p>';
+    } else {
+      jours.forEach(function (j) { h += renderJourEdit(b, j, dis); });
+    }
+
+    if (State.peutEditer) {
+      h += '<button type="button" class="pa-btn pa-btn--add pa-jours__add" ' +
+        'data-jouract="add" data-bloc="' + esc(b.id) + '">+ Ajouter un jour d\'entraînement</button>';
+    }
+    h += '</div>';
+    return h;
+  }
+
+  // Rendu d'UN jour : sélecteur jour + titre + les 4 axes (markup identique au
+  // bloc, mais attributs data-jour-* / data-jid pour des handlers dédiés).
+  function renderJourEdit(b, j, dis) {
+    var h = '<div class="pa-jour" data-jid="' + esc(j.id) + '" data-bloc="' + esc(b.id) + '">';
+
+    // Barre : sélecteur jour + titre + suppression + duplication.
+    h += '<div class="pa-jour__bar">';
+    h += '<select class="pa-jour__select" data-jour-f="jour" data-jid="' + esc(j.id) + '"' + dis + '>';
+    JOURS_SEMAINE.forEach(function (d) {
+      var sel = (Number(j.jour) === d.v) ? ' selected' : '';
+      h += '<option value="' + d.v + '"' + sel + '>' + esc(d.label) + '</option>';
+    });
+    h += '</select>';
+    h += '<input type="text" class="pa-jour__titre" value="' + esc(j.titre || '') + '" ' +
+      'data-jour-f="titre" data-jid="' + esc(j.id) + '"' + dis +
+      ' placeholder="Thématique du jour…">';
+    if (State.peutEditer) {
+      h += '<span class="pa-jour__actions">' +
+        '<button type="button" class="pa-mini" data-jouract="dup" data-jid="' + esc(j.id) + '" data-bloc="' + esc(b.id) + '" title="Dupliquer ce jour">Dupliquer</button>' +
+        '<button type="button" class="pa-mini pa-mini--del" data-jouract="del" data-jid="' + esc(j.id) + '">Supprimer</button>' +
+        '</span>';
+    }
+    h += '</div>';
+
+    // Axe individuel (cases fixes) — markup identique au bloc, attributs jour.
+    h += '<div class="pa-axe"><div class="pa-axe__lbl">🧍 Axe de travail individuel <em>(Technique individuelle)</em></div>';
+    h += '<div class="pa-indiv">';
+    AXE_INDIV_ITEMS.forEach(function (it) {
+      var ck = (j.axe_indiv || []).indexOf(it.id) >= 0 ? ' checked' : '';
+      h += '<label class="pa-check"><input type="checkbox"' + ck + dis +
+        ' data-jour-indiv="' + esc(it.id) + '" data-jid="' + esc(j.id) + '"> ' + esc(it.label) + '</label>';
+    });
+    h += '</div></div>';
+
+    // Axes pioche — même helper que le bloc, mode « jour ».
+    h += renderAxeSelectJour(j, 'axe_collectif', '🧠 Axe de travail collectif', State.axes.collectif, dis);
+    h += renderAxeSelectJour(j, 'axe_physique', '💪 Axe de travail physique', State.axes.physique, dis);
+    h += renderAxeSelectJour(j, 'axe_poste', '🏟️ Axe jeu au poste', State.axes.poste, dis);
+
+    if (State.peutEditer) {
+      h += '<div class="pa-bloc__save">' +
+        '<button type="button" class="pa-btn" data-jouract="save" data-jid="' + esc(j.id) + '">' +
+        (j._draft ? 'Enregistrer ce jour' : 'Mettre à jour') + '</button>' +
+        '<span class="pa-bloc__state" data-jstate="' + esc(j.id) + '"></span></div>';
+    }
+
+    h += '</div>';
+    return h;
+  }
+
+  // Jumelle de renderAxeSelect, ciblée « jour » (attributs data-jouraxe*).
+  // Même comportement « Autre (texte libre) » et même markup visuel.
+  function renderAxeSelectJour(j, champ, label, liste, dis) {
+    var val = j[champ] || '';
+    var known = liste.indexOf(val) >= 0;
+    var estAutre = (val !== '' && !known);
+    var h = '<div class="pa-axe"><div class="pa-axe__lbl">' + esc(label) + '</div>';
+    h += '<select class="pa-select" data-jouraxe="' + esc(champ) + '" data-jid="' + esc(j.id) + '"' + dis + '>';
+    h += '<option value="">-- Choisir --</option>';
+    liste.forEach(function (opt) {
+      var sel = (opt === val) ? ' selected' : '';
+      h += '<option value="' + esc(opt) + '"' + sel + '>' + esc(opt) + '</option>';
+    });
+    h += '<option value="' + esc(AUTRE) + '"' + (estAutre ? ' selected' : '') + '>' + esc(AUTRE) + '</option>';
+    h += '</select>';
+    h += '<input type="text" class="pa-axe__custom" data-jouraxecustom="' + esc(champ) + '" data-jid="' + esc(j.id) + '"' +
+      dis + ' placeholder="Préciser…" value="' + esc(estAutre ? val : '') + '" style="' +
+      (estAutre ? '' : 'display:none') + '">';
     h += '</div>';
     return h;
   }
@@ -329,6 +500,42 @@
     if (b.axe_physique) axes.push(b.axe_physique);
     if (b.axe_poste) axes.push(b.axe_poste);
     return axes;
+  }
+
+  // PLANIF-SOUSBLOCS-PAR-JOUR : axes agrégés d'UN jour (même ordre que le bloc).
+  function axesDuJour(j) {
+    var axes = [];
+    (j.axe_indiv || []).forEach(function (id) {
+      var it = AXE_INDIV_ITEMS.filter(function (x) { return x.id === id; })[0];
+      if (it) axes.push(it.label);
+    });
+    if (j.axe_collectif) axes.push(j.axe_collectif);
+    if (j.axe_physique) axes.push(j.axe_physique);
+    if (j.axe_poste) axes.push(j.axe_poste);
+    return axes;
+  }
+
+  // PLANIF-SOUSBLOCS-PAR-JOUR : rendu lecture des jours d'un bloc dans la frise.
+  // Additif : '' si le bloc n'a aucun jour (frise historique inchangée). Les
+  // jours (persistés uniquement) sont triés (jour, created_at) via le back ;
+  // ici on respecte l'ordre déjà chargé. Réutilise .pa-fv-jours (défini dans
+  // planification.html — hub.css INTERDIT intact).
+  function renderJoursFrise(b) {
+    var jours = (Array.isArray(b._jours) ? b._jours : []).filter(function (j) { return !j._draft; });
+    if (jours.length === 0) return '';
+    var h = '<div class="pa-fv-jours">';
+    jours.forEach(function (j) {
+      var axes = axesDuJour(j);
+      var tete = libelleJour(j.jour) + (j.titre ? ' — ' + j.titre : '');
+      h += '<div class="pa-fv-jour">' +
+        '<span class="pa-fv-jour__tete">' + esc(tete) + '</span>' +
+        (axes.length
+          ? '<ul>' + axes.map(function (a) { return '<li>' + esc(a) + '</li>'; }).join('') + '</ul>'
+          : '') +
+        '</div>';
+    });
+    h += '</div>';
+    return h;
   }
 
   // Cartouche d'en-tête (type club) : écusson MOM, catégorie/pôle, saison,
@@ -420,6 +627,7 @@
           (axes.length
             ? '<ul>' + axes.map(function (a) { return '<li>' + esc(a) + '</li>'; }).join('') + '</ul>'
             : '') +
+          renderJoursFrise(b) +
           (b.commentaires ? '<p>' + esc(b.commentaires) + '</p>' : '') +
         '</div>' +
         '</div>';
@@ -545,6 +753,89 @@
         if (act === 'down') return onMove(id, 1);
       });
     });
+
+    // ── PLANIF-SOUSBLOCS-PAR-JOUR : handlers dédiés « jour » (additifs) ──
+    // Champs simples du jour (select jour / titre).
+    root.querySelectorAll('[data-jour-f]').forEach(function (el) {
+      var evt = (el.tagName === 'SELECT') ? 'change' : 'input';
+      el.addEventListener(evt, function () {
+        var j = findJour(el.getAttribute('data-jid'));
+        if (!j) return;
+        var f = el.getAttribute('data-jour-f');
+        j[f] = (f === 'jour') ? Number(el.value) : el.value;
+      });
+    });
+
+    // Axe individuel du jour (cases).
+    root.querySelectorAll('[data-jour-indiv]').forEach(function (el) {
+      el.addEventListener('change', function () {
+        var j = findJour(el.getAttribute('data-jid'));
+        if (!j) return;
+        var id = el.getAttribute('data-jour-indiv');
+        j.axe_indiv = j.axe_indiv || [];
+        var pos = j.axe_indiv.indexOf(id);
+        if (el.checked && pos < 0) j.axe_indiv.push(id);
+        if (!el.checked && pos >= 0) j.axe_indiv.splice(pos, 1);
+      });
+    });
+
+    // Pioches axes du jour (select) → bascule champ libre.
+    root.querySelectorAll('[data-jouraxe]').forEach(function (el) {
+      el.addEventListener('change', function () {
+        var j = findJour(el.getAttribute('data-jid'));
+        if (!j) return;
+        var champ = el.getAttribute('data-jouraxe');
+        var custom = root.querySelector('[data-jouraxecustom="' + champ + '"][data-jid="' + el.getAttribute('data-jid') + '"]');
+        if (el.value === AUTRE) {
+          if (custom) { custom.style.display = ''; j[champ] = custom.value || ''; }
+        } else {
+          if (custom) custom.style.display = 'none';
+          j[champ] = el.value;
+        }
+      });
+    });
+
+    // Champs libres axes du jour.
+    root.querySelectorAll('[data-jouraxecustom]').forEach(function (el) {
+      el.addEventListener('input', function () {
+        var j = findJour(el.getAttribute('data-jid'));
+        if (!j) return;
+        j[el.getAttribute('data-jouraxecustom')] = el.value;
+      });
+    });
+
+    // Boutons d'action « jour ».
+    root.querySelectorAll('[data-jouract]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        var act = el.getAttribute('data-jouract');
+        if (act === 'add') return onAddJour(el.getAttribute('data-bloc'));
+        var jid = el.getAttribute('data-jid');
+        if (act === 'save') return onSaveJour(jid);
+        if (act === 'del') return onDeleteJour(jid);
+        if (act === 'dup') return onDupJour(el.getAttribute('data-bloc'), jid);
+      });
+    });
+  }
+
+  // Cherche un jour dans tous les _jours de tous les blocs.
+  function findJour(jid) {
+    for (var i = 0; i < State.blocs.length; i++) {
+      var arr = State.blocs[i]._jours || [];
+      for (var k = 0; k < arr.length; k++) {
+        if (String(arr[k].id) === String(jid)) return arr[k];
+      }
+    }
+    return null;
+  }
+
+  function blocDeJour(jid) {
+    for (var i = 0; i < State.blocs.length; i++) {
+      var arr = State.blocs[i]._jours || [];
+      for (var k = 0; k < arr.length; k++) {
+        if (String(arr[k].id) === String(jid)) return State.blocs[i];
+      }
+    }
+    return null;
   }
 
   function findBloc(id) {
@@ -625,6 +916,92 @@
     hub().deletePlanificationBloc(id).then(function (res) {
       if (!res || !res.ok) { setState(id, 'Échec suppression : ' + ((res && res.error) || ''), false); return; }
       State.blocs = State.blocs.filter(function (x) { return String(x.id) !== String(id); });
+      render();
+    });
+  }
+
+  // ── PLANIF-SOUSBLOCS-PAR-JOUR : actions « jour » ──
+  function setStateJour(jid, msg, ok) {
+    var sel = (window.CSS && CSS.escape) ? CSS.escape(jid) : jid;
+    var el = State.mount.querySelector('[data-jstate="' + sel + '"]');
+    if (el) { el.textContent = msg; el.className = 'pa-bloc__state' + (ok === false ? ' pa-bloc__state--err' : (ok ? ' pa-bloc__state--ok' : '')); }
+  }
+
+  // Payload propre d'un jour pour la base (id omis si brouillon).
+  function payloadJour(j) {
+    var p = {
+      bloc_id: j.bloc_id,
+      jour: Number(j.jour),
+      titre: j.titre || null,
+      axe_indiv: j.axe_indiv || [],
+      axe_collectif: j.axe_collectif || null,
+      axe_physique: j.axe_physique || null,
+      axe_poste: j.axe_poste || null
+    };
+    if (!j._draft) p.id = j.id;
+    return p;
+  }
+
+  function onAddJour(blocId) {
+    var b = findBloc(blocId);
+    if (!b || b._draft) return; // un bloc non persisté ne peut pas porter de jour
+    b._jours = b._jours || [];
+    b._jours.push(newJourDraft(b.id));
+    render();
+  }
+
+  // Duplique un jour (contenu identique, nouveau brouillon à enregistrer).
+  function onDupJour(blocId, jid) {
+    var b = findBloc(blocId);
+    var src = findJour(jid);
+    if (!b || !src) return;
+    var copie = newJourDraft(b.id);
+    copie.jour = Number(src.jour);
+    copie.titre = src.titre || '';
+    copie.axe_indiv = (src.axe_indiv || []).slice();
+    copie.axe_collectif = src.axe_collectif || '';
+    copie.axe_physique = src.axe_physique || '';
+    copie.axe_poste = src.axe_poste || '';
+    b._jours = b._jours || [];
+    b._jours.push(copie);
+    render();
+  }
+
+  function onSaveJour(jid) {
+    var j = findJour(jid);
+    var b = blocDeJour(jid);
+    if (!j || !b) return;
+    setStateJour(jid, 'Enregistrement…', null);
+    hub().savePlanificationJour(payloadJour(j)).then(function (res) {
+      if (!res || !res.ok) {
+        setStateJour(jid, 'Échec : ' + ((res && res.error) || 'erreur'), false);
+        return;
+      }
+      // Remplace le brouillon par l'objet persisté (récupère l'uuid réel).
+      var arr = b._jours || [];
+      var i = arr.findIndex(function (x) { return String(x.id) === String(jid); });
+      if (i >= 0 && res.data) {
+        res.data.axe_indiv = Array.isArray(res.data.axe_indiv) ? res.data.axe_indiv : [];
+        arr[i] = res.data;
+      }
+      render();
+    });
+  }
+
+  function onDeleteJour(jid) {
+    var j = findJour(jid);
+    var b = blocDeJour(jid);
+    if (!j || !b) return;
+    // Brouillon non persisté : suppression locale directe.
+    if (j._draft) {
+      b._jours = (b._jours || []).filter(function (x) { return String(x.id) !== String(jid); });
+      render();
+      return;
+    }
+    if (!global.confirm('Supprimer ce jour d\'entraînement ? Cette action est définitive.')) return;
+    hub().deletePlanificationJour(jid).then(function (res) {
+      if (!res || !res.ok) { setStateJour(jid, 'Échec suppression : ' + ((res && res.error) || ''), false); return; }
+      b._jours = (b._jours || []).filter(function (x) { return String(x.id) !== String(jid); });
       render();
     });
   }
