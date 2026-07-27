@@ -42,11 +42,14 @@
   ];
 
   // PLANIF-SOUSBLOCS-PAR-JOUR (sql_234) : jours d'entraînement d'un bloc.
-  // Liste fermée 1=lundi … 7=dimanche (aligné CHECK planification_jours_jour_chk).
+  // Liste fermée 0=toute la semaine, 1=lundi … 7=dimanche (aligné CHECK
+  // planification_jours_jour_chk élargi à 0..7 par sql_236). « Toute la
+  // semaine » sert aux blocs qui ne différencient pas les objectifs par jour.
   // Additif : le bloc conserve son rendu/axes actuels intacts ; les jours
   // s'ajoutent EN PLUS, dans une sous-section dédiée. Un bloc sans jour =
   // comportement historique inchangé.
   var JOURS_SEMAINE = [
+    { v: 0, label: 'Toute la semaine' },
     { v: 1, label: 'Lundi' },
     { v: 2, label: 'Mardi' },
     { v: 3, label: 'Mercredi' },
