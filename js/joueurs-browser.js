@@ -723,14 +723,23 @@ window.JoueursBrowser = (function () {
 
     const sub = document.getElementById('joueur-header-sub');
     if (sub) {
-      const nbMom = ALL_JOUEURS.filter(j => j.profil === 'mom' || j.profil === 'f15').length;
-      const nbF15 = ALL_JOUEURS.filter(j => j.profil === 'f15').length;
-      // Libellé « /F-15 » affiché uniquement s'il y a réellement des F-15 dans l'effectif
-      // (ex. M14) ; sinon « MOM » seul (ex. M16 sans F-15).
+      // Compteurs sur les seuls joueurs NON archivés (les archivés restent
+      // visibles via le filtre État mais ne gonflent plus les totaux).
+      const nonArchive = j => j.etat_calcule !== 'archive';
+      const nbMom  = ALL_JOUEURS.filter(j => nonArchive(j) && (j.profil === 'mom' || j.profil === 'f15')).length;
+      const nbF15  = ALL_JOUEURS.filter(j => nonArchive(j) && j.profil === 'f15').length;
+      const nbPart = ALL_JOUEURS.filter(j => nonArchive(j) && j.profil === 'partenaire').length;
+      const nbCoach = ALL_JOUEURS.filter(j => nonArchive(j) && j.profil === 'coach').length;
+      // « joueurs » = tout sauf les coachs (l'encadrement n'est pas un joueur).
+      const nbJoueurs = nbMom + nbPart;
+      // Libellé « /F-15 » affiché uniquement s'il y a réellement des F-15 (ex. M14) ;
+      // sinon « MOM » seul (ex. M16 sans F-15).
       const labelMom = nbF15 > 0 ? ' MOM/F-15 · ' : ' MOM · ';
-      sub.textContent = ALL_JOUEURS.length + ' joueurs au total · '
+      let txt = nbJoueurs + ' joueurs au total · '
         + nbMom + labelMom
-        + ALL_JOUEURS.filter(j => j.profil === 'partenaire').length + ' partenaires';
+        + nbPart + ' partenaires';
+      if (nbCoach > 0) txt += ' · ' + nbCoach + ' coachs';
+      sub.textContent = txt;
     }
   }
 
