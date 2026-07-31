@@ -723,8 +723,13 @@ window.JoueursBrowser = (function () {
 
     const sub = document.getElementById('joueur-header-sub');
     if (sub) {
+      const nbMom = ALL_JOUEURS.filter(j => j.profil === 'mom' || j.profil === 'f15').length;
+      const nbF15 = ALL_JOUEURS.filter(j => j.profil === 'f15').length;
+      // Libellé « /F-15 » affiché uniquement s'il y a réellement des F-15 dans l'effectif
+      // (ex. M14) ; sinon « MOM » seul (ex. M16 sans F-15).
+      const labelMom = nbF15 > 0 ? ' MOM/F-15 · ' : ' MOM · ';
       sub.textContent = ALL_JOUEURS.length + ' joueurs au total · '
-        + ALL_JOUEURS.filter(j => j.profil === 'mom' || j.profil === 'f15').length + ' MOM/F-15 · '
+        + nbMom + labelMom
         + ALL_JOUEURS.filter(j => j.profil === 'partenaire').length + ' partenaires';
     }
   }
