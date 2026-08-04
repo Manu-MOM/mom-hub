@@ -332,6 +332,7 @@
               </div>
               <div class="plan-sub-body">
           `;
+          // (rendu du corps de la sous-rubrique ci-dessous)
 
           const visibleSS = (sub.ss || []).filter(ss => !ss.soon && subItems.some(a => a.ss_id === ss.id));
           if (visibleSS.length === 0) {
@@ -372,6 +373,20 @@
 
           h += '</div></div>';
         });
+        // Sous-rubriques encore "à venir" (soon) : annoncées en "Bientôt"
+        // même lorsque la rubrique est par ailleurs ouverte.
+        rub.subs.filter(s => s.soon || (s.ss || []).every(ss => ss.soon))
+          .forEach(sub => {
+            h += `
+            <div class="plan-sub plan-sub-placeholder">
+              <div class="plan-sub-h">
+                <span class="plan-sub-icon">${escHtml(sub.icon || '')}</span>
+                <span class="plan-sub-title">${escHtml(sub.label)}</span>
+                <span class="rub-soon-badge">Bientôt</span>
+              </div>
+            </div>
+          `;
+          });
       }
 
       h += '</div></div>';
