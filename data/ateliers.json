@@ -2480,6 +2480,186 @@
                   ],
                   "cross": "1b Defense",
                   "id_pptx_origine": "14o3Os67Yu-K8sS7oU3xKWXbxnW6q2y2J"
+                },
+                {
+                  "n": "01",
+                  "t": "« Le plaquage » — situation 01/12",
+                  "s": "",
+                  "id": "1leysEkwi3Bu2NnTYShBiTRSzCNHTWvb4",
+                  "ages": [
+                    "M10",
+                    "M12",
+                    "M14F15",
+                    "M16"
+                  ],
+                  "tags": [
+                    "GUIDE-EDUCATEUR"
+                  ]
+                },
+                {
+                  "n": "02",
+                  "t": "« Le plaquage » — situation 02/12",
+                  "s": "",
+                  "id": "1TCc5jpop0cH8ok-MkWgvH1_0ariZHnJy",
+                  "ages": [
+                    "M10",
+                    "M12",
+                    "M14F15",
+                    "M16"
+                  ],
+                  "tags": [
+                    "GUIDE-EDUCATEUR"
+                  ]
+                },
+                {
+                  "n": "03",
+                  "t": "« Le plaquage » — situation 03/12",
+                  "s": "",
+                  "id": "1nb8bBhOAftqD4_nTtA0VHBh9PyyOMtHF",
+                  "ages": [
+                    "M10",
+                    "M12",
+                    "M14F15",
+                    "M16"
+                  ],
+                  "tags": [
+                    "GUIDE-EDUCATEUR"
+                  ]
+                },
+                {
+                  "n": "04",
+                  "t": "« Le plaquage » — situation 04/12",
+                  "s": "",
+                  "id": "1gv_mhga_nE43vGeY52rqPWX_o91F4VyC",
+                  "ages": [
+                    "M10",
+                    "M12",
+                    "M14F15",
+                    "M16"
+                  ],
+                  "tags": [
+                    "GUIDE-EDUCATEUR"
+                  ]
+                },
+                {
+                  "n": "05",
+                  "t": "« Le plaquage » — situation 05/12",
+                  "s": "",
+                  "id": "1IRJwh_g6ToOkeVeznlvhXv1DAvtJOB9N",
+                  "ages": [
+                    "M10",
+                    "M12",
+                    "M14F15",
+                    "M16"
+                  ],
+                  "tags": [
+                    "GUIDE-EDUCATEUR"
+                  ]
+                },
+                {
+                  "n": "06",
+                  "t": "« Le plaquage » — situation 06/12",
+                  "s": "",
+                  "id": "1t62GLTu2JaTP4gi3BAkFAj8gu-XCRD_U",
+                  "ages": [
+                    "M10",
+                    "M12",
+                    "M14F15",
+                    "M16"
+                  ],
+                  "tags": [
+                    "GUIDE-EDUCATEUR"
+                  ]
+                },
+                {
+                  "n": "07",
+                  "t": "« Le plaquage » — situation 07/12",
+                  "s": "",
+                  "id": "1qrvxvaNvEAfHaiGDw88ReEB5s-2xKVV1",
+                  "ages": [
+                    "M10",
+                    "M12",
+                    "M14F15",
+                    "M16"
+                  ],
+                  "tags": [
+                    "GUIDE-EDUCATEUR"
+                  ]
+                },
+                {
+                  "n": "08",
+                  "t": "« Le plaquage » — situation 08/12",
+                  "s": "",
+                  "id": "1uf9A0orNkegQd9G0Z7YIBx2l8XpQDg0i",
+                  "ages": [
+                    "M10",
+                    "M12",
+                    "M14F15",
+                    "M16"
+                  ],
+                  "tags": [
+                    "GUIDE-EDUCATEUR"
+                  ]
+                },
+                {
+                  "n": "09",
+                  "t": "« Le plaquage » — situation 09/12",
+                  "s": "",
+                  "id": "17zeryXuA7F-nDGD3yCGiQ4UsWcwPbz71",
+                  "ages": [
+                    "M10",
+                    "M12",
+                    "M14F15",
+                    "M16"
+                  ],
+                  "tags": [
+                    "GUIDE-EDUCATEUR"
+                  ]
+                },
+                {
+                  "n": "10",
+                  "t": "« Le plaquage » — situation 10/12",
+                  "s": "",
+                  "id": "1BQniS7A7tOGv3zZxEkFe6-KKA7e0Wljl",
+                  "ages": [
+                    "M10",
+                    "M12",
+                    "M14F15",
+                    "M16"
+                  ],
+                  "tags": [
+                    "GUIDE-EDUCATEUR"
+                  ]
+                },
+                {
+                  "n": "11",
+                  "t": "« Le plaquage » — situation 11/12",
+                  "s": "",
+                  "id": "1X1v8xatLpVkrW1D1lHcBdEW0BRHaXv8k",
+                  "ages": [
+                    "M10",
+                    "M12",
+                    "M14F15",
+                    "M16"
+                  ],
+                  "tags": [
+                    "GUIDE-EDUCATEUR"
+                  ]
+                },
+                {
+                  "n": "12",
+                  "t": "« Le plaquage » — situation 12/12",
+                  "s": "",
+                  "id": "18kv11FOCDjJnwpKem7qqciLq-XTxUgXL",
+                  "ages": [
+                    "M10",
+                    "M12",
+                    "M14F15",
+                    "M16"
+                  ],
+                  "tags": [
+                    "GUIDE-EDUCATEUR"
+                  ]
                 }
               ]
             }
@@ -16134,6 +16314,462 @@
       "ss_label": "Jeu penetrant — Defense etiree",
       "ss_id": "oc-att-pen",
       "famille": "tactique"
+    },
+    {
+      "n": "01",
+      "t": "« Le plaquage » — situation 01/12",
+      "s": "",
+      "id": "1leysEkwi3Bu2NnTYShBiTRSzCNHTWvb4",
+      "ages": [
+        "M10",
+        "M12",
+        "M14F15",
+        "M16"
+      ],
+      "tags": [
+        "GUIDE-EDUCATEUR"
+      ],
+      "cross": "1b Defense",
+      "video": false,
+      "rub_num": "2",
+      "rub_label": "Technique individuelle",
+      "rub_id": "ti",
+      "rub_icon": "👤",
+      "sub_label": "2b — Plaquer",
+      "sub_id": "ti-plaq",
+      "sub_color": "#5a1a1a",
+      "sub_badge": "#ffeaea",
+      "sub_badge_text": "#5a1a1a",
+      "sub_icon": "💪",
+      "sub_sub": "Technique de plaquage securise",
+      "sub_comp": [
+        "Plaquer bas",
+        "Entourer les hanches",
+        "Se relever rapidement",
+        "Plaquer en securite",
+        "Plaquer lateral et frontal"
+      ],
+      "ss_label": "Plaquages",
+      "ss_id": "ti-plaq-1",
+      "famille": "technique"
+    },
+    {
+      "n": "02",
+      "t": "« Le plaquage » — situation 02/12",
+      "s": "",
+      "id": "1TCc5jpop0cH8ok-MkWgvH1_0ariZHnJy",
+      "ages": [
+        "M10",
+        "M12",
+        "M14F15",
+        "M16"
+      ],
+      "tags": [
+        "GUIDE-EDUCATEUR"
+      ],
+      "cross": "1b Defense",
+      "video": false,
+      "rub_num": "2",
+      "rub_label": "Technique individuelle",
+      "rub_id": "ti",
+      "rub_icon": "👤",
+      "sub_label": "2b — Plaquer",
+      "sub_id": "ti-plaq",
+      "sub_color": "#5a1a1a",
+      "sub_badge": "#ffeaea",
+      "sub_badge_text": "#5a1a1a",
+      "sub_icon": "💪",
+      "sub_sub": "Technique de plaquage securise",
+      "sub_comp": [
+        "Plaquer bas",
+        "Entourer les hanches",
+        "Se relever rapidement",
+        "Plaquer en securite",
+        "Plaquer lateral et frontal"
+      ],
+      "ss_label": "Plaquages",
+      "ss_id": "ti-plaq-1",
+      "famille": "technique"
+    },
+    {
+      "n": "03",
+      "t": "« Le plaquage » — situation 03/12",
+      "s": "",
+      "id": "1nb8bBhOAftqD4_nTtA0VHBh9PyyOMtHF",
+      "ages": [
+        "M10",
+        "M12",
+        "M14F15",
+        "M16"
+      ],
+      "tags": [
+        "GUIDE-EDUCATEUR"
+      ],
+      "cross": "1b Defense",
+      "video": false,
+      "rub_num": "2",
+      "rub_label": "Technique individuelle",
+      "rub_id": "ti",
+      "rub_icon": "👤",
+      "sub_label": "2b — Plaquer",
+      "sub_id": "ti-plaq",
+      "sub_color": "#5a1a1a",
+      "sub_badge": "#ffeaea",
+      "sub_badge_text": "#5a1a1a",
+      "sub_icon": "💪",
+      "sub_sub": "Technique de plaquage securise",
+      "sub_comp": [
+        "Plaquer bas",
+        "Entourer les hanches",
+        "Se relever rapidement",
+        "Plaquer en securite",
+        "Plaquer lateral et frontal"
+      ],
+      "ss_label": "Plaquages",
+      "ss_id": "ti-plaq-1",
+      "famille": "technique"
+    },
+    {
+      "n": "04",
+      "t": "« Le plaquage » — situation 04/12",
+      "s": "",
+      "id": "1gv_mhga_nE43vGeY52rqPWX_o91F4VyC",
+      "ages": [
+        "M10",
+        "M12",
+        "M14F15",
+        "M16"
+      ],
+      "tags": [
+        "GUIDE-EDUCATEUR"
+      ],
+      "cross": "1b Defense",
+      "video": false,
+      "rub_num": "2",
+      "rub_label": "Technique individuelle",
+      "rub_id": "ti",
+      "rub_icon": "👤",
+      "sub_label": "2b — Plaquer",
+      "sub_id": "ti-plaq",
+      "sub_color": "#5a1a1a",
+      "sub_badge": "#ffeaea",
+      "sub_badge_text": "#5a1a1a",
+      "sub_icon": "💪",
+      "sub_sub": "Technique de plaquage securise",
+      "sub_comp": [
+        "Plaquer bas",
+        "Entourer les hanches",
+        "Se relever rapidement",
+        "Plaquer en securite",
+        "Plaquer lateral et frontal"
+      ],
+      "ss_label": "Plaquages",
+      "ss_id": "ti-plaq-1",
+      "famille": "technique"
+    },
+    {
+      "n": "05",
+      "t": "« Le plaquage » — situation 05/12",
+      "s": "",
+      "id": "1IRJwh_g6ToOkeVeznlvhXv1DAvtJOB9N",
+      "ages": [
+        "M10",
+        "M12",
+        "M14F15",
+        "M16"
+      ],
+      "tags": [
+        "GUIDE-EDUCATEUR"
+      ],
+      "cross": "1b Defense",
+      "video": false,
+      "rub_num": "2",
+      "rub_label": "Technique individuelle",
+      "rub_id": "ti",
+      "rub_icon": "👤",
+      "sub_label": "2b — Plaquer",
+      "sub_id": "ti-plaq",
+      "sub_color": "#5a1a1a",
+      "sub_badge": "#ffeaea",
+      "sub_badge_text": "#5a1a1a",
+      "sub_icon": "💪",
+      "sub_sub": "Technique de plaquage securise",
+      "sub_comp": [
+        "Plaquer bas",
+        "Entourer les hanches",
+        "Se relever rapidement",
+        "Plaquer en securite",
+        "Plaquer lateral et frontal"
+      ],
+      "ss_label": "Plaquages",
+      "ss_id": "ti-plaq-1",
+      "famille": "technique"
+    },
+    {
+      "n": "06",
+      "t": "« Le plaquage » — situation 06/12",
+      "s": "",
+      "id": "1t62GLTu2JaTP4gi3BAkFAj8gu-XCRD_U",
+      "ages": [
+        "M10",
+        "M12",
+        "M14F15",
+        "M16"
+      ],
+      "tags": [
+        "GUIDE-EDUCATEUR"
+      ],
+      "cross": "1b Defense",
+      "video": false,
+      "rub_num": "2",
+      "rub_label": "Technique individuelle",
+      "rub_id": "ti",
+      "rub_icon": "👤",
+      "sub_label": "2b — Plaquer",
+      "sub_id": "ti-plaq",
+      "sub_color": "#5a1a1a",
+      "sub_badge": "#ffeaea",
+      "sub_badge_text": "#5a1a1a",
+      "sub_icon": "💪",
+      "sub_sub": "Technique de plaquage securise",
+      "sub_comp": [
+        "Plaquer bas",
+        "Entourer les hanches",
+        "Se relever rapidement",
+        "Plaquer en securite",
+        "Plaquer lateral et frontal"
+      ],
+      "ss_label": "Plaquages",
+      "ss_id": "ti-plaq-1",
+      "famille": "technique"
+    },
+    {
+      "n": "07",
+      "t": "« Le plaquage » — situation 07/12",
+      "s": "",
+      "id": "1qrvxvaNvEAfHaiGDw88ReEB5s-2xKVV1",
+      "ages": [
+        "M10",
+        "M12",
+        "M14F15",
+        "M16"
+      ],
+      "tags": [
+        "GUIDE-EDUCATEUR"
+      ],
+      "cross": "1b Defense",
+      "video": false,
+      "rub_num": "2",
+      "rub_label": "Technique individuelle",
+      "rub_id": "ti",
+      "rub_icon": "👤",
+      "sub_label": "2b — Plaquer",
+      "sub_id": "ti-plaq",
+      "sub_color": "#5a1a1a",
+      "sub_badge": "#ffeaea",
+      "sub_badge_text": "#5a1a1a",
+      "sub_icon": "💪",
+      "sub_sub": "Technique de plaquage securise",
+      "sub_comp": [
+        "Plaquer bas",
+        "Entourer les hanches",
+        "Se relever rapidement",
+        "Plaquer en securite",
+        "Plaquer lateral et frontal"
+      ],
+      "ss_label": "Plaquages",
+      "ss_id": "ti-plaq-1",
+      "famille": "technique"
+    },
+    {
+      "n": "08",
+      "t": "« Le plaquage » — situation 08/12",
+      "s": "",
+      "id": "1uf9A0orNkegQd9G0Z7YIBx2l8XpQDg0i",
+      "ages": [
+        "M10",
+        "M12",
+        "M14F15",
+        "M16"
+      ],
+      "tags": [
+        "GUIDE-EDUCATEUR"
+      ],
+      "cross": "1b Defense",
+      "video": false,
+      "rub_num": "2",
+      "rub_label": "Technique individuelle",
+      "rub_id": "ti",
+      "rub_icon": "👤",
+      "sub_label": "2b — Plaquer",
+      "sub_id": "ti-plaq",
+      "sub_color": "#5a1a1a",
+      "sub_badge": "#ffeaea",
+      "sub_badge_text": "#5a1a1a",
+      "sub_icon": "💪",
+      "sub_sub": "Technique de plaquage securise",
+      "sub_comp": [
+        "Plaquer bas",
+        "Entourer les hanches",
+        "Se relever rapidement",
+        "Plaquer en securite",
+        "Plaquer lateral et frontal"
+      ],
+      "ss_label": "Plaquages",
+      "ss_id": "ti-plaq-1",
+      "famille": "technique"
+    },
+    {
+      "n": "09",
+      "t": "« Le plaquage » — situation 09/12",
+      "s": "",
+      "id": "17zeryXuA7F-nDGD3yCGiQ4UsWcwPbz71",
+      "ages": [
+        "M10",
+        "M12",
+        "M14F15",
+        "M16"
+      ],
+      "tags": [
+        "GUIDE-EDUCATEUR"
+      ],
+      "cross": "1b Defense",
+      "video": false,
+      "rub_num": "2",
+      "rub_label": "Technique individuelle",
+      "rub_id": "ti",
+      "rub_icon": "👤",
+      "sub_label": "2b — Plaquer",
+      "sub_id": "ti-plaq",
+      "sub_color": "#5a1a1a",
+      "sub_badge": "#ffeaea",
+      "sub_badge_text": "#5a1a1a",
+      "sub_icon": "💪",
+      "sub_sub": "Technique de plaquage securise",
+      "sub_comp": [
+        "Plaquer bas",
+        "Entourer les hanches",
+        "Se relever rapidement",
+        "Plaquer en securite",
+        "Plaquer lateral et frontal"
+      ],
+      "ss_label": "Plaquages",
+      "ss_id": "ti-plaq-1",
+      "famille": "technique"
+    },
+    {
+      "n": "10",
+      "t": "« Le plaquage » — situation 10/12",
+      "s": "",
+      "id": "1BQniS7A7tOGv3zZxEkFe6-KKA7e0Wljl",
+      "ages": [
+        "M10",
+        "M12",
+        "M14F15",
+        "M16"
+      ],
+      "tags": [
+        "GUIDE-EDUCATEUR"
+      ],
+      "cross": "1b Defense",
+      "video": false,
+      "rub_num": "2",
+      "rub_label": "Technique individuelle",
+      "rub_id": "ti",
+      "rub_icon": "👤",
+      "sub_label": "2b — Plaquer",
+      "sub_id": "ti-plaq",
+      "sub_color": "#5a1a1a",
+      "sub_badge": "#ffeaea",
+      "sub_badge_text": "#5a1a1a",
+      "sub_icon": "💪",
+      "sub_sub": "Technique de plaquage securise",
+      "sub_comp": [
+        "Plaquer bas",
+        "Entourer les hanches",
+        "Se relever rapidement",
+        "Plaquer en securite",
+        "Plaquer lateral et frontal"
+      ],
+      "ss_label": "Plaquages",
+      "ss_id": "ti-plaq-1",
+      "famille": "technique"
+    },
+    {
+      "n": "11",
+      "t": "« Le plaquage » — situation 11/12",
+      "s": "",
+      "id": "1X1v8xatLpVkrW1D1lHcBdEW0BRHaXv8k",
+      "ages": [
+        "M10",
+        "M12",
+        "M14F15",
+        "M16"
+      ],
+      "tags": [
+        "GUIDE-EDUCATEUR"
+      ],
+      "cross": "1b Defense",
+      "video": false,
+      "rub_num": "2",
+      "rub_label": "Technique individuelle",
+      "rub_id": "ti",
+      "rub_icon": "👤",
+      "sub_label": "2b — Plaquer",
+      "sub_id": "ti-plaq",
+      "sub_color": "#5a1a1a",
+      "sub_badge": "#ffeaea",
+      "sub_badge_text": "#5a1a1a",
+      "sub_icon": "💪",
+      "sub_sub": "Technique de plaquage securise",
+      "sub_comp": [
+        "Plaquer bas",
+        "Entourer les hanches",
+        "Se relever rapidement",
+        "Plaquer en securite",
+        "Plaquer lateral et frontal"
+      ],
+      "ss_label": "Plaquages",
+      "ss_id": "ti-plaq-1",
+      "famille": "technique"
+    },
+    {
+      "n": "12",
+      "t": "« Le plaquage » — situation 12/12",
+      "s": "",
+      "id": "18kv11FOCDjJnwpKem7qqciLq-XTxUgXL",
+      "ages": [
+        "M10",
+        "M12",
+        "M14F15",
+        "M16"
+      ],
+      "tags": [
+        "GUIDE-EDUCATEUR"
+      ],
+      "cross": "1b Defense",
+      "video": false,
+      "rub_num": "2",
+      "rub_label": "Technique individuelle",
+      "rub_id": "ti",
+      "rub_icon": "👤",
+      "sub_label": "2b — Plaquer",
+      "sub_id": "ti-plaq",
+      "sub_color": "#5a1a1a",
+      "sub_badge": "#ffeaea",
+      "sub_badge_text": "#5a1a1a",
+      "sub_icon": "💪",
+      "sub_sub": "Technique de plaquage securise",
+      "sub_comp": [
+        "Plaquer bas",
+        "Entourer les hanches",
+        "Se relever rapidement",
+        "Plaquer en securite",
+        "Plaquer lateral et frontal"
+      ],
+      "ss_label": "Plaquages",
+      "ss_id": "ti-plaq-1",
+      "famille": "technique"
     }
   ]
 }
