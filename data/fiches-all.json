@@ -17518,5 +17518,670 @@
    "fiche_origine_pptx_id": "",
    "videos": []
   }
+ },
+ "1leysEkwi3Bu2NnTYShBiTRSzCNHTWvb4": {
+  "source": {
+   "nom_fiche": "Guide de l'éducateur - Le plaquage - 01",
+   "fileId_origine": "1Q1AAQsCtkseU_dLlYVQFr2PTEV8CZDO5",
+   "fileId_dossier": "1leysEkwi3Bu2NnTYShBiTRSzCNHTWvb4",
+   "generated_at": "2026-08-04T19:18:38Z",
+   "converter_version": "GE-1.0"
+  },
+  "cartouche": {
+   "titre": "« Le plaquage » — situation 01/12",
+   "theme": "Technique individuelle · Le plaquage",
+   "niveau": "—",
+   "rapport_de_force": "Équilibré",
+   "format": "Jeu collectif (image)",
+   "duree": "—",
+   "materiel": "Ballons, plots (la « mare »)",
+   "effectif": "« Crocodiles » (plaqueurs) vs porteurs",
+   "categorie": "—"
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Apprendre progressivement le geste du plaquage."
+   ],
+   "but": "Ceinturer les porteurs traversant la mare, en un minimum de temps.",
+   "lancement": "On appelle cette situation le jeu des crocodiles (les plaqueurs). Des joueurs avec ballon sont en dehors de « la mare aux crocodiles ». Au signal, ils rentrent dans la mare en tenant le ballon à 2 mains et essaient d'éviter les crocodiles tout en étant continuellement en mouvement. Les crocodiles sont debout et tentent de ceinturer les porteurs sans les lâcher pendant 3 secondes. Quand un joueur est ceinturé 3 secondes, il ressort de la mare, compte jusqu'à 5, puis revient. Séquences d'une minute avant de changer les rôles ; on comptabilise le nombre total de ceinturés. La situation est adaptable à toute catégorie, à vous d'enlever le côté imaginaire.",
+   "consignes": [],
+   "critere_reussite": [
+    "Ceinturer et immobiliser 3 secondes."
+   ],
+   "comportements_attendus": [
+    "Lève toujours la tête et ouvre les yeux",
+    "Fléchis les jambes",
+    "Encercle le joueur avec les 2 bras en serrant fort",
+    "Engage l'épaule au niveau du short de l'adversaire",
+    "Mets ta tête sur le côté opposé à l'épaule engagée (épaule gauche → tête à droite)",
+    "Sois « dur » au moment de ceinturer",
+    "Décale tes appuis pour être équilibré et ne pas tomber",
+    "Essaie de te toucher les mains en ceinturant",
+    "Colle ton oreille contre le short de l'adversaire"
+   ],
+   "variantes": [
+    "Un joueur ceinturé devient crocodile : ne pas vouloir être crocodile augmente le niveau des porteurs",
+    "Attraper puis faire reculer et/ou pivoter le porteur : habituer à se servir des appuis d'un plaquage",
+    "Crocodiles à genoux, faire tomber les porteurs (réduire le diamètre si besoin) : arriver sur un plaquage",
+    "Crocodiles debout, plaquer les porteurs : plaquage en partant debout plus difficile, attention à la posture"
+   ]
+  },
+  "files": {
+   "fiche_json_id": "1PzuPtJZNToD48rKL0nrJmBVBf14IbQO2",
+   "fiche_pdf_id": "1fmtrbr_Y3NJtVdZI6ouczhAoO68f1ppW",
+   "fiche_pptx_id": "1Q1AAQsCtkseU_dLlYVQFr2PTEV8CZDO5",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1TCc5jpop0cH8ok-MkWgvH1_0ariZHnJy": {
+  "source": {
+   "nom_fiche": "Guide de l'éducateur - Le plaquage - 02",
+   "fileId_origine": "1b9reWsxx4DUg3Z5efS0iD05Y1VCIe7fg",
+   "fileId_dossier": "1TCc5jpop0cH8ok-MkWgvH1_0ariZHnJy",
+   "generated_at": "2026-08-04T19:18:38Z",
+   "converter_version": "GE-1.0"
+  },
+  "cartouche": {
+   "titre": "« Le plaquage » — situation 02/12",
+   "theme": "Technique individuelle · Le plaquage",
+   "niveau": "—",
+   "rapport_de_force": "—",
+   "format": "Plaquage à genoux",
+   "duree": "—",
+   "materiel": "Ballon, plots (en-but)",
+   "effectif": "1 PB vs 1 plaqueur à genoux",
+   "categorie": "—"
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Plaquer en sécurité ; s'engager au plaquage sans crainte."
+   ],
+   "but": "Faire tomber le porteur qui trottine vers l'en-but.",
+   "lancement": "Un porteur de balle (PB) part à 3 mètres du plaqueur positionné à genoux. Une ligne d'en-but est située 1 mètre derrière le plaqueur. On demande au PB de trottiner vers l'en-but pour marquer tout en s'engageant sur une des 2 épaules du plaqueur, qui doit le faire tomber. On varie l'intensité de l'engagement. Attention à bien mettre une ligne d'en-but : sans elle, le PB risque de s'arrêter au contact, ce qui rend le plaquage très difficile (plaquer quelqu'un de statique est compliqué).",
+   "consignes": [],
+   "critere_reussite": [
+    "Faire tomber le PB en tombant avec lui."
+   ],
+   "comportements_attendus": [
+    "Regarde devant toi",
+    "Lève le menton",
+    "Engage l'épaule droite dans le short du PB",
+    "Place ta tête en sécurité, à gauche de la hanche de l'adversaire",
+    "Colle ton oreille droite au short du PB",
+    "Encercle le PB avec tes 2 bras et serre fort pour lui bloquer les appuis",
+    "Tombe avec le PB et finis sur lui",
+    "Pivote avec l'adversaire tout en serrant ses jambes pour le déséquilibrer",
+    "Sois « dur » au contact",
+    "Appuie avec ta tête sur la hanche du porteur de balle",
+    "Relève-toi rapidement une fois le plaquage effectué"
+   ],
+   "variantes": [
+    "Faire la situation en marchant : faciliter l'engagement pour les joueurs qui appréhendent le contact",
+    "Le plaqueur part debout, prêt à plaquer jambes fléchies : plus réaliste, utilisation des jambes",
+    "Le joueur part sur 4 appuis : travail de gainage et de pré-action, très bas donc tout de suite en position de plaquage dos plat"
+   ]
+  },
+  "files": {
+   "fiche_json_id": "195rvnMdXy09Xl5lRLIUz3x1ZjK3ooofd",
+   "fiche_pdf_id": "1dldLhk04hzqWcwBVtpMBMduYjjFdRwHk",
+   "fiche_pptx_id": "1b9reWsxx4DUg3Z5efS0iD05Y1VCIe7fg",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1nb8bBhOAftqD4_nTtA0VHBh9PyyOMtHF": {
+  "source": {
+   "nom_fiche": "Guide de l'éducateur - Le plaquage - 03",
+   "fileId_origine": "1PKDOuR1mJ44II2Pova4a80bktkO3iSpo",
+   "fileId_dossier": "1nb8bBhOAftqD4_nTtA0VHBh9PyyOMtHF",
+   "generated_at": "2026-08-04T19:18:38Z",
+   "converter_version": "GE-1.0"
+  },
+  "cartouche": {
+   "titre": "« Le plaquage » — situation 03/12",
+   "theme": "Technique individuelle · Le plaquage",
+   "niveau": "—",
+   "rapport_de_force": "—",
+   "format": "Poussée en position de plaquage",
+   "duree": "—",
+   "materiel": "— (photo repère)",
+   "effectif": "1 plaqueur + 1 PW",
+   "categorie": "—"
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Utiliser les appuis lors d'un plaquage."
+   ],
+   "but": "Faire reculer le PB sur 5 mètres en gardant la position de plaquage.",
+   "lancement": "Le porteur de balle (PB) et le plaqueur partent déjà en position de plaquage. Au « top », le plaqueur fait reculer le PB sur 5 mètres en gardant la position de plaquage (dos plat, jambes fléchies). Au bout de 5 mètres, le plaqueur se stoppe simplement sans faire tomber le PB. Le but est de regarder la position du plaqueur et de travailler l'utilisation des jambes pendant un plaquage. On demande au PB de fléchir les jambes pour mettre une légère résistance. On effectue 4 passages, 2 sur chaque épaule.",
+   "consignes": [],
+   "critere_reussite": [
+    "Faire reculer le PB en gardant le dos placé."
+   ],
+   "comportements_attendus": [
+    "Lève toujours la tête",
+    "Fléchis les jambes",
+    "Sors les fesses vers le ciel pour avoir le dos placé",
+    "Encercle et serre le PB avec tes 2 bras",
+    "Repousse le PB en avançant avec tes 2 jambes",
+    "Repousse le PB en utilisant tes appuis de façon dynamique",
+    "Fais en sorte que tes appuis ne se croisent jamais pour rester équilibré",
+    "Appuie avec ton oreille sur la hanche du porteur de balle tout en gardant le menton relevé"
+   ],
+   "variantes": [
+    "Au 2e « top », le PB essaie de se sortir du contact pour retourner au départ ; le plaqueur peut le faire tomber : grande réactivité, se servir du changement de direction",
+    "Pendant la poussée, le PB libère un bras et crée des déséquilibres (tenter de faire pivoter) : maintenir une pression de face, dos placé, appuis dynamiques indispensables"
+   ]
+  },
+  "files": {
+   "fiche_json_id": "19NC63No15D_YoKKJgGsDsopS4mskYI1E",
+   "fiche_pdf_id": "1M7s-arl7kkG171ERh8d8EIB_4ioSiOUy",
+   "fiche_pptx_id": "1PKDOuR1mJ44II2Pova4a80bktkO3iSpo",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1gv_mhga_nE43vGeY52rqPWX_o91F4VyC": {
+  "source": {
+   "nom_fiche": "Guide de l'éducateur - Le plaquage - 04",
+   "fileId_origine": "12EXaobD8SewiKI9qb78rqrJLuTbzhRgs",
+   "fileId_dossier": "1gv_mhga_nE43vGeY52rqPWX_o91F4VyC",
+   "generated_at": "2026-08-04T19:18:38Z",
+   "converter_version": "GE-1.0"
+  },
+  "cartouche": {
+   "titre": "« Le plaquage » — situation 04/12",
+   "theme": "Technique individuelle · Le plaquage",
+   "niveau": "—",
+   "rapport_de_force": "—",
+   "format": "Plaquage avec cadrage (couleur)",
+   "duree": "—",
+   "materiel": "Ballon, plots (bleu, rouge), en-but",
+   "effectif": "1 PB vs 1 défenseur",
+   "categorie": "—"
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Plaquer en engageant la bonne épaule."
+   ],
+   "but": "Empêcher le PB de marquer 2 mètres derrière le défenseur.",
+   "lancement": "Les 2 joueurs sont espacés de 2 mètres. L'éducateur annonce une couleur (bleu ou rouge) ; le défenseur va toucher le plot correspondant. Le PB part en trottinant au moment où le défenseur touche le plot. L'attaquant tente de marquer dans l'en-but situé 2 mètres derrière le défenseur, ce qui l'oblige à ne pas s'arrêter. On adapte les distances selon l'âge : au moment où le défenseur se relève, il doit être quasiment épaule dans le short du porteur.",
+   "consignes": [],
+   "critere_reussite": [
+    "Engager la bonne épaule en position de sécurité."
+   ],
+   "comportements_attendus": [
+    "Lève la tête et ouvre les yeux",
+    "Fléchis les jambes pour placer ton dos",
+    "Écarte les bras avant d'engager l'épaule",
+    "Engage l'épaule droite",
+    "Place ta tête en sécurité, l'oreille droite collée au short de l'adversaire",
+    "Encercle le porteur avec tes 2 bras et serre fort pour lui bloquer les appuis",
+    "Continue de pousser avec les jambes pour faire reculer ou pivoter le porteur",
+    "Mets tes épaules au-dessus de tes genoux pour être équilibré",
+    "Mets-toi sur l'avant des pieds juste avant de t'engager",
+    "Sois « dur » au contact",
+    "Appuie avec ta tête sur la hanche du porteur",
+    "Appuie-toi sur le porteur une fois le plaquage effectué pour te relever vite et contester le ballon"
+   ],
+   "variantes": [
+    "Faire la situation en marchant : plus facile, le défenseur a le temps de se positionner",
+    "À vitesse réelle, l'attaquant doit tout faire pour marquer : plus difficile, s'engager plus fort",
+    "Demander à l'attaquant de tenir son ballon à 2 mains : plus facile pour le défenseur",
+    "Un 3e joueur avec bouclier oblige à « contre-rucker » après s'être relevé : enchaînement de tâches, intensité croissante"
+   ]
+  },
+  "files": {
+   "fiche_json_id": "1sZ6KeyA7WHii9I7qHYGZXa-zFGFfsH_B",
+   "fiche_pdf_id": "1J-3OHWPnXEbyz31nEmEXKHYML-XjC7O8",
+   "fiche_pptx_id": "12EXaobD8SewiKI9qb78rqrJLuTbzhRgs",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1IRJwh_g6ToOkeVeznlvhXv1DAvtJOB9N": {
+  "source": {
+   "nom_fiche": "Guide de l'éducateur - Le plaquage - 05",
+   "fileId_origine": "1lZYwUU9Kt1kdu35sCYBq2YYEzuYjVozH",
+   "fileId_dossier": "1IRJwh_g6ToOkeVeznlvhXv1DAvtJOB9N",
+   "generated_at": "2026-08-04T19:18:39Z",
+   "converter_version": "GE-1.0"
+  },
+  "cartouche": {
+   "titre": "« Le plaquage » — situation 05/12",
+   "theme": "Technique individuelle · Le plaquage",
+   "niveau": "—",
+   "rapport_de_force": "—",
+   "format": "Cadrage latéral",
+   "duree": "—",
+   "materiel": "Ballon, plots (bouclier en évolution)",
+   "effectif": "1 PB vs 1 défenseur",
+   "categorie": "—"
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Cadrer et conserver le cadrage avant un plaquage."
+   ],
+   "but": "Plaquer avec la bonne épaule après avoir conservé le cadrage.",
+   "lancement": "Le PB et le défenseur (D) sont espacés de 2 m ; on effectue la situation en trottinant. 1) Le PB est cadré par « D » et fait quelques pas chassés sur le côté (5 m maxi). 2) Le PB s'engage avec une course droite en cherchant à avancer jusqu'à passer derrière « D », qui plaque avec la bonne épaule (ici l'épaule droite). Une fois acquis, on évolue : 3) idem que 1 ; 4) possibilité pour le PB de changer de direction, ce qui oblige « D » à changer le cadrage ; 5) idem que 2, le défenseur s'engage avec la bonne épaule (ici épaule gauche).",
+   "consignes": [],
+   "critere_reussite": [
+    "Rester au cadrage, jamais face au ballon."
+   ],
+   "comportements_attendus": [
+    "Lève la tête et ouvre les yeux",
+    "Mets-toi au cadrage, épaule droite à l'intérieur de la hanche droite du porteur",
+    "Reste au cadrage et déplace-toi en même temps que le porteur",
+    "Ne te positionne jamais face au ballon",
+    "Passe en fréquence d'appuis dynamiques quand le porteur avance",
+    "Ré-accélère quand tu es à distance de plaquage (un bras environ)",
+    "Remets-toi très vite au cadrage en fréquence d'appuis quand le PB change de direction, en restant le moins de temps possible devant le ballon",
+    "Mets-toi sur l'avant des pieds juste avant de t'engager"
+   ],
+   "variantes": [
+    "Faire la situation en marchant : plus facile, le défenseur conserve le cadrage",
+    "À vitesse réelle : plus grande concentration sur le cadrage",
+    "Écarter le PB et le défenseur : cadrer davantage puis réduire le cadrage à mesure qu'il avance",
+    "Rapprocher à 1 mètre : cadrer un peu moins (moins de risque intérieur)",
+    "Un 3e joueur avec bouclier oblige à contre-rucker après s'être relevé : enchaînement de tâches"
+   ]
+  },
+  "files": {
+   "fiche_json_id": "1FZMdEMXLOuJhLLpQPCbNUYUcoZwUPn8A",
+   "fiche_pdf_id": "1VRgPhSibQKxJYl18GScMLHcHv9eay7UI",
+   "fiche_pptx_id": "1lZYwUU9Kt1kdu35sCYBq2YYEzuYjVozH",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1t62GLTu2JaTP4gi3BAkFAj8gu-XCRD_U": {
+  "source": {
+   "nom_fiche": "Guide de l'éducateur - Le plaquage - 06",
+   "fileId_origine": "1ALSXHkJvANfkq79aV-zFYjiL9vdZByWL",
+   "fileId_dossier": "1t62GLTu2JaTP4gi3BAkFAj8gu-XCRD_U",
+   "generated_at": "2026-08-04T19:18:39Z",
+   "converter_version": "GE-1.0"
+  },
+  "cartouche": {
+   "titre": "« Le plaquage » — situation 06/12",
+   "theme": "Technique individuelle · Le plaquage",
+   "niveau": "—",
+   "rapport_de_force": "—",
+   "format": "Cadrage avec choix de côté",
+   "duree": "—",
+   "materiel": "Ballon, plots jaunes, zones (en-but)",
+   "effectif": "1 PB vs 1 défenseur",
+   "categorie": "—"
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Cadrer avant un plaquage."
+   ],
+   "but": "Plaquer dans la bonne zone (système de points par zone).",
+   "lancement": "Le PB en rouge est à 5 mètres du défenseur (D) en bleu. Le départ est donné par le PB qui contourne un des 2 plots jaunes pour rentrer à droite ou à gauche ; s'il rentre à gauche, il ne peut jouer son duel que dans la partie droite du terrain. « D » ne peut sortir qu'à partir du moment où le PB a dépassé le plot jaune. Le but du PB est de marquer dans l'en-but ; « D » doit marquer le plus de points possible : plaquage en zone 1 (en avançant) → 5 points ; en zone 2 → 3 points ; pendant que le PB marque → 1 point ; pas de plaquage → 0. On considère qu'il y a plaquage si le PB sort en touche sans tomber sous la pression de « D » (bien cadré). 5 passages par joueur.",
+   "consignes": [],
+   "critere_reussite": [
+    "Cadrer tôt et plaquer en avançant (zone 1)."
+   ],
+   "comportements_attendus": [
+    "Lève la tête et ouvre les yeux",
+    "Monte vite en restant au cadrage : épaule droite à l'intérieur de la hanche droite du PB",
+    "Passe en fréquence d'appuis dynamiques quand tu te rapproches",
+    "Ré-accélère quand tu es à distance de plaquage (un bras environ)",
+    "Écarte les bras juste avant le plaquage",
+    "Fléchis les jambes pour avoir le dos placé",
+    "Reste équilibré : tes épaules au-dessus de tes genoux",
+    "Mets-toi sur l'avant de tes pieds juste avant de t'engager",
+    "Appuie-toi sur le porteur une fois le plaquage effectué pour te relever vite et contester le ballon"
+   ],
+   "variantes": [
+    "Faire la situation en marchant : plus facile, le défenseur réfléchit à son cadrage",
+    "Bonus d'un point si le défenseur se relève vite et « gratte » : habituer à contester après le plaquage",
+    "Le défenseur sort de ses plots quand il veut : enlever un repère de cadrage, s'adapter",
+    "Rapprocher le défenseur à 2 m : moins de vitesse, plus facile",
+    "Un joueur à chaque plot, ballon échangé, départ au « TOP » : moins de temps pour voir sortir le PB, concentration sur le cadrage"
+   ]
+  },
+  "files": {
+   "fiche_json_id": "1lwBjJQdC2Y_IxrC7uFC8BIdnyejCtaI4",
+   "fiche_pdf_id": "1H9pQLJEM2f_BtA_XN4g36_Um2HgP5qXG",
+   "fiche_pptx_id": "1ALSXHkJvANfkq79aV-zFYjiL9vdZByWL",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1qrvxvaNvEAfHaiGDw88ReEB5s-2xKVV1": {
+  "source": {
+   "nom_fiche": "Guide de l'éducateur - Le plaquage - 07",
+   "fileId_origine": "1xZlZl3IOwBDSBPGa_t_Xo1kHcfVjV-CP",
+   "fileId_dossier": "1qrvxvaNvEAfHaiGDw88ReEB5s-2xKVV1",
+   "generated_at": "2026-08-04T19:18:39Z",
+   "converter_version": "GE-1.0"
+  },
+  "cartouche": {
+   "titre": "« Le plaquage » — situation 07/12",
+   "theme": "Technique individuelle · Le plaquage",
+   "niveau": "—",
+   "rapport_de_force": "Sur-nombre offensif",
+   "format": "Cadrage sur 3 attaquants",
+   "duree": "—",
+   "materiel": "Ballon, plots (bleus, rouges)",
+   "effectif": "1 défenseur vs 3 attaquants",
+   "categorie": "—"
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Cadrer le porteur avant de s'engager ; s'engager en sécurité."
+   ],
+   "but": "Ceinturer le porteur qui tente de franchir seul.",
+   "lancement": "Le défenseur en rouge est à 5 mètres des 3 attaquants en bleu. 1) Les attaquants se font des passes sans dépasser la ligne de plots bleus. 2) Au « TOP » ou à son initiative, le porteur essaie d'aller derrière la ligne de plots rouges seul avec une course droite. Le défenseur doit ceinturer le porteur en engageant la bonne épaule. On fait tout à intensité très réduite (en trottinant), on peut vite évoluer vers un vrai plaquage à haute intensité. 5 passages pour le défenseur avant de changer de rôle.",
+   "consignes": [],
+   "critere_reussite": [
+    "Cadrer sans jamais dépasser le ballon."
+   ],
+   "comportements_attendus": [
+    "Lève la tête et ouvre les yeux",
+    "Déplace-toi en restant au cadrage",
+    "Ne dépasse jamais le ballon (reste à l'intérieur) par rapport au sens de jeu",
+    "Engage ton épaule gauche",
+    "Fléchis les jambes",
+    "Encercle le joueur avec tes 2 bras en serrant fort",
+    "Mets ta tête sur le côté gauche et colle ton oreille contre le short de l'adversaire",
+    "Passe en fréquence d'appuis dynamiques quand l'attaquant avance",
+    "Ré-accélère quand tu es à distance de plaquage (un bras environ)",
+    "Décale les appuis pour être équilibré",
+    "Reste équilibré : tes épaules au-dessus de tes genoux",
+    "Mets-toi sur l'avant des pieds juste avant de t'engager",
+    "Continue de pousser sur tes jambes une fois le blocage effectué jusqu'à l'arrêt de l'action"
+   ],
+   "variantes": [
+    "Faire la situation en marchant : plus facile",
+    "Autoriser le PB à faire 1 ou 2 appuis : maintien du cadrage plus difficile",
+    "À vitesse réelle : plus réaliste et difficile",
+    "Élargir ou rétrécir le terrain : élargir = plus dynamique et vigilant ; rétrécir = plus facile",
+    "Changer les angles de course (croisées, coupes) : vision périphérique sur les 3 joueurs, se rapprocher des contraintes du jeu"
+   ]
+  },
+  "files": {
+   "fiche_json_id": "169Dy6c-0bpmXSrK1BBs8V06p3YHOuFwU",
+   "fiche_pdf_id": "1sTn-uR5RW8raxmgtL0gt0lHAR2hfslVA",
+   "fiche_pptx_id": "1xZlZl3IOwBDSBPGa_t_Xo1kHcfVjV-CP",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1uf9A0orNkegQd9G0Z7YIBx2l8XpQDg0i": {
+  "source": {
+   "nom_fiche": "Guide de l'éducateur - Le plaquage - 08",
+   "fileId_origine": "1DierZnjnU2Jw0GU-D-3pZjNucec3iwTr",
+   "fileId_dossier": "1uf9A0orNkegQd9G0Z7YIBx2l8XpQDg0i",
+   "generated_at": "2026-08-04T19:18:40Z",
+   "converter_version": "GE-1.0"
+  },
+  "cartouche": {
+   "titre": "« Le plaquage » — situation 08/12",
+   "theme": "Technique individuelle · Le plaquage",
+   "niveau": "—",
+   "rapport_de_force": "—",
+   "format": "Plaquage de côté (colonnes)",
+   "duree": "—",
+   "materiel": "Ballon, plots",
+   "effectif": "Colonnes PB vs défenseurs (croisement)",
+   "categorie": "—"
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Plaquer de côté en position de sécurité."
+   ],
+   "but": "Enchaîner des plaquages de côté en alternant l'épaule.",
+   "lancement": "Les porteurs en bleu (PB) et les défenseurs en rouge (D) partent en même temps en trottinant. Le PB doit rejoindre la colonne d'en face en courant droit ; le défenseur du haut tente de le plaquer puis rejoint le plot en face de lui. Ensuite l'autre PB part et se fait plaquer par l'autre défenseur. On enchaîne 6 plaquages ; les défenseurs alternent donc l'épaule engagée à chaque passage.",
+   "consignes": [],
+   "critere_reussite": [
+    "Plaquer de côté en sécurité en gérant la vitesse du PB."
+   ],
+   "comportements_attendus": [
+    "Monte vite sur le PB",
+    "Passe en fréquence d'appuis proche du PB",
+    "Oriente ton épaule gauche, quand tu es proche du PB, face à sa hanche gauche",
+    "Lève la tête et garde les yeux ouverts",
+    "Place ton dos, fléchis les jambes, engage l'épaule gauche et encercle fort le PB avec tes 2 bras",
+    "Continue de travailler avec tes jambes pour avancer et/ou faire pivoter le porteur",
+    "Passe en fréquence à mesure que tu te rapproches pour ne pas te faire prendre à contre-pied",
+    "Sers-toi de ta vitesse pour faire pivoter le PB et le déséquilibrer (s'il en a peu)",
+    "Sers-toi de la vitesse du PB, s'il en a beaucoup, pour l'aider à tomber en « subissant » légèrement",
+    "Appuie-toi sur le porteur une fois le plaquage effectué pour te relever le plus vite possible"
+   ],
+   "variantes": [
+    "Un soutien part en retard avec le PB et vient se mettre au-dessus du ballon après le plaquage : se relever vite pour contre-rucker ou récupérer",
+    "Autoriser le PB à mettre 1 ou 2 appuis sur le côté : créer de l'incertitude, plus difficile",
+    "À vitesse réelle : moins de préparation, s'engager plus fort"
+   ]
+  },
+  "files": {
+   "fiche_json_id": "1OSk908AJS4hFCtKIVkdbmAB9lHhdtbBj",
+   "fiche_pdf_id": "1rsaZ7LWw5yuLP9Id99Op8J6YjxY3wAPX",
+   "fiche_pptx_id": "1DierZnjnU2Jw0GU-D-3pZjNucec3iwTr",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "17zeryXuA7F-nDGD3yCGiQ4UsWcwPbz71": {
+  "source": {
+   "nom_fiche": "Guide de l'éducateur - Le plaquage - 09",
+   "fileId_origine": "1p3WEXLzGH1kiaGFNIjqxn6QfsJ_WNa5f",
+   "fileId_dossier": "17zeryXuA7F-nDGD3yCGiQ4UsWcwPbz71",
+   "generated_at": "2026-08-04T19:18:40Z",
+   "converter_version": "GE-1.0"
+  },
+  "cartouche": {
+   "titre": "« Le plaquage » — situation 09/12",
+   "theme": "Technique individuelle · Le plaquage",
+   "niveau": "—",
+   "rapport_de_force": "Équilibré",
+   "format": "Défense en contrôle",
+   "duree": "—",
+   "materiel": "Ballon, plots (bleus, rouges), en-but (40 m)",
+   "effectif": "1 PB vs 1 défenseur",
+   "categorie": "—"
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Cadrer le porteur et maintenir le cadrage défensif ; défendre en contrôlant."
+   ],
+   "but": "Empêcher le PB de marquer ou le repousser vers la touche.",
+   "lancement": "Le PB démarre avec le ballon entre les 2 plots bleus. Le défenseur (D) est entre les 2 plots rouges à 15 mètres du PB. Le jeu démarre à l'initiative du PB qui doit marquer dans l'en-but à 40 m. Le défenseur doit l'en empêcher, en tentant de le plaquer ou de le repousser vers la touche. Le jeu au pied est interdit. 3 passages avant de changer de rôle ; 1 point pour le défenseur quand il a empêché le PB de marquer.",
+   "consignes": [],
+   "critere_reussite": [
+    "Contrôler le PB entre soi et la touche."
+   ],
+   "comportements_attendus": [
+    "Avance sur le PB pour gagner du terrain sans prendre trop de vitesse",
+    "Cadre le PB entre toi et la ligne de touche : épaule gauche face à la hanche gauche du PB",
+    "Fais en sorte que le PB soit le plus proche possible de la touche et qu'il n'ait plus d'autre choix que d'aller au contact",
+    "Ralentis et passe en fréquence d'appuis à environ 5 m du PB, en conservant le cadrage",
+    "Engage-toi pour plaquer si le PB ne va pas trop vite et sans incertitude ; s'il va très vite avec de l'incertitude, cours avec lui en reculant tout en conservant le cadrage (contrôle)",
+    "Passe en fréquence à mesure que tu te rapproches pour ne pas te faire prendre à contre-pied",
+    "Sers-toi de ta vitesse pour faire pivoter le PB (s'il en a peu)",
+    "Sers-toi de la vitesse du PB, s'il en a beaucoup, pour le faire tomber en « subissant » le plaquage",
+    "Appuie-toi sur le porteur une fois le plaquage effectué pour te relever vite"
+   ],
+   "variantes": [
+    "Autoriser le jeu au pied : le défenseur doit davantage contrôler le porteur pour l'empêcher",
+    "Rapprocher PB et défenseur à 10 mètres : moins de vitesse, contrôle pas toujours nécessaire selon l'incertitude"
+   ]
+  },
+  "files": {
+   "fiche_json_id": "1W6THkbKuMVqs4kh84YmM7A-HmwcT_Rrc",
+   "fiche_pdf_id": "12LUYPpkiyaS3UrADmwox8Rg1m-ga9Xw7",
+   "fiche_pptx_id": "1p3WEXLzGH1kiaGFNIjqxn6QfsJ_WNa5f",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1BQniS7A7tOGv3zZxEkFe6-KKA7e0Wljl": {
+  "source": {
+   "nom_fiche": "Guide de l'éducateur - Le plaquage - 10",
+   "fileId_origine": "165KeJZ7mBPVtgfWHHEr_CaDv4PlWWDl8",
+   "fileId_dossier": "1BQniS7A7tOGv3zZxEkFe6-KKA7e0Wljl",
+   "generated_at": "2026-08-04T19:18:40Z",
+   "converter_version": "GE-1.0"
+  },
+  "cartouche": {
+   "titre": "« Le plaquage » — situation 10/12",
+   "theme": "Technique individuelle · Le plaquage",
+   "niveau": "—",
+   "rapport_de_force": "—",
+   "format": "Percussion sur sac",
+   "duree": "—",
+   "materiel": "Sac de plaquage",
+   "effectif": "1 plaqueur + 1 tenant de sac",
+   "categorie": "—"
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Utiliser le haut et le bas du corps pour repousser l'adversaire ; s'engager rudement."
+   ],
+   "but": "Repousser le sac sur 5 mètres et « l'écraser » au sol.",
+   "lancement": "On positionne un joueur debout qui tient le sac de plaquage et un plaqueur à 3 mètres. Au « top », le plaqueur s'engage sur le sac, le ceinture puis le soulève pour le repousser jusqu'à « l'écraser » contre le sol après avoir avancé d'environ 5 mètres. Pendant ce temps, le joueur de gauche retient le sac en restant debout avec des attitudes hautes : il résiste sans stopper la progression du plaqueur. On effectue 4 passages (2 par épaule) avant d'échanger les rôles.",
+   "consignes": [],
+   "critere_reussite": [
+    "Repousser droit et écraser le sac, appuis dynamiques."
+   ],
+   "comportements_attendus": [
+    "Engage l'épaule sur le sac à la hauteur du short du joueur qui le retient",
+    "Serre les 2 bras le plus fort possible autour du sac",
+    "Garde la tête relevée, l'oreille droite collée au sac",
+    "Fléchis tes jambes et garde le dos le plus droit et horizontal possible",
+    "Repousse le sac grâce à tes appuis de façon dynamique pour ne pas être déséquilibré et pousser droit",
+    "Passe sur des appuis fréquents juste avant d'impacter le sac",
+    "Sois « dur » au contact",
+    "Ne croise jamais tes appuis sinon tu risques d'être déséquilibré",
+    "Appuie-toi sur le sac pour te relever le plus vite possible une fois le plaquage effectué"
+   ],
+   "variantes": [
+    "Le joueur qui retient le sac peut fléchir les jambes pour retenir plus efficacement : utiliser d'abord sa vitesse pour gagner du terrain",
+    "Le joueur peut faire pivoter le sac : sans appuis dynamiques, impossible d'écraser le sac sans se déséquilibrer",
+    "Un joueur avec bouclier derrière celui qui retient le sac met la pression une fois le sac au sol : rester actif après le plaquage, prêt pour un ruck ou un grattage"
+   ]
+  },
+  "files": {
+   "fiche_json_id": "1YJ6XERY_3BkciGMCuYX0ASEZy031EQPo",
+   "fiche_pdf_id": "17XjR-APFbs4m916GwAiWM6rkwsyLXnz2",
+   "fiche_pptx_id": "165KeJZ7mBPVtgfWHHEr_CaDv4PlWWDl8",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "1X1v8xatLpVkrW1D1lHcBdEW0BRHaXv8k": {
+  "source": {
+   "nom_fiche": "Guide de l'éducateur - Le plaquage - 11",
+   "fileId_origine": "1lf6Mx4v5_ARHTi7m2Z92otncEq7167BT",
+   "fileId_dossier": "1X1v8xatLpVkrW1D1lHcBdEW0BRHaXv8k",
+   "generated_at": "2026-08-04T19:18:40Z",
+   "converter_version": "GE-1.0"
+  },
+  "cartouche": {
+   "titre": "« Le plaquage » — situation 11/12",
+   "theme": "Technique individuelle · Le plaquage",
+   "niveau": "—",
+   "rapport_de_force": "Équilibré",
+   "format": "Jeu à plaquer (rugby à XIII)",
+   "duree": "—",
+   "materiel": "Ballon, plots, en-but",
+   "effectif": "Équipes complètes",
+   "categorie": "—"
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Enchaîner les plaquages ; être capable de bloquer la continuité du jeu."
+   ],
+   "but": "Bloquer la continuité adverse en enchaînant les plaquages efficaces.",
+   "lancement": "Ce jeu est en quelque sorte du rugby à XIII : on joue selon les règles du rugby à XV, sauf certaines aménagées. Après un plaquage, il n'y a jamais de ruck. Le joueur plaqué (le porteur) se relève le plus vite possible et effectue un « gratte-poule » (talonner le ballon vers l'arrière pour un relayeur). Au même moment, le plaqueur se met debout au contact du plaqué et ne peut pas intervenir avant que les attaquants aient fait 5 mètres avec le ballon. Les plaquages peuvent être effectués au niveau du sternum (on peut viser le ballon) — attention à la catégorie, actuellement interdit en école de rugby mais travaillable avec des M14 confirmés. On donne 5 possessions (5 passages au sol) à l'attaque ; sinon le ballon va aux défenseurs. Jeu au pied interdit.",
+   "consignes": [],
+   "critere_reussite": [
+    "Se relever vite et bloquer la continuité."
+   ],
+   "comportements_attendus": [
+    "Sois « dur » au contact",
+    "Relève-toi le plus vite possible une fois le plaquage effectué",
+    "Si un partenaire plaque au niveau du short, viens très vite t'engager sur le ballon pour bloquer la continuité",
+    "Engage l'épaule au niveau du ballon",
+    "Serre les 2 bras le plus fort possible",
+    "Continue de travailler avec tes jambes pour avancer et/ou faire pivoter le porteur afin de désorganiser l'attaque",
+    "Tente d'arracher le ballon s'il est à distance de bras"
+   ],
+   "variantes": [
+    "Autoriser le jeu au pied à la dernière possession : rideau profond, plaquages plus efficaces",
+    "Autoriser le jeu au pied tout le temps : défenseurs souvent en sous-nombre, contrôler un peu plus",
+    "Lors d'un blocage debout, interdire l'aide des soutiens au porteur : plus facile de bloquer la continuité",
+    "Élargir le terrain (5 m ou plus par joueur) : plus d'espace, se rapprocher des distances du XV",
+    "Rétrécir le terrain : plus de contacts et de plaquages"
+   ]
+  },
+  "files": {
+   "fiche_json_id": "1-ryXGGMS3A1oIW4IhIsRHEJjmXBMGDG4",
+   "fiche_pdf_id": "1HtioBaGnn02ezvHnpgcNKHu7QGEc02MQ",
+   "fiche_pptx_id": "1lf6Mx4v5_ARHTi7m2Z92otncEq7167BT",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
+ },
+ "18kv11FOCDjJnwpKem7qqciLq-XTxUgXL": {
+  "source": {
+   "nom_fiche": "Guide de l'éducateur - Le plaquage - 12",
+   "fileId_origine": "1fbS3dlwCFPDL1P8UzLloBJepDoBofU9D",
+   "fileId_dossier": "18kv11FOCDjJnwpKem7qqciLq-XTxUgXL",
+   "generated_at": "2026-08-04T19:18:41Z",
+   "converter_version": "GE-1.0"
+  },
+  "cartouche": {
+   "titre": "« Le plaquage » — situation 12/12",
+   "theme": "Technique individuelle · Le plaquage",
+   "niveau": "—",
+   "rapport_de_force": "—",
+   "format": "3 techniques en 1 contre 1",
+   "duree": "—",
+   "materiel": "Ballon",
+   "effectif": "1 PB vs 1 plaqueur",
+   "categorie": "—"
+  },
+  "pedagogie": {
+   "objectifs": [
+    "Maîtriser 3 techniques de plaquage : casser un raffut, plaquage-blocage sur le ballon, plaquer un joueur aux attitudes très basses."
+   ],
+   "but": "Réussir chacune des 3 situations de plaquage selon l'attitude du PB.",
+   "lancement": "Sur cette fiche, 3 situations techniques de plaquage en 1 contre 1 avec les corrections correspondant à différentes attitudes du porteur. Un PB est à 5 mètres du plaqueur ; il lance le jeu en avançant et réalise un 1 contre 1 avec différentes consignes : 1) il vise et raffute avec son bras libre le plexus ou l'épaule du plaqueur ; 2) il s'engage en tenant le ballon à 2 mains près du corps ; 3) il s'engage de face en cherchant à « enterrer » le plaqueur dans le sol. Les situations peuvent être réalisées en marchant jusqu'à vitesse réelle. Toutes les corrections sont des compléments aux autres situations du thème.",
+   "consignes": [],
+   "critere_reussite": [
+    "Adapter la technique à l'attitude du porteur."
+   ],
+   "comportements_attendus": [
+    "Casser un raffut : prépare ton bras « dur » et prêt à chasser le raffut adverse",
+    "Chasse le raffut de haut en bas avec ton bras opposé à l'épaule que tu vas engager",
+    "Commence à encercler le PB avec le bras inutilisé",
+    "Encercle rudement le PB avec ton bras une fois le raffut enlevé",
+    "Plaquage-blocage : engage ton épaule au niveau des bras et du ballon du PB",
+    "Bloque et serre les bras du PB afin qu'il ne puisse pas faire circuler le ballon",
+    "Fais pivoter le coude de l'adversaire, si ta position le permet, pour tenter de lui arracher le ballon",
+    "Fais pivoter l'adversaire dans ton camp si tu n'arrives pas à faire pivoter son coude, afin de l'isoler de ses soutiens",
+    "Attitudes basses, de face : engage-toi plus bas que le PB, du bas vers le haut de façon très intense",
+    "Termine sur l'avant des pieds au moment de t'engager",
+    "Attitudes basses, de côté : efface ton épaule au dernier moment et laisse le PB passer derrière",
+    "Engage tes 2 bras au même moment autour du PB en serrant ses jambes",
+    "Sers-toi de son déséquilibre avant pour le faire pivoter et l'aider à tomber",
+    "Relève-toi très vite pour contester le ballon"
+   ],
+   "variantes": [
+    "Réaliser les situations en marchant jusqu'à vitesse réelle : augmenter progressivement l'intensité et le réalisme"
+   ]
+  },
+  "files": {
+   "fiche_json_id": "1v_fJTx1EjOKJV_Y4fKf9nDETopCeg8y2",
+   "fiche_pdf_id": "1asFeOylRWwNdi68VMEcEi888cxFlGDVQ",
+   "fiche_pptx_id": "1fbS3dlwCFPDL1P8UzLloBJepDoBofU9D",
+   "fiche_origine_pptx_id": "",
+   "videos": []
+  }
  }
 }
