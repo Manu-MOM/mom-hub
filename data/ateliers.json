@@ -949,8 +949,7 @@
                     "GUIDE-EDUCATEUR"
                   ]
                 }
-              ],
-              "soon": true
+              ]
             }
           ]
         },
@@ -3213,7 +3212,6 @@
             {
               "id": "jp-melee-1",
               "label": "Melee ordonnee",
-              "soon": true,
               "items": [
                 {
                   "n": "01",
@@ -3283,7 +3281,6 @@
             {
               "id": "jp-touche-1",
               "label": "Touche ordonnee",
-              "soon": true,
               "items": [
                 {
                   "n": "01",
