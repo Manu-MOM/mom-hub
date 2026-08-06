@@ -245,19 +245,49 @@
       color: #fff; padding: .35rem .8rem .35rem 1rem;
       clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%, 16px 50%);
       overflow: hidden; cursor: pointer;
-      filter: drop-shadow(0 3px 4px rgba(12, 61, 36, .28));
+      filter: drop-shadow(0 4px 6px rgba(12, 61, 36, .42));
       display: flex; flex-direction: column; justify-content: flex-end;
       transition: filter .12s, transform .12s;
+    }
+    /* Liseré clair intérieur pour détacher chaque bloc principal du fond. */
+    .pa-ft__bloc:not(.pa-ft__bloc--rf)::after {
+      content: ''; position: absolute; inset: 0;
+      clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%, 16px 50%);
+      box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .55);
+      pointer-events: none;
+    }
+    .pa-ft__bloc:first-child:not(.pa-ft__bloc--rf)::after {
+      clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%);
     }
     .pa-ft__bloc:first-child {
       clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%);
       padding-left: .8rem;
     }
-    .pa-ft__bloc:hover { filter: drop-shadow(0 5px 7px rgba(12, 61, 36, .34)) brightness(1.06); transform: translateY(-2px); }
+    .pa-ft__bloc:hover { filter: drop-shadow(0 6px 9px rgba(12, 61, 36, .5)) brightness(1.06); transform: translateY(-2px); }
     .pa-ft__bloc.c-vertf { background: var(--vert-fonce); }
     .pa-ft__bloc.c-gold  { background: var(--gold); color: var(--vert-fonce); }
     .pa-ft__bloc.c-vert  { background: var(--vert); }
     .pa-ft__bloc.c-clay  { background: var(--clay); }
+    /* Intercalé « rejoint la frise » : barre sur la ligne principale, plus
+       basse que les blocs principaux, hachurée à la teinte du bloc. */
+    .pa-ft__bloc--rf {
+      height: 2.9rem; top: .5rem; padding: .3rem .6rem .3rem .8rem;
+      clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%, 10px 50%);
+      filter: drop-shadow(0 2px 3px rgba(12, 61, 36, .3));
+      justify-content: center; border: 1px solid rgba(0,0,0,.25);
+    }
+    .pa-ft__bloc--rf.i-or     { background: repeating-linear-gradient(45deg, var(--gold), var(--gold) 6px, var(--goldd) 6px, var(--goldd) 12px); color: #2c1c04; }
+    .pa-ft__bloc--rf.i-clay   { background: repeating-linear-gradient(45deg, #c98a6a, #c98a6a 6px, var(--clayd) 6px, var(--clayd) 12px); color: #fff; }
+    .pa-ft__bloc--rf.i-violet { background: repeating-linear-gradient(45deg, #b6a5d8, #b6a5d8 6px, #6a4fa3 6px, #6a4fa3 12px); color: #fff; }
+    .pa-ft__bloc--rf.i-bleu   { background: repeating-linear-gradient(45deg, #8fb3d8, #8fb3d8 6px, #3066be 6px, #3066be 12px); color: #fff; }
+    .pa-ft__bloc--rf .pa-ft__num { position: static; margin-bottom: .1rem; width: 18px; height: 18px; font-size: .64rem; background: rgba(0,0,0,.22); }
+    .pa-ft__bloc--rf .pa-ft__titre { font-size: .72rem; }
+    /* Alerte de collision (case « rejoindre la frise » bloquée) */
+    .pa-rf-alert {
+      margin: .1rem 0 .5rem; padding: .4rem .6rem; border-radius: 6px;
+      background: var(--feedback-error-bg, #fdecea); color: var(--feedback-error-fg, #8a1b14);
+      font-size: .8rem; font-weight: 600; border: 1px solid #f0b3ad;
+    }
     .pa-ft__num {
       position: absolute; top: .32rem; left: 1rem;
       display: inline-flex; align-items: center; justify-content: center;
@@ -348,16 +378,26 @@
       }
       .pa-ft__titre { font-size: .8rem; }
       .pa-ft__grad-lbl { font-size: .56rem; }
-      /* détail : 3 colonnes pour tenir en hauteur sur une page */
-      .pa-fv-titre { margin: .5rem 0 .4rem; }
+      .pa-ft__bloc--rf { filter: none !important; }
+      /* La frise occupe le haut de la 1re page ; le détail démarre après. */
+      .pa-frise-card .pa-ft-scroll { break-after: page; }
+      /* Détail : 2 blocs de large, coulant sur AUTANT DE PAGES que nécessaire
+         (plus de column-count qui écrase tout sur une page). Chaque bloc
+         reste insécable ; on évite les blocs coupés entre deux pages. */
+      .pa-fv-titre { margin: .4rem 0 .5rem; break-before: avoid; }
       .pa-fv { padding-left: 0; }
       .pa-fv__rail { display: none; }
-      .pa-fv-grid { column-count: 3; column-gap: 8mm; }
-      .pa-fv__item { margin: 0 0 4mm; break-inside: avoid; padding-left: 0; }
+      .pa-fv-grid {
+        column-count: 2; column-gap: 8mm;
+        /* column-fill: auto → remplit colonne puis page, au lieu d'équilibrer
+           sur une hauteur fixe (ce qui tronquait le contenu). */
+        column-fill: auto;
+      }
+      .pa-fv__item { margin: 0 0 5mm; break-inside: avoid; padding-left: 0; }
       .pa-fv__num { position: static; display: inline-flex; margin-right: .3rem; vertical-align: middle; width: 18px; height: 18px; font-size: .68rem; }
-      .pa-fv__card { padding: .4rem .6rem; }
-      .pa-fv__card ul { font-size: .68rem; line-height: 1.4; }
-      .pa-fv__titre { font-size: .82rem; }
+      .pa-fv__card { padding: .45rem .7rem; break-inside: avoid; }
+      .pa-fv__card ul { font-size: .7rem; line-height: 1.42; }
+      .pa-fv__titre { font-size: .84rem; }
     }
   </style>
 </head>
