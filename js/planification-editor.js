@@ -635,6 +635,152 @@
   //   2. Frise VERTICALE : détail des contenus (axes, commentaires),
   //      toujours visible sous l'horizontale, mêmes codes couleur.
   //   + Cartouche + bouton d'export.
+  // ── PLANIF-FRISE-CHRONOLOGIQUE : frise à échelle de temps réelle ──
+  // Parse 'YYYY-MM-DD' en timestamp (ms). Renvoie NaN si invalide.
+  function parseJour(s) {
+    if (!s) return NaN;
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s));
+    if (!m) return NaN;
+    return Date.UTC(+m[1], +m[2] - 1, +m[3]);
+  }
+
+  // Périodes effectives d'un bloc pour la frise :
+  //  - bloc intercalé avec periodes saisies → ses périodes (couples complets) ;
+  //  - sinon → une pseudo-période unique [date_debut, date_fin] si datée.
+  // Chaque période renvoyée porte {d0, d1} en ms (d1 borné >= d0).
+  function periodesEffectives(b) {
+    var out = [];
+    if (b.intercale && Array.isArray(b.periodes) && b.periodes.length) {
+      b.periodes.forEach(function (p) {
+        if (!p || !p.debut || !p.fin) return;
+        var a = parseJour(p.debut), z = parseJour(p.fin);
+        if (isNaN(a) || isNaN(z)) return;
+        out.push({ d0: Math.min(a, z), d1: Math.max(a, z), debut: p.debut, fin: p.fin });
+      });
+    }
+    if (out.length === 0) {
+      var a2 = parseJour(b.date_debut), z2 = parseJour(b.date_fin);
+      if (!isNaN(a2) || !isNaN(z2)) {
+        var dd = isNaN(a2) ? z2 : a2, ff = isNaN(z2) ? a2 : z2;
+        out.push({ d0: Math.min(dd, ff), d1: Math.max(dd, ff),
+                   debut: b.date_debut || b.date_fin, fin: b.date_fin || b.date_debut });
+      }
+    }
+    out.sort(function (x, y) { return x.d0 - y.d0; });
+    return out;
+  }
+
+  // Libellé mois court FR à partir d'un timestamp ms.
+  var MOIS_FR = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin',
+                 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+  function moisLabel(ms) {
+    var d = new Date(ms);
+    return MOIS_FR[d.getUTCMonth()] + ' ' + String(d.getUTCFullYear()).slice(2);
+  }
+  // Formate un 'YYYY-MM-DD' en 'JJ/MM' pour les étiquettes compactes.
+  function jjmm(s) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || ''));
+    return m ? (m[3] + '/' + m[2]) : esc(s || '');
+  }
+
+  // Rendu de la frise chronologique. HTML positionné en % (responsive +
+  // scroll conservé). Deux couches : blocs datés (bas) + intercalés (haut).
+  function renderFriseTemporelle(persistes) {
+    // Sépare datés / non datés.
+    var datesToutes = [];
+    var blocsDatables = [];
+    var nonDates = 0;
+    persistes.forEach(function (b, i) {
+      var pers = periodesEffectives(b);
+      if (pers.length === 0) { nonDates++; return; }
+      pers.forEach(function (p) { datesToutes.push(p.d0); datesToutes.push(p.d1); });
+      blocsDatables.push({ b: b, i: i, pers: pers });
+    });
+
+    if (blocsDatables.length === 0) {
+      var vide = '<p class="pa-attente">Aucun bloc daté à afficher sur l\'axe.</p>';
+      if (nonDates > 0) {
+        vide += '<p class="pa-ft__nondate">' + nonDates +
+          ' bloc(s) non daté(s) — visibles dans le détail ci-dessous.</p>';
+      }
+      return vide;
+    }
+
+    // Échelle : min/max des dates saisies. Plancher anti-division par zéro
+    // (min=max ⇒ on force une fenêtre d'1 mois pour donner une largeur).
+    var tMin = Math.min.apply(null, datesToutes);
+    var tMax = Math.max.apply(null, datesToutes);
+    if (tMax <= tMin) { tMax = tMin + 30 * 24 * 3600 * 1000; }
+    var span = tMax - tMin;
+    var pct = function (ms) { return ((ms - tMin) / span) * 100; };
+
+    // Graduations mensuelles (1er de chaque mois dans la fenêtre).
+    var grads = '';
+    var cur = new Date(tMin);
+    cur = new Date(Date.UTC(cur.getUTCFullYear(), cur.getUTCMonth(), 1));
+    for (var guard = 0; guard < 60; guard++) {
+      var ms = cur.getTime();
+      if (ms > tMax) break;
+      if (ms >= tMin) {
+        var left = pct(ms);
+        grads += '<span class="pa-ft__grad" style="left:' + left.toFixed(3) + '%">' +
+          '<span class="pa-ft__grad-lbl">' + esc(moisLabel(ms)) + '</span></span>';
+      }
+      cur = new Date(Date.UTC(cur.getUTCFullYear(), cur.getUTCMonth() + 1, 1));
+    }
+
+    // Couche basse : blocs datés NON intercalés.
+    var bas = '';
+    var ci = 0;
+    blocsDatables.forEach(function (o) {
+      if (o.b.intercale) return;
+      var couleurCls = FRISE_CYCLE[ci % FRISE_CYCLE.length]; ci++;
+      var p = o.pers[0];
+      var l = pct(p.d0), w = Math.max(pct(p.d1) - pct(p.d0), 2.2);
+      bas += '<div class="pa-ft__bloc ' + couleurCls + '" ' +
+        'style="left:' + l.toFixed(3) + '%;width:' + w.toFixed(3) + '%" ' +
+        'data-act="gobloc" data-n="' + (o.i + 1) + '" ' +
+        'title="' + esc(o.b.titre || 'Sans titre') + '">' +
+        '<span class="pa-ft__num">' + (o.i + 1) + '</span>' +
+        '<span class="pa-ft__titre">' + esc(o.b.titre || 'Sans titre') + '</span>' +
+        '<span class="pa-ft__date">' + jjmm(p.debut) + '→' + jjmm(p.fin) + '</span>' +
+        '</div>';
+    });
+
+    // Couche haute : blocs intercalés, une barre par période, reliées.
+    var haut = '';
+    blocsDatables.forEach(function (o) {
+      if (!o.b.intercale) return;
+      var num = o.i + 1;
+      // Trait de liaison entre 1re et dernière période.
+      var lFirst = pct(o.pers[0].d0);
+      var lLast = pct(o.pers[o.pers.length - 1].d1);
+      haut += '<div class="pa-ft__lien" style="left:' + lFirst.toFixed(3) +
+        '%;width:' + Math.max(lLast - lFirst, 0).toFixed(3) + '%"></div>';
+      o.pers.forEach(function (p, k) {
+        var l = pct(p.d0), w = Math.max(pct(p.d1) - pct(p.d0), 1.8);
+        haut += '<div class="pa-ft__inter" ' +
+          'style="left:' + l.toFixed(3) + '%;width:' + w.toFixed(3) + '%" ' +
+          'data-act="gobloc" data-n="' + num + '" ' +
+          'title="' + esc(o.b.titre || 'Sans titre') + ' · période ' + (k + 1) + '">' +
+          '<span class="pa-ft__inter-lbl">' + num + '·' + (k + 1) +
+            ' <em>' + jjmm(p.debut) + '→' + jjmm(p.fin) + '</em></span>' +
+          '</div>';
+      });
+    });
+
+    var h = '<div class="pa-ft-scroll"><div class="pa-ft">';
+    h += '<div class="pa-ft__axe">' + grads + '</div>';
+    h += '<div class="pa-ft__haut">' + haut + '</div>';
+    h += '<div class="pa-ft__bas">' + bas + '</div>';
+    h += '</div></div>';
+    if (nonDates > 0) {
+      h += '<p class="pa-ft__nondate">' + nonDates +
+        ' bloc(s) non daté(s) — non placés sur l\'axe, visibles dans le détail ci-dessous.</p>';
+    }
+    return h;
+  }
+
   function renderFrise() {
     var persistes = State.blocs.filter(function (b) { return !b._draft; });
     var h = '<section class="pa-card pa-frise-card">';
@@ -651,23 +797,12 @@
       '<button type="button" class="pa-btn pa-frise-export" data-act="export">' +
       'Exporter / Imprimer (PDF)</button></div>';
 
-    // 1) Frise horizontale (chevrons alternés, scrollable, cliquables).
-    h += '<div class="pa-fh-scroll"><div class="pa-fh">';
-    persistes.forEach(function (b, i) {
-      var couleur = b.intercale ? 'pa-fh__bloc--inter'
-        : FRISE_CYCLE[i % FRISE_CYCLE.length];
-      var periode = (b.date_debut || b.date_fin)
-        ? esc(b.date_debut || '?') + ' → ' + esc(b.date_fin || '?')
-        : '';
-      h += '<div class="pa-fh__bloc ' + couleur + '" data-act="gobloc" data-n="' + (i + 1) + '">' +
-        '<div class="pa-fh__head">' +
-          '<span class="pa-fh__num">' + (i + 1) + '</span>' +
-          '<span class="pa-fh__titre">' + esc(b.titre || 'Sans titre') + '</span>' +
-        '</div>' +
-        (periode ? '<div class="pa-fh__date">' + periode + '</div>' : '') +
-        '</div>';
-    });
-    h += '</div></div>';
+    // 1) Frise chronologique (échelle de temps réelle, une seule ligne).
+    // PLANIF-FRISE-CHRONOLOGIQUE : remplace l'ancienne frise séquentielle
+    // de chevrons (pa-fh). Les blocs sont positionnés/dimensionnés selon
+    // leurs vraies dates ; un bloc intercalé se fractionne en une barre par
+    // période (posées sur le haut, texte par étages pour rester lisible).
+    h += renderFriseTemporelle(persistes);
 
     // 2) Frise verticale (détail), toujours visible.
     h += '<div class="pa-fv-titre">Détail des blocs</div>';
