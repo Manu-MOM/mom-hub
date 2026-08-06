@@ -237,30 +237,37 @@
     .pa-ft__inter.i-clay .pa-ft__inter-num,
     .pa-ft__inter.i-violet .pa-ft__inter-num,
     .pa-ft__inter.i-bleu .pa-ft__inter-num { color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,.35); }
-    /* Couche basse : blocs datés (barres pleines, texte ancré en bas) */
-    .pa-ft__bas { position: relative; height: 3.3rem; }
+    /* Couche basse : blocs principaux — mis en avant (plus hauts, pointe
+       chevron marquée, ombre portée suivant la forme, titre plus grand). */
+    .pa-ft__bas { position: relative; height: 3.9rem; }
     .pa-ft__bloc {
-      position: absolute; top: 0; height: 3.3rem; box-sizing: border-box;
-      color: #fff; padding: .32rem .7rem .3rem; 
-      clip-path: polygon(0 0, calc(100% - 11px) 0, 100% 50%, calc(100% - 11px) 100%, 0 100%, 11px 50%);
+      position: absolute; top: 0; height: 3.9rem; box-sizing: border-box;
+      color: #fff; padding: .35rem .8rem .35rem 1rem;
+      clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%, 16px 50%);
       overflow: hidden; cursor: pointer;
+      filter: drop-shadow(0 3px 4px rgba(12, 61, 36, .28));
       display: flex; flex-direction: column; justify-content: flex-end;
       transition: filter .12s, transform .12s;
     }
-    .pa-ft__bloc:hover { filter: brightness(1.08); transform: translateY(-2px); }
+    .pa-ft__bloc:first-child {
+      clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%);
+      padding-left: .8rem;
+    }
+    .pa-ft__bloc:hover { filter: drop-shadow(0 5px 7px rgba(12, 61, 36, .34)) brightness(1.06); transform: translateY(-2px); }
     .pa-ft__bloc.c-vertf { background: var(--vert-fonce); }
     .pa-ft__bloc.c-gold  { background: var(--gold); color: var(--vert-fonce); }
     .pa-ft__bloc.c-vert  { background: var(--vert); }
     .pa-ft__bloc.c-clay  { background: var(--clay); }
     .pa-ft__num {
-      position: absolute; top: .28rem; left: .8rem;
+      position: absolute; top: .32rem; left: 1rem;
       display: inline-flex; align-items: center; justify-content: center;
-      width: 18px; height: 18px; border-radius: 50%;
-      background: rgba(255, 255, 255, .28); font-size: .66rem; font-weight: 800;
+      width: 20px; height: 20px; border-radius: 50%;
+      background: rgba(255, 255, 255, .32); font-size: .72rem; font-weight: 800;
     }
+    .pa-ft__bloc:first-child .pa-ft__num { left: .8rem; }
     .pa-ft__bloc.c-gold .pa-ft__num { background: rgba(12, 61, 36, .22); }
-    .pa-ft__titre { font-weight: 800; font-size: .82rem; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .pa-ft__date { font-size: .64rem; opacity: .9; white-space: nowrap; }
+    .pa-ft__titre { font-weight: 800; font-size: .92rem; line-height: 1.12; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pa-ft__date { font-size: .68rem; opacity: .92; white-space: nowrap; }
     .pa-ft__nondate { font-size: .78rem; color: var(--attente, #8a93a0); font-style: italic; margin-top: .5rem; }
 
     /* ---- Frise VERTICALE (détail) ---- */
@@ -326,10 +333,21 @@
       .pa-cartouche__ecusson { width: 46px; height: 46px; }
       .pa-cartouche__titre { font-size: 1.15rem; }
       .pa-cartouche__sous { font-size: .7rem; }
-      /* frise chronologique : visible, échelle conservée, sans scrollbar */
+      /* frise chronologique : visible, échelle conservée, sans scrollbar.
+         Les deux couches (haut = intercalés, bas = principaux) gardent leur
+         hauteur et leurs couleurs ; ombres retirées pour l'impression. */
       .pa-ft-scroll { overflow: visible; }
-      .pa-ft { min-width: 0; }
-      .pa-ft__bloc { box-shadow: none; }
+      .pa-ft { min-width: 0; padding-top: 1.6rem; }
+      .pa-ft__haut { height: 2.5rem; }
+      .pa-ft__bas { height: 3.4rem; }
+      .pa-ft__bloc { height: 3.4rem; filter: none !important; }
+      .pa-ft__bloc, .pa-ft__inter,
+      .pa-ft__inter.i-or, .pa-ft__inter.i-clay,
+      .pa-ft__inter.i-violet, .pa-ft__inter.i-bleu {
+        -webkit-print-color-adjust: exact; print-color-adjust: exact;
+      }
+      .pa-ft__titre { font-size: .8rem; }
+      .pa-ft__grad-lbl { font-size: .56rem; }
       /* détail : 3 colonnes pour tenir en hauteur sur une page */
       .pa-fv-titre { margin: .5rem 0 .4rem; }
       .pa-fv { padding-left: 0; }
