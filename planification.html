@@ -93,16 +93,6 @@
     .pa-jours__lbl em { font-weight: 400; font-style: italic; text-transform: none; color: var(--gris); }
     .pa-jours__hint { font-size: .82rem; color: var(--gris); margin: .2rem 0 .5rem; }
     .pa-jours__add { font-size: .86rem; }
-    /* PLANIF-BLOCS-INTERCALES-MULTIPERIODES : éditeur de périodes (additif).
-       Cadre crème + accent gold, cohérent avec le fond « intercalé » de la
-       frise. Réutilise les .pa-field / .pa-btn existants. */
-    .pa-periodes { background: #fdf7e6; border: 1px solid var(--gold); border-left: 3px solid var(--goldd); border-radius: 8px; padding: .8rem .9rem; margin: .5rem 0; }
-    .pa-periodes__lbl { font-size: .85rem; font-weight: 700; color: var(--goldd); text-transform: uppercase; letter-spacing: .02em; margin-bottom: .5rem; }
-    .pa-periodes__lbl em { font-weight: 400; font-style: italic; text-transform: none; color: var(--gris); }
-    .pa-periodes__hint { font-size: .82rem; color: var(--gris); margin: .2rem 0 .5rem; }
-    .pa-periode-row { display: flex; gap: .5rem; align-items: flex-end; flex-wrap: wrap; margin-top: .45rem; }
-    .pa-periode-row .pa-field { flex: 1 1 140px; }
-    .pa-btn--mini { padding: .35rem .6rem; font-size: .82rem; margin-top: .4rem; }
     /* Style 1 — carte encadrée : chaque jour dans un cadre à fond crème. */
     .pa-jour { background: var(--paper-warm); border: 1px solid var(--bord); border-radius: 8px; padding: .8rem .9rem; margin-top: .6rem; }
     .pa-jour:first-of-type { margin-top: .3rem; }
@@ -207,45 +197,59 @@
     }
     .pa-frise-export:hover { background: var(--vert-fonce); }
 
-    /* ---- Frise HORIZONTALE : chevrons alternés, scrollable ---- */
-    .pa-fh-scroll { overflow-x: auto; overflow-y: hidden; padding-bottom: .5rem; }
-    .pa-fh-scroll::-webkit-scrollbar { height: 8px; }
-    .pa-fh-scroll::-webkit-scrollbar-thumb { background: var(--bord); border-radius: 4px; }
-    .pa-fh { display: flex; gap: 0; min-width: min-content; }
-    .pa-fh__bloc {
-      position: relative; flex: 1 1 190px; color: #fff;
-      padding: .8rem 1.6rem; margin-right: -16px;
-      clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%, 16px 50%);
-      cursor: pointer; transition: transform .12s, filter .12s;
-      box-shadow: 0 2px 5px rgba(12, 61, 36, .18);
+    /* ---- Frise CHRONOLOGIQUE : échelle de temps réelle, une ligne ----
+       PLANIF-FRISE-CHRONOLOGIQUE. Remplace l'ancienne frise séquentielle
+       de chevrons (pa-fh, retirée : classes plus émises par le JS).
+       Positionnement en % : responsive + scroll horizontal conservé.
+       Deux couches (bas = blocs datés ; haut = intercalés fractionnés). */
+    .pa-ft-scroll { overflow-x: auto; overflow-y: hidden; padding-bottom: .5rem; }
+    .pa-ft-scroll::-webkit-scrollbar { height: 8px; }
+    .pa-ft-scroll::-webkit-scrollbar-thumb { background: var(--bord); border-radius: 4px; }
+    .pa-ft { position: relative; min-width: 640px; padding: 1.7rem 0 .3rem; }
+    /* Axe + graduations mensuelles */
+    .pa-ft__axe { position: relative; height: 0; }
+    .pa-ft__grad { position: absolute; top: -1.35rem; transform: translateX(-50%); }
+    .pa-ft__grad-lbl { font-family: 'JetBrains Mono', monospace; font-size: .62rem; color: var(--gris); white-space: nowrap; }
+    .pa-ft__grad::after { content: ''; position: absolute; left: 50%; top: 1.1rem; width: 1px; height: 4.4rem; background: var(--paper-deep, #e2d9bf); }
+    /* Couche haute : barres intercalées (posées sur le haut) */
+    .pa-ft__haut { position: relative; height: 1.5rem; margin-bottom: .18rem; }
+    .pa-ft__lien { position: absolute; top: 1.02rem; height: 0; border-top: 2px dotted var(--goldd); opacity: .5; }
+    .pa-ft__inter {
+      position: absolute; top: 0; height: 1.3rem; box-sizing: border-box;
+      background: repeating-linear-gradient(45deg, var(--gold), var(--gold) 6px, var(--goldd) 6px, var(--goldd) 12px);
+      border: 1px solid #7a5c10; border-radius: 4px; cursor: pointer;
+      transition: filter .12s, transform .12s;
     }
-    .pa-fh__bloc:hover { filter: brightness(1.08); transform: translateY(-2px); }
-    .pa-fh__bloc:first-child {
-      padding-left: 1.1rem;
-      clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%);
+    .pa-ft__inter:hover { filter: brightness(1.06); transform: translateY(-1px); }
+    .pa-ft__inter-lbl {
+      position: absolute; left: 0; top: -1.02rem; white-space: nowrap;
+      font-size: .62rem; font-weight: 800; color: var(--goldd);
     }
-    .pa-fh__bloc:last-child {
-      padding-right: 1.1rem; margin-right: 0;
-      clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 16px 50%);
+    .pa-ft__inter-lbl em { font-weight: 400; font-style: normal; color: var(--gris); }
+    /* Couche basse : blocs datés (barres pleines, texte ancré en bas) */
+    .pa-ft__bas { position: relative; height: 3.3rem; }
+    .pa-ft__bloc {
+      position: absolute; top: 0; height: 3.3rem; box-sizing: border-box;
+      color: #fff; padding: .32rem .5rem .3rem; border-radius: 6px;
+      overflow: hidden; cursor: pointer; box-shadow: 0 2px 5px rgba(12, 61, 36, .18);
+      display: flex; flex-direction: column; justify-content: flex-end;
+      transition: filter .12s, transform .12s;
     }
-    .pa-fh__bloc.c-vertf { background: var(--vert-fonce); }
-    .pa-fh__bloc.c-gold  { background: var(--gold); color: var(--vert-fonce); }
-    .pa-fh__bloc.c-vert  { background: var(--vert); }
-    .pa-fh__bloc.c-clay  { background: var(--clay); }
-    .pa-fh__bloc--inter {
-      background: repeating-linear-gradient(45deg, var(--gold), var(--gold) 10px, var(--goldd) 10px, var(--goldd) 20px);
-      color: var(--vert-fonce);
-    }
-    .pa-fh__head { display: flex; align-items: center; gap: .45rem; margin-bottom: .3rem; }
-    .pa-fh__num {
+    .pa-ft__bloc:hover { filter: brightness(1.08); transform: translateY(-2px); }
+    .pa-ft__bloc.c-vertf { background: var(--vert-fonce); }
+    .pa-ft__bloc.c-gold  { background: var(--gold); color: var(--vert-fonce); }
+    .pa-ft__bloc.c-vert  { background: var(--vert); }
+    .pa-ft__bloc.c-clay  { background: var(--clay); }
+    .pa-ft__num {
+      position: absolute; top: .28rem; left: .4rem;
       display: inline-flex; align-items: center; justify-content: center;
-      width: 22px; height: 22px; border-radius: 50%;
-      background: rgba(255, 255, 255, .28); font-size: .74rem; font-weight: 800;
-      flex: 0 0 auto;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: rgba(255, 255, 255, .28); font-size: .66rem; font-weight: 800;
     }
-    .pa-fh__bloc.c-gold .pa-fh__num, .pa-fh__bloc--inter .pa-fh__num { background: rgba(12, 61, 36, .22); }
-    .pa-fh__titre { font-weight: 800; font-size: .98rem; }
-    .pa-fh__date { font-size: .74rem; opacity: .9; padding-left: calc(22px + .45rem); }
+    .pa-ft__bloc.c-gold .pa-ft__num { background: rgba(12, 61, 36, .22); }
+    .pa-ft__titre { font-weight: 800; font-size: .82rem; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pa-ft__date { font-size: .64rem; opacity: .9; white-space: nowrap; }
+    .pa-ft__nondate { font-size: .78rem; color: var(--attente, #8a93a0); font-style: italic; margin-top: .5rem; }
 
     /* ---- Frise VERTICALE (détail) ---- */
     .pa-fv-titre {
@@ -281,10 +285,6 @@
     .pa-fv__date { font-size: .72rem; color: var(--gris); }
     .pa-fv__card ul { margin: 0; padding-left: 1.1rem; font-size: .78rem; color: var(--ink); line-height: 1.55; }
     .pa-fv__card p { margin: 0; font-size: .78rem; color: var(--ink); font-style: italic; }
-    /* PLANIF-BLOCS-INTERCALES-MULTIPERIODES : liste des périodes en détail. */
-    .pa-fv__periodes { margin: .35rem 0 .1rem; padding: 0; list-style: none; display: flex; flex-direction: column; gap: .25rem; }
-    .pa-fv__periodes li { font-size: .76rem; color: var(--ink); }
-    .pa-fv__periode-n { display: inline-block; background: var(--goldd); color: #fff; font-size: .66rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; padding: .1rem .45rem; border-radius: 5px; margin-right: .4rem; }
     /* PLANIF-SOUSBLOCS-PAR-JOUR : jours dans la frise (lecture). Additif. */
     .pa-fv-jours { margin-top: .5rem; display: flex; flex-direction: column; gap: .4rem; }
     /* Style 1 — carte encadrée en frise : cadre crème + étiquette de jour. */
@@ -296,7 +296,7 @@
     .pa-fv__card.is-target { animation: pa-flash 1.6s ease-out; }
 
     @media (max-width: 640px) {
-      .pa-fh__bloc { flex: 1 1 160px; }
+      .pa-ft { min-width: 560px; }
     }
 
     /* ---- IMPRESSION : 1 page A4 paysage, condensé, cartouche visible ---- */
@@ -314,12 +314,10 @@
       .pa-cartouche__ecusson { width: 46px; height: 46px; }
       .pa-cartouche__titre { font-size: 1.15rem; }
       .pa-cartouche__sous { font-size: .7rem; }
-      /* frise horizontale : wrap + tout visible, compacte */
-      .pa-fh-scroll { overflow: visible; }
-      .pa-fh { flex-wrap: wrap; min-width: 0; }
-      .pa-fh__bloc { flex: 1 1 150px; padding: .45rem 1.1rem; box-shadow: none; break-inside: avoid; }
-      .pa-fh__titre { font-size: .82rem; }
-      .pa-fh__date { font-size: .64rem; }
+      /* frise chronologique : visible, échelle conservée, sans scrollbar */
+      .pa-ft-scroll { overflow: visible; }
+      .pa-ft { min-width: 0; }
+      .pa-ft__bloc { box-shadow: none; }
       /* détail : 3 colonnes pour tenir en hauteur sur une page */
       .pa-fv-titre { margin: .5rem 0 .4rem; }
       .pa-fv { padding-left: 0; }
