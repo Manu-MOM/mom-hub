@@ -550,6 +550,13 @@
   // Un bloc intercalé sort du cycle (rendu hachuré or, classe dédiée).
   var FRISE_CYCLE = ['c-vertf', 'c-gold', 'c-vert', 'c-clay'];
 
+  // PLANIF-FRISE-CHRONOLOGIQUE : cycle de teintes pour différencier les blocs
+  // INTERCALÉS entre eux (motif hachuré commun = « intercalé » ; la teinte
+  // distingue quel bloc). INTER_NIVEAUX = nb de sous-niveaux verticaux pour
+  // éviter le croisement de deux intercalés aux périodes entremêlées.
+  var INTER_CYCLE = ['i-or', 'i-clay', 'i-violet', 'i-bleu'];
+  var INTER_NIVEAUX = 2;
+
   // Agrège les axes d'un bloc en une liste de libellés (ordre : individuel,
   // collectif, physique, poste). Utilisé par les deux frises.
   function axesDuBloc(b) {
@@ -748,23 +755,27 @@
     });
 
     // Couche haute : blocs intercalés, une barre par période, reliées.
+    // Chaque bloc intercalé reçoit une TEINTE distincte (cycle) pour être
+    // différenciable d'un autre bloc intercalé, et un NIVEAU vertical (0,1,…)
+    // pour éviter que deux blocs se croisent quand leurs périodes s'entremêlent.
     var haut = '';
-    blocsDatables.forEach(function (o) {
-      if (!o.b.intercale) return;
+    var interComptes = blocsDatables.filter(function (o) { return o.b.intercale; });
+    interComptes.forEach(function (o, rangInter) {
+      var teinte = INTER_CYCLE[rangInter % INTER_CYCLE.length];
+      var niveau = rangInter % INTER_NIVEAUX; // 0..INTER_NIVEAUX-1
       var num = o.i + 1;
-      // Trait de liaison entre 1re et dernière période.
       var lFirst = pct(o.pers[0].d0);
       var lLast = pct(o.pers[o.pers.length - 1].d1);
-      haut += '<div class="pa-ft__lien" style="left:' + lFirst.toFixed(3) +
-        '%;width:' + Math.max(lLast - lFirst, 0).toFixed(3) + '%"></div>';
+      haut += '<div class="pa-ft__lien ' + teinte + ' niv' + niveau + '" style="left:' +
+        lFirst.toFixed(3) + '%;width:' + Math.max(lLast - lFirst, 0).toFixed(3) + '%"></div>';
       o.pers.forEach(function (p, k) {
         var l = pct(p.d0), w = Math.max(pct(p.d1) - pct(p.d0), 1.8);
-        haut += '<div class="pa-ft__inter" ' +
+        haut += '<div class="pa-ft__inter ' + teinte + ' niv' + niveau + '" ' +
           'style="left:' + l.toFixed(3) + '%;width:' + w.toFixed(3) + '%" ' +
           'data-act="gobloc" data-n="' + num + '" ' +
-          'title="' + esc(o.b.titre || 'Sans titre') + ' · période ' + (k + 1) + '">' +
-          '<span class="pa-ft__inter-lbl">' + num + '·' + (k + 1) +
-            ' <em>' + jjmm(p.debut) + '→' + jjmm(p.fin) + '</em></span>' +
+          'title="' + esc(o.b.titre || 'Sans titre') + ' · période ' + (k + 1) +
+            ' (' + jjmm(p.debut) + '→' + jjmm(p.fin) + ')">' +
+          '<span class="pa-ft__inter-num">' + num + '·' + (k + 1) + '</span>' +
           '</div>';
       });
     });
