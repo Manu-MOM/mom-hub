@@ -134,6 +134,7 @@
       date_debut: '',
       date_fin: '',
       intercale: false,
+      rejoint_frise: false,
       periodes: [],
       axe_indiv: [],
       axe_collectif: '',
@@ -339,6 +340,17 @@
     // min/max des périodes), donc pas besoin de les toucher ici.
     if (b.intercale) {
       h += renderPeriodesEditor(b, dis);
+      // PLANIF recette v4 : option « rejoindre la frise principale ».
+      // Cochée → les périodes descendent sur la ligne principale. La case
+      // est gardée par une détection de collision bloquante (onRejointFrise).
+      var ckRf = b.rejoint_frise ? ' checked' : '';
+      h += '<label class="pa-check pa-check--inline" data-rf-wrap="' + esc(b.id) + '">' +
+        '<input type="checkbox"' + ckRf + dis +
+        ' data-rf="' + esc(b.id) + '"> Faire rejoindre les périodes à la frise principale' +
+        '</label>';
+      h += '<div class="pa-rf-alert" data-rf-alert="' + esc(b.id) + '"' +
+        (b._rfAlert ? '' : ' style="display:none"') + '>' +
+        esc(b._rfAlert || '') + '</div>';
     }
 
     // Commentaires
@@ -736,22 +748,45 @@
       cur = new Date(Date.UTC(cur.getUTCFullYear(), cur.getUTCMonth() + 1, 1));
     }
 
-    // Couche basse : blocs datés NON intercalés.
+    // Couche basse : blocs principaux (non intercalés) + intercalés ayant
+    // « rejoint la frise principale » (rejoint_frise=true). Ces derniers
+    // sont rendus en une barre par période, à leur teinte intercalée.
     var bas = '';
     var ci = 0;
+    // Index de teinte : stable par bloc intercalé, pour cohérence avec la
+    // légende et un éventuel autre intercalé resté en couche haute.
+    var rangInterBas = 0;
     blocsDatables.forEach(function (o) {
-      if (o.b.intercale) return;
-      var couleurCls = FRISE_CYCLE[ci % FRISE_CYCLE.length]; ci++;
-      var p = o.pers[0];
-      var l = pct(p.d0), w = Math.max(pct(p.d1) - pct(p.d0), 2.2);
-      bas += '<div class="pa-ft__bloc ' + couleurCls + '" ' +
-        'style="left:' + l.toFixed(3) + '%;width:' + w.toFixed(3) + '%" ' +
-        'data-act="gobloc" data-n="' + (o.i + 1) + '" ' +
-        'title="' + esc(o.b.titre || 'Sans titre') + '">' +
-        '<span class="pa-ft__num">' + (o.i + 1) + '</span>' +
-        '<span class="pa-ft__titre">' + esc(o.b.titre || 'Sans titre') + '</span>' +
-        '<span class="pa-ft__date">' + jjmm(p.debut) + '→' + jjmm(p.fin) + '</span>' +
-        '</div>';
+      if (o.b.intercale && !o.b.rejoint_frise) return; // reste en couche haute
+      if (!o.b.intercale) {
+        // Bloc principal : chevron plein, cycle de couleurs de saison.
+        var couleurCls = FRISE_CYCLE[ci % FRISE_CYCLE.length]; ci++;
+        var p = o.pers[0];
+        var l = pct(p.d0), w = Math.max(pct(p.d1) - pct(p.d0), 2.2);
+        bas += '<div class="pa-ft__bloc ' + couleurCls + '" ' +
+          'style="left:' + l.toFixed(3) + '%;width:' + w.toFixed(3) + '%" ' +
+          'data-act="gobloc" data-n="' + (o.i + 1) + '" ' +
+          'title="' + esc(o.b.titre || 'Sans titre') + '">' +
+          '<span class="pa-ft__num">' + (o.i + 1) + '</span>' +
+          '<span class="pa-ft__titre">' + esc(o.b.titre || 'Sans titre') + '</span>' +
+          '<span class="pa-ft__date">' + jjmm(p.debut) + '→' + jjmm(p.fin) + '</span>' +
+          '</div>';
+      } else {
+        // Intercalé rejoint : une barre chevron par période, teinte du bloc.
+        var teinteB = INTER_CYCLE[rangInterBas % INTER_CYCLE.length]; rangInterBas++;
+        var numB = o.i + 1;
+        o.pers.forEach(function (p, k) {
+          var lb = pct(p.d0), wb = Math.max(pct(p.d1) - pct(p.d0), 1.8);
+          bas += '<div class="pa-ft__bloc pa-ft__bloc--rf ' + teinteB + '" ' +
+            'style="left:' + lb.toFixed(3) + '%;width:' + wb.toFixed(3) + '%" ' +
+            'data-act="gobloc" data-n="' + numB + '" ' +
+            'title="' + esc(o.b.titre || 'Sans titre') + ' · période ' + (k + 1) +
+              ' (' + jjmm(p.debut) + '→' + jjmm(p.fin) + ')">' +
+            '<span class="pa-ft__num">' + numB + '·' + (k + 1) + '</span>' +
+            '<span class="pa-ft__titre">' + esc(o.b.titre || 'Sans titre') + '</span>' +
+            '</div>';
+        });
+      }
     });
 
     // Couche haute : blocs intercalés, une barre par période, reliées.
@@ -759,7 +794,9 @@
     // différenciable d'un autre bloc intercalé, et un NIVEAU vertical (0,1,…)
     // pour éviter que deux blocs se croisent quand leurs périodes s'entremêlent.
     var haut = '';
-    var interComptes = blocsDatables.filter(function (o) { return o.b.intercale; });
+    var interComptes = blocsDatables.filter(function (o) {
+      return o.b.intercale && !o.b.rejoint_frise;
+    });
     interComptes.forEach(function (o, rangInter) {
       var teinte = INTER_CYCLE[rangInter % INTER_CYCLE.length];
       var niveau = rangInter % INTER_NIVEAUX; // 0..INTER_NIVEAUX-1
@@ -931,6 +968,13 @@
         if (isNaN(idx) || idx < 0) return;
         if (!b.periodes[idx]) b.periodes[idx] = { debut: '', fin: '' };
         b.periodes[idx][isDebut ? 'debut' : 'fin'] = el.value;
+      });
+    });
+
+    // PLANIF recette v4 : case « rejoindre la frise principale » (bloquante).
+    root.querySelectorAll('[data-rf]').forEach(function (el) {
+      el.addEventListener('change', function () {
+        onRejointFrise(el.getAttribute('data-rf'), el.checked);
       });
     });
 
@@ -1118,6 +1162,7 @@
       date_debut: b.date_debut || null,
       date_fin: b.date_fin || null,
       intercale: !!b.intercale,
+      rejoint_frise: !!b.rejoint_frise,
       // PLANIF-BLOCS-INTERCALES-MULTIPERIODES : périodes poussées uniquement
       // si le bloc est intercalé ; on ne garde que les couples complets et
       // triés par début (le trigger base recalcule ensuite date_debut/fin).
@@ -1138,6 +1183,62 @@
   }
 
   // PLANIF-BLOCS-INTERCALES-MULTIPERIODES : ajoute une période vide au bloc.
+  // PLANIF recette v4 : deux intervalles [a0,a1] et [b0,b1] se chevauchent ?
+  function intervallesChevauchent(a0, a1, b0, b1) {
+    return a0 <= b1 && b0 <= a1;
+  }
+
+  // Détecte si les périodes du bloc `cible` (intercalé) chevauchent un bloc
+  // DÉJÀ présent sur la ligne principale : bloc principal (non intercalé,
+  // daté) OU autre intercalé ayant déjà rejoint (rejoint_frise=true).
+  // Renvoie le titre du 1er bloc en collision, ou null si aucune.
+  function collisionLignePrincipale(cible) {
+    var persCible = periodesEffectives(cible);
+    if (persCible.length === 0) return null;
+    var autres = State.blocs.filter(function (x) {
+      if (x._draft) return false;
+      if (String(x.id) === String(cible.id)) return false;
+      var surLigne = (!x.intercale) || (x.intercale && x.rejoint_frise);
+      return surLigne;
+    });
+    for (var i = 0; i < autres.length; i++) {
+      var persAutre = periodesEffectives(autres[i]);
+      for (var a = 0; a < persCible.length; a++) {
+        for (var z = 0; z < persAutre.length; z++) {
+          if (intervallesChevauchent(persCible[a].d0, persCible[a].d1,
+                                     persAutre[z].d0, persAutre[z].d1)) {
+            return autres[i].titre || 'Sans titre';
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  // Handler de la case « rejoindre la frise principale » (bloquant).
+  // Coché : n'active que si aucune collision, sinon avertit et re-décoche.
+  function onRejointFrise(id, checked) {
+    var b = findBloc(id);
+    if (!b) return;
+    if (!checked) {
+      b.rejoint_frise = false;
+      b._rfAlert = '';
+      render();
+      return;
+    }
+    var conflit = collisionLignePrincipale(b);
+    if (conflit) {
+      b.rejoint_frise = false;
+      b._rfAlert = '⛔ Impossible : une période chevauche « ' + conflit +
+        ' » déjà sur la frise principale. Ajuste les dates avant d\'activer.';
+      render();
+      return;
+    }
+    b.rejoint_frise = true;
+    b._rfAlert = '';
+    render();
+  }
+
   function onPeriodeAdd(id) {
     var b = findBloc(id);
     if (!b) return;
