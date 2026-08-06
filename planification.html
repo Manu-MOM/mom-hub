@@ -93,6 +93,16 @@
     .pa-jours__lbl em { font-weight: 400; font-style: italic; text-transform: none; color: var(--gris); }
     .pa-jours__hint { font-size: .82rem; color: var(--gris); margin: .2rem 0 .5rem; }
     .pa-jours__add { font-size: .86rem; }
+    /* PLANIF-BLOCS-INTERCALES-MULTIPERIODES : éditeur de périodes (additif).
+       Cadre crème + accent gold, cohérent avec le fond « intercalé » de la
+       frise. Réutilise les .pa-field / .pa-btn existants. */
+    .pa-periodes { background: #fdf7e6; border: 1px solid var(--gold); border-left: 3px solid var(--goldd); border-radius: 8px; padding: .8rem .9rem; margin: .5rem 0; }
+    .pa-periodes__lbl { font-size: .85rem; font-weight: 700; color: var(--goldd); text-transform: uppercase; letter-spacing: .02em; margin-bottom: .5rem; }
+    .pa-periodes__lbl em { font-weight: 400; font-style: italic; text-transform: none; color: var(--gris); }
+    .pa-periodes__hint { font-size: .82rem; color: var(--gris); margin: .2rem 0 .5rem; }
+    .pa-periode-row { display: flex; gap: .5rem; align-items: flex-end; flex-wrap: wrap; margin-top: .45rem; }
+    .pa-periode-row .pa-field { flex: 1 1 140px; }
+    .pa-btn--mini { padding: .35rem .6rem; font-size: .82rem; margin-top: .4rem; }
     /* Style 1 — carte encadrée : chaque jour dans un cadre à fond crème. */
     .pa-jour { background: var(--paper-warm); border: 1px solid var(--bord); border-radius: 8px; padding: .8rem .9rem; margin-top: .6rem; }
     .pa-jour:first-of-type { margin-top: .3rem; }
@@ -271,6 +281,10 @@
     .pa-fv__date { font-size: .72rem; color: var(--gris); }
     .pa-fv__card ul { margin: 0; padding-left: 1.1rem; font-size: .78rem; color: var(--ink); line-height: 1.55; }
     .pa-fv__card p { margin: 0; font-size: .78rem; color: var(--ink); font-style: italic; }
+    /* PLANIF-BLOCS-INTERCALES-MULTIPERIODES : liste des périodes en détail. */
+    .pa-fv__periodes { margin: .35rem 0 .1rem; padding: 0; list-style: none; display: flex; flex-direction: column; gap: .25rem; }
+    .pa-fv__periodes li { font-size: .76rem; color: var(--ink); }
+    .pa-fv__periode-n { display: inline-block; background: var(--goldd); color: #fff; font-size: .66rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; padding: .1rem .45rem; border-radius: 5px; margin-right: .4rem; }
     /* PLANIF-SOUSBLOCS-PAR-JOUR : jours dans la frise (lecture). Additif. */
     .pa-fv-jours { margin-top: .5rem; display: flex; flex-direction: column; gap: .4rem; }
     /* Style 1 — carte encadrée en frise : cadre crème + étiquette de jour. */
