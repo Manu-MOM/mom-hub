@@ -134,6 +134,7 @@
       date_debut: '',
       date_fin: '',
       intercale: false,
+      periodes: [],
       axe_indiv: [],
       axe_collectif: '',
       axe_physique: '',
@@ -331,6 +332,15 @@
     h += '<label class="pa-check pa-check--inline"><input type="checkbox"' + ck + dis +
       ' data-f="intercale" data-id="' + esc(b.id) + '"> Bloc intercalé sur la saison (ex : défense en plusieurs parties)</label>';
 
+    // PLANIF-BLOCS-INTERCALES-MULTIPERIODES (additif) : quand le bloc est
+    // intercalé, il peut être constitué de plusieurs périodes disjointes.
+    // Éditeur déplié uniquement si intercale=true. Les dates début/fin du
+    // bloc sont recalculées côté base (trigger trg_planif_bloc_sync_dates =
+    // min/max des périodes), donc pas besoin de les toucher ici.
+    if (b.intercale) {
+      h += renderPeriodesEditor(b, dis);
+    }
+
     // Commentaires
     h += '<label class="pa-field pa-field--full"><span>💬 Commentaires libres</span>' +
       '<textarea rows="2" data-f="commentaires" data-id="' + esc(b.id) + '"' + dis +
@@ -348,6 +358,61 @@
     }
 
     h += '</div>';
+    return h;
+  }
+
+  // ---- Rendu : éditeur de périodes d'un bloc intercalé (additif) ----
+  // PLANIF-BLOCS-INTERCALES-MULTIPERIODES. Liste de couples début/fin ;
+  // ajout / suppression de lignes. Réutilise les classes existantes
+  // (pa-field, pa-btn) — aucune dépendance à hub.css (INTERDIT intact).
+  function renderPeriodesEditor(b, dis) {
+    var periodes = Array.isArray(b.periodes) ? b.periodes : [];
+    var h = '<div class="pa-periodes" data-periodes-for="' + esc(b.id) + '">';
+    h += '<div class="pa-periodes__lbl">🗓️ Périodes intercalées ' +
+      '<em>(le bloc peut se décomposer en plusieurs plages qui ne s\'enchaînent pas)</em></div>';
+    if (!periodes.length) {
+      h += '<p class="pa-periodes__hint">Aucune période saisie. ' +
+        'Sans période, le bloc utilise ses dates début/fin ci-dessus.</p>';
+    }
+    periodes.forEach(function (p, idx) {
+      h += '<div class="pa-periode-row">' +
+        '<label class="pa-field"><span>du</span>' +
+          '<input type="date" value="' + esc(p && p.debut ? p.debut : '') + '"' +
+          ' data-per-debut="' + idx + '" data-id="' + esc(b.id) + '"' + dis + '></label>' +
+        '<label class="pa-field"><span>au</span>' +
+          '<input type="date" value="' + esc(p && p.fin ? p.fin : '') + '"' +
+          ' data-per-fin="' + idx + '" data-id="' + esc(b.id) + '"' + dis + '></label>';
+      if (!dis) {
+        h += '<button type="button" class="pa-btn pa-btn--mini" ' +
+          'data-act="per-del" data-per="' + idx + '" data-id="' + esc(b.id) + '" ' +
+          'title="Supprimer cette période">✕</button>';
+      }
+      h += '</div>';
+    });
+    if (!dis) {
+      h += '<button type="button" class="pa-btn pa-btn--mini" ' +
+        'data-act="per-add" data-id="' + esc(b.id) + '">+ Ajouter une période</button>';
+    }
+    h += '</div>';
+    return h;
+  }
+
+  // ---- Rendu : périodes intercalées dans le détail (lecture seule) ----
+  // PLANIF-BLOCS-INTERCALES-MULTIPERIODES. N'affiche la liste que si le bloc
+  // est intercalé ET porte au moins 2 périodes (une seule = équivalent d'un
+  // bloc simple, déjà résumé par la ligne de dates min→max au-dessus).
+  function renderPeriodesDetail(b) {
+    if (!b || !b.intercale) return '';
+    var periodes = (Array.isArray(b.periodes) ? b.periodes : [])
+      .filter(function (p) { return p && p.debut && p.fin; })
+      .sort(function (x, y) { return x.debut < y.debut ? -1 : (x.debut > y.debut ? 1 : 0); });
+    if (periodes.length < 2) return '';
+    var h = '<ul class="pa-fv__periodes">';
+    periodes.forEach(function (p, i) {
+      h += '<li><span class="pa-fv__periode-n">Période ' + (i + 1) + '</span> ' +
+        esc(p.debut) + ' → ' + esc(p.fin) + '</li>';
+    });
+    h += '</ul>';
     return h;
   }
 
@@ -628,6 +693,7 @@
               (inter ? ' <em>· intercalé</em>' : '') + '</span>' +
             (periode ? '<span class="pa-fv__date">' + periode + '</span>' : '') +
           '</div>' +
+          renderPeriodesDetail(b) +
           (axes.length
             ? '<ul>' + axes.map(function (a) { return '<li>' + esc(a) + '</li>'; }).join('') + '</ul>'
             : '') +
@@ -702,6 +768,23 @@
         if (!b) return;
         var f = el.getAttribute('data-f');
         b[f] = (el.type === 'checkbox') ? el.checked : el.value;
+        // PLANIF-BLOCS-INTERCALES-MULTIPERIODES : cocher/décocher « intercalé »
+        // déplie/replie l'éditeur de périodes → re-render.
+        if (f === 'intercale') render();
+      });
+    });
+
+    // PLANIF-BLOCS-INTERCALES-MULTIPERIODES : inputs date des périodes.
+    root.querySelectorAll('[data-per-debut], [data-per-fin]').forEach(function (el) {
+      el.addEventListener('input', function () {
+        var b = findBloc(el.getAttribute('data-id'));
+        if (!b) return;
+        b.periodes = Array.isArray(b.periodes) ? b.periodes : [];
+        var isDebut = el.hasAttribute('data-per-debut');
+        var idx = parseInt(el.getAttribute(isDebut ? 'data-per-debut' : 'data-per-fin'), 10);
+        if (isNaN(idx) || idx < 0) return;
+        if (!b.periodes[idx]) b.periodes[idx] = { debut: '', fin: '' };
+        b.periodes[idx][isDebut ? 'debut' : 'fin'] = el.value;
       });
     });
 
@@ -755,6 +838,9 @@
         if (act === 'del') return onDelete(id);
         if (act === 'up') return onMove(id, -1);
         if (act === 'down') return onMove(id, 1);
+        // PLANIF-BLOCS-INTERCALES-MULTIPERIODES : gestion des périodes.
+        if (act === 'per-add') return onPeriodeAdd(id);
+        if (act === 'per-del') return onPeriodeDel(id, el.getAttribute('data-per'));
       });
     });
 
@@ -886,6 +972,15 @@
       date_debut: b.date_debut || null,
       date_fin: b.date_fin || null,
       intercale: !!b.intercale,
+      // PLANIF-BLOCS-INTERCALES-MULTIPERIODES : périodes poussées uniquement
+      // si le bloc est intercalé ; on ne garde que les couples complets et
+      // triés par début (le trigger base recalcule ensuite date_debut/fin).
+      periodes: (b.intercale && Array.isArray(b.periodes))
+        ? b.periodes
+            .filter(function (p) { return p && p.debut && p.fin; })
+            .map(function (p) { return { debut: p.debut, fin: p.fin }; })
+            .sort(function (x, y) { return x.debut < y.debut ? -1 : (x.debut > y.debut ? 1 : 0); })
+        : [],
       axe_indiv: b.axe_indiv || [],
       axe_collectif: b.axe_collectif || null,
       axe_physique: b.axe_physique || null,
@@ -894,6 +989,26 @@
     };
     if (!b._draft) p.id = b.id;
     return p;
+  }
+
+  // PLANIF-BLOCS-INTERCALES-MULTIPERIODES : ajoute une période vide au bloc.
+  function onPeriodeAdd(id) {
+    var b = findBloc(id);
+    if (!b) return;
+    b.periodes = Array.isArray(b.periodes) ? b.periodes : [];
+    b.periodes.push({ debut: '', fin: '' });
+    render();
+  }
+
+  // PLANIF-BLOCS-INTERCALES-MULTIPERIODES : retire la période d'indice idx.
+  function onPeriodeDel(id, idxAttr) {
+    var b = findBloc(id);
+    if (!b) return;
+    var idx = parseInt(idxAttr, 10);
+    if (isNaN(idx) || idx < 0) return;
+    b.periodes = Array.isArray(b.periodes) ? b.periodes : [];
+    if (idx < b.periodes.length) b.periodes.splice(idx, 1);
+    render();
   }
 
   function onSave(id) {
