@@ -566,7 +566,11 @@
   // INTERCALÉS entre eux (motif hachuré commun = « intercalé » ; la teinte
   // distingue quel bloc). INTER_NIVEAUX = nb de sous-niveaux verticaux pour
   // éviter le croisement de deux intercalés aux périodes entremêlées.
-  var INTER_CYCLE = ['i-or', 'i-clay', 'i-violet', 'i-bleu'];
+  // Teintes des blocs INTERCALÉS : volontairement DISTINCTES du cycle des
+  // blocs principaux (c-vertf/c-gold/c-vert/c-clay) pour rester lisibles même
+  // quand un intercalé rejoint la ligne principale (or/clay se confondaient
+  // avec le gold/clay de saison). Motif hachuré commun = « intercalé ».
+  var INTER_CYCLE = ['i-violet', 'i-bleu', 'i-rose', 'i-cyan'];
   var INTER_NIVEAUX = 2;
 
   // Agrège les axes d'un bloc en une liste de libellés (ordre : individuel,
@@ -763,13 +767,17 @@
         var couleurCls = FRISE_CYCLE[ci % FRISE_CYCLE.length]; ci++;
         var p = o.pers[0];
         var l = pct(p.d0), w = Math.max(pct(p.d1) - pct(p.d0), 2.2);
-        bas += '<div class="pa-ft__bloc ' + couleurCls + '" ' +
+        // Titre affiché seulement si la barre est assez large (sinon illisible) ;
+        // sous le seuil, on ne garde que le numéro (titre au survol + détail).
+        var etroit = w < 9;
+        bas += '<div class="pa-ft__bloc ' + couleurCls + (etroit ? ' pa-ft__bloc--narrow' : '') + '" ' +
           'style="left:' + l.toFixed(3) + '%;width:' + w.toFixed(3) + '%" ' +
           'data-act="gobloc" data-n="' + (o.i + 1) + '" ' +
-          'title="' + esc(o.b.titre || 'Sans titre') + '">' +
+          'title="' + esc(o.b.titre || 'Sans titre') + ' (' + jjmm(p.debut) + '→' + jjmm(p.fin) + ')">' +
           '<span class="pa-ft__num">' + (o.i + 1) + '</span>' +
-          '<span class="pa-ft__titre">' + esc(o.b.titre || 'Sans titre') + '</span>' +
-          '<span class="pa-ft__date">' + jjmm(p.debut) + '→' + jjmm(p.fin) + '</span>' +
+          (etroit ? '' :
+            '<span class="pa-ft__titre">' + esc(o.b.titre || 'Sans titre') + '</span>' +
+            '<span class="pa-ft__date">' + jjmm(p.debut) + '→' + jjmm(p.fin) + '</span>') +
           '</div>';
       } else {
         // Intercalé rejoint : une barre chevron par période, teinte du bloc.
@@ -777,13 +785,16 @@
         var numB = o.i + 1;
         o.pers.forEach(function (p, k) {
           var lb = pct(p.d0), wb = Math.max(pct(p.d1) - pct(p.d0), 1.8);
-          bas += '<div class="pa-ft__bloc pa-ft__bloc--rf ' + teinteB + '" ' +
+          // Barres de période souvent étroites : numéro seul, titre au survol.
+          var etroitRf = wb < 12;
+          bas += '<div class="pa-ft__bloc pa-ft__bloc--rf ' + teinteB + (etroitRf ? ' pa-ft__bloc--narrow' : '') + '" ' +
             'style="left:' + lb.toFixed(3) + '%;width:' + wb.toFixed(3) + '%" ' +
             'data-act="gobloc" data-n="' + numB + '" ' +
             'title="' + esc(o.b.titre || 'Sans titre') + ' · période ' + (k + 1) +
               ' (' + jjmm(p.debut) + '→' + jjmm(p.fin) + ')">' +
             '<span class="pa-ft__num">' + numB + '·' + (k + 1) + '</span>' +
-            '<span class="pa-ft__titre">' + esc(o.b.titre || 'Sans titre') + '</span>' +
+            (etroitRf ? '' :
+              '<span class="pa-ft__titre">' + esc(o.b.titre || 'Sans titre') + '</span>') +
             '</div>';
         });
       }
