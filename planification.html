@@ -230,13 +230,18 @@
     .pa-ft__inter.i-clay   { background: repeating-linear-gradient(45deg, #c98a6a, #c98a6a 5px, var(--clayd) 5px, var(--clayd) 10px); border-color: #5c220d; }
     .pa-ft__inter.i-violet { background: repeating-linear-gradient(45deg, #b6a5d8, #b6a5d8 5px, #6a4fa3 5px, #6a4fa3 10px); border-color: #4a3576; }
     .pa-ft__inter.i-bleu   { background: repeating-linear-gradient(45deg, #8fb3d8, #8fb3d8 5px, #3066be 5px, #3066be 10px); border-color: #1f4a82; }
-    .pa-ft__lien.i-clay   { border-top-color: var(--clayd); }
+    .pa-ft__inter.i-rose   { background: repeating-linear-gradient(45deg, #e0a3bf, #e0a3bf 5px, #a83c66 5px, #a83c66 10px); border-color: #7a2848; }
+    .pa-ft__inter.i-cyan   { background: repeating-linear-gradient(45deg, #8fd0cf, #8fd0cf 5px, #1d8a86 5px, #1d8a86 10px); border-color: #12615e; }
     .pa-ft__lien.i-violet { border-top-color: #6a4fa3; }
     .pa-ft__lien.i-bleu   { border-top-color: #3066be; }
+    .pa-ft__lien.i-rose   { border-top-color: #a83c66; }
+    .pa-ft__lien.i-cyan   { border-top-color: #1d8a86; }
     .pa-ft__inter-num { font-size: .6rem; font-weight: 800; color: #2c1c04; text-shadow: 0 1px 1px rgba(248,245,236,.5); white-space: nowrap; }
     .pa-ft__inter.i-clay .pa-ft__inter-num,
     .pa-ft__inter.i-violet .pa-ft__inter-num,
-    .pa-ft__inter.i-bleu .pa-ft__inter-num { color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,.35); }
+    .pa-ft__inter.i-bleu .pa-ft__inter-num,
+    .pa-ft__inter.i-rose .pa-ft__inter-num,
+    .pa-ft__inter.i-cyan .pa-ft__inter-num { color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,.35); }
     /* Couche basse : blocs principaux — mis en avant (plus hauts, pointe
        chevron marquée, ombre portée suivant la forme, titre plus grand). */
     .pa-ft__bas { position: relative; height: 3.9rem; }
@@ -280,8 +285,13 @@
     .pa-ft__bloc--rf.i-clay   { background: repeating-linear-gradient(45deg, #c98a6a, #c98a6a 6px, var(--clayd) 6px, var(--clayd) 12px); color: #fff; }
     .pa-ft__bloc--rf.i-violet { background: repeating-linear-gradient(45deg, #b6a5d8, #b6a5d8 6px, #6a4fa3 6px, #6a4fa3 12px); color: #fff; }
     .pa-ft__bloc--rf.i-bleu   { background: repeating-linear-gradient(45deg, #8fb3d8, #8fb3d8 6px, #3066be 6px, #3066be 12px); color: #fff; }
-    .pa-ft__bloc--rf .pa-ft__num { position: static; margin-bottom: .1rem; width: 18px; height: 18px; font-size: .64rem; background: rgba(0,0,0,.22); }
+    .pa-ft__bloc--rf.i-rose   { background: repeating-linear-gradient(45deg, #e0a3bf, #e0a3bf 6px, #a83c66 6px, #a83c66 12px); color: #fff; }
+    .pa-ft__bloc--rf.i-cyan   { background: repeating-linear-gradient(45deg, #8fd0cf, #8fd0cf 6px, #1d8a86 6px, #1d8a86 12px); color: #fff; }
+    .pa-ft__bloc--rf .pa-ft__num { position: static; margin-bottom: .1rem; width: 18px; height: 18px; font-size: .64rem; background: rgba(0,0,0,.28); }
     .pa-ft__bloc--rf .pa-ft__titre { font-size: .72rem; }
+    /* Barre étroite : numéro seul, centré ; titre/date masqués (titre au survol). */
+    .pa-ft__bloc--narrow { justify-content: center; align-items: center; padding-left: .2rem; padding-right: .2rem; }
+    .pa-ft__bloc--narrow .pa-ft__num { position: static; margin: 0; }
     /* Alerte de collision (case « rejoindre la frise » bloquée) */
     .pa-rf-alert {
       margin: .1rem 0 .5rem; padding: .4rem .6rem; border-radius: 6px;
@@ -381,21 +391,23 @@
       .pa-ft__bloc--rf { filter: none !important; }
       /* La frise occupe le haut de la 1re page ; le détail démarre après. */
       .pa-frise-card .pa-ft-scroll { break-after: page; }
-      /* Détail : 2 blocs de large, coulant sur AUTANT DE PAGES que nécessaire
-         (plus de column-count qui écrase tout sur une page). Chaque bloc
-         reste insécable ; on évite les blocs coupés entre deux pages. */
-      .pa-fv-titre { margin: .4rem 0 .5rem; break-before: avoid; }
+      /* Détail : flex 2 colonnes qui se répartit et COULE naturellement sur
+         plusieurs pages (column-count était mal paginé à l'impression et
+         tronquait le contenu). Chaque bloc insécable. */
+      .pa-fv-titre { margin: .4rem 0 .5rem; break-before: avoid; break-after: avoid; }
       .pa-fv { padding-left: 0; }
       .pa-fv__rail { display: none; }
       .pa-fv-grid {
-        column-count: 2; column-gap: 8mm;
-        /* column-fill: auto → remplit colonne puis page, au lieu d'équilibrer
-           sur une hauteur fixe (ce qui tronquait le contenu). */
-        column-fill: auto;
+        display: flex; flex-wrap: wrap; align-items: flex-start;
+        gap: 5mm 8mm; column-count: auto;
       }
-      .pa-fv__item { margin: 0 0 5mm; break-inside: avoid; padding-left: 0; }
+      .pa-fv__item {
+        flex: 0 0 calc(50% - 4mm); width: calc(50% - 4mm);
+        margin: 0; padding-left: 0;
+        break-inside: avoid; page-break-inside: avoid;
+      }
       .pa-fv__num { position: static; display: inline-flex; margin-right: .3rem; vertical-align: middle; width: 18px; height: 18px; font-size: .68rem; }
-      .pa-fv__card { padding: .45rem .7rem; break-inside: avoid; }
+      .pa-fv__card { padding: .45rem .7rem; break-inside: avoid; page-break-inside: avoid; }
       .pa-fv__card ul { font-size: .7rem; line-height: 1.42; }
       .pa-fv__titre { font-size: .84rem; }
     }
