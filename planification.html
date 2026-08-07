@@ -389,12 +389,18 @@
       .pa-ft__titre { font-size: .8rem; }
       .pa-ft__grad-lbl { font-size: .56rem; }
       .pa-ft__bloc--rf { filter: none !important; }
-      /* La frise occupe le haut de la 1re page ; le détail démarre après.
-         (overflow visible garanti pour ne pas couper le flux à une page) */
-      .pa-frise-card, .pa-frise-card .pa-fv, .pa-frise-card .pa-fv-grid {
-        overflow: visible !important; height: auto !important; max-height: none !important;
+      /* FIX PDF (radical) : à l'impression, AUCUN conteneur de la carte ne
+         doit garder d'overflow scrollable ni de hauteur contrainte — sinon le
+         moteur rend tout dans une seule page avec scrollbar (bug constaté :
+         aperçu « 1 page » + scrollbar) au lieu de paginer. On neutralise sur
+         TOUTE la sous-arborescence, ceinture et bretelles. */
+      .pa-frise-card, .pa-frise-card * {
+        overflow: visible !important;
+        max-height: none !important;
       }
-      .pa-frise-card .pa-ft-scroll { break-after: page; overflow: visible; }
+      .pa-frise-card .pa-ft-scroll { overflow: visible !important; }
+      /* Pas de break-after sur la frise : il pouvait figer/creer une page
+         fantôme. Le détail suit simplement le flux. */
       /* Détail : blocs en INLINE-BLOCK à 2 colonnes. C'est la seule technique
          qui pagine de façon fiable sur plusieurs pages à l'impression — flex
          ET column-count coupaient le flux à la 1re page. Chaque bloc insécable. */
