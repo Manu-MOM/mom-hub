@@ -752,14 +752,26 @@
       cur = new Date(Date.UTC(cur.getUTCFullYear(), cur.getUTCMonth() + 1, 1));
     }
 
+    // PLANIF recette v6 (fix couleur) : la teinte d'un bloc intercalé doit
+    // être STABLE et UNIQUE, qu'il soit en couche haute (non rejoint) ou en
+    // couche basse (rejoint). On indexe TOUS les intercalés dans l'ordre des
+    // blocs et on mémorise leur teinte dans une map id→teinte, partagée par
+    // les deux couches (sinon deux compteurs séparés repartaient de 0 et le
+    // 1er rejoint + le 1er non-rejoint prenaient la même couleur).
+    var teinteParBloc = {};
+    var rangInterGlobal = 0;
+    blocsDatables.forEach(function (o) {
+      if (o.b.intercale) {
+        teinteParBloc[o.b.id] = INTER_CYCLE[rangInterGlobal % INTER_CYCLE.length];
+        rangInterGlobal++;
+      }
+    });
+
     // Couche basse : blocs principaux (non intercalés) + intercalés ayant
     // « rejoint la frise principale » (rejoint_frise=true). Ces derniers
     // sont rendus en une barre par période, à leur teinte intercalée.
     var bas = '';
     var ci = 0;
-    // Index de teinte : stable par bloc intercalé, pour cohérence avec la
-    // légende et un éventuel autre intercalé resté en couche haute.
-    var rangInterBas = 0;
     blocsDatables.forEach(function (o) {
       if (o.b.intercale && !o.b.rejoint_frise) return; // reste en couche haute
       if (!o.b.intercale) {
@@ -780,8 +792,9 @@
             '<span class="pa-ft__date">' + jjmm(p.debut) + '→' + jjmm(p.fin) + '</span>') +
           '</div>';
       } else {
-        // Intercalé rejoint : une barre chevron par période, teinte du bloc.
-        var teinteB = INTER_CYCLE[rangInterBas % INTER_CYCLE.length]; rangInterBas++;
+        // Intercalé rejoint : une barre chevron par période, teinte du bloc
+        // (issue de la map globale → cohérente avec la couche haute).
+        var teinteB = teinteParBloc[o.b.id];
         var numB = o.i + 1;
         o.pers.forEach(function (p, k) {
           var lb = pct(p.d0), wb = Math.max(pct(p.d1) - pct(p.d0), 1.8);
@@ -809,7 +822,7 @@
       return o.b.intercale && !o.b.rejoint_frise;
     });
     interComptes.forEach(function (o, rangInter) {
-      var teinte = INTER_CYCLE[rangInter % INTER_CYCLE.length];
+      var teinte = teinteParBloc[o.b.id];
       var niveau = rangInter % INTER_NIVEAUX; // 0..INTER_NIVEAUX-1
       var num = o.i + 1;
       var lFirst = pct(o.pers[0].d0);
