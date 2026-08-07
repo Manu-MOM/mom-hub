@@ -410,24 +410,26 @@
         max-height: none !important;
       }
       .pa-frise-card .pa-ft-scroll { overflow: visible !important; }
-      /* Pas de break-after sur la frise : il pouvait figer/creer une page
-         fantôme. Le détail suit simplement le flux. */
-      /* Détail : blocs en INLINE-BLOCK à 2 colonnes. C'est la seule technique
-         qui pagine de façon fiable sur plusieurs pages à l'impression — flex
-         ET column-count coupaient le flux à la 1re page. Chaque bloc insécable. */
-      .pa-fv-titre { margin: .4rem 0 .5rem; break-before: avoid; break-after: avoid; }
+      /* Frise compacte : ne doit pas manger une page entière avant le détail. */
+      .pa-ft { padding-top: 1.4rem !important; margin-bottom: .3rem !important; }
+      .pa-frise-card .pa-ft-scroll { overflow: visible !important; margin-bottom: .4rem; }
+      /* Détail : CSS multi-colonnes. Contrairement à inline-block (qui laissait
+         des trous sous un bloc court à côté d'un bloc long), `columns` REMPLIT
+         en coulant le contenu colonne par colonne. La pagination marche
+         maintenant que l'overflow est neutralisé sur toute la chaîne. */
+      .pa-fv-titre { margin: .3rem 0 .4rem; break-before: avoid; break-after: avoid; }
       .pa-fv { padding-left: 0; }
       .pa-fv__rail { display: none; }
       .pa-fv-grid {
-        display: block; font-size: 0; /* supprime l'espace inter-inline-block */
+        column-count: 2;
+        column-gap: 6mm;
+        column-fill: auto;
       }
       .pa-fv__item {
-        display: inline-block; vertical-align: top;
-        width: 49%; margin: 0 0 4mm; padding: 0;
-        font-size: 1rem; /* restaure la taille dans l'item */
+        margin: 0 0 4mm; padding: 0;
         break-inside: avoid; page-break-inside: avoid;
+        -webkit-column-break-inside: avoid;
       }
-      .pa-fv__item:nth-child(odd) { margin-right: 1.6%; }
       .pa-fv__num { position: static; display: inline-flex; margin-right: .3rem; vertical-align: middle; width: 18px; height: 18px; font-size: .68rem; }
       .pa-fv__card { padding: .45rem .7rem; break-inside: avoid; page-break-inside: avoid; }
       .pa-fv__card ul { font-size: .7rem; line-height: 1.42; }
