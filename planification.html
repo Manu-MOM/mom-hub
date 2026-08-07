@@ -365,6 +365,17 @@
         background: #fff !important; padding: 0; margin: 0;
         -webkit-print-color-adjust: exact; print-color-adjust: exact;
       }
+      /* FIX PDF : neutraliser TOUTE la chaîne de conteneurs à l'impression.
+         La scrollbar « 1 page » venait d'un ancêtre (wrap/mount) qui gardait
+         un contexte de défilement/largeur fixe empêchant la pagination. */
+      html, body, .pa-wrap, #pa-mount {
+        overflow: visible !important;
+        height: auto !important;
+        max-height: none !important;
+        max-width: none !important;
+        width: auto !important;
+      }
+      .pa-wrap { padding: 0 !important; margin: 0 !important; }
       .topbar, .hub-nav, footer, .pa-frise-tools,
       .pa-head, .pa-bloc, .pa-btn--add,
       section.pa-card:not(.pa-frise-card) { display: none !important; }
