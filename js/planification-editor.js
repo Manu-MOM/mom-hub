@@ -117,6 +117,10 @@
     filsRouges: [],
     etapeSelId: null,
     filsOuverts: false,
+    // PLANIF-BLOCS-REPLIABLES : ids des blocs repliés (corps masqué). Set-like
+    // via objet {id: true}. Par défaut vide = tous dépliés (comportement
+    // inchangé au 1er rendu).
+    blocsReplies: {},
     // Multi-catégories (portée catégorie d'un encadrant N>1) : liste des
     // catégories de son périmètre, pour le sélecteur intégré au header.
     categoriesPerimetre: [],
@@ -357,9 +361,15 @@
   // ---- Rendu : un bloc éditable ----
   function renderBlocEdit(b, index) {
     var dis = State.peutEditer ? '' : ' disabled';
+    var replie = !!State.blocsReplies[b.id];
     var h = '';
-    h += '<div class="pa-bloc" data-id="' + esc(b.id) + '">';
-    h += '<div class="pa-bloc__bar"><span class="pa-bloc__rang">Bloc ' + (index + 1) + '</span>';
+    h += '<div class="pa-bloc' + (replie ? ' pa-bloc--replie' : '') + '" data-id="' + esc(b.id) + '">';
+    // Barre cliquable : replie/déplie le corps du bloc. Le chevron indique
+    // l'état ; un résumé (titre) s'affiche quand le bloc est replié.
+    h += '<div class="pa-bloc__bar" data-bloctoggle="' + esc(b.id) + '">' +
+      '<span class="pa-bloc__chev" aria-hidden="true">' + (replie ? '▸' : '▾') + '</span>' +
+      '<span class="pa-bloc__rang">Bloc ' + (index + 1) + '</span>' +
+      '<span class="pa-bloc__resume">' + (replie ? esc(b.titre || 'Sans titre') : '') + '</span>';
     if (State.peutEditer) {
       h += '<span class="pa-bloc__actions">' +
         (index > 0 ? '<button type="button" class="pa-mini" data-act="up" data-id="' + esc(b.id) + '">↑</button>' : '') +
@@ -368,6 +378,9 @@
         '</span>';
     }
     h += '</div>';
+
+    // Corps repliable (tout le contenu d'édition du bloc).
+    h += '<div class="pa-bloc__corps"' + (replie ? ' style="display:none"' : '') + '>';
 
     // Titre + dates
     h += '<div class="pa-row">';
@@ -425,7 +438,8 @@
         '<span class="pa-bloc__state" data-state="' + esc(b.id) + '"></span></div>';
     }
 
-    h += '</div>';
+    h += '</div>'; // fin .pa-bloc__corps
+    h += '</div>'; // fin .pa-bloc
     return h;
   }
 
@@ -1334,6 +1348,19 @@
   // ---- Évènements (délégation) ----
   function bindEvents() {
     var root = State.mount;
+
+    // PLANIF-BLOCS-REPLIABLES : clic sur la barre d'un bloc → replie/déplie son
+    // corps. On ignore les clics sur les boutons d'action (up/down/del) qui
+    // vivent dans la barre, pour ne pas déclencher le repli en les utilisant.
+    root.querySelectorAll('[data-bloctoggle]').forEach(function (el) {
+      el.addEventListener('click', function (ev) {
+        if (ev.target.closest('.pa-bloc__actions')) return;
+        var id = el.getAttribute('data-bloctoggle');
+        if (State.blocsReplies[id]) { delete State.blocsReplies[id]; }
+        else { State.blocsReplies[id] = true; }
+        render();
+      });
+    });
 
     // Sélecteur de catégorie (multi-cat) : mémorise + rebascule la cible.
     var selCat = root.querySelector('#pa-cat-selecteur');
