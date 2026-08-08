@@ -93,6 +93,12 @@
     referents: [],
     axes: { collectif: [], physique: [], poste: [] },
     blocs: [],           // blocs chargés (objets DB) + brouillons locaux
+    // PLANIF-FIL-ROUGE : fils rouges de la portée (chacun porte ._etapes).
+    // etapeSelId = étape dont le détail est affiché sous les bandeaux (clic
+    // lecture) ; null = aucune sélection. filsOuverts = éditeur replié/déplié.
+    filsRouges: [],
+    etapeSelId: null,
+    filsOuverts: false,
     // Multi-catégories (portée catégorie d'un encadrant N>1) : liste des
     // catégories de son périmètre, pour le sélecteur intégré au header.
     categoriesPerimetre: [],
@@ -179,7 +185,12 @@
           // PLANIF-FRISE-COSMETIQUE-EXPORT : résout le(s) référent(s) pour le
           // cartouche d'export. Non bloquant : en cas d'échec ou d'absence,
           // State.referents reste [] et le cartouche s'affiche sans nom.
-          return chargerReferents().then(render);
+          return chargerReferents().then(function () {
+            // PLANIF-FIL-ROUGE : hydrate les fils rouges + leurs étapes de la
+            // portée. Non bloquant : en cas d'échec, State.filsRouges = [] et
+            // la section fils rouges reste vide (dégradation honnête).
+            return chargerFilsRouges().then(render);
+          });
         });
       });
     });
@@ -250,6 +261,33 @@
         .catch(function () { b._jours = []; });
     });
     return Promise.all(proms);
+  }
+
+  // PLANIF-FIL-ROUGE : hydrate State.filsRouges (fils de la portée) et, pour
+  // chaque fil PERSISTÉ, ses étapes (fr._etapes). Écriture PostgREST direct
+  // via les wrappers supabase-client ≥ v1.81 ; dégradation honnête si absents
+  // (fils = [], section vide). Le tri (ordre) est fait côté base.
+  function chargerFilsRouges() {
+    State.filsRouges = [];
+    var h = hub();
+    if (!h || typeof h.listFilsRouges !== 'function') return Promise.resolve();
+    var opts = State.portee === 'pole'
+      ? { saisonId: State.saison.id, poleId: State.cibleId }
+      : { saisonId: State.saison.id, categorieId: State.cibleId };
+    return Promise.resolve(h.listFilsRouges(opts)).then(function (fils) {
+      State.filsRouges = (Array.isArray(fils) ? fils : []).map(function (fr) {
+        fr.couleur = couleurFilValide(fr.couleur);
+        fr._etapes = [];
+        return fr;
+      });
+      if (typeof h.listFilRougeEtapes !== 'function') return;
+      var proms = State.filsRouges.map(function (fr) {
+        return Promise.resolve(h.listFilRougeEtapes(fr.id))
+          .then(function (rows) { fr._etapes = Array.isArray(rows) ? rows : []; })
+          .catch(function () { fr._etapes = []; });
+      });
+      return Promise.all(proms);
+    }).catch(function () { State.filsRouges = []; });
   }
 
   // Libellé « Prénom NOM » concaténé des référents (pour le cartouche).
@@ -573,6 +611,49 @@
   var INTER_CYCLE = ['i-violet', 'i-bleu', 'i-rose', 'i-cyan'];
   var INTER_NIVEAUX = 2;
 
+  // ── PLANIF-FIL-ROUGE (sql_239) : compétences suivies toute la saison ──
+  // Un fil rouge = une compétence décrite par des étapes datées, rendue en
+  // bandeau sous la frise (une pastille par étape, positionnée à sa date sur
+  // le MÊME axe temporel que la frise — échelle partagée, cf. calcEchelle-
+  // Frise). Palette DÉDIÉE (clés fr-*), volontairement distincte du cycle des
+  // blocs (c-*) ET des intercalés (i-violet/bleu/rose/cyan) : teintes chaudes/
+  // terreuses. La colonne couleur stocke la CLÉ (fr-rouge…) ; le hex vit en
+  // CSS (planification.html, variables --fr-*). Fallback = 1re clé.
+  var FR_PALETTE = ['fr-rouge', 'fr-orange', 'fr-moutarde', 'fr-sarcelle', 'fr-olive', 'fr-bordeaux'];
+
+  function couleurFilValide(cle) {
+    return FR_PALETTE.indexOf(cle) >= 0 ? cle : FR_PALETTE[0];
+  }
+
+  // Un fil rouge « brouillon » (non encore en base) a un id temporaire tmpfr-*.
+  function newFilDraft() {
+    return {
+      id: 'tmpfr-' + Date.now() + '-' + Math.round(Math.random() * 1e6),
+      _draft: true,
+      saison_id: State.saison ? State.saison.id : null,
+      categorie_id: State.portee === 'categorie' ? State.cibleId : null,
+      pole_id: State.portee === 'pole' ? State.cibleId : null,
+      nom: '',
+      couleur: FR_PALETTE[0],
+      ordre: State.filsRouges.length,
+      _etapes: []
+    };
+  }
+
+  // Une étape « brouillon » a un id temporaire tmpet-*.
+  function newEtapeDraft(filId, ordre) {
+    return {
+      id: 'tmpet-' + Date.now() + '-' + Math.round(Math.random() * 1e6),
+      _draft: true,
+      fil_rouge_id: filId,
+      date_debut: '',
+      date_fin: '',
+      titre: '',
+      texte: '',
+      ordre: ordre || 0
+    };
+  }
+
   // Agrège les axes d'un bloc en une liste de libellés (ordre : individuel,
   // collectif, physique, poste). Utilisé par les deux frises.
   function axesDuBloc(b) {
@@ -706,6 +787,33 @@
     return m ? (m[3] + '/' + m[2]) : esc(s || '');
   }
 
+  // PLANIF-FIL-ROUGE : échelle temporelle de la frise, EXTRAITE pour être
+  // PARTAGÉE avec les bandeaux de fil rouge (Option A : le fil s'aligne sur la
+  // frise, jamais l'inverse). Fonction PURE : mêmes blocs persistés en entrée
+  // ⇒ mêmes tMin/tMax/pct qu'avant. Retourne { ok:false } si aucun bloc daté
+  // (pas d'axe → bandeaux non positionnables, cf. renderBandeauxFilsRouges).
+  // Bornage strictement identique à l'ancien inline (aucune régression frise).
+  function calcEchelleFrise(persistes) {
+    var datesToutes = [];
+    (persistes || []).forEach(function (b) {
+      periodesEffectives(b).forEach(function (p) {
+        datesToutes.push(p.d0); datesToutes.push(p.d1);
+      });
+    });
+    if (datesToutes.length === 0) return { ok: false };
+    var tMin = Math.min.apply(null, datesToutes);
+    var tMax = Math.max.apply(null, datesToutes);
+    if (tMax <= tMin) { tMax = tMin + 30 * 24 * 3600 * 1000; }
+    var span = tMax - tMin;
+    return {
+      ok: true,
+      tMin: tMin,
+      tMax: tMax,
+      span: span,
+      pct: function (ms) { return ((ms - tMin) / span) * 100; }
+    };
+  }
+
   // Rendu de la frise chronologique. HTML positionné en % (responsive +
   // scroll conservé). Deux couches : blocs datés (bas) + intercalés (haut).
   function renderFriseTemporelle(persistes) {
@@ -731,11 +839,11 @@
 
     // Échelle : min/max des dates saisies. Plancher anti-division par zéro
     // (min=max ⇒ on force une fenêtre d'1 mois pour donner une largeur).
-    var tMin = Math.min.apply(null, datesToutes);
-    var tMax = Math.max.apply(null, datesToutes);
-    if (tMax <= tMin) { tMax = tMin + 30 * 24 * 3600 * 1000; }
-    var span = tMax - tMin;
-    var pct = function (ms) { return ((ms - tMin) / span) * 100; };
+    var _ech = calcEchelleFrise(persistes);
+    var tMin = _ech.tMin;
+    var tMax = _ech.tMax;
+    var span = _ech.span;
+    var pct = _ech.pct;
 
     // Graduations mensuelles (1er de chaque mois dans la fenêtre).
     var grads = '';
@@ -853,6 +961,100 @@
     return h;
   }
 
+  // PLANIF-FIL-ROUGE : point médian (ms) d'une étape pour son positionnement
+  // sur l'axe. Étape avec 2 dates → milieu ; 1 seule date → cette date ;
+  // aucune date → NaN (étape non positionnable, listée mais pas sur l'axe).
+  function etapeMs(e) {
+    var a = parseJour(e.date_debut), z = parseJour(e.date_fin);
+    if (!isNaN(a) && !isNaN(z)) return (a + z) / 2;
+    if (!isNaN(a)) return a;
+    if (!isNaN(z)) return z;
+    return NaN;
+  }
+
+  // Libellé de dates compact d'une étape ('JJ/MM → JJ/MM', ou une seule).
+  function etapeDatesLbl(e) {
+    var d = e.date_debut ? jjmm(e.date_debut) : '';
+    var f = e.date_fin ? jjmm(e.date_fin) : '';
+    if (d && f) return d + ' → ' + f;
+    return d || f || 'sans date';
+  }
+
+  // Rendu des bandeaux de fil rouge (lecture) sous la frise chronologique.
+  // Un bandeau par fil PERSISTÉ ; une pastille par étape POSITIONNABLE, placée
+  // avec le MÊME pct() que la frise (échelle partagée, Option A). Une étape
+  // hors fenêtre [tMin,tMax] est CLIPPÉE au bord (0/100 %) et marquée « hors
+  // cadre ». '' si aucun fil, ou si aucune échelle (pas de bloc daté : on ne
+  // peut pas positionner — les étapes restent éditables/listées ailleurs).
+  function renderBandeauxFilsRouges(persistes) {
+    var fils = (State.filsRouges || []).filter(function (fr) { return !fr._draft; });
+    if (fils.length === 0) return '';
+    var ech = calcEchelleFrise(persistes);
+    if (!ech.ok) {
+      return '<p class="pa-fr-noaxe">Fils rouges définis, mais aucun bloc daté : ' +
+        'l\'axe temporel n\'est pas disponible pour les positionner.</p>';
+    }
+    var h = '<div class="pa-fr-bandeaux">';
+    fils.forEach(function (fr) {
+      var etapes = (Array.isArray(fr._etapes) ? fr._etapes : [])
+        .filter(function (e) { return !e._draft; });
+      h += '<div class="pa-fr-bandeau pa-fr--' + esc(fr.couleur) + '">';
+      h += '<div class="pa-fr-bandeau__tete">' +
+        '<span class="pa-fr-puce"></span>' +
+        '<span class="pa-fr-nom">' + esc(fr.nom || 'Fil rouge') + '</span>' +
+        '</div>';
+      h += '<div class="pa-fr-piste">';
+      // Points positionnables (triés par date) pour tracer la ligne de liaison.
+      var pos = etapes.map(function (e) {
+        var ms = etapeMs(e);
+        if (isNaN(ms)) return null;
+        var raw = ech.pct(ms);
+        var clip = Math.max(0, Math.min(100, raw));
+        return { e: e, left: clip, hors: (raw < 0 || raw > 100) };
+      }).filter(Boolean).sort(function (x, y) { return x.left - y.left; });
+      if (pos.length >= 2) {
+        var l0 = pos[0].left, l1 = pos[pos.length - 1].left;
+        h += '<span class="pa-fr-ligne" style="left:' + l0.toFixed(3) +
+          '%;width:' + (l1 - l0).toFixed(3) + '%"></span>';
+      }
+      pos.forEach(function (p) {
+        var sel = String(State.etapeSelId) === String(p.e.id);
+        h += '<button type="button" class="pa-fr-etape' +
+          (sel ? ' is-sel' : '') + (p.hors ? ' is-hors' : '') +
+          '" data-fr-etape="' + esc(p.e.id) + '"' +
+          ' style="left:' + p.left.toFixed(3) + '%"' +
+          ' title="' + esc((p.e.titre || 'Étape') + ' · ' + etapeDatesLbl(p.e)) +
+          (p.hors ? ' (hors cadre)' : '') + '"></button>';
+      });
+      h += '</div></div>';
+    });
+    h += '</div>';
+    h += renderDetailEtape();
+    return h;
+  }
+
+  // Zone de détail (lecture) de l'étape sélectionnée, sous les bandeaux.
+  // '' si aucune sélection. Titre + dates + texte libre. Bordure gauche à la
+  // couleur du fil parent (classe pa-fr--<couleur>).
+  function renderDetailEtape() {
+    if (!State.etapeSelId) return '';
+    var found = null, parent = null;
+    (State.filsRouges || []).forEach(function (fr) {
+      (fr._etapes || []).forEach(function (e) {
+        if (String(e.id) === String(State.etapeSelId)) { found = e; parent = fr; }
+      });
+    });
+    if (!found) return '';
+    return '<div class="pa-fr-detail pa-fr--' + esc(parent.couleur) + '">' +
+      '<div class="pa-fr-detail__meta">Étape sélectionnée · ' +
+        esc(etapeDatesLbl(found)) + '</div>' +
+      '<div class="pa-fr-detail__titre">' + esc(found.titre || 'Sans titre') + '</div>' +
+      (found.texte
+        ? '<div class="pa-fr-detail__txt">' + esc(found.texte) + '</div>'
+        : '') +
+      '</div>';
+  }
+
   function renderFrise() {
     var persistes = State.blocs.filter(function (b) { return !b._draft; });
     var h = '<section class="pa-card pa-frise-card">';
@@ -875,6 +1077,10 @@
     // leurs vraies dates ; un bloc intercalé se fractionne en une barre par
     // période (posées sur le haut, texte par étages pour rester lisible).
     h += renderFriseTemporelle(persistes);
+
+    // 1bis) PLANIF-FIL-ROUGE : bandeaux de fil rouge, sous la frise, sur le
+    // MÊME axe temporel (échelle partagée). + zone détail de l'étape cliquée.
+    h += renderBandeauxFilsRouges(persistes);
 
     // 2) Frise verticale (détail), toujours visible.
     h += '<div class="pa-fv-titre">Détail des blocs</div>';
@@ -945,8 +1151,100 @@
     }
     h += '</section>';
 
+    // PLANIF-FIL-ROUGE : section éditeur (repliable), SOUS les blocs.
+    h += renderEditeurFilsRouges();
+
     State.mount.innerHTML = h;
     bindEvents();
+  }
+
+  // PLANIF-FIL-ROUGE : éditeur repliable des fils rouges (création/renommage/
+  // couleur/suppression + étapes datées). Réutilise les patrons d'édition
+  // existants (data-* + délégation). Auto-save (patron « jours »). La section
+  // s'affiche toujours (même vide) pour permettre l'ajout d'un 1er fil.
+  function renderEditeurFilsRouges() {
+    var ouvert = !!State.filsOuverts;
+    var h = '<section class="pa-card pa-fr-editeur">';
+    h += '<button type="button" class="pa-fr-editeur__tete" data-fr-act="toggle" ' +
+      'aria-expanded="' + (ouvert ? 'true' : 'false') + '">' +
+      '<span class="pa-fr-editeur__titre">Fils rouges de la saison</span>' +
+      '<span class="pa-fr-editeur__chev">' + (ouvert ? '▾' : '▸') + '</span>' +
+      '</button>';
+    if (!ouvert) { h += '</section>'; return h; }
+
+    h += '<div class="pa-fr-editeur__corps">';
+    if (State.filsRouges.length === 0) {
+      h += '<p class="pa-attente">Aucun fil rouge. Ajoutez une compétence à suivre sur la saison.</p>';
+    } else {
+      State.filsRouges.forEach(function (fr) { h += renderFilEdit(fr); });
+    }
+    if (State.peutEditer) {
+      h += '<button type="button" class="pa-btn pa-btn--add" data-fr-act="add-fil">' +
+        '+ Ajouter un fil rouge</button>';
+    }
+    h += '</div></section>';
+    return h;
+  }
+
+  // Édition d'un fil : nom + sélecteur couleur (palette) + suppression, puis
+  // ses étapes. data-frid porte l'id du fil ; data-fr-state = indicateur.
+  function renderFilEdit(fr) {
+    var ro = State.peutEditer ? '' : ' disabled';
+    var h = '<div class="pa-fr-fil pa-fr--' + esc(fr.couleur) + '" data-frwrap="' + esc(fr.id) + '">';
+    h += '<div class="pa-fr-fil__bar">';
+    h += '<input type="text" class="pa-fr-fil__nom" data-fr-f="nom" data-frid="' + esc(fr.id) +
+      '" value="' + esc(fr.nom || '') + '" placeholder="Nom du fil rouge"' + ro + '>';
+    h += '<span class="pa-fr-swatches">';
+    FR_PALETTE.forEach(function (cle) {
+      var on = (fr.couleur === cle) ? ' is-on' : '';
+      h += '<button type="button" class="pa-fr-swatch pa-fr--' + cle + on +
+        '" data-fr-couleur="' + cle + '" data-frid="' + esc(fr.id) +
+        '" title="' + cle.replace('fr-', '') + '"' + ro + '></button>';
+    });
+    h += '</span>';
+    h += '<span class="pa-fr-fil__state" data-fr-state="' + esc(fr.id) + '"></span>';
+    if (State.peutEditer) {
+      h += '<button type="button" class="pa-btn pa-btn--del" data-fr-act="del-fil" ' +
+        'data-frid="' + esc(fr.id) + '" title="Supprimer ce fil">✕</button>';
+    }
+    h += '</div>';
+
+    // Étapes du fil.
+    h += '<div class="pa-fr-etapes-edit">';
+    var etapes = Array.isArray(fr._etapes) ? fr._etapes : [];
+    etapes.forEach(function (e) { h += renderEtapeEdit(fr, e); });
+    if (State.peutEditer) {
+      h += '<button type="button" class="pa-btn pa-btn--add pa-fr-add-etape" ' +
+        'data-fr-act="add-etape" data-frid="' + esc(fr.id) + '">+ Ajouter une étape</button>';
+    }
+    h += '</div>';
+
+    h += '</div>';
+    return h;
+  }
+
+  // Édition d'une étape : 2 dates + titre (ligne) + texte libre (dessous).
+  // data-etid = id étape ; data-et-state = indicateur d'enregistrement.
+  function renderEtapeEdit(fr, e) {
+    var ro = State.peutEditer ? '' : ' disabled';
+    var h = '<div class="pa-fr-etape-edit" data-etwrap="' + esc(e.id) + '">';
+    h += '<div class="pa-fr-etape-edit__ligne">';
+    h += '<input type="date" class="pa-fr-et-date" data-et-f="date_debut" data-etid="' +
+      esc(e.id) + '" value="' + esc(e.date_debut || '') + '"' + ro + '>';
+    h += '<input type="date" class="pa-fr-et-date" data-et-f="date_fin" data-etid="' +
+      esc(e.id) + '" value="' + esc(e.date_fin || '') + '"' + ro + '>';
+    h += '<input type="text" class="pa-fr-et-titre" data-et-f="titre" data-etid="' +
+      esc(e.id) + '" value="' + esc(e.titre || '') + '" placeholder="Titre de l\'étape"' + ro + '>';
+    h += '<span class="pa-fr-et-state" data-et-state="' + esc(e.id) + '"></span>';
+    if (State.peutEditer) {
+      h += '<button type="button" class="pa-btn pa-btn--del" data-fr-act="del-etape" ' +
+        'data-etid="' + esc(e.id) + '" title="Supprimer cette étape">✕</button>';
+    }
+    h += '</div>';
+    h += '<textarea class="pa-fr-et-texte" data-et-f="texte" data-etid="' + esc(e.id) +
+      '" rows="2" placeholder="Détail (optionnel)"' + ro + '>' + esc(e.texte || '') + '</textarea>';
+    h += '</div>';
+    return h;
   }
 
   // ---- Évènements (délégation) ----
@@ -1125,6 +1423,61 @@
         var jid = el.getAttribute('data-jid');
         if (act === 'del') return onDeleteJour(jid);
         if (act === 'dup') return onDupJour(el.getAttribute('data-bloc'), jid);
+      });
+    });
+
+    // ── PLANIF-FIL-ROUGE : handlers dédiés (additifs) ──
+    // Clic sur une pastille d'étape (lecture) → sélectionne + affiche détail.
+    root.querySelectorAll('[data-fr-etape]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        var id = el.getAttribute('data-fr-etape');
+        State.etapeSelId = (String(State.etapeSelId) === String(id)) ? null : id;
+        render();
+      });
+    });
+
+    // Champs simples d'un fil (nom). Auto-save au changement.
+    root.querySelectorAll('[data-fr-f]').forEach(function (el) {
+      el.addEventListener('input', function () {
+        var fr = findFil(el.getAttribute('data-frid'));
+        if (!fr) return;
+        fr[el.getAttribute('data-fr-f')] = el.value;
+        scheduleAutosaveFil(fr.id);
+      });
+    });
+
+    // Sélecteur de couleur (palette) d'un fil. Auto-save + re-render (teinte).
+    root.querySelectorAll('[data-fr-couleur]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        var fr = findFil(el.getAttribute('data-frid'));
+        if (!fr || !State.peutEditer) return;
+        fr.couleur = couleurFilValide(el.getAttribute('data-fr-couleur'));
+        scheduleAutosaveFil(fr.id);
+        render();
+      });
+    });
+
+    // Champs d'une étape (dates / titre / texte). Auto-save au changement.
+    root.querySelectorAll('[data-et-f]').forEach(function (el) {
+      var evt = (el.type === 'date') ? 'change' : 'input';
+      el.addEventListener(evt, function () {
+        var e = findEtape(el.getAttribute('data-etid'));
+        if (!e) return;
+        e[el.getAttribute('data-et-f')] = el.value;
+        scheduleAutosaveEtape(e.id);
+      });
+    });
+
+    // Boutons d'action fil rouge (toggle / add-fil / del-fil / add-etape /
+    // del-etape).
+    root.querySelectorAll('[data-fr-act]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        var act = el.getAttribute('data-fr-act');
+        if (act === 'toggle') { State.filsOuverts = !State.filsOuverts; return render(); }
+        if (act === 'add-fil') return onAddFil();
+        if (act === 'del-fil') return onDeleteFil(el.getAttribute('data-frid'));
+        if (act === 'add-etape') return onAddEtape(el.getAttribute('data-frid'));
+        if (act === 'del-etape') return onDeleteEtape(el.getAttribute('data-etid'));
       });
     });
   }
@@ -1456,6 +1809,217 @@
       b._jours = (b._jours || []).filter(function (x) { return String(x.id) !== String(jid); });
       render();
     });
+  }
+
+  // ══ PLANIF-FIL-ROUGE : logique métier (fils + étapes) ══════════════════
+  function findFil(id) {
+    return (State.filsRouges || []).filter(function (fr) {
+      return String(fr.id) === String(id);
+    })[0] || null;
+  }
+
+  function findEtape(id) {
+    for (var i = 0; i < (State.filsRouges || []).length; i++) {
+      var arr = State.filsRouges[i]._etapes || [];
+      for (var k = 0; k < arr.length; k++) {
+        if (String(arr[k].id) === String(id)) return arr[k];
+      }
+    }
+    return null;
+  }
+
+  function filDeEtape(id) {
+    for (var i = 0; i < (State.filsRouges || []).length; i++) {
+      var arr = State.filsRouges[i]._etapes || [];
+      for (var k = 0; k < arr.length; k++) {
+        if (String(arr[k].id) === String(id)) return State.filsRouges[i];
+      }
+    }
+    return null;
+  }
+
+  function onAddFil() {
+    if (!State.peutEditer) return;
+    State.filsRouges.push(newFilDraft());
+    render();
+  }
+
+  function onDeleteFil(id) {
+    var fr = findFil(id);
+    if (!fr) return;
+    if (fr._draft) {
+      State.filsRouges = State.filsRouges.filter(function (x) { return String(x.id) !== String(id); });
+      render();
+      return;
+    }
+    if (!global.confirm('Supprimer ce fil rouge et toutes ses étapes ? Cette action est définitive.')) return;
+    hub().deleteFilRouge(id).then(function (res) {
+      if (!res || !res.ok) { setStateFil(id, 'Échec : ' + ((res && res.error) || ''), false); return; }
+      State.filsRouges = State.filsRouges.filter(function (x) { return String(x.id) !== String(id); });
+      // Purge la sélection si l'étape affichée appartenait à ce fil.
+      if (State.etapeSelId && !findEtape(State.etapeSelId)) State.etapeSelId = null;
+      render();
+    });
+  }
+
+  function onAddEtape(filId) {
+    var fr = findFil(filId);
+    if (!fr || !State.peutEditer) return;
+    fr._etapes = Array.isArray(fr._etapes) ? fr._etapes : [];
+    fr._etapes.push(newEtapeDraft(fr.id, fr._etapes.length));
+    render();
+  }
+
+  function onDeleteEtape(id) {
+    var e = findEtape(id);
+    var fr = filDeEtape(id);
+    if (!e || !fr) return;
+    if (e._draft) {
+      fr._etapes = (fr._etapes || []).filter(function (x) { return String(x.id) !== String(id); });
+      render();
+      return;
+    }
+    if (!global.confirm('Supprimer cette étape ? Cette action est définitive.')) return;
+    hub().deleteFilRougeEtape(id).then(function (res) {
+      if (!res || !res.ok) { setStateEtape(id, 'Échec : ' + ((res && res.error) || ''), false); return; }
+      fr._etapes = (fr._etapes || []).filter(function (x) { return String(x.id) !== String(id); });
+      if (String(State.etapeSelId) === String(id)) State.etapeSelId = null;
+      render();
+    });
+  }
+
+  // Payloads propres (jamais l'id tmp*, ni les flags internes _*).
+  function payloadFil(fr) {
+    var p = {
+      saison_id: fr.saison_id,
+      nom: fr.nom || '',
+      couleur: couleurFilValide(fr.couleur),
+      ordre: fr.ordre || 0
+    };
+    if (fr.categorie_id) p.categorie_id = fr.categorie_id;
+    if (fr.pole_id) p.pole_id = fr.pole_id;
+    if (!fr._draft) p.id = fr.id;
+    return p;
+  }
+
+  function payloadEtape(e) {
+    var p = {
+      fil_rouge_id: e.fil_rouge_id,
+      titre: e.titre || '',
+      texte: e.texte || null,
+      date_debut: e.date_debut || null,
+      date_fin: e.date_fin || null,
+      ordre: e.ordre || 0
+    };
+    if (!e._draft) p.id = e.id;
+    return p;
+  }
+
+  // Indicateurs d'état (mêmes conventions visuelles que les jours).
+  function setStateFil(id, msg, ok) {
+    var el = State.mount && State.mount.querySelector(
+      '[data-fr-state="' + (window.CSS && CSS.escape ? CSS.escape(id) : id) + '"]');
+    if (el) { el.textContent = msg; el.className = 'pa-fr-fil__state' + (ok === false ? ' is-err' : (ok ? ' is-ok' : '')); }
+  }
+  function setStateEtape(id, msg, ok) {
+    var el = State.mount && State.mount.querySelector(
+      '[data-et-state="' + (window.CSS && CSS.escape ? CSS.escape(id) : id) + '"]');
+    if (el) { el.textContent = msg; el.className = 'pa-fr-et-state' + (ok === false ? ' is-err' : (ok ? ' is-ok' : '')); }
+  }
+
+  // Auto-save fil (patron « jours » : debounce silencieux, verrou anti double-
+  // insert, ré-étiquetage draft→uuid sans re-render pour garder le focus).
+  var _filTimers = {}, _filSaving = {}, _filRedo = {};
+
+  function scheduleAutosaveFil(id) {
+    if (!State.peutEditer) return;
+    setStateFil(id, 'Modifié…', null);
+    if (_filTimers[id]) clearTimeout(_filTimers[id]);
+    _filTimers[id] = setTimeout(function () { flushAutosaveFil(id); }, AUTOSAVE_DELAY);
+  }
+
+  function flushAutosaveFil(id) {
+    var fr = findFil(id);
+    if (!fr) return;
+    if (_filSaving[id]) { _filRedo[id] = true; return; }
+    _filSaving[id] = true;
+    setStateFil(id, 'Enregistrement…', null);
+    var etaitDraft = !!fr._draft;
+    hub().saveFilRouge(payloadFil(fr)).then(function (res) {
+      _filSaving[id] = false;
+      if (!res || !res.ok) { setStateFil(id, 'Échec : ' + ((res && res.error) || 'erreur'), false); return; }
+      if (etaitDraft && res.data && res.data.id) {
+        var nid = res.data.id;
+        fr.id = nid; fr._draft = false;
+        reetiqueterFrDom('frid', 'fr-state', id, nid);
+        // Les étapes en brouillon de ce fil doivent pointer le nouvel id.
+        (fr._etapes || []).forEach(function (e) { if (e._draft) e.fil_rouge_id = nid; });
+        if (_filRedo[id]) { delete _filRedo[id]; _filRedo[nid] = true; }
+        id = nid;
+      }
+      setStateFil(id, 'Enregistré ✓', true);
+      if (_filRedo[id]) { delete _filRedo[id]; scheduleAutosaveFil(id); }
+    }).catch(function () { _filSaving[id] = false; setStateFil(id, 'Échec réseau', false); });
+  }
+
+  // Auto-save étape (même patron). Une étape draft ne peut partir que si son
+  // fil parent est déjà persisté (fil_rouge_id NOT NULL) : sinon on reporte.
+  var _etTimers = {}, _etSaving = {}, _etRedo = {};
+
+  function scheduleAutosaveEtape(id) {
+    if (!State.peutEditer) return;
+    setStateEtape(id, 'Modifié…', null);
+    if (_etTimers[id]) clearTimeout(_etTimers[id]);
+    _etTimers[id] = setTimeout(function () { flushAutosaveEtape(id); }, AUTOSAVE_DELAY);
+  }
+
+  function flushAutosaveEtape(id) {
+    var e = findEtape(id);
+    var fr = filDeEtape(id);
+    if (!e || !fr) return;
+    // Titre obligatoire (NOT NULL) : on n'enregistre pas une étape sans titre.
+    if (!e.titre || !e.titre.trim()) { setStateEtape(id, 'Titre requis', false); return; }
+    // Fil parent pas encore en base : on force d'abord son enregistrement,
+    // puis on reprogramme l'étape (fil_rouge_id sera alors un uuid réel).
+    if (fr._draft || String(fr.id).indexOf('tmpfr-') === 0) {
+      scheduleAutosaveFil(fr.id);
+      setStateEtape(id, 'En attente du fil…', null);
+      setTimeout(function () { scheduleAutosaveEtape(id); }, AUTOSAVE_DELAY + 200);
+      return;
+    }
+    e.fil_rouge_id = fr.id;
+    if (_etSaving[id]) { _etRedo[id] = true; return; }
+    _etSaving[id] = true;
+    setStateEtape(id, 'Enregistrement…', null);
+    var etaitDraft = !!e._draft;
+    hub().saveFilRougeEtape(payloadEtape(e)).then(function (res) {
+      _etSaving[id] = false;
+      if (!res || !res.ok) { setStateEtape(id, 'Échec : ' + ((res && res.error) || 'erreur'), false); return; }
+      if (etaitDraft && res.data && res.data.id) {
+        var nid = res.data.id;
+        e.id = nid; e._draft = false;
+        reetiqueterFrDom('etid', 'et-state', id, nid);
+        if (String(State.etapeSelId) === String(id)) State.etapeSelId = nid;
+        if (_etRedo[id]) { delete _etRedo[id]; _etRedo[nid] = true; }
+        id = nid;
+      }
+      setStateEtape(id, 'Enregistré ✓', true);
+      if (_etRedo[id]) { delete _etRedo[id]; scheduleAutosaveEtape(id); }
+    }).catch(function () { _etSaving[id] = false; setStateEtape(id, 'Échec réseau', false); });
+  }
+
+  // Ré-étiquette les attributs DOM d'un fil/étape après insertion (draft→uuid),
+  // sans re-render (garde le focus). dataAttr = 'frid'|'etid' ; stateAttr =
+  // 'fr-state'|'et-state'.
+  function reetiqueterFrDom(dataAttr, stateAttr, ancienId, nouvelId) {
+    var root = State.mount;
+    if (!root) return;
+    var e1 = (window.CSS && CSS.escape) ? CSS.escape(ancienId) : ancienId;
+    root.querySelectorAll('[data-' + dataAttr + '="' + e1 + '"]').forEach(function (el) {
+      el.setAttribute('data-' + dataAttr, nouvelId);
+    });
+    var st = root.querySelector('[data-' + stateAttr + '="' + e1 + '"]');
+    if (st) st.setAttribute('data-' + stateAttr, nouvelId);
   }
 
   // ---- Démarrage adaptatif (portée) ----
