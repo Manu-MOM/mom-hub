@@ -518,8 +518,10 @@
       .pa-ft__inter.i-violet, .pa-ft__inter.i-bleu {
         -webkit-print-color-adjust: exact; print-color-adjust: exact;
       }
-      .pa-ft__titre { font-size: .72rem; line-height: 1.12; -webkit-line-clamp: 2; }
-      .pa-ft__date { font-size: .62rem; }
+      /* line-clamp échoue à l'impression (laisse passer une 3e ligne qui
+         chevauche la date). On coupe par max-height stricte + overflow. */
+      .pa-ft__titre { display: block; font-size: .7rem; line-height: 1.12; max-height: 2.24em; overflow: hidden; }
+      .pa-ft__date { font-size: .6rem; margin-top: .1rem; }
       .pa-ft__num { top: .3rem; }
       .pa-ft__grad-lbl { font-size: .56rem; }
       /* FIX PDF (radical) : à l'impression, AUCUN conteneur de la carte ne
