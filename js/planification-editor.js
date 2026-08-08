@@ -11,6 +11,10 @@
  *   détail. Impression hybride : bandeaux graphiques + rappel textuel des
  *   étapes (renderFilsRougesPrint, masqué écran/visible print). Additif ;
  *   frise des blocs inchangée. CSS pa-fr-* fourni par planification.html.
+ *   [PLANIF-FIL-ROUGE recette — 08/08] Étapes SANS date réparties uniformément
+ *   sur la piste (dates optionnelles) ; rafraîchissement CIBLÉ du bandeau
+ *   (#pa-fr-zone) après auto-save, sans voler le focus (fix : les étapes
+ *   saisies n'apparaissaient pas tant qu'aucun render global n'avait lieu).
  *   [PLANIF-ECRITURE-POLE — juin 2026] Écriture des trames de pôle ouverte
  *   au responsable DÉSIGNÉ (sql_106). Le boot charge les droits réels une
  *   fois (_chargerDroits : transverse / pôles responsables via
@@ -1013,14 +1017,24 @@
         '<span class="pa-fr-nom">' + esc(fr.nom || 'Fil rouge') + '</span>' +
         '</div>';
       h += '<div class="pa-fr-piste">';
-      // Points positionnables (triés par date) pour tracer la ligne de liaison.
-      var pos = etapes.map(function (e) {
+      // Étapes DATÉES → positionnées au pct partagé (clip hors-fenêtre). Étapes
+      // SANS date → réparties uniformément sur 0-100 % (indépendamment des
+      // datées), pour rester visibles et manipulables. On sépare les deux lots.
+      var datees = [];
+      var sansDate = [];
+      etapes.forEach(function (e) {
         var ms = etapeMs(e);
-        if (isNaN(ms)) return null;
+        if (isNaN(ms)) { sansDate.push(e); return; }
         var raw = ech.pct(ms);
-        var clip = Math.max(0, Math.min(100, raw));
-        return { e: e, left: clip, hors: (raw < 0 || raw > 100) };
-      }).filter(Boolean).sort(function (x, y) { return x.left - y.left; });
+        datees.push({ e: e, left: Math.max(0, Math.min(100, raw)), hors: (raw < 0 || raw > 100), nodate: false });
+      });
+      // Répartition homogène des sans-date : n étapes → positions
+      // (i+1)/(n+1)*100 (1 → 50 % ; 2 → 33/66 % ; 3 → 25/50/75 %…).
+      var nsd = sansDate.length;
+      sansDate.forEach(function (e, i) {
+        datees.push({ e: e, left: ((i + 1) / (nsd + 1)) * 100, hors: false, nodate: true });
+      });
+      var pos = datees.sort(function (x, y) { return x.left - y.left; });
       if (pos.length >= 2) {
         var l0 = pos[0].left, l1 = pos[pos.length - 1].left;
         h += '<span class="pa-fr-ligne" style="left:' + l0.toFixed(3) +
@@ -1030,6 +1044,7 @@
         var sel = String(State.etapeSelId) === String(p.e.id);
         h += '<button type="button" class="pa-fr-etape' +
           (sel ? ' is-sel' : '') + (p.hors ? ' is-hors' : '') +
+          (p.nodate ? ' is-nodate' : '') +
           '" data-fr-etape="' + esc(p.e.id) + '"' +
           ' style="left:' + p.left.toFixed(3) + '%"' +
           ' title="' + esc((p.e.titre || 'Étape') + ' · ' + etapeDatesLbl(p.e)) +
@@ -1040,6 +1055,25 @@
     h += '</div>';
     h += renderDetailEtape();
     return h;
+  }
+
+  // PLANIF-FIL-ROUGE : rafraîchit UNIQUEMENT la zone des bandeaux (#pa-fr-zone),
+  // sans re-render global — appelé après un auto-save réussi pour que le
+  // bandeau lecture reflète les saisies, tout en préservant le focus dans
+  // l'éditeur. No-op si la zone n'est pas montée (ex. frise absente).
+  function rafraichirBandeaux() {
+    var zone = State.mount && State.mount.querySelector('#pa-fr-zone');
+    if (!zone) return;
+    var persistes = State.blocs.filter(function (b) { return !b._draft; });
+    zone.innerHTML = renderBandeauxFilsRouges(persistes);
+    // Re-bind les clics des pastilles régénérées (délégation locale à la zone).
+    zone.querySelectorAll('[data-fr-etape]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        var id = el.getAttribute('data-fr-etape');
+        State.etapeSelId = (String(State.etapeSelId) === String(id)) ? null : id;
+        render();
+      });
+    });
   }
 
   // Zone de détail (lecture) de l'étape sélectionnée, sous les bandeaux.
@@ -1120,13 +1154,11 @@
 
     // 1bis) PLANIF-FIL-ROUGE : bandeaux de fil rouge, sous la frise, sur le
     // MÊME axe temporel (échelle partagée). + zone détail de l'étape cliquée.
-    h += renderBandeauxFilsRouges(persistes);
-
-    // 1ter) PLANIF-FIL-ROUGE : rappel TEXTUEL des étapes (masqué à l'écran,
-    // visible à l'impression seulement — décision PDF hybride). Placé DANS la
-    // frise-card pour survivre au masquage print des autres .pa-card. Porte le
-    // texte libre, invisible dans la zone de détail interactive au print.
-    h += renderFilsRougesPrint();
+    // Enveloppés dans #pa-fr-zone pour permettre un rafraîchissement CIBLÉ
+    // après auto-save (rafraichirBandeaux), sans re-render global (garde le
+    // focus dans l'éditeur pendant la frappe).
+    h += '<div id="pa-fr-zone">' + renderBandeauxFilsRouges(persistes) +
+      renderFilsRougesPrint() + '</div>';
 
     // 2) Frise verticale (détail), toujours visible.
     h += '<div class="pa-fv-titre">Détail des blocs</div>';
@@ -2004,6 +2036,7 @@
         id = nid;
       }
       setStateFil(id, 'Enregistré ✓', true);
+      rafraichirBandeaux();
       if (_filRedo[id]) { delete _filRedo[id]; scheduleAutosaveFil(id); }
     }).catch(function () { _filSaving[id] = false; setStateFil(id, 'Échec réseau', false); });
   }
@@ -2050,6 +2083,7 @@
         id = nid;
       }
       setStateEtape(id, 'Enregistré ✓', true);
+      rafraichirBandeaux();
       if (_etRedo[id]) { delete _etRedo[id]; scheduleAutosaveEtape(id); }
     }).catch(function () { _etSaving[id] = false; setStateEtape(id, 'Échec réseau', false); });
   }
