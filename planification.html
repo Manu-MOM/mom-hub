@@ -398,6 +398,10 @@
     }
     .pa-fr-jalon__puce { width: .45rem; height: .45rem; border-radius: 50%; background: var(--fr, var(--gris)); flex: 0 0 auto; }
     .pa-fr-jalon__lbl { overflow: hidden; text-overflow: ellipsis; }
+    /* Vignette d'extrémité : alignée sur le bord (posée via classes is-first/
+       is-last en JS, car la ligne de liaison est le 1er enfant de la piste). */
+    .pa-fr-jalon.is-first { transform: translateY(-50%); }
+    .pa-fr-jalon.is-last { transform: translateY(-50%) translateX(-100%); }
     .pa-fr-jalon:hover { box-shadow: 0 0 0 2px color-mix(in srgb, var(--fr, var(--gris)) 30%, transparent); }
     .pa-fr-jalon.is-sel { background: var(--fr, var(--gris)); color: #fff; }
     .pa-fr-jalon.is-sel .pa-fr-jalon__puce { background: #fff; }
@@ -548,14 +552,15 @@
       }
       .pa-fr-piste { break-inside: avoid; page-break-inside: avoid; }
       .pa-fr-detail { display: none !important; }
-      /* FIX PDF (leçon pt 237) : le bloc fils rouges ne doit pas réserver de
-         hauteur fantôme ni forcer le détail en page suivante. On le rend
-         compact et on empêche tout saut de page entre lui et le détail. */
-      #pa-fr-zone { overflow: visible !important; height: auto !important; max-height: none !important; break-after: avoid; page-break-after: avoid; }
-      .pa-fv, .pa-fv-titre { break-before: avoid !important; page-break-before: avoid !important; }
+      /* FIX PDF : le rappel texte des fils rouges est désormais rendu EN FIN
+         de flux (après le détail des blocs), côté JS. Il ne s'intercale donc
+         plus en pleine largeur entre la frise et le détail multi-colonnes —
+         c'était la cause du grand blanc en page 1. Le bloc graphique
+         (#pa-fr-zone) ne réserve pas de hauteur fantôme. */
+      #pa-fr-zone { overflow: visible !important; height: auto !important; max-height: none !important; }
       .pa-fr-print {
         display: block !important; font-style: normal; color: var(--ink);
-        margin: .3rem 0 .2rem; break-inside: avoid;
+        margin: .5rem 0 0; break-inside: avoid; break-before: auto;
       }
       .pa-fr-print__titre { font-size: .95rem; font-weight: 700; color: var(--vert-fonce); margin: 0 0 .3rem; }
       .pa-fr-print__fil { margin: 0 0 .35rem; padding-left: .5rem; border-left: 3px solid var(--fr, var(--gris)); break-inside: avoid; }
