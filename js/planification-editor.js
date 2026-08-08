@@ -896,17 +896,39 @@
     // Couche basse : blocs principaux (non intercalés) + intercalés ayant
     // « rejoint la frise principale » (rejoint_frise=true). Ces derniers
     // sont rendus en une barre par période, à leur teinte intercalée.
+    // PLANIF-FIL-ROUGE recette (point 2) : pour réduire les TROUS horizontaux
+    // entre chevrons successifs SANS casser l'échelle (position/date de début
+    // exacte), chaque chevron de la couche basse s'étend jusqu'au DÉBUT du
+    // chevron suivant. On pré-collecte tous les débuts (pct) de la couche
+    // basse, triés, puis pour chaque barre on cherche le plus proche début
+    // strictement supérieur. Le dernier va jusqu'à 100 %.
+    var debutsBas = [];
+    blocsDatables.forEach(function (o) {
+      if (o.b.intercale && !o.b.rejoint_frise) return;
+      if (!o.b.intercale) { debutsBas.push(pct(o.pers[0].d0)); }
+      else { o.pers.forEach(function (p) { debutsBas.push(pct(p.d0)); }); }
+    });
+    debutsBas.sort(function (a, b) { return a - b; });
+    var FR_GAP = 0.5; // % d'espace résiduel entre deux chevrons
+    function combleW(l, wReelle) {
+      // plus petit début strictement > l (tolérance anti-égalité 0.05)
+      var suivant = null;
+      for (var k = 0; k < debutsBas.length; k++) {
+        if (debutsBas[k] > l + 0.05) { suivant = debutsBas[k]; break; }
+      }
+      var wComble = (suivant != null ? suivant : 100) - l - FR_GAP;
+      return Math.max(wReelle, wComble);
+    }
     var bas = '';
     var ci = 0;
     blocsDatables.forEach(function (o) {
       if (o.b.intercale && !o.b.rejoint_frise) return; // reste en couche haute
       if (!o.b.intercale) {
         // Bloc principal : chevron plein, cycle de couleurs de saison.
-        // Largeur = durée réelle (proportion frise chronologique), position =
-        // date réelle. Minimum 2.2 % pour rester cliquable.
+        // Position = date réelle ; largeur comblée jusqu'au chevron suivant.
         var couleurCls = FRISE_CYCLE[ci % FRISE_CYCLE.length]; ci++;
         var p = o.pers[0];
-        var l = pct(p.d0), w = Math.max(pct(p.d1) - pct(p.d0), 2.2);
+        var l = pct(p.d0), w = Math.max(combleW(l, pct(p.d1) - pct(p.d0)), 2.2);
         // Titre affiché seulement si la barre est assez large (sinon illisible) ;
         // sous le seuil, on ne garde que le numéro (titre au survol + détail).
         var etroit = w < 9;
@@ -925,7 +947,7 @@
         var teinteB = teinteParBloc[o.b.id];
         var numB = o.i + 1;
         o.pers.forEach(function (p, k) {
-          var lb = pct(p.d0), wb = Math.max(pct(p.d1) - pct(p.d0), 1.8);
+          var lb = pct(p.d0), wb = Math.max(combleW(lb, pct(p.d1) - pct(p.d0)), 1.8);
           // Barres de période souvent étroites : numéro seul, titre au survol.
           var etroitRf = wb < 12;
           bas += '<div class="pa-ft__bloc pa-ft__bloc--rf ' + teinteB + (etroitRf ? ' pa-ft__bloc--narrow' : '') + '" ' +
@@ -1016,27 +1038,29 @@
       h += '<div class="pa-fr-bandeau pa-fr--' + esc(fr.couleur) + '">';
       h += '<div class="pa-fr-bandeau__tete">' +
         '<span class="pa-fr-puce"></span>' +
-        '<span class="pa-fr-nom">' + esc(fr.nom || 'Fil rouge') + '</span>' +
+        '<span class="pa-fr-nom">Fil rouge : ' + esc(fr.nom || 'Fil rouge') + '</span>' +
         '</div>';
       h += '<div class="pa-fr-piste">';
       // PLANIF-FIL-ROUGE recette : les vignettes sont réparties RÉGULIÈREMENT
       // d'un bout à l'autre de la piste (dans l'ordre des étapes), et non plus
       // positionnées à leur date. Les dates éventuelles apparaissent au survol
-      // (title). Répartition : n étapes → positions (i+1)/(n+1)*100.
+      // (title). Répartition du DÉBUT (0 %) à la FIN (100 %) : i/(n-1)*100
+      // (n=1 → centré à 50 %).
       var n = etapes.length;
       var pos = etapes.map(function (e, i) {
-        return { e: e, left: ((i + 1) / (n + 1)) * 100 };
+        return { e: e, left: (n <= 1) ? 50 : (i / (n - 1)) * 100 };
       });
       if (pos.length >= 2) {
         var l0 = pos[0].left, l1 = pos[pos.length - 1].left;
         h += '<span class="pa-fr-ligne" style="left:' + l0.toFixed(3) +
           '%;width:' + (l1 - l0).toFixed(3) + '%"></span>';
       }
-      pos.forEach(function (p) {
+      pos.forEach(function (p, idx) {
         var sel = String(State.etapeSelId) === String(p.e.id);
         var aDate = !!(p.e.date_debut || p.e.date_fin);
+        var bord = (idx === 0 ? ' is-first' : '') + (idx === pos.length - 1 ? ' is-last' : '');
         h += '<button type="button" class="pa-fr-jalon' +
-          (sel ? ' is-sel' : '') + (aDate ? '' : ' is-nodate') +
+          (sel ? ' is-sel' : '') + (aDate ? '' : ' is-nodate') + bord +
           '" data-fr-etape="' + esc(p.e.id) + '"' +
           ' style="left:' + p.left.toFixed(3) + '%"' +
           ' title="' + esc((p.e.titre || 'Étape') +
@@ -1107,7 +1131,7 @@
         .filter(function (e) { return !e._draft; });
       h += '<div class="pa-fr-print__fil pa-fr--' + esc(fr.couleur) + '">';
       h += '<div class="pa-fr-print__nom"><span class="pa-fr-puce"></span>' +
-        esc(fr.nom || 'Fil rouge') + '</div>';
+        'Fil rouge : ' + esc(fr.nom || 'Fil rouge') + '</div>';
       if (etapes.length) {
         h += '<ul class="pa-fr-print__etapes">';
         etapes.forEach(function (e) {
@@ -1152,8 +1176,7 @@
     // Enveloppés dans #pa-fr-zone pour permettre un rafraîchissement CIBLÉ
     // après auto-save (rafraichirBandeaux), sans re-render global (garde le
     // focus dans l'éditeur pendant la frappe).
-    h += '<div id="pa-fr-zone">' + renderBandeauxFilsRouges(persistes) +
-      renderFilsRougesPrint() + '</div>';
+    h += '<div id="pa-fr-zone">' + renderBandeauxFilsRouges(persistes) + '</div>';
 
     // 2) Frise verticale (détail), toujours visible.
     h += '<div class="pa-fv-titre">Détail des blocs</div>';
@@ -1189,6 +1212,13 @@
         '</div>';
     });
     h += '</div></div>';
+
+    // 3) PLANIF-FIL-ROUGE : rappel TEXTUEL des fils rouges (masqué écran /
+    // visible print seulement). Placé EN DERNIER, après le détail des blocs :
+    // intercalé avant le détail, ce bloc pleine largeur cassait la pagination
+    // multi-colonnes et laissait un grand blanc en page 1 (leçon PDF). En fin
+    // de flux, le détail colle à la frise et le rappel suit sans trou.
+    h += renderFilsRougesPrint();
 
     h += '</section>';
     return h;
