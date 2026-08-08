@@ -494,12 +494,25 @@
       .pa-ft-scroll { overflow: visible; }
       .pa-ft { min-width: 0; padding-top: 1.6rem; }
       .pa-ft__haut { height: 2.5rem; }
-      .pa-ft__bas { height: 3.4rem; }
-      .pa-ft__bloc { height: 3.4rem; filter: none !important; }
-      /* Au print les principaux passent à 3.4rem (centre 1.7rem) : recentrer le
-         --rf (2.9rem) sur cette médiane (top = 1.7 − 1.45 = 0.25rem) pour
-         aligner les pointes des chevrons rejoints sur les principaux. */
-      .pa-ft__bloc--rf { top: 0; }
+      .pa-ft__bas { height: 5rem; }
+      .pa-ft__bloc {
+        height: 5rem; filter: none !important; padding-left: 1.5rem;
+        clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 50%, calc(100% - 20px) 100%, 0 100%, 20px 50%);
+      }
+      .pa-ft__bloc:first-child {
+        clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 50%, calc(100% - 20px) 100%, 0 100%);
+      }
+      /* Chevron rejoint : même hauteur (5rem) et même pointe (20px) que les
+         principaux au print → angle identique, alignement parfait (top 0). */
+      .pa-ft__bloc--rf {
+        top: 0; height: 5rem;
+        clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 50%, calc(100% - 20px) 100%, 0 100%, 20px 50%);
+      }
+      /* Intercalés couche haute : pointe proportionnée à leur hauteur (~5px)
+         pour conserver le même angle doux que les chevrons du bas. */
+      .pa-ft__inter {
+        clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 50%, calc(100% - 5px) 100%, 0 100%, 5px 50%);
+      }
       .pa-ft__bloc, .pa-ft__inter,
       .pa-ft__inter.i-or, .pa-ft__inter.i-clay,
       .pa-ft__inter.i-violet, .pa-ft__inter.i-bleu {
@@ -507,7 +520,6 @@
       }
       .pa-ft__titre { font-size: .8rem; }
       .pa-ft__grad-lbl { font-size: .56rem; }
-      .pa-ft__bloc--rf { filter: none !important; }
       /* FIX PDF (radical) : à l'impression, AUCUN conteneur de la carte ne
          doit garder d'overflow scrollable ni de hauteur contrainte — sinon le
          moteur rend tout dans une seule page avec scrollbar (bug constaté :
