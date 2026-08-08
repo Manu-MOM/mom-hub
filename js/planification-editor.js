@@ -15,10 +15,11 @@
  *   sur la piste (dates optionnelles) ; rafraîchissement CIBLÉ du bandeau
  *   (#pa-fr-zone) après auto-save, sans voler le focus (fix : les étapes
  *   saisies n'apparaissaient pas tant qu'aucun render global n'avait lieu).
- *   [PLANIF-FIL-ROUGE recette 2 — 08/08] Bandeau : jalons « puce + titre »
- *   (pa-fr-jalon) au lieu de pastilles nues. Frise : chevrons principaux
- *   étendus jusqu'au début du suivant (comble les trous, échelle/position
- *   conservées ; intercalés inchangés). CSS pa-fr-jalon dans planification.html.
+ *   [PLANIF-FIL-ROUGE recette 3 — 08/08] Bandeau : vignettes « puce + titre »
+ *   réparties RÉGULIÈREMENT d'un bout à l'autre (indépendamment des dates ;
+ *   dates au survol/tooltip). Chevrons principaux : retour largeur
+ *   PROPORTIONNELLE aux dates (comblage recette 2 annulé). Angles de pointe
+ *   uniformisés côté CSS. Fix PDF (leçon pt 237) côté planification.html.
  *   [PLANIF-ECRITURE-POLE — juin 2026] Écriture des trames de pôle ouverte
  *   au responsable DÉSIGNÉ (sql_106). Le boot charge les droits réels une
  *   fois (_chargerDroits : transverse / pôles responsables via
@@ -895,33 +896,17 @@
     // Couche basse : blocs principaux (non intercalés) + intercalés ayant
     // « rejoint la frise principale » (rejoint_frise=true). Ces derniers
     // sont rendus en une barre par période, à leur teinte intercalée.
-    // PLANIF-FIL-ROUGE recette (point 2) : pour RÉDUIRE les trous entre blocs
-    // principaux sans casser l'échelle temporelle, chaque chevron principal
-    // s'étend jusqu'au DÉBUT du chevron principal suivant (la position/date de
-    // début reste exacte ; seule la largeur est comblée). On pré-calcule les
-    // débuts (pct) des blocs principaux, dans l'ordre d'affichage.
-    var debutsPrincipaux = [];
-    blocsDatables.forEach(function (o) {
-      if (!o.b.intercale) debutsPrincipaux.push(pct(o.pers[0].d0));
-    });
-    var FR_GAP = 0.6; // % d'espace résiduel entre deux chevrons (fin)
-    var idxPrincipal = 0;
     var bas = '';
     var ci = 0;
     blocsDatables.forEach(function (o) {
       if (o.b.intercale && !o.b.rejoint_frise) return; // reste en couche haute
       if (!o.b.intercale) {
         // Bloc principal : chevron plein, cycle de couleurs de saison.
+        // Largeur = durée réelle (proportion frise chronologique), position =
+        // date réelle. Minimum 2.2 % pour rester cliquable.
         var couleurCls = FRISE_CYCLE[ci % FRISE_CYCLE.length]; ci++;
         var p = o.pers[0];
-        var l = pct(p.d0);
-        // Largeur = jusqu'au début du principal suivant (− gap), bornée à la
-        // largeur réelle minimale ; le dernier principal s'étend jusqu'à 100 %.
-        var suivant = debutsPrincipaux[idxPrincipal + 1];
-        idxPrincipal++;
-        var wReelle = pct(p.d1) - pct(p.d0);
-        var wComble = (suivant != null ? suivant : 100) - l - FR_GAP;
-        var w = Math.max(wReelle, wComble, 2.2);
+        var l = pct(p.d0), w = Math.max(pct(p.d1) - pct(p.d0), 2.2);
         // Titre affiché seulement si la barre est assez large (sinon illisible) ;
         // sous le seuil, on ne garde que le numéro (titre au survol + détail).
         var etroit = w < 9;
@@ -1024,11 +1009,6 @@
   function renderBandeauxFilsRouges(persistes) {
     var fils = (State.filsRouges || []).filter(function (fr) { return !fr._draft; });
     if (fils.length === 0) return '';
-    var ech = calcEchelleFrise(persistes);
-    if (!ech.ok) {
-      return '<p class="pa-fr-noaxe">Fils rouges définis, mais aucun bloc daté : ' +
-        'l\'axe temporel n\'est pas disponible pour les positionner.</p>';
-    }
     var h = '<div class="pa-fr-bandeaux">';
     fils.forEach(function (fr) {
       var etapes = (Array.isArray(fr._etapes) ? fr._etapes : [])
@@ -1039,24 +1019,14 @@
         '<span class="pa-fr-nom">' + esc(fr.nom || 'Fil rouge') + '</span>' +
         '</div>';
       h += '<div class="pa-fr-piste">';
-      // Étapes DATÉES → positionnées au pct partagé (clip hors-fenêtre). Étapes
-      // SANS date → réparties uniformément sur 0-100 % (indépendamment des
-      // datées), pour rester visibles et manipulables. On sépare les deux lots.
-      var datees = [];
-      var sansDate = [];
-      etapes.forEach(function (e) {
-        var ms = etapeMs(e);
-        if (isNaN(ms)) { sansDate.push(e); return; }
-        var raw = ech.pct(ms);
-        datees.push({ e: e, left: Math.max(0, Math.min(100, raw)), hors: (raw < 0 || raw > 100), nodate: false });
+      // PLANIF-FIL-ROUGE recette : les vignettes sont réparties RÉGULIÈREMENT
+      // d'un bout à l'autre de la piste (dans l'ordre des étapes), et non plus
+      // positionnées à leur date. Les dates éventuelles apparaissent au survol
+      // (title). Répartition : n étapes → positions (i+1)/(n+1)*100.
+      var n = etapes.length;
+      var pos = etapes.map(function (e, i) {
+        return { e: e, left: ((i + 1) / (n + 1)) * 100 };
       });
-      // Répartition homogène des sans-date : n étapes → positions
-      // (i+1)/(n+1)*100 (1 → 50 % ; 2 → 33/66 % ; 3 → 25/50/75 %…).
-      var nsd = sansDate.length;
-      sansDate.forEach(function (e, i) {
-        datees.push({ e: e, left: ((i + 1) / (nsd + 1)) * 100, hors: false, nodate: true });
-      });
-      var pos = datees.sort(function (x, y) { return x.left - y.left; });
       if (pos.length >= 2) {
         var l0 = pos[0].left, l1 = pos[pos.length - 1].left;
         h += '<span class="pa-fr-ligne" style="left:' + l0.toFixed(3) +
@@ -1064,13 +1034,13 @@
       }
       pos.forEach(function (p) {
         var sel = String(State.etapeSelId) === String(p.e.id);
+        var aDate = !!(p.e.date_debut || p.e.date_fin);
         h += '<button type="button" class="pa-fr-jalon' +
-          (sel ? ' is-sel' : '') + (p.hors ? ' is-hors' : '') +
-          (p.nodate ? ' is-nodate' : '') +
+          (sel ? ' is-sel' : '') + (aDate ? '' : ' is-nodate') +
           '" data-fr-etape="' + esc(p.e.id) + '"' +
           ' style="left:' + p.left.toFixed(3) + '%"' +
-          ' title="' + esc((p.e.titre || 'Étape') + ' · ' + etapeDatesLbl(p.e)) +
-          (p.hors ? ' (hors cadre)' : '') + '">' +
+          ' title="' + esc((p.e.titre || 'Étape') +
+            (aDate ? ' · ' + etapeDatesLbl(p.e) : '')) + '">' +
           '<span class="pa-fr-jalon__puce"></span>' +
           '<span class="pa-fr-jalon__lbl">' + esc(p.e.titre || 'Étape') + '</span>' +
           '</button>';
