@@ -42,8 +42,13 @@
       border: 1px solid var(--bord); border-radius: 10px; padding: .9rem 1rem;
       margin-bottom: 1rem; background: var(--paper);
     }
-    .pa-bloc__bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: .7rem; }
-    .pa-bloc__rang { font-weight: 700; color: var(--vert-fonce); letter-spacing: .02em; }
+    .pa-bloc__bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: .7rem; cursor: pointer; gap: .5rem; }
+    .pa-bloc__bar:hover .pa-bloc__rang { color: var(--vert); }
+    .pa-bloc__chev { color: var(--vert); font-size: .9rem; flex: 0 0 auto; }
+    .pa-bloc__rang { font-weight: 700; color: var(--vert-fonce); letter-spacing: .02em; flex: 0 0 auto; }
+    .pa-bloc__resume { flex: 1 1 auto; color: var(--gris); font-size: .88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pa-bloc--replie { padding-bottom: .2rem; }
+    .pa-bloc--replie .pa-bloc__bar { margin-bottom: 0; }
     .pa-bloc__actions { display: flex; gap: .35rem; }
     .pa-mini {
       border: 1px solid var(--bord); background: var(--carte); color: var(--vert-fonce);
