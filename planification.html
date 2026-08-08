@@ -244,11 +244,11 @@
     .pa-ft__inter.i-cyan .pa-ft__inter-num { color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,.35); }
     /* Couche basse : blocs principaux — mis en avant (plus hauts, pointe
        chevron marquée, ombre portée suivant la forme, titre plus grand). */
-    .pa-ft__bas { position: relative; height: 3.9rem; }
+    .pa-ft__bas { position: relative; height: 4.8rem; }
     .pa-ft__bloc {
-      position: absolute; top: 0; height: 3.9rem; box-sizing: border-box;
-      color: #fff; padding: .35rem .8rem .35rem 1rem;
-      clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%, 16px 50%);
+      position: absolute; top: 0; height: 4.8rem; box-sizing: border-box;
+      color: #fff; padding: .4rem .7rem .4rem .9rem;
+      clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%, 10px 50%);
       overflow: hidden; cursor: pointer;
       filter: drop-shadow(0 4px 6px rgba(12, 61, 36, .42));
       display: flex; flex-direction: column; justify-content: flex-end;
@@ -257,15 +257,15 @@
     /* Liseré clair intérieur pour détacher chaque bloc principal du fond. */
     .pa-ft__bloc:not(.pa-ft__bloc--rf)::after {
       content: ''; position: absolute; inset: 0;
-      clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%, 16px 50%);
+      clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%, 10px 50%);
       box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .55);
       pointer-events: none;
     }
     .pa-ft__bloc:first-child:not(.pa-ft__bloc--rf)::after {
-      clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%);
+      clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%);
     }
     .pa-ft__bloc:first-child {
-      clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%);
+      clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%);
       padding-left: .8rem;
     }
     .pa-ft__bloc:hover { filter: drop-shadow(0 6px 9px rgba(12, 61, 36, .5)) brightness(1.06); transform: translateY(-2px); }
@@ -306,7 +306,7 @@
     }
     .pa-ft__bloc:first-child .pa-ft__num { left: .8rem; }
     .pa-ft__bloc.c-gold .pa-ft__num { background: rgba(12, 61, 36, .22); }
-    .pa-ft__titre { font-weight: 800; font-size: .92rem; line-height: 1.12; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pa-ft__titre { font-weight: 800; font-size: .92rem; line-height: 1.12; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; }
     .pa-ft__date { font-size: .68rem; opacity: .92; white-space: nowrap; }
     .pa-ft__nondate { font-size: .78rem; color: var(--attente, #8a93a0); font-style: italic; margin-top: .5rem; }
 
@@ -395,6 +395,7 @@
     .pa-fr-etape:hover { box-shadow: 0 0 0 2px var(--fr, var(--gris)); }
     .pa-fr-etape.is-sel { box-shadow: 0 0 0 2px var(--fr, var(--gris)); }
     .pa-fr-etape.is-hors { border-style: dashed; opacity: .8; }
+    .pa-fr-etape.is-nodate { background: var(--carte); border: 2px solid var(--fr, var(--gris)); box-shadow: 0 0 0 1px var(--bord); }
     .pa-fr-noaxe, .pa-fr-print { color: var(--attente); font-style: italic; font-size: .85rem; margin: .4rem 0 0; }
 
     /* ---- Zone détail de l'étape sélectionnée ---- */
