@@ -2,6 +2,15 @@
  * js/planification-editor.js — Module « Planification annuelle » (MOM Hub)
  * ----------------------------------------------------------------------------
  * Version : 1.0 — juin 2026
+ *   [PLANIF-FIL-ROUGE — août 2026] Fils rouges de la planification (sql_239,
+ *   wrappers supabase-client v1.81). Compétences suivies toute la saison,
+ *   rendues en bandeaux sous la frise (1 pastille/étape, échelle temporelle
+ *   PARTAGÉE avec la frise — calcEchelleFrise ; hors-cadre clippé + marqué).
+ *   Éditeur repliable sous les blocs (nom + palette 6 couleurs fr-* + étapes
+ *   datées titre/texte), auto-save patron « jours ». Clic pastille → zone
+ *   détail. Impression hybride : bandeaux graphiques + rappel textuel des
+ *   étapes (renderFilsRougesPrint, masqué écran/visible print). Additif ;
+ *   frise des blocs inchangée. CSS pa-fr-* fourni par planification.html.
  *   [PLANIF-ECRITURE-POLE — juin 2026] Écriture des trames de pôle ouverte
  *   au responsable DÉSIGNÉ (sql_106). Le boot charge les droits réels une
  *   fois (_chargerDroits : transverse / pôles responsables via
@@ -1055,6 +1064,37 @@
       '</div>';
   }
 
+  // PLANIF-FIL-ROUGE : rappel textuel des fils + étapes pour l'impression
+  // (décision PDF hybride). Masqué à l'écran (classe pa-fr-print, display:none),
+  // révélé par @media print. '' si aucun fil persisté. Chaque fil = un titre
+  // coloré (pastille) + la liste de ses étapes (dates, titre, texte libre).
+  function renderFilsRougesPrint() {
+    var fils = (State.filsRouges || []).filter(function (fr) { return !fr._draft; });
+    if (fils.length === 0) return '';
+    var h = '<div class="pa-fr-print">';
+    h += '<div class="pa-fr-print__titre">Fils rouges</div>';
+    fils.forEach(function (fr) {
+      var etapes = (Array.isArray(fr._etapes) ? fr._etapes : [])
+        .filter(function (e) { return !e._draft; });
+      h += '<div class="pa-fr-print__fil pa-fr--' + esc(fr.couleur) + '">';
+      h += '<div class="pa-fr-print__nom"><span class="pa-fr-puce"></span>' +
+        esc(fr.nom || 'Fil rouge') + '</div>';
+      if (etapes.length) {
+        h += '<ul class="pa-fr-print__etapes">';
+        etapes.forEach(function (e) {
+          h += '<li><span class="pa-fr-print__dates">' + esc(etapeDatesLbl(e)) + '</span> ' +
+            '<span class="pa-fr-print__et-titre">' + esc(e.titre || 'Sans titre') + '</span>' +
+            (e.texte ? '<span class="pa-fr-print__et-txt"> — ' + esc(e.texte) + '</span>' : '') +
+            '</li>';
+        });
+        h += '</ul>';
+      }
+      h += '</div>';
+    });
+    h += '</div>';
+    return h;
+  }
+
   function renderFrise() {
     var persistes = State.blocs.filter(function (b) { return !b._draft; });
     var h = '<section class="pa-card pa-frise-card">';
@@ -1081,6 +1121,12 @@
     // 1bis) PLANIF-FIL-ROUGE : bandeaux de fil rouge, sous la frise, sur le
     // MÊME axe temporel (échelle partagée). + zone détail de l'étape cliquée.
     h += renderBandeauxFilsRouges(persistes);
+
+    // 1ter) PLANIF-FIL-ROUGE : rappel TEXTUEL des étapes (masqué à l'écran,
+    // visible à l'impression seulement — décision PDF hybride). Placé DANS la
+    // frise-card pour survivre au masquage print des autres .pa-card. Porte le
+    // texte libre, invisible dans la zone de détail interactive au print.
+    h += renderFilsRougesPrint();
 
     // 2) Frise verticale (détail), toujours visible.
     h += '<div class="pa-fv-titre">Détail des blocs</div>';
