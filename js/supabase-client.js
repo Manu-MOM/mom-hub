@@ -18,7 +18,15 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.80 — juillet 2026
+ * Version : 1.81 — août 2026
+ *   v1.81 : PLANIF-FIL-ROUGE (FAIT FOI gelé 08/08/2026). 6 wrappers ADDITIFS
+ *          pour le fil rouge de planification (socle SQL sql_239 déjà en
+ *          prod) : listFilsRouges / saveFilRouge / deleteFilRouge (table
+ *          planification_fils_rouges) + listFilRougeEtapes / saveFilRougeEtape
+ *          / deleteFilRougeEtape (table planification_fil_rouge_etapes).
+ *          Patron strictement calqué sur les wrappers planification_blocs
+ *          (écriture PostgREST direct, RLS fait foi, aucune RPC). Aucune
+ *          ligne existante touchée. node --check OK.
  *   v1.80 : EDITION-EMAIL-FICHE (FAIT FOI gelé 10/07/2026). Wrapper ADDITIF
  *          majIdentiteFiche(personneId, patch) → RPC sql_196
  *          maj_identite_fiche() : canal identité e-mail réservé bureau/admin
@@ -7920,6 +7928,164 @@
       if (error) {
         console.error('MOM Hub: deletePlanificationBloc()', error);
         return { ok: false, error: error.message || 'Erreur suppression bloc' };
+      }
+      return { ok: true };
+    },
+
+    /**
+     * Fils rouges d'une planification (sql_239). Un fil rouge = une
+     * compétence suivie toute la saison, décrite par des étapes datées.
+     * Portée exclusive categorie_id XOR pole_id (CHECK
+     * planification_fils_rouges_portee_chk). La RLS fait foi (mêmes gardes
+     * que planification_blocs : pôle ⇒ mes_poles_autorises ; catégorie ⇒
+     * puis_je_ecrire_categorie). Triés par ordre.
+     *
+     * @param {{saisonId:string, categorieId?:string, poleId?:string}} opts
+     * @returns {Promise<Array>} fils ; [] si erreur ou paramètres absents.
+     */
+    async listFilsRouges(opts) {
+      const o = opts || {};
+      if (!o.saisonId || (!o.categorieId && !o.poleId)) {
+        console.error('MOM Hub: listFilsRouges() requiert saisonId + (categorieId | poleId)');
+        return [];
+      }
+      let q = client
+        .from('planification_fils_rouges')
+        .select('*')
+        .eq('saison_id', o.saisonId);
+      if (o.poleId) {
+        q = q.eq('pole_id', o.poleId);
+      } else {
+        q = q.eq('categorie_id', o.categorieId);
+      }
+      const { data, error } = await q.order('ordre', { ascending: true });
+      if (error) {
+        console.error('MOM Hub: listFilsRouges()', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * Crée ou met à jour un fil rouge (upsert par id). L'écriture est
+     * soumise aux policies RLS planification_fils_rouges (pôle ⇒
+     * admin|bureau|mes_poles_responsable ; catégorie ⇒
+     * puis_je_ecrire_categorie). Le payload doit porter EXACTEMENT une
+     * portée (categorie_id XOR pole_id) — la CHECK
+     * planification_fils_rouges_portee_chk le garantit côté base.
+     *
+     * @param {object} payload champs de planification_fils_rouges
+     * @returns {Promise<{ok:boolean, data?:object, error?:string}>}
+     */
+    async saveFilRouge(payload) {
+      if (!payload || !payload.saison_id) {
+        return { ok: false, error: 'saison_id requis' };
+      }
+      const { data, error } = await client
+        .from('planification_fils_rouges')
+        .upsert(payload)
+        .select()
+        .single();
+      if (error) {
+        console.error('MOM Hub: saveFilRouge()', error);
+        return { ok: false, error: error.message || 'Erreur enregistrement fil rouge' };
+      }
+      return { ok: true, data: data };
+    },
+
+    /**
+     * Supprime un fil rouge par id. Soumis à la policy RLS
+     * planification_fils_rouges_delete (même garde que l'écriture). La
+     * cascade base supprime aussi ses étapes (FK on delete cascade).
+     *
+     * @param {string} id UUID du fil rouge
+     * @returns {Promise<{ok:boolean, error?:string}>}
+     */
+    async deleteFilRouge(id) {
+      if (!id) {
+        return { ok: false, error: 'id requis' };
+      }
+      const { error } = await client
+        .from('planification_fils_rouges')
+        .delete()
+        .eq('id', id);
+      if (error) {
+        console.error('MOM Hub: deleteFilRouge()', error);
+        return { ok: false, error: error.message || 'Erreur suppression fil rouge' };
+      }
+      return { ok: true };
+    },
+
+    /**
+     * Étapes datées d'un fil rouge (sql_239). Une étape = titre
+     * (obligatoire) + texte libre (optionnel) + dates. La RLS
+     * planification_fil_rouge_etapes est héritée du fil parent (EXISTS) :
+     * on ne voit/écrit les étapes que d'un fil qu'on a le droit de voir.
+     * Triées par ordre.
+     *
+     * @param {string} filRougeId UUID du fil rouge parent
+     * @returns {Promise<Array>} étapes ; [] si erreur ou filRougeId absent.
+     */
+    async listFilRougeEtapes(filRougeId) {
+      if (!filRougeId) {
+        console.error('MOM Hub: listFilRougeEtapes() requiert filRougeId');
+        return [];
+      }
+      const { data, error } = await client
+        .from('planification_fil_rouge_etapes')
+        .select('*')
+        .eq('fil_rouge_id', filRougeId)
+        .order('ordre', { ascending: true });
+      if (error) {
+        console.error('MOM Hub: listFilRougeEtapes()', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * Crée ou met à jour une étape de fil rouge (upsert par id).
+     * L'écriture est soumise aux policies RLS
+     * planification_fil_rouge_etapes, héritées du fil parent. Le payload
+     * doit porter fil_rouge_id et titre (NOT NULL en base).
+     *
+     * @param {object} payload champs de planification_fil_rouge_etapes
+     * @returns {Promise<{ok:boolean, data?:object, error?:string}>}
+     */
+    async saveFilRougeEtape(payload) {
+      if (!payload || !payload.fil_rouge_id) {
+        return { ok: false, error: 'fil_rouge_id requis' };
+      }
+      const { data, error } = await client
+        .from('planification_fil_rouge_etapes')
+        .upsert(payload)
+        .select()
+        .single();
+      if (error) {
+        console.error('MOM Hub: saveFilRougeEtape()', error);
+        return { ok: false, error: error.message || 'Erreur enregistrement étape' };
+      }
+      return { ok: true, data: data };
+    },
+
+    /**
+     * Supprime une étape de fil rouge par id. Soumis à la policy RLS
+     * planification_fil_rouge_etapes_delete (héritée du fil parent).
+     *
+     * @param {string} id UUID de l'étape
+     * @returns {Promise<{ok:boolean, error?:string}>}
+     */
+    async deleteFilRougeEtape(id) {
+      if (!id) {
+        return { ok: false, error: 'id requis' };
+      }
+      const { error } = await client
+        .from('planification_fil_rouge_etapes')
+        .delete()
+        .eq('id', id);
+      if (error) {
+        console.error('MOM Hub: deleteFilRougeEtape()', error);
+        return { ok: false, error: error.message || 'Erreur suppression étape' };
       }
       return { ok: true };
     },
