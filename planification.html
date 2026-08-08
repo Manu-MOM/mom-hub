@@ -494,9 +494,9 @@
       .pa-ft-scroll { overflow: visible; }
       .pa-ft { min-width: 0; padding-top: 1.6rem; }
       .pa-ft__haut { height: 2.5rem; }
-      .pa-ft__bas { height: 5rem; }
+      .pa-ft__bas { height: 5.5rem; }
       .pa-ft__bloc {
-        height: 5rem; filter: none !important; padding-left: 1.5rem;
+        height: 5.5rem; filter: none !important; padding-left: 1.5rem;
         clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 50%, calc(100% - 20px) 100%, 0 100%, 20px 50%);
       }
       .pa-ft__bloc:first-child {
@@ -505,7 +505,7 @@
       /* Chevron rejoint : même hauteur (5rem) et même pointe (20px) que les
          principaux au print → angle identique, alignement parfait (top 0). */
       .pa-ft__bloc--rf {
-        top: 0; height: 5rem;
+        top: 0; height: 5.5rem;
         clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 50%, calc(100% - 20px) 100%, 0 100%, 20px 50%);
       }
       /* Intercalés couche haute : pointe proportionnée à leur hauteur (~5px)
@@ -518,7 +518,9 @@
       .pa-ft__inter.i-violet, .pa-ft__inter.i-bleu {
         -webkit-print-color-adjust: exact; print-color-adjust: exact;
       }
-      .pa-ft__titre { font-size: .8rem; }
+      .pa-ft__titre { font-size: .72rem; line-height: 1.12; -webkit-line-clamp: 2; }
+      .pa-ft__date { font-size: .62rem; }
+      .pa-ft__num { top: .3rem; }
       .pa-ft__grad-lbl { font-size: .56rem; }
       /* FIX PDF (radical) : à l'impression, AUCUN conteneur de la carte ne
          doit garder d'overflow scrollable ni de hauteur contrainte — sinon le
