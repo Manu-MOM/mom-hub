@@ -15,6 +15,10 @@
  *   sur la piste (dates optionnelles) ; rafraîchissement CIBLÉ du bandeau
  *   (#pa-fr-zone) après auto-save, sans voler le focus (fix : les étapes
  *   saisies n'apparaissaient pas tant qu'aucun render global n'avait lieu).
+ *   [PLANIF-FIL-ROUGE recette 2 — 08/08] Bandeau : jalons « puce + titre »
+ *   (pa-fr-jalon) au lieu de pastilles nues. Frise : chevrons principaux
+ *   étendus jusqu'au début du suivant (comble les trous, échelle/position
+ *   conservées ; intercalés inchangés). CSS pa-fr-jalon dans planification.html.
  *   [PLANIF-ECRITURE-POLE — juin 2026] Écriture des trames de pôle ouverte
  *   au responsable DÉSIGNÉ (sql_106). Le boot charge les droits réels une
  *   fois (_chargerDroits : transverse / pôles responsables via
@@ -891,6 +895,17 @@
     // Couche basse : blocs principaux (non intercalés) + intercalés ayant
     // « rejoint la frise principale » (rejoint_frise=true). Ces derniers
     // sont rendus en une barre par période, à leur teinte intercalée.
+    // PLANIF-FIL-ROUGE recette (point 2) : pour RÉDUIRE les trous entre blocs
+    // principaux sans casser l'échelle temporelle, chaque chevron principal
+    // s'étend jusqu'au DÉBUT du chevron principal suivant (la position/date de
+    // début reste exacte ; seule la largeur est comblée). On pré-calcule les
+    // débuts (pct) des blocs principaux, dans l'ordre d'affichage.
+    var debutsPrincipaux = [];
+    blocsDatables.forEach(function (o) {
+      if (!o.b.intercale) debutsPrincipaux.push(pct(o.pers[0].d0));
+    });
+    var FR_GAP = 0.6; // % d'espace résiduel entre deux chevrons (fin)
+    var idxPrincipal = 0;
     var bas = '';
     var ci = 0;
     blocsDatables.forEach(function (o) {
@@ -899,7 +914,14 @@
         // Bloc principal : chevron plein, cycle de couleurs de saison.
         var couleurCls = FRISE_CYCLE[ci % FRISE_CYCLE.length]; ci++;
         var p = o.pers[0];
-        var l = pct(p.d0), w = Math.max(pct(p.d1) - pct(p.d0), 2.2);
+        var l = pct(p.d0);
+        // Largeur = jusqu'au début du principal suivant (− gap), bornée à la
+        // largeur réelle minimale ; le dernier principal s'étend jusqu'à 100 %.
+        var suivant = debutsPrincipaux[idxPrincipal + 1];
+        idxPrincipal++;
+        var wReelle = pct(p.d1) - pct(p.d0);
+        var wComble = (suivant != null ? suivant : 100) - l - FR_GAP;
+        var w = Math.max(wReelle, wComble, 2.2);
         // Titre affiché seulement si la barre est assez large (sinon illisible) ;
         // sous le seuil, on ne garde que le numéro (titre au survol + détail).
         var etroit = w < 9;
@@ -1042,13 +1064,16 @@
       }
       pos.forEach(function (p) {
         var sel = String(State.etapeSelId) === String(p.e.id);
-        h += '<button type="button" class="pa-fr-etape' +
+        h += '<button type="button" class="pa-fr-jalon' +
           (sel ? ' is-sel' : '') + (p.hors ? ' is-hors' : '') +
           (p.nodate ? ' is-nodate' : '') +
           '" data-fr-etape="' + esc(p.e.id) + '"' +
           ' style="left:' + p.left.toFixed(3) + '%"' +
           ' title="' + esc((p.e.titre || 'Étape') + ' · ' + etapeDatesLbl(p.e)) +
-          (p.hors ? ' (hors cadre)' : '') + '"></button>';
+          (p.hors ? ' (hors cadre)' : '') + '">' +
+          '<span class="pa-fr-jalon__puce"></span>' +
+          '<span class="pa-fr-jalon__lbl">' + esc(p.e.titre || 'Étape') + '</span>' +
+          '</button>';
       });
       h += '</div></div>';
     });
