@@ -220,7 +220,7 @@
     .pa-ft__inter {
       position: absolute; top: var(--niv-top, 0rem); height: 1.15rem; box-sizing: border-box;
       border: 1px solid #7a5c10; cursor: pointer;
-      clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 50%, calc(100% - 6px) 100%, 0 100%, 6px 50%);
+      clip-path: polygon(0 0, calc(100% - 3px) 0, 100% 50%, calc(100% - 3px) 100%, 0 100%, 3px 50%);
       display: flex; align-items: center; justify-content: center;
       transition: filter .12s, transform .12s;
     }
@@ -244,11 +244,11 @@
     .pa-ft__inter.i-cyan .pa-ft__inter-num { color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,.35); }
     /* Couche basse : blocs principaux — mis en avant (plus hauts, pointe
        chevron marquée, ombre portée suivant la forme, titre plus grand). */
-    .pa-ft__bas { position: relative; height: 5.6rem; }
+    .pa-ft__bas { position: relative; height: 4.4rem; }
     .pa-ft__bloc {
-      position: absolute; top: 0; height: 5.6rem; box-sizing: border-box;
+      position: absolute; top: 0; height: 4.4rem; box-sizing: border-box;
       color: #fff; padding: .4rem .7rem .4rem .9rem;
-      clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%, 10px 50%);
+      clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%, 12px 50%);
       overflow: hidden; cursor: pointer;
       filter: drop-shadow(0 4px 6px rgba(12, 61, 36, .42));
       display: flex; flex-direction: column; justify-content: flex-end;
@@ -257,15 +257,15 @@
     /* Liseré clair intérieur pour détacher chaque bloc principal du fond. */
     .pa-ft__bloc:not(.pa-ft__bloc--rf)::after {
       content: ''; position: absolute; inset: 0;
-      clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%, 10px 50%);
+      clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%, 12px 50%);
       box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .55);
       pointer-events: none;
     }
     .pa-ft__bloc:first-child:not(.pa-ft__bloc--rf)::after {
-      clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%);
+      clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%);
     }
     .pa-ft__bloc:first-child {
-      clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%);
+      clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%);
       padding-left: .8rem;
     }
     .pa-ft__bloc:hover { filter: drop-shadow(0 6px 9px rgba(12, 61, 36, .5)) brightness(1.06); transform: translateY(-2px); }
@@ -277,7 +277,7 @@
        basse que les blocs principaux, hachurée à la teinte du bloc. */
     .pa-ft__bloc--rf {
       height: 2.9rem; top: .5rem; padding: .3rem .6rem .3rem .8rem;
-      clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%, 10px 50%);
+      clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%, 8px 50%);
       filter: drop-shadow(0 2px 3px rgba(12, 61, 36, .3));
       justify-content: center; border: 1px solid rgba(0,0,0,.25);
     }
@@ -306,7 +306,7 @@
     }
     .pa-ft__bloc:first-child .pa-ft__num { left: .8rem; }
     .pa-ft__bloc.c-gold .pa-ft__num { background: rgba(12, 61, 36, .22); }
-    .pa-ft__titre { font-weight: 800; font-size: .82rem; line-height: 1.14; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; }
+    .pa-ft__titre { font-weight: 800; font-size: .84rem; line-height: 1.14; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; }
     .pa-ft__date { font-size: .68rem; opacity: .92; white-space: nowrap; }
     .pa-ft__nondate { font-size: .78rem; color: var(--attente, #8a93a0); font-style: italic; margin-top: .5rem; }
 
@@ -548,9 +548,14 @@
       }
       .pa-fr-piste { break-inside: avoid; page-break-inside: avoid; }
       .pa-fr-detail { display: none !important; }
+      /* FIX PDF (leçon pt 237) : le bloc fils rouges ne doit pas réserver de
+         hauteur fantôme ni forcer le détail en page suivante. On le rend
+         compact et on empêche tout saut de page entre lui et le détail. */
+      #pa-fr-zone { overflow: visible !important; height: auto !important; max-height: none !important; break-after: avoid; page-break-after: avoid; }
+      .pa-fv, .pa-fv-titre { break-before: avoid !important; page-break-before: avoid !important; }
       .pa-fr-print {
         display: block !important; font-style: normal; color: var(--ink);
-        margin: .3rem 0 .2rem;
+        margin: .3rem 0 .2rem; break-inside: avoid;
       }
       .pa-fr-print__titre { font-size: .95rem; font-weight: 700; color: var(--vert-fonce); margin: 0 0 .3rem; }
       .pa-fr-print__fil { margin: 0 0 .35rem; padding-left: .5rem; border-left: 3px solid var(--fr, var(--gris)); break-inside: avoid; }
