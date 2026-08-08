@@ -389,7 +389,7 @@
     .pa-fr-ligne { position: absolute; top: 50%; height: 2px; background: var(--fr, var(--gris)); opacity: .45; transform: translateY(-50%); }
     /* Variante C : jalon = étiquette « puce + titre » posée à sa date. */
     .pa-fr-jalon {
-      position: absolute; top: 50%; transform: translateY(-50%) translateX(-8px);
+      position: absolute; top: 50%; transform: translateY(-50%) translateX(-50%);
       display: inline-flex; align-items: center; gap: .3rem; max-width: 12rem;
       padding: .12rem .5rem; border-radius: 11px; cursor: pointer;
       background: color-mix(in srgb, var(--fr, var(--gris)) 12%, #fff);
@@ -398,10 +398,6 @@
     }
     .pa-fr-jalon__puce { width: .45rem; height: .45rem; border-radius: 50%; background: var(--fr, var(--gris)); flex: 0 0 auto; }
     .pa-fr-jalon__lbl { overflow: hidden; text-overflow: ellipsis; }
-    /* Vignette d'extrémité : alignée sur le bord (posée via classes is-first/
-       is-last en JS, car la ligne de liaison est le 1er enfant de la piste). */
-    .pa-fr-jalon.is-first { transform: translateY(-50%); }
-    .pa-fr-jalon.is-last { transform: translateY(-50%) translateX(-100%); }
     .pa-fr-jalon:hover { box-shadow: 0 0 0 2px color-mix(in srgb, var(--fr, var(--gris)) 30%, transparent); }
     .pa-fr-jalon.is-sel { background: var(--fr, var(--gris)); color: #fff; }
     .pa-fr-jalon.is-sel .pa-fr-jalon__puce { background: #fff; }
