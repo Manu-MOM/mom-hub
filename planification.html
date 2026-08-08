@@ -359,6 +359,97 @@
     }
 
     /* ---- IMPRESSION : 1 page A4 paysage, condensé, cartouche visible ---- */
+    /* ═══ PLANIF-FIL-ROUGE ═══════════════════════════════════════════════
+       Palette DÉDIÉE (clés fr-*), distincte des blocs (vert/gold/clay) et des
+       intercalés (violet/bleu/rose/cyan) : teintes chaudes/terreuses. La clé
+       est stockée en base ; le hex vit ici. La classe pa-fr--<cle> pose la
+       teinte via --fr (consommée par pastilles, lignes, bordures, swatch on). */
+    .pa-fr--fr-rouge    { --fr: #c0392b; }
+    .pa-fr--fr-orange   { --fr: #e67e22; }
+    .pa-fr--fr-moutarde { --fr: #d4ac0d; }
+    .pa-fr--fr-sarcelle { --fr: #16a085; }
+    .pa-fr--fr-olive    { --fr: #7f8c3a; }
+    .pa-fr--fr-bordeaux { --fr: #922b21; }
+
+    /* Bouton suppression générique (réutilisé fil + étape). */
+    .pa-btn--del {
+      background: var(--carte); color: var(--clay); border: 1px solid #e3b3a4;
+      border-radius: 6px; padding: .2rem .5rem; font: inherit; line-height: 1;
+      cursor: pointer; flex: 0 0 auto;
+    }
+    .pa-btn--del:hover { background: #faede8; }
+
+    /* ---- Bandeaux (lecture), sous la frise ---- */
+    .pa-fr-bandeaux { margin: .5rem 0 .2rem; display: flex; flex-direction: column; gap: .5rem; }
+    .pa-fr-bandeau { }
+    .pa-fr-bandeau__tete { display: flex; align-items: center; gap: .4rem; margin-bottom: .2rem; }
+    .pa-fr-puce { width: .7rem; height: .7rem; border-radius: 50%; background: var(--fr, var(--gris)); flex: 0 0 auto; }
+    .pa-fr-nom { font-size: .9rem; font-weight: 700; color: var(--vert-fonce); }
+    .pa-fr-piste { position: relative; height: 1.6rem; background: var(--paper); border: 1px solid var(--bord); border-radius: 6px; }
+    .pa-fr-ligne { position: absolute; top: 50%; height: 2px; background: var(--fr, var(--gris)); opacity: .5; transform: translateY(-50%); }
+    .pa-fr-etape {
+      position: absolute; top: 50%; width: .85rem; height: .85rem; margin-left: -.425rem;
+      transform: translateY(-50%); border-radius: 50%; background: var(--fr, var(--gris));
+      border: 2px solid var(--carte); padding: 0; cursor: pointer; box-shadow: 0 0 0 1px var(--bord);
+    }
+    .pa-fr-etape:hover { box-shadow: 0 0 0 2px var(--fr, var(--gris)); }
+    .pa-fr-etape.is-sel { box-shadow: 0 0 0 2px var(--fr, var(--gris)); }
+    .pa-fr-etape.is-hors { border-style: dashed; opacity: .8; }
+    .pa-fr-noaxe, .pa-fr-print { color: var(--attente); font-style: italic; font-size: .85rem; margin: .4rem 0 0; }
+
+    /* ---- Zone détail de l'étape sélectionnée ---- */
+    .pa-fr-detail {
+      margin: .5rem 0 .2rem; padding: .5rem .8rem; background: var(--carte);
+      border: 1px solid var(--bord); border-left: 3px solid var(--fr, var(--gris));
+      border-radius: 0 8px 8px 0;
+    }
+    .pa-fr-detail__meta { font-size: .72rem; color: var(--gris); margin-bottom: .15rem; }
+    .pa-fr-detail__titre { font-size: .95rem; font-weight: 700; color: var(--vert-fonce); }
+    .pa-fr-detail__txt { font-size: .85rem; color: var(--ink); margin-top: .2rem; line-height: 1.5; }
+
+    /* ---- Éditeur repliable (sous les blocs) ---- */
+    .pa-fr-editeur { padding-top: .4rem; }
+    .pa-fr-editeur__tete {
+      width: 100%; display: flex; align-items: center; justify-content: space-between;
+      background: none; border: none; padding: .3rem 0; cursor: pointer; font: inherit;
+    }
+    .pa-fr-editeur__titre { font-size: 1.15rem; font-weight: 700; color: var(--vert-fonce); }
+    .pa-fr-editeur__chev { color: var(--vert); font-size: 1rem; }
+    .pa-fr-editeur__corps { margin-top: .6rem; }
+    .pa-fr-fil {
+      border: 1px solid var(--bord); border-left: 3px solid var(--fr, var(--gris));
+      border-radius: 8px; padding: .7rem .8rem; margin-bottom: .8rem; background: var(--paper);
+    }
+    .pa-fr-fil__bar { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+    .pa-fr-fil__nom {
+      flex: 1 1 200px; font: inherit; padding: .35rem .5rem; border: 1px solid var(--bord);
+      border-radius: 6px; background: #fff; color: var(--ink);
+    }
+    .pa-fr-swatches { display: flex; gap: .2rem; }
+    .pa-fr-swatch {
+      width: 1.15rem; height: 1.15rem; border-radius: 50%; background: var(--fr, var(--gris));
+      border: 2px solid var(--carte); box-shadow: 0 0 0 1px var(--bord); padding: 0; cursor: pointer;
+    }
+    .pa-fr-swatch.is-on { box-shadow: 0 0 0 2px var(--fr, var(--vert-fonce)); }
+    .pa-fr-fil__state { font-size: .72rem; color: var(--gris); min-width: 5.5rem; }
+    .pa-fr-fil__state.is-ok { color: var(--vert); }
+    .pa-fr-fil__state.is-err { color: var(--clay); }
+    .pa-fr-etapes-edit { margin: .6rem 0 0; padding-left: .8rem; border-left: 2px solid var(--bord); }
+    .pa-fr-etape-edit { margin-bottom: .5rem; }
+    .pa-fr-etape-edit__ligne { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+    .pa-fr-et-date { font: inherit; padding: .3rem .4rem; border: 1px solid var(--bord); border-radius: 6px; background: #fff; color: var(--ink); }
+    .pa-fr-et-titre { flex: 1 1 160px; font: inherit; padding: .3rem .5rem; border: 1px solid var(--bord); border-radius: 6px; background: #fff; color: var(--ink); }
+    .pa-fr-et-state { font-size: .7rem; color: var(--gris); min-width: 5rem; }
+    .pa-fr-et-state.is-ok { color: var(--vert); }
+    .pa-fr-et-state.is-err { color: var(--clay); }
+    .pa-fr-et-texte {
+      width: 100%; margin-top: .3rem; font: inherit; padding: .35rem .5rem;
+      border: 1px solid var(--bord); border-radius: 6px; background: #fff; color: var(--ink); resize: vertical;
+    }
+    .pa-fr-add-etape { font-size: .85rem; }
+    /* Rappel textuel print : masqué à l'écran, révélé par @media print. */
+    .pa-fr-print { display: none; }
+
     @media print {
       @page { size: A4 landscape; margin: 8mm; }
       html, body {
@@ -434,6 +525,30 @@
       .pa-fv__card { padding: .45rem .7rem; break-inside: avoid; page-break-inside: avoid; }
       .pa-fv__card ul { font-size: .7rem; line-height: 1.42; }
       .pa-fv__titre { font-size: .84rem; }
+
+      /* PLANIF-FIL-ROUGE (impression hybride) : les bandeaux graphiques sont
+         dans .pa-frise-card (donc conservés) ; on force leurs couleurs. La
+         zone de détail interactive n'a pas de sens au print → masquée. Le
+         rappel textuel des étapes (.pa-fr-print) est révélé pour porter le
+         texte libre. L'éditeur (.pa-fr-editeur, une .pa-card hors frise) est
+         déjà masqué par la règle section.pa-card:not(.pa-frise-card). */
+      .pa-fr-bandeaux, .pa-fr-bandeau, .pa-fr-piste, .pa-fr-ligne, .pa-fr-etape,
+      .pa-fr-puce {
+        -webkit-print-color-adjust: exact; print-color-adjust: exact;
+      }
+      .pa-fr-piste { break-inside: avoid; page-break-inside: avoid; }
+      .pa-fr-detail { display: none !important; }
+      .pa-fr-print {
+        display: block !important; font-style: normal; color: var(--ink);
+        margin: .4rem 0 0; break-inside: avoid; page-break-inside: avoid;
+      }
+      .pa-fr-print__titre { font-size: .95rem; font-weight: 700; color: var(--vert-fonce); margin: 0 0 .3rem; }
+      .pa-fr-print__fil { margin: 0 0 .35rem; padding-left: .5rem; border-left: 3px solid var(--fr, var(--gris)); break-inside: avoid; }
+      .pa-fr-print__nom { display: flex; align-items: center; gap: .3rem; font-weight: 700; font-size: .82rem; }
+      .pa-fr-print__etapes { margin: .1rem 0 0; padding-left: 1rem; font-size: .74rem; line-height: 1.4; }
+      .pa-fr-print__dates { font-family: 'JetBrains Mono', monospace; color: var(--gris); }
+      .pa-fr-print__et-titre { font-weight: 700; }
+      .pa-fr-print__et-txt { color: var(--ink); }
     }
   </style>
 </head>
