@@ -258,7 +258,7 @@
     .pa-ft__bloc:not(.pa-ft__bloc--rf)::after {
       content: ''; position: absolute; inset: 0;
       clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%, 12px 50%);
-      box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .55);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .5);
       pointer-events: none;
     }
     .pa-ft__bloc:first-child:not(.pa-ft__bloc--rf)::after {
@@ -276,7 +276,7 @@
     /* Intercalé « rejoint la frise » : barre sur la ligne principale, plus
        basse que les blocs principaux, hachurée à la teinte du bloc. */
     .pa-ft__bloc--rf {
-      height: 2.9rem; top: .5rem; padding: .3rem .6rem .3rem .8rem;
+      height: 2.9rem; top: .75rem; padding: .3rem .6rem .3rem .8rem;
       clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%, 8px 50%);
       filter: drop-shadow(0 2px 3px rgba(12, 61, 36, .3));
       justify-content: center; border: 1px solid rgba(0,0,0,.25);
