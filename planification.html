@@ -244,9 +244,9 @@
     .pa-ft__inter.i-cyan .pa-ft__inter-num { color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,.35); }
     /* Couche basse : blocs principaux — mis en avant (plus hauts, pointe
        chevron marquée, ombre portée suivant la forme, titre plus grand). */
-    .pa-ft__bas { position: relative; height: 4.8rem; }
+    .pa-ft__bas { position: relative; height: 5.6rem; }
     .pa-ft__bloc {
-      position: absolute; top: 0; height: 4.8rem; box-sizing: border-box;
+      position: absolute; top: 0; height: 5.6rem; box-sizing: border-box;
       color: #fff; padding: .4rem .7rem .4rem .9rem;
       clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%, 10px 50%);
       overflow: hidden; cursor: pointer;
@@ -306,7 +306,7 @@
     }
     .pa-ft__bloc:first-child .pa-ft__num { left: .8rem; }
     .pa-ft__bloc.c-gold .pa-ft__num { background: rgba(12, 61, 36, .22); }
-    .pa-ft__titre { font-weight: 800; font-size: .92rem; line-height: 1.12; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; }
+    .pa-ft__titre { font-weight: 800; font-size: .82rem; line-height: 1.14; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; }
     .pa-ft__date { font-size: .68rem; opacity: .92; white-space: nowrap; }
     .pa-ft__nondate { font-size: .78rem; color: var(--attente, #8a93a0); font-style: italic; margin-top: .5rem; }
 
@@ -385,17 +385,25 @@
     .pa-fr-bandeau__tete { display: flex; align-items: center; gap: .4rem; margin-bottom: .2rem; }
     .pa-fr-puce { width: .7rem; height: .7rem; border-radius: 50%; background: var(--fr, var(--gris)); flex: 0 0 auto; }
     .pa-fr-nom { font-size: .9rem; font-weight: 700; color: var(--vert-fonce); }
-    .pa-fr-piste { position: relative; height: 1.6rem; background: var(--paper); border: 1px solid var(--bord); border-radius: 6px; }
-    .pa-fr-ligne { position: absolute; top: 50%; height: 2px; background: var(--fr, var(--gris)); opacity: .5; transform: translateY(-50%); }
-    .pa-fr-etape {
-      position: absolute; top: 50%; width: .85rem; height: .85rem; margin-left: -.425rem;
-      transform: translateY(-50%); border-radius: 50%; background: var(--fr, var(--gris));
-      border: 2px solid var(--carte); padding: 0; cursor: pointer; box-shadow: 0 0 0 1px var(--bord);
+    .pa-fr-piste { position: relative; height: 2.1rem; }
+    .pa-fr-ligne { position: absolute; top: 50%; height: 2px; background: var(--fr, var(--gris)); opacity: .45; transform: translateY(-50%); }
+    /* Variante C : jalon = étiquette « puce + titre » posée à sa date. */
+    .pa-fr-jalon {
+      position: absolute; top: 50%; transform: translateY(-50%) translateX(-8px);
+      display: inline-flex; align-items: center; gap: .3rem; max-width: 12rem;
+      padding: .12rem .5rem; border-radius: 11px; cursor: pointer;
+      background: color-mix(in srgb, var(--fr, var(--gris)) 12%, #fff);
+      border: 1px solid var(--fr, var(--gris)); color: var(--fr, var(--gris));
+      font: inherit; font-size: .72rem; font-weight: 700; line-height: 1.2; white-space: nowrap;
     }
-    .pa-fr-etape:hover { box-shadow: 0 0 0 2px var(--fr, var(--gris)); }
-    .pa-fr-etape.is-sel { box-shadow: 0 0 0 2px var(--fr, var(--gris)); }
-    .pa-fr-etape.is-hors { border-style: dashed; opacity: .8; }
-    .pa-fr-etape.is-nodate { background: var(--carte); border: 2px solid var(--fr, var(--gris)); box-shadow: 0 0 0 1px var(--bord); }
+    .pa-fr-jalon__puce { width: .45rem; height: .45rem; border-radius: 50%; background: var(--fr, var(--gris)); flex: 0 0 auto; }
+    .pa-fr-jalon__lbl { overflow: hidden; text-overflow: ellipsis; }
+    .pa-fr-jalon:hover { box-shadow: 0 0 0 2px color-mix(in srgb, var(--fr, var(--gris)) 30%, transparent); }
+    .pa-fr-jalon.is-sel { background: var(--fr, var(--gris)); color: #fff; }
+    .pa-fr-jalon.is-sel .pa-fr-jalon__puce { background: #fff; }
+    .pa-fr-jalon.is-hors { border-style: dashed; }
+    .pa-fr-jalon.is-nodate { background: var(--carte); border-style: dashed; }
+    .pa-fr-jalon.is-nodate .pa-fr-jalon__puce { background: var(--carte); border: 1.5px solid var(--fr, var(--gris)); box-sizing: border-box; }
     .pa-fr-noaxe, .pa-fr-print { color: var(--attente); font-style: italic; font-size: .85rem; margin: .4rem 0 0; }
 
     /* ---- Zone détail de l'étape sélectionnée ---- */
@@ -533,7 +541,8 @@
          rappel textuel des étapes (.pa-fr-print) est révélé pour porter le
          texte libre. L'éditeur (.pa-fr-editeur, une .pa-card hors frise) est
          déjà masqué par la règle section.pa-card:not(.pa-frise-card). */
-      .pa-fr-bandeaux, .pa-fr-bandeau, .pa-fr-piste, .pa-fr-ligne, .pa-fr-etape,
+      .pa-fr-bandeaux, .pa-fr-bandeau, .pa-fr-piste, .pa-fr-ligne, .pa-fr-jalon,
+      .pa-fr-jalon__puce,
       .pa-fr-puce {
         -webkit-print-color-adjust: exact; print-color-adjust: exact;
       }
@@ -541,7 +550,7 @@
       .pa-fr-detail { display: none !important; }
       .pa-fr-print {
         display: block !important; font-style: normal; color: var(--ink);
-        margin: .4rem 0 0; break-inside: avoid; page-break-inside: avoid;
+        margin: .3rem 0 .2rem;
       }
       .pa-fr-print__titre { font-size: .95rem; font-weight: 700; color: var(--vert-fonce); margin: 0 0 .3rem; }
       .pa-fr-print__fil { margin: 0 0 .35rem; padding-left: .5rem; border-left: 3px solid var(--fr, var(--gris)); break-inside: avoid; }
