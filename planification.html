@@ -254,11 +254,11 @@
       display: flex; flex-direction: column; justify-content: flex-end;
       transition: filter .12s, transform .12s;
     }
-    /* Liseré clair intérieur pour détacher chaque bloc principal du fond. */
+    /* (Liséré blanc intérieur retiré — il créait un « cadre blanc » visible
+       autour des chevrons, notamment à la jonction avec les intercalés.) */
     .pa-ft__bloc:not(.pa-ft__bloc--rf)::after {
       content: ''; position: absolute; inset: 0;
       clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%, 12px 50%);
-      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .5);
       pointer-events: none;
     }
     .pa-ft__bloc:first-child:not(.pa-ft__bloc--rf)::after {
@@ -496,6 +496,10 @@
       .pa-ft__haut { height: 2.5rem; }
       .pa-ft__bas { height: 3.4rem; }
       .pa-ft__bloc { height: 3.4rem; filter: none !important; }
+      /* Au print les principaux passent à 3.4rem (centre 1.7rem) : recentrer le
+         --rf (2.9rem) sur cette médiane (top = 1.7 − 1.45 = 0.25rem) pour
+         aligner les pointes des chevrons rejoints sur les principaux. */
+      .pa-ft__bloc--rf { top: .25rem; }
       .pa-ft__bloc, .pa-ft__inter,
       .pa-ft__inter.i-or, .pa-ft__inter.i-clay,
       .pa-ft__inter.i-violet, .pa-ft__inter.i-bleu {
