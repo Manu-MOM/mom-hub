@@ -1022,11 +1022,15 @@
       // PLANIF-FIL-ROUGE recette : les vignettes sont réparties RÉGULIÈREMENT
       // d'un bout à l'autre de la piste (dans l'ordre des étapes), et non plus
       // positionnées à leur date. Les dates éventuelles apparaissent au survol
-      // (title). Répartition du DÉBUT (0 %) à la FIN (100 %) : i/(n-1)*100
-      // (n=1 → centré à 50 %).
+      // (title). Répartition HOMOGÈNE avec marge intérieure (8 %) : les
+      // vignettes sont réparties régulièrement de 8 % à 92 %, toutes CENTRÉES
+      // sur leur position (espaces égaux quel que soit le nb d'étapes). n=1 →
+      // centré à 50 %.
       var n = etapes.length;
+      var FR_MARGE = 8; // % de marge aux extrémités
       var pos = etapes.map(function (e, i) {
-        return { e: e, left: (n <= 1) ? 50 : (i / (n - 1)) * 100 };
+        var left = (n <= 1) ? 50 : FR_MARGE + (i / (n - 1)) * (100 - 2 * FR_MARGE);
+        return { e: e, left: left };
       });
       if (pos.length >= 2) {
         var l0 = pos[0].left, l1 = pos[pos.length - 1].left;
@@ -1036,9 +1040,8 @@
       pos.forEach(function (p, idx) {
         var sel = String(State.etapeSelId) === String(p.e.id);
         var aDate = !!(p.e.date_debut || p.e.date_fin);
-        var bord = (idx === 0 ? ' is-first' : '') + (idx === pos.length - 1 ? ' is-last' : '');
         h += '<button type="button" class="pa-fr-jalon' +
-          (sel ? ' is-sel' : '') + (aDate ? '' : ' is-nodate') + bord +
+          (sel ? ' is-sel' : '') + (aDate ? '' : ' is-nodate') +
           '" data-fr-etape="' + esc(p.e.id) + '"' +
           ' style="left:' + p.left.toFixed(3) + '%"' +
           ' title="' + esc((p.e.titre || 'Étape') +
