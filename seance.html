@@ -2365,6 +2365,66 @@
       font-style: italic;
     }
 
+    /* --------------------------------------------------------------
+       CIRCUIT — matrice de rotation (seance-editor v1.23)
+       Tableau temps × stations. Lignes = tours, colonnes = stations,
+       cellules = groupe présent (ou "—" si station vide). Rendu dérivé.
+       -------------------------------------------------------------- */
+    .seance-circuit__hint,
+    .seance-circuit__warn {
+      margin: 8px 0 0;
+      padding-left: 26px;
+      font-size: 12px;
+      font-style: italic;
+    }
+    .seance-circuit__hint { color: var(--ink-soft); }
+    .seance-circuit__warn { color: #9b2c2c; font-style: normal; }
+    .seance-circuit__matrix-wrap {
+      margin-top: 10px;
+      padding-left: 26px;
+      overflow-x: auto;
+    }
+    .seance-circuit__matrix {
+      border-collapse: collapse;
+      font-size: 12px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+    }
+    .seance-circuit__matrix th,
+    .seance-circuit__matrix td {
+      border: 1px solid var(--line);
+      padding: 5px 10px;
+      text-align: center;
+      white-space: nowrap;
+    }
+    .seance-circuit__matrix thead th {
+      background: var(--vert-light);
+      color: var(--vert-prairie);
+      font-weight: 600;
+    }
+    .seance-circuit__matrix-corner {
+      background: #fff !important;
+      color: var(--ink-soft) !important;
+    }
+    .seance-circuit__matrix-tour {
+      font-weight: 600;
+      color: var(--ink-soft);
+      text-align: left;
+    }
+    .seance-circuit__matrix-min {
+      font-weight: 400;
+      color: #8a98a5;
+      font-size: 11px;
+    }
+    .seance-circuit__matrix-grp {
+      color: var(--ink);
+      font-weight: 500;
+    }
+    .seance-circuit__matrix-vide {
+      color: #c2d4ca;
+    }
+
     /* Groupe de boutons dans le header de trame (PDF + Ajouter). */
     .seance-trame__header-actions {
       display: flex;
