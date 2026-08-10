@@ -11,7 +11,19 @@
  *   - 5.5.A : éditeur méta + sauvegarde manuelle (CETTE VERSION)
  *   - 5.5.B : autosave 30s + dropdowns lieu/événement + champs secondaires
  *
- * Version : 1.19 — FIX pioche staff en intersaison : 0 au lieu du repli M14 (juil. 2026)
+ * Version : 1.20 — CIRCUIT-ATELIERS mécanisme (sql_241, août 2026)
+ *   v1.20 : CIRCUIT D'ATELIERS — mécanisme (FAIT FOI gelé). Un étage
+ *           PARALLÈLE peut être qualifié de "circuit" : les groupes tournent
+ *           sur les voies. Ligne dépliable sous l'étage parallèle (case à
+ *           cocher "Faire tourner les groupes" + saisie durée par station).
+ *           État : State.circuits (fiches seances_etages_circuits, sql_241),
+ *           chargé dans loadBlocs via listCircuits. Helper _circuitDeLetage.
+ *           Handlers onToggleCircuit (saveCircuit/deleteCircuit) +
+ *           onChangeCircuitDuree (saveCircuit upsert), pattern optimiste +
+ *           repli honnête. Périmètre = MÉCANISME seul ; le rendu visuel de la
+ *           rotation (groupes tournants) viendra dans un livrable dédié. Le
+ *           CSS .seance-circuit__* est livré à part dans seance.html.
+ *           Additif pur, node --check OK.
  *   v1.19 : Bug recette terrain (Manu, PC admin, M6 sélectionné) : la pioche
  *           encadrants méta ET la pioche coachs des blocs proposaient les 8
  *           encadrants M14, quelle que soit la catégorie choisie. Cause racine
@@ -388,6 +400,7 @@
     autosaveTimer: null,    // handle setInterval (5.5.B2)
     autosaveStatus: 'idle', // 'idle' | 'saving' | 'error' (5.5.B2)
     blocs: [],              // blocs de la séance courante, triés par ordre (5.6.A)
+    circuits: [],           // fiches de marche circuit (seances_etages_circuits, sql_241) — 1 par étage rotatif
     staffDisponible: [],    // [{personne_id,nom,prenom}] coachs assignables par bloc (v1.10, sql_108)
     dedoublerOrdre: null,   // étage cible quand on ajoute une voie parallèle (v1.10)
     typesBlocsRef: null,    // référentiel des 11 types (data/types-blocs.json, 5.6.A)
@@ -1964,6 +1977,42 @@
             '</td>' +
           '</tr>';
 
+        // v1.20 (sql_241) — Ligne dépliable CIRCUIT sous un étage PARALLÈLE.
+        // Un étage parallèle peut être qualifié de "circuit" (les groupes
+        // tournent sur les voies). La bascule crée/supprime la fiche de marche
+        // (seances_etages_circuits) ; la durée de station y est saisie.
+        // Étages simples (1 voie) : pas de circuit possible → pas de ligne.
+        if (parallele) {
+          const circ = _circuitDeLetage(etage.ordre);
+          const estCircuit = !!circ;
+          const nbStations = blocsEtage.length;
+          const dureeStation = circ && circ.duree_station_min ? circ.duree_station_min : '';
+          let panneau = '';
+          if (estCircuit) {
+            panneau =
+              '<div class="seance-circuit__panel">' +
+                '<label class="seance-circuit__field">' +
+                  '<span class="seance-circuit__field-label">Durée par station</span>' +
+                  '<input type="number" min="1" max="240" class="seance-circuit__duree-input" ' +
+                         'data-action="circuit-duree" data-etage-ordre="' + escapeHtml(etage.ordre) + '" ' +
+                         'value="' + escapeHtml(dureeStation) + '" /> ' +
+                  '<span class="seance-circuit__field-unit">min</span>' +
+                '</label>' +
+                '<span class="seance-circuit__recap">' + nbStations + ' stations · les groupes tournent</span>' +
+              '</div>';
+          }
+          html +=
+            '<tr class="seance-trame__row seance-circuit__row' + (estCircuit ? ' is-on' : '') + '" data-etage-ordre="' + escapeHtml(etage.ordre) + '">' +
+              '<td class="seance-circuit__cell" colspan="4">' +
+                '<label class="seance-circuit__toggle">' +
+                  '<input type="checkbox" data-action="circuit-toggle" data-etage-ordre="' + escapeHtml(etage.ordre) + '"' + (estCircuit ? ' checked' : '') + ' /> ' +
+                  '<span class="seance-circuit__toggle-label">🔄 Faire tourner les groupes (circuit)</span>' +
+                '</label>' +
+                panneau +
+              '</td>' +
+            '</tr>';
+        }
+
         if (curHeure) curHeure = heureFin;
       });
 
@@ -2043,6 +2092,28 @@
         const blocId = cell.getAttribute('data-bloc-id');
         onOpenBlocDetail(blocId);
       });
+    });
+
+    // v1.20 (sql_241) : bascule CIRCUIT d'un étage parallèle (checkbox).
+    // Cochée → crée la fiche de marche ; décochée → la supprime.
+    section.querySelectorAll('[data-action="circuit-toggle"]').forEach(function (cb) {
+      cb.addEventListener('change', function (e) {
+        e.stopPropagation();
+        const ordre = parseInt(cb.getAttribute('data-etage-ordre'), 10);
+        onToggleCircuit(ordre, cb.checked);
+      });
+    });
+
+    // v1.20 : saisie de la durée de station d'un circuit (input number).
+    // Persistée sur 'change' (blur / validation), pas à chaque frappe.
+    section.querySelectorAll('[data-action="circuit-duree"]').forEach(function (inp) {
+      inp.addEventListener('change', function (e) {
+        e.stopPropagation();
+        const ordre = parseInt(inp.getAttribute('data-etage-ordre'), 10);
+        onChangeCircuitDuree(ordre, inp.value);
+      });
+      // Empêche le clic dans l'input de déclencher d'autres handlers d'étage.
+      inp.addEventListener('click', function (e) { e.stopPropagation(); });
     });
 
     // Phase 5.7 : si on est en vue détail bloc, masquer la trame et afficher le détail
@@ -4401,6 +4472,73 @@
     togglePicker();
   }
 
+  // ------------------------------------------------------------------
+  // v1.20 (sql_241) — CIRCUIT D'ATELIERS : bascule + durée de station.
+  // Un étage parallèle peut devenir un "circuit" (les groupes tournent
+  // sur les voies). L'état vit dans une fiche de marche
+  // (seances_etages_circuits), 1 par étage rotatif, clé (seance_id, ordre).
+  // Périmètre v1.20 = MÉCANISME (activer/désactiver + saisir la durée) ;
+  // le rendu visuel de la rotation viendra dans un livrable dédié.
+  // ------------------------------------------------------------------
+
+  /**
+   * Active ou désactive le mode circuit d'un étage parallèle.
+   * Coché → crée la fiche de marche (saveCircuit) avec une durée par défaut.
+   * Décoché → supprime la fiche (deleteCircuit). L'étage redevient un
+   * parallèle simultané ordinaire. Mise à jour optimiste puis persistance ;
+   * repli (rechargement) en cas d'échec.
+   * @param {number} ordre ordre de l'étage
+   * @param {boolean} actif nouvel état souhaité
+   */
+  async function onChangeCircuitDuree(ordre, valeur) {
+    const circ = _circuitDeLetage(ordre);
+    if (!circ) return; // pas de circuit sur cet étage — rien à faire
+    let n = parseInt(valeur, 10);
+    if (isNaN(n) || n < 1) n = 1;
+    if (n > 240) n = 240;
+    circ.duree_station_min = n; // optimiste
+    const r = await SupabaseHub.saveCircuit({
+      id: circ.id,
+      seance_id: circ.seance_id,
+      ordre: circ.ordre,
+      duree_station_min: n
+    });
+    if (!r || !r.ok) {
+      // Repli honnête : recharge l'état réel et re-render.
+      await loadBlocs();
+    }
+    renderTrame();
+  }
+
+  async function onToggleCircuit(ordre, actif) {
+    if (!State.currentSeance) return;
+    if (actif) {
+      const existant = _circuitDeLetage(ordre);
+      if (existant) { renderTrame(); return; } // déjà circuit
+      const r = await SupabaseHub.saveCircuit({
+        seance_id: State.currentSeance.id,
+        ordre: ordre,
+        duree_station_min: 15 // valeur de départ raisonnable, éditable ensuite
+      });
+      if (r && r.ok && r.data) {
+        State.circuits.push(r.data); // optimiste sur la donnée réelle renvoyée
+      } else {
+        await loadBlocs(); // repli honnête
+      }
+    } else {
+      const circ = _circuitDeLetage(ordre);
+      if (circ) {
+        const r = await SupabaseHub.deleteCircuit(circ.id);
+        if (r && r.ok) {
+          State.circuits = State.circuits.filter(function (c) { return c.id !== circ.id; });
+        } else {
+          await loadBlocs(); // repli honnête
+        }
+      }
+    }
+    renderTrame();
+  }
+
   /**
    * Export PDF (v1.10) — construit une vue d'impression simplifiée de la
    * trame puis déclenche window.print(). La mise en page (charte hub,
@@ -5108,9 +5246,29 @@
   async function loadBlocs() {
     if (!State.currentSeance) {
       State.blocs = [];
+      State.circuits = [];
       return;
     }
     State.blocs = await SupabaseHub.listBlocsBySeance(State.currentSeance.id);
+    // Circuits d'ateliers (sql_241) : fiches de marche des étages rotatifs.
+    // Chargés en parallèle des blocs ; [] si le wrapper est absent (repli honnête).
+    if (typeof SupabaseHub !== 'undefined' && typeof SupabaseHub.listCircuits === 'function') {
+      State.circuits = await SupabaseHub.listCircuits(State.currentSeance.id);
+    } else {
+      State.circuits = [];
+    }
+  }
+
+  /**
+   * Retourne la fiche de marche circuit d'un étage donné (par son `ordre`),
+   * ou null si l'étage n'est pas un circuit. Clé (seance_id, ordre) : au plus
+   * un circuit par étage (unicité base sql_241).
+   * @param {number} ordre ordre de l'étage
+   * @returns {object|null}
+   */
+  function _circuitDeLetage(ordre) {
+    if (!Array.isArray(State.circuits)) return null;
+    return State.circuits.find(function (c) { return c.ordre === ordre; }) || null;
   }
 
   // ============================================================
