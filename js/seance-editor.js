@@ -11,7 +11,20 @@
  *   - 5.5.A : éditeur méta + sauvegarde manuelle (CETTE VERSION)
  *   - 5.5.B : autosave 30s + dropdowns lieu/événement + champs secondaires
  *
- * Version : 1.20 — CIRCUIT-ATELIERS mécanisme (sql_241, août 2026)
+ * Version : 1.21 — CIRCUIT-ATELIERS durée & pause (sql_242, août 2026)
+ *   v1.21 : CIRCUIT D'ATELIERS — corrections recette terrain (Manu).
+ *           (1) BUG durée : un étage-circuit compte ses stations en
+ *           SUCCESSION, pas en simultané. Nouveau helper
+ *           _dureeEffectiveEtage(etage) : durée = (station × nb_stations)
+ *           + (pause × (nb_stations − 1)) pour un circuit, sinon dureeMax
+ *           (parallèle simultané inchangé). Les 6 points consommant la
+ *           durée d'étage (rendu trame, footer récap, export PDF joueurs
+ *           & coachs) routés vers ce helper. (2) Pause entre stations :
+ *           champ de saisie + handler onChangeCircuitPause (sql_242,
+ *           colonne duree_pause_min). saveCircuit envoie désormais la
+ *           ligne complète (station + pause) pour préserver l'autre champ
+ *           à l'upsert. Récap enrichi : "N stations · X min au total".
+ *           Additif pur, node --check OK.
  *   v1.20 : CIRCUIT D'ATELIERS — mécanisme (FAIT FOI gelé). Un étage
  *           PARALLÈLE peut être qualifié de "circuit" : les groupes tournent
  *           sur les voies. Ligne dépliable sous l'étage parallèle (case à
@@ -1821,6 +1834,31 @@
   }
 
   /**
+   * Durée effective d'un étage (minutes), circuit-aware.
+   * - Étage ordinaire (parallèle simultané ou bloc seul) : max des voies
+   *   (dureeMax) — les voies se déroulent en même temps.
+   * - Étage CIRCUIT (sql_241) : les groupes tournent, les stations se font
+   *   en SUCCESSION. Durée = (durée_station × nb_stations)
+   *                        + (durée_pause × (nb_stations − 1)).
+   *   La pause n'existe qu'entre les stations (nb − 1 intervalles).
+   *   Repli sur dureeMax si le circuit n'a pas de durée de station saisie.
+   * @param {{ordre:number, blocs:Array, dureeMax:number}} etage
+   * @returns {number} durée en minutes
+   */
+  function _dureeEffectiveEtage(etage) {
+    if (!etage) return 0;
+    const circ = _circuitDeLetage(etage.ordre);
+    if (circ && circ.duree_station_min) {
+      const nb = Array.isArray(etage.blocs) ? etage.blocs.length : 0;
+      if (nb <= 0) return etage.dureeMax || 0;
+      const station = circ.duree_station_min;
+      const pause = circ.duree_pause_min || 0;
+      return (station * nb) + (pause * (nb - 1));
+    }
+    return etage.dureeMax || 0;
+  }
+
+  /**
    * Nom court d'un coach à partir de son encadrant_id (v1.10).
    * Cherche dans State.staffDisponible. Renvoie '' si introuvable ou null.
    */
@@ -1924,7 +1962,7 @@
       const etages = _grouperBlocsParEtage(State.blocs);
       etages.forEach(function (etage, idxEtage) {
         const blocsEtage = etage.blocs;       // ≥1 bloc, triés par voie
-        const dureeEtage = etage.dureeMax;    // max des durées de voie
+        const dureeEtage = _dureeEffectiveEtage(etage);    // circuit-aware (succession si circuit, max sinon)
         const heureCell = curHeure || '—';
         const heureFin = curHeure ? addMinutesToHeure(curHeure, dureeEtage) : '';
 
@@ -1944,7 +1982,7 @@
           const titreCompl = b.titre_precision ? ' — ' + escapeHtml(b.titre_precision) : '';
           const coachsNoms = _nomsCoachsBloc(b);
           const coachLabel = coachsNoms.length ? coachsNoms.join(', ') : '';
-          const dureeVoie = (parallele && b.duree_min !== dureeEtage)
+          const dureeVoie = (parallele && b.duree_min !== etage.dureeMax)
             ? '<span class="seance-trame__voie-duree">' + b.duree_min + ' min</span>' : '';
           cellBlocs +=
             '<div class="seance-trame__voie seance-trame__td-bloc--clickable" ' +
@@ -1987,8 +2025,10 @@
           const estCircuit = !!circ;
           const nbStations = blocsEtage.length;
           const dureeStation = circ && circ.duree_station_min ? circ.duree_station_min : '';
+          const dureePause = circ && circ.duree_pause_min ? circ.duree_pause_min : 0;
           let panneau = '';
           if (estCircuit) {
+            const totalCircuit = _dureeEffectiveEtage(etage);
             panneau =
               '<div class="seance-circuit__panel">' +
                 '<label class="seance-circuit__field">' +
@@ -1998,7 +2038,14 @@
                          'value="' + escapeHtml(dureeStation) + '" /> ' +
                   '<span class="seance-circuit__field-unit">min</span>' +
                 '</label>' +
-                '<span class="seance-circuit__recap">' + nbStations + ' stations · les groupes tournent</span>' +
+                '<label class="seance-circuit__field">' +
+                  '<span class="seance-circuit__field-label">Pause entre stations</span>' +
+                  '<input type="number" min="0" max="60" class="seance-circuit__duree-input" ' +
+                         'data-action="circuit-pause" data-etage-ordre="' + escapeHtml(etage.ordre) + '" ' +
+                         'value="' + escapeHtml(dureePause) + '" /> ' +
+                  '<span class="seance-circuit__field-unit">min</span>' +
+                '</label>' +
+                '<span class="seance-circuit__recap">' + nbStations + ' stations · ' + totalCircuit + ' min au total · les groupes tournent</span>' +
               '</div>';
           }
           html +=
@@ -2021,7 +2068,7 @@
         '</table>';
 
       // Footer récap : durée totale (somme des MAX par étage) vs durée prévue.
-      const dureeBlocs = etages.reduce(function (sum, e) { return sum + (e.dureeMax || 0); }, 0);
+      const dureeBlocs = etages.reduce(function (sum, e) { return sum + (_dureeEffectiveEtage(e) || 0); }, 0);
       const dureePrevue = State.currentSeance.duree_totale_min || 0;
       const ecart = dureeBlocs - dureePrevue;
       let recapClass = 'is-ok';
@@ -2113,6 +2160,16 @@
         onChangeCircuitDuree(ordre, inp.value);
       });
       // Empêche le clic dans l'input de déclencher d'autres handlers d'étage.
+      inp.addEventListener('click', function (e) { e.stopPropagation(); });
+    });
+
+    // v1.21 : saisie de la pause entre stations (input number).
+    section.querySelectorAll('[data-action="circuit-pause"]').forEach(function (inp) {
+      inp.addEventListener('change', function (e) {
+        e.stopPropagation();
+        const ordre = parseInt(inp.getAttribute('data-etage-ordre'), 10);
+        onChangeCircuitPause(ordre, inp.value);
+      });
       inp.addEventListener('click', function (e) { e.stopPropagation(); });
     });
 
@@ -4501,10 +4558,37 @@
       id: circ.id,
       seance_id: circ.seance_id,
       ordre: circ.ordre,
-      duree_station_min: n
+      duree_station_min: n,
+      duree_pause_min: circ.duree_pause_min || 0 // préservé (upsert = ligne complète)
     });
     if (!r || !r.ok) {
       // Repli honnête : recharge l'état réel et re-render.
+      await loadBlocs();
+    }
+    renderTrame();
+  }
+
+  /**
+   * Change la pause entre stations d'un circuit (v1.21). Bornée 0..60.
+   * Préserve la durée de station existante dans l'upsert.
+   * @param {number} ordre ordre de l'étage-circuit
+   * @param {string} valeur saisie brute de l'input
+   */
+  async function onChangeCircuitPause(ordre, valeur) {
+    const circ = _circuitDeLetage(ordre);
+    if (!circ) return;
+    let n = parseInt(valeur, 10);
+    if (isNaN(n) || n < 0) n = 0;
+    if (n > 60) n = 60;
+    circ.duree_pause_min = n; // optimiste
+    const r = await SupabaseHub.saveCircuit({
+      id: circ.id,
+      seance_id: circ.seance_id,
+      ordre: circ.ordre,
+      duree_station_min: circ.duree_station_min, // préservé
+      duree_pause_min: n
+    });
+    if (!r || !r.ok) {
       await loadBlocs();
     }
     renderTrame();
@@ -4757,7 +4841,7 @@
         '</tr></thead><tbody>';
       let cur = heureDebut;
       etages.forEach(function (etage) {
-        const fin = cur ? addMinutesToHeure(cur, etage.dureeMax) : '';
+        const fin = cur ? addMinutesToHeure(cur, _dureeEffectiveEtage(etage)) : '';
         const horaire = cur ? (cur + (fin ? '→' + fin : '')) : '—';
         const parallele = etage.blocs.length > 1;
         etage.blocs.forEach(function (b, k) {
@@ -4785,7 +4869,7 @@
       // ----- MODE COACH : fiches détaillées par étage + ateliers liés -----
       let cur = heureDebut;
       etages.forEach(function (etage) {
-        const fin = cur ? addMinutesToHeure(cur, etage.dureeMax) : '';
+        const fin = cur ? addMinutesToHeure(cur, _dureeEffectiveEtage(etage)) : '';
         const horaire = cur ? (cur + (fin ? ' → ' + fin : '')) : '—';
         const parallele = etage.blocs.length > 1;
 
@@ -4793,7 +4877,7 @@
           '<section class="seance-print__etage' + (parallele ? ' seance-print__etage--parallele' : '') + '">' +
             '<div class="seance-print__etage-head">' +
               '<span class="seance-print__etage-horaire">' + horaire + '</span>' +
-              '<span class="seance-print__etage-duree">' + etage.dureeMax + ' min' +
+              '<span class="seance-print__etage-duree">' + _dureeEffectiveEtage(etage) + ' min' +
                 (parallele ? ' · ∥ ' + etage.blocs.length + ' voies parallèles' : '') +
               '</span>' +
             '</div>' +
