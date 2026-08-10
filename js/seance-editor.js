@@ -11,7 +11,23 @@
  *   - 5.5.A : éditeur méta + sauvegarde manuelle (CETTE VERSION)
  *   - 5.5.B : autosave 30s + dropdowns lieu/événement + champs secondaires
  *
- * Version : 1.21 — CIRCUIT-ATELIERS durée & pause (sql_242, août 2026)
+ * Version : 1.22 — GROUPES LIBRES (D3, août 2026)
+ *   v1.22 : LIBÉRATION DES GROUPES (FAIT FOI D3). Fin des 3 groupes fixes
+ *           G1/G2/G3 mappés au référentiel : les groupes sont désormais
+ *           LIBRES — nommés à la volée, en nombre variable (0..N). Le
+ *           référentiel groupes-joueur.json ne sert plus que de SUGGESTIONS
+ *           de nom (boutons rapides). Couleur par POSITION (palette cyclique
+ *           _couleurGroupeParIndex). getGroupesCourants retourne les groupes
+ *           stockés tels quels (plus d'invariant 3). Nom éditable par carte,
+ *           bouton supprimer-groupe, bouton "+ Ajouter un groupe". Nouvelles
+ *           mutations onAddGroupe / onRenameGroupe (refus doublon) /
+ *           onRemoveGroupe. persistGroupes filtre les groupes sans nom.
+ *           Popover joueurs inchangé (référence par nom, couleur par
+ *           position). Stockage groupes_jsonb, héritage et unicité déjà
+ *           génériques : non touchés. AUCUN impact compositions
+ *           (equipe_joueurs.niveau_profil) : usages disjoints. CSS des
+ *           nouveaux contrôles livré à part dans seance.html. node --check OK.
+ *   v1.21 — CIRCUIT-ATELIERS durée & pause (sql_242, août 2026)
  *   v1.21 : CIRCUIT D'ATELIERS — corrections recette terrain (Manu).
  *           (1) BUG durée : un étage-circuit compte ses stations en
  *           SUCCESSION, pas en simultané. Nouveau helper
@@ -433,7 +449,7 @@
     groupesRef: null,       // miroir data/groupes-joueur.json ({_meta, groupes:[...]})
     vivier: [],             // vivier de la catégorie active via getVivierCompoCategorie
     vivierById: null,       // Map (joueur_id → joueur) pour lookup rapide
-    groupePicker: null,     // état popover groupe ({open: bool, nomGroupe: 'G1'|'G2'|'G3', query: string})
+    groupePicker: null,     // état popover groupe ({open: bool, nomGroupe: <nom libre>, query: string})
     // Phase 5.10 : sidebar enrichie + nettoyage brouillons
     showArchivees: false,        // toggle "Afficher les archivées" dans sidebar header
     brouillonsVides: [],         // liste des brouillons vides éligibles à suppression (cache)
@@ -3070,13 +3086,33 @@
    * croissant : G1=Performance, G2=Développement, G3=Initiation.
    * Tolère un référentiel partiel (fallback sur le nom court).
    */
-  function getGroupeDef(nomGroupe) {
-    if (!nomGroupe) return null;
-    const idx = parseInt(String(nomGroupe).replace(/[^0-9]/g, ''), 10) - 1;
-    if (isNaN(idx) || idx < 0) return null;
-    const list = (State.groupesRef && State.groupesRef.groupes) ? State.groupesRef.groupes : [];
-    if (idx >= list.length) return null;
-    return list[idx];
+  // v1.22 — LIBÉRATION DES GROUPES (D3). Les groupes ne sont plus 3 fixes
+  // (G1/G2/G3 mappés au référentiel) mais librement nommés et en nombre
+  // variable (0..N), stockés tels quels dans groupes_jsonb. Le référentiel
+  // groupes-joueur.json ne sert plus que de SUGGESTIONS de nom.
+
+  /**
+   * Palette cyclique de couleurs de groupe, indexée par POSITION (choix A).
+   * Prévisible et stable au re-render (l'ordre des groupes est stable).
+   * @param {number} idx position du groupe (0-based)
+   * @returns {string} couleur hex
+   */
+  function _couleurGroupeParIndex(idx) {
+    var PALETTE = ['#8B0000', '#FF8C00', '#4682B4', '#2D7D46', '#6A4C93', '#B8860B', '#008080', '#A0522D'];
+    var i = (typeof idx === 'number' && idx >= 0) ? (idx % PALETTE.length) : 0;
+    return PALETTE[i];
+  }
+
+  /**
+   * Noms suggérés depuis le référentiel groupes-joueur.json. Servent de
+   * boutons de saisie rapide ; l'utilisateur reste libre de taper un nom.
+   * @returns {string[]} libellés courts suggérés
+   */
+  function _nomsSuggeresGroupes() {
+    var list = (State.groupesRef && Array.isArray(State.groupesRef.groupes)) ? State.groupesRef.groupes : [];
+    return list
+      .filter(function (g) { return g && g.actif !== false && g.libelle_court; })
+      .map(function (g) { return g.libelle_court; });
   }
 
   /**
@@ -3095,18 +3131,20 @@
    * pour les groupes non encore définis. Garantit l'invariant attendu par l'UI.
    */
   function getGroupesCourants() {
+    // v1.22 : groupes LIBRES. On retourne les groupes stockés tels quels
+    // (0..N, noms libres), sans plus forcer le triplet G1/G2/G3. Copie
+    // défensive des tableaux de joueurs pour ne pas muter State directement.
     const stored = (State.currentBloc && Array.isArray(State.currentBloc.groupes_jsonb))
       ? State.currentBloc.groupes_jsonb
       : [];
-    const result = [];
-    ['G1', 'G2', 'G3'].forEach(function (nom) {
-      const found = stored.find(function (g) { return g && g.nom === nom; });
-      result.push({
-        nom: nom,
-        joueurs: (found && Array.isArray(found.joueurs)) ? found.joueurs.slice() : []
+    return stored
+      .filter(function (g) { return g && typeof g.nom === 'string'; })
+      .map(function (g) {
+        return {
+          nom: g.nom,
+          joueurs: Array.isArray(g.joueurs) ? g.joueurs.slice() : []
+        };
       });
-    });
-    return result;
   }
 
   /**
@@ -3162,18 +3200,23 @@
     }
 
     html += '<div class="seance-groupes-grid">';
-    groupes.forEach(function (g) {
-      const def = getGroupeDef(g.nom);
-      const couleur = (def && def.couleur) ? def.couleur : '#666666';
-      const libelle = (def && def.libelle_court) ? def.libelle_court : g.nom;
+    groupes.forEach(function (g, idx) {
+      const couleur = _couleurGroupeParIndex(idx);
 
       html +=
-        '<div class="seance-groupe-card" data-groupe="' + escapeHtml(g.nom) + '" ' +
+        '<div class="seance-groupe-card" data-groupe-idx="' + idx + '" ' +
               'style="border-color: ' + escapeHtml(couleur) + ';">' +
           '<div class="seance-groupe-card__header" ' +
                 'style="background: ' + escapeHtml(couleur) + ';">' +
-            '<span class="seance-groupe-card__nom">' + escapeHtml(g.nom) + '</span>' +
+            '<input type="text" class="seance-groupe-card__nom-input" ' +
+                   'data-action="rename-groupe" data-groupe-idx="' + idx + '" ' +
+                   'value="' + escapeHtml(g.nom) + '" ' +
+                   'placeholder="Nom du groupe" maxlength="40" ' +
+                   'title="Renommer ce groupe" /> ' +
             '<span class="seance-groupe-card__count">' + g.joueurs.length + '</span>' +
+            '<button type="button" class="seance-groupe-card__del-groupe" ' +
+                    'data-action="remove-groupe" data-groupe-idx="' + idx + '" ' +
+                    'title="Supprimer ce groupe">🗑</button>' +
           '</div>' +
           '<div class="seance-groupe-card__body">';
 
@@ -3188,9 +3231,9 @@
             '<li class="seance-groupe-card__item">' +
               '<span class="seance-groupe-card__joueur">' + escapeHtml(nom) + '</span>' +
               '<button type="button" class="seance-groupe-card__remove" ' +
-                      'data-groupe="' + escapeHtml(g.nom) + '" ' +
+                      'data-groupe-idx="' + idx + '" ' +
                       'data-joueur-id="' + escapeHtml(uid) + '" ' +
-                      'title="Retirer du groupe">✕</button>' +
+                      'title="Retirer du groupe">\u2715</button>' +
             '</li>';
         });
         html += '</ul>';
@@ -3198,12 +3241,34 @@
 
       html +=
             '<button type="button" class="seance-groupe-card__add" ' +
-                    'data-groupe="' + escapeHtml(g.nom) + '">' +
-              '+ Ajouter…' +
+                    'data-groupe-idx="' + idx + '">' +
+              '+ Ajouter\u2026' +
             '</button>' +
           '</div>' +
         '</div>';
     });
+
+    // Bouton d'ajout d'un nouveau groupe (0..N, choix D3). Suggestions de nom
+    // depuis le référentiel, en boutons rapides (facultatifs).
+    const suggestions = _nomsSuggeresGroupes();
+    html +=
+      '<div class="seance-groupes-add">' +
+        '<button type="button" class="seance-groupes-add__btn" data-action="add-groupe">' +
+          '\u2795 Ajouter un groupe' +
+        '</button>';
+    if (suggestions.length) {
+      html += '<div class="seance-groupes-add__suggestions">';
+      suggestions.forEach(function (nom) {
+        html +=
+          '<button type="button" class="seance-groupes-add__suggestion" ' +
+                  'data-action="add-groupe-nomme" data-nom="' + escapeHtml(nom) + '">' +
+            escapeHtml(nom) +
+          '</button>';
+      });
+      html += '</div>';
+    }
+    html += '</div>';
+
     html += '</div>';
 
     return html;
@@ -3230,18 +3295,65 @@
     const section = DOM.groupesSection();
     if (!section) return;
 
+    // "+ Ajouter…" (joueurs) d'une carte → popover joueurs. Résolution
+    // index→nom au clic (le popover fonctionne par nom). Un groupe sans nom
+    // ne peut pas recevoir de joueurs (on invite d'abord à le nommer).
     section.querySelectorAll('.seance-groupe-card__add').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        const nomGroupe = btn.getAttribute('data-groupe');
-        openGroupePicker(nomGroupe);
+        const idx = parseInt(btn.getAttribute('data-groupe-idx'), 10);
+        const groupes = getGroupesCourants();
+        const g = groupes[idx];
+        if (!g || !g.nom || !g.nom.trim()) {
+          showFeedback('Nommez d\'abord ce groupe.', 'error');
+          return;
+        }
+        openGroupePicker(g.nom);
       });
     });
 
+    // "✕" sur un joueur → retrait (résolution index→nom).
     section.querySelectorAll('.seance-groupe-card__remove').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        const nomGroupe = btn.getAttribute('data-groupe');
+        const idx = parseInt(btn.getAttribute('data-groupe-idx'), 10);
         const joueurId = btn.getAttribute('data-joueur-id');
-        onRemoveJoueurFromGroupe(nomGroupe, joueurId);
+        const groupes = getGroupesCourants();
+        const g = groupes[idx];
+        if (g && g.nom) onRemoveJoueurFromGroupe(g.nom, joueurId);
+      });
+    });
+
+    // v1.22 : renommer un groupe (input nom). Persiste sur 'change' (blur).
+    section.querySelectorAll('[data-action="rename-groupe"]').forEach(function (inp) {
+      inp.addEventListener('change', function (e) {
+        e.stopPropagation();
+        const idx = parseInt(inp.getAttribute('data-groupe-idx'), 10);
+        onRenameGroupe(idx, inp.value);
+      });
+      inp.addEventListener('click', function (e) { e.stopPropagation(); });
+    });
+
+    // v1.22 : supprimer un groupe entier.
+    section.querySelectorAll('[data-action="remove-groupe"]').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        const idx = parseInt(btn.getAttribute('data-groupe-idx'), 10);
+        onRemoveGroupe(idx);
+      });
+    });
+
+    // v1.22 : ajouter un groupe vide.
+    section.querySelectorAll('[data-action="add-groupe"]').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        onAddGroupe('');
+      });
+    });
+
+    // v1.22 : ajouter un groupe pré-nommé depuis une suggestion.
+    section.querySelectorAll('[data-action="add-groupe-nomme"]').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        onAddGroupe(btn.getAttribute('data-nom') || '');
       });
     });
   }
@@ -3295,9 +3407,11 @@
     const query = State.groupePicker.query || '';
     const qNorm = normalizeForSearch(query);
 
-    const def = getGroupeDef(nomGroupe);
-    const couleur = (def && def.couleur) ? def.couleur : '#666666';
-    const libelle = (def && def.libelle_court) ? def.libelle_court : nomGroupe;
+    // v1.22 : groupes libres — le nom EST le libellé ; la couleur vient de
+    // la POSITION du groupe dans la liste courante (palette cyclique).
+    const _grpIdx = getGroupesCourants().findIndex(function (g) { return g.nom === nomGroupe; });
+    const couleur = _couleurGroupeParIndex(_grpIdx >= 0 ? _grpIdx : 0);
+    const libelle = nomGroupe;
 
     // Filtre par recherche (nom + prénom + niveau_profil + poste éventuel)
     const allJoueurs = State.vivier || [];
@@ -3498,11 +3612,14 @@
    */
   async function persistGroupes(groupes) {
     if (!State.currentBloc) return;
-    // Nettoyage : on ne persiste pas les groupes vides ? Si, on garde tout
-    // (3 entrées G1/G2/G3) pour conserver l'invariant côté UI au reload.
-    const clean = groupes.map(function (g) {
-      return { nom: g.nom, joueurs: g.joueurs.slice() };
-    });
+    // v1.22 : on persiste la liste LIBRE telle quelle (0..N groupes, noms
+    // libres). Les groupes sans nom sont tolérés en mémoire mais filtrés à
+    // la persistance (un groupe anonyme n'a pas de sens au reload).
+    const clean = groupes
+      .filter(function (g) { return g && typeof g.nom === 'string' && g.nom.trim() !== ''; })
+      .map(function (g) {
+        return { nom: g.nom.trim(), joueurs: g.joueurs.slice() };
+      });
 
     const res = await SupabaseHub.updateBloc(State.currentBloc.id, {
       groupes_jsonb: clean
@@ -3515,6 +3632,79 @@
     State.currentBloc.groupes_jsonb = clean;
     const idx = State.blocs.findIndex(function (b) { return b.id === State.currentBloc.id; });
     if (idx !== -1) State.blocs[idx].groupes_jsonb = clean;
+  }
+
+  /**
+   * v1.22 — Ajoute un groupe (nom éventuellement vide, éditable ensuite).
+   * @param {string} nom nom initial (peut être '')
+   */
+  async function onAddGroupe(nom) {
+    const groupes = getGroupesCourants();
+    groupes.push({ nom: (nom || '').trim(), joueurs: [] });
+    // Un groupe au nom vide n'est pas persisté par persistGroupes (filtré) ;
+    // pour qu'il survive à l'écran le temps d'être nommé, on met à jour la
+    // mémoire directement AVANT de re-render, et on ne persiste que s'il est nommé.
+    if ((nom || '').trim() !== '') {
+      await persistGroupes(groupes);
+    } else {
+      // maintien en mémoire volatile (sera persisté au premier rename non vide)
+      if (State.currentBloc) State.currentBloc.groupes_jsonb = groupes.map(function (g) {
+        return { nom: g.nom, joueurs: g.joueurs.slice() };
+      });
+    }
+    renderGroupesSection();
+  }
+
+  /**
+   * v1.22 — Renomme le groupe à la position idx. Un nom vidé n'est pas
+   * persisté (le groupe reste en mémoire, éditable) ; un doublon de nom est
+   * refusé (le popover joueurs référence par nom).
+   * @param {number} idx position du groupe
+   * @param {string} nouveauNom
+   */
+  async function onRenameGroupe(idx, nouveauNom) {
+    const groupes = getGroupesCourants();
+    if (idx < 0 || idx >= groupes.length) return;
+    const clean = (nouveauNom || '').trim();
+    // Refus de doublon (hors ce même groupe).
+    const doublon = groupes.some(function (g, i) {
+      return i !== idx && g.nom && g.nom.trim().toLowerCase() === clean.toLowerCase() && clean !== '';
+    });
+    if (doublon) {
+      showFeedback('Un autre groupe porte déjà ce nom.', 'error');
+      renderGroupesSection(); // restaure l'affichage (annule la saisie)
+      return;
+    }
+    groupes[idx].nom = clean;
+    if (clean === '') {
+      // Nom vidé : on garde en mémoire, non persisté (invariant persistGroupes).
+      if (State.currentBloc) State.currentBloc.groupes_jsonb = groupes.map(function (g) {
+        return { nom: g.nom, joueurs: g.joueurs.slice() };
+      });
+      renderGroupesSection();
+      return;
+    }
+    await persistGroupes(groupes);
+    renderGroupesSection();
+  }
+
+  /**
+   * v1.22 — Supprime le groupe à la position idx (joueurs de ce groupe
+   * libérés). 0 groupe est autorisé (choix Manu).
+   * @param {number} idx position du groupe
+   */
+  async function onRemoveGroupe(idx) {
+    const groupes = getGroupesCourants();
+    if (idx < 0 || idx >= groupes.length) return;
+    groupes.splice(idx, 1);
+    await persistGroupes(groupes);
+    // Reflète aussi le cas 0 groupe en mémoire (persistGroupes filtre déjà).
+    if (State.currentBloc && groupes.length === 0) {
+      State.currentBloc.groupes_jsonb = [];
+      const k = State.blocs.findIndex(function (b) { return b.id === State.currentBloc.id; });
+      if (k !== -1) State.blocs[k].groupes_jsonb = [];
+    }
+    renderGroupesSection();
   }
 
   // ============================================================
