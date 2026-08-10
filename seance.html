@@ -2218,6 +2218,66 @@
       background: rgba(45, 122, 62, 0.03);
     }
 
+    /* --------------------------------------------------------------
+       CIRCUIT D'ATELIERS (sql_241, seance-editor v1.20)
+       Ligne dépliable sous un étage parallèle : bascule "les groupes
+       tournent" + saisie de la durée de station. Additif, calqué sur
+       les conventions de la trame (variables hub, fonds discrets).
+       -------------------------------------------------------------- */
+    .seance-circuit__row > .seance-circuit__cell {
+      padding: 6px 12px 10px;
+      background: rgba(45, 122, 62, 0.03);
+      border-top: 1px dashed var(--line);
+    }
+    .seance-circuit__row.is-on > .seance-circuit__cell {
+      background: rgba(45, 122, 62, 0.07);
+    }
+    .seance-circuit__toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--ink-soft);
+    }
+    .seance-circuit__toggle input { cursor: pointer; }
+    .seance-circuit__row.is-on .seance-circuit__toggle-label {
+      color: var(--vert-prairie);
+    }
+    .seance-circuit__panel {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 8px;
+      padding-left: 26px;
+    }
+    .seance-circuit__field {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: var(--ink-soft);
+    }
+    .seance-circuit__field-label { font-weight: 600; }
+    .seance-circuit__duree-input {
+      width: 64px;
+      padding: 4px 8px;
+      font-family: inherit;
+      font-size: 13px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--ink);
+    }
+    .seance-circuit__field-unit { color: var(--ink-soft); }
+    .seance-circuit__recap {
+      font-size: 12px;
+      color: var(--vert-prairie);
+      font-style: italic;
+    }
+
     /* Groupe de boutons dans le header de trame (PDF + Ajouter). */
     .seance-trame__header-actions {
       display: flex;
