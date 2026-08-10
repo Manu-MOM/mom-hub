@@ -1944,6 +1944,93 @@
       border-style: solid;
     }
 
+    /* --------------------------------------------------------------
+       GROUPES LIBRES (seance-editor v1.22) — nom éditable, suppression
+       de groupe, ajout de groupe + suggestions. Calqué sur les
+       conventions de la section groupes (dashed pour l'ajout, etc.).
+       -------------------------------------------------------------- */
+    .seance-groupe-card__nom-input {
+      flex: 1;
+      min-width: 0;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 700;
+      color: white;
+      background: rgba(255, 255, 255, 0.18);
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      border-radius: 4px;
+      padding: 2px 6px;
+    }
+    .seance-groupe-card__nom-input::placeholder {
+      color: rgba(255, 255, 255, 0.7);
+      font-weight: 400;
+    }
+    .seance-groupe-card__nom-input:focus {
+      outline: none;
+      background: rgba(255, 255, 255, 0.28);
+      border-color: rgba(255, 255, 255, 0.6);
+    }
+    .seance-groupe-card__del-groupe {
+      background: transparent;
+      border: none;
+      color: white;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 0 2px;
+      line-height: 1;
+      flex-shrink: 0;
+      opacity: 0.85;
+    }
+    .seance-groupe-card__del-groupe:hover {
+      opacity: 1;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 3px;
+    }
+    .seance-groupes-add {
+      margin-top: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .seance-groupes-add__btn {
+      align-self: flex-start;
+      padding: 8px 14px;
+      background: white;
+      border: 1px dashed var(--vert-prairie);
+      border-radius: 6px;
+      color: var(--vert-prairie);
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      transition: background 0.15s;
+    }
+    .seance-groupes-add__btn:hover {
+      background: var(--vert-light);
+      border-style: solid;
+    }
+    .seance-groupes-add__suggestions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+    .seance-groupes-add__suggestion {
+      padding: 4px 10px;
+      background: #f6f9f7;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      color: var(--ink-soft);
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 12px;
+      transition: background 0.15s;
+    }
+    .seance-groupes-add__suggestion:hover {
+      background: var(--vert-light);
+      color: var(--vert-prairie);
+    }
+
     /* ----------------------------------------------------------
      * Popover picker joueurs (Phase 5.9)
      * Pattern modale calqué sur le picker fiche (5.8).
