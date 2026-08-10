@@ -11,7 +11,17 @@
  *   - 5.5.A : éditeur méta + sauvegarde manuelle (CETTE VERSION)
  *   - 5.5.B : autosave 30s + dropdowns lieu/événement + champs secondaires
  *
- * Version : 1.23 — CIRCUIT rendu rotation (août 2026)
+ * Version : 1.24 — CIRCUIT PDF + retrait suggestions (août 2026)
+ *   v1.24 : Deux retours de recette (Manu). (1) Retrait des SUGGESTIONS de
+ *           noms de groupes (Perf/Dév/Ini) : helper _nomsSuggeresGroupes,
+ *           rendu et bind add-groupe-nomme supprimés ; le bouton "+ Ajouter
+ *           un groupe" (groupe vide, nommé ensuite) reste. (2) PDF coach :
+ *           la matrice de rotation apparaît désormais sous chaque étage-
+ *           circuit (helper _matriceRotationHtmlPdf, réutilise le calcul
+ *           _matriceRotation) et chaque station affiche sa durée
+ *           ("N min / station"). Additif, node --check OK. CSS PDF associé
+ *           livré dans seance.html.
+ *   v1.23 — CIRCUIT rendu rotation (août 2026)
  *   v1.23 : CIRCUIT D'ATELIERS — rendu visuel de la rotation. Nouveau helper
  *           _matriceRotation(blocsEtage) : matrice temps × stations (rendu
  *           dérivé, rien stocké — D5). Rotation cyclique : au tour t, le
@@ -1946,6 +1956,40 @@
   }
 
   /**
+   * v1.24 — Rend la matrice de rotation en HTML statique pour le PDF coach
+   * (pas d'inputs, styles print). Réutilise le calcul _matriceRotation.
+   * @param {object} etage étage courant
+   * @param {object} circ fiche circuit (durée station + pause)
+   * @returns {string} HTML
+   */
+  function _matriceRotationHtmlPdf(etage, circ) {
+    const mat = _matriceRotation(etage.blocs);
+    if (mat.desequilibre === 'aucun') return '';
+    if (mat.desequilibre === 'trop') {
+      return '<p class="seance-print__circuit-warn">⚠️ Plus de groupes (' + mat.groupes.length +
+             ') que de stations (' + mat.stations.length + ').</p>';
+    }
+    const station = circ.duree_station_min || 0;
+    const pause = circ.duree_pause_min || 0;
+    let thead = '<tr><th>Tour</th>';
+    mat.stations.forEach(function (st) { thead += '<th>' + escapeHtml(st) + '</th>'; });
+    thead += '</tr>';
+    let tbody = '';
+    mat.grille.forEach(function (ligne, t) {
+      const debut = t * (station + pause);
+      tbody += '<tr><td class="seance-print__circuit-tour">T' + (t + 1) + ' (' + debut + '\u2032)</td>';
+      ligne.forEach(function (nomGroupe) {
+        tbody += nomGroupe
+          ? '<td>' + escapeHtml(nomGroupe) + '</td>'
+          : '<td class="seance-print__circuit-vide">\u2014</td>';
+      });
+      tbody += '</tr>';
+    });
+    return '<table class="seance-print__circuit-matrix"><thead>' + thead +
+           '</thead><tbody>' + tbody + '</tbody></table>';
+  }
+
+  /**
    * Nom court d'un coach à partir de son encadrant_id (v1.10).
    * Cherche dans State.staffDisponible. Renvoie '' si introuvable ou null.
    */
@@ -3217,18 +3261,6 @@
   }
 
   /**
-   * Noms suggérés depuis le référentiel groupes-joueur.json. Servent de
-   * boutons de saisie rapide ; l'utilisateur reste libre de taper un nom.
-   * @returns {string[]} libellés courts suggérés
-   */
-  function _nomsSuggeresGroupes() {
-    var list = (State.groupesRef && Array.isArray(State.groupesRef.groupes)) ? State.groupesRef.groupes : [];
-    return list
-      .filter(function (g) { return g && g.actif !== false && g.libelle_court; })
-      .map(function (g) { return g.libelle_court; });
-  }
-
-  /**
    * Helper : normalise un nom court de joueur ("Dupont J.").
    */
   function libelleJoueurCourt(joueur) {
@@ -3361,26 +3393,15 @@
         '</div>';
     });
 
-    // Bouton d'ajout d'un nouveau groupe (0..N, choix D3). Suggestions de nom
-    // depuis le référentiel, en boutons rapides (facultatifs).
-    const suggestions = _nomsSuggeresGroupes();
+    // Bouton d'ajout d'un nouveau groupe (0..N, choix D3). Groupe cree vide,
+    // nomme ensuite librement (les suggestions de nom ont ete retirees en
+    // v1.24 a la demande de Manu).
     html +=
       '<div class="seance-groupes-add">' +
         '<button type="button" class="seance-groupes-add__btn" data-action="add-groupe">' +
           '\u2795 Ajouter un groupe' +
-        '</button>';
-    if (suggestions.length) {
-      html += '<div class="seance-groupes-add__suggestions">';
-      suggestions.forEach(function (nom) {
-        html +=
-          '<button type="button" class="seance-groupes-add__suggestion" ' +
-                  'data-action="add-groupe-nomme" data-nom="' + escapeHtml(nom) + '">' +
-            escapeHtml(nom) +
-          '</button>';
-      });
-      html += '</div>';
-    }
-    html += '</div>';
+        '</button>' +
+      '</div>';
 
     html += '</div>';
 
@@ -3462,13 +3483,6 @@
       });
     });
 
-    // v1.22 : ajouter un groupe pré-nommé depuis une suggestion.
-    section.querySelectorAll('[data-action="add-groupe-nomme"]').forEach(function (btn) {
-      btn.addEventListener('click', function (e) {
-        e.stopPropagation();
-        onAddGroupe(btn.getAttribute('data-nom') || '');
-      });
-    });
   }
 
   /**
@@ -5175,6 +5189,7 @@
         const fin = cur ? addMinutesToHeure(cur, _dureeEffectiveEtage(etage)) : '';
         const horaire = cur ? (cur + (fin ? ' → ' + fin : '')) : '—';
         const parallele = etage.blocs.length > 1;
+        const circPdf = _circuitDeLetage(etage.ordre); // v1.24 : circuit ? (durée station + matrice PDF)
 
         html +=
           '<section class="seance-print__etage' + (parallele ? ' seance-print__etage--parallele' : '') + '">' +
@@ -5223,6 +5238,7 @@
               '<div class="seance-print__bloc-titre">' +
                 emoji + ' <strong>' + escapeHtml(libType) + '</strong>' +
                 (b.titre_precision ? ' — ' + escapeHtml(b.titre_precision) : '') +
+                (circPdf && circPdf.duree_station_min ? ' <span class="seance-print__bloc-station">(' + circPdf.duree_station_min + ' min / station)</span>' : '') +
               '</div>' +
               '<div class="seance-print__bloc-tags">' +
                 coachsTags +
@@ -5236,7 +5252,11 @@
             '</div>';
         });
 
-        html += '</div></section>';
+        html += '</div>';
+        if (circPdf) {
+          html += _matriceRotationHtmlPdf(etage, circPdf);
+        }
+        html += '</section>';
         if (cur) cur = fin;
       });
     }
