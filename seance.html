@@ -2315,6 +2315,9 @@
       padding: 6px 12px 10px;
       background: rgba(45, 122, 62, 0.03);
       border-top: 1px dashed var(--line);
+      /* Empêche la matrice imbriquée (large) de gonfler la table de trame :
+         on borne la cellule et on confine le débordement au wrap interne. */
+      max-width: 0;
     }
     .seance-circuit__row.is-on > .seance-circuit__cell {
       background: rgba(45, 122, 62, 0.07);
@@ -2383,6 +2386,7 @@
       margin-top: 10px;
       padding-left: 26px;
       overflow-x: auto;
+      max-width: 100%;
     }
     .seance-circuit__matrix {
       border-collapse: collapse;
@@ -2396,6 +2400,13 @@
       border: 1px solid var(--line);
       padding: 5px 10px;
       text-align: center;
+    }
+    .seance-circuit__matrix thead th {
+      white-space: normal;
+      max-width: 160px;
+      word-break: break-word;
+    }
+    .seance-circuit__matrix tbody td {
       white-space: nowrap;
     }
     .seance-circuit__matrix thead th {
@@ -2672,6 +2683,7 @@
         color: #0c3d24;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
+        word-break: break-word;
       }
       .seance-print__circuit-tour {
         text-align: left;
