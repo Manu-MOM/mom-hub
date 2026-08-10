@@ -18,7 +18,15 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.81 — août 2026
+ * Version : 1.82 — août 2026
+ *   v1.82 : CIRCUIT-ATELIERS (FAIT FOI gelé, module Séance). 3 wrappers
+ *          ADDITIFS pour la fiche de marche du circuit d'ateliers (socle
+ *          SQL sql_241 déjà en prod) : listCircuits / saveCircuit /
+ *          deleteCircuit (table seances_etages_circuits). Un circuit
+ *          qualifie un étage (seance_id, ordre) de seances_blocs comme
+ *          rotatif + durée unique de station. Patron calqué sur les
+ *          wrappers fils rouges (écriture PostgREST direct, RLS fait foi,
+ *          aucune RPC). Aucune ligne existante touchée. node --check OK.
  *   v1.81 : PLANIF-FIL-ROUGE (FAIT FOI gelé 08/08/2026). 6 wrappers ADDITIFS
  *          pour le fil rouge de planification (socle SQL sql_239 déjà en
  *          prod) : listFilsRouges / saveFilRouge / deleteFilRouge (table
@@ -8547,6 +8555,85 @@
         return { ok: false, error: error.message || 'Erreur création séance ponctuelle' };
       }
       return { ok: true, data: data };
+    },
+
+    /**
+     * Circuits d'ateliers d'une séance (sql_241). Un circuit = "fiche de
+     * marche" qui qualifie un étage (seance_id, ordre) de seances_blocs
+     * comme rotatif et porte la durée unique de station. Créé À LA DEMANDE,
+     * uniquement pour les étages en mode circuit ; les étages ordinaires
+     * restent déduits de l'ordre (inchangés). La RLS
+     * seances_etages_circuits_select fait foi (SELECT authentifié). Triés
+     * par ordre — même ordre d'étage que la trame.
+     *
+     * @param {string} seanceId UUID de la séance
+     * @returns {Promise<Array>} circuits ; [] si erreur ou seanceId absent.
+     */
+    async listCircuits(seanceId) {
+      if (!seanceId) {
+        console.error('MOM Hub: listCircuits() requiert seanceId');
+        return [];
+      }
+      const { data, error } = await client
+        .from('seances_etages_circuits')
+        .select('*')
+        .eq('seance_id', seanceId)
+        .order('ordre', { ascending: true });
+      if (error) {
+        console.error('MOM Hub: listCircuits()', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * Crée ou met à jour un circuit (upsert par id). L'écriture est
+     * soumise aux policies RLS seances_etages_circuits (mêmes gardes que
+     * seances_blocs : admin | bureau | puis_je_ecrire_categorie de la
+     * catégorie de la séance). Le payload doit porter seance_id + ordre
+     * (l'étage cible) + duree_station_min (NOT NULL, 1..240 en base).
+     * L'unicité (seance_id, ordre) garantit un seul circuit par étage.
+     *
+     * @param {object} payload champs de seances_etages_circuits
+     * @returns {Promise<{ok:boolean, data?:object, error?:string}>}
+     */
+    async saveCircuit(payload) {
+      if (!payload || !payload.seance_id) {
+        return { ok: false, error: 'seance_id requis' };
+      }
+      const { data, error } = await client
+        .from('seances_etages_circuits')
+        .upsert(payload)
+        .select()
+        .single();
+      if (error) {
+        console.error('MOM Hub: saveCircuit()', error);
+        return { ok: false, error: error.message || 'Erreur enregistrement circuit' };
+      }
+      return { ok: true, data: data };
+    },
+
+    /**
+     * Supprime un circuit par id (l'étage redevient un parallèle ordinaire).
+     * Soumis à la policy RLS seances_etages_circuits_delete (même garde que
+     * l'écriture).
+     *
+     * @param {string} id UUID du circuit
+     * @returns {Promise<{ok:boolean, error?:string}>}
+     */
+    async deleteCircuit(id) {
+      if (!id) {
+        return { ok: false, error: 'id requis' };
+      }
+      const { error } = await client
+        .from('seances_etages_circuits')
+        .delete()
+        .eq('id', id);
+      if (error) {
+        console.error('MOM Hub: deleteCircuit()', error);
+        return { ok: false, error: error.message || 'Erreur suppression circuit' };
+      }
+      return { ok: true };
     }
 
   };
