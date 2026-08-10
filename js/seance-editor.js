@@ -11,7 +11,19 @@
  *   - 5.5.A : éditeur méta + sauvegarde manuelle (CETTE VERSION)
  *   - 5.5.B : autosave 30s + dropdowns lieu/événement + champs secondaires
  *
- * Version : 1.22 — GROUPES LIBRES (D3, août 2026)
+ * Version : 1.23 — CIRCUIT rendu rotation (août 2026)
+ *   v1.23 : CIRCUIT D'ATELIERS — rendu visuel de la rotation. Nouveau helper
+ *           _matriceRotation(blocsEtage) : matrice temps × stations (rendu
+ *           dérivé, rien stocké — D5). Rotation cyclique : au tour t, le
+ *           groupe g occupe la station (g+t) % S ; nb de tours = nb de
+ *           stations. Stations = voies de l'étage ; groupes = union des noms
+ *           distincts des groupes_jsonb des stations. Déséquilibres (choix
+ *           Manu) : G<S → stations vides "—" ; G=S → nominal ; G>S →
+ *           avertissement (pas de matrice élaborée). Chaque tour affiche son
+ *           heure de début relative (station + pause). Affiché sous le
+ *           panneau circuit. Le CSS .seance-circuit__matrix* est livré à
+ *           part dans seance.html. Additif pur, node --check OK.
+ *   v1.22 — GROUPES LIBRES (D3, août 2026)
  *   v1.22 : LIBÉRATION DES GROUPES (FAIT FOI D3). Fin des 3 groupes fixes
  *           G1/G2/G3 mappés au référentiel : les groupes sont désormais
  *           LIBRES — nommés à la volée, en nombre variable (0..N). Le
@@ -1875,6 +1887,65 @@
   }
 
   /**
+   * v1.23 — Calcule la matrice de rotation d'un étage-circuit (rendu dérivé,
+   * rien n'est stocké — cf. D5). Rotation complète implicite : à chaque tour
+   * chaque groupe avance d'une station (cyclique). Nb de tours = nb de stations.
+   *
+   * Stations = les voies (blocs) de l'étage. Groupes = union des noms de
+   * groupes distincts présents dans les groupes_jsonb des stations.
+   *
+   * Déséquilibres (choix Manu) :
+   *  - G < S (moins de groupes que de stations) : stations vides = null ("—").
+   *  - G = S : cas nominal, toutes stations occupées.
+   *  - G > S (plus de groupes que de stations) : signalé via desequilibre='trop'
+   *    (l'appelant affiche un avertissement plutôt qu'une matrice élaborée).
+   *
+   * @param {Array} blocsEtage voies de l'étage (triées par voie)
+   * @returns {{stations:string[], groupes:string[], grille:Array, desequilibre:string}}
+   */
+  function _matriceRotation(blocsEtage) {
+    const stations = (blocsEtage || []).map(function (b) {
+      const t = lookupTypeBloc(b.type_bloc);
+      const lib = (t && t.libelle) || b.type_bloc || 'Station';
+      return b.titre_precision ? (lib + ' — ' + b.titre_precision) : lib;
+    });
+
+    // Union ordonnée des noms de groupes distincts (première apparition).
+    const vus = {};
+    const groupes = [];
+    (blocsEtage || []).forEach(function (b) {
+      if (Array.isArray(b.groupes_jsonb)) {
+        b.groupes_jsonb.forEach(function (g) {
+          if (g && g.nom && !vus[g.nom]) { vus[g.nom] = true; groupes.push(g.nom); }
+        });
+      }
+    });
+
+    const S = stations.length;
+    const G = groupes.length;
+    let desequilibre = 'ok';
+    if (G === 0) desequilibre = 'aucun';        // pas de groupe défini
+    else if (G < S) desequilibre = 'moins';     // stations vides
+    else if (G > S) desequilibre = 'trop';      // avertissement (choix ii)
+
+    // Grille : nb de tours = nb de stations. grille[tour][idxStation] = nom|null.
+    // Au tour t, le groupe d'indice g occupe la station (g + t) % S.
+    const grille = [];
+    if (S > 0 && G > 0 && desequilibre !== 'trop') {
+      for (let t = 0; t < S; t++) {
+        const ligne = new Array(S).fill(null);
+        for (let g = 0; g < G; g++) {
+          const idxStation = (g + t) % S;
+          ligne[idxStation] = groupes[g];
+        }
+        grille.push(ligne);
+      }
+    }
+
+    return { stations: stations, groupes: groupes, grille: grille, desequilibre: desequilibre };
+  }
+
+  /**
    * Nom court d'un coach à partir de son encadrant_id (v1.10).
    * Cherche dans State.staffDisponible. Renvoie '' si introuvable ou null.
    */
@@ -2045,6 +2116,47 @@
           let panneau = '';
           if (estCircuit) {
             const totalCircuit = _dureeEffectiveEtage(etage);
+            const mat = _matriceRotation(blocsEtage);
+            let matriceHtml = '';
+            if (mat.desequilibre === 'aucun') {
+              matriceHtml =
+                '<p class="seance-circuit__hint">Ajoutez des groupes aux stations pour visualiser la rotation.</p>';
+            } else if (mat.desequilibre === 'trop') {
+              matriceHtml =
+                '<p class="seance-circuit__warn">⚠️ Plus de groupes (' + mat.groupes.length + ') que de stations (' + mat.stations.length + ') : réduisez les groupes ou ajoutez des stations pour une rotation nette.</p>';
+            } else {
+              // Matrice temps × stations. Lignes = tours, colonnes = stations.
+              let thead = '<tr><th class="seance-circuit__matrix-corner">Tour</th>';
+              mat.stations.forEach(function (st) {
+                thead += '<th>' + escapeHtml(st) + '</th>';
+              });
+              thead += '</tr>';
+
+              const station = circ.duree_station_min || 0;
+              const pause = circ.duree_pause_min || 0;
+              let tbody = '';
+              mat.grille.forEach(function (ligne, t) {
+                const debut = t * (station + pause);
+                tbody += '<tr>' +
+                  '<td class="seance-circuit__matrix-tour">T' + (t + 1) + ' <span class="seance-circuit__matrix-min">' + debut + '\u2032</span></td>';
+                ligne.forEach(function (nomGroupe) {
+                  if (nomGroupe) {
+                    tbody += '<td class="seance-circuit__matrix-grp">' + escapeHtml(nomGroupe) + '</td>';
+                  } else {
+                    tbody += '<td class="seance-circuit__matrix-vide">\u2014</td>';
+                  }
+                });
+                tbody += '</tr>';
+              });
+
+              matriceHtml =
+                '<div class="seance-circuit__matrix-wrap">' +
+                  '<table class="seance-circuit__matrix">' +
+                    '<thead>' + thead + '</thead>' +
+                    '<tbody>' + tbody + '</tbody>' +
+                  '</table>' +
+                '</div>';
+            }
             panneau =
               '<div class="seance-circuit__panel">' +
                 '<label class="seance-circuit__field">' +
@@ -2062,7 +2174,8 @@
                   '<span class="seance-circuit__field-unit">min</span>' +
                 '</label>' +
                 '<span class="seance-circuit__recap">' + nbStations + ' stations · ' + totalCircuit + ' min au total · les groupes tournent</span>' +
-              '</div>';
+              '</div>' +
+              matriceHtml;
           }
           html +=
             '<tr class="seance-trame__row seance-circuit__row' + (estCircuit ? ' is-on' : '') + '" data-etage-ordre="' + escapeHtml(etage.ordre) + '">' +
