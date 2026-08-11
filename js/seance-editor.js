@@ -2186,7 +2186,7 @@
       });
       tbody += '</tr>';
     });
-    return '<table class="seance-print__circuit-matrix"><thead>' + thead +
+    return '<table class="seance-print__circuit-matrix seance-print__circuit-matrix--rencontres"><thead>' + thead +
            '</thead><tbody>' + tbody + '</tbody></table>';
   }
 
