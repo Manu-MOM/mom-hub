@@ -11,6 +11,12 @@
  *   - 5.5.A : éditeur méta + sauvegarde manuelle (CETTE VERSION)
  *   - 5.5.B : autosave 30s + dropdowns lieu/événement + champs secondaires
  *
+ * Version : 1.27 — RENCONTRES : colonne match 2× plus large (août 2026)
+ *   v1.27 : Cosmétique rencontres. La ou les colonnes « match » de la matrice
+ *           (écran + PDF) sont rendues 2× plus larges qu'une colonne atelier
+ *           (une station-match vaut 2 groupes). Classes CSS ajoutées sur th/td
+ *           (seance-circuit__matrix-match / seance-print__circuit-match) ;
+ *           largeurs pilotées dans seance.html. Mode circuit inchangé.
  * Version : 1.26 — RENCONTRES TOURNANTES UI de saisie (août 2026)
  *   v1.26 : RENCONTRES-TOURNANTES (FAIT FOI gelé 11/08/2026), maillon 3/3.
  *           UI de saisie dans le panneau circuit : sélecteur Format
@@ -2159,19 +2165,24 @@
     const pause = circ.duree_pause_min || 0;
     let thead = '<tr><th>Tour</th>';
     mat.stations.forEach(function (st, i) {
-      const tag = mat.rolesVoies[i] === 'match' ? ' ⚔️' : '';
-      thead += '<th>' + escapeHtml(st) + tag + '</th>';
+      const estMatch = mat.rolesVoies[i] === 'match';
+      const tag = estMatch ? ' ⚔️' : '';
+      const cls = estMatch ? ' class="seance-print__circuit-match"' : '';
+      thead += '<th' + cls + '>' + escapeHtml(st) + tag + '</th>';
     });
     thead += '</tr>';
     let tbody = '';
     mat.grille.forEach(function (ligne, t) {
       const debut = t * (station + pause);
       tbody += '<tr><td class="seance-print__circuit-tour">T' + (t + 1) + ' (' + debut + '\u2032)</td>';
-      ligne.forEach(function (cell) {
+      ligne.forEach(function (cell, i) {
         const txt = _celluleRencontreTexte(cell);
-        tbody += txt
-          ? '<td>' + escapeHtml(txt) + '</td>'
-          : '<td class="seance-print__circuit-vide">\u2014</td>';
+        const estMatch = mat.rolesVoies[i] === 'match';
+        if (txt) {
+          tbody += '<td' + (estMatch ? ' class="seance-print__circuit-match"' : '') + '>' + escapeHtml(txt) + '</td>';
+        } else {
+          tbody += '<td class="seance-print__circuit-vide' + (estMatch ? ' seance-print__circuit-match' : '') + '">\u2014</td>';
+        }
       });
       tbody += '</tr>';
     });
@@ -2205,8 +2216,10 @@
     const pause = circ.duree_pause_min || 0;
     let thead = '<tr><th class="seance-circuit__matrix-corner">Tour</th>';
     mat.stations.forEach(function (st, i) {
-      const tag = mat.rolesVoies[i] === 'match' ? ' ⚔️' : '';
-      thead += '<th>' + escapeHtml(st) + tag + '</th>';
+      const estMatch = mat.rolesVoies[i] === 'match';
+      const tag = estMatch ? ' ⚔️' : '';
+      const cls = estMatch ? ' seance-circuit__matrix-match' : '';
+      thead += '<th class="seance-circuit__matrix-col' + cls + '">' + escapeHtml(st) + tag + '</th>';
     });
     thead += '</tr>';
     let tbody = '';
@@ -2214,12 +2227,13 @@
       const debut = t * (station + pause);
       tbody += '<tr>' +
         '<td class="seance-circuit__matrix-tour">T' + (t + 1) + ' <span class="seance-circuit__matrix-min">' + debut + '\u2032</span></td>';
-      ligne.forEach(function (cell) {
+      ligne.forEach(function (cell, i) {
         const txt = _celluleRencontreTexte(cell);
+        const m = mat.rolesVoies[i] === 'match' ? ' seance-circuit__matrix-match' : '';
         if (txt) {
-          tbody += '<td class="seance-circuit__matrix-grp">' + escapeHtml(txt) + '</td>';
+          tbody += '<td class="seance-circuit__matrix-grp' + m + '">' + escapeHtml(txt) + '</td>';
         } else {
-          tbody += '<td class="seance-circuit__matrix-vide">\u2014</td>';
+          tbody += '<td class="seance-circuit__matrix-vide' + m + '">\u2014</td>';
         }
       });
       tbody += '</tr>';
