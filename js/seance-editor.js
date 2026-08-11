@@ -11,7 +11,16 @@
  *   - 5.5.A : éditeur méta + sauvegarde manuelle (CETTE VERSION)
  *   - 5.5.B : autosave 30s + dropdowns lieu/événement + champs secondaires
  *
- * Version : 1.24 — CIRCUIT PDF + retrait suggestions (août 2026)
+ * Version : 1.25 — RENCONTRES TOURNANTES moteur+rendus (août 2026)
+ *   v1.25 : RENCONTRES-TOURNANTES (FAIT FOI gelé 11/08/2026), maillon 2/3.
+ *           Mode 'rencontres' du circuit (extension additive). Helpers neufs
+ *           _matriceRencontres / _matriceRencontresHtmlPdf /
+ *           _matriceRencontresHtmlEcran / _roleVoie / _celluleRencontreTexte.
+ *           Rendus écran + PDF routés par circ.mode. Cas (a) : 1 voie match
+ *           (2 groupes, "G1 vs G2") + N ateliers, rotation cyclique "qui se
+ *           repose". vainqueur_reste = cadre-règle sans matrice. Cas (b) =
+ *           dette. _matriceRotation / _matriceRotationHtmlPdf INTOUCHÉS.
+ *           UI de saisie du mode/rôles = maillon 3 (à venir).
  *   v1.24 : Deux retours de recette (Manu). (1) Retrait des SUGGESTIONS de
  *           noms de groupes (Perf/Dév/Ini) : helper _nomsSuggeresGroupes,
  *           rendu et bind add-groupe-nomme supprimés ; le bouton "+ Ajouter
@@ -1989,6 +1998,231 @@
            '</thead><tbody>' + tbody + '</tbody></table>';
   }
 
+  // ============================================================
+  //  RENCONTRES TOURNANTES (mode='rencontres') — ADDITIF
+  //  Extension du circuit d'ateliers : une voie "match" consomme
+  //  DEUX groupes (opposition), les voies "atelier" en consomment un.
+  //  N'altère PAS _matriceRotation / _matriceRotationHtmlPdf (mode
+  //  'circuit' inchangé). Périmètre livré : cas (a) — 1 voie match +
+  //  N ateliers, rotation cyclique déterministe ("qui se repose").
+  //  Cas (b) multi-équipes = dette tracée (STATE), non simulé ici.
+  // ============================================================
+
+  /**
+   * Rôle d'une voie (station) en mode rencontres. Lit roles_voies_jsonb
+   * du circuit : mapping { "<ordre_voie>": "match" | "atelier" }. La voie
+   * est identifiée par son index (0..S-1) dans l'étage, converti en clé
+   * string. Défaut 'atelier' si non renseigné. Ignoré hors mode rencontres.
+   *
+   * @param {object} circ fiche seances_etages_circuits
+   * @param {number} idxVoie index de la voie dans l'étage
+   * @returns {'match'|'atelier'}
+   */
+  function _roleVoie(circ, idxVoie) {
+    const map = (circ && circ.roles_voies_jsonb && typeof circ.roles_voies_jsonb === 'object')
+      ? circ.roles_voies_jsonb : {};
+    const r = map[String(idxVoie)];
+    return r === 'match' ? 'match' : 'atelier';
+  }
+
+  /**
+   * Matrice de rotation en mode RENCONTRES (cas a, cyclique déterministe).
+   * Modèle : parmi les voies, exactement UNE porte le rôle 'match' (elle
+   * affiche une paire de groupes qui s'affrontent) ; les autres sont des
+   * 'atelier' (un groupe chacune). Rotation "qui se repose" : à chaque tour,
+   * une paire distincte est au match et chaque groupe passe à son tour hors
+   * du match. Nb de tours = nb de groupes G (chaque groupe est "au repos
+   * hors match" une fois). Déterministe → matrice pré-remplie.
+   *
+   * Retour parallèle à _matriceRotation, enrichi :
+   *  - stations[] : libellés des voies (comme _matriceRotation)
+   *  - rolesVoies[] : 'match'|'atelier' par voie (même ordre que stations)
+   *  - groupes[] : union ordonnée des noms de groupes
+   *  - grille[tour][idxVoie] : pour une voie 'atelier' → nom|null ;
+   *                            pour la voie 'match' → { pair:[gA,gB] }|null
+   *  - desequilibre : 'ok'|'aucun'|'non_simulable'
+   *      'non_simulable' = config hors périmètre (a) : 0 ou >1 voie match,
+   *      ou G<3, ou pas assez de groupes → l'appelant affiche un cadre-règle
+   *      au lieu d'une matrice.
+   *
+   * @param {Array} blocsEtage voies de l'étage
+   * @param {object} circ fiche circuit (mode='rencontres')
+   * @returns {{stations:string[], rolesVoies:string[], groupes:string[], grille:Array, desequilibre:string}}
+   */
+  function _matriceRencontres(blocsEtage, circ) {
+    const voies = blocsEtage || [];
+    const stations = voies.map(function (b) {
+      const t = lookupTypeBloc(b.type_bloc);
+      const lib = (t && t.libelle) || b.type_bloc || 'Station';
+      return b.titre_precision ? (lib + ' — ' + b.titre_precision) : lib;
+    });
+    const rolesVoies = voies.map(function (b, i) { return _roleVoie(circ, i); });
+
+    // Union ordonnée des noms de groupes distincts (première apparition).
+    const vus = {};
+    const groupes = [];
+    voies.forEach(function (b) {
+      if (Array.isArray(b.groupes_jsonb)) {
+        b.groupes_jsonb.forEach(function (g) {
+          if (g && g.nom && !vus[g.nom]) { vus[g.nom] = true; groupes.push(g.nom); }
+        });
+      }
+    });
+
+    const S = stations.length;
+    const G = groupes.length;
+    const idxMatchs = [];
+    rolesVoies.forEach(function (r, i) { if (r === 'match') idxMatchs.push(i); });
+
+    // Périmètre livré (a) : exactement 1 voie match, >=3 groupes, et assez
+    // de groupes pour peupler le match (2) + les ateliers (S-1).
+    if (G === 0) {
+      return { stations: stations, rolesVoies: rolesVoies, groupes: groupes, grille: [], desequilibre: 'aucun' };
+    }
+    const nbAteliers = S - 1;
+    if (idxMatchs.length !== 1 || G < 3 || G < (2 + nbAteliers)) {
+      return { stations: stations, rolesVoies: rolesVoies, groupes: groupes, grille: [], desequilibre: 'non_simulable' };
+    }
+
+    const idxMatch = idxMatchs[0];
+    // Indices des voies atelier, dans l'ordre.
+    const idxAteliers = [];
+    rolesVoies.forEach(function (r, i) { if (r !== 'match') idxAteliers.push(i); });
+
+    // Rotation "qui se repose" : au tour t, la paire au match = groupes
+    // d'indices (t) et (t+1) mod G. Les groupes suivants (t+2, t+3, …)
+    // remplissent les ateliers dans l'ordre. Ainsi chaque groupe occupe
+    // successivement match puis ateliers puis re-match → chacun passe une
+    // fois par chaque rôle sur G tours. Déterministe.
+    const grille = [];
+    for (let t = 0; t < G; t++) {
+      const ligne = new Array(S).fill(null);
+      const gA = groupes[t % G];
+      const gB = groupes[(t + 1) % G];
+      ligne[idxMatch] = { pair: [gA, gB] };
+      for (let a = 0; a < idxAteliers.length; a++) {
+        const gAtel = groupes[(t + 2 + a) % G];
+        ligne[idxAteliers[a]] = gAtel;
+      }
+      grille.push(ligne);
+    }
+
+    return { stations: stations, rolesVoies: rolesVoies, groupes: groupes, grille: grille, desequilibre: 'ok' };
+  }
+
+  /**
+   * Libellé d'une cellule de matrice rencontres (écran ou PDF).
+   * @param {*} cell contenu grille[t][i] : {pair:[a,b]} | string | null
+   * @returns {string} texte prêt à échapper ('' si vide)
+   */
+  function _celluleRencontreTexte(cell) {
+    if (!cell) return '';
+    if (typeof cell === 'object' && Array.isArray(cell.pair)) {
+      return cell.pair[0] + ' vs ' + cell.pair[1];
+    }
+    return String(cell);
+  }
+
+  /**
+   * Rend la matrice RENCONTRES en HTML statique pour le PDF coach.
+   * Calque de _matriceRotationHtmlPdf. En 'vainqueur_reste' ou config hors
+   * périmètre → cadre-règle textuel, pas de matrice simulée.
+   *
+   * @param {object} etage étage courant (etage.blocs)
+   * @param {object} circ fiche circuit (mode='rencontres')
+   * @returns {string} HTML
+   */
+  function _matriceRencontresHtmlPdf(etage, circ) {
+    const kind = (circ && circ.rotation_kind === 'vainqueur_reste') ? 'vainqueur_reste' : 'cyclique';
+    if (kind === 'vainqueur_reste') {
+      return '<p class="seance-print__circuit-warn">🏆 Rencontres — « vainqueur reste » : ' +
+             'l\u2019équipe qui gagne conserve le terrain, l\u2019équipe qui perd cède sa place au groupe suivant. ' +
+             'Rotation dépendante du résultat — pas de matrice pré-remplie.</p>';
+    }
+    const mat = _matriceRencontres(etage.blocs, circ);
+    if (mat.desequilibre === 'aucun') return '';
+    if (mat.desequilibre === 'non_simulable') {
+      return '<p class="seance-print__circuit-warn">⚔️ Rencontres tournantes — configuration hors ' +
+             'rotation pré-remplie (une seule voie « match » et au moins 3 groupes requis). ' +
+             'Organisez les oppositions au sifflet.</p>';
+    }
+    const station = circ.duree_station_min || 0;
+    const pause = circ.duree_pause_min || 0;
+    let thead = '<tr><th>Tour</th>';
+    mat.stations.forEach(function (st, i) {
+      const tag = mat.rolesVoies[i] === 'match' ? ' ⚔️' : '';
+      thead += '<th>' + escapeHtml(st) + tag + '</th>';
+    });
+    thead += '</tr>';
+    let tbody = '';
+    mat.grille.forEach(function (ligne, t) {
+      const debut = t * (station + pause);
+      tbody += '<tr><td class="seance-print__circuit-tour">T' + (t + 1) + ' (' + debut + '\u2032)</td>';
+      ligne.forEach(function (cell) {
+        const txt = _celluleRencontreTexte(cell);
+        tbody += txt
+          ? '<td>' + escapeHtml(txt) + '</td>'
+          : '<td class="seance-print__circuit-vide">\u2014</td>';
+      });
+      tbody += '</tr>';
+    });
+    return '<table class="seance-print__circuit-matrix"><thead>' + thead +
+           '</thead><tbody>' + tbody + '</tbody></table>';
+  }
+
+  /**
+   * Rend la matrice RENCONTRES en HTML pour l'écran (éditeur de trame).
+   * Calque du rendu inline mode circuit. Renvoie le fragment matrice
+   * (sans le panneau de durée, géré par l'appelant).
+   *
+   * @param {object} mat retour de _matriceRencontres
+   * @param {object} circ fiche circuit
+   * @returns {string} HTML
+   */
+  function _matriceRencontresHtmlEcran(mat, circ) {
+    const kind = (circ && circ.rotation_kind === 'vainqueur_reste') ? 'vainqueur_reste' : 'cyclique';
+    if (kind === 'vainqueur_reste') {
+      return '<p class="seance-circuit__hint">🏆 « Vainqueur reste » : l\u2019équipe gagnante conserve le ' +
+             'terrain, la perdante cède sa place. Rotation selon le résultat — pas de matrice pré-remplie.</p>';
+    }
+    if (mat.desequilibre === 'aucun') {
+      return '<p class="seance-circuit__hint">Ajoutez des groupes aux stations pour visualiser les rencontres.</p>';
+    }
+    if (mat.desequilibre === 'non_simulable') {
+      return '<p class="seance-circuit__warn">⚔️ Configuration hors rotation pré-remplie : il faut exactement ' +
+             'une voie « match » et au moins 3 groupes (dont assez pour peupler les ateliers).</p>';
+    }
+    const station = circ.duree_station_min || 0;
+    const pause = circ.duree_pause_min || 0;
+    let thead = '<tr><th class="seance-circuit__matrix-corner">Tour</th>';
+    mat.stations.forEach(function (st, i) {
+      const tag = mat.rolesVoies[i] === 'match' ? ' ⚔️' : '';
+      thead += '<th>' + escapeHtml(st) + tag + '</th>';
+    });
+    thead += '</tr>';
+    let tbody = '';
+    mat.grille.forEach(function (ligne, t) {
+      const debut = t * (station + pause);
+      tbody += '<tr>' +
+        '<td class="seance-circuit__matrix-tour">T' + (t + 1) + ' <span class="seance-circuit__matrix-min">' + debut + '\u2032</span></td>';
+      ligne.forEach(function (cell) {
+        const txt = _celluleRencontreTexte(cell);
+        if (txt) {
+          tbody += '<td class="seance-circuit__matrix-grp">' + escapeHtml(txt) + '</td>';
+        } else {
+          tbody += '<td class="seance-circuit__matrix-vide">\u2014</td>';
+        }
+      });
+      tbody += '</tr>';
+    });
+    return '<div class="seance-circuit__matrix-wrap">' +
+             '<table class="seance-circuit__matrix">' +
+               '<thead>' + thead + '</thead>' +
+               '<tbody>' + tbody + '</tbody>' +
+             '</table>' +
+           '</div>';
+  }
+
   /**
    * Nom court d'un coach à partir de son encadrant_id (v1.10).
    * Cherche dans State.staffDisponible. Renvoie '' si introuvable ou null.
@@ -2160,8 +2394,13 @@
           let panneau = '';
           if (estCircuit) {
             const totalCircuit = _dureeEffectiveEtage(etage);
-            const mat = _matriceRotation(blocsEtage);
             let matriceHtml = '';
+            if (circ.mode === 'rencontres') {
+              // Mode rencontres tournantes (ADDITIF) : rendu dédié, court-circuite
+              // la matrice circuit ci-dessous. _matriceRotation intouché.
+              matriceHtml = _matriceRencontresHtmlEcran(_matriceRencontres(blocsEtage, circ), circ);
+            } else {
+            const mat = _matriceRotation(blocsEtage);
             if (mat.desequilibre === 'aucun') {
               matriceHtml =
                 '<p class="seance-circuit__hint">Ajoutez des groupes aux stations pour visualiser la rotation.</p>';
@@ -2201,6 +2440,7 @@
                   '</table>' +
                 '</div>';
             }
+            } // fin else (mode circuit) — le panneau ci-dessous est commun aux 2 modes
             panneau =
               '<div class="seance-circuit__panel">' +
                 '<label class="seance-circuit__field">' +
@@ -5254,7 +5494,9 @@
 
         html += '</div>';
         if (circPdf) {
-          html += _matriceRotationHtmlPdf(etage, circPdf);
+          html += (circPdf.mode === 'rencontres')
+            ? _matriceRencontresHtmlPdf(etage, circPdf)
+            : _matriceRotationHtmlPdf(etage, circPdf);
         }
         html += '</section>';
         if (cur) cur = fin;
