@@ -11,6 +11,15 @@
  *   - 5.5.A : éditeur méta + sauvegarde manuelle (CETTE VERSION)
  *   - 5.5.B : autosave 30s + dropdowns lieu/événement + champs secondaires
  *
+ * Version : 1.26 — RENCONTRES TOURNANTES UI de saisie (août 2026)
+ *   v1.26 : RENCONTRES-TOURNANTES (FAIT FOI gelé 11/08/2026), maillon 3/3.
+ *           UI de saisie dans le panneau circuit : sélecteur Format
+ *           (circuit/rencontres), rotation (cyclique/vainqueur_reste), et une
+ *           rangée de rôles par voie (atelier/match). Helper
+ *           _panneauRencontresControlsHtml + handlers onChangeCircuitMode /
+ *           onChangeCircuitRotationKind / onToggleRoleVoie + _payloadCircuit
+ *           (upsert ligne complète, préserve tous les champs). Style dans
+ *           seance.html (commit séparé). Moteur/rendus v1.25 inchangés.
  * Version : 1.25 — RENCONTRES TOURNANTES moteur+rendus (août 2026)
  *   v1.25 : RENCONTRES-TOURNANTES (FAIT FOI gelé 11/08/2026), maillon 2/3.
  *           Mode 'rencontres' du circuit (extension additive). Helpers neufs
@@ -2224,6 +2233,71 @@
   }
 
   /**
+   * Contrôles de saisie du mode RENCONTRES (v1.26, maillon 3). Rendu dans le
+   * panneau circuit : sélecteur Circuit/Rencontres ; si rencontres, choix
+   * rotation_kind (Cyclique/Vainqueur reste) + une rangée listant les voies
+   * de l'étage avec un bascule de rôle (Atelier/Match) chacune. Tous les
+   * contrôles portent data-etage-ordre ; les rôles portent aussi data-voie-idx.
+   *
+   * @param {object} etage étage courant
+   * @param {object} circ fiche circuit
+   * @param {Array} blocsEtage voies de l'étage (pour la rangée de rôles)
+   * @returns {string} HTML
+   */
+  function _panneauRencontresControlsHtml(etage, circ, blocsEtage) {
+    const ordreAttr = escapeHtml(etage.ordre);
+    const estRencontres = circ.mode === 'rencontres';
+
+    // Sélecteur de mode (toujours affiché quand l'étage est un circuit).
+    let html =
+      '<label class="seance-circuit__field seance-circuit__field--mode">' +
+        '<span class="seance-circuit__field-label">Format</span>' +
+        '<select class="seance-circuit__select" data-action="circuit-mode" data-etage-ordre="' + ordreAttr + '">' +
+          '<option value="circuit"' + (!estRencontres ? ' selected' : '') + '>🔄 Circuit (rotation simple)</option>' +
+          '<option value="rencontres"' + (estRencontres ? ' selected' : '') + '>⚔️ Rencontres tournantes</option>' +
+        '</select>' +
+      '</label>';
+
+    if (!estRencontres) return html;
+
+    // rotation_kind
+    const kind = circ.rotation_kind === 'vainqueur_reste' ? 'vainqueur_reste' : 'cyclique';
+    html +=
+      '<label class="seance-circuit__field seance-circuit__field--kind">' +
+        '<span class="seance-circuit__field-label">Rotation</span>' +
+        '<select class="seance-circuit__select" data-action="circuit-rotation-kind" data-etage-ordre="' + ordreAttr + '">' +
+          '<option value="cyclique"' + (kind === 'cyclique' ? ' selected' : '') + '>Cyclique (matrice)</option>' +
+          '<option value="vainqueur_reste"' + (kind === 'vainqueur_reste' ? ' selected' : '') + '>Vainqueur reste (règle)</option>' +
+        '</select>' +
+      '</label>';
+
+    // Rangée de rôles par voie.
+    const voies = Array.isArray(blocsEtage) ? blocsEtage : [];
+    let roles = '';
+    voies.forEach(function (b, i) {
+      const role = _roleVoie(circ, i);
+      const estMatch = role === 'match';
+      const t = lookupTypeBloc(b.type_bloc);
+      const lib = (t && t.libelle) || b.type_bloc || 'Voie';
+      const libCourt = b.titre_precision ? (lib + ' — ' + b.titre_precision) : lib;
+      roles +=
+        '<button type="button" class="seance-circuit__role' + (estMatch ? ' is-match' : '') + '" ' +
+                'data-action="circuit-role-voie" data-etage-ordre="' + ordreAttr + '" data-voie-idx="' + i + '" ' +
+                'title="' + escapeHtml('Basculer le rôle de : ' + libCourt) + '">' +
+          '<span class="seance-circuit__role-lib">' + escapeHtml(libCourt) + '</span>' +
+          '<span class="seance-circuit__role-tag">' + (estMatch ? '⚔️ Match' : '🛠 Atelier') + '</span>' +
+        '</button>';
+    });
+    html +=
+      '<div class="seance-circuit__roles" data-etage-ordre="' + ordreAttr + '">' +
+        '<span class="seance-circuit__roles-label">Rôle des voies</span>' +
+        roles +
+      '</div>';
+
+    return html;
+  }
+
+  /**
    * Nom court d'un coach à partir de son encadrant_id (v1.10).
    * Cherche dans State.staffDisponible. Renvoie '' si introuvable ou null.
    */
@@ -2443,6 +2517,7 @@
             } // fin else (mode circuit) — le panneau ci-dessous est commun aux 2 modes
             panneau =
               '<div class="seance-circuit__panel">' +
+                _panneauRencontresControlsHtml(etage, circ, blocsEtage) +
                 '<label class="seance-circuit__field">' +
                   '<span class="seance-circuit__field-label">Durée par station</span>' +
                   '<input type="number" min="1" max="240" class="seance-circuit__duree-input" ' +
@@ -2457,7 +2532,7 @@
                          'value="' + escapeHtml(dureePause) + '" /> ' +
                   '<span class="seance-circuit__field-unit">min</span>' +
                 '</label>' +
-                '<span class="seance-circuit__recap">' + nbStations + ' stations · ' + totalCircuit + ' min au total · les groupes tournent</span>' +
+                '<span class="seance-circuit__recap">' + nbStations + ' stations · ' + totalCircuit + ' min au total · ' + (circ.mode === 'rencontres' ? 'les équipes s\u2019affrontent' : 'les groupes tournent') + '</span>' +
               '</div>' +
               matriceHtml;
           }
@@ -2584,6 +2659,37 @@
         onChangeCircuitPause(ordre, inp.value);
       });
       inp.addEventListener('click', function (e) { e.stopPropagation(); });
+    });
+
+    // v1.26 : sélecteur de format (circuit / rencontres).
+    section.querySelectorAll('[data-action="circuit-mode"]').forEach(function (sel) {
+      sel.addEventListener('change', function (e) {
+        e.stopPropagation();
+        const ordre = parseInt(sel.getAttribute('data-etage-ordre'), 10);
+        onChangeCircuitMode(ordre, sel.value);
+      });
+      sel.addEventListener('click', function (e) { e.stopPropagation(); });
+    });
+
+    // v1.26 : sélecteur de rotation (cyclique / vainqueur_reste).
+    section.querySelectorAll('[data-action="circuit-rotation-kind"]').forEach(function (sel) {
+      sel.addEventListener('change', function (e) {
+        e.stopPropagation();
+        const ordre = parseInt(sel.getAttribute('data-etage-ordre'), 10);
+        onChangeCircuitRotationKind(ordre, sel.value);
+      });
+      sel.addEventListener('click', function (e) { e.stopPropagation(); });
+    });
+
+    // v1.26 : bascule du rôle d'une voie (match / atelier).
+    section.querySelectorAll('[data-action="circuit-role-voie"]').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        e.preventDefault();
+        const ordre = parseInt(btn.getAttribute('data-etage-ordre'), 10);
+        const idx = parseInt(btn.getAttribute('data-voie-idx'), 10);
+        onToggleRoleVoie(ordre, idx);
+      });
     });
 
     // Phase 5.7 : si on est en vue détail bloc, masquer la trame et afficher le détail
@@ -5177,6 +5283,81 @@
         }
       }
     }
+    renderTrame();
+  }
+
+  /**
+   * Construit le payload complet d'un circuit pour un upsert (v1.26). L'upsert
+   * réécrit la ligne entière : on repart de l'objet circ courant pour préserver
+   * tous les champs, en appliquant les surcharges passées. Évite d'écraser
+   * duree_station_min / duree_pause_min / mode / rotation_kind / roles_voies_jsonb.
+   *
+   * @param {object} circ fiche circuit courante
+   * @param {object} surcharges champs à remplacer
+   * @returns {object} payload prêt pour saveCircuit
+   */
+  function _payloadCircuit(circ, surcharges) {
+    const base = {
+      id: circ.id,
+      seance_id: circ.seance_id,
+      ordre: circ.ordre,
+      duree_station_min: circ.duree_station_min,
+      duree_pause_min: circ.duree_pause_min || 0,
+      mode: circ.mode || 'circuit',
+      rotation_kind: circ.rotation_kind || 'cyclique',
+      roles_voies_jsonb: circ.roles_voies_jsonb || {}
+    };
+    return Object.assign(base, surcharges || {});
+  }
+
+  /**
+   * Change le format d'un circuit (v1.26) : 'circuit' | 'rencontres'.
+   * @param {number} ordre ordre de l'étage-circuit
+   * @param {string} valeur nouveau mode
+   */
+  async function onChangeCircuitMode(ordre, valeur) {
+    const circ = _circuitDeLetage(ordre);
+    if (!circ) return;
+    const mode = valeur === 'rencontres' ? 'rencontres' : 'circuit';
+    circ.mode = mode; // optimiste
+    const r = await SupabaseHub.saveCircuit(_payloadCircuit(circ, { mode: mode }));
+    if (!r || !r.ok) { await loadBlocs(); }
+    renderTrame();
+  }
+
+  /**
+   * Change le type de rotation d'un circuit en mode rencontres (v1.26) :
+   * 'cyclique' | 'vainqueur_reste'.
+   * @param {number} ordre ordre de l'étage-circuit
+   * @param {string} valeur nouveau rotation_kind
+   */
+  async function onChangeCircuitRotationKind(ordre, valeur) {
+    const circ = _circuitDeLetage(ordre);
+    if (!circ) return;
+    const kind = valeur === 'vainqueur_reste' ? 'vainqueur_reste' : 'cyclique';
+    circ.rotation_kind = kind; // optimiste
+    const r = await SupabaseHub.saveCircuit(_payloadCircuit(circ, { rotation_kind: kind }));
+    if (!r || !r.ok) { await loadBlocs(); }
+    renderTrame();
+  }
+
+  /**
+   * Bascule le rôle d'une voie (match <-> atelier) en mode rencontres (v1.26).
+   * Le rôle est stocké dans roles_voies_jsonb sous la clé string de l'index.
+   * @param {number} ordre ordre de l'étage-circuit
+   * @param {number} idxVoie index de la voie dans l'étage
+   */
+  async function onToggleRoleVoie(ordre, idxVoie) {
+    const circ = _circuitDeLetage(ordre);
+    if (!circ) return;
+    const map = (circ.roles_voies_jsonb && typeof circ.roles_voies_jsonb === 'object')
+      ? Object.assign({}, circ.roles_voies_jsonb) : {};
+    const cle = String(idxVoie);
+    const actuel = map[cle] === 'match' ? 'match' : 'atelier';
+    map[cle] = actuel === 'match' ? 'atelier' : 'match';
+    circ.roles_voies_jsonb = map; // optimiste
+    const r = await SupabaseHub.saveCircuit(_payloadCircuit(circ, { roles_voies_jsonb: map }));
+    if (!r || !r.ok) { await loadBlocs(); }
     renderTrame();
   }
 
