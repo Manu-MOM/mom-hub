@@ -2395,6 +2395,7 @@
       border: 1px solid var(--line);
       border-radius: 6px;
       width: 100%;
+      table-layout: fixed;
     }
     .seance-circuit__matrix th,
     .seance-circuit__matrix td {
@@ -2437,9 +2438,16 @@
       color: #c2d4ca;
     }
     /* v1.27 : colonne "match" 2x plus large (station match = 2 groupes). */
+    /* v1.27 : avec table-layout:fixed, colonne Tour étroite et colonne "match"
+       2x la largeur d'un atelier (station match = 2 groupes). Les colonnes
+       atelier se partagent le reste. */
+    .seance-circuit__matrix-corner,
+    .seance-circuit__matrix-tour {
+      width: 64px;
+    }
     .seance-circuit__matrix th.seance-circuit__matrix-match,
     .seance-circuit__matrix td.seance-circuit__matrix-match {
-      width: 40%;
+      width: 50%;
     }
 
     /* --------------------------------------------------------------
@@ -2760,6 +2768,18 @@
         color: #6a7b70;
       }
       .seance-print__circuit-vide { color: #b9b9b9; }
+      /* v1.27 : colonne "match" 2x plus large (station match = 2 groupes).
+         Scopé à la matrice rencontres pour ne pas affecter le circuit. */
+      .seance-print__circuit-matrix--rencontres {
+        table-layout: fixed;
+      }
+      .seance-print__circuit-matrix--rencontres .seance-print__circuit-tour {
+        width: 48pt;
+      }
+      .seance-print__circuit-matrix--rencontres th.seance-print__circuit-match,
+      .seance-print__circuit-matrix--rencontres td.seance-print__circuit-match {
+        width: 50%;
+      }
       /* v1.27 : colonne "match" 2x plus large (station match = 2 groupes). */
       .seance-print__circuit-matrix th.seance-print__circuit-match,
       .seance-print__circuit-matrix td.seance-print__circuit-match {
