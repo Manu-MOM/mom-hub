@@ -2167,8 +2167,8 @@
     mat.stations.forEach(function (st, i) {
       const estMatch = mat.rolesVoies[i] === 'match';
       const tag = estMatch ? ' ⚔️' : '';
-      const cls = estMatch ? ' class="seance-print__circuit-match"' : '';
-      thead += '<th' + cls + '>' + escapeHtml(st) + tag + '</th>';
+      const cls = estMatch ? ' seance-print__circuit-match' : ' seance-print__circuit-atelier';
+      thead += '<th class="' + cls.trim() + '">' + escapeHtml(st) + tag + '</th>';
     });
     thead += '</tr>';
     let tbody = '';
@@ -2218,7 +2218,7 @@
     mat.stations.forEach(function (st, i) {
       const estMatch = mat.rolesVoies[i] === 'match';
       const tag = estMatch ? ' ⚔️' : '';
-      const cls = estMatch ? ' seance-circuit__matrix-match' : '';
+      const cls = estMatch ? ' seance-circuit__matrix-match' : ' seance-circuit__matrix-atelier';
       thead += '<th class="seance-circuit__matrix-col' + cls + '">' + escapeHtml(st) + tag + '</th>';
     });
     thead += '</tr>';
