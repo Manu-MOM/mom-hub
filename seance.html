@@ -2395,6 +2395,7 @@
       border: 1px solid var(--line);
       border-radius: 6px;
       width: 100%;
+      min-width: 440px;
       table-layout: fixed;
     }
     .seance-circuit__matrix th,
@@ -2445,8 +2446,12 @@
     .seance-circuit__matrix-tour {
       width: 64px;
     }
-    .seance-circuit__matrix th.seance-circuit__matrix-match,
-    .seance-circuit__matrix td.seance-circuit__matrix-match {
+    /* v1.27 : ratio 1:2 entre atelier et match (station match = 2 groupes).
+       table-layout:fixed normalise ces largeurs proportionnellement. */
+    .seance-circuit__matrix th.seance-circuit__matrix-atelier {
+      width: 25%;
+    }
+    .seance-circuit__matrix th.seance-circuit__matrix-match {
       width: 50%;
     }
 
@@ -2776,8 +2781,10 @@
       .seance-print__circuit-matrix--rencontres .seance-print__circuit-tour {
         width: 48pt;
       }
-      .seance-print__circuit-matrix--rencontres th.seance-print__circuit-match,
-      .seance-print__circuit-matrix--rencontres td.seance-print__circuit-match {
+      .seance-print__circuit-matrix--rencontres th.seance-print__circuit-atelier {
+        width: 25%;
+      }
+      .seance-print__circuit-matrix--rencontres th.seance-print__circuit-match {
         width: 50%;
       }
       /* v1.27 : colonne "match" 2x plus large (station match = 2 groupes). */
