@@ -2436,6 +2436,69 @@
       color: #c2d4ca;
     }
 
+    /* --------------------------------------------------------------
+       RENCONTRES TOURNANTES — contrôles de saisie (seance-editor v1.26)
+       Sélecteurs Format/Rotation + rangée de rôles par voie dans le
+       panneau circuit. Réutilise les variables de charte du hub.
+       -------------------------------------------------------------- */
+    .seance-circuit__select {
+      padding: 4px 8px;
+      font-family: inherit;
+      font-size: 13px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--ink);
+      cursor: pointer;
+    }
+    .seance-circuit__roles {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      width: 100%;
+      padding-left: 26px;
+      margin-top: 4px;
+    }
+    .seance-circuit__roles-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--ink-soft);
+      margin-right: 4px;
+    }
+    .seance-circuit__role {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      font-family: inherit;
+      font-size: 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      color: var(--ink);
+      cursor: pointer;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .seance-circuit__role:hover {
+      border-color: var(--vert-prairie);
+    }
+    .seance-circuit__role.is-match {
+      background: var(--vert-light);
+      border-color: var(--vert-prairie);
+    }
+    .seance-circuit__role-lib {
+      color: var(--ink-soft);
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .seance-circuit__role-tag {
+      font-weight: 600;
+      color: var(--vert-prairie);
+    }
+
     /* Groupe de boutons dans le header de trame (PDF + Ajouter). */
     .seance-trame__header-actions {
       display: flex;
