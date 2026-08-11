@@ -2394,6 +2394,7 @@
       background: #fff;
       border: 1px solid var(--line);
       border-radius: 6px;
+      width: 100%;
     }
     .seance-circuit__matrix th,
     .seance-circuit__matrix td {
@@ -2434,6 +2435,11 @@
     }
     .seance-circuit__matrix-vide {
       color: #c2d4ca;
+    }
+    /* v1.27 : colonne "match" 2x plus large (station match = 2 groupes). */
+    .seance-circuit__matrix th.seance-circuit__matrix-match,
+    .seance-circuit__matrix td.seance-circuit__matrix-match {
+      width: 40%;
     }
 
     /* --------------------------------------------------------------
@@ -2754,6 +2760,11 @@
         color: #6a7b70;
       }
       .seance-print__circuit-vide { color: #b9b9b9; }
+      /* v1.27 : colonne "match" 2x plus large (station match = 2 groupes). */
+      .seance-print__circuit-matrix th.seance-print__circuit-match,
+      .seance-print__circuit-matrix td.seance-print__circuit-match {
+        width: 40%;
+      }
       .seance-print__circuit-warn {
         font-size: 9pt;
         color: #9b2c2c;
