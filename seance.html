@@ -1189,6 +1189,7 @@
       justify-content: space-between;
       gap: 12px;
       margin-bottom: 16px;
+      flex-wrap: wrap;
     }
     .seance-trame__title {
       font-family: 'Oswald', sans-serif;
@@ -2401,6 +2402,10 @@
       border: 1px solid var(--line);
       border-radius: 6px;
       width: 100%;
+    }
+    /* Layout fixe + largeurs de colonnes réservés à la matrice rencontres.
+       Le circuit ordinaire garde un layout auto (colonnes équilibrées). */
+    .seance-circuit__matrix--rencontres {
       min-width: 440px;
       table-layout: fixed;
     }
@@ -2445,20 +2450,21 @@
       color: #c2d4ca;
     }
     /* v1.27 : colonne "match" 2x plus large (station match = 2 groupes). */
-    /* v1.27 : avec table-layout:fixed, colonne Tour étroite et colonne "match"
-       2x la largeur d'un atelier (station match = 2 groupes). Les colonnes
-       atelier se partagent le reste. */
+    /* Tour : ne jamais casser "TOUR" sur 2 lignes (les 2 modes). */
     .seance-circuit__matrix-corner,
     .seance-circuit__matrix-tour {
-      width: 44px;
       white-space: nowrap;
     }
-    /* v1.27 : ratio 1:2 entre atelier et match (station match = 2 groupes).
-       table-layout:fixed normalise ces largeurs proportionnellement. */
-    .seance-circuit__matrix th.seance-circuit__matrix-atelier {
+    /* Largeurs de colonnes réservées à la matrice rencontres (layout fixe) :
+       Tour étroit, atelier 1 part, match 2 parts. */
+    .seance-circuit__matrix--rencontres .seance-circuit__matrix-corner,
+    .seance-circuit__matrix--rencontres .seance-circuit__matrix-tour {
+      width: 60px;
+    }
+    .seance-circuit__matrix--rencontres th.seance-circuit__matrix-atelier {
       width: 25%;
     }
-    .seance-circuit__matrix th.seance-circuit__matrix-match {
+    .seance-circuit__matrix--rencontres th.seance-circuit__matrix-match {
       width: 50%;
     }
 
@@ -2530,6 +2536,7 @@
       display: flex;
       align-items: center;
       gap: 8px;
+      flex-wrap: wrap;
     }
     .seance-trame__pdf-btn {
       padding: 8px 16px;
