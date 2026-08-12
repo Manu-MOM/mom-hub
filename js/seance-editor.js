@@ -11,6 +11,12 @@
  *   - 5.5.A : éditeur méta + sauvegarde manuelle (CETTE VERSION)
  *   - 5.5.B : autosave 30s + dropdowns lieu/événement + champs secondaires
  *
+ * Version : 1.28 — RENCONTRES vignette match + responsive mobile (août 2026)
+ *   v1.28 : (1) La vignette de la voie « match » (mode rencontres) est 2x plus
+ *           large que les voies atelier (classe seance-trame__voie--match, flex
+ *           2 vs 1). (2) Correctifs seance.html : colonne Tour de matrice
+ *           resserrée, anti-débordement horizontal du header de trame sur mobile
+ *           (<640px), box-sizing du wrapper matrice. Largeurs pilotées côté CSS.
  * Version : 1.27 — RENCONTRES : colonne match 2× plus large (août 2026)
  *   v1.27 : Cosmétique rencontres. La ou les colonnes « match » de la matrice
  *           (écran + PDF) sont rendues 2× plus larges qu'une colonne atelier
@@ -2427,18 +2433,23 @@
 
         // Cellule « Bloc » : une mini-carte par voie. En parallèle, elles
         // s'affichent en colonnes (classe --parallele pilote la CSS flex).
+        // v1.28 : en mode rencontres, la voie « match » (2 groupes) est rendue
+        // 2x plus large que les voies atelier (classe --match).
+        const circVoies = _circuitDeLetage(etage.ordre);
+        const rencontres = !!circVoies && circVoies.mode === 'rencontres';
         let cellBlocs = '<div class="seance-trame__voies' + (parallele ? ' seance-trame__voies--parallele' : '') + '">';
-        blocsEtage.forEach(function (b) {
+        blocsEtage.forEach(function (b, iVoie) {
           const t = lookupTypeBloc(b.type_bloc);
           const emoji = (t && t.emoji) || '·';
           const libType = (t && t.libelle) || b.type_bloc;
           const titreCompl = b.titre_precision ? ' — ' + escapeHtml(b.titre_precision) : '';
           const coachsNoms = _nomsCoachsBloc(b);
           const coachLabel = coachsNoms.length ? coachsNoms.join(', ') : '';
+          const clsMatch = (rencontres && _roleVoie(circVoies, iVoie) === 'match') ? ' seance-trame__voie--match' : '';
           const dureeVoie = (parallele && b.duree_min !== etage.dureeMax)
             ? '<span class="seance-trame__voie-duree">' + b.duree_min + ' min</span>' : '';
           cellBlocs +=
-            '<div class="seance-trame__voie seance-trame__td-bloc--clickable" ' +
+            '<div class="seance-trame__voie seance-trame__td-bloc--clickable' + clsMatch + '" ' +
                  'data-action="open-detail" data-bloc-id="' + escapeHtml(b.id) + '" ' +
                  'title="Cliquer pour éditer ce bloc en détail">' +
               '<span class="seance-trame__emoji">' + emoji + '</span> ' +
