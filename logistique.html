@@ -421,6 +421,11 @@
     <section class="logi-section">
       <h3 class="logi-section__title">Nouvelle demande</h3>
 
+      <!-- MULTI-OBJETS (RESERVATIONS-MULTI, F2-β) : sélection multiple par
+           cases à cocher (patron catégories/responsables). Cocher ≥ 2
+           ressources = une demande groupée (mêmes dates + créneau) ; chaque
+           ressource garde sa ligne, sa validation et son agenda propres. -->
+      <label style="display:block;margin-bottom:8px;">Ressources <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink-mute);text-transform:none;letter-spacing:0;">(coche une ou plusieurs — ex. les 2 minibus, ou clubhouse + stade)</span></label>
       <div id="logi-ressources" class="logi-ressources">
         <div class="logi-empty">Chargement…</div>
       </div>
@@ -451,9 +456,20 @@
           <label for="logi-mode-recurrente" style="margin:0;cursor:pointer;">Réservation récurrente</label>
         </div>
 
-        <div class="logi-field" id="logi-field-date">
-          <label for="logi-date">Date</label>
-          <input type="date" id="logi-date" />
+        <!-- MULTI-JOURS (RESERVATIONS-MULTI, F1-α) : « Jusqu'au » optionnel.
+             Vide = réservation d'un seul jour (comportement historique).
+             Renseigné = plage continue Date → Jusqu'au (même créneau chaque
+             jour). Le contrôle « Jusqu'au ≥ Date » est fait au submit ; le
+             CHECK SQL date_fin >= date tranche en dernier ressort. -->
+        <div class="logi-row2" id="logi-field-date">
+          <div class="logi-field">
+            <label for="logi-date">Date</label>
+            <input type="date" id="logi-date" />
+          </div>
+          <div class="logi-field">
+            <label for="logi-date-fin">Jusqu'au <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink-mute);text-transform:none;letter-spacing:0;">(optionnel — plusieurs jours)</span></label>
+            <input type="date" id="logi-date-fin" />
+          </div>
         </div>
 
         <div class="logi-row2">
