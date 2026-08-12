@@ -38,7 +38,17 @@
       margin: 0 0 12px; display: flex; align-items: center; gap: 8px;
     }
     /* Grille ressources */
-    .logi-ressources { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+    /* SAISIE UNIFIÉE (RESERVATIONS-MULTI v2, A2) : conteneur en colonne pour
+       empiler les sections (titre + grille) ; chaque grille reprend le
+       flex-wrap horizontal historique des tuiles. */
+    .logi-ressources { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
+    .logi-res-section {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--ink-mute); margin-top: 6px;
+    }
+    .logi-res-section:first-child { margin-top: 0; }
+    .logi-res-grid { display: flex; flex-wrap: wrap; gap: 10px; }
     .logi-res-card {
       display: flex; flex-direction: column; gap: 4px; align-items: flex-start;
       background: #fff; border: 1px solid var(--line); border-radius: 10px;
@@ -470,6 +480,16 @@
             <label for="logi-date-fin">Jusqu'au <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink-mute);text-transform:none;letter-spacing:0;">(optionnel — plusieurs jours)</span></label>
             <input type="date" id="logi-date-fin" />
           </div>
+        </div>
+
+        <!-- JOURNÉE ENTIÈRE (RESERVATIONS-MULTI v2, A1) : coche → créneau
+             rempli auto (08:00–22:00) et grisé. Pour réservation d'une
+             journée complète ou multi-jours sans horaire précis. -->
+        <div class="logi-field">
+          <label class="logi-journee-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;letter-spacing:0;">
+            <input type="checkbox" id="logi-journee" style="width:auto;margin:0;" />
+            <span>Journée entière <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink-mute);">(08:00–22:00)</span></span>
+          </label>
         </div>
 
         <div class="logi-row2">
