@@ -515,29 +515,71 @@
         return out;
       }
 
+      // MULTI-JOURS (RESERVATIONS-MULTI, F1-α) : dates ISO d'une réservation
+      // ponctuelle, bornées à l'intersection avec la fenêtre [debutISO,finISO].
+      // Sans date_fin (ou <= date) → le seul jour `date` s'il tombe dans la
+      // fenêtre. Garde-fou 90 jours.
+      function joursPonctuelle(dateIso, dateFinIso, debutISO, finISO) {
+        if (!dateIso) return [];
+        var fin = (dateFinIso && dateFinIso > dateIso) ? dateFinIso : dateIso;
+        var lo = dateIso < debutISO ? debutISO : dateIso;   // max(date, debut)
+        var hi = fin > finISO ? finISO : fin;               // min(date_fin, fin)
+        if (lo > hi) return [];
+        var out = [];
+        var d = new Date(lo + 'T00:00:00');
+        var f = new Date(hi + 'T00:00:00');
+        var garde = 0;
+        while (d <= f && garde < 90) {
+          out.push(d.getFullYear() + '-' +
+            String(d.getMonth() + 1).padStart(2, '0') + '-' +
+            String(d.getDate()).padStart(2, '0'));
+          d.setDate(d.getDate() + 1);
+          garde++;
+        }
+        return out;
+      }
+
       var lastWindow = null; // mémorisée pour résoudre l'année du clic créneau libre
 
       async function fetchWindow(debutISO, finISO) {
         lastWindow = { debut: debutISO, fin: finISO };
         var items = [];
 
-        // 1) Ponctuelles (pending + approved) fenêtrées sur date
+        // 1) Ponctuelles (pending + approved) chevauchant la fenêtre.
+        //    MULTI-JOURS (RESERVATIONS-MULTI, F1-α) : une résa dont la plage
+        //    date→date_fin intersecte [debutISO, finISO] doit apparaître, même
+        //    si son 1er jour précède la fenêtre. Filtre : date <= finISO ET
+        //    (date_fin >= debutISO OU date >= debutISO). Un item par jour
+        //    intersecté (lot marqué pour l'affichage groupé, F2-β).
         var p = await SupabaseHub.client
           .from('reservations_logistiques').select('*')
-          .gte('date', debutISO).lte('date', finISO)
+          .lte('date', finISO)
+          .or('date_fin.gte.' + debutISO + ',date.gte.' + debutISO)
           .in('statut', ['pending', 'approved']);
         if (p.error) throw p.error;
         (p.data || []).forEach(function (r) {
-          items.push({
-            id: 'p-' + r.id,
-            date: r.date,
-            heure: r.heure_debut ? String(r.heure_debut).slice(0, 5) : null,
-            duree_min: dureeEntre(r.heure_debut, r.heure_fin),
-            type: typeCodeOf(r.ressource_id),
-            libelle: (r.motif || ressLbl(r.ressource_id)) + ' · ' + catsLbl(r),
-            etat: r.statut,
-            meta: { src: 'ponctuelle', row: r }
-          });
+          // Total de jours de la plage complète (pour un libellé Ji/N stable,
+          // indépendant du fenêtrage) et date de départ réelle.
+          var finReelle = (r.date_fin && r.date_fin > r.date) ? r.date_fin : r.date;
+          var totalPlage = joursPonctuelle(r.date, finReelle, r.date, finReelle).length;
+          joursPonctuelle(r.date, r.date_fin, debutISO, finISO)
+            .forEach(function (jour) {
+              // Rang 1-based du jour dans la plage = nb de jours de r.date à
+              // `jour` inclus (joursPonctuelle borné à ce sous-intervalle).
+              var rangDansPlage = joursPonctuelle(r.date, jour, r.date, jour).length;
+              items.push({
+                id: 'p-' + r.id + '-' + jour,
+                date: jour,
+                heure: r.heure_debut ? String(r.heure_debut).slice(0, 5) : null,
+                duree_min: dureeEntre(r.heure_debut, r.heure_fin),
+                type: typeCodeOf(r.ressource_id),
+                libelle: (r.lot_id ? '⛓ ' : '') +
+                  (r.motif || ressLbl(r.ressource_id)) + ' · ' + catsLbl(r) +
+                  (totalPlage > 1 ? ' (J' + rangDansPlage + '/' + totalPlage + ')' : ''),
+                etat: r.statut,
+                meta: { src: 'ponctuelle', row: r }
+              });
+            });
         });
 
         // 2) Règles récurrentes (pending + approved, actives) chevauchant
