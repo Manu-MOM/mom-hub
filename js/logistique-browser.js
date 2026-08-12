@@ -664,6 +664,28 @@
   // ============================================================
   // Agenda — liste chronologique (P1 ; getOccurrences réplique exacte)
   // ============================================================
+
+  // MULTI-JOURS (RESERVATIONS-MULTI, F1-α) : égrène les dates ISO d'une
+  // réservation ponctuelle. Sans date_fin → [date] (1 jour, historique).
+  // Avec date_fin ≥ date → chaque jour de la plage incluse. Garde-fou :
+  // borne à 90 jours (plage aberrante = on s'arrête, jamais de boucle folle).
+  function _joursDeLaPlage(dateIso, dateFinIso) {
+    if (!dateIso) return [];
+    if (!dateFinIso || dateFinIso <= dateIso) return [dateIso];
+    var out = [];
+    var d = new Date(dateIso + 'T00:00:00');
+    var f = new Date(dateFinIso + 'T00:00:00');
+    var garde = 0;
+    while (d <= f && garde < 90) {
+      out.push(d.getFullYear() + '-' +
+        String(d.getMonth() + 1).padStart(2, '0') + '-' +
+        String(d.getDate()).padStart(2, '0'));
+      d.setDate(d.getDate() + 1);
+      garde++;
+    }
+    return out;
+  }
+
   async function refreshAgenda() {
     const host = el('logi-agenda');
     if (!host) return;
@@ -689,9 +711,16 @@
 
     const items = [];
     simples.forEach(function (r) {
-      items.push({ date: r.date, label: byId[r.ressource_id] || '—',
-        creneau: (r.heure_debut || '').slice(0,5) + '–' + (r.heure_fin || '').slice(0,5),
-        recur: false, motif: r.motif });
+      // MULTI-JOURS (F1-α) : un item par jour de la plage (1 seul si mono-jour).
+      var jours = _joursDeLaPlage(r.date, r.date_fin);
+      var nb = jours.length;
+      jours.forEach(function (jour, idx) {
+        items.push({ date: jour, label: byId[r.ressource_id] || '—',
+          creneau: (r.heure_debut || '').slice(0,5) + '–' + (r.heure_fin || '').slice(0,5),
+          recur: false, motif: r.motif,
+          lot: !!r.lot_id,                                   // MULTI-OBJETS (F2-β)
+          plageInfo: nb > 1 ? ('J' + (idx + 1) + '/' + nb) : '' });  // multi-jours
+      });
     });
     recs.forEach(function (r) {
       const occ = getOccurrences(r, now.getFullYear(), now.getMonth());
@@ -715,8 +744,11 @@
     }
     host.innerHTML = items.map(function (it) {
       return '<div class="logi-agenda-row">' +
-        '<span class="logi-agenda-date">' + escapeHtml(formatDateLong(it.date)) + '</span>' +
-        '<span class="logi-agenda-res">' + (it.recur ? '↻ ' : '') + escapeHtml(it.label) + '</span>' +
+        '<span class="logi-agenda-date">' + escapeHtml(formatDateLong(it.date)) +
+          (it.plageInfo ? ' <span class="logi-agenda-plage">' + escapeHtml(it.plageInfo) + '</span>' : '') +
+        '</span>' +
+        '<span class="logi-agenda-res">' + (it.recur ? '↻ ' : '') +
+          (it.lot ? '⛓ ' : '') + escapeHtml(it.label) + '</span>' +
         '<span class="logi-agenda-creneau">' + escapeHtml(it.creneau) + '</span>' +
         (it.motif ? '<span class="logi-agenda-motif">' + escapeHtml(it.motif) + '</span>' : '') +
       '</div>';
@@ -832,12 +864,19 @@
       } catch (e) { simples = []; }
       simples.forEach(function (s) {
         if (!s.date) return;
-        pushOcc(s.date, {
-          creneau: (s.heure_debut || '').slice(0, 5) + '–' + (s.heure_fin || '').slice(0, 5),
-          res: label,
-          motif: s.motif || '',
-          recur: false,
-          hd: (s.heure_debut || '')
+        // MULTI-JOURS (F1-α) : occupe chaque jour de la plage (1 si mono-jour).
+        var jours = _joursDeLaPlage(s.date, s.date_fin);
+        var nb = jours.length;
+        jours.forEach(function (jour, idx) {
+          pushOcc(jour, {
+            creneau: (s.heure_debut || '').slice(0, 5) + '–' + (s.heure_fin || '').slice(0, 5),
+            res: label,
+            motif: s.motif || '',
+            recur: false,
+            lot: !!s.lot_id,                                   // MULTI-OBJETS (F2-β)
+            plageInfo: nb > 1 ? ('J' + (idx + 1) + '/' + nb) : '',
+            hd: (s.heure_debut || '')
+          });
         });
       });
 
@@ -959,7 +998,10 @@
       return '<div class="logi-cal__detail-row">' +
         '<div class="logi-cal__detail-line1">' +
           '<span class="logi-cal__detail-creneau">' + escapeHtml(it.creneau) + '</span>' +
-          '<span class="logi-cal__detail-res">' + (it.recur ? '↻ ' : '') + escapeHtml(it.res) + '</span>' +
+          '<span class="logi-cal__detail-res">' + (it.recur ? '↻ ' : '') +
+            (it.lot ? '⛓ ' : '') + escapeHtml(it.res) +
+            (it.plageInfo ? ' <span class="logi-cal__detail-plage">' + escapeHtml(it.plageInfo) + '</span>' : '') +
+          '</span>' +
         '</div>' +
         (it.motif ? '<div class="logi-cal__detail-motif">' + escapeHtml(it.motif) + '</div>' : '') +
       '</div>';
