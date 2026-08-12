@@ -1146,7 +1146,8 @@
       display: flex;
       align-items: center;
       gap: 10px;
-      flex-shrink: 0;
+      flex-shrink: 1;
+      flex-wrap: wrap;
     }
     .seance-form-collapsed__edit-btn {
       padding: 6px 14px;
@@ -2402,12 +2403,13 @@
       border: 1px solid var(--line);
       border-radius: 6px;
       width: 100%;
+      table-layout: fixed;
     }
-    /* Layout fixe + largeurs de colonnes réservés à la matrice rencontres.
-       Le circuit ordinaire garde un layout auto (colonnes équilibrées). */
+    /* min-width (scroll mobile) + largeurs de colonnes réservés aux rencontres.
+       Les deux modes partagent table-layout:fixed pour une colonne Tour
+       identique ; le circuit ordinaire équilibre ses ateliers automatiquement. */
     .seance-circuit__matrix--rencontres {
       min-width: 440px;
-      table-layout: fixed;
     }
     .seance-circuit__matrix th,
     .seance-circuit__matrix td {
