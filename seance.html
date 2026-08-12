@@ -2278,6 +2278,11 @@
     .seance-trame__voies--parallele .seance-trame__voie:nth-child(n+4) {
       border-left-color: var(--ink-mute);
     }
+    /* v1.28 : en mode rencontres, la voie « match » (2 groupes qui s'opposent)
+       occupe 2x la largeur d'une voie atelier. */
+    .seance-trame__voies--parallele .seance-trame__voie--match {
+      flex: 2 2 0;
+    }
 
     /* Pastille coach sous le libellé du bloc. */
     .seance-trame__coach {
@@ -2387,6 +2392,7 @@
       padding-left: 26px;
       overflow-x: auto;
       max-width: 100%;
+      box-sizing: border-box;
     }
     .seance-circuit__matrix {
       border-collapse: collapse;
@@ -2444,7 +2450,8 @@
        atelier se partagent le reste. */
     .seance-circuit__matrix-corner,
     .seance-circuit__matrix-tour {
-      width: 64px;
+      width: 44px;
+      white-space: nowrap;
     }
     /* v1.27 : ratio 1:2 entre atelier et match (station match = 2 groupes).
        table-layout:fixed normalise ces largeurs proportionnellement. */
@@ -2567,6 +2574,24 @@
       .seance-trame__voies--parallele {
         flex-direction: column;
         gap: 6px;
+      }
+      /* v1.28 : anti-débordement horizontal du header de trame sur mobile.
+         Titre au-dessus, barre d'actions dessous et repliable ; les boutons
+         s'étirent pour remplir la largeur au lieu de dépasser le viewport. */
+      .seance-trame__header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+      }
+      .seance-trame__header-actions {
+        flex-wrap: wrap;
+        width: 100%;
+      }
+      .seance-trame__pdf-btn,
+      .seance-trame__add-btn {
+        flex: 1 1 auto;
+        text-align: center;
+        white-space: nowrap;
       }
     }
 
@@ -2779,7 +2804,8 @@
         table-layout: fixed;
       }
       .seance-print__circuit-matrix--rencontres .seance-print__circuit-tour {
-        width: 48pt;
+        width: 34pt;
+        white-space: nowrap;
       }
       .seance-print__circuit-matrix--rencontres th.seance-print__circuit-atelier {
         width: 25%;
