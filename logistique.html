@@ -598,6 +598,12 @@
         Toute modification renvoie la demande en attente de validation :
         vous perdez l'approbation en cours, le bureau devra la revalider.
       </p>
+      <!-- LOT (maillon 5) : rappel que l'édition est ligne-à-ligne. Masqué
+           par défaut, révélé par le JS si la ligne appartient à un lot. -->
+      <p class="lmd-edit-avert" id="lmd-edit-lot" style="display:none;">
+        ⛓ Cette réservation fait partie d'un lot. Les modifications ne
+        s'appliquent qu'à cette ressource ; les autres restent inchangées.
+      </p>
       <div class="lmd-edit-field">
         <label for="lmd-edit-ressource">Ressource</label>
         <select id="lmd-edit-ressource"></select>
@@ -609,6 +615,13 @@
       <div class="lmd-edit-field" id="lmd-edit-f-date">
         <label for="lmd-edit-date">Date</label>
         <input type="date" id="lmd-edit-date" />
+      </div>
+      <!-- MULTI-JOURS (maillon 5) : « Jusqu'au » d'édition, optionnel.
+           Vide = réservation d'un seul jour. Doit être présent ici sinon
+           modifier une résa multi-jours l'écraserait en mono-jour. -->
+      <div class="lmd-edit-field" id="lmd-edit-f-date-fin">
+        <label for="lmd-edit-date-fin">Jusqu'au <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink-mute);text-transform:none;letter-spacing:0;">(optionnel — plusieurs jours)</span></label>
+        <input type="date" id="lmd-edit-date-fin" />
       </div>
       <div id="lmd-edit-recur" style="display:none;">
         <div class="lmd-edit-field">
