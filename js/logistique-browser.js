@@ -137,7 +137,10 @@
   const state = {
     type: getTypeParam(),
     ressources: [],
-    selectedRessourceId: null,
+    selectedRessourceId: null,   // MIROIR de ressourceCoches[0] (rétro-compat
+                                 // édition/agenda qui lisent le scalaire)
+    ressourceCoches: [],   // MULTI-OBJETS (F2-β) : uuid[] ressources cochées,
+                           // ORDRE DE COCHE (1re = principale/miroir scalaire)
     categories: [],        // mes catégories autorisées (B5) résolues
     isTransverse: false,   // admin|bureau → toutes catégories
     catCoches: [],         // uuid[] catégories cochées, ORDRE DE COCHE (T4)
@@ -360,13 +363,21 @@
         (r.conducteur_requis
           ? '<span class="logi-res-card__tag">conducteur requis</span>' : '');
       card.addEventListener('click', function () {
-        state.selectedRessourceId = r.id;
-        Array.prototype.forEach.call(
-          host.querySelectorAll('.logi-res-card'),
-          function (c) { c.classList.remove('is-selected'); });
-        card.classList.add('is-selected');
+        // MULTI-OBJETS (F2-β) : toggle par coche, ordre de coche conservé
+        // (patron catégories/responsables). selectedRessourceId = miroir
+        // de la 1re cochée (rétro-compat des lecteurs du scalaire).
+        const pos = state.ressourceCoches.indexOf(r.id);
+        if (pos === -1) {
+          state.ressourceCoches.push(r.id);
+          card.classList.add('is-selected');
+        } else {
+          state.ressourceCoches.splice(pos, 1);
+          card.classList.remove('is-selected');
+        }
+        state.selectedRessourceId = state.ressourceCoches.length
+          ? state.ressourceCoches[0] : null;
         const ff = el('logi-form-fields');
-        if (ff) ff.classList.add('is-active');
+        if (ff) ff.classList.toggle('is-active', state.ressourceCoches.length > 0);
       });
       host.appendChild(card);
     });
@@ -535,12 +546,14 @@
     // façon). Aucune catégorie = Bureau/Autre, transverses seulement (M3).
     const categorieIds = state.catCoches.slice();
     const responsables = state.respCoches.slice();
+    const ressourceIds = state.ressourceCoches.slice();  // MULTI-OBJETS (F2-β)
     const date    = (el('logi-date') || {}).value || null;
+    const dateFin = (el('logi-date-fin') || {}).value || null;  // MULTI-JOURS (F1-α)
     const hDebut  = (el('logi-heure-debut') || {}).value || null;
     const hFin    = (el('logi-heure-fin') || {}).value || null;
     const motif   = (el('logi-motif') || {}).value || null;
 
-    if (!state.selectedRessourceId) { showToast('Choisis une ressource', false); return; }
+    if (ressourceIds.length === 0) { showToast('Coche au moins une ressource', false); return; }
     if (responsables.length === 0) { showToast('Coche au moins un responsable', false); return; }
     if (categorieIds.length === 0 && !state.isTransverse) {
       showToast('Coche au moins une catégorie', false); return;
@@ -588,13 +601,20 @@
         showToast('Renseigne une date', false);
         if (submitBtn) submitBtn.disabled = false; return;
       }
+      // MULTI-JOURS (F1-α) : contrôle formulaire « Jusqu'au ≥ Date »
+      // (le CHECK SQL date_fin >= date tranche en dernier ressort).
+      if (dateFin && dateFin < date) {
+        showToast('« Jusqu\'au » doit être postérieur ou égal à la date', false);
+        if (submitBtn) submitBtn.disabled = false; return;
+      }
       res = await SupabaseHub.createReservation({
-        ressource_id: state.selectedRessourceId,
+        ressource_ids: ressourceIds,            // MULTI-OBJETS (F2-β)
         categorie_id: categorieIds[0] || null,
         categorie_ids: categorieIds,
         responsable_personne_id: responsables[0],
         responsables_personne_ids: responsables,
         date: date,
+        date_fin: dateFin,                       // MULTI-JOURS (F1-α)
         heure_debut: hDebut,
         heure_fin: hFin,
         motif: motif
@@ -606,15 +626,27 @@
       showToast('Échec : ' + (res.error || 'erreur'), false);
       return;
     }
-    showToast('Demande envoyée (en attente de validation)', true);
+    // Message reflétant le lot (F2-β) et la plage (F1-α) le cas échéant.
+    var nbRes = (res.rows && res.rows.length) || 1;
+    var msgOk = nbRes > 1
+      ? (nbRes + ' réservations envoyées (en attente de validation)')
+      : 'Demande envoyée (en attente de validation)';
+    showToast(msgOk, true);
     resetForm();
     await refreshAgenda();
     await refreshMesDemandes();
   }
 
   function resetForm() {
-    ['logi-date','logi-heure-debut','logi-heure-fin','logi-motif','logi-recur-fin','logi-recur-debut']
+    ['logi-date','logi-date-fin','logi-heure-debut','logi-heure-fin','logi-motif','logi-recur-fin','logi-recur-debut']
       .forEach(function (id) { if (el(id)) el(id).value = ''; });
+    // MULTI-OBJETS (F2-β) : purge des ressources cochées + état visuel des tuiles.
+    state.ressourceCoches = [];
+    state.selectedRessourceId = null;
+    Array.prototype.forEach.call(
+      document.querySelectorAll('#logi-ressources .logi-res-card.is-selected'),
+      function (c) { c.classList.remove('is-selected'); });
+    const ff2 = el('logi-form-fields'); if (ff2) ff2.classList.remove('is-active');
     state.recurOn = false;
     state.recurJours = [];
     const mp = el('logi-mode-ponctuelle'); if (mp) mp.checked = true;
