@@ -273,14 +273,13 @@
   // Chargements
   // ============================================================
   async function loadRessources() {
-    const ctx = TYPES[state.type];
-    let list = await SupabaseHub.listRessourcesLogistiques(ctx.resType, ctx.sousType);
-    // 'autre' = matériel hors minibus (veo + autre). Le wrapper ne filtre
-    // pas l'exclusion → on retire les minibus côté front.
-    if (state.type === 'autre') {
-      list = list.filter(function (r) { return r.sous_type !== 'minibus'; });
-    }
-    state.ressources = list;
+    // SAISIE UNIFIÉE TRANS-TYPES (RESERVATIONS-MULTI v2, A2) : le formulaire
+    // charge TOUT le parc actif (le wrapper renvoie tout sans filtre) ; le
+    // regroupement visuel par type est fait au rendu (renderRessources).
+    // L'agenda sous le formulaire, lui, reste filtré par ?type= (state.type
+    // inchangé de ce côté). Le filtre par type n'est donc plus un filtre de
+    // SAISIE mais seulement de CONSULTATION agenda.
+    state.ressources = await SupabaseHub.listRessourcesLogistiques();
     renderRessources();
   }
 
@@ -353,11 +352,15 @@
       return;
     }
     host.innerHTML = '';
-    state.ressources.forEach(function (r) {
+
+    // Fabrique d'une tuile ressource (toggle multi F2-β inchangé).
+    function fabriquerTuile(r) {
       const card = document.createElement('button');
       card.type = 'button';
       card.className = 'logi-res-card';
       card.dataset.id = r.id;
+      // Re-cocher si déjà dans la sélection (robustesse si re-render).
+      if (state.ressourceCoches.indexOf(r.id) !== -1) card.classList.add('is-selected');
       card.innerHTML =
         '<span class="logi-res-card__label">' + escapeHtml(r.libelle) + '</span>' +
         (r.conducteur_requis
@@ -379,7 +382,28 @@
         const ff = el('logi-form-fields');
         if (ff) ff.classList.toggle('is-active', state.ressourceCoches.length > 0);
       });
-      host.appendChild(card);
+      return card;
+    }
+
+    // SAISIE UNIFIÉE (A2) : 3 sections d'ordre fixe. Une ressource va dans
+    // « Minibus » si sous_type='minibus', « Infrastructures » si type='site',
+    // « Autre » sinon (matériel hors minibus, ex. Veo). Section masquée si vide.
+    const SECTIONS = [
+      { titre: 'Infrastructures', test: function (r) { return r.type === 'site'; } },
+      { titre: 'Minibus',         test: function (r) { return r.sous_type === 'minibus'; } },
+      { titre: 'Autre',           test: function (r) { return r.type !== 'site' && r.sous_type !== 'minibus'; } }
+    ];
+    SECTIONS.forEach(function (sec) {
+      const membres = state.ressources.filter(sec.test);
+      if (membres.length === 0) return;
+      const titre = document.createElement('div');
+      titre.className = 'logi-res-section';
+      titre.textContent = sec.titre;
+      host.appendChild(titre);
+      const grille = document.createElement('div');
+      grille.className = 'logi-res-grid';
+      membres.forEach(function (r) { grille.appendChild(fabriquerTuile(r)); });
+      host.appendChild(grille);
     });
   }
 
@@ -527,9 +551,33 @@
         joursHost.appendChild(b);
       });
     }
+    // JOURNÉE ENTIÈRE (RESERVATIONS-MULTI v2, A1) : cochée → créneau rempli
+    // auto (08:00–22:00, amplitude club) et champs grisés ; décochée → saisie
+    // manuelle. Le créneau n'est jamais vide → colonnes NOT NULL + CHECK
+    // heure_fin > heure_debut respectés, ZÉRO SQL.
+    const journee = el('logi-journee');
+    if (journee) {
+      journee.addEventListener('change', function () {
+        appliquerJourneeEntiere(journee.checked);
+      });
+    }
     // Soumission
     const submitBtn = el('logi-submit');
     if (submitBtn) submitBtn.addEventListener('click', onSubmit);
+  }
+
+  // JOURNÉE ENTIÈRE (A1) : bornes club 08:00–22:00. Sépare l'application de
+  // l'état du listener pour pouvoir la rappeler depuis resetForm.
+  function appliquerJourneeEntiere(actif) {
+    const hd = el('logi-heure-debut');
+    const hf = el('logi-heure-fin');
+    if (actif) {
+      if (hd) { hd.value = '08:00'; hd.disabled = true; }
+      if (hf) { hf.value = '22:00'; hf.disabled = true; }
+    } else {
+      if (hd) hd.disabled = false;
+      if (hf) hf.disabled = false;
+    }
   }
 
   function showToast(msg, ok) {
@@ -647,6 +695,9 @@
       document.querySelectorAll('#logi-ressources .logi-res-card.is-selected'),
       function (c) { c.classList.remove('is-selected'); });
     const ff2 = el('logi-form-fields'); if (ff2) ff2.classList.remove('is-active');
+    // JOURNÉE ENTIÈRE (A1) : décocher + dégriser les champs créneau.
+    const je = el('logi-journee'); if (je) je.checked = false;
+    appliquerJourneeEntiere(false);
     state.recurOn = false;
     state.recurJours = [];
     const mp = el('logi-mode-ponctuelle'); if (mp) mp.checked = true;
