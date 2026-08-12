@@ -2245,7 +2245,7 @@
       tbody += '</tr>';
     });
     return '<div class="seance-circuit__matrix-wrap">' +
-             '<table class="seance-circuit__matrix">' +
+             '<table class="seance-circuit__matrix seance-circuit__matrix--rencontres">' +
                '<thead>' + thead + '</thead>' +
                '<tbody>' + tbody + '</tbody>' +
              '</table>' +
