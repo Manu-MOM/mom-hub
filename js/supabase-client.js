@@ -7215,26 +7215,84 @@
      * sur la catégorie (ou categorie_id null hors transverse).
      * @param {Object} payload { ressource_id, categorie_id?, categorie_ids?,
      *   responsable_personne_id, responsables_personne_ids?,
-     *   date, heure_debut, heure_fin, motif? }
-     *   (multi : tableaux uuid[] transmis tels quels, trigger T1 sql_156
-     *   synchronise scalaire ↔ tableau ; policy B5 souple sur le tableau)
+     *   date, date_fin?, heure_debut, heure_fin, motif? }
+     *   (multi CATÉGORIES : tableaux uuid[] transmis tels quels, trigger T1
+     *   sql_156 synchronise scalaire ↔ tableau ; policy B5 souple sur le tableau)
+     *
+     *   MULTI-OBJETS (RESERVATIONS-MULTI, F2-β) : si `ressource_ids` (uuid[])
+     *   est fourni avec ≥ 2 entrées, une LIGNE par ressource est insérée,
+     *   toutes partageant un même `lot_id` généré ici (chaque ligne garde sa
+     *   validation et son agenda propres — modèle « 1 ligne = 1 ressource »
+     *   préservé). 0/1 ressource → `lot_id` NULL (résa simple, inchangée).
+     *   `ressource_id` scalaire reste accepté seul (rétro-compat stricte).
+     *
+     *   MULTI-JOURS (F1-α) : `date` = 1er jour (requis) ; `date_fin` optionnel
+     *   (NULL/absent = réservation d'un seul jour ; le CHECK SQL impose
+     *   date_fin >= date).
      * @returns {Promise<{ok:boolean, data?:object, error?:string}>}
      */
     async createReservation(payload) {
-      if (!payload || !payload.ressource_id || !payload.responsable_personne_id
+      if (!payload || !payload.responsable_personne_id
           || !payload.date || !payload.heure_debut || !payload.heure_fin) {
-        return { ok: false, error: 'Champs requis manquants : ressource_id, responsable_personne_id, date, heure_debut, heure_fin' };
+        return { ok: false, error: 'Champs requis manquants : responsable_personne_id, date, heure_debut, heure_fin' };
       }
+
+      // Résolution de la liste de ressources : tableau explicite, sinon
+      // repli sur le scalaire (rétro-compat). Dédoublonnage + purge des vides.
+      var ressourceIds = Array.isArray(payload.ressource_ids)
+        ? payload.ressource_ids.filter(function (v) { return !!v; })
+        : [];
+      if (ressourceIds.length === 0 && payload.ressource_id) {
+        ressourceIds = [payload.ressource_id];
+      }
+      ressourceIds = ressourceIds.filter(function (v, i, a) { return a.indexOf(v) === i; });
+      if (ressourceIds.length === 0) {
+        return { ok: false, error: 'Champs requis manquants : au moins une ressource' };
+      }
+
+      // Lot : uuid partagé seulement si ≥ 2 ressources (sinon résa simple).
+      var lotId = null;
+      if (ressourceIds.length > 1) {
+        lotId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+          ? crypto.randomUUID()
+          : 'lot-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+      }
+
+      // Champs métier communs à toutes les lignes du lot (hors ressource_id).
+      var commun = {
+        categorie_id: payload.categorie_id || null,
+        categorie_ids: Array.isArray(payload.categorie_ids) ? payload.categorie_ids : undefined,
+        responsable_personne_id: payload.responsable_personne_id,
+        responsables_personne_ids: Array.isArray(payload.responsables_personne_ids)
+          ? payload.responsables_personne_ids : undefined,
+        date: payload.date,
+        date_fin: payload.date_fin || null,
+        heure_debut: payload.heure_debut,
+        heure_fin: payload.heure_fin,
+        motif: payload.motif || null,
+        lot_id: lotId
+      };
+
+      var rows = ressourceIds.map(function (rid) {
+        var row = { ressource_id: rid };
+        Object.keys(commun).forEach(function (k) {
+          if (commun[k] !== undefined) row[k] = commun[k];
+        });
+        return row;
+      });
+
       const { data, error } = await client
         .from('reservations_logistiques')
-        .insert(payload)
-        .select()
-        .single();
+        .insert(rows)
+        .select();
       if (error) {
         console.error('MOM Hub: createReservation()', error);
         return { ok: false, error: error.message || 'Erreur INSERT reservations_logistiques' };
       }
-      return { ok: true, data: data };
+      var list = Array.isArray(data) ? data : (data ? [data] : []);
+      // Rétro-compat : `data` = 1re ligne (appelants mono existants) ;
+      // `rows`/`lot_id` = accès au lot complet pour les nouveaux appelants.
+      return { ok: true, data: list[0] || null, rows: list, lot_id: lotId };
     },
 
     /**
@@ -7416,7 +7474,8 @@
         p_motif: payload.motif || null,
         p_categorie_ids: (Array.isArray(payload.categorie_ids)
           && payload.categorie_ids.length)
-          ? payload.categorie_ids : null
+          ? payload.categorie_ids : null,
+        p_date_fin: payload.date_fin || null
       });
       if (error) {
         console.error('MOM Hub: modifierReservation()', error);
