@@ -1012,7 +1012,7 @@
       color: #fff;
       cursor: pointer;
       transition: background-color 0.15s, opacity 0.15s;
-      min-width: 220px;
+      min-width: min(220px, 100%);
     }
     .seance-form__save-btn:hover:not(:disabled) { background: var(--vert-bouteille); }
     .seance-form__save-btn:disabled { opacity: 0.55; cursor: default; }
@@ -2453,19 +2453,16 @@
     /* Tour : ne jamais casser "TOUR" sur 2 lignes (les 2 modes). */
     .seance-circuit__matrix-corner,
     .seance-circuit__matrix-tour {
+      width: 60px;
       white-space: nowrap;
     }
     /* Largeurs de colonnes réservées à la matrice rencontres (layout fixe) :
-       Tour étroit, atelier 1 part, match 2 parts. */
-    .seance-circuit__matrix--rencontres .seance-circuit__matrix-corner,
-    .seance-circuit__matrix--rencontres .seance-circuit__matrix-tour {
-      width: 60px;
-    }
+       Tour figé à 60px (atelier+match = 90% -> pas de reste redistribué au Tour). */
     .seance-circuit__matrix--rencontres th.seance-circuit__matrix-atelier {
-      width: 25%;
+      width: 30%;
     }
     .seance-circuit__matrix--rencontres th.seance-circuit__matrix-match {
-      width: 50%;
+      width: 60%;
     }
 
     /* --------------------------------------------------------------
