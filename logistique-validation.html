@@ -302,6 +302,11 @@
   <div id="lgv-edit-overlay" class="lgv-edit-overlay">
     <div class="lgv-edit-modal">
       <h3 id="lgv-edit-titre">Modifier la demande</h3>
+      <!-- LOT (maillon 6) : rappel édition ligne-à-ligne. Masqué par défaut. -->
+      <p id="lgv-edit-lot" style="display:none;font-size:12px;color:var(--ink-mute);margin:0 0 12px;">
+        ⛓ Cette réservation fait partie d'un lot. Les modifications ne
+        s'appliquent qu'à cette ressource ; les autres restent inchangées.
+      </p>
       <div class="lgv-edit-field">
         <label for="lgv-edit-ressource">Ressource</label>
         <select id="lgv-edit-ressource"></select>
@@ -314,6 +319,13 @@
       <div class="lgv-edit-field" id="lgv-edit-f-date">
         <label for="lgv-edit-date">Date</label>
         <input type="date" id="lgv-edit-date" />
+      </div>
+      <!-- MULTI-JOURS (maillon 6) : « Jusqu'au » d'édition, optionnel. Vide =
+           un seul jour. Absent jusqu'ici sur cette page -> modifier une résa
+           multi-jours l'écrasait en mono-jour. -->
+      <div class="lgv-edit-field" id="lgv-edit-f-date-fin">
+        <label for="lgv-edit-date-fin">Jusqu'au <span style="font-size:10px;color:var(--ink-mute);">(optionnel — plusieurs jours)</span></label>
+        <input type="date" id="lgv-edit-date-fin" />
       </div>
       <div id="lgv-edit-recur" style="display:none;">
         <div class="lgv-edit-field">
@@ -673,24 +685,57 @@
       // fetchWindow — tri-source, IDENTIQUE à la consultation (les pending
       // sont projetés, règles pending incluses AVANT approbation).
       // ------------------------------------------------------------------
+      // MULTI-JOURS (maillon 6) : dates ISO d'une réservation ponctuelle,
+      // bornées à l'intersection avec la fenêtre [debutISO, finISO]. Sans
+      // date_fin (ou <= date) → le seul jour `date`. Garde-fou 90 jours.
+      function joursPonctuelle(dateIso, dateFinIso, debutISO, finISO) {
+        if (!dateIso) return [];
+        var fin = (dateFinIso && dateFinIso > dateIso) ? dateFinIso : dateIso;
+        var lo = dateIso < debutISO ? debutISO : dateIso;
+        var hi = fin > finISO ? finISO : fin;
+        if (lo > hi) return [];
+        var out = [];
+        var d = new Date(lo + 'T00:00:00');
+        var f = new Date(hi + 'T00:00:00');
+        var garde = 0;
+        while (d <= f && garde < 90) {
+          out.push(d.getFullYear() + '-' +
+            String(d.getMonth() + 1).padStart(2, '0') + '-' +
+            String(d.getDate()).padStart(2, '0'));
+          d.setDate(d.getDate() + 1);
+          garde++;
+        }
+        return out;
+      }
+
       async function fetchWindow(debutISO, finISO) {
         var items = [];
 
+        // MULTI-JOURS (maillon 6) : capter les plages qui débordent dans la
+        // fenêtre même si leur 1er jour la précède, puis un item par jour.
         var p = await SupabaseHub.client
           .from('reservations_logistiques').select('*')
-          .gte('date', debutISO).lte('date', finISO)
+          .lte('date', finISO)
+          .or('date_fin.gte.' + debutISO + ',date.gte.' + debutISO)
           .in('statut', ['pending', 'approved']);
         if (p.error) throw p.error;
         (p.data || []).forEach(function (r) {
-          items.push({
-            id: 'p-' + r.id,
-            date: r.date,
-            heure: r.heure_debut ? String(r.heure_debut).slice(0, 5) : null,
-            duree_min: dureeEntre(r.heure_debut, r.heure_fin),
-            type: typeCodeOf(r.ressource_id),
-            libelle: (r.motif || ressLbl(r.ressource_id)) + ' · ' + catsLbl(r),
-            etat: r.statut,
-            meta: { src: 'ponctuelle', row: r }
+          var finReelle = (r.date_fin && r.date_fin > r.date) ? r.date_fin : r.date;
+          var totalPlage = joursPonctuelle(r.date, finReelle, r.date, finReelle).length;
+          joursPonctuelle(r.date, r.date_fin, debutISO, finISO).forEach(function (jour) {
+            var rang = joursPonctuelle(r.date, jour, r.date, jour).length;
+            items.push({
+              id: 'p-' + r.id + '-' + jour,
+              date: jour,
+              heure: r.heure_debut ? String(r.heure_debut).slice(0, 5) : null,
+              duree_min: dureeEntre(r.heure_debut, r.heure_fin),
+              type: typeCodeOf(r.ressource_id),
+              libelle: (r.lot_id ? '⛓ ' : '') +
+                (r.motif || ressLbl(r.ressource_id)) + ' · ' + catsLbl(r) +
+                (totalPlage > 1 ? ' (J' + rang + '/' + totalPlage + ')' : ''),
+              etat: r.statut,
+              meta: { src: 'ponctuelle', row: r }
+            });
           });
         });
 
@@ -862,10 +907,15 @@
           return;
         }
         ponct.forEach(function (r) {
+          // MULTI-JOURS (maillon 6) : mention de la plage si date_fin présente.
+          var quand = formatDateLong(r.date)
+            + (r.date_fin && r.date_fin > r.date
+                ? ' → ' + formatDateLong(r.date_fin) : '')
+            + ' · ' + creneauLbl(r) + ' · ' + catsLbl(r);
           host.appendChild(carteFile(
             'ponctuelle', 'Ponctuelle', '',
-            ressLbl(r.ressource_id),
-            formatDateLong(r.date) + ' · ' + creneauLbl(r) + ' · ' + catsLbl(r),
+            (r.lot_id ? '⛓ ' : '') + ressLbl(r.ressource_id),
+            quand,
             r.motif, r.id));
         });
         recur.forEach(function (r) {
@@ -1098,6 +1148,12 @@
         el('lgv-edit-hfin').value = row.heure_fin ? String(row.heure_fin).slice(0, 5) : '';
         el('lgv-edit-motif').value = row.motif || '';
         el('lgv-edit-f-date').style.display = isRecur ? 'none' : '';
+        // MULTI-JOURS (maillon 6) : « Jusqu'au » d'édition en ponctuel seulement.
+        var vffin = el('lgv-edit-f-date-fin');
+        if (vffin) vffin.style.display = isRecur ? 'none' : '';
+        // LOT (maillon 6) : mention ligne-à-ligne si la ligne appartient à un lot.
+        var vlot = el('lgv-edit-lot');
+        if (vlot) vlot.style.display = (!isRecur && row.lot_id) ? '' : 'none';
         el('lgv-edit-recur').style.display = isRecur ? '' : 'none';
         if (isRecur) {
           el('lgv-edit-freq').value = row.freq || 'weekly';
@@ -1114,6 +1170,9 @@
           }
         } else {
           el('lgv-edit-date').value = row.date || '';
+          // MULTI-JOURS (maillon 6) : pré-remplissage de la borne de fin.
+          var vedf = el('lgv-edit-date-fin');
+          if (vedf) vedf.value = row.date_fin || '';
         }
         el('lgv-edit-overlay').classList.add('is-open');
       }
@@ -1157,11 +1216,18 @@
             showToast('Renseigne une date', false);
             if (btn) btn.disabled = false; return;
           }
+          // MULTI-JOURS (maillon 6) : contrôle « Jusqu'au ≥ Date ».
+          var vedFin = (el('lgv-edit-date-fin') || {}).value || null;
+          if (vedFin && vedFin < el('lgv-edit-date').value) {
+            showToast('« Jusqu\'au » doit être postérieur ou égal à la date', false);
+            if (btn) btn.disabled = false; return;
+          }
           res = await SupabaseHub.modifierReservation(editCtx.row.id, {
             ressource_id: el('lgv-edit-ressource').value,
             categorie_id: editCats[0] || null,
             categorie_ids: editCats.slice(),
             date: el('lgv-edit-date').value,
+            date_fin: vedFin,
             heure_debut: hd,
             heure_fin: hf,
             motif: el('lgv-edit-motif').value || null
