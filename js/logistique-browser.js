@@ -1384,7 +1384,14 @@
     el('lmd-edit-hfin').value   = row.heure_fin   ? String(row.heure_fin).slice(0, 5)   : '';
     el('lmd-edit-motif').value  = row.motif || '';
     el('lmd-edit-f-date').style.display = isRecur ? 'none' : '';
+    // MULTI-JOURS (maillon 5) : champ « Jusqu'au » d'édition, uniquement en
+    // ponctuel (la récurrence a ses propres bornes). Pré-rempli depuis row.
+    var ffin = el('lmd-edit-f-date-fin');
+    if (ffin) ffin.style.display = isRecur ? 'none' : '';
     el('lmd-edit-recur').style.display  = isRecur ? '' : 'none';
+    // LOT (maillon 5) : mention ligne-à-ligne si la ligne appartient à un lot.
+    var lotP = el('lmd-edit-lot');
+    if (lotP) lotP.style.display = (!isRecur && row.lot_id) ? '' : 'none';
     if (isRecur) {
       el('lmd-edit-freq').value = row.freq || 'weekly';
       state.editJours = (row.jours || []).slice();
@@ -1396,6 +1403,9 @@
       if (exd) { exd.value = ''; exd.min = row.date_debut || ''; exd.max = row.date_fin || ''; }
     } else {
       el('lmd-edit-date').value = row.date || '';
+      // MULTI-JOURS (maillon 5) : pré-remplissage de la borne de fin.
+      var edf = el('lmd-edit-date-fin');
+      if (edf) edf.value = row.date_fin || '';
     }
     el('lmd-edit-overlay').classList.add('is-open');
   }
@@ -1439,11 +1449,18 @@
         showToast('Renseigne une date', false);
         if (btn) btn.disabled = false; return;
       }
+      // MULTI-JOURS (maillon 5) : contrôle « Jusqu'au ≥ Date ».
+      var edFin = (el('lmd-edit-date-fin') || {}).value || null;
+      if (edFin && edFin < el('lmd-edit-date').value) {
+        showToast('« Jusqu\'au » doit être postérieur ou égal à la date', false);
+        if (btn) btn.disabled = false; return;
+      }
       res = await SupabaseHub.modifierReservation(state.editCtx.row.id, {
         ressource_id: el('lmd-edit-ressource').value,
         categorie_id: state.editCats[0] || null,
         categorie_ids: state.editCats.slice(),
         date: el('lmd-edit-date').value,
+        date_fin: edFin,
         heure_debut: hd,
         heure_fin: hf,
         motif: el('lmd-edit-motif').value || null
