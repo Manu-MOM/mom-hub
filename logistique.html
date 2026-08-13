@@ -383,6 +383,30 @@
       cursor: pointer; margin-right: auto;
     }
     .lmd-btn-annule:disabled { opacity: 0.5; cursor: default; }
+
+    /* ============================================================
+       AXE UX 2 — Traitement visuel du LOT (réservations groupées).
+       FAIT FOI : D-forme-A (liseré + badge « ⛓ lot de N »),
+       D-couleur-1 (teinte unique « lot », pas de couleur par uuid).
+       Liseré ambre à gauche de la ligne + pastille badge. Additif :
+       n'altère aucune règle existante (sélecteurs .is-lot neufs).
+       ============================================================ */
+    .logi-lot-accent { /* ancre de la teinte lot, réutilisable */ }
+    .logi-agenda-row.is-lot,
+    .logi-cal__detail-row.is-lot {
+      border-left: 3px solid #d98c1f;      /* ambre lot */
+      padding-left: 13px;                   /* compense le liseré */
+    }
+    .logi-agenda-row.is-lot { border-radius: 10px; }
+    .logi-lot-badge {
+      display: inline-block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; letter-spacing: 0.04em;
+      color: #8a5a12; background: #fbeed6;
+      border: 1px solid #ecd3a3; border-radius: 6px;
+      padding: 1px 6px; margin-left: 2px;
+      white-space: nowrap; vertical-align: middle;
+    }
   </style>
 </head>
 <body class="auth-pending">
