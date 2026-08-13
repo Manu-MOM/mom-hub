@@ -746,6 +746,36 @@
     return out;
   }
 
+  // ============================================================
+  // AXE UX 2 — Traitement visuel du LOT (réservations groupées).
+  // FAIT FOI : D-forme-A (liseré ambre + badge « ⛓ lot de N »),
+  // D-tri-1 (tri chronologique préservé, lien à distance par teinte
+  // unique « lot »), D-couleur-1 (une seule couleur d'accent lot, pas
+  // de teinte par uuid). N = nb de lignes du même lot_id dans la
+  // fenêtre chargée du rendu (pré-passe de comptage). Sur le détail
+  // du jour (lot multi-jours fractionné) → badge SANS N (V-surf).
+  // ============================================================
+
+  // Compte les lignes par lot_id sur un tableau de réservations brutes.
+  // Retourne { lotId: nbLignes }. Ignore les lignes sans lot_id.
+  function _compterLots(rows) {
+    var m = {};
+    (rows || []).forEach(function (r) {
+      if (r && r.lot_id) { m[r.lot_id] = (m[r.lot_id] || 0) + 1; }
+    });
+    return m;
+  }
+
+  // Fragment HTML du marqueur de lot. lotId truthy requis. Si n≥2 fourni,
+  // affiche « ⛓ lot de N » ; sinon « ⛓ lot » (fenêtre partielle : détail
+  // du jour). Le liseré est porté par la classe CSS is-lot sur la ligne.
+  function _lotBadgeHtml(lotId, n) {
+    if (!lotId) return '';
+    var txt = (n && n >= 2) ? ('lot de ' + n) : 'lot';
+    return '<span class="logi-lot-badge" title="Réservation groupée">⛓ ' +
+      escapeHtml(txt) + '</span>';
+  }
+
   async function refreshAgenda() {
     const host = el('logi-agenda');
     if (!host) return;
@@ -779,6 +809,7 @@
           creneau: (r.heure_debut || '').slice(0,5) + '–' + (r.heure_fin || '').slice(0,5),
           recur: false, motif: r.motif,
           lot: !!r.lot_id,                                   // MULTI-OBJETS (F2-β)
+          lotId: r.lot_id || null,                           // AXE UX 2 : lot_id réel
           plageInfo: nb > 1 ? ('J' + (idx + 1) + '/' + nb) : '' });  // multi-jours
       });
     });
@@ -798,17 +829,22 @@
       return a.creneau < b.creneau ? -1 : 1;
     });
 
+    // AXE UX 2 : comptage N par lot sur les LIGNES (simples), pas sur les
+    // items égrenés par jour. Le lot complet du mois est en mémoire ici.
+    var lotN = _compterLots(simples);
+
     if (items.length === 0) {
       host.innerHTML = '<div class="logi-empty">Aucune réservation approuvée ce mois-ci.</div>';
       return;
     }
     host.innerHTML = items.map(function (it) {
-      return '<div class="logi-agenda-row">' +
+      return '<div class="logi-agenda-row' + (it.lotId ? ' is-lot' : '') + '">' +
         '<span class="logi-agenda-date">' + escapeHtml(formatDateLong(it.date)) +
           (it.plageInfo ? ' <span class="logi-agenda-plage">' + escapeHtml(it.plageInfo) + '</span>' : '') +
         '</span>' +
         '<span class="logi-agenda-res">' + (it.recur ? '↻ ' : '') +
-          (it.lot ? '⛓ ' : '') + escapeHtml(it.label) + '</span>' +
+          escapeHtml(it.label) +
+          (it.lotId ? ' ' + _lotBadgeHtml(it.lotId, lotN[it.lotId]) : '') + '</span>' +
         '<span class="logi-agenda-creneau">' + escapeHtml(it.creneau) + '</span>' +
         (it.motif ? '<span class="logi-agenda-motif">' + escapeHtml(it.motif) + '</span>' : '') +
       '</div>';
@@ -934,6 +970,7 @@
             motif: s.motif || '',
             recur: false,
             lot: !!s.lot_id,                                   // MULTI-OBJETS (F2-β)
+            lotId: s.lot_id || null,                           // AXE UX 2 : lot_id réel
             plageInfo: nb > 1 ? ('J' + (idx + 1) + '/' + nb) : '',
             hd: (s.heure_debut || '')
           });
@@ -1055,11 +1092,14 @@
     }
 
     body.innerHTML = occ.map(function (it) {
-      return '<div class="logi-cal__detail-row">' +
+      return '<div class="logi-cal__detail-row' + (it.lotId ? ' is-lot' : '') + '">' +
         '<div class="logi-cal__detail-line1">' +
           '<span class="logi-cal__detail-creneau">' + escapeHtml(it.creneau) + '</span>' +
           '<span class="logi-cal__detail-res">' + (it.recur ? '↻ ' : '') +
-            (it.lot ? '⛓ ' : '') + escapeHtml(it.res) +
+            escapeHtml(it.res) +
+            // AXE UX 2 (V-surf) : détail du jour = lot multi-jours fractionné
+            // → badge « ⛓ lot » SANS compteur (N serait faux sur cette vue).
+            (it.lotId ? ' ' + _lotBadgeHtml(it.lotId, null) : '') +
             (it.plageInfo ? ' <span class="logi-cal__detail-plage">' + escapeHtml(it.plageInfo) + '</span>' : '') +
           '</span>' +
         '</div>' +
