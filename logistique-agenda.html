@@ -260,6 +260,16 @@
           .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
           .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
       }
+      // AXE UX 2 — Traitement visuel du LOT. L'agenda est rendu par HubAgenda
+      // (libellé en textContent, INTERDIT hub-agenda.js non touché) → marqueur
+      // TEXTE « ⛓ lot de N » dans le libellé, N pré-compté sur la fenêtre.
+      function _compterLots(rows) {
+        var m = {};
+        (rows || []).forEach(function (r) {
+          if (r && r.lot_id) { m[r.lot_id] = (m[r.lot_id] || 0) + 1; }
+        });
+        return m;
+      }
       // Copies privées (module MOIS/JOURS — duplication tracée, patron G5)
       var MOIS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
       var JOURS_LBL = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']; // 0=Lun..6=Dim
@@ -557,11 +567,16 @@
           .or('date_fin.gte.' + debutISO + ',date.gte.' + debutISO)
           .in('statut', ['pending', 'approved']);
         if (p.error) throw p.error;
+        // AXE UX 2 : N par lot sur la fenêtre chargée (tout le lot présent).
+        var lotNwin = _compterLots(p.data || []);
         (p.data || []).forEach(function (r) {
           // Total de jours de la plage complète (pour un libellé Ji/N stable,
           // indépendant du fenêtrage) et date de départ réelle.
           var finReelle = (r.date_fin && r.date_fin > r.date) ? r.date_fin : r.date;
           var totalPlage = joursPonctuelle(r.date, finReelle, r.date, finReelle).length;
+          var lotTxt = r.lot_id
+            ? ('⛓ ' + ((lotNwin[r.lot_id] >= 2) ? ('lot de ' + lotNwin[r.lot_id]) : 'lot') + ' · ')
+            : '';
           joursPonctuelle(r.date, r.date_fin, debutISO, finISO)
             .forEach(function (jour) {
               // Rang 1-based du jour dans la plage = nb de jours de r.date à
@@ -573,7 +588,7 @@
                 heure: r.heure_debut ? String(r.heure_debut).slice(0, 5) : null,
                 duree_min: dureeEntre(r.heure_debut, r.heure_fin),
                 type: typeCodeOf(r.ressource_id),
-                libelle: (r.lot_id ? '⛓ ' : '') +
+                libelle: lotTxt +
                   (r.motif || ressLbl(r.ressource_id)) + ' · ' + catsLbl(r) +
                   (totalPlage > 1 ? ' (J' + rangDansPlage + '/' + totalPlage + ')' : ''),
                 etat: r.statut,
