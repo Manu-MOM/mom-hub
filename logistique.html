@@ -37,6 +37,24 @@
       letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft);
       margin: 0 0 12px; display: flex; align-items: center; gap: 8px;
     }
+    /* Agenda repliable (Axe UX 1) : summary cliquable, marqueur natif retiré,
+       chevron qui pivote à l'ouverture. Replié par défaut (pas d'attribut
+       open sur le <details>). */
+    .logi-agenda-details { margin-bottom: 30px; }
+    .logi-agenda-summary {
+      cursor: pointer; list-style: none; user-select: none;
+      margin-bottom: 0;
+    }
+    .logi-agenda-summary::-webkit-details-marker { display: none; }
+    .logi-agenda-summary:hover { color: var(--ink); }
+    .logi-agenda-summary__chevron {
+      display: inline-block; transition: transform 0.15s ease;
+      font-size: 12px;
+    }
+    .logi-agenda-details[open] .logi-agenda-summary__chevron {
+      transform: rotate(90deg);
+    }
+    .logi-agenda-details[open] .logi-agenda-summary { margin-bottom: 12px; }
     /* Grille ressources */
     /* SAISIE UNIFIÉE (RESERVATIONS-MULTI v2, A2) : conteneur en colonne pour
        empiler les sections (titre + grille) ; chaque grille reprend le
@@ -533,11 +551,18 @@
       </div>
     </section>
 
-    <!-- AGENDA -->
-    <section class="logi-section">
-      <h3 class="logi-section__title">Agenda du mois</h3>
+    <!-- AGENDA — repliable (Axe UX 1) : le mini-calendrier latéral couvre la
+         consultation immédiate (jour → détail) ; l'agenda empilé reste
+         disponible pour le « flux à venir continu » mais REPLIÉ par défaut
+         pour alléger la page. <details> natif = zéro JS d'état. Le conteneur
+         #logi-agenda est INCHANGÉ (renderAgenda le peuple à l'identique). -->
+    <details class="logi-section logi-agenda-details">
+      <summary class="logi-section__title logi-agenda-summary">
+        <span class="logi-agenda-summary__chevron" aria-hidden="true">▸</span>
+        Agenda du mois
+      </summary>
       <div id="logi-agenda"><div class="logi-empty">Chargement…</div></div>
-    </section>
+    </details>
 
     <!-- MES DEMANDES (SURFACE-DEMANDEUR) : le demandeur retrouve, là où il
          dépose, l'ensemble de SES demandes (logistique + règles + bus) avec
