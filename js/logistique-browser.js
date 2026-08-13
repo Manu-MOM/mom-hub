@@ -40,6 +40,12 @@
   // Contexte type (?type=site|minibus|autre) — D6
   // ============================================================
   const TYPES = {
+    // Entrée générique : arrivée SANS ?type= (porte unifiée « Réserver » de
+    // l'accueil / du menu latéral, Axe UX 1). Titre neutre car le formulaire
+    // charge TOUT le parc depuis la saisie unifiée (pt 243, A2). resType/
+    // sousType conservés à null par symétrie — non lus depuis A2.
+    tous:    { titre: 'Réservation',     sousTitre: 'Toutes ressources',
+               resType: null,       sousType: null },
     site:    { titre: 'Infrastructures', sousTitre: 'Réservation des lieux',
                resType: 'site',     sousType: null },
     minibus: { titre: 'Minibus',         sousTitre: 'Réservation des minibus',
@@ -50,7 +56,10 @@
 
   function getTypeParam() {
     const p = new URLSearchParams(window.location.search).get('type');
-    return TYPES[p] ? p : 'site';
+    // Axe UX 1 : sans ?type= explicite → 'tous' (titre générique « Réservation
+    // / Toutes ressources »). Un lien ?type=site|minibus|autre garde son titre
+    // spécifique. Le parc chargé est identique dans tous les cas (A2).
+    return TYPES[p] ? p : 'tous';
   }
 
   // ============================================================
