@@ -217,6 +217,24 @@
     }
     .lgv-toast.is-show { opacity: 1; transform: translateX(-50%) translateY(0); }
     .lgv-toast.is-err { background: var(--rouge-alerte, #b23); }
+
+    /* ============================================================
+       AXE UX 2 — Traitement visuel du LOT (réservations groupées).
+       Liseré ambre + badge « ⛓ lot de N » sur les cartes de la file
+       d'attente. Additif (sélecteurs .is-lot / .lgv-lot-badge neufs).
+       ============================================================ */
+    .lgv-card.is-lot {
+      border-left: 3px solid #d98c1f;   /* ambre lot */
+    }
+    .lgv-lot-badge {
+      display: inline-block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; letter-spacing: 0.04em;
+      color: #8a5a12; background: #fbeed6;
+      border: 1px solid #ecd3a3; border-radius: 6px;
+      padding: 1px 6px; margin-left: 4px;
+      white-space: nowrap; vertical-align: middle;
+    }
   </style>
 </head>
 <body class="auth-pending">
@@ -416,6 +434,25 @@
           .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
           .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
       }
+
+      // AXE UX 2 — Traitement visuel du LOT (réservations groupées).
+      // Helpers autonomes (cette page ne charge pas logistique-browser.js).
+      // _compterLots : { lot_id: nbLignes } sur des lignes brutes.
+      // _lotBadgeHtml : « ⛓ lot de N » (n≥2) ou « ⛓ lot » (n absent).
+      function _compterLots(rows) {
+        var m = {};
+        (rows || []).forEach(function (r) {
+          if (r && r.lot_id) { m[r.lot_id] = (m[r.lot_id] || 0) + 1; }
+        });
+        return m;
+      }
+      function _lotBadgeHtml(lotId, n) {
+        if (!lotId) return '';
+        var txt = (n && n >= 2) ? ('lot de ' + n) : 'lot';
+        return '<span class="lgv-lot-badge" title="Réservation groupée">⛓ ' +
+          escapeHtml(txt) + '</span>';
+      }
+
       var JOURS_LBL = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']; // 0=Lun..6=Dim
       var MOIS_LONG = ['janvier','février','mars','avril','mai','juin','juillet',
                        'août','septembre','octobre','novembre','décembre'];
@@ -719,9 +756,15 @@
           .or('date_fin.gte.' + debutISO + ',date.gte.' + debutISO)
           .in('statut', ['pending', 'approved']);
         if (p.error) throw p.error;
+        // AXE UX 2 : N par lot sur la fenêtre (agenda partagé HubAgenda rend le
+        // libellé en textContent → marqueur TEXTE « ⛓ lot de N », pas de HTML).
+        var lotNwin = _compterLots(p.data || []);
         (p.data || []).forEach(function (r) {
           var finReelle = (r.date_fin && r.date_fin > r.date) ? r.date_fin : r.date;
           var totalPlage = joursPonctuelle(r.date, finReelle, r.date, finReelle).length;
+          var lotTxt = r.lot_id
+            ? ('⛓ ' + ((lotNwin[r.lot_id] >= 2) ? ('lot de ' + lotNwin[r.lot_id]) : 'lot') + ' · ')
+            : '';
           joursPonctuelle(r.date, r.date_fin, debutISO, finISO).forEach(function (jour) {
             var rang = joursPonctuelle(r.date, jour, r.date, jour).length;
             items.push({
@@ -730,7 +773,7 @@
               heure: r.heure_debut ? String(r.heure_debut).slice(0, 5) : null,
               duree_min: dureeEntre(r.heure_debut, r.heure_fin),
               type: typeCodeOf(r.ressource_id),
-              libelle: (r.lot_id ? '⛓ ' : '') +
+              libelle: lotTxt +
                 (r.motif || ressLbl(r.ressource_id)) + ' · ' + catsLbl(r) +
                 (totalPlage > 1 ? ' (J' + rang + '/' + totalPlage + ')' : ''),
               etat: r.statut,
@@ -842,13 +885,18 @@
       // ------------------------------------------------------------------
       // File tri-source (gauche)
       // ------------------------------------------------------------------
-      function carteFile(src, tag, tagClass, titre, meta, motif, id) {
+      // AXE UX 2 : lotBadgeHtml (optionnel) = fragment HTML déjà sûr produit
+      // par _lotBadgeHtml, inséré NON échappé après le titre ; classe is-lot
+      // pour le liseré. Paramètre en fin de signature → appels existants
+      // (7 args) restent valides, lotBadgeHtml vaut undefined = pas de badge.
+      function carteFile(src, tag, tagClass, titre, meta, motif, id, lotBadgeHtml) {
         var card = document.createElement('div');
-        card.className = 'lgv-card';
+        card.className = 'lgv-card' + (lotBadgeHtml ? ' is-lot' : '');
         card.innerHTML =
           '<div class="lgv-card__top">' +
             '<span class="lgv-tag' + (tagClass ? ' ' + tagClass : '') + '">' + escapeHtml(tag) + '</span>' +
-            '<span class="lgv-card__res">' + escapeHtml(titre) + '</span>' +
+            '<span class="lgv-card__res">' + escapeHtml(titre) +
+              (lotBadgeHtml ? ' ' + lotBadgeHtml : '') + '</span>' +
           '</div>' +
           '<div class="lgv-card__meta">' + escapeHtml(meta) + '</div>' +
           (motif ? '<div class="lgv-card__motif">' + escapeHtml(motif) + '</div>' : '');
@@ -906,6 +954,9 @@
           host.innerHTML = '<div class="lgv-empty">Aucune demande en attente.</div>';
           return;
         }
+        // AXE UX 2 : comptage N par lot sur la file d'attente complète (tous
+        // les pending sont en mémoire dans `ponct` → N fiable).
+        var lotNfile = _compterLots(ponct);
         ponct.forEach(function (r) {
           // MULTI-JOURS (maillon 6) : mention de la plage si date_fin présente.
           var quand = formatDateLong(r.date)
@@ -914,9 +965,10 @@
             + ' · ' + creneauLbl(r) + ' · ' + catsLbl(r);
           host.appendChild(carteFile(
             'ponctuelle', 'Ponctuelle', '',
-            (r.lot_id ? '⛓ ' : '') + ressLbl(r.ressource_id),
+            ressLbl(r.ressource_id),
             quand,
-            r.motif, r.id));
+            r.motif, r.id,
+            r.lot_id ? _lotBadgeHtml(r.lot_id, lotNfile[r.lot_id]) : ''));
         });
         recur.forEach(function (r) {
           host.appendChild(carteFile(
