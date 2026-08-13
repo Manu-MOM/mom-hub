@@ -60,10 +60,14 @@
     .ag-sw.t-site-mom-holtzplatz { background:#2f6fb0; }
     .ag-ev.t-site-mom-clubhouse,  .ag-chip.t-site-mom-clubhouse  { background:#faeee8; color:#7a3d20; border-left-color:#c0622f; }
     .ag-sw.t-site-mom-clubhouse  { background:#c0622f; }
-    .ag-ev.t-minibus-1,           .ag-chip.t-minibus-1           { background:#f1ecfa; color:#4a3577; border-left-color:#6d4fc2; }
-    .ag-sw.t-minibus-1           { background:#6d4fc2; }
-    .ag-ev.t-minibus-2,           .ag-chip.t-minibus-2           { background:#faf3e2; color:#7a5a12; border-left-color:#d9a222; }
-    .ag-sw.t-minibus-2           { background:#d9a222; }
+    /* UX-AXE3 (a) : minibus-1 violet écarté du bleu holtzplatz (dE 41.2->61.3),
+       minibus-2 ambre écarté de l'orange clubhouse (dE 37.8->50.8) — teintes
+       objectivées deltaE, trios (fond/texte/barre/swatch) réalignés, contraste
+       texte WCAG AA vérifié. Les 4 autres ressources restent inchangées (dE>50). */
+    .ag-ev.t-minibus-1,           .ag-chip.t-minibus-1           { background:#efeaf5; color:#481d86; border-left-color:#7d3fd6; }
+    .ag-sw.t-minibus-1           { background:#7d3fd6; }
+    .ag-ev.t-minibus-2,           .ag-chip.t-minibus-2           { background:#f8f5e7; color:#806600; border-left-color:#e0b400; }
+    .ag-sw.t-minibus-2           { background:#e0b400; }
     .ag-ev.t-veo,                 .ag-chip.t-veo                 { background:#fae9f0; color:#82345a; border-left-color:#c7508a; }
     .ag-sw.t-veo                 { background:#c7508a; }
     .ag-ev.t-bus,                 .ag-chip.t-bus                 { background:#eceff2; color:#333e4a; border-left-color:#52616f; }
@@ -75,6 +79,18 @@
     .ag-sw.t-ferie               { background:#c98a8a; }
     .ag-ev.t-vacances,            .ag-chip.t-vacances            { background:#f3f1ea; color:#7a746a; border-left-color:#c9c2b2; }
     .ag-sw.t-vacances            { background:#c9c2b2; }
+
+    /* ----------------------------------------------------------
+       UX-AXE3 (a') : barre latérale de couleur épaissie 3px->5px.
+       Surcharge LOCALE de la largeur héritée du moteur partagé
+       (hub-agenda.css .ag-ev/.ag-chip { border-left: 3px solid } —
+       INTERDIT, NON touché). Le signal couleur (border-left) passe
+       devant le fond pâle pour un oeil non-habitué. La COULEUR reste
+       pilotée par la palette t-* ci-dessus ; ici, largeur seule.
+       Placé AVANT le bloc pending pour que 'border-left-style: dashed'
+       du pending reste prioritaire sur les demandes en attente.
+       ---------------------------------------------------------- */
+    .ag-ev, .ag-chip { border-left-width: 5px; }
 
     /* ----------------------------------------------------------
        PENDING (rendu validé en maquette : hachuré + bordure
