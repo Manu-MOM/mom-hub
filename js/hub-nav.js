@@ -144,9 +144,7 @@
       ariaLabel: 'Navigation logistique',
       carrefour: false,
       liens: tronc().concat([
-        { label: 'Sites', href: 'logistique.html?type=site' },
-        { label: 'Minibus', href: 'logistique.html?type=minibus' },
-        { label: 'Autre', href: 'logistique.html?type=autre' },
+        { label: 'Réserver', href: 'logistique.html' },
         { label: 'Agenda', href: 'logistique-agenda.html' },
         { label: 'Bus', href: 'bus.html' },
         { label: 'Validation', href: 'logistique-validation.html', show: 'admin bureau' }
