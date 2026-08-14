@@ -4100,6 +4100,11 @@
       html += '<button type="button" class="evt-btn evt-btn-primary" data-action="edit-from-fiche" data-event-id="' + escHtml(evt.id) + '">✏️ Modifier</button>';
       html += '<button type="button" class="evt-btn" data-action="notes-from-fiche" data-event-id="' + escHtml(evt.id) + '">📝 Notes</button>';
       html += '<button type="button" class="evt-btn" data-action="duplicate-from-fiche" data-event-id="' + escHtml(evt.id) + '">📋 Dupliquer</button>';
+      // EVT-PONT-SAISIE (brique A) : amène l'écran RESERVATIONS-MULTI
+      // pré-rempli depuis cet événement (bouton explicite, pas d'enchaînement
+      // automatique). Le lien réel est construit au clic (handler ci-dessous)
+      // selon la règle domicile/extérieur/null.
+      html += '<button type="button" class="evt-btn" data-action="reserver-logistique-from-fiche" data-event-id="' + escHtml(evt.id) + '">🚌 Réserver pour cet évènement</button>';
       html += '<div class="evt-fiche-actions-spacer"></div>';
       html += '<button type="button" class="evt-btn evt-btn-danger" data-action="cancel-from-fiche" data-event-id="' + escHtml(evt.id) + '">🗑 Supprimer</button>';
     } else if (evt.etat === 'annule') {
@@ -4573,6 +4578,17 @@
         if (id) openModalLogistique(id);
       });
     });
+    // ── EVT-PONT-SAISIE (brique A) : « Réserver pour cet évènement ».
+    //    Sibling strict de logistique-from-fiche. Construit l'URL vers
+    //    l'écran RESERVATIONS-MULTI pré-rempli, puis redirige. Règle de
+    //    portée (FAIT FOI) résolue au clic, ressources lues en direct
+    //    (aucun uuid en dur — anti-fabrication DS-1).
+    document.querySelectorAll('[data-action="reserver-logistique-from-fiche"]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        const id = this.getAttribute('data-event-id');
+        if (id) reserverLogistiquePourEvenement(id);
+      });
+    });
     // ── PRÉSERVÉ v1.8+ : SUIVI-COACH-1 Objet A actions de la section
     //    Suivi (bloc 5 renderFiche v1.25 — INVARIANT byte-identique
     //    renderSuiviSection md5 aa631ebe...).
@@ -4866,6 +4882,94 @@
   function closeModalLogistique() {
     MODAL_LOGISTIQUE_EVENT_ID = null;
     document.getElementById('evt-overlay-logistique').classList.remove('show');
+  }
+
+  // ============================================================
+  // EVT-PONT-SAISIE (brique A) — « Réserver pour cet évènement ».
+  // Construit l'URL vers l'écran RESERVATIONS-MULTI (logistique.html)
+  // pré-rempli depuis l'événement, puis redirige. NE crée RIEN : le
+  // pré-remplissage reste ajustable, l'utilisateur valide sur place.
+  //
+  // Règle de portée (FAIT FOI, table domicile/extérieur/null) :
+  //   - 'domicile'  -> la ressource type='site' dont site_id == celui de
+  //                    l'événement (mapping 1:1) ; rien si site_id absent.
+  //   - 'exterieur' -> les 2 minibus (materiel, sous_type minibus) ;
+  //                    PAS de terrain.
+  //   - null/autre  -> la ressource site du site_id de l'événement si
+  //                    présent ; sinon RIEN pré-coché (écran ouvert).
+  //   - site_id absent (tout cas) -> RIEN pré-coché.
+  // Ressources lues en direct (listRessourcesLogistiques) : aucun uuid
+  // en dur, robuste au renommage/remplacement (DS-1 anti-fabrication).
+  //
+  // Décomposition temporelle (timestamptz -> date + time) :
+  //   date       = date_debut (yyyy-mm-dd)
+  //   debut      = debut_match (HH:MM) sinon partie heure de date_debut
+  //   fin        = fin_prevue  (HH:MM) sinon partie heure de date_fin
+  // Catégorie : categorie_id de l'événement (si présent).
+  // ============================================================
+  async function reserverLogistiquePourEvenement(evenementId) {
+    if (!evenementId) return;
+    // evt courant déjà en mémoire (openFiche) ; repli lecture si besoin.
+    var evt = (FICHE_EVT_COURANT && FICHE_EVT_COURANT.id === evenementId)
+      ? FICHE_EVT_COURANT
+      : (EVENTS_BY_ID ? EVENTS_BY_ID[evenementId] : null);
+    if (!evt && window.SupabaseHub
+        && typeof SupabaseHub.getEvenementWithEncadrants === 'function') {
+      try { evt = await SupabaseHub.getEvenementWithEncadrants(evenementId); }
+      catch (e) { console.error('reserverLogistiquePourEvenement lecture evt', e); }
+    }
+    if (!evt) { window.location.href = 'logistique.html'; return; }
+
+    // Ressources actives (parc complet) pour résoudre site/minibus.
+    var parc = [];
+    if (window.SupabaseHub
+        && typeof SupabaseHub.listRessourcesLogistiques === 'function') {
+      try { parc = await SupabaseHub.listRessourcesLogistiques(); }
+      catch (e) { console.error('reserverLogistiquePourEvenement parc', e); }
+    }
+    parc = Array.isArray(parc) ? parc : [];
+
+    var resIds = [];
+    var dom = evt.domicile_exterieur || null;
+    var siteId = evt.site_id || null;
+
+    if (dom === 'exterieur') {
+      // Les 2 minibus (materiel). Repère par sous_type 'minibus' ; repli
+      // honnête sur le libellé si sous_type non renseigné.
+      parc.forEach(function (r) {
+        if (r.type === 'materiel'
+            && ((r.sous_type && String(r.sous_type).toLowerCase() === 'minibus')
+                || /minibus/i.test(r.libelle || ''))) {
+          resIds.push(r.id);
+        }
+      });
+    } else if (siteId) {
+      // 'domicile' OU null avec site connu -> ressource site correspondante.
+      parc.forEach(function (r) {
+        if (r.type === 'site' && r.site_id === siteId) resIds.push(r.id);
+      });
+    }
+    // site_id absent (hors extérieur) -> resIds vide -> écran ouvert.
+    resIds = resIds.filter(function (v, i, a) { return a.indexOf(v) === i; });
+
+    // Décomposition temporelle.
+    var pad = function (v) { return v ? String(v).slice(0, 5) : ''; };
+    var date  = evt.date_debut ? String(evt.date_debut).slice(0, 10) : '';
+    var debut = pad(evt.debut_match)
+      || (evt.date_debut ? String(evt.date_debut).slice(11, 16) : '');
+    var fin = pad(evt.fin_prevue)
+      || (evt.date_fin ? String(evt.date_fin).slice(11, 16) : '');
+
+    // Construction de l'URL (params consommés par applyUrlPrefill).
+    var params = new URLSearchParams();
+    params.set('evenement', evt.id);
+    if (resIds.length) params.set('ressources', resIds.join(','));
+    if (evt.categorie_id) params.set('categorie', evt.categorie_id);
+    if (date)  params.set('date', date);
+    if (debut) params.set('debut', debut);
+    if (fin)   params.set('fin', fin);
+
+    window.location.href = 'logistique.html?' + params.toString();
   }
 
   async function submitModalLogistique() {
