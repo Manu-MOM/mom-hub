@@ -7270,7 +7270,11 @@
         heure_debut: payload.heure_debut,
         heure_fin: payload.heure_fin,
         motif: payload.motif || null,
-        lot_id: lotId
+        lot_id: lotId,
+        // EVT-PONT-SAISIE (brique A) : lien persistant vers l'événement
+        // source (maille occurrence), nullable. Propagé à chaque ligne du
+        // lot via le forEach ci-dessous. Absent (saisie manuelle) -> null.
+        evenement_id: payload.evenement_id || null
       };
 
       var rows = ressourceIds.map(function (rid) {
