@@ -3224,6 +3224,17 @@
       cb.addEventListener('change', function () { setBlocDirty(true); });
     });
 
+    // v1.14 — dirty sur les champs Contenu pédagogique (Axe 4). Ces champs
+    // portent data-bloc-field-axe4 (et NON data-bloc-field), donc ils
+    // échappaient au bind générique blocInputs() : une valeur choisie dans
+    // la datalist ne marquait pas le bloc dirty et saveBloc() sortait sans
+    // rien persister (bouton figé « ✓ Enregistré » trompeur). On les câble
+    // ici, symétriquement aux cases coachs. Couvre bouton manuel ET autosave.
+    document.querySelectorAll('[data-bloc-field-axe4]').forEach(function (el) {
+      el.addEventListener('input',  function () { setBlocDirty(true); });
+      el.addEventListener('change', function () { setBlocDirty(true); });
+    });
+
     // Phase 5.8 : binds section ateliers
     bindAteliersSection();
 
