@@ -399,7 +399,40 @@
         .concat([{ code: 'ferie', lib: 'Férié' }, { code: 'vacances', lib: 'Vacances scolaires' },
                  { code: 'absence', lib: 'Repos / congés' }])
         .map(function (t) { return { code: t.code, lib: t.lib }; }),
-      detail: { titre: function (it) { return it.libelle || agTypeLib(it.type); }, rows: agDetailRows },
+      detail: {
+        titre: function (it) { return it.libelle || agTypeLib(it.type); },
+        rows: agDetailRows,
+        // VALIDATION-SEANCE-DEPUIS-AGENDA (F3+F5) : action « Marquer réalisée » injectée
+        // dans la modale de détail via le hook detail.action de HubAgenda — AUCUNE
+        // modification de l'INTERDIT js/hub-agenda.js. Le bouton n'apparaît que pour une
+        // vraie séance déclarable (état prevue|realisee ; les états validee|annulee et les
+        // repères férié/vacances/absence n'ont pas d'état déclarable -> pas de bouton) ET
+        // à partir du jour d'exécution (jour J inclus, F5). La garde d'autorisation et la
+        // garde de date sont RÉAFFIRMÉES côté serveur par declarer_occurrence (F6/F7) :
+        // ce test front est ergonomie, pas rempart. Heures réelles non saisies ici (F4 :
+        // p_heures_reelles null ; la saisie fine reste dans suivi-salarie.html).
+        action: function (it) {
+          if (!it || (it.etat !== 'prevue' && it.etat !== 'realisee')) return null;
+          const now = new Date();
+          const todayISO = now.getFullYear() + '-'
+            + String(now.getMonth() + 1).padStart(2, '0') + '-'
+            + String(now.getDate()).padStart(2, '0');
+          if (String(it.date).slice(0, 10) > todayISO) return null;
+          return {
+            label: 'Marquer réalisée',
+            onClick: async function (item, closeDetail) {
+              try {
+                await rpc('declarer_occurrence', { p_id: item.id, p_heures_reelles: null });
+                flash('Séance déclarée réalisée.', 'ok');
+                if (typeof closeDetail === 'function') closeDetail();
+                await agenda.refresh();
+              } catch (e) {
+                flash('Déclaration impossible : ' + errMsg(e), 'err');
+              }
+            }
+          };
+        }
+      },
       capacites: { pleinEcran: true, caseAnnulees: true },
       plageFixe: [8, 22],          // AGENDA-MODULE-V1.1 P2 : grille stable 08-22 (modèle unique)
       untimedEnRangee: true,       // AGENDA-MODULE-V1.1 R1 : séances sans heure en rangée journée entière
