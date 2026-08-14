@@ -150,6 +150,9 @@
                                  // édition/agenda qui lisent le scalaire)
     ressourceCoches: [],   // MULTI-OBJETS (F2-β) : uuid[] ressources cochées,
                            // ORDRE DE COCHE (1re = principale/miroir scalaire)
+    evenementId: null,     // EVT-PONT-SAISIE (brique A) : lien événement source
+                           // posé par applyUrlPrefill (?evenement=), null sinon.
+                           // Ajouté au payload createReservation au submit.
     categories: [],        // mes catégories autorisées (B5) résolues
     isTransverse: false,   // admin|bureau → toutes catégories
     catCoches: [],         // uuid[] catégories cochées, ORDRE DE COCHE (T4)
@@ -251,22 +254,76 @@
   // (état + classes + activation du formulaire, un seul chemin).
   // NB : les champs date/heures n'ont pas de listener d'état → le
   // .value programmatique suffit (piège pt 140 sans objet ici).
+  //
+  // EVT-PONT-SAISIE (brique A) — params additionnels pour le flux
+  // « Réserver pour cet événement » (bouton posé dans la fiche
+  // événement). Rétro-compat : le param `ressource` (singulier) reste
+  // géré tel quel pour le créneau libre agenda ; le flux événement
+  // utilise en plus :
+  //   ?ressources=<uuid>,<uuid>  (multi-objets, ex. 2 minibus extérieur)
+  //   ?categorie=<uuid>          (catégorie de l'événement)
+  //   ?evenement=<uuid>          (lien persistant, posé sur l'INSERT)
+  // Tous les pré-cochages restent décochables (état de coche normal).
+  // Le même chemin de coche (click rejoué) est réutilisé : un seul
+  // mécanisme, pas de logique dupliquée.
   // ============================================================
   function applyUrlPrefill() {
     const sp = new URLSearchParams(window.location.search);
     const ressource = sp.get('ressource');
+    const ressourcesCsv = sp.get('ressources');
+    const categorie = sp.get('categorie');
+    const evenement = sp.get('evenement');
     const date = sp.get('date');
     const debut = sp.get('debut');
     const fin = sp.get('fin');
-    if (!ressource && !date && !debut && !fin) return;
+    if (!ressource && !ressourcesCsv && !categorie && !evenement
+        && !date && !debut && !fin) return;
 
-    if (ressource) {
-      const host = el('logi-ressources');
+    // Lien persistant vers l'événement : mémorisé dans l'état, ajouté au
+    // payload createReservation au submit (nullable, aucun effet si absent).
+    if (evenement && /^[0-9a-fA-F-]{36}$/.test(evenement)) {
+      state.evenementId = evenement;
+    }
+
+    const host = el('logi-ressources');
+    // Liste de ressources à pré-cocher : `ressources` (pluriel, CSV) prime ;
+    // repli sur `ressource` (singulier, rétro-compat créneau libre).
+    var resIds = [];
+    if (ressourcesCsv) {
+      resIds = ressourcesCsv.split(',')
+        .map(function (s) { return s.trim(); })
+        .filter(function (s) { return /^[0-9a-fA-F-]{36}$/.test(s); });
+    } else if (ressource) {
+      resIds = [ressource];
+    }
+    // Dédoublonnage (une carte cochée deux fois se décocherait).
+    resIds = resIds.filter(function (v, i, a) { return a.indexOf(v) === i; });
+    resIds.forEach(function (rid) {
       const card = host
-        ? host.querySelector('.logi-res-card[data-id="' + CSS.escape(ressource) + '"]')
+        ? host.querySelector('.logi-res-card[data-id="' + CSS.escape(rid) + '"]')
         : null;
       if (card) card.click();
+    });
+
+    // Catégorie de l'événement : prime sur la catégorie mémorisée
+    // pré-cochée par renderCategorieOptions. On désélectionne d'abord la
+    // (les) coche(s) en place, puis on coche celle de l'URL — via le même
+    // click rejoué (synchro responsables + mémorisation incluses).
+    if (categorie && /^[0-9a-fA-F-]{36}$/.test(categorie)) {
+      const catHost = el('logi-categorie');
+      const cible = catHost
+        ? catHost.querySelector('.logi-day[data-id="' + CSS.escape(categorie) + '"]')
+        : null;
+      if (cible) {
+        if (!cible.classList.contains('is-on')) {
+          catHost.querySelectorAll('.logi-day.is-on').forEach(function (b) {
+            if (b !== cible) b.click();
+          });
+          cible.click();
+        }
+      }
     }
+
     if (date && /^\d{4}-\d{2}-\d{2}$/.test(date) && el('logi-date')) {
       el('logi-date').value = date;
     }
@@ -674,7 +731,8 @@
         date_fin: dateFin,                       // MULTI-JOURS (F1-α)
         heure_debut: hDebut,
         heure_fin: hFin,
-        motif: motif
+        motif: motif,
+        evenement_id: state.evenementId || null  // EVT-PONT-SAISIE (brique A)
       });
     }
 
@@ -700,6 +758,9 @@
     // MULTI-OBJETS (F2-β) : purge des ressources cochées + état visuel des tuiles.
     state.ressourceCoches = [];
     state.selectedRessourceId = null;
+    // EVT-PONT-SAISIE (brique A) : purge du lien événement — une saisie
+    // manuelle suivante dans la même session ne doit pas en hériter.
+    state.evenementId = null;
     Array.prototype.forEach.call(
       document.querySelectorAll('#logi-ressources .logi-res-card.is-selected'),
       function (c) { c.classList.remove('is-selected'); });
