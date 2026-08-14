@@ -276,6 +276,7 @@
     const date = sp.get('date');
     const debut = sp.get('debut');
     const fin = sp.get('fin');
+    const serie = sp.get('serie');
     if (!ressource && !ressourcesCsv && !categorie && !evenement
         && !date && !debut && !fin) return;
 
@@ -333,6 +334,207 @@
     if (fin && /^\d{2}:\d{2}$/.test(fin) && el('logi-heure-fin')) {
       el('logi-heure-fin').value = fin;
     }
+
+    // EVT-PONT-SAISIE (brique A) — mode SÉRIE : ?serie=1 sur une mère
+    // récurrente. Les ressources + catégorie (communes) sont déjà
+    // pré-cochées ci-dessus ; on bascule l'écran sur le panneau de revue
+    // des N occurrences (chacune avec sa date/créneau, décochable) et une
+    // validation en une action. Fail-soft : tout échec de chargement
+    // laisse l'écran standard utilisable.
+    if (serie === '1' && state.evenementId) {
+      activerModeSerie(state.evenementId);
+    }
+  }
+
+  // ============================================================
+  // EVT-PONT-SAISIE (brique A) — MODE SÉRIE
+  // Panneau de revue des N occurrences d'une mère récurrente, injecté
+  // dynamiquement (aucune modification de logistique.html). Chaque
+  // occurrence porte sa date + son créneau (lus via getOccurrencesSerie),
+  // est décochable, et donne lieu à un createReservation indépendant
+  // (evenement_id = id de l'OCCURRENCE, maille FAIT FOI). Les ressources,
+  // catégories et responsables (communs) sont pris de l'état standard,
+  // déjà pré-cochés par applyUrlPrefill.
+  // ============================================================
+  const serieState = { mereId: null, occurrences: [], coches: {} };
+
+  async function activerModeSerie(mereId) {
+    if (!mereId || !window.SupabaseHub
+        || typeof SupabaseHub.getOccurrencesSerie !== 'function') return;
+    let res;
+    try { res = await SupabaseHub.getOccurrencesSerie(mereId); }
+    catch (e) { console.error('activerModeSerie', e); return; }
+    if (!res || !res.ok || !Array.isArray(res.data) || res.data.length === 0) {
+      // Pas d'occurrences exploitables : on laisse l'écran standard.
+      return;
+    }
+    // On ne garde que les occurrences non annulées, triées par date.
+    serieState.mereId = mereId;
+    serieState.occurrences = res.data
+      .filter(function (o) { return o && o.etat !== 'annule' && o.date_debut; })
+      .sort(function (a, b) {
+        return String(a.date_debut).localeCompare(String(b.date_debut));
+      });
+    serieState.coches = {};
+    serieState.occurrences.forEach(function (o) { serieState.coches[o.id] = true; });
+    if (serieState.occurrences.length === 0) return;
+    renderPanneauSerie();
+  }
+
+  function _fmtDateFr(iso) {
+    // iso = 'YYYY-MM-DD...' -> 'jj mois' court, sans dépendance externe.
+    if (!iso) return '';
+    const d = String(iso).slice(0, 10).split('-');
+    if (d.length !== 3) return String(iso).slice(0, 10);
+    const j = parseInt(d[2], 10);
+    const m = parseInt(d[1], 10) - 1;
+    return j + ' ' + (MOIS[m] || '');
+  }
+
+  function _occCreneau(o) {
+    // Début : debut_match sinon partie heure de date_debut. Fin : fin_prevue
+    // sinon vide (l'utilisateur ajustera). Format HH:MM.
+    var deb = o.debut_match ? String(o.debut_match).slice(0, 5)
+      : (o.date_debut && String(o.date_debut).length >= 16
+          ? String(o.date_debut).slice(11, 16) : '');
+    var fin = o.fin_prevue ? String(o.fin_prevue).slice(0, 5) : '';
+    return { debut: deb, fin: fin };
+  }
+
+  function renderPanneauSerie() {
+    const formFields = el('logi-form-fields');
+    // Masque les champs de saisie mono (date/heures/motif/mode/récurrence) :
+    // en série, ce sont les occurrences qui portent date + créneau. On
+    // laisse visibles catégories + responsables (communs), déjà dans le DOM.
+    ['logi-mode-line', 'logi-field-date', 'logi-recur-box', 'logi-motif']
+      .forEach(function (id) {
+        const node = el(id);
+        if (node) {
+          const wrap = node.closest ? (node.closest('.logi-field') || node) : node;
+          wrap.style.display = 'none';
+        }
+      });
+    // Masque aussi la case journée entière et le créneau mono.
+    Array.prototype.forEach.call(
+      document.querySelectorAll('#logi-form-fields .logi-journee-label, #logi-form-fields .logi-row2'),
+      function (n) { n.style.display = 'none'; });
+
+    // Masque le bouton d'envoi standard : la validation série a le sien.
+    const stdBtn = el('logi-submit');
+    if (stdBtn) stdBtn.style.display = 'none';
+
+    // Conteneur série (idempotent : recréé si déjà présent).
+    let box = el('logi-serie-box');
+    if (box) box.remove();
+    box = document.createElement('div');
+    box.id = 'logi-serie-box';
+    box.className = 'logi-field';
+    box.style.marginTop = '10px';
+
+    let html = '<label style="display:block;margin-bottom:8px;">'
+      + 'Occurrences de la série '
+      + '<span style="font-family:\'JetBrains Mono\',monospace;font-size:10px;'
+      + 'color:var(--ink-mute);text-transform:none;letter-spacing:0;">'
+      + '(décoche celles à exclure — une demande par occurrence cochée)</span></label>';
+    html += '<div id="logi-serie-liste">';
+    serieState.occurrences.forEach(function (o) {
+      const cr = _occCreneau(o);
+      const creneauTxt = cr.debut
+        ? (cr.debut + (cr.fin ? '–' + cr.fin : ''))
+        : 'créneau à préciser';
+      html += '<label class="logi-serie-ligne" data-occ-id="' + escapeHtml(o.id) + '" '
+        + 'style="display:flex;align-items:center;gap:10px;padding:7px 4px;'
+        + 'border-bottom:1px solid var(--line,#e5e0d8);cursor:pointer;">'
+        + '<input type="checkbox" class="logi-serie-check" '
+        + 'data-occ-id="' + escapeHtml(o.id) + '" checked style="width:auto;margin:0;" />'
+        + '<span style="font-weight:600;min-width:80px;">' + escapeHtml(_fmtDateFr(o.date_debut)) + '</span>'
+        + '<span style="color:var(--ink-mute);font-size:13px;">' + escapeHtml(creneauTxt) + '</span>'
+        + '</label>';
+    });
+    html += '</div>';
+    html += '<button type="button" id="logi-serie-submit" class="logi-submit" '
+      + 'style="margin-top:12px;">Valider la sélection ('
+      + serieState.occurrences.length + ')</button>';
+    box.innerHTML = html;
+    if (formFields) formFields.appendChild(box);
+
+    // Câblage : cases + bouton valider.
+    box.querySelectorAll('.logi-serie-check').forEach(function (chk) {
+      chk.addEventListener('change', function () {
+        const oid = this.getAttribute('data-occ-id');
+        serieState.coches[oid] = this.checked;
+        const n = Object.keys(serieState.coches)
+          .filter(function (k) { return serieState.coches[k]; }).length;
+        const b = el('logi-serie-submit');
+        if (b) b.textContent = 'Valider la sélection (' + n + ')';
+      });
+    });
+    const sbtn = el('logi-serie-submit');
+    if (sbtn) sbtn.addEventListener('click', onSubmitSerie);
+  }
+
+  async function onSubmitSerie() {
+    const categorieIds = state.catCoches.slice();
+    const responsables = state.respCoches.slice();
+    const ressourceIds = state.ressourceCoches.slice();
+
+    if (ressourceIds.length === 0) { showToast('Coche au moins une ressource', false); return; }
+    if (responsables.length === 0) { showToast('Coche au moins un responsable', false); return; }
+    if (categorieIds.length === 0 && !state.isTransverse) {
+      showToast('Coche au moins une catégorie', false); return;
+    }
+    const choisies = serieState.occurrences.filter(function (o) {
+      return serieState.coches[o.id];
+    });
+    if (choisies.length === 0) { showToast('Coche au moins une occurrence', false); return; }
+
+    const sbtn = el('logi-serie-submit');
+    if (sbtn) sbtn.disabled = true;
+
+    let okCount = 0;
+    let koCount = 0;
+    // Appels séquentiels (chaque résa indépendante, statut pending). Un
+    // échec n'interrompt pas les autres : on rapporte le bilan (FAIT FOI 5a,
+    // arbitrage « tout envoyer + rapport »).
+    for (const o of choisies) {
+      const cr = _occCreneau(o);
+      if (!cr.debut || !cr.fin) {
+        // Créneau incomplet sur cette occurrence : on la compte en échec
+        // honnête plutôt que d'envoyer un créneau invalide.
+        koCount += 1;
+        continue;
+      }
+      const dateOcc = String(o.date_debut).slice(0, 10);
+      let r;
+      try {
+        r = await SupabaseHub.createReservation({
+          ressource_ids: ressourceIds,
+          categorie_id: categorieIds[0] || null,
+          categorie_ids: categorieIds,
+          responsable_personne_id: responsables[0],
+          responsables_personne_ids: responsables,
+          date: dateOcc,
+          date_fin: null,
+          heure_debut: cr.debut,
+          heure_fin: cr.fin,
+          motif: null,
+          evenement_id: o.id   // maille OCCURRENCE (enfant), pas la mère
+        });
+      } catch (e) {
+        console.error('onSubmitSerie createReservation', e);
+        r = { ok: false };
+      }
+      if (r && r.ok) okCount += 1; else koCount += 1;
+    }
+
+    if (sbtn) sbtn.disabled = false;
+    if (koCount === 0) {
+      showToast(okCount + ' occurrence(s) réservée(s) (en attente de validation)', true);
+    } else {
+      showToast(okCount + ' envoyée(s), ' + koCount + ' en échec', okCount > 0);
+    }
+    await refreshAgenda();
+    await refreshMesDemandes();
   }
 
   // ============================================================
