@@ -399,20 +399,31 @@
       }
       serieState.dejaReserve[r.evenement_id][r.ressource_id] = true;
     });
-    // Ressources actuellement sélectionnées à l'écran (state, pré-cochées par
-    // applyUrlPrefill). Une occurrence est « déjà réservée » (donc décochée +
-    // marquée) si elle a une résa active pour AU MOINS une de ces ressources.
+    _recalcCochesSerie();
+    renderPanneauSerie();
+  }
+
+  // MÉMOIRE-DATES-COCHÉES — (re)calcule serieState.coches à partir des
+  // ressources ACTUELLEMENT cochées (state.ressourceCoches) et de la carte
+  // des résas existantes (serieState.dejaReserve). Une occurrence est décochée
+  // + marquée « déjà réservé » (FAIT FOI 1b) si elle a une résa active pour AU
+  // MOINS une des ressources cochées (FAIT FOI 2). Sélection vide -> rien de
+  // marqué (état d'attente honnête, pas de faux positif — FAIT FOI 6). Appelée
+  // à l'ouverture ET à chaque changement de sélection de ressources (recalcul
+  // dynamique) : le marquage est déterministe, il reflète toujours la
+  // sélection courante (un recochage manuel d'occurrence est donc réévalué au
+  // prochain changement de ressource — comportement assumé).
+  function _recalcCochesSerie() {
     var resSelection = (state.ressourceCoches || []);
+    var carte = serieState.dejaReserve || {};
     serieState.coches = {};
     serieState.occurrences.forEach(function (o) {
-      var couvertes = serieState.dejaReserve[o.id] || {};
+      var couvertes = carte[o.id] || {};
       var dejaPourSelection = resSelection.some(function (rid) {
         return couvertes[rid] === true;
       });
-      // 1b : déjà réservée -> décochée par défaut (re-cochable, pas de verrou).
       serieState.coches[o.id] = !dejaPourSelection;
     });
-    renderPanneauSerie();
   }
 
   function _fmtDateFr(iso) {
@@ -696,6 +707,16 @@
           ? state.ressourceCoches[0] : null;
         const ff = el('logi-form-fields');
         if (ff) ff.classList.toggle('is-active', state.ressourceCoches.length > 0);
+        // MÉMOIRE-DATES-COCHÉES (FAIT FOI 6) : en mode série, tout changement
+        // de sélection de ressources recalcule le marquage « déjà réservé »
+        // des occurrences et redessine le panneau. Hors mode série
+        // (serieState.mereId null), aucun effet.
+        if (serieState.mereId
+            && Array.isArray(serieState.occurrences)
+            && serieState.occurrences.length) {
+          _recalcCochesSerie();
+          renderPanneauSerie();
+        }
       });
       return card;
     }
