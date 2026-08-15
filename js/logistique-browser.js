@@ -457,6 +457,35 @@
       }
       serieState.dejaReserve[r.evenement_id][r.ressource_id] = true;
     });
+    // MÉMOIRE-DATES-COCHÉES · côté RESSOURCES — mode SÉRIE.
+    // Le bouton « Réserver » d'une mère récurrente pose ?evenement=<MÈRE>&serie=1.
+    // Les résas réelles ne vivent JAMAIS sur la mère : elles portent le
+    // evenement_id des OCCURRENCES (constaté en base). _recocherRessourcesDepuisResas
+    // (chemin ?evenement=) lirait donc la mère -> 0 résultat. On dérive ici le
+    // re-cochage des résas des occurrences DÉJÀ chargées ci-dessus (resasExistantes
+    // sur occIds) : une ressource active sur AU MOINS UNE occurrence de la série
+    // est re-cochée (union série — ressources « communes »). Chemin de coche
+    // UNIQUE (card.click(), renfort pt 253) avec DÉDOUBLONNAGE contre
+    // state.ressourceCoches : une carte déjà cochée (inféré ?ressources=) n'est
+    // jamais re-cliquée (sinon _decocherRessource la retirerait). Placé AVANT
+    // _recalcCochesSerie pour que le recalcul série parte d'une sélection peuplée.
+    var _resSerieActives = resasExistantes
+      .filter(function (r) {
+        return r && r.ressource_id && STATUTS_ACTIFS[r.statut];
+      })
+      .map(function (r) { return r.ressource_id; })
+      .filter(function (v, i, a) { return a.indexOf(v) === i; });
+    if (_resSerieActives.length) {
+      var _hostSerieRes = el('logi-ressources');
+      if (_hostSerieRes) {
+        _resSerieActives.forEach(function (rid) {
+          if ((state.ressourceCoches || []).indexOf(rid) !== -1) return;
+          var card = _hostSerieRes.querySelector(
+            '.logi-res-card[data-id="' + CSS.escape(rid) + '"]');
+          if (card) card.click();
+        });
+      }
+    }
     _recalcCochesSerie();
     renderPanneauSerie();
   }
