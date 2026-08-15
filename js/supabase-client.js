@@ -7377,6 +7377,34 @@
     },
 
     /**
+     * Valide/refuse un LOT de réservations ponctuelles en une transaction
+     * serveur atomique (tout-ou-rien). RPC valider_reservations_lot,
+     * gardée bureau|admin. Sert la validation « toute la série » ET la
+     * sélection multiple : le front résout la liste d'ids et la passe ici.
+     * Atomicité : si un id est introuvable, la RPC lève → aucun changement.
+     * @param {string[]} ids  liste des reservation_id à traiter
+     * @param {string} decision  'approved' | 'rejected'
+     * @param {string} [motifRefus]  conservé si rejected (motif commun au lot)
+     * @returns {Promise<{ok:boolean, data?:object[], error?:string}>}
+     *          data = tableau des lignes modifiées (SETOF).
+     */
+    async validerReservationsLot(ids, decision, motifRefus) {
+      if (!Array.isArray(ids) || ids.length === 0 || !decision) {
+        return { ok: false, error: 'ids (liste non vide) et decision requis' };
+      }
+      const { data, error } = await client.rpc('valider_reservations_lot', {
+        p_ids: ids,
+        p_decision: decision,
+        p_motif_refus: motifRefus || null
+      });
+      if (error) {
+        console.error('MOM Hub: validerReservationsLot()', error);
+        return { ok: false, error: error.message || 'Erreur valider_reservations_lot' };
+      }
+      return { ok: true, data: Array.isArray(data) ? data : (data ? [data] : []) };
+    },
+
+    /**
      * Valide/refuse une règle récurrente. RPC gardée bureau|admin.
      * @param {string} id  recurrence_id
      * @param {string} decision  'approved' | 'rejected'
