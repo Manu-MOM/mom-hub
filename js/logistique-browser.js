@@ -375,9 +375,43 @@
       .sort(function (a, b) {
         return String(a.date_debut).localeCompare(String(b.date_debut));
       });
-    serieState.coches = {};
-    serieState.occurrences.forEach(function (o) { serieState.coches[o.id] = true; });
     if (serieState.occurrences.length === 0) return;
+    // MÉMOIRE-DATES-COCHÉES — reconnaît les occurrences DÉJÀ réservées pour
+    // ne pas recréer de doublon (FAIT FOI : 1b décochée+marquée, 2 maille
+    // occurrence × ressource, 3 statuts actifs = pending|approved).
+    // serieState.dejaReserve[occId] = Set(ressource_id actifs sur cette occ).
+    // Fail-soft : toute erreur de lecture laisse le pré-cochage « tout coché »
+    // historique (aucune régression du parcours de création).
+    serieState.dejaReserve = {};
+    var occIds = serieState.occurrences.map(function (o) { return o.id; });
+    var resasExistantes = [];
+    if (window.SupabaseHub
+        && typeof SupabaseHub.listReservationsSerie === 'function') {
+      try { resasExistantes = await SupabaseHub.listReservationsSerie(occIds); }
+      catch (e) { console.error('activerModeSerie/listReservationsSerie', e); resasExistantes = []; }
+    }
+    var STATUTS_ACTIFS = { pending: true, approved: true };
+    resasExistantes.forEach(function (r) {
+      if (!r || !r.evenement_id || !r.ressource_id) return;
+      if (!STATUTS_ACTIFS[r.statut]) return;
+      if (!serieState.dejaReserve[r.evenement_id]) {
+        serieState.dejaReserve[r.evenement_id] = {};
+      }
+      serieState.dejaReserve[r.evenement_id][r.ressource_id] = true;
+    });
+    // Ressources actuellement sélectionnées à l'écran (state, pré-cochées par
+    // applyUrlPrefill). Une occurrence est « déjà réservée » (donc décochée +
+    // marquée) si elle a une résa active pour AU MOINS une de ces ressources.
+    var resSelection = (state.ressourceCoches || []);
+    serieState.coches = {};
+    serieState.occurrences.forEach(function (o) {
+      var couvertes = serieState.dejaReserve[o.id] || {};
+      var dejaPourSelection = resSelection.some(function (rid) {
+        return couvertes[rid] === true;
+      });
+      // 1b : déjà réservée -> décochée par défaut (re-cochable, pas de verrou).
+      serieState.coches[o.id] = !dejaPourSelection;
+    });
     renderPanneauSerie();
   }
 
@@ -442,19 +476,32 @@
       const creneauTxt = cr.debut
         ? (cr.debut + (cr.fin ? '–' + cr.fin : ''))
         : 'créneau à préciser';
+      // MÉMOIRE-DATES-COCHÉES : état de coche calculé (décoché si déjà réservé
+      // pour la sélection courante) + marquage visuel « déjà réservé ».
+      const estCoche = serieState.coches[o.id] !== false;
+      const dejaReserve = (serieState.coches[o.id] === false);
       html += '<label class="logi-serie-ligne" data-occ-id="' + escapeHtml(o.id) + '" '
         + 'style="display:flex;align-items:center;gap:10px;padding:7px 4px;'
-        + 'border-bottom:1px solid var(--line,#e5e0d8);cursor:pointer;">'
+        + 'border-bottom:1px solid var(--line,#e5e0d8);cursor:pointer;'
+        + (dejaReserve ? 'opacity:0.62;' : '') + '">'
         + '<input type="checkbox" class="logi-serie-check" '
-        + 'data-occ-id="' + escapeHtml(o.id) + '" checked style="width:auto;margin:0;" />'
+        + 'data-occ-id="' + escapeHtml(o.id) + '"' + (estCoche ? ' checked' : '')
+        + ' style="width:auto;margin:0;" />'
         + '<span style="font-weight:600;min-width:80px;">' + escapeHtml(_fmtDateFr(o.date_debut)) + '</span>'
         + '<span style="color:var(--ink-mute);font-size:13px;">' + escapeHtml(creneauTxt) + '</span>'
+        + (dejaReserve
+            ? '<span class="logi-serie-deja" style="margin-left:auto;font-size:11px;'
+              + 'font-weight:600;color:#d98c1f;white-space:nowrap;">déjà réservé</span>'
+            : '')
         + '</label>';
     });
     html += '</div>';
+    var _nCoche = serieState.occurrences.filter(function (o) {
+      return serieState.coches[o.id] !== false;
+    }).length;
     html += '<button type="button" id="logi-serie-submit" class="logi-submit" '
       + 'style="margin-top:12px;">Valider la sélection ('
-      + serieState.occurrences.length + ')</button>';
+      + _nCoche + ')</button>';
     box.innerHTML = html;
     if (formFields) formFields.appendChild(box);
 
