@@ -4920,6 +4920,24 @@
     }
     if (!evt) { window.location.href = 'logistique.html'; return; }
 
+    // La décision « mère récurrente » dépend du champ recurrence (jsonb).
+    // L'evt en mémoire (FICHE_EVT_COURANT / listing) peut ne PAS le porter
+    // renseigné -> _estMereRecurrente renverrait faux à tort. On garantit la
+    // fiabilité : si recurrence est absent alors que l'evt est une racine
+    // entrainement/stage, on relit la ligne complète (RPC renvoie recurrence).
+    if ((!evt.recurrence)
+        && !evt.evenement_parent_id
+        && (evt.type_evenement === 'entrainement' || evt.type_evenement === 'stage')
+        && window.SupabaseHub
+        && typeof SupabaseHub.getEvenementWithEncadrants === 'function') {
+      try {
+        var frais = await SupabaseHub.getEvenementWithEncadrants(evenementId);
+        if (frais) evt = frais;
+      } catch (e) {
+        console.error('reserverLogistiquePourEvenement relecture recurrence', e);
+      }
+    }
+
     // Ressources actives (parc complet) pour résoudre site/minibus.
     var parc = [];
     if (window.SupabaseHub
@@ -4961,13 +4979,23 @@
       || (evt.date_fin ? String(evt.date_fin).slice(11, 16) : '');
 
     // Construction de l'URL (params consommés par applyUrlPrefill).
+    // Mode SÉRIE (mère récurrente) : on transmet serie=1 ; l'écran résa
+    // charge les N occurrences (getOccurrencesSerie) et affiche un panneau
+    // de revue. Les ressources/catégorie (communes à la série) restent
+    // pré-cochées ; les date/heures NE sont PAS posées globalement — chaque
+    // occurrence porte les siennes dans le panneau.
+    var estSerie = _estMereRecurrente(evt);
     var params = new URLSearchParams();
     params.set('evenement', evt.id);
     if (resIds.length) params.set('ressources', resIds.join(','));
     if (evt.categorie_id) params.set('categorie', evt.categorie_id);
-    if (date)  params.set('date', date);
-    if (debut) params.set('debut', debut);
-    if (fin)   params.set('fin', fin);
+    if (estSerie) {
+      params.set('serie', '1');
+    } else {
+      if (date)  params.set('date', date);
+      if (debut) params.set('debut', debut);
+      if (fin)   params.set('fin', fin);
+    }
 
     window.location.href = 'logistique.html?' + params.toString();
   }
