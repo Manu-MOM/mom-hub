@@ -74,8 +74,17 @@
       transition: border-color 0.15s, box-shadow 0.15s;
     }
     .logi-res-card:hover { border-color: var(--vert-prairie); }
+    /* SUJET B (a. arb.1c) : renforcement de l'état coché — bordure + halo
+       historiques CONSERVÉS, plus un fond teinté et une pastille ✓ pour que
+       la sélection saute aux yeux (solde la note UX pt 249 « cochage trop
+       discret »). Le ✓ est injecté en ::before, aucun DOM ajouté à la carte. */
     .logi-res-card.is-selected {
       border-color: var(--vert-prairie); box-shadow: 0 0 0 2px var(--vert-light);
+      background: var(--vert-light);
+    }
+    .logi-res-card.is-selected .logi-res-card__label::before {
+      content: '\2713'; display: inline-block; margin-right: 6px;
+      color: var(--vert-prairie); font-weight: 700;
     }
     .logi-res-card__label {
       font-family: 'Oswald', sans-serif; font-size: 15px; font-weight: 500;
@@ -85,6 +94,36 @@
       font-family: 'JetBrains Mono', monospace; font-size: 9px;
       letter-spacing: 0.1em; text-transform: uppercase; color: var(--bleu-base);
     }
+    /* SUJET B (b. arb.1a) : récapitulatif de la sélection en chips, placé
+       sous les 3 sections de cartes et au-dessus du formulaire (arb.2). Rendu
+       UNIQUEMENT si au moins une ressource est cochée (le JS masque le host
+       sinon). Ordre des chips = ordre de coche (arb.4, state.ressourceCoches).
+       Chaque chip porte une croix qui décoche via le CHEMIN UNIQUE de décoche
+       (arb.3) — préserve MÉMOIRE-DATES-COCHÉES (pt 251). */
+    .logi-res-recap {
+      display: none; flex-wrap: wrap; align-items: center; gap: 8px;
+      margin-bottom: 18px;
+    }
+    .logi-res-recap.is-shown { display: flex; }
+    .logi-res-recap__title {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-mute);
+      margin-right: 2px;
+    }
+    .logi-res-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--vert-light); border: 1px solid var(--vert-prairie);
+      border-radius: 999px; padding: 4px 6px 4px 12px;
+      font-family: 'Oswald', sans-serif; font-size: 13px; color: var(--ink);
+    }
+    .logi-res-chip__x {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 18px; height: 18px; border: none; border-radius: 50%;
+      background: transparent; color: var(--vert-prairie); cursor: pointer;
+      font-family: inherit; font-size: 15px; line-height: 1; padding: 0;
+      transition: background 0.15s, color 0.15s;
+    }
+    .logi-res-chip__x:hover { background: var(--vert-prairie); color: #fff; }
 
     /* Formulaire */
     .logi-form-fields { opacity: 0.5; pointer-events: none; transition: opacity 0.2s; }
@@ -481,6 +520,11 @@
       <div id="logi-ressources" class="logi-ressources">
         <div class="logi-empty">Chargement…</div>
       </div>
+
+      <!-- SUJET B (arb.1a/2) : récapitulatif de la sélection (chips avec croix
+           de retrait). Vide + masqué par défaut ; peuplé/affiché par
+           renderRecapRessources() dès qu'une ressource est cochée. -->
+      <div id="logi-res-recap" class="logi-res-recap" aria-live="polite"></div>
 
       <div id="logi-form-fields" class="logi-form-fields">
         <!-- MULTI-CATEGORIES (FAIT FOI 05/07/2026, M5/M6) : les deux
