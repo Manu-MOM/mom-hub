@@ -498,16 +498,17 @@
       }
 
       // ------------------------------------------------------------------
-      // VALIDATION-LOT-SERIE (pt 250)
-      // Résolution des « séries » côté front : une série = les résas dont
-      // l'evenement_id pointe sur des occurrences partageant la même mère
-      // (evenement_parent_id). evenement_parent_id vit sur `evenements`, pas
-      // sur reservations_logistiques → un SELECT de résolution, puis
-      // regroupement en mémoire. Ne renvoie QUE les groupes de 2+ résas
-      // pending (une occurrence seule ne « fait pas série »).
+      // VALIDATION-LOT-SERIE (pt 250) — B : validation PAR RESSOURCE.
+      // Une « série » validable = les résas d'une MÊME ressource sur les
+      // occurrences d'une MÊME mère (evenement_parent_id). Clé de groupe =
+      // parent × ressource_id. « Valider la série » sur une vignette ne
+      // touche donc QUE cette ressource sur toutes ses dates (les autres
+      // ressources de la même série restent en attente, validables par leur
+      // propre bouton). evenement_parent_id vit sur `evenements` → un SELECT
+      // de résolution, puis regroupement en mémoire.
       // Retour : map { reservation_id -> { serieIds:[...lignes], serieN:occ } }
-      //   serieIds = toutes les lignes de la série (périmètre validé) ;
-      //   serieN   = nombre d'occurrences distinctes (affiché « série de N »).
+      //   serieIds = lignes de CETTE ressource sur la série (périmètre validé) ;
+      //   serieN   = nombre d'occurrences de cette ressource (badge « série de N »).
       async function _resoudreSeries(ponct) {
         var map = {};
         var evIds = [];
@@ -531,25 +532,25 @@
           parentDe[e.id] = e.evenement_parent_id || e.id;
         });
 
-        // Regrouper par clé de série (parent). Pour chaque groupe on trace :
-        // - ids  : toutes les lignes (reservation_id) → PÉRIMÈTRE validé
-        //          (inclut les 2e ressources d'une occurrence multi-ressources).
-        // - occ  : les evenement_id distincts → NOMBRE d'occurrences (séances)
-        //          affiché dans le badge « série de N ».
+        // Regrouper par clé = parent × ressource_id. Pour chaque groupe :
+        // - ids : les lignes de cette ressource sur la série → PÉRIMÈTRE validé.
+        // - occ : les evenement_id distincts → NOMBRE d'occurrences (badge).
+        // (Une même ressource n'a normalement qu'1 ligne par occurrence ;
+        // ids.length == occurrences dans le cas courant.)
         var parGroupe = {};
         (ponct || []).forEach(function (r) {
           if (!r.evenement_id) return;
-          var cle = parentDe[r.evenement_id];
-          if (!cle) return;
+          var parent = parentDe[r.evenement_id];
+          if (!parent) return;
+          var cle = parent + '::' + (r.ressource_id || '');
           var g = (parGroupe[cle] = parGroupe[cle] || { ids: [], occ: {} });
           g.ids.push(r.id);
           g.occ[r.evenement_id] = true;
         });
 
-        // Une SÉRIE = 2+ occurrences distinctes (pas 2+ lignes : une seule
-        // séance à 2 minibus n'est pas une série). serieN = nb d'occurrences ;
-        // serieIds = toutes les lignes (le clic valide bien tout, minibus
-        // compris).
+        // Une SÉRIE (pour cette ressource) = 2+ occurrences distinctes.
+        // serieIds = lignes de cette ressource seulement → le clic « Valider
+        // la série » n'approuve QUE cette ressource sur toutes ses dates.
         Object.keys(parGroupe).forEach(function (cle) {
           var g = parGroupe[cle];
           var nbOcc = Object.keys(g.occ).length;
