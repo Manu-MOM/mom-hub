@@ -6558,9 +6558,14 @@
 
   /**
    * Génère un code unique pour le nouvel évent (pattern interne).
-   * Format : EVT-YYYY-MM-DD-<TYPE>-M14-<RAND>
+   * Format : EVT-YYYY-MM-DD-HHMMSS-<TYPE>-<CAT>-<RAND>
+   * <CAT> = code compact de la catégorie active (categories.code, ex.
+   * « M16 », « SR-F »), repli « NC » (non-catégorisé) si indisponible au
+   * point d'appel. Remplace le segment « M14 » historiquement figé (vestige
+   * module mono-équipe M14) : le segment reflète désormais la vraie
+   * catégorie. Cf. SUJET C / dette code↔categorie_id.
    */
-  function generateEventCode(type, dateDebut) {
+  function generateEventCode(type, dateDebut, categorieCode) {
     const d = new Date(dateDebut);
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -6593,7 +6598,18 @@
     const SS = String(now.getSeconds()).padStart(2, '0');
     const rand = Math.random().toString(36).substring(2, 8).toUpperCase();
     return 'EVT-' + y + '-' + m + '-' + day + '-' + HH + MM + SS
-         + '-' + typeShort + '-M14-' + rand;
+         + '-' + typeShort + '-' + (categorieCode || 'NC') + '-' + rand;
+  }
+
+  // SUJET C — résout le code compact (categories.code) de la catégorie
+  // ACTIVE, à injecter comme 3e argument de generateEventCode. Miroir de
+  // _libelleCategorieActive() mais renvoie le `code` (compact, sans espace :
+  // « SR-F » et non « Seniors F ») pour rester homogène avec le format de
+  // code. Repli null → le générateur applique « NC » (non-catégorisé).
+  function _codeCategorieActive() {
+    if (!CTX_PERIMETRE || !Array.isArray(CTX_PERIMETRE.categories)) return null;
+    const c = CTX_PERIMETRE.categories.find(x => x.id === CTX_PERIMETRE.active);
+    return c ? (c.code || null) : null;
   }
 
   // ────────────────────────────────────────────────────────────────
@@ -6630,7 +6646,7 @@
       // Niveau 2 — phase-boîte : ligne evenements enfant de la racine,
       // phase_libelle renseigné, PAS d'adversaire (M6 §4.4).
       const phasePayload = {
-        code:                       generateEventCode('competition', new Date().toISOString()),
+        code:                       generateEventCode('competition', new Date().toISOString(), _codeCategorieActive()),
         libelle:                    phaseLibelle,
         type_evenement:             'competition',
         type_competition:           heritage.type_competition || 'tournoi',
@@ -6666,7 +6682,7 @@
           continue;
         }
         const matchPayload = {
-          code:                       generateEventCode('competition', new Date().toISOString()),
+          code:                       generateEventCode('competition', new Date().toISOString(), _codeCategorieActive()),
           libelle:                    phaseLibelle + ' — vs ' + adv,
           type_evenement:             'competition',
           type_competition:           heritage.type_competition || 'tournoi',
@@ -6774,7 +6790,7 @@
     const payload = {
       type_evenement:              familleEvt,
       libelle:                     libelle,
-      code:                        generateEventCode(familleEvt, dateDebut),
+      code:                        generateEventCode(familleEvt, dateDebut, _codeCategorieActive()),
       date_debut:                  new Date(dateDebut).toISOString(),
       saison_id:                   CTX_SAISON_ID,
       organisateur_principal_id:   CTX_ORGANISATEUR_ID
@@ -7152,7 +7168,7 @@
       return;
     }
     const overrides = {
-      code:                      generateEventCode(familleEvt, dateDebut),
+      code:                      generateEventCode(familleEvt, dateDebut, _codeCategorieActive()),
       libelle:                   libelle,
       type_evenement:            familleEvt,
       date_debut:                new Date(dateDebut).toISOString(),
