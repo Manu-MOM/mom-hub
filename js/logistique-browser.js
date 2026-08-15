@@ -668,6 +668,87 @@
   }
 
   // ============================================================
+  // SUJET B — sélection des ressources : effets communs, chemin de
+  // décoche unique, et récapitulatif en chips.
+  // ============================================================
+
+  // Effets APRÈS toute modification de state.ressourceCoches (coche OU
+  // décoche) : miroir scalaire, activation du formulaire, récap chips, et
+  // recalcul du marquage série (MÉMOIRE-DATES-COCHÉES, pt 251). Centralisé
+  // ici pour que coche et décoche partagent exactement les mêmes effets.
+  function _appliquerChangementSelection() {
+    state.selectedRessourceId = state.ressourceCoches.length
+      ? state.ressourceCoches[0] : null;
+    const ff = el('logi-form-fields');
+    if (ff) ff.classList.toggle('is-active', state.ressourceCoches.length > 0);
+    renderRecapRessources();
+    // MÉMOIRE-DATES-COCHÉES (FAIT FOI pt 251, arb.6) : en mode série, tout
+    // changement de sélection de ressources recalcule le marquage « déjà
+    // réservé » des occurrences et redessine le panneau. Hors mode série
+    // (serieState.mereId null), aucun effet.
+    if (serieState.mereId
+        && Array.isArray(serieState.occurrences)
+        && serieState.occurrences.length) {
+      _recalcCochesSerie();
+      renderPanneauSerie();
+    }
+  }
+
+  // CHEMIN UNIQUE de décoche (SUJET B arb.3) : retire l'uuid de la sélection,
+  // dé-sélectionne visuellement la carte correspondante si présente, puis
+  // applique les effets communs. Appelé PAR le handler de clic carte ET par
+  // la croix des chips du récap — aucune duplication de logique.
+  function _decocherRessource(rid) {
+    const pos = state.ressourceCoches.indexOf(rid);
+    if (pos === -1) return;
+    state.ressourceCoches.splice(pos, 1);
+    const host = el('logi-ressources');
+    if (host) {
+      const card = host.querySelector(
+        '.logi-res-card[data-id="' + CSS.escape(rid) + '"]');
+      if (card) card.classList.remove('is-selected');
+    }
+    _appliquerChangementSelection();
+  }
+
+  // Récapitulatif de la sélection en chips (SUJET B arb.1a/2/4). Vidé + masqué
+  // si aucune ressource cochée ; sinon liste les ressources DANS L'ORDRE DE
+  // COCHE (state.ressourceCoches), chacune avec une croix de retrait.
+  function renderRecapRessources() {
+    const host = el('logi-res-recap');
+    if (!host) return;
+    const coches = state.ressourceCoches || [];
+    if (coches.length === 0) {
+      host.innerHTML = '';
+      host.classList.remove('is-shown');
+      return;
+    }
+    host.innerHTML = '';
+    const titre = document.createElement('span');
+    titre.className = 'logi-res-recap__title';
+    titre.textContent = 'Sélection';
+    host.appendChild(titre);
+    coches.forEach(function (rid) {
+      const r = (state.ressources || []).find(function (x) { return x.id === rid; });
+      const chip = document.createElement('span');
+      chip.className = 'logi-res-chip';
+      const lbl = document.createElement('span');
+      lbl.className = 'logi-res-chip__label';
+      lbl.textContent = r ? r.libelle : rid;
+      const x = document.createElement('button');
+      x.type = 'button';
+      x.className = 'logi-res-chip__x';
+      x.setAttribute('aria-label', 'Retirer ' + (r ? r.libelle : 'cette ressource'));
+      x.textContent = '\u00d7';
+      x.addEventListener('click', function () { _decocherRessource(rid); });
+      chip.appendChild(lbl);
+      chip.appendChild(x);
+      host.appendChild(chip);
+    });
+    host.classList.add('is-shown');
+  }
+
+  // ============================================================
   // Rendu — grille ressources
   // ============================================================
   function renderRessources() {
@@ -697,25 +778,16 @@
         // de la 1re cochée (rétro-compat des lecteurs du scalaire).
         const pos = state.ressourceCoches.indexOf(r.id);
         if (pos === -1) {
+          // COCHE : ajout + effets communs (SUJET B : le récap et le recalcul
+          // série sont regroupés dans _appliquerChangementSelection).
           state.ressourceCoches.push(r.id);
           card.classList.add('is-selected');
+          _appliquerChangementSelection();
         } else {
-          state.ressourceCoches.splice(pos, 1);
-          card.classList.remove('is-selected');
-        }
-        state.selectedRessourceId = state.ressourceCoches.length
-          ? state.ressourceCoches[0] : null;
-        const ff = el('logi-form-fields');
-        if (ff) ff.classList.toggle('is-active', state.ressourceCoches.length > 0);
-        // MÉMOIRE-DATES-COCHÉES (FAIT FOI 6) : en mode série, tout changement
-        // de sélection de ressources recalcule le marquage « déjà réservé »
-        // des occurrences et redessine le panneau. Hors mode série
-        // (serieState.mereId null), aucun effet.
-        if (serieState.mereId
-            && Array.isArray(serieState.occurrences)
-            && serieState.occurrences.length) {
-          _recalcCochesSerie();
-          renderPanneauSerie();
+          // DÉCOCHE : passe par le CHEMIN UNIQUE (SUJET B arb.3) — la croix
+          // d'une chip du récap emprunte EXACTEMENT le même chemin, aucune
+          // logique de décoche dupliquée. Préserve MÉMOIRE-DATES-COCHÉES.
+          _decocherRessource(r.id);
         }
       });
       return card;
@@ -741,6 +813,11 @@
       membres.forEach(function (r) { grille.appendChild(fabriquerTuile(r)); });
       host.appendChild(grille);
     });
+
+    // SUJET B : refléter l'état courant de la sélection dans le récap chips.
+    // Couvre le cas d'un pré-cochage (applyUrlPrefill) présent AVANT le rendu :
+    // le récap s'affiche d'emblée si ressourceCoches est déjà peuplé.
+    renderRecapRessources();
   }
 
   function renderCategorieOptions() {
@@ -1035,6 +1112,8 @@
       document.querySelectorAll('#logi-ressources .logi-res-card.is-selected'),
       function (c) { c.classList.remove('is-selected'); });
     const ff2 = el('logi-form-fields'); if (ff2) ff2.classList.remove('is-active');
+    // SUJET B : purge du récap chips (sélection vidée ci-dessus).
+    renderRecapRessources();
     // JOURNÉE ENTIÈRE (A1) : décocher + dégriser les champs créneau.
     const je = el('logi-journee'); if (je) je.checked = false;
     appliquerJourneeEntiere(false);
