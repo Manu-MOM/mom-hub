@@ -2182,6 +2182,35 @@
     },
 
     /**
+     * MÉMOIRE-DATES-COCHÉES — réservations logistiques existantes rattachées
+     * à une liste d'occurrences (evenement_id, maille OCCURRENCE posée pt 249).
+     * Sert à reconnaître, à la ré-ouverture du panneau série, les occurrences
+     * DÉJÀ réservées (par ressource) pour ne pas recréer de doublon.
+     * Lecture seule ; RLS SELECT = true (tout authentifié). Projection
+     * minimale (evenement_id, ressource_id, statut) — le filtrage des statuts
+     * « actifs » (pending|approved) est fait côté appelant, pas ici, pour
+     * laisser le helper générique. Patron des list* voisins.
+     * @param {string[]} evenementIds UUID[] des occurrences (enfants) de la série
+     * @returns {Promise<Array>} lignes { evenement_id, ressource_id, statut } ; [] si vide/erreur.
+     */
+    async listReservationsSerie(evenementIds) {
+      var ids = Array.isArray(evenementIds)
+        ? evenementIds.filter(function (v) { return !!v; })
+        : [];
+      ids = ids.filter(function (v, i, a) { return a.indexOf(v) === i; });
+      if (ids.length === 0) return [];
+      const { data, error } = await client
+        .from('reservations_logistiques')
+        .select('evenement_id, ressource_id, statut')
+        .in('evenement_id', ids);
+      if (error) {
+        console.error('MOM Hub: listReservationsSerie()', error);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
      * EVT-SERIE-ECRAN — modifie la récurrence d'une mère (Q4=B) : met à jour
      * le champ recurrence puis PROLONGE (regénère, idempotent) et, si la fin
      * est raccourcie, SUPPRIME les occurrences futures au-delà de la nouvelle
