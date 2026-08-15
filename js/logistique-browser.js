@@ -226,7 +226,7 @@
     } else {
       wireForm();
     }
-    applyUrlPrefill();
+    await applyUrlPrefill();
     await refreshAgenda();
     await refreshCalendar();
 
@@ -267,7 +267,7 @@
   // Le même chemin de coche (click rejoué) est réutilisé : un seul
   // mécanisme, pas de logique dupliquée.
   // ============================================================
-  function applyUrlPrefill() {
+  async function applyUrlPrefill() {
     const sp = new URLSearchParams(window.location.search);
     const ressource = sp.get('ressource');
     const ressourcesCsv = sp.get('ressources');
@@ -335,6 +335,21 @@
       el('logi-heure-fin').value = fin;
     }
 
+    // MÉMOIRE-DATES-COCHÉES · côté RESSOURCES — re-cochage à la ré-ouverture.
+    // Quand on rouvre un événement DÉJÀ réservé (?evenement=<uuid>), le
+    // pré-cochage inféré ci-dessus (?ressources=, posé par INFÉRENCE du type
+    // d'événement) peut être vide (ex. entraînement domicile sans site) ou
+    // divergent (ressource « Autre » ajoutée à la main, non ré-inférée). On
+    // relit donc les résas RÉELLES de l'occurrence et on re-coche ce qui
+    // manque. Union dédoublonnée (FAIT FOI arb.3) : on ne clique JAMAIS une
+    // carte déjà cochée (un 2e click la décocherait — cf. _decocherRessource),
+    // donc réel ∪ inféré sans effet de bord. Placé AVANT la bascule série
+    // (arb.5) pour que _recalcCochesSerie parte d'une sélection peuplée.
+    // Fail-soft intégral : toute erreur laisse la sélection en l'état.
+    if (state.evenementId) {
+      await _recocherRessourcesDepuisResas(state.evenementId);
+    }
+
     // EVT-PONT-SAISIE (brique A) — mode SÉRIE : ?serie=1 sur une mère
     // récurrente. Les ressources + catégorie (communes) sont déjà
     // pré-cochées ci-dessus ; on bascule l'écran sur le panneau de revue
@@ -344,6 +359,49 @@
     if (serie === '1' && state.evenementId) {
       activerModeSerie(state.evenementId);
     }
+  }
+
+  // ============================================================
+  // MÉMOIRE-DATES-COCHÉES · côté RESSOURCES
+  // Re-coche les ressources RÉELLEMENT réservées (lues en base) pour
+  // l'occurrence rouverte, en complément du pré-cochage inféré (?ressources=).
+  // Chemin de coche UNIQUE : card.click() sur les cartes cibles (bénéficie du
+  // renfort pt 253 — is-selected + chip récap + _appliquerChangementSelection,
+  // donc recalcul série gratuit si applicable). DÉDOUBLONNAGE STRICT contre
+  // state.ressourceCoches AVANT tout click : une carte déjà cochée (par
+  // l'inféré) n'est PAS re-cliquée, sinon elle se décocherait (toggle
+  // _decocherRessource). Statuts actifs = pending|approved (aligné pt 251).
+  // Maille = occurrence seule (FAIT FOI arb.2). Fail-soft intégral.
+  // ============================================================
+  async function _recocherRessourcesDepuisResas(evenementId) {
+    if (!evenementId || !window.SupabaseHub
+        || typeof SupabaseHub.listReservationsSerie !== 'function') return;
+    var resas = [];
+    try {
+      resas = await SupabaseHub.listReservationsSerie([evenementId]);
+    } catch (e) {
+      console.error('MOM Hub: _recocherRessourcesDepuisResas()', e);
+      return;
+    }
+    if (!Array.isArray(resas) || resas.length === 0) return;
+    var STATUTS_ACTIFS = { pending: true, approved: true };
+    // ressource_id actifs, dédoublonnés.
+    var cibles = resas
+      .filter(function (r) {
+        return r && r.ressource_id && STATUTS_ACTIFS[r.statut];
+      })
+      .map(function (r) { return r.ressource_id; })
+      .filter(function (v, i, a) { return a.indexOf(v) === i; });
+    if (cibles.length === 0) return;
+    const host = el('logi-ressources');
+    if (!host) return;
+    cibles.forEach(function (rid) {
+      // DÉDOUBLONNAGE (arb.3) : ne jamais re-cliquer une carte déjà cochée.
+      if ((state.ressourceCoches || []).indexOf(rid) !== -1) return;
+      const card = host.querySelector(
+        '.logi-res-card[data-id="' + CSS.escape(rid) + '"]');
+      if (card) card.click();
+    });
   }
 
   // ============================================================
