@@ -235,6 +235,50 @@
       padding: 1px 6px; margin-left: 4px;
       white-space: nowrap; vertical-align: middle;
     }
+
+    /* ============================================================
+       VALIDATION-LOT-SERIE (pt 250) — série d'occurrences + sélection
+       multiple. Additif (sélecteurs .is-serie / .lgv-serie-badge /
+       .lgv-card__select / .lgv-selbar / .lgv-btn-serie neufs). Teinte
+       bleu-ardoise pour distinguer la SÉRIE (occurrences d'une même
+       mère) du LOT ambre (1 occurrence multi-ressources).
+       ============================================================ */
+    .lgv-card.is-serie {
+      border-left: 3px solid #4a6fa5;   /* ardoise série */
+    }
+    .lgv-card.is-serie.is-lot {
+      /* série ET lot : dégradé des deux repères sur le liseré */
+      border-left: 3px solid #4a6fa5;
+      box-shadow: inset 3px 0 0 -1px #d98c1f;
+    }
+    .lgv-serie-badge {
+      display: inline-block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; letter-spacing: 0.04em;
+      color: #294a78; background: #e6eef8;
+      border: 1px solid #b9cde8; border-radius: 6px;
+      padding: 1px 6px; margin-left: 4px;
+      white-space: nowrap; vertical-align: middle;
+    }
+    .lgv-card__select {
+      margin-left: auto;
+      font-size: 11px; color: var(--ink-mute);
+      display: inline-flex; align-items: center; gap: 4px;
+      cursor: pointer; white-space: nowrap;
+    }
+    .lgv-card__select input { cursor: pointer; }
+    .lgv-btn-serie { font-weight: 600; }
+    .lgv-selbar {
+      display: flex; align-items: center; gap: 14px;
+      padding: 8px 10px; margin-bottom: 10px;
+      background: #f4f7fb; border: 1px solid #d9e2ef; border-radius: 8px;
+    }
+    .lgv-selbar__all {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; color: var(--ink); cursor: pointer; white-space: nowrap;
+    }
+    .lgv-selbar__all input { cursor: pointer; }
+    .lgv-selbar__go { margin-left: auto; }
   </style>
 </head>
 <body class="auth-pending">
@@ -452,6 +496,78 @@
         return '<span class="lgv-lot-badge" title="Réservation groupée">⛓ ' +
           escapeHtml(txt) + '</span>';
       }
+
+      // ------------------------------------------------------------------
+      // VALIDATION-LOT-SERIE (pt 250)
+      // Résolution des « séries » côté front : une série = les résas dont
+      // l'evenement_id pointe sur des occurrences partageant la même mère
+      // (evenement_parent_id). evenement_parent_id vit sur `evenements`, pas
+      // sur reservations_logistiques → un SELECT de résolution, puis
+      // regroupement en mémoire. Ne renvoie QUE les groupes de 2+ résas
+      // pending (une occurrence seule ne « fait pas série »).
+      // Retour : map { reservation_id -> { serieIds:[...], serieN:N } }.
+      async function _resoudreSeries(ponct) {
+        var map = {};
+        var evIds = [];
+        (ponct || []).forEach(function (r) {
+          if (r && r.evenement_id && evIds.indexOf(r.evenement_id) === -1) {
+            evIds.push(r.evenement_id);
+          }
+        });
+        if (evIds.length === 0) return map;
+
+        // id -> evenement_parent_id (mère). Les occurrences filles portent le
+        // parent ; une occurrence « mère » a evenement_parent_id NULL → on la
+        // regroupe alors sous son propre id (série d'une seule maille = pas
+        // de série, filtrée plus bas de toute façon).
+        var ev = await SupabaseHub.client
+          .from('evenements').select('id, evenement_parent_id')
+          .in('id', evIds);
+        if (ev.error) { console.error('MOM Hub: _resoudreSeries()', ev.error); return map; }
+        var parentDe = {};
+        (ev.data || []).forEach(function (e) {
+          parentDe[e.id] = e.evenement_parent_id || e.id;
+        });
+
+        // Regrouper les reservation_id par clé de série (parent).
+        var parGroupe = {};
+        (ponct || []).forEach(function (r) {
+          if (!r.evenement_id) return;
+          var cle = parentDe[r.evenement_id];
+          if (!cle) return;
+          (parGroupe[cle] = parGroupe[cle] || []).push(r.id);
+        });
+
+        // Ne garder que les groupes de 2+ → chaque résa du groupe connaît la
+        // liste complète de la série et son N.
+        Object.keys(parGroupe).forEach(function (cle) {
+          var ids = parGroupe[cle];
+          if (ids.length < 2) return;
+          ids.forEach(function (rid) {
+            map[rid] = { serieIds: ids.slice(), serieN: ids.length };
+          });
+        });
+        return map;
+      }
+
+      // Action groupée : approuve une liste d'ids via la RPC atomique.
+      // toutOuRien côté serveur ; ici on gère le bilan + refresh.
+      async function _validerLot(ids, libelle) {
+        if (!Array.isArray(ids) || ids.length === 0) return;
+        var res = await SupabaseHub.validerReservationsLot(ids, 'approved', null);
+        if (res.ok) {
+          var n = (res.data && res.data.length) || ids.length;
+          showToast((libelle || 'Sélection') + ' : ' + n + ' demande(s) approuvée(s)', true);
+          _selection = {};
+          await refreshTout();
+        } else {
+          showToast('Échec : ' + (res.error || ''), false);
+        }
+      }
+
+      // État de sélection multiple (reservation_id -> true). Réinitialisé à
+      // chaque refresh de la file.
+      var _selection = {};
 
       var JOURS_LBL = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']; // 0=Lun..6=Dim
       var MOIS_LONG = ['janvier','février','mars','avril','mai','juin','juillet',
@@ -889,17 +1005,45 @@
       // par _lotBadgeHtml, inséré NON échappé après le titre ; classe is-lot
       // pour le liseré. Paramètre en fin de signature → appels existants
       // (7 args) restent valides, lotBadgeHtml vaut undefined = pas de badge.
-      function carteFile(src, tag, tagClass, titre, meta, motif, id, lotBadgeHtml) {
+      // serieOpts (optionnel, VALIDATION-LOT-SERIE, source ponctuelle
+      // uniquement) : { selectable:bool, serie:{serieIds:[...], serieN:N}|null }.
+      // Absent (recurrence/bus) → aucune case ni bouton série : comportement
+      // historique strictement inchangé.
+      function carteFile(src, tag, tagClass, titre, meta, motif, id, lotBadgeHtml, serieOpts) {
+        var opts = serieOpts || {};
+        var serie = opts.serie || null;
         var card = document.createElement('div');
-        card.className = 'lgv-card' + (lotBadgeHtml ? ' is-lot' : '');
+        card.className = 'lgv-card' + (lotBadgeHtml ? ' is-lot' : '') +
+          (serie ? ' is-serie' : '');
         card.innerHTML =
           '<div class="lgv-card__top">' +
             '<span class="lgv-tag' + (tagClass ? ' ' + tagClass : '') + '">' + escapeHtml(tag) + '</span>' +
             '<span class="lgv-card__res">' + escapeHtml(titre) +
-              (lotBadgeHtml ? ' ' + lotBadgeHtml : '') + '</span>' +
+              (lotBadgeHtml ? ' ' + lotBadgeHtml : '') +
+              (serie ? ' <span class="lgv-serie-badge" title="Occurrences d\'une même série">◫ série de ' +
+                escapeHtml(String(serie.serieN)) + '</span>' : '') + '</span>' +
           '</div>' +
           '<div class="lgv-card__meta">' + escapeHtml(meta) + '</div>' +
           (motif ? '<div class="lgv-card__motif">' + escapeHtml(motif) + '</div>' : '');
+
+        // Case de sélection multiple (ponctuelles sélectionnables).
+        if (opts.selectable) {
+          var selWrap = document.createElement('label');
+          selWrap.className = 'lgv-card__select';
+          var cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.className = 'lgv-select-cb';
+          cb.setAttribute('data-rid', id);
+          cb.checked = !!_selection[id];
+          cb.addEventListener('change', function () {
+            if (cb.checked) { _selection[id] = true; } else { delete _selection[id]; }
+            _majBarreSelection();
+          });
+          selWrap.appendChild(cb);
+          selWrap.appendChild(document.createTextNode(' sélectionner'));
+          card.querySelector('.lgv-card__top').appendChild(selWrap);
+        }
+
         var actions = document.createElement('div');
         actions.className = 'lgv-card__actions';
         var ok = document.createElement('button');
@@ -923,8 +1067,84 @@
         ed.type = 'button'; ed.className = 'lgv-btn-toggle'; ed.textContent = 'Modifier';
         ed.addEventListener('click', function () { ouvrirEdition(src, id); });
         actions.appendChild(ok); actions.appendChild(no); actions.appendChild(ed);
+
+        // Bouton « Valider la série » : approuve toutes les occurrences de la
+        // série en une action (RPC atomique). Approbation seule (le refus
+        // reste unitaire via le bouton Refuser ci-dessus).
+        if (serie && serie.serieIds && serie.serieIds.length >= 2) {
+          var okSerie = document.createElement('button');
+          okSerie.type = 'button';
+          okSerie.className = 'lgv-btn-ok lgv-btn-serie';
+          okSerie.textContent = 'Valider la série (' + serie.serieN + ')';
+          okSerie.addEventListener('click', async function () {
+            okSerie.disabled = true;
+            await _validerLot(serie.serieIds, 'Série');
+          });
+          actions.appendChild(okSerie);
+        }
+
         card.appendChild(actions);
         return card;
+      }
+
+      // ------------------------------------------------------------------
+      // VALIDATION-LOT-SERIE : barre de sélection multiple (ponctuelles).
+      // « Tout sélectionner » + « Valider la sélection (N) ». Recréée à
+      // chaque refreshFile ; agit sur l'état _selection.
+      // ------------------------------------------------------------------
+      function _barreSelectionEl() {
+        var bar = document.createElement('div');
+        bar.className = 'lgv-selbar';
+        bar.id = 'lgv-selbar';
+
+        var all = document.createElement('label');
+        all.className = 'lgv-selbar__all';
+        var allCb = document.createElement('input');
+        allCb.type = 'checkbox';
+        allCb.id = 'lgv-selbar-all';
+        allCb.addEventListener('change', function () {
+          var cbs = document.querySelectorAll('#lgv-file .lgv-select-cb');
+          _selection = {};
+          cbs.forEach(function (cb) {
+            cb.checked = allCb.checked;
+            var rid = cb.getAttribute('data-rid');
+            if (allCb.checked && rid) { _selection[rid] = true; }
+          });
+          _majBarreSelection();
+        });
+        all.appendChild(allCb);
+        all.appendChild(document.createTextNode(' Tout sélectionner'));
+
+        var act = document.createElement('button');
+        act.type = 'button';
+        act.className = 'lgv-btn-ok lgv-selbar__go';
+        act.id = 'lgv-selbar-go';
+        act.textContent = 'Valider la sélection';
+        act.disabled = true;
+        act.addEventListener('click', async function () {
+          var ids = Object.keys(_selection);
+          if (ids.length === 0) return;
+          act.disabled = true;
+          await _validerLot(ids, 'Sélection');
+        });
+
+        bar.appendChild(all);
+        bar.appendChild(act);
+        return bar;
+      }
+
+      function _majBarreSelection() {
+        var n = Object.keys(_selection).length;
+        var go = el('lgv-selbar-go');
+        if (go) {
+          go.disabled = (n === 0);
+          go.textContent = n > 0 ? ('Valider la sélection (' + n + ')') : 'Valider la sélection';
+        }
+        var all = el('lgv-selbar-all');
+        if (all) {
+          var cbs = document.querySelectorAll('#lgv-file .lgv-select-cb');
+          all.checked = (cbs.length > 0 && n === cbs.length);
+        }
       }
 
       async function refreshFile() {
@@ -957,6 +1177,11 @@
         // AXE UX 2 : comptage N par lot sur la file d'attente complète (tous
         // les pending sont en mémoire dans `ponct` → N fiable).
         var lotNfile = _compterLots(ponct);
+        // VALIDATION-LOT-SERIE : résolution des séries (map reservation_id ->
+        // {serieIds, serieN}) + barre de sélection multiple (ponctuelles).
+        var seriesMap = await _resoudreSeries(ponct);
+        _selection = {}; // repart propre à chaque refresh de la file
+        if (ponct.length > 0) { host.appendChild(_barreSelectionEl()); }
         ponct.forEach(function (r) {
           // MULTI-JOURS (maillon 6) : mention de la plage si date_fin présente.
           var quand = formatDateLong(r.date)
@@ -968,8 +1193,10 @@
             ressLbl(r.ressource_id),
             quand,
             r.motif, r.id,
-            r.lot_id ? _lotBadgeHtml(r.lot_id, lotNfile[r.lot_id]) : ''));
+            r.lot_id ? _lotBadgeHtml(r.lot_id, lotNfile[r.lot_id]) : '',
+            { selectable: true, serie: seriesMap[r.id] || null }));
         });
+        _majBarreSelection();
         recur.forEach(function (r) {
           host.appendChild(carteFile(
             'recurrence', 'Récurrente', 'lgv-tag--recur',
