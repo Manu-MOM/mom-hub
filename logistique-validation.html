@@ -71,6 +71,18 @@
     }
     .lgv-badge:empty { display: none; }
 
+    /* Rubriques repliables (<details>/<summary>) — style hub préservé.
+       Repliées par défaut (pas d'attribut open). Zéro JS, accessible clavier. */
+    details.lgv-section > summary.lgv-section__title {
+      cursor: pointer; list-style: none; user-select: none;
+    }
+    details.lgv-section > summary.lgv-section__title::-webkit-details-marker { display: none; }
+    details.lgv-section > summary.lgv-section__title::before {
+      content: '▸'; font-size: 11px; color: var(--ink-soft);
+      transition: transform 0.15s ease; display: inline-block;
+    }
+    details.lgv-section[open] > summary.lgv-section__title::before { transform: rotate(90deg); }
+
     /* File tri-source : une carte par demande en attente */
     .lgv-card {
       background: #fff; border: 1px solid var(--line); border-radius: 10px;
@@ -341,10 +353,15 @@
           <div id="lgv-file"><div class="lgv-empty">Chargement…</div></div>
         </section>
 
-        <section class="lgv-section">
-          <h3 class="lgv-section__title">Règles récurrentes</h3>
+        <details class="lgv-section">
+          <summary class="lgv-section__title">Réservations récurrentes</summary>
           <div id="lgv-regles"><div class="lgv-empty">—</div></div>
-        </section>
+        </details>
+
+        <details class="lgv-section">
+          <summary class="lgv-section__title">Réservations ponctuelles</summary>
+          <div id="lgv-ponct"><div class="lgv-empty">—</div></div>
+        </details>
       </div>
 
       <!-- AGENDA D'ARBITRAGE (droite) : les conflits se lisent en contexte,
@@ -1278,6 +1295,40 @@
       }
 
       // ------------------------------------------------------------------
+      // Réservations ponctuelles VALIDÉES (consultation, lecture seule).
+      // Périmètre (FAIT FOI arb.3) : statut='approved' ET evenement_id IS
+      // NULL → résas ponctuelles PURES (occurrences de série exclues).
+      // Le pending ponctuel reste dans la file d'attente (pas de doublon).
+      // Aucune action ici (rubrique de consultation repliée par défaut).
+      // ------------------------------------------------------------------
+      async function refreshPonctuelles() {
+        var host = el('lgv-ponct');
+        if (!host) return;
+        var all = await SupabaseHub.listReservations({ statut: 'approved' });
+        var pures = (all || []).filter(function (r) {
+          return r.evenement_id === null || r.evenement_id === undefined;
+        });
+        host.innerHTML = '';
+        if (pures.length === 0) {
+          host.innerHTML = '<div class="lgv-empty">Aucune réservation ponctuelle validée.</div>';
+          return;
+        }
+        pures.forEach(function (r) {
+          var card = document.createElement('div');
+          card.className = 'lgv-card';
+          card.innerHTML =
+            '<div class="lgv-card__top">' +
+              '<span class="lgv-card__res">' + escapeHtml(ressLbl(r.ressource_id)) + '</span>' +
+            '</div>' +
+            '<div class="lgv-card__meta">' +
+              escapeHtml(formatDateLong(r.date) + ' · ' + creneauLbl(r)) +
+            '</div>' +
+            (r.motif ? '<div class="lgv-card__motif">' + escapeHtml(r.motif) + '</div>' : '');
+          host.appendChild(card);
+        });
+      }
+
+      // ------------------------------------------------------------------
       // Édition & annulation (cycle de vie B1-B7, FAIT FOI b59b44d9).
       // La ligne est RECHARGÉE INTÉGRALEMENT avant ouverture (patron
       // pt 141) et TOUS les champs sont ré-émis (B7 — UPDATE dur côté
@@ -1649,11 +1700,13 @@
       async function refreshTout() {
         await refreshFile();
         await refreshRegles();
+        await refreshPonctuelles();
         await agenda.refresh();
       }
 
       await refreshFile();
       await refreshRegles();
+      await refreshPonctuelles();
       await agenda.init();
 
       console.log('%c🏉 Validation logistique chargée', 'color:#2D7D46;font-weight:bold;',
