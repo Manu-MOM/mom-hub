@@ -505,7 +505,9 @@
       // sur reservations_logistiques → un SELECT de résolution, puis
       // regroupement en mémoire. Ne renvoie QUE les groupes de 2+ résas
       // pending (une occurrence seule ne « fait pas série »).
-      // Retour : map { reservation_id -> { serieIds:[...], serieN:N } }.
+      // Retour : map { reservation_id -> { serieIds:[...lignes], serieN:occ } }
+      //   serieIds = toutes les lignes de la série (périmètre validé) ;
+      //   serieN   = nombre d'occurrences distinctes (affiché « série de N »).
       async function _resoudreSeries(ponct) {
         var map = {};
         var evIds = [];
@@ -529,22 +531,31 @@
           parentDe[e.id] = e.evenement_parent_id || e.id;
         });
 
-        // Regrouper les reservation_id par clé de série (parent).
+        // Regrouper par clé de série (parent). Pour chaque groupe on trace :
+        // - ids  : toutes les lignes (reservation_id) → PÉRIMÈTRE validé
+        //          (inclut les 2e ressources d'une occurrence multi-ressources).
+        // - occ  : les evenement_id distincts → NOMBRE d'occurrences (séances)
+        //          affiché dans le badge « série de N ».
         var parGroupe = {};
         (ponct || []).forEach(function (r) {
           if (!r.evenement_id) return;
           var cle = parentDe[r.evenement_id];
           if (!cle) return;
-          (parGroupe[cle] = parGroupe[cle] || []).push(r.id);
+          var g = (parGroupe[cle] = parGroupe[cle] || { ids: [], occ: {} });
+          g.ids.push(r.id);
+          g.occ[r.evenement_id] = true;
         });
 
-        // Ne garder que les groupes de 2+ → chaque résa du groupe connaît la
-        // liste complète de la série et son N.
+        // Une SÉRIE = 2+ occurrences distinctes (pas 2+ lignes : une seule
+        // séance à 2 minibus n'est pas une série). serieN = nb d'occurrences ;
+        // serieIds = toutes les lignes (le clic valide bien tout, minibus
+        // compris).
         Object.keys(parGroupe).forEach(function (cle) {
-          var ids = parGroupe[cle];
-          if (ids.length < 2) return;
-          ids.forEach(function (rid) {
-            map[rid] = { serieIds: ids.slice(), serieN: ids.length };
+          var g = parGroupe[cle];
+          var nbOcc = Object.keys(g.occ).length;
+          if (nbOcc < 2) return;
+          g.ids.forEach(function (rid) {
+            map[rid] = { serieIds: g.ids.slice(), serieN: nbOcc };
           });
         });
         return map;
