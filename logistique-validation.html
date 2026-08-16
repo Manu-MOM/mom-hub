@@ -583,6 +583,10 @@
       // toutOuRien côté serveur ; ici on gère le bilan + refresh.
       async function _validerLot(ids, libelle) {
         if (!Array.isArray(ids) || ids.length === 0) return;
+        // RESA-ANTI-CHEVAUCHEMENT : alerte non bloquante agrégée sur le lot
+        // avant l'approbation atomique. Annulation = on ne touche à rien
+        // (retour false → l'appelant peut ré-activer son bouton).
+        if (!(await _confirmerSiConflitLot(ids))) { return false; }
         var res = await SupabaseHub.validerReservationsLot(ids, 'approved', null);
         if (res.ok) {
           var n = (res.data && res.data.length) || ids.length;
@@ -1018,6 +1022,102 @@
       }
 
       // ------------------------------------------------------------------
+      // RESA-ANTI-CHEVAUCHEMENT : détection NON BLOQUANTE de conflit de
+      // ressource matériel exclusive au moment de valider (FAIT FOI :
+      // ARB.0 = alerte c1, ARB.1 approved, ARB.A materiel, ARB.4 3 surfaces).
+      // La RPC sql_246 fait tout le travail (filtre materiel/site, overlap,
+      // projection récurrente) ; ici on ne fait qu'appeler + présenter.
+      // ------------------------------------------------------------------
+      // Index des rows pending par id (peuplé dans refreshFile).
+      var _rowsPendingParId = {};
+
+      // Récupère les conflits pour une row pending donnée selon sa source.
+      // Ponctuelle : créneau date..date_fin, exclut la résa elle-même.
+      // Récurrence : fenêtre date_debut..date_fin de la règle, exclut la
+      // règle elle-même (la projection SQL déplie les occurrences).
+      async function _conflitsRow(src, row) {
+        if (!row || !row.ressource_id) return [];
+        var params;
+        if (src === 'recurrence') {
+          // Fenêtre = [date_debut .. date_fin] de la règle. Si date_debut
+          // NULL (rare : toutes les règles en base en ont une), repli sur
+          // aujourd'hui — on ne cherche pas de conflit dans le passé, et on
+          // couvre tout le futur jusqu'à date_fin.
+          var borneBasse = row.date_debut || new Date().toISOString().slice(0, 10);
+          params = {
+            ressourceId: row.ressource_id,
+            date: borneBasse,
+            dateFin: row.date_fin,
+            heureDebut: row.heure_debut,
+            heureFin: row.heure_fin,
+            excludeRecurrenceId: row.id
+          };
+        } else {
+          params = {
+            ressourceId: row.ressource_id,
+            date: row.date,
+            dateFin: row.date_fin || null,
+            heureDebut: row.heure_debut,
+            heureFin: row.heure_fin,
+            excludeId: row.id
+          };
+        }
+        var res = await SupabaseHub.detecterConflitsRessource(params);
+        return (res && res.ok && Array.isArray(res.data)) ? res.data : [];
+      }
+
+      // Formatte une ligne de conflit pour le message confirm().
+      function _conflitLbl(c) {
+        var hd = c.out_heure_debut ? String(c.out_heure_debut).slice(0, 5) : '';
+        var hf = c.out_heure_fin ? String(c.out_heure_fin).slice(0, 5) : '';
+        var srcTxt = (c.out_source === 'recurrent') ? 'récurrente' : 'ponctuelle';
+        return '• ' + formatDateLong(c.out_date_conflit) + ' ' + hd + '–' + hf +
+          ' (' + srcTxt + ')';
+      }
+
+      // Détecte + demande confirmation NON BLOQUANTE si conflit. Renvoie
+      // true = procéder (aucun conflit, ou bureau confirme malgré tout),
+      // false = annuler (bureau a refusé la confirmation).
+      async function _confirmerSiConflit(src, row) {
+        var conflits = await _conflitsRow(src, row);
+        if (!conflits.length) return true;
+        var libRes = conflits[0].out_libelle_ressource || 'Cette ressource';
+        var lignes = conflits.slice(0, 8).map(_conflitLbl).join('\n');
+        var suite = conflits.length > 8
+          ? '\n… et ' + (conflits.length - 8) + ' autre(s)' : '';
+        var msg = '\u26A0\uFE0F ' + libRes + ' est déjà réservé(e) (approuvé) sur '
+          + conflits.length + ' créneau(x) qui chevauche(nt) :\n\n'
+          + lignes + suite
+          + '\n\nApprouver quand même ?';
+        return window.confirm(msg);
+      }
+
+      // Variante LOT : agrège les conflits de plusieurs ids (rows en mémoire),
+      // un seul confirm() récapitulatif. Renvoie true = procéder.
+      async function _confirmerSiConflitLot(ids) {
+        var total = [];
+        var resLbls = {};
+        for (var i = 0; i < ids.length; i++) {
+          var entry = _rowsPendingParId[ids[i]];
+          if (!entry) continue;
+          var cs = await _conflitsRow(entry.src, entry.row);
+          cs.forEach(function (c) {
+            total.push(c);
+            if (c.out_libelle_ressource) resLbls[c.out_libelle_ressource] = true;
+          });
+        }
+        if (!total.length) return true;
+        var noms = Object.keys(resLbls).join(', ') || 'Ressource(s) matériel';
+        var lignes = total.slice(0, 8).map(_conflitLbl).join('\n');
+        var suite = total.length > 8 ? '\n… et ' + (total.length - 8) + ' autre(s)' : '';
+        var msg = '\u26A0\uFE0F Conflit(s) détecté(s) sur : ' + noms + '\n\n'
+          + total.length + ' créneau(x) du lot chevauche(nt) une réservation '
+          + 'déjà approuvée :\n\n' + lignes + suite
+          + '\n\nApprouver l\u2019ensemble quand même ?';
+        return window.confirm(msg);
+      }
+
+      // ------------------------------------------------------------------
       // Décisions (Approuver/Refuser) — un seul aiguillage par source
       // ------------------------------------------------------------------
       async function decider(src, id, decision, motif) {
@@ -1079,6 +1179,11 @@
         ok.type = 'button'; ok.className = 'lgv-btn-ok'; ok.textContent = 'Approuver';
         ok.addEventListener('click', async function () {
           ok.disabled = true;
+          // RESA-ANTI-CHEVAUCHEMENT : alerte non bloquante avant approbation.
+          var ent = _rowsPendingParId[id];
+          if (ent && !(await _confirmerSiConflit(ent.src, ent.row))) {
+            ok.disabled = false; return;
+          }
           var res = await decider(src, id, 'approved', null);
           if (res.ok) { showToast('Demande approuvée', true); await refreshTout(); }
           else { showToast('Échec : ' + (res.error || ''), false); ok.disabled = false; }
@@ -1107,7 +1212,8 @@
           okSerie.textContent = 'Valider la série (' + serie.serieN + ')';
           okSerie.addEventListener('click', async function () {
             okSerie.disabled = true;
-            await _validerLot(serie.serieIds, 'Série');
+            var okv = await _validerLot(serie.serieIds, 'Série');
+            if (okv === false) { okSerie.disabled = false; }
           });
           actions.appendChild(okSerie);
         }
@@ -1154,7 +1260,8 @@
           var ids = Object.keys(_selection);
           if (ids.length === 0) return;
           act.disabled = true;
-          await _validerLot(ids, 'Sélection');
+          var okv = await _validerLot(ids, 'Sélection');
+          if (okv === false) { act.disabled = false; }
         });
 
         bar.appendChild(all);
@@ -1194,6 +1301,13 @@
         var recur = (pr.error ? [] : (pr.data || []));
         var bus = pb || [];
         var total = ponct.length + recur.length + bus.length;
+
+        // RESA-ANTI-CHEVAUCHEMENT : index des rows pending (ponctuelles +
+        // récurrentes) par id, pour la détection de conflit au moment de
+        // valider sans re-fetch. Reconstruit à chaque refresh.
+        _rowsPendingParId = {};
+        ponct.forEach(function (r) { _rowsPendingParId[r.id] = { src: 'ponctuelle', row: r }; });
+        recur.forEach(function (r) { _rowsPendingParId[r.id] = { src: 'recurrence', row: r }; });
 
         var badge = el('lgv-badge');
         if (badge) badge.textContent = total ? String(total) : '';
@@ -1663,6 +1777,12 @@
                 label: 'Approuver',
                 onClick: async function (item, closeDetail) {
                   var id = item.meta.row.id;
+                  // RESA-ANTI-CHEVAUCHEMENT : alerte non bloquante avant
+                  // approbation (row disponible directement dans item.meta).
+                  var srcRow = (item.meta.src === 'recurrence') ? 'recurrence' : 'ponctuelle';
+                  if (!(await _confirmerSiConflit(srcRow, item.meta.row))) {
+                    return;
+                  }
                   var res = await decider(item.meta.src, id, 'approved', null);
                   if (res.ok) {
                     closeDetail();
