@@ -126,7 +126,8 @@
   function tronc() {
     return [
       { label: 'Accueil', href: './' },
-      { label: 'Tableau de bord', href: 'dashboard.html', show: 'staff' }
+      { label: 'Tableau de bord', href: 'dashboard.html', show: 'staff' },
+      { label: 'Agenda général', href: 'agenda-general.html', show: 'admin bureau' }
     ];
   }
 
@@ -258,15 +259,14 @@
     },
 
     /* EVT-ORCHESTRATION : thème de la vue agenda générale transverse. La page
-     * porte sa propre garde admin|bureau ; la nav offre le retour Accueil +
-     * Tableau de bord (tronc) et « Agenda général » comme lien courant (marqué
-     * .active, non révélé par jeton car la page est déjà admise). */
+     * porte sa propre garde admin|bureau. « Agenda général » vit dans tronc()
+     * (accessible depuis toutes les pages) ; ici marquerCourante() le passe en
+     * .active non-cliquable. Le thème n'ajoute donc RIEN au tronc (éviter le
+     * doublon d'entrée). */
     'agenda-general': {
       ariaLabel: 'Navigation agenda général',
       carrefour: false,
-      liens: tronc().concat([
-        { label: 'Agenda général', href: 'agenda-general.html' }
-      ])
+      liens: tronc()
     }
   };
 
