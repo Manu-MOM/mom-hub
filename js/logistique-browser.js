@@ -618,6 +618,68 @@
     if (sbtn) sbtn.addEventListener('click', onSubmitSerie);
   }
 
+  // ============================================================
+  // RESA-ALERTE-SAISIE (option a) : alerte NON BLOQUANTE de conflit de
+  // ressource matériel exclusive AU MOMENT DE LA CRÉATION (écart 1 conv=
+  // 1 sujet assumé Manu). Même RPC detecter_conflits_ressource (sql_246)
+  // que la validation ; ici on teste AVANT écriture (rien à exclure, la
+  // résa n'existe pas encore). confirm() récapitulatif ; OK = créer,
+  // Annuler = abandon. type='site' → 0 conflit (RPC, ARB.A).
+  // ============================================================
+
+  // Détecte les conflits pour une liste de ressources sur une FENÊTRE
+  // [from,to] + un créneau horaire. Un appel par ressource (la RPC déplie
+  // la fenêtre et vérifie l'overlap horaire sur chaque date projetée).
+  // ressourceIds : ids testés (les sites seront ignorés côté RPC).
+  // Retour : tableau agrégé de conflits.
+  async function _detecterConflitsSaisie(ressourceIds, from, to, hd, hf) {
+    var total = [];
+    if (!Array.isArray(ressourceIds) || !from || !hd || !hf) return total;
+    for (var i = 0; i < ressourceIds.length; i++) {
+      var rid = ressourceIds[i];
+      if (!rid) continue;
+      var res = await SupabaseHub.detecterConflitsRessource({
+        ressourceId: rid,
+        date: from,
+        dateFin: to || from,
+        heureDebut: hd,
+        heureFin: hf
+        // aucune exclusion : la réservation testée n'existe pas encore.
+      });
+      if (res && res.ok && Array.isArray(res.data)) {
+        res.data.forEach(function (c) { total.push(c); });
+      }
+    }
+    return total;
+  }
+
+  // Formatte une ligne de conflit pour le confirm().
+  function _conflitLblSaisie(c) {
+    var hdc = c.out_heure_debut ? String(c.out_heure_debut).slice(0, 5) : '';
+    var hfc = c.out_heure_fin ? String(c.out_heure_fin).slice(0, 5) : '';
+    var srcTxt = (c.out_source === 'recurrent') ? 'récurrente' : 'ponctuelle';
+    var dLbl = c.out_date_conflit ? String(c.out_date_conflit) : '';
+    return '• ' + dLbl + ' ' + hdc + '–' + hfc + ' (' + srcTxt + ')';
+  }
+
+  // confirm() récapitulatif si conflit. true = créer, false = abandon.
+  function _confirmerSaisie(conflits) {
+    if (!conflits.length) return true;
+    var resLbls = {};
+    conflits.forEach(function (c) {
+      if (c.out_libelle_ressource) resLbls[c.out_libelle_ressource] = true;
+    });
+    var noms = Object.keys(resLbls).join(', ') || 'Ressource(s) matériel';
+    var lignes = conflits.slice(0, 8).map(_conflitLblSaisie).join('\n');
+    var suite = conflits.length > 8
+      ? '\n… et ' + (conflits.length - 8) + ' autre(s)' : '';
+    var msg = '\u26A0\uFE0F ' + noms + ' : ' + conflits.length
+      + ' créneau(x) déjà réservé(s) (approuvé) chevauche(nt) votre demande :\n\n'
+      + lignes + suite
+      + '\n\nCréer la demande quand même ?';
+    return window.confirm(msg);
+  }
+
   async function onSubmitSerie() {
     const categorieIds = state.catCoches.slice();
     const responsables = state.respCoches.slice();
@@ -632,6 +694,23 @@
       return serieState.coches[o.id];
     });
     if (choisies.length === 0) { showToast('Coche au moins une occurrence', false); return; }
+
+    // RESA-ALERTE-SAISIE : détection agrégée AVANT la boucle de création.
+    // Fenêtre = [1re, dernière] occurrence cochée ; créneau = 1er créneau
+    // valide (la série porte un créneau constant). 1 appel par ressource.
+    var _sDates = choisies
+      .map(function (o) { return String(o.date_debut).slice(0, 10); })
+      .filter(Boolean).sort();
+    var _sCr = null;
+    for (var _si = 0; _si < choisies.length; _si++) {
+      var _c = _occCreneau(choisies[_si]);
+      if (_c.debut && _c.fin) { _sCr = _c; break; }
+    }
+    if (_sDates.length && _sCr) {
+      var _sConf = await _detecterConflitsSaisie(
+        ressourceIds, _sDates[0], _sDates[_sDates.length - 1], _sCr.debut, _sCr.fin);
+      if (!_confirmerSaisie(_sConf)) { return; }
+    }
 
     const sbtn = el('logi-serie-submit');
     if (sbtn) sbtn.disabled = true;
@@ -1130,6 +1209,14 @@
         showToast('« À partir du » doit précéder la date de fin', false);
         if (submitBtn) submitBtn.disabled = false; return;
       }
+      // RESA-ALERTE-SAISIE : détection sur la fenêtre [dateDebut,dateFin]
+      // de la règle. dateDebut peut être vide → repli aujourd'hui.
+      var _rFrom = dateDebut || new Date().toISOString().slice(0, 10);
+      var _rConf = await _detecterConflitsSaisie(
+        [state.selectedRessourceId], _rFrom, dateFin, hDebut, hFin);
+      if (!_confirmerSaisie(_rConf)) {
+        if (submitBtn) submitBtn.disabled = false; return;
+      }
       res = await SupabaseHub.createRecurrence({
         ressource_id: state.selectedRessourceId,
         categorie_id: categorieIds[0] || null,
@@ -1153,6 +1240,12 @@
       // (le CHECK SQL date_fin >= date tranche en dernier ressort).
       if (dateFin && dateFin < date) {
         showToast('« Jusqu\'au » doit être postérieur ou égal à la date', false);
+        if (submitBtn) submitBtn.disabled = false; return;
+      }
+      // RESA-ALERTE-SAISIE : détection multi-ressources sur [date,dateFin].
+      var _pConf = await _detecterConflitsSaisie(
+        ressourceIds, date, dateFin || date, hDebut, hFin);
+      if (!_confirmerSaisie(_pConf)) {
         if (submitBtn) submitBtn.disabled = false; return;
       }
       res = await SupabaseHub.createReservation({
