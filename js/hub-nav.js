@@ -126,7 +126,8 @@
   function tronc() {
     return [
       { label: 'Accueil', href: './' },
-      { label: 'Tableau de bord', href: 'dashboard.html', show: 'staff' }
+      { label: 'Tableau de bord', href: 'dashboard.html', show: 'staff' },
+      { label: 'Agenda général', href: 'agenda-general.html', show: 'admin bureau' }
     ];
   }
 
