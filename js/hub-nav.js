@@ -376,12 +376,17 @@
   }
 
   /* ------------------------------------------------------------------ *
-   * Révélation fail-safe des liens filtrés. Attend DOMContentLoaded :
+   * Révélation fail-safe des liens filtrés. Joue à DOMContentLoaded :
    * supabase-client.js est chargé en fin de body, APRÈS ce module.
    * Échec silencieux = liens masqués (patron data-show du dashboard).
+   * BFCACHE (back/forward) : au retour arrière, la page est restaurée d'un
+   * instantané mémoire SANS re-déclencher DOMContentLoaded -> les liens à
+   * `show` resteraient dans l'état masqué de l'instantané (bug : le lien
+   * disparaît au retour, ne revient qu'au hard refresh). On rejoue donc la
+   * révélation sur `pageshow` quand event.persisted (page sortie du bfcache).
    * ------------------------------------------------------------------ */
   function revelerFiltres(nav) {
-    document.addEventListener('DOMContentLoaded', async function () {
+    async function appliquer() {
       try {
         if (typeof SupabaseHub === 'undefined') { return; }
         var session = await SupabaseHub.getSession();
@@ -398,7 +403,9 @@
           if (ok) { el.hidden = false; el.removeAttribute('aria-hidden'); }
         });
       } catch (e) { /* honnête : les liens filtrés restent masqués */ }
-    });
+    }
+    document.addEventListener('DOMContentLoaded', appliquer);
+    window.addEventListener('pageshow', function (e) { if (e && e.persisted) { appliquer(); } });
   }
 
   /* ------------------------------------------------------------------ *
