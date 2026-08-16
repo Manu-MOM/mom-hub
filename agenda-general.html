@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agenda général · MOM Hub</title>
+<link rel="icon" type="image/png" href="assets/logo-m2m.png">
+<!--
+  MOM Hub · Agenda général — vue TRANSVERSE et UNIFIÉE du club (EVT-ORCHESTRATION).
+  Superpose sur une seule grille calendaire (patron hub-agenda) TROIS briques :
+    - ÉVÈNEMENTS   (entraînements / compétitions / stages, toutes catégories),
+    - LOGISTIQUE   (réservations ponctuelles + récurrentes projetées + bus),
+    - MISSIONS     (séances des salariés).
+  + repères fériés/vacances (informatifs, fail-soft).
+
+  FAIT FOI (gelé par Manu — 5 arbitrages + 2 décisions de design) :
+    arb.0 PÉRIMÈTRE = (c) vue club totale (3 briques).
+    arb.1 PAGE NEUVE : equipe-agenda / logistique-agenda / missions-agenda
+          restent INCHANGÉES ; cette page les orchestre sans les toucher.
+    arb.2 SOURCES = réutilisation intégrale, ZÉRO SQL, ZÉRO RPC nouvelle :
+          • évènements → boucle get_evenements_{a_venir,passes} par catégorie
+            cochée + fusion + dédup par id (pattern equipe-agenda) ;
+          • logistique → fetchWindow 4-sources transposé de logistique-agenda
+            (ponctuelles + reservations_recurrentes projetées + demandes_bus) ;
+          • missions   → boucle sur les CONTRATS ACTIFS (list_contrats_salaries)
+            → agenda_seances_salarie(personne_id,…). AUCUN uuid en dur. La RPC
+            porte sa propre garde (_gs_peut_ecrire() = admin|bureau voit tous
+            les salariés) : cohérent avec le show:'admin bureau' de la nav.
+    arb.3 FILTRES = Option A, 3 rangées CUMULABLES (briques / catégories /
+          sous-types), toutes cochées par défaut, barre REPLIABLE. Filtrage
+          CLIENT sur les items chargés (le moteur n'a pas de filtre natif).
+    arb.4 PALETTE = grain BRIQUE : 1 teinte par brique (Évt/Logi/Mission) +
+          2 repères (férié/vacances). meta.src = discriminant de brique porté
+          par chaque item. Palette .t-* dans le <style> INLINE — hub.css NON
+          touché. (La couleur de tuile suit la BRIQUE, pas le sous-type ;
+          le sous-type sert au FILTRE et à la modale de détail.)
+    arb.5 NAV = entrée « Agenda général » (bloc racine, show:'admin bureau'),
+          dérogation hub-nav.js assumée (D-nav2, cf. pt 244).
+
+  INTERDITS consommés, JAMAIS modifiés :
+    - css/hub-agenda.css + js/hub-agenda.js  (AGENDA-HUB-PATRON, INTERDIT),
+    - css/hub.css                            (INTERDIT).
+  hub-nav.js est touché par DÉROGATION (1 ligne, chantier séparé, tracé).
+
+  Contrat item hub-agenda :
+    { id, date:'YYYY-MM-DD', heure:'HH:MM'|null, duree_min, type, libelle,
+      etat, meta } ; libellé rendu en textContent (jamais innerHTML).
+-->
+<link rel="stylesheet" href="css/hub.css">
+<!-- CSS structurel du patron agenda (INTERDIT, consommé). La palette .t-* de
+     la page reste dans le <style> ci-dessous (grain BRIQUE, arb.4). -->
+<link rel="stylesheet" href="css/hub-agenda.css">
+<style>
+  body.auth-pending { visibility: hidden; }
+  .ag-wrap { max-width: 980px; margin: 0 auto; padding: 24px 24px 48px; }
+  .ag-wrap h1 { font-size: 20px; margin: 0 0 4px; color: var(--ink, #0c3d24); }
+  .ag-sub { color: var(--ink-mute, #6b7a74); margin: 0 0 20px; font-size: 13px; }
+
+  .ag-msg { margin: 0 0 16px; }
+  .ag-flash { padding: 10px 14px; border-radius: 8px; font-size: 14px; margin-bottom: 10px; }
+  .ag-flash.ok  { background: var(--feedback-success-bg, #e7f3ec); color: var(--feedback-success-fg, #1f5a32); }
+  .ag-flash.err { background: var(--feedback-error-bg, #fdecea);   color: var(--feedback-error-fg, #8a1b14); }
+
+  /* ----- Barre de filtres (3 rangées cumulables, repliable — arb.3) ----- */
+  /* Mécanisme <details> NATIF : zéro JS d'état, accessible clavier. */
+  details.agf { border: 1px solid var(--line, #e2e8e4); border-radius: 10px; margin: 0 0 18px; background: var(--surface, #fff); }
+  details.agf > summary { list-style: none; cursor: pointer; padding: 11px 16px; display: flex; align-items: center; gap: 10px; font-weight: 600; color: var(--ink, #0c3d24); }
+  details.agf > summary::-webkit-details-marker { display: none; }
+  details.agf > summary .agf-chevron { display: inline-block; transition: transform .15s ease; color: var(--ink-mute, #6b7a74); }
+  details.agf[open] > summary .agf-chevron { transform: rotate(90deg); }
+  details.agf > summary .agf-summary { font-weight: 400; color: var(--ink-mute, #6b7a74); font-size: 13px; }
+  .agf-body { padding: 4px 16px 14px; }
+  .agf-row { padding: 8px 0; border-top: 1px dashed var(--line, #e2e8e4); }
+  .agf-row:first-child { border-top: 0; }
+  .agf-row__head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+  .agf-row__title { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-mute, #6b7a74); font-weight: 700; }
+  .agf-row__actions button { font-size: 12px; padding: 2px 8px; border: 1px solid var(--line, #e2e8e4); border-radius: 6px; background: var(--surface, #fff); color: var(--ink-mute, #6b7a74); cursor: pointer; }
+  .agf-row__actions button:hover { background: var(--paper-warm, #f6f4ee); }
+  .agf-opts { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+  .agf-opt { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink, #0c3d24); cursor: pointer; }
+  .agf-opt input { accent-color: var(--vert-prairie, #2d7a3e); }
+  .agf-grp { display: inline-flex; flex-direction: column; gap: 3px; margin: 2px 0; }
+  .agf-grp__lbl { font-size: 11px; color: var(--ink-mute, #6b7a74); font-weight: 600; }
+  .agf-grp__opts { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+
+  /* ----- Palette GRAIN BRIQUE (arb.4) -----
+     Convention hub-agenda : .ag-ev.t-X / .ag-chip.t-X / .ag-sw.t-X.
+     3 briques + 2 repères. Teintes distinctes entre elles ET des repères :
+       évènement  = vert prairie   (#2d7a3e),
+       logistique = ambre profond  (#c08a1e),
+       mission    = indigo         (#4a5fc1, cohérent type mission pt 228),
+       férié      = rose grisé     (#c98a8a, repris),
+       vacances   = sable          (#c9c2b2, repris). ----- */
+  .ag-ev.t-brique_evenement, .ag-chip.t-brique_evenement { background: #e7f3ec; color: #1f5a32; border-left-color: #2d7a3e; }
+  .ag-sw.t-brique_evenement { background: #2d7a3e; }
+  .ag-ev.t-brique_logistique, .ag-chip.t-brique_logistique { background: #fbf1dd; color: #83590c; border-left-color: #c08a1e; }
+  .ag-sw.t-brique_logistique { background: #c08a1e; }
+  .ag-ev.t-brique_mission, .ag-chip.t-brique_mission { background: #e8eafa; color: #2c3782; border-left-color: #4a5fc1; }
+  .ag-sw.t-brique_mission { background: #4a5fc1; }
+  .ag-ev.t-ferie, .ag-chip.t-ferie { background: #f6e9e9; color: #8a4a4a; border-left-color: #c98a8a; }
+  .ag-sw.t-ferie { background: #c98a8a; }
+  .ag-ev.t-vacances, .ag-chip.t-vacances { background: #f3f1ea; color: #7a746a; border-left-color: #c9c2b2; }
+  .ag-sw.t-vacances { background: #c9c2b2; }
+</style>
+</head>
+<body class="auth-pending">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo"><img src="assets/logo-m2m.png" alt="MOM Rugby"></div>
+      <div class="brand-text">
+        <h1>MOM Hub</h1>
+        <p>Mutzig Ovalie Molsheim</p>
+      </div>
+    </div>
+
+    <div class="season-pill" id="season-pill">SAISON</div>
+
+    <nav class="main-nav hub-nav" data-hub-nav="agenda-general"></nav>
+
+    <div class="icon-row">
+      <button class="icon-btn" title="Recherche" aria-label="Recherche">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      </button>
+    </div>
+
+    <div class="user-profile">
+      <div class="avatar">EJ</div>
+      <div class="user-info">
+        <div class="user-name">Emmanuel Jung</div>
+        <div class="user-role">Administrateur</div>
+      </div>
+      <a href="./" class="user-action" title="Retour au portail" aria-label="Retour au portail">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/></svg>
+      </a>
+      <button type="button" class="user-action" id="btn-signout" title="Se déconnecter" aria-label="Se déconnecter">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <script src="js/hub-nav.js"></script>
+
+  <div class="ag-wrap">
+    <h1>Agenda général</h1>
+    <p class="ag-sub">Vue transverse du club — évènements, logistique et missions salarié sur une même grille.</p>
+
+    <div class="ag-msg" id="agMsg"></div>
+
+    <!-- Barre de filtres : 3 rangées cumulables, repliable (arb.3) -->
+    <details class="agf" id="agFiltres">
+      <summary>
+        <span class="agf-chevron" aria-hidden="true">▸</span>
+        <span>Filtres</span>
+        <span class="agf-summary" id="agfSummary"></span>
+      </summary>
+      <div class="agf-body">
+        <div class="agf-row" id="agfRowBriques">
+          <div class="agf-row__head">
+            <span class="agf-row__title">Briques</span>
+            <span class="agf-row__actions"><button type="button" data-all="brique">Tout</button> <button type="button" data-none="brique">Aucun</button></span>
+          </div>
+          <div class="agf-opts" id="agfBriques"></div>
+        </div>
+        <div class="agf-row" id="agfRowCats">
+          <div class="agf-row__head">
+            <span class="agf-row__title">Catégories</span>
+            <span class="agf-row__actions"><button type="button" data-all="cat">Tout</button> <button type="button" data-none="cat">Aucun</button></span>
+          </div>
+          <div class="agf-opts" id="agfCats"></div>
+        </div>
+        <div class="agf-row" id="agfRowTypes">
+          <div class="agf-row__head">
+            <span class="agf-row__title">Sous-types</span>
+            <span class="agf-row__actions"><button type="button" data-all="type">Tout</button> <button type="button" data-none="type">Aucun</button></span>
+          </div>
+          <div class="agf-opts" id="agfTypes"></div>
+        </div>
+      </div>
+    </details>
+
+    <!-- Container du patron agenda : HubAgenda.create y génère la classe
+         ag-root et tout le squelette (grille, mini-mois, plein écran, légende,
+         modale de détail, repli mobile). -->
+    <section id="agRoot"></section>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/hub-agenda.js"></script>
+<script src="js/season-pill.js"></script>
+<script>
+(async function () {
+  'use strict';
+  const $ = function (id) { return document.getElementById(id); };
+  const client = SupabaseHub.client;
+
+  // ============================================================== CONSTANTES
+
+  // Briques (arb.0 + arb.4). Le `code` sert de type de palette (grain brique)
+  // ET de discriminant meta.src. L'ordre = ordre de légende.
+  const BRIQUES = [
+    { src: 'evenement',  code: 'brique_evenement',  lib: 'Évènement' },
+    { src: 'logistique', code: 'brique_logistique', lib: 'Logistique' },
+    { src: 'mission',    code: 'brique_mission',    lib: 'Mission' }
+  ];
+  const BRIQUE_BY_SRC = {};
+  BRIQUES.forEach(function (b) { BRIQUE_BY_SRC[b.src] = b; });
+
+  // Sous-types par brique (rangée 3 des filtres). Repris VERBATIM des 3
+  // surfaces sources (DS-1, aucun libellé inventé).
+  const SOUS_TYPES = {
+    evenement: [
+      { code: 'entrainement', lib: 'Entraînement' },
+      { code: 'competition',  lib: 'Compétition' },
+      { code: 'stage',        lib: 'Stage' },
+      { code: 'divers',       lib: 'Divers' }
+    ],
+    logistique: [
+      { code: 'ponctuelle', lib: 'Réservation ponctuelle' },
+      { code: 'recurrence', lib: 'Réservation récurrente' },
+      { code: 'bus',        lib: 'Bus (affrété)' }
+    ],
+    mission: [
+      { code: 'intervention_scolaire',   lib: 'Intervention scolaire' },
+      { code: 'entrainement_section',    lib: 'Entraînement section' },
+      { code: 'entrainement_sr_m',       lib: 'Entraînement SR-M' },
+      { code: 'autre_entrainement_mom',  lib: 'Autre entraînement MOM' },
+      { code: 'reunion',                 lib: 'Réunion' },
+      { code: 'suivi_competition',       lib: 'Suivi compétition' },
+      { code: 'accompagnement_terrain',  lib: 'Accompagnement terrain' },
+      { code: 'travail_personnel',       lib: 'Travail personnel' },
+      { code: 'stage',                   lib: 'Stage' },
+      { code: 'evenement_extra_sportif', lib: 'Évènement extra-sportif' },
+      { code: 'divers',                  lib: 'Divers' }
+    ]
+  };
+
+  const EVT_TYPES = { entrainement: 1, competition: 1, stage: 1 }; // normType
+  const ETAT_MISSION_LABEL = { prevue: 'Prévue', realisee: 'Réalisée', validee: 'Validée', annulee: 'Annulée' };
+  const JOURS = ['lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.', 'dim.'];
+  const MOIS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+  const JOURS_LBL = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+  const MARGE_JOURS = 7;   // marge sur les bornes RPC évènements (jours, pas bornes)
+
+  // ============================================================== ÉTAT
+  let saisonActive = null;
+  let perimetre = null;              // {categories, transverse, active, vide}
+  let categoriesById = {};           // id -> {id, code, libelle_court, pole_id, ordre_tri}
+  let polesById = {};                // id -> {id, libelle_court}
+  let salarieIds = [];               // personne_id des contrats actifs (missions)
+  let agenda = null;
+
+  // Filtres (arb.3) : 3 Sets d'états cochés. Tout coché au départ.
+  let briquesCochees = new Set(BRIQUES.map(function (b) { return b.src; }));
+  let catsCochees = new Set();       // categorie_id (peuplé au boot)
+  let typesCoches = new Set();       // sous-type code, préfixé brique (src:code)
+
+  function typeKey(src, code) { return src + ':' + code; }
+
+  // Référentiels logistique (chargés une fois)
+  let ressById = {};                 // id -> {code, type, sous_type, libelle, actif}
+  let catLogiById = {};              // id -> libellé court (voie logistique-agenda)
+  let persById = {};                 // personne_id -> nom (détail logistique)
+
+  // ============================================================== HELPERS
+  async function rpc(name, params) {
+    const { data, error } = await client.rpc(name, params);
+    if (error) throw error;
+    return data;
+  }
+  function errMsg(e) {
+    if (!e) return 'erreur inconnue';
+    return e.message || e.error_description || e.msg || String(e);
+  }
+  function flash(msg, kind) {
+    const box = $('agMsg');
+    if (!box) return;
+    const div = document.createElement('div');
+    div.className = 'ag-flash ' + (kind === 'err' ? 'err' : 'ok');
+    div.textContent = msg;
+    box.innerHTML = '';
+    box.appendChild(div);
+  }
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+  function isoOf(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+  function parseDate(s) { const p = String(s).slice(0, 10).split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  function mondayOf(dt) {
+    const d = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+    const dow = d.getDay() === 0 ? 6 : d.getDay() - 1;
+    d.setDate(d.getDate() - dow);
+    return d;
+  }
+  function dureeEntre(hd, hf) {
+    if (!hd || !hf) return null;
+    const a = parseInt(String(hd).slice(0, 2), 10) * 60 + parseInt(String(hd).slice(3, 5), 10);
+    const b = parseInt(String(hf).slice(0, 2), 10) * 60 + parseInt(String(hf).slice(3, 5), 10);
+    if (isNaN(a) || isNaN(b) || b <= a) return null;
+    return b - a;
+  }
+
+  // ---- Repères fériés/vacances (fail-soft, patron partagé) ----
+  let reperesData = { feries: [], vacances: [] };
+  async function chargerReperes() {
+    try {
+      const r = await fetch('data/vacances-feries-2026-2027.json');
+      if (!r.ok) return;
+      const d = await r.json();
+      if (d && Array.isArray(d.feries) && Array.isArray(d.vacances)) reperesData = d;
+    } catch (e) { console.warn('Repères vacances/fériés indisponibles', e); }
+  }
+  function chaqueJourISO(debISO, finISO, cb) {
+    const d = parseDate(debISO), fin = parseDate(finISO);
+    while (d <= fin) { cb(isoOf(d)); d.setDate(d.getDate() + 1); }
+  }
+  function reperesFenetre(debutISO, finISO) {
+    const out = [];
+    (reperesData.feries || []).forEach(function (f) {
+      if (!f || !f.date || f.date < debutISO || f.date > finISO) return;
+      out.push({
+        id: 'fer-' + f.date, date: f.date, heure: null, duree_min: null,
+        type: 'ferie', libelle: 'Férié — ' + (f.libelle || ''),
+        etat: 'repere', meta: { src: 'repere', repere: f }
+      });
+    });
+    (reperesData.vacances || []).forEach(function (v, idx) {
+      if (!v || !v.debut || !v.fin) return;
+      const deb = v.debut > debutISO ? v.debut : debutISO;
+      const fin = v.fin < finISO ? v.fin : finISO;
+      if (deb > fin) return;
+      chaqueJourISO(deb, fin, function (iso) {
+        out.push({
+          id: 'vac-' + idx + '-' + iso, date: iso, heure: null, duree_min: null,
+          type: 'vacances', libelle: v.libelle || 'Vacances',
+          etat: 'repere', meta: { src: 'repere', repere: v }
+        });
+      });
+    });
+    return out;
+  }
+
+  // ================================================= BRIQUE 1 : ÉVÈNEMENTS
+  // Pattern equipe-agenda : boucle par catégorie cochée + fusion + dédup id.
+  // La palette est GRAIN BRIQUE (arb.4) : type='brique_evenement' pour la
+  // couleur ; le sous-type d'origine est conservé dans meta.sousType pour le
+  // FILTRE (rangée 3) et la modale.
+  function evNormSousType(t) {
+    const c = String(t || '').toLowerCase();
+    return EVT_TYPES[c] ? c : 'divers';
+  }
+  function evHeureDe(iso) {
+    if (!iso) return null;
+    const d = new Date(iso);
+    if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0) return null;
+    return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  }
+  function evDateDe(iso) { return String(iso).slice(0, 10); }
+  function evDateLocaleDe(iso) {
+    const d = new Date(iso);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function evDureeDe(ev, heure) {
+    if (!heure) return null;
+    const dm = ev.debut_match, fp = ev.fin_prevue;
+    if (dm && fp) {
+      const p = function (t) { const a = String(t).split(':'); return (+a[0]) * 60 + (+(a[1] || 0)); };
+      const d = p(fp) - p(dm);
+      if (d > 0 && d < 24 * 60) return d;
+    }
+    return null;
+  }
+  function evSousTypeLib(code) {
+    const arr = SOUS_TYPES.evenement;
+    for (let i = 0; i < arr.length; i++) { if (arr[i].code === code) return arr[i].lib; }
+    return code || '—';
+  }
+  // Un évènement -> 1..N items (multi-jours = une puce journée entière/jour).
+  function evMapRows(ev) {
+    const sousType = evNormSousType(ev.type_evenement);
+    let libelle = ev.libelle || evSousTypeLib(sousType);
+    if (sousType === 'competition' && ev.adversaire_nom) libelle += ' — ' + ev.adversaire_nom;
+    const etat = ev.etat || 'prevu';
+    const dDeb = evDateDe(ev.date_debut);
+    const dFin = ev.date_fin ? evDateDe(ev.date_fin) : dDeb;
+
+    if (!dFin || dFin <= dDeb) {
+      const heure = evHeureDe(ev.date_debut);
+      const dJour = heure ? evDateLocaleDe(ev.date_debut) : dDeb;
+      return [{
+        id: 'e-' + ev.id, date: dJour, heure: heure, duree_min: evDureeDe(ev, heure),
+        type: 'brique_evenement', libelle: libelle, etat: etat,
+        meta: { src: 'evenement', sousType: sousType, catId: ev.categorie_id || null, row: ev }
+      }];
+    }
+    const out = [];
+    let cur = parseDate(dDeb);
+    const fin = parseDate(dFin);
+    let garde = 0;
+    while (cur <= fin && garde < 366) {
+      const iso = isoOf(cur);
+      out.push({
+        id: 'e-' + ev.id + '#' + iso, date: iso, heure: null, duree_min: null,
+        type: 'brique_evenement', libelle: libelle, etat: etat,
+        meta: { src: 'evenement', sousType: sousType, catId: ev.categorie_id || null, row: ev }
+      });
+      cur.setDate(cur.getDate() + 1);
+      garde++;
+    }
+    return out;
+  }
+  // Charge les évènements des catégories cochées, borné à la fenêtre.
+  async function fetchEvenements(debutISO, finISO) {
+    const cats = Array.from(catsCochees);
+    if (!cats.length) return [];
+    const auj = new Date(); auj.setHours(0, 0, 0, 0);
+    const debut = parseDate(debutISO), fin = parseDate(finISO);
+    const MS = 86400000;
+    const joursPasses = Math.max(0, Math.ceil((auj - debut) / MS)) + MARGE_JOURS;
+    const joursAVenir = Math.max(0, Math.ceil((fin - auj) / MS)) + MARGE_JOURS;
+
+    const appels = [];
+    cats.forEach(function (catId) {
+      appels.push(SupabaseHub.getEvenementsPasses(null, joursPasses, 500, catId));
+      appels.push(SupabaseHub.getEvenementsAVenir(null, joursAVenir, catId));
+    });
+    const listes = await Promise.all(appels);
+
+    const vus = new Set();
+    const items = [];
+    listes.forEach(function (liste) {
+      (Array.isArray(liste) ? liste : []).forEach(function (ev) {
+        if (!ev || !ev.id || vus.has(ev.id) || !ev.date_debut) return;
+        // Racines + occurrences d'entraînement/stage ; enfants de tournoi masqués.
+        const estOccEntr = !!ev.evenement_parent_id
+          && (ev.type_evenement === 'entrainement' || ev.type_evenement === 'stage');
+        if (ev.evenement_parent_id && !estOccEntr) return;
+        vus.add(ev.id);
+        evMapRows(ev).forEach(function (it) {
+          if (it.date >= debutISO && it.date <= finISO) items.push(it);
+        });
+      });
+    });
+    return items;
+  }
+
+  // ================================================= BRIQUE 2 : LOGISTIQUE
+  // Transposition fidèle du fetchWindow 4-sources de logistique-agenda.
+  // Palette GRAIN BRIQUE : type='brique_logistique' ; sous-type (ponctuelle /
+  // recurrence / bus) dans meta.sousType pour le FILTRE et la modale.
+  async function chargerReferentielsLogi() {
+    const r1 = await client.from('ressources_logistiques')
+      .select('id, code, type, sous_type, libelle, actif')
+      .order('libelle', { ascending: true });
+    if (r1.error) throw r1.error;
+    (r1.data || []).forEach(function (r) { ressById[r.id] = r; });
+    const r2 = await client.from('categories')
+      .select('id, code, libelle_court, libelle_long')
+      .order('ordre_tri', { ascending: true });
+    if (r2.error) throw r2.error;
+    (r2.data || []).forEach(function (c) {
+      catLogiById[c.id] = c.libelle_court || c.code || c.libelle_long || c.id;
+    });
+    try {
+      const staff = await SupabaseHub.listStaffDisponibles(null);
+      (staff || []).forEach(function (p) {
+        if (p && p.personne_id) persById[p.personne_id] = ((p.nom || '') + ' ' + (p.prenom || '')).trim();
+      });
+    } catch (e) { /* fail-soft : détail sans noms */ }
+  }
+  function ressLbl(id) { const r = ressById[id]; return r ? r.libelle : '—'; }
+  function catsLbl(row) {
+    const ids = (row && Array.isArray(row.categorie_ids) && row.categorie_ids.length)
+      ? row.categorie_ids : (row && row.categorie_id ? [row.categorie_id] : []);
+    if (!ids.length) return 'Bureau / Autre';
+    return ids.map(function (id) { return catLogiById[id] || '—'; }).join(' + ');
+  }
+  function respsLbl(row) {
+    const ids = (row && Array.isArray(row.responsables_personne_ids) && row.responsables_personne_ids.length)
+      ? row.responsables_personne_ids : (row && row.responsable_personne_id ? [row.responsable_personne_id] : []);
+    if (!ids.length) return null;
+    return ids.map(function (id, i) {
+      const nom = persById[id] || '—';
+      return i === 0 ? nom : nom + ' (indicatif)';
+    }).join(' · ');
+  }
+  function freqLbl(f) {
+    return f === 'weekly' ? 'Hebdomadaire' : f === 'biweekly' ? 'Une semaine sur deux'
+         : f === 'monthly' ? 'Mensuelle' : (f || '—');
+  }
+  function statutLbl(s) {
+    return s === 'pending' ? 'En attente ⏳' : s === 'approved' ? 'Approuvée'
+         : s === 'rejected' ? 'Refusée' : (s || '—');
+  }
+  function occurrencesFenetre(rule, debutISO, finISO) {
+    const out = [];
+    const jours = rule.jours || [];
+    const exclues = rule.dates_exclues || [];
+    if (!jours.length || !rule.date_fin) return out;
+    const lo = debutISO;
+    const hi = (rule.date_fin < finISO) ? rule.date_fin : finISO;
+    if (lo > hi) return out;
+    const depuis = rule.date_debut ? new Date(rule.date_debut + 'T00:00:00') : null;
+    let cur = new Date(parseInt(lo.slice(0, 4), 10), parseInt(lo.slice(5, 7), 10) - 1, 1);
+    const last = new Date(parseInt(hi.slice(0, 4), 10), parseInt(hi.slice(5, 7), 10) - 1, 1);
+    while (cur <= last) {
+      const yr = cur.getFullYear(), mo = cur.getMonth();
+      const dim = new Date(yr, mo + 1, 0).getDate();
+      let monthlyDone = false;
+      for (let d = 1; d <= dim; d++) {
+        const dt = new Date(yr, mo, d);
+        const iso = isoOf(dt);
+        if (iso > rule.date_fin) continue;
+        const dow = dt.getDay() === 0 ? 6 : dt.getDay() - 1;
+        if (jours.indexOf(dow) === -1) continue;
+        if (depuis && iso < rule.date_debut) continue;
+        if (rule.freq === 'biweekly') {
+          let wk;
+          if (depuis) wk = Math.round((mondayOf(dt) - mondayOf(depuis)) / 604800000);
+          else wk = Math.floor((dt - new Date(yr, 0, 1)) / 604800000);
+          if (wk % 2 !== 0) continue;
+        }
+        if (rule.freq === 'monthly') { if (monthlyDone) continue; monthlyDone = true; }
+        if (exclues.indexOf(iso) !== -1) continue;
+        if (iso >= debutISO && iso <= finISO) out.push(iso);
+      }
+      cur.setMonth(cur.getMonth() + 1);
+    }
+    return out;
+  }
+  function joursPonctuelle(dateIso, dateFinIso, debutISO, finISO) {
+    if (!dateIso) return [];
+    const fin = (dateFinIso && dateFinIso > dateIso) ? dateFinIso : dateIso;
+    const lo = dateIso < debutISO ? debutISO : dateIso;
+    const hi = fin > finISO ? finISO : fin;
+    if (lo > hi) return [];
+    const out = [];
+    let d = new Date(lo + 'T00:00:00');
+    const f = new Date(hi + 'T00:00:00');
+    let garde = 0;
+    while (d <= f && garde < 90) { out.push(isoOf(d)); d.setDate(d.getDate() + 1); garde++; }
+    return out;
+  }
+  async function fetchLogistique(debutISO, finISO) {
+    const items = [];
+
+    // 1) Ponctuelles (pending + approved) chevauchant la fenêtre.
+    const p = await client.from('reservations_logistiques').select('*')
+      .lte('date', finISO)
+      .or('date_fin.gte.' + debutISO + ',date.gte.' + debutISO)
+      .in('statut', ['pending', 'approved']);
+    if (p.error) throw p.error;
+    (p.data || []).forEach(function (r) {
+      const finReelle = (r.date_fin && r.date_fin > r.date) ? r.date_fin : r.date;
+      const totalPlage = joursPonctuelle(r.date, finReelle, r.date, finReelle).length;
+      joursPonctuelle(r.date, r.date_fin, debutISO, finISO).forEach(function (jour) {
+        const rang = joursPonctuelle(r.date, jour, r.date, jour).length;
+        items.push({
+          id: 'lp-' + r.id + '-' + jour, date: jour,
+          heure: r.heure_debut ? String(r.heure_debut).slice(0, 5) : null,
+          duree_min: dureeEntre(r.heure_debut, r.heure_fin),
+          type: 'brique_logistique',
+          libelle: (r.motif || ressLbl(r.ressource_id)) + ' · ' + catsLbl(r)
+            + (totalPlage > 1 ? ' (J' + rang + '/' + totalPlage + ')' : ''),
+          etat: r.statut, meta: { src: 'logistique', sousType: 'ponctuelle', row: r }
+        });
+      });
+    });
+
+    // 2) Règles récurrentes -> occurrences projetées.
+    const q = await client.from('reservations_recurrentes').select('*')
+      .in('statut', ['pending', 'approved']).eq('active', true)
+      .gte('date_fin', debutISO);
+    if (q.error) throw q.error;
+    (q.data || []).forEach(function (rule) {
+      occurrencesFenetre(rule, debutISO, finISO).forEach(function (iso) {
+        items.push({
+          id: 'lr-' + rule.id + '-' + iso, date: iso,
+          heure: rule.heure_debut ? String(rule.heure_debut).slice(0, 5) : null,
+          duree_min: dureeEntre(rule.heure_debut, rule.heure_fin),
+          type: 'brique_logistique',
+          libelle: '↻ ' + (rule.motif || ressLbl(rule.ressource_id)) + ' · ' + catsLbl(rule),
+          etat: rule.statut, meta: { src: 'logistique', sousType: 'recurrence', row: rule }
+        });
+      });
+    });
+
+    // 3) Demandes de bus (journée entière).
+    const b = await client.from('demandes_bus').select('*')
+      .gte('date', debutISO).lte('date', finISO)
+      .in('statut', ['pending', 'approved']);
+    if (b.error) throw b.error;
+    (b.data || []).forEach(function (d) {
+      items.push({
+        id: 'lb-' + d.id, date: d.date, heure: null, duree_min: null,
+        type: 'brique_logistique',
+        libelle: 'Bus · ' + (d.destination || '—') + ' · ' + catsLbl(d),
+        etat: d.statut, meta: { src: 'logistique', sousType: 'bus', row: d }
+      });
+    });
+
+    return items;
+  }
+
+  // ================================================= BRIQUE 3 : MISSIONS
+  // Boucle sur les CONTRATS ACTIFS (aucun uuid en dur). agenda_seances_salarie
+  // porte sa garde interne (_gs_peut_ecrire() : admin|bureau voit tous les
+  // salariés). Palette GRAIN BRIQUE : type='brique_mission' ; le type de
+  // mission d'origine (out_type_mission) va dans meta.sousType (FILTRE/modale).
+  function missionMapRow(o) {
+    return {
+      id: 'm-' + o.out_seance_id,
+      date: String(o.out_date_seance).slice(0, 10),
+      heure: o.out_heure_debut ? String(o.out_heure_debut).slice(0, 5) : null,
+      duree_min: o.out_duree_min,
+      type: 'brique_mission',
+      libelle: o.out_libelle || o.out_mission_libelle || null,
+      etat: o.out_etat,
+      meta: { src: 'mission', sousType: o.out_type_mission || 'divers', row: o }
+    };
+  }
+  async function fetchMissions(debutISO, finISO) {
+    if (!salarieIds.length) return [];
+    const appels = salarieIds.map(function (pid) {
+      return rpc('agenda_seances_salarie', {
+        p_salarie_id: pid, p_date_debut: debutISO, p_date_fin: finISO
+      }).catch(function () { return []; }); // fail-soft par salarié
+    });
+    const listes = await Promise.all(appels);
+    const items = [];
+    listes.forEach(function (liste) {
+      (Array.isArray(liste) ? liste : []).forEach(function (o) {
+        if (o && o.out_seance_id) items.push(missionMapRow(o));
+      });
+    });
+    return items;
+  }
+
+  // ================================================= FILTRAGE CLIENT (arb.3)
+  function passeFiltres(it) {
+    const src = it.meta && it.meta.src;
+    if (src === 'repere') return true;             // repères toujours visibles
+    if (!briquesCochees.has(src)) return false;    // rangée 1 : brique
+    // rangée 2 : catégorie — s'applique à évènement (catId) et logistique
+    // (categorie_ids/categorie_id). Les missions n'ont pas de catégorie -> non filtrées par cat.
+    if (src === 'evenement') {
+      const cid = it.meta.catId;
+      // sans catégorie résoluble : on n'exclut pas (item déjà remonté par une cat cochée).
+      if (cid && !catsCochees.has(cid)) return false;
+    } else if (src === 'logistique') {
+      const row = it.meta.row || {};
+      const ids = (Array.isArray(row.categorie_ids) && row.categorie_ids.length)
+        ? row.categorie_ids : (row.categorie_id ? [row.categorie_id] : []);
+      if (ids.length) {
+        let ok = false;
+        for (let i = 0; i < ids.length; i++) { if (catsCochees.has(ids[i])) { ok = true; break; } }
+        if (!ok) return false;
+      }
+      // logistique « Bureau / Autre » (sans catégorie) : jamais masquée par la rangée cat.
+    }
+    // rangée 3 : sous-type
+    const st = it.meta.sousType;
+    if (st && !typesCoches.has(typeKey(src, st))) return false;
+    return true;
+  }
+
+  // ================================================= fetchWindow ORCHESTRÉ
+  async function fetchWindow(debutISO, finISO) {
+    const résultats = await Promise.all([
+      briquesCochees.has('evenement')  ? fetchEvenements(debutISO, finISO)  : Promise.resolve([]),
+      briquesCochees.has('logistique') ? fetchLogistique(debutISO, finISO)  : Promise.resolve([]),
+      briquesCochees.has('mission')    ? fetchMissions(debutISO, finISO)    : Promise.resolve([])
+    ]);
+    let items = [];
+    résultats.forEach(function (arr) { items = items.concat(arr); });
+    items = items.concat(reperesFenetre(debutISO, finISO));
+    return items.filter(passeFiltres);
+  }
+
+  // ================================================= DÉTAIL (modale)
+  function detailTitre(it) {
+    const m = it.meta || {};
+    if (m.src === 'repere') return it.libelle;
+    if (m.src === 'evenement') return it.libelle || 'Évènement';
+    if (m.src === 'logistique') {
+      if (m.sousType === 'bus') return 'Bus · ' + ((m.row && m.row.destination) || '—');
+      return ressLbl(m.row && m.row.ressource_id);
+    }
+    if (m.src === 'mission') return it.libelle || 'Séance';
+    return it.libelle || '—';
+  }
+  function detailRows(it) {
+    const m = it.meta || {};
+    if (m.src === 'repere') {
+      const rp = m.repere || {};
+      const rows = [{ lbl: 'Nature', val: it.type === 'ferie' ? 'Jour férié (Alsace-Moselle)' : 'Vacances scolaires (zone B — académie de Strasbourg)' }];
+      if (rp.debut && rp.fin) rows.push({ lbl: 'Période', val: rp.debut + ' → ' + rp.fin });
+      else rows.push({ lbl: 'Date', val: it.date });
+      rows.push({ lbl: 'Info', val: 'Repère informatif.' });
+      return rows;
+    }
+    const d = parseDate(it.date);
+    const when = JOURS[(d.getDay() + 6) % 7] + ' ' + d.getDate() + ' ' + MOIS[d.getMonth()]
+      + (it.heure ? ' · ' + it.heure : ' · toute la journée')
+      + (it.duree_min != null ? ' · ' + HubAgenda.dureeLabel(it.duree_min) : '');
+
+    if (m.src === 'evenement') {
+      const ev = m.row || {};
+      const rows = [
+        { lbl: 'Brique', val: 'Évènement' },
+        { lbl: 'Type', val: evSousTypeLib(m.sousType) },
+        { lbl: 'Date · horaire', val: when }
+      ];
+      if (ev.adversaire_nom) rows.push({ lbl: 'Adversaire', val: ev.adversaire_nom });
+      if (ev.site_libelle_court) rows.push({ lbl: 'Lieu', val: ev.site_libelle_court });
+      else if (ev.rdv_lieu) rows.push({ lbl: 'Lieu', val: ev.rdv_lieu });
+      return rows;
+    }
+    if (m.src === 'logistique') {
+      const r = m.row || {};
+      const rows = [{ lbl: 'Brique', val: 'Logistique' }];
+      if (m.sousType === 'bus') {
+        rows.push({ lbl: 'Destination', val: r.destination || '—' });
+        rows.push({ lbl: 'Date', val: it.date });
+        if (r.heure_arrivee_souhaitee) rows.push({ lbl: 'Arrivée souhaitée', val: String(r.heure_arrivee_souhaitee).slice(0, 5) });
+        rows.push({ lbl: 'Catégories', val: catsLbl(r) });
+        if (respsLbl(r)) rows.push({ lbl: 'Responsables', val: respsLbl(r) });
+        if (r.total_bus != null) rows.push({ lbl: 'Passagers', val: String(r.total_bus) });
+        rows.push({ lbl: 'Statut', val: statutLbl(r.statut) });
+        return rows;
+      }
+      rows.push({ lbl: 'Ressource', val: ressLbl(r.ressource_id) });
+      rows.push({ lbl: 'Date', val: it.date });
+      rows.push({
+        lbl: 'Créneau',
+        val: (it.heure || '—') + '–' + (r.heure_fin ? String(r.heure_fin).slice(0, 5) : '—')
+          + (it.duree_min ? ' · ' + HubAgenda.dureeLabel(it.duree_min) : '')
+      });
+      rows.push({ lbl: 'Catégories', val: catsLbl(r) });
+      if (respsLbl(r)) rows.push({ lbl: 'Responsables', val: respsLbl(r) });
+      if (r.motif) rows.push({ lbl: 'Motif', val: r.motif });
+      if (m.sousType === 'recurrence') {
+        rows.push({
+          lbl: 'Règle',
+          val: freqLbl(r.freq) + ' · ' + (r.jours || []).map(function (j) { return JOURS_LBL[j]; }).join(' ')
+            + ' · jusqu\'au ' + (r.date_fin || '—')
+        });
+      }
+      rows.push({ lbl: 'Statut', val: statutLbl(r.statut) });
+      return rows;
+    }
+    if (m.src === 'mission') {
+      const o = m.row || {};
+      const stLib = (function (c) {
+        const arr = SOUS_TYPES.mission;
+        for (let i = 0; i < arr.length; i++) { if (arr[i].code === c) return arr[i].lib; }
+        return c || '—';
+      })(m.sousType);
+      return [
+        { lbl: 'Brique', val: 'Mission' },
+        { lbl: 'Type — mission', val: stLib + (o.out_mission_libelle ? ' — ' + o.out_mission_libelle : '') },
+        { lbl: 'Date · horaire · durée', val: when },
+        { lbl: 'Lieu', val: o.out_lieu || '—' },
+        { lbl: 'État', val: ETAT_MISSION_LABEL[it.etat] || it.etat }
+      ];
+    }
+    return [{ lbl: 'Date', val: it.date }];
+  }
+  // Action : deep-link vers la fiche évènement (navigation, pas mutation).
+  // Logistique/mission = consultation seule ici (leur édition vit sur leurs
+  // surfaces dédiées). Repères = inertes.
+  function detailAction(it) {
+    const m = it.meta || {};
+    if (m.src !== 'evenement') return null;
+    const evId = m.row && m.row.id;
+    if (!evId) return null;
+    return {
+      label: 'Ouvrir la fiche',
+      title: 'Ouvre la fiche de l\u2019\u00e9v\u00e8nement sur la page \u00c9v\u00e8nements',
+      onClick: function (item, closeDetail) {
+        try { if (typeof closeDetail === 'function') closeDetail(); } catch (e) {}
+        window.location.href = 'evenements.html?fiche=' + encodeURIComponent(evId);
+      }
+    };
+  }
+
+  // ================================================= LÉGENDE (types[])
+  function legendeTypes() {
+    const t = BRIQUES.map(function (b) { return { code: b.code, lib: b.lib }; });
+    t.push({ code: 'ferie', lib: 'Férié' });
+    t.push({ code: 'vacances', lib: 'Vacances scolaires' });
+    return t;
+  }
+
+  // ================================================= FILTRES : rendu + câblage
+  function renderFiltres() {
+    // Rangée 1 : briques
+    const bHost = $('agfBriques');
+    bHost.innerHTML = '';
+    BRIQUES.forEach(function (b) {
+      const lab = document.createElement('label'); lab.className = 'agf-opt';
+      const cb = document.createElement('input'); cb.type = 'checkbox';
+      cb.setAttribute('data-brique', b.src); cb.checked = briquesCochees.has(b.src);
+      lab.appendChild(cb); lab.appendChild(document.createTextNode(' ' + b.lib));
+      bHost.appendChild(lab);
+    });
+    // Rangée 2 : catégories, groupées par pôle (ordre du périmètre)
+    const cHost = $('agfCats');
+    cHost.innerHTML = '';
+    const cats = (perimetre && perimetre.categories) || [];
+    const parPole = {};
+    const ordrePoles = [];
+    cats.forEach(function (c) {
+      const ref = categoriesById[c.id] || c;
+      const pid = ref.pole_id || '__nopole';
+      if (!parPole[pid]) { parPole[pid] = []; ordrePoles.push(pid); }
+      parPole[pid].push(c);
+    });
+    ordrePoles.forEach(function (pid) {
+      const grp = document.createElement('div'); grp.className = 'agf-grp';
+      const lbl = document.createElement('span'); lbl.className = 'agf-grp__lbl';
+      const pole = polesById[pid];
+      lbl.textContent = pole ? (pole.libelle_court || 'Pôle') : (pid === '__nopole' ? 'Autres' : 'Pôle');
+      grp.appendChild(lbl);
+      const opts = document.createElement('div'); opts.className = 'agf-grp__opts';
+      parPole[pid].forEach(function (c) {
+        const ref = categoriesById[c.id] || c;
+        const lab = document.createElement('label'); lab.className = 'agf-opt';
+        const cb = document.createElement('input'); cb.type = 'checkbox';
+        cb.setAttribute('data-cat', c.id); cb.checked = catsCochees.has(c.id);
+        lab.appendChild(cb);
+        lab.appendChild(document.createTextNode(' ' + (ref.libelle_court || ref.code || '—')));
+        opts.appendChild(lab);
+      });
+      grp.appendChild(opts); cHost.appendChild(grp);
+    });
+    // Rangée 3 : sous-types, groupés par brique
+    const tHost = $('agfTypes');
+    tHost.innerHTML = '';
+    BRIQUES.forEach(function (b) {
+      const grp = document.createElement('div'); grp.className = 'agf-grp';
+      const lbl = document.createElement('span'); lbl.className = 'agf-grp__lbl';
+      lbl.textContent = b.lib; grp.appendChild(lbl);
+      const opts = document.createElement('div'); opts.className = 'agf-grp__opts';
+      (SOUS_TYPES[b.src] || []).forEach(function (st) {
+        const lab = document.createElement('label'); lab.className = 'agf-opt';
+        const cb = document.createElement('input'); cb.type = 'checkbox';
+        cb.setAttribute('data-type', typeKey(b.src, st.code));
+        cb.checked = typesCoches.has(typeKey(b.src, st.code));
+        lab.appendChild(cb); lab.appendChild(document.createTextNode(' ' + st.lib));
+        opts.appendChild(lab);
+      });
+      grp.appendChild(opts); tHost.appendChild(grp);
+    });
+    majSummary();
+  }
+  function majSummary() {
+    const nbB = briquesCochees.size, totB = BRIQUES.length;
+    const nbC = catsCochees.size, totC = ((perimetre && perimetre.categories) || []).length;
+    $('agfSummary').textContent = '— ' + nbB + '/' + totB + ' briques · ' + nbC + '/' + totC + ' catégories';
+  }
+  function bindFiltres() {
+    const root = $('agFiltres');
+    root.addEventListener('change', function (e) {
+      const t = e.target;
+      if (!t || t.tagName !== 'INPUT') return;
+      if (t.hasAttribute('data-brique')) {
+        const src = t.getAttribute('data-brique');
+        if (t.checked) briquesCochees.add(src); else briquesCochees.delete(src);
+      } else if (t.hasAttribute('data-cat')) {
+        const id = t.getAttribute('data-cat');
+        if (t.checked) catsCochees.add(id); else catsCochees.delete(id);
+      } else if (t.hasAttribute('data-type')) {
+        const k = t.getAttribute('data-type');
+        if (t.checked) typesCoches.add(k); else typesCoches.delete(k);
+      } else return;
+      majSummary();
+      if (agenda) agenda.refresh();
+    });
+    root.addEventListener('click', function (e) {
+      const t = e.target;
+      if (!t || t.tagName !== 'BUTTON') return;
+      const all = t.getAttribute('data-all'), none = t.getAttribute('data-none');
+      if (all === 'brique' || none === 'brique') {
+        briquesCochees = new Set(all ? BRIQUES.map(function (b) { return b.src; }) : []);
+      } else if (all === 'cat' || none === 'cat') {
+        catsCochees = new Set(all ? ((perimetre && perimetre.categories) || []).map(function (c) { return c.id; }) : []);
+      } else if (all === 'type' || none === 'type') {
+        typesCoches = new Set();
+        if (all) BRIQUES.forEach(function (b) {
+          (SOUS_TYPES[b.src] || []).forEach(function (st) { typesCoches.add(typeKey(b.src, st.code)); });
+        });
+      } else return;
+      renderFiltres();
+      if (agenda) agenda.refresh();
+    });
+  }
+
+  // ================================================= BOOT
+  const so = $('btn-signout');
+  if (so) so.addEventListener('click', async function () {
+    try { await SupabaseHub.signOut(); } catch (e) {}
+    window.location.replace('login.html');
+  });
+
+  const session = await SupabaseHub.getSession();
+  if (!session) { window.location.replace('login.html'); return; }
+
+  // Garde d'accès : admin|bureau (aligné show:'admin bureau' de la nav).
+  let roles = [];
+  try { roles = await SupabaseHub.getMyRoles(); } catch (e) { roles = []; }
+  const peutVoir = roles.indexOf('admin') !== -1 || roles.indexOf('bureau') !== -1;
+  if (!peutVoir) {
+    document.body.classList.remove('auth-pending');
+    flash('Accès réservé au bureau et à l\u2019administration.', 'err');
+    return;
+  }
+
+  saisonActive = await SupabaseHub.getSaisonActive();
+  if ($('season-pill') && saisonActive && saisonActive.libelle) {
+    $('season-pill').textContent = String(saisonActive.libelle).toUpperCase();
+  }
+
+  // Périmètre catégories (transverse pour admin/bureau).
+  perimetre = await SupabaseHub.resoudrePerimetreCategories();
+  if (!perimetre || perimetre.vide || !Array.isArray(perimetre.categories)) {
+    perimetre = { categories: [], transverse: true, active: null, vide: true };
+  }
+  // Référentiels catégories/pôles pour l'affichage des cases.
+  try {
+    const cats = await SupabaseHub.getCategories();
+    (cats || []).forEach(function (c) { categoriesById[c.id] = c; });
+  } catch (e) { /* fail-soft */ }
+  try {
+    const poles = await SupabaseHub.getPoles();
+    (poles || []).forEach(function (p) { polesById[p.id] = p; });
+  } catch (e) { /* fail-soft */ }
+
+  // Init des filtres : tout coché.
+  catsCochees = new Set((perimetre.categories || []).map(function (c) { return c.id; }));
+  typesCoches = new Set();
+  BRIQUES.forEach(function (b) {
+    (SOUS_TYPES[b.src] || []).forEach(function (st) { typesCoches.add(typeKey(b.src, st.code)); });
+  });
+
+  // Salariés (missions) : personne_id des contrats actifs. Aucun uuid en dur.
+  try {
+    const contrats = (await rpc('list_contrats_salaries', { p_inclure_inactifs: false })) || [];
+    const vus = {};
+    contrats.forEach(function (c) {
+      if (c && c.personne_id && !vus[c.personne_id]) { vus[c.personne_id] = 1; salarieIds.push(c.personne_id); }
+    });
+  } catch (e) { salarieIds = []; /* fail-soft : brique missions vide */ }
+
+  // Référentiels logistique (une fois).
+  try { await chargerReferentielsLogi(); }
+  catch (e) { flash('Ressources logistiques indisponibles : ' + errMsg(e), 'err'); }
+
+  await chargerReperes();          // fail-soft interne
+  document.body.classList.remove('auth-pending');
+
+  renderFiltres();
+  bindFiltres();
+
+  agenda = HubAgenda.create($('agRoot'), {
+    titre: 'Agenda général du club',
+    libelleVide: 'Aucun élément cette semaine.',
+    fetchWindow: fetchWindow,
+    types: legendeTypes(),
+    detail: { titre: detailTitre, rows: detailRows, action: detailAction },
+    capacites: { pleinEcran: true, caseAnnulees: false },
+    plageFixe: [8, 22],
+    untimedEnRangee: true,
+    estAnnulee: function (it) { return it.etat === 'annule' || it.etat === 'annulee'; },
+    etatMark: function () { return ''; },
+    onError: function (e) { flash('Agenda : ' + errMsg(e), 'err'); }
+  });
+  try { await agenda.init(); } catch (e) { flash('Agenda : ' + errMsg(e), 'err'); }
+})();
+</script>
+</body>
+</html>
