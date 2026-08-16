@@ -7503,6 +7503,44 @@
       return { ok: true, data: r };
     },
 
+    /**
+     * Détection NON BLOQUANTE de conflits de ressource MATÉRIEL exclusive
+     * (chantier RESA-ANTI-CHEVAUCHEMENT). Appelle la RPC SECURITY DEFINER
+     * detecter_conflits_ressource (sql_246) : renvoie les réservations
+     * approved (ponctuelles + occurrences récurrentes projetées) qui
+     * chevauchent le créneau testé sur la MÊME ressource. Ressource
+     * type='site' → toujours [] (sites partageables, ARB.A). Purement
+     * consultatif : ne bloque rien, ne valide rien. Le front décide de
+     * l'affichage (confirm) et laisse le bureau trancher.
+     * @param {Object} p { ressourceId, date, dateFin?, heureDebut, heureFin,
+     *   excludeId? (résa ponctuelle à ignorer = soi-même),
+     *   excludeRecurrenceId? (règle récurrente à ignorer = soi-même) }
+     * @returns {Promise<{ok:boolean, data?:object[], error?:string}>}
+     *   data = conflits [{ out_source, out_conflit_id, out_date_conflit,
+     *   out_heure_debut, out_heure_fin, out_ressource_id,
+     *   out_libelle_ressource, out_motif }], [] si aucun.
+     */
+    async detecterConflitsRessource(p) {
+      p = p || {};
+      if (!p.ressourceId || !p.date) {
+        return { ok: false, error: 'ressourceId et date requis' };
+      }
+      const { data, error } = await client.rpc('detecter_conflits_ressource', {
+        p_ressource_id: p.ressourceId,
+        p_date: p.date,
+        p_date_fin: p.dateFin || null,
+        p_heure_debut: p.heureDebut || null,
+        p_heure_fin: p.heureFin || null,
+        p_exclure_id: p.excludeId || null,
+        p_exclure_recurrence_id: p.excludeRecurrenceId || null
+      });
+      if (error) {
+        console.error('MOM Hub: detecterConflitsRessource()', error);
+        return { ok: false, error: error.message || 'Erreur detecter_conflits_ressource' };
+      }
+      return { ok: true, data: Array.isArray(data) ? data : (data ? [data] : []) };
+    },
+
     // ========================================================
     // CYCLE DE VIE DES RÉSERVATIONS (sql_152) — 6 wrappers
     // ADDITIFS (v1.74). RPC SECURITY DEFINER gardées bureau|admin
