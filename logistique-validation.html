@@ -120,6 +120,31 @@
     .lgv-card.is-suspended { opacity: 0.55; }
 
     /* ----------------------------------------------------------
+       Recherche par rubrique (chantier MOTEUR-RECHERCHE-VALIDATION).
+       Champ texte libre en tête de chaque <details> de consultation ;
+       filtrage CLIENT sur les cartes déjà rendues (libellé ressource +
+       motif). Non persistant (repart à zéro à chaque visite).
+       ---------------------------------------------------------- */
+    .lgv-search { margin: 0 0 10px; }
+    .lgv-search__input {
+      width: 100%; box-sizing: border-box;
+      font-family: 'JetBrains Mono', monospace; font-size: 12px;
+      letter-spacing: 0.04em; color: var(--ink);
+      background: #fff; border: 1px solid var(--line); border-radius: 8px;
+      padding: 8px 11px;
+    }
+    .lgv-search__input:focus {
+      outline: none; border-color: var(--vert-prairie);
+    }
+    .lgv-search__input::placeholder { color: var(--ink-mute); }
+    .lgv-card.is-filtered { display: none; }
+    .lgv-search__vide {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      color: var(--ink-mute); padding: 4px 2px; display: none;
+    }
+    .lgv-search__vide.is-shown { display: block; }
+
+    /* ----------------------------------------------------------
        Modale d'édition (cycle de vie B3) — CSS de PAGE, aucune
        dépendance aux classes ag-* du module (indépendance tracée).
        z-index 80 : au-dessus de la modale de détail du module (60).
@@ -355,12 +380,22 @@
 
         <details class="lgv-section">
           <summary class="lgv-section__title">Réservations récurrentes</summary>
+          <div class="lgv-search">
+            <input type="text" id="lgv-search-regles" class="lgv-search__input"
+                   placeholder="Rechercher (ressource, motif…)" autocomplete="off">
+          </div>
           <div id="lgv-regles"><div class="lgv-empty">—</div></div>
+          <div id="lgv-search-regles-vide" class="lgv-search__vide">Aucun résultat pour cette recherche.</div>
         </details>
 
         <details class="lgv-section">
           <summary class="lgv-section__title">Réservations ponctuelles</summary>
+          <div class="lgv-search">
+            <input type="text" id="lgv-search-ponct" class="lgv-search__input"
+                   placeholder="Rechercher (ressource, motif…)" autocomplete="off">
+          </div>
           <div id="lgv-ponct"><div class="lgv-empty">—</div></div>
+          <div id="lgv-search-ponct-vide" class="lgv-search__vide">Aucun résultat pour cette recherche.</div>
         </details>
       </div>
 
@@ -1358,6 +1393,46 @@
       }
 
       // ------------------------------------------------------------------
+      // MOTEUR-RECHERCHE-VALIDATION — filtrage CLIENT des rubriques de
+      // consultation (récurrentes + ponctuelles). Texte libre, match sur
+      // le libellé ressource + le motif (data-search posé au rendu).
+      // Non persistant : aucun stockage, l'état repart à zéro à la visite.
+      // ------------------------------------------------------------------
+      function _normSearch(s) {
+        return (s == null ? '' : String(s))
+          .toLowerCase()
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          .replace(/\s+/g, ' ').trim();
+      }
+      function _appliquerFiltre(inputId, hostId, videId) {
+        var input = el(inputId);
+        var host = el(hostId);
+        if (!input || !host) return;
+        var terme = _normSearch(input.value);
+        var cards = host.querySelectorAll('.lgv-card');
+        var visibles = 0;
+        for (var i = 0; i < cards.length; i++) {
+          var hay = cards[i].getAttribute('data-search') || '';
+          var match = (terme === '' || hay.indexOf(terme) !== -1);
+          cards[i].classList.toggle('is-filtered', !match);
+          if (match) visibles++;
+        }
+        var vide = el(videId);
+        if (vide) {
+          // Bandeau « aucun résultat » : seulement si un terme est saisi,
+          // qu'il existe des cartes, et qu'aucune ne matche.
+          vide.classList.toggle('is-shown', terme !== '' && cards.length > 0 && visibles === 0);
+        }
+      }
+      function _brancherRecherche(inputId, hostId, videId) {
+        var input = el(inputId);
+        if (!input) return;
+        input.addEventListener('input', function () {
+          _appliquerFiltre(inputId, hostId, videId);
+        });
+      }
+
+      // ------------------------------------------------------------------
       // Règles récurrentes — Suspendre/Réactiver (déménagé du guichet §5.5)
       // ------------------------------------------------------------------
       async function refreshRegles() {
@@ -1372,6 +1447,7 @@
         all.forEach(function (r) {
           var card = document.createElement('div');
           card.className = 'lgv-card' + (r.active ? '' : ' is-suspended');
+          card.setAttribute('data-search', _normSearch(ressLbl(r.ressource_id) + ' ' + (r.motif || '')));
           card.innerHTML =
             '<div class="lgv-card__top">' +
               '<span class="lgv-tag lgv-tag--recur">' + escapeHtml(statutLbl(r.statut)) + '</span>' +
@@ -1406,6 +1482,7 @@
           card.appendChild(actions);
           host.appendChild(card);
         });
+        _appliquerFiltre('lgv-search-regles', 'lgv-regles', 'lgv-search-regles-vide');
       }
 
       // ------------------------------------------------------------------
@@ -1430,6 +1507,7 @@
         pures.forEach(function (r) {
           var card = document.createElement('div');
           card.className = 'lgv-card';
+          card.setAttribute('data-search', _normSearch(ressLbl(r.ressource_id) + ' ' + (r.motif || '')));
           card.innerHTML =
             '<div class="lgv-card__top">' +
               '<span class="lgv-card__res">' + escapeHtml(ressLbl(r.ressource_id)) + '</span>' +
@@ -1440,6 +1518,7 @@
             (r.motif ? '<div class="lgv-card__motif">' + escapeHtml(r.motif) + '</div>' : '');
           host.appendChild(card);
         });
+        _appliquerFiltre('lgv-search-ponct', 'lgv-ponct', 'lgv-search-ponct-vide');
       }
 
       // ------------------------------------------------------------------
@@ -1827,6 +1906,13 @@
       await refreshFile();
       await refreshRegles();
       await refreshPonctuelles();
+
+      // MOTEUR-RECHERCHE-VALIDATION : branchement unique des champs de
+      // recherche (les listeners persistent ; chaque refresh ré-applique
+      // le filtre courant via _appliquerFiltre en fin de rendu).
+      _brancherRecherche('lgv-search-regles', 'lgv-regles', 'lgv-search-regles-vide');
+      _brancherRecherche('lgv-search-ponct', 'lgv-ponct', 'lgv-search-ponct-vide');
+
       await agenda.init();
 
       console.log('%c🏉 Validation logistique chargée', 'color:#2D7D46;font-weight:bold;',
