@@ -452,5 +452,230 @@
       "pdf": "1BC7e1R0Pkkydy4xHJk-bI-YwGVXx495h",
       "drive": "1KjTDmPXgEoL1vN8RE9kqLBgqljbpzHfu"
     }
+  },
+  {
+    "type": "regles_jeu",
+    "titre": "M6 — Premiers pas à l'École de Rugby",
+    "themes": [
+      "premiers pas",
+      "saisir",
+      "ceinturer"
+    ],
+    "etiquette_age": "M6",
+    "fileId_dossier": "1ZfcUwZCEQ9Y1Wq2p9BlexxNt3Af33axY",
+    "liens": {
+      "pdf": "1seLBt-eR2FqtibwAakZZMEVCtNish_WK",
+      "drive": "1ZfcUwZCEQ9Y1Wq2p9BlexxNt3Af33axY"
+    }
+  },
+  {
+    "type": "regles_jeu",
+    "titre": "M8 — Toucher + 2 secondes",
+    "themes": [
+      "toucher",
+      "2 secondes",
+      "passe"
+    ],
+    "etiquette_age": "M8",
+    "fileId_dossier": "19hpPvNJJWxT9NtOCfNS2LkbkR2n8CdJX",
+    "liens": {
+      "pdf": "13c85vPH3hj2W1nSyWvsEeSlCo37jU4uq",
+      "drive": "19hpPvNJJWxT9NtOCfNS2LkbkR2n8CdJX"
+    }
+  },
+  {
+    "type": "regles_jeu",
+    "titre": "M8 — Jouer au contact",
+    "themes": [
+      "contact",
+      "plaquage",
+      "raffut"
+    ],
+    "etiquette_age": "M8",
+    "fileId_dossier": "19hpPvNJJWxT9NtOCfNS2LkbkR2n8CdJX",
+    "liens": {
+      "pdf": "1jmnucZ-uB0Wu-eXM6AF-LotKIbGklgcu",
+      "drive": "19hpPvNJJWxT9NtOCfNS2LkbkR2n8CdJX"
+    }
+  },
+  {
+    "type": "regles_jeu",
+    "titre": "M10 — Toucher + 2 secondes",
+    "themes": [
+      "toucher",
+      "2 secondes",
+      "passe"
+    ],
+    "etiquette_age": "M10",
+    "fileId_dossier": "1nVeaiKR3Drz9aThJeff6BXpwvH84arWN",
+    "liens": {
+      "pdf": "1GW_Dc4pic-5YIq_Y8zR7FiWkhaQkNxm8",
+      "drive": "1nVeaiKR3Drz9aThJeff6BXpwvH84arWN"
+    }
+  },
+  {
+    "type": "regles_jeu",
+    "titre": "M10 — Jouer au contact",
+    "themes": [
+      "contact",
+      "plaquage",
+      "raffut"
+    ],
+    "etiquette_age": "M10",
+    "fileId_dossier": "1nVeaiKR3Drz9aThJeff6BXpwvH84arWN",
+    "liens": {
+      "pdf": "1_4G1jsQ-og142FzaTwKI7i1_WKxZsPdd",
+      "drive": "1nVeaiKR3Drz9aThJeff6BXpwvH84arWN"
+    }
+  },
+  {
+    "type": "regles_jeu",
+    "titre": "M10 — Jeu à 7",
+    "themes": [
+      "jeu à 7",
+      "contact",
+      "plaquage"
+    ],
+    "etiquette_age": "M10",
+    "fileId_dossier": "1nVeaiKR3Drz9aThJeff6BXpwvH84arWN",
+    "liens": {
+      "pdf": "1YE1dVpmFUMJekrbrLLv3fW0kJ-dIzQ3M",
+      "drive": "1nVeaiKR3Drz9aThJeff6BXpwvH84arWN"
+    }
+  },
+  {
+    "type": "regles_jeu",
+    "titre": "M12 — Toucher + 2 secondes",
+    "themes": [
+      "toucher",
+      "2 secondes",
+      "touché 4 mains"
+    ],
+    "etiquette_age": "M12",
+    "fileId_dossier": "1Z4rIKM7r3SWmKV31RerJVK73VzyGkoyv",
+    "liens": {
+      "pdf": "1-zjae7GW237qPx_01d__m_22uglrUTFD",
+      "drive": "1Z4rIKM7r3SWmKV31RerJVK73VzyGkoyv"
+    }
+  },
+  {
+    "type": "regles_jeu",
+    "titre": "M12 — Jouer au contact",
+    "themes": [
+      "contact",
+      "plaquage",
+      "raffut"
+    ],
+    "etiquette_age": "M12",
+    "fileId_dossier": "1Z4rIKM7r3SWmKV31RerJVK73VzyGkoyv",
+    "liens": {
+      "pdf": "1qBVwXC87B-o0JH-XHTxj6XqcWkO-myOH",
+      "drive": "1Z4rIKM7r3SWmKV31RerJVK73VzyGkoyv"
+    }
+  },
+  {
+    "type": "regles_jeu",
+    "titre": "M12 — Jeu à X",
+    "themes": [
+      "jeu à 10",
+      "mêlée",
+      "touche"
+    ],
+    "etiquette_age": "M12",
+    "fileId_dossier": "1Z4rIKM7r3SWmKV31RerJVK73VzyGkoyv",
+    "liens": {
+      "pdf": "1lLHeVsQTNLw_u2pjkRh-FZWzES2xRYu2",
+      "drive": "1Z4rIKM7r3SWmKV31RerJVK73VzyGkoyv"
+    }
+  },
+  {
+    "type": "regles_jeu",
+    "titre": "M14 — Toucher + 2 secondes",
+    "themes": [
+      "toucher",
+      "2 secondes",
+      "touché 4 mains"
+    ],
+    "etiquette_age": "M14",
+    "fileId_dossier": "11pDL14EI6Mira5vBsSwOIHaaDD017YtQ",
+    "liens": {
+      "pdf": "1Mr5jmyZx0V5B6JP6rUEyPjX1zAVF7uht",
+      "drive": "11pDL14EI6Mira5vBsSwOIHaaDD017YtQ"
+    }
+  },
+  {
+    "type": "regles_jeu",
+    "titre": "M14 — Jouer au contact",
+    "themes": [
+      "contact",
+      "plaquage",
+      "raffut"
+    ],
+    "etiquette_age": "M14",
+    "fileId_dossier": "11pDL14EI6Mira5vBsSwOIHaaDD017YtQ",
+    "liens": {
+      "pdf": "1YzLuR4N6vxvQZ4xgd1KaOBLRMFGfZxPC",
+      "drive": "11pDL14EI6Mira5vBsSwOIHaaDD017YtQ"
+    }
+  },
+  {
+    "type": "regles_jeu",
+    "titre": "M14 — Jeu à X",
+    "themes": [
+      "jeu à 10",
+      "mêlée",
+      "touche"
+    ],
+    "etiquette_age": "M14",
+    "fileId_dossier": "11pDL14EI6Mira5vBsSwOIHaaDD017YtQ",
+    "liens": {
+      "pdf": "12SDMT9bOYL2lI3X6EIl3qDA0lQ2kFYi6",
+      "drive": "11pDL14EI6Mira5vBsSwOIHaaDD017YtQ"
+    }
+  },
+  {
+    "type": "regles_jeu",
+    "titre": "M14 — Jeu à XV",
+    "themes": [
+      "jeu à 15",
+      "mêlée",
+      "touche"
+    ],
+    "etiquette_age": "M14",
+    "fileId_dossier": "11pDL14EI6Mira5vBsSwOIHaaDD017YtQ",
+    "liens": {
+      "pdf": "1Ibp5hB4yprGRuas4X1uTKWmalYj4nZQy",
+      "drive": "11pDL14EI6Mira5vBsSwOIHaaDD017YtQ"
+    }
+  },
+  {
+    "type": "regles_jeu",
+    "titre": "M14 — Sevens",
+    "themes": [
+      "sevens",
+      "mêlée",
+      "touche"
+    ],
+    "etiquette_age": "M14",
+    "fileId_dossier": "11pDL14EI6Mira5vBsSwOIHaaDD017YtQ",
+    "liens": {
+      "pdf": "1WYdYh_ls9QJpQlnLXyiBMmDxwIvj0m7R",
+      "drive": "11pDL14EI6Mira5vBsSwOIHaaDD017YtQ"
+    }
+  },
+  {
+    "type": "regles_jeu",
+    "titre": "M15F — Challenge Jeu à X",
+    "themes": [
+      "jeu à 10",
+      "féminines",
+      "mêlée"
+    ],
+    "etiquette_age": "M15F",
+    "fileId_dossier": "11pDL14EI6Mira5vBsSwOIHaaDD017YtQ",
+    "liens": {
+      "pdf": "13WaJrTRJOaMNZIuHsurTt7gYy6B7gVD_",
+      "drive": "11pDL14EI6Mira5vBsSwOIHaaDD017YtQ"
+    }
   }
 ]
