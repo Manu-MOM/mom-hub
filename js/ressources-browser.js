@@ -67,6 +67,10 @@
     plan_formation: {
       label: 'Plans de formation FFR', short: 'Plan FFR', icon: '🎓',
       color: '#7a2e1a', bg: '#fdece6', bloc: 'data', ordre: 5
+    },
+    regles_jeu: {
+      label: 'Règles du Jeu', short: 'Règles', icon: '📏',
+      color: '#1e3a4a', bg: '#e6f0f4', bloc: 'data', ordre: 6
     }
   };
 
