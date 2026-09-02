@@ -5570,6 +5570,128 @@
    * @param {'coach'|'joueurs'} mode
    * @param {Object|null} ateliersParBloc map blocId -> [rattachements] (mode coach)
    */
+
+  /**
+   * Helper (chantier ANNEXE-FICHES-PDF-COACH) : construit l'annexe « fiches
+   * ateliers » du PDF Coach. Déroule le CONTENU reconstitué de chaque atelier
+   * rattaché distinct (cartouche + pédagogie de data/fiches-all.json).
+   *
+   * Règles gelées (FAIT FOI) :
+   *  - dédoublonnage : un atelier_fileid_drive distinct = une fiche, dans
+   *    l'ordre d'apparition des blocs (State.blocs) ;
+   *  - fiche introuvable (lookupFiche → null) : ignorée silencieusement ;
+   *  - aucun accès Drive, aucune dépendance : rendu HTML natif print.
+   * Retourne '' si aucune fiche rendable (annexe alors totalement absente).
+   *
+   * @param {Object|null} ateliersParBloc map blocId -> [rattachements]
+   * @returns {string} HTML de l'annexe (ou '' si rien à rendre)
+   */
+  function _annexeFichesHtml(ateliersParBloc) {
+    if (!ateliersParBloc) return '';
+
+    // Collecte des fileId distincts dans l'ordre d'apparition des blocs.
+    const seen = new Set();
+    const fichesOrdonnees = [];
+    (State.blocs || []).forEach(function (b) {
+      const rats = ateliersParBloc[b.id] || [];
+      rats.forEach(function (rat) {
+        const fid = rat.atelier_fileid_drive;
+        if (!fid || seen.has(fid)) return;
+        seen.add(fid);
+        const fiche = lookupFiche(fid);
+        if (!fiche) return; // introuvable → ignorée silencieusement
+        fichesOrdonnees.push({ fid: fid, fiche: fiche });
+      });
+    });
+
+    if (fichesOrdonnees.length === 0) return '';
+
+    // Petits helpers de rendu locaux.
+    const champ = function (label, valeur) {
+      const v = (valeur == null) ? '' : String(valeur).trim();
+      if (!v) return '';
+      return '<div class="seance-fiche__meta-item">' +
+        '<span class="seance-fiche__meta-label">' + escapeHtml(label) + '</span> ' +
+        '<span class="seance-fiche__meta-val">' + escapeHtml(v) + '</span>' +
+        '</div>';
+    };
+    const liste = function (titre, arr) {
+      const items = (Array.isArray(arr) ? arr : [])
+        .map(function (x) { return (x == null) ? '' : String(x).trim(); })
+        .filter(function (x) { return x !== ''; });
+      if (items.length === 0) return '';
+      return '<div class="seance-fiche__sec">' +
+        '<h4 class="seance-fiche__sec-titre">' + escapeHtml(titre) + '</h4>' +
+        '<ul class="seance-fiche__list">' +
+          items.map(function (x) { return '<li>' + escapeHtml(x) + '</li>'; }).join('') +
+        '</ul>' +
+      '</div>';
+    };
+    const bloctexte = function (titre, valeur) {
+      const v = (valeur == null) ? '' : String(valeur).trim();
+      if (!v) return '';
+      return '<div class="seance-fiche__sec">' +
+        '<h4 class="seance-fiche__sec-titre">' + escapeHtml(titre) + '</h4>' +
+        '<p class="seance-fiche__texte">' + escapeHtml(v) + '</p>' +
+      '</div>';
+    };
+
+    let html =
+      '<section class="seance-print__annexe">' +
+        '<h2 class="seance-print__annexe-titre">📎 Annexe — Fiches ateliers (' +
+          fichesOrdonnees.length + ')</h2>';
+
+    fichesOrdonnees.forEach(function (entry) {
+      const f = entry.fiche;
+      const c = f.cartouche || {};
+      const p = f.pedagogie || {};
+      const v = p.variantes || {};
+      const titre = libelleFicheCourt(f);
+
+      // Ligne méta (cartouche) : uniquement les champs renseignés.
+      const meta =
+        champ('Thème', c.theme) +
+        champ('Niveau', c.niveau) +
+        champ('Format', c.format) +
+        champ('Durée', c.duree) +
+        champ('Effectif', c.effectif) +
+        champ('Rapport de force', c.rapport_de_force) +
+        champ('Matériel', c.materiel) +
+        champ('Catégorie', c.categorie);
+
+      // Variantes : sous-bloc seulement si au moins une non vide.
+      let variantesHtml = '';
+      const vPlus = (v.plus || '').trim();
+      const vMoins = (v.moins || '').trim();
+      const vProg = (v.progression || '').trim();
+      if (vPlus || vMoins || vProg) {
+        variantesHtml =
+          '<div class="seance-fiche__sec">' +
+            '<h4 class="seance-fiche__sec-titre">Variantes</h4>' +
+            (vPlus ? '<p class="seance-fiche__texte"><strong>+ </strong>' + escapeHtml(vPlus) + '</p>' : '') +
+            (vMoins ? '<p class="seance-fiche__texte"><strong>− </strong>' + escapeHtml(vMoins) + '</p>' : '') +
+            (vProg ? '<p class="seance-fiche__texte"><strong>Progression : </strong>' + escapeHtml(vProg) + '</p>' : '') +
+          '</div>';
+      }
+
+      html +=
+        '<article class="seance-fiche">' +
+          '<h3 class="seance-fiche__titre">' + escapeHtml(titre) + '</h3>' +
+          (meta ? '<div class="seance-fiche__meta">' + meta + '</div>' : '') +
+          liste('Objectifs', p.objectifs) +
+          bloctexte('But', p.but) +
+          bloctexte('Lancement', p.lancement) +
+          liste('Consignes', p.consignes) +
+          liste('Critères de réussite', p.critere_reussite) +
+          liste('Comportements attendus', p.comportements_attendus) +
+          variantesHtml +
+        '</article>';
+    });
+
+    html += '</section>';
+    return html;
+  }
+
   function _buildPrintHtml(mode, ateliersParBloc) {
     const s = State.currentSeance;
     const heureDebut = s.heure_debut ? normalizeHeureForInput(s.heure_debut) : null;
@@ -5718,6 +5840,12 @@
         html += '</section>';
         if (cur) cur = fin;
       });
+    }
+
+    // Annexe fiches ateliers (mode coach uniquement) — chantier
+    // ANNEXE-FICHES-PDF-COACH. Insérée après les étages, avant le footer.
+    if (!isJoueurs) {
+      html += _annexeFichesHtml(ateliersParBloc);
     }
 
     html +=
