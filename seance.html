@@ -2939,6 +2939,81 @@
         font-style: italic;
         color: #6b7a6f;
       }
+
+      /* ANNEXE-FICHES-PDF-COACH — fiches ateliers reconstituées, en fin de
+         PDF Coach. Nouvelle page, une fiche par article (évite les coupures). */
+      .seance-print__annexe {
+        page-break-before: always;
+        margin-top: 0;
+      }
+      .seance-print__annexe-titre {
+        font-family: 'Oswald', Arial, sans-serif;
+        font-size: 15pt;
+        font-weight: 600;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        color: #fff;
+        background: #0c3d24 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        border-bottom: 3pt solid #2d7a3e;
+        padding: 8pt 12pt;
+        margin: 0 0 12pt;
+        border-radius: 4pt 4pt 0 0;
+      }
+      .seance-fiche {
+        page-break-inside: avoid;
+        margin-bottom: 14pt;
+        padding-bottom: 10pt;
+        border-bottom: 0.5pt solid #cabe9f;
+      }
+      .seance-fiche:last-child { border-bottom: none; }
+      .seance-fiche__titre {
+        font-family: 'Oswald', Arial, sans-serif;
+        font-size: 13pt;
+        font-weight: 600;
+        color: #0c3d24;
+        margin: 0 0 6pt;
+      }
+      .seance-fiche__meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4pt 16pt;
+        background: #f4f1e6 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        padding: 6pt 8pt;
+        border-radius: 3pt;
+        margin-bottom: 8pt;
+        font-size: 9.5pt;
+      }
+      .seance-fiche__meta-label {
+        font-weight: 700;
+        color: #2d7a3e;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+        font-size: 8.5pt;
+      }
+      .seance-fiche__meta-val { color: #0c3d24; }
+      .seance-fiche__sec { margin: 6pt 0; }
+      .seance-fiche__sec-titre {
+        font-family: 'Oswald', Arial, sans-serif;
+        font-size: 10.5pt;
+        font-weight: 600;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        color: #2d7a3e;
+        margin: 0 0 2pt;
+      }
+      .seance-fiche__list {
+        margin: 0;
+        padding-left: 16pt;
+      }
+      .seance-fiche__list li { margin: 1pt 0; }
+      .seance-fiche__texte {
+        margin: 0;
+        white-space: pre-line;
+      }
     }
 
   </style>
