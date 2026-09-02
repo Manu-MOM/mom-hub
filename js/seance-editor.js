@@ -2375,6 +2375,12 @@
           '<button type="button" id="seance-btn-export-pdf-coach" class="seance-trame__pdf-btn" title="Export complet pour les coachs (détails + fiches ateliers)">' +
             '🖨 PDF Coach' +
           '</button>' +
+          // FICHES-ATELIERS-PDF — concatène les vraies fiches PDF des ateliers
+          // rattachés à la séance (data/fiches-pdf/<fileId>.pdf), fusionnées via
+          // pdf-lib. Indépendant du PDF Coach (trame) ci-dessus.
+          '<button type="button" id="seance-btn-export-fiches-pdf" class="seance-trame__pdf-btn" title="Recueil des vraies fiches PDF des ateliers de la séance">' +
+            '📄 Fiches ateliers (PDF)' +
+          '</button>' +
           '<button type="button" id="seance-btn-export-pdf-joueurs" class="seance-trame__pdf-btn" title="Export compact pour les joueurs">' +
             '🖨 PDF Joueurs' +
           '</button>' +
@@ -2627,6 +2633,14 @@
       btnPdfJoueurs.addEventListener('click', function (e) {
         e.stopPropagation();
         onExportPdfJoueurs();
+      });
+    }
+    // FICHES-ATELIERS-PDF — bind du bouton recueil de fiches PDF
+    const btnFichesPdf = document.getElementById('seance-btn-export-fiches-pdf');
+    if (btnFichesPdf) {
+      btnFichesPdf.addEventListener('click', function (e) {
+        e.stopPropagation();
+        onExportFichesAteliers();
       });
     }
 
@@ -5519,6 +5533,102 @@
     if (!State.currentSeance) return;
     const nomFichier = _dateFichierSeance() + ' - MOM Hub · Séance ' + _libelleCategorieCourt() + ' joueurs';
     _imprimerVue(_buildPrintHtml('joueurs', null), nomFichier);
+  }
+
+  /**
+   * FICHES-ATELIERS-PDF — Export du recueil des vraies fiches PDF (FAIT FOI).
+   *
+   * Concatène en un seul PDF les fiches PDF des ateliers rattachés à la
+   * séance, servies en même origine depuis data/fiches-pdf/<fileId>.pdf.
+   * Règles gelées :
+   *  - dédoublonnage par atelier_fileid_drive, ordre d'apparition des blocs ;
+   *  - PDF absent (404 ou contenu non-%PDF) : ignoré silencieusement ;
+   *  - aucun atelier rattaché : message, aucun fichier généré.
+   * Dépendance : pdf-lib (window.PDFLib), chargée dans seance.html.
+   */
+  async function onExportFichesAteliers() {
+    if (!State.currentSeance) return;
+    const btn = document.getElementById('seance-btn-export-fiches-pdf');
+
+    if (!window.PDFLib || !window.PDFLib.PDFDocument) {
+      alert('Module PDF non chargé. Recharge la page et réessaie.');
+      return;
+    }
+
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Préparation…'; }
+    try {
+      // 1. Collecte des fileId distincts, dans l'ordre des blocs.
+      const ateliersParBloc = await _chargerAteliersTousBlocs();
+      const seen = {};
+      const fileIds = [];
+      (State.blocs || []).forEach(function (b) {
+        const rats = ateliersParBloc[b.id] || [];
+        rats.forEach(function (rat) {
+          const fid = rat.atelier_fileid_drive;
+          if (fid && !seen[fid]) { seen[fid] = true; fileIds.push(fid); }
+        });
+      });
+
+      if (fileIds.length === 0) {
+        alert('Aucun atelier rattaché à cette séance.');
+        return;
+      }
+
+      // 2. Récupération + fusion des PDF (fiche absente = ignorée).
+      // Chemin relatif à la page courante -> robuste au sous-dossier du site.
+      const base = new URL('data/fiches-pdf/', window.location.href);
+      const { PDFDocument } = window.PDFLib;
+      const out = await PDFDocument.create();
+      let ajoutees = 0;
+      let ignorees = 0;
+
+      for (let i = 0; i < fileIds.length; i++) {
+        const url = new URL(encodeURIComponent(fileIds[i]) + '.pdf', base).href;
+        try {
+          const resp = await fetch(url);
+          if (!resp.ok) { ignorees++; continue; }
+          const bytes = await resp.arrayBuffer();
+          // Vérif signature %PDF (évite d'injecter une page HTML d'erreur).
+          const sig = String.fromCharCode.apply(null, new Uint8Array(bytes.slice(0, 5)));
+          if (sig.indexOf('%PDF') !== 0) { ignorees++; continue; }
+          const src = await PDFDocument.load(bytes, { ignoreEncryption: true });
+          const pages = await out.copyPages(src, src.getPageIndices());
+          pages.forEach(function (p) { out.addPage(p); });
+          ajoutees++;
+        } catch (e) {
+          console.warn('SeanceEditor: fiche PDF ignorée (' + fileIds[i] + ')', e);
+          ignorees++;
+        }
+      }
+
+      if (ajoutees === 0) {
+        alert('Aucune fiche PDF disponible pour les ateliers de cette séance.');
+        return;
+      }
+
+      // 3. Sauvegarde + téléchargement.
+      const pdfBytes = await out.save();
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const nomFichier = _dateFichierSeance() + ' - MOM Hub · Fiches ateliers ' +
+        _libelleCategorieCourt() + '.pdf';
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = nomFichier;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+
+      if (ignorees > 0) {
+        console.info('SeanceEditor: ' + ajoutees + ' fiche(s) ajoutée(s), ' +
+          ignorees + ' ignorée(s) (PDF absent).');
+      }
+    } catch (e) {
+      console.error('SeanceEditor: onExportFichesAteliers() KO', e);
+      alert('Erreur préparation des fiches PDF : ' + (e.message || e));
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = '📄 Fiches ateliers (PDF)'; }
+    }
   }
 
   /**
