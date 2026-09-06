@@ -5476,11 +5476,17 @@
 
   /** Libellé court de la catégorie (ex. « M14 ») pour les noms de fichier (v1.15). */
   function _libelleCategorieCourt() {
-    const ctx = window.momSeanceContext;
-    const raw = (ctx && ctx.categorie_uuid) ? String(ctx.categorie_uuid) : '';
-    // 'cat-m14' -> 'M14' ; sinon repli 'M14' (module mono-équipe M14).
-    const m = raw.replace(/^cat-/i, '').trim();
-    return m ? m.toUpperCase() : 'M14';
+    // TITRE-CAT-DYN : le libellé (noms de fichier PDF) suit désormais la
+    // catégorie active réellement résolue (State.perimetreCat), plus la
+    // constante 'cat-m14'. Repli neutre 'SEANCE' si non résolu — évite
+    // d'étiqueter par erreur en 'M14' les exports d'un autre périmètre.
+    if (State.perimetreCat
+        && typeof UXSelecteurCategorie !== 'undefined'
+        && typeof UXSelecteurCategorie.libelleActif === 'function') {
+      const lib = UXSelecteurCategorie.libelleActif(State.perimetreCat);
+      if (lib) return String(lib).toUpperCase();
+    }
+    return 'SEANCE';
   }
 
   /**
@@ -6266,9 +6272,18 @@
    */
   async function loadEncadrantsForCategorie() {
     try {
-      const categorie = window.momSeanceContext && window.momSeanceContext.categorie_uuid 
-                        ? window.momSeanceContext.categorie_uuid 
-                        : 'cat-m14';
+      // TITRE-CAT-DYN : clé du miroir encadrants résolue depuis la catégorie
+      // active (State.perimetreCat), convention 'cat-<libelle>' minuscule.
+      // Le miroir ne couvre aujourd'hui que 'cat-m14' → toute autre catégorie
+      // tombe en dégradation honnête (catData undefined → saisie libre),
+      // comportement inchangé pour M14, non bloquant pour les autres.
+      let categorie = 'cat-m14';
+      if (State.perimetreCat
+          && typeof UXSelecteurCategorie !== 'undefined'
+          && typeof UXSelecteurCategorie.libelleActif === 'function') {
+        const lib = UXSelecteurCategorie.libelleActif(State.perimetreCat);
+        if (lib) categorie = 'cat-' + String(lib).toLowerCase();
+      }
       const resp = await fetch('data/encadrants-par-categorie.json', { cache: 'force-cache' });
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       const data = await resp.json();
@@ -6393,6 +6408,24 @@
         State.perimetreCat = null;
       }
     }
+    // Titre dynamique (TITRE-CAT-DYN) : injecte le libellé de la catégorie
+    // active dans le span dédié du H2, INDÉPENDAMMENT de UXSelecteurCategorie
+    // .monter() — ce dernier sort en amont pour un encadrant mono-catégorie
+    // (return false si <=1 cat non transverse) et ne mettait donc jamais le
+    // titre à jour pour ce profil (bug : M14 en dur affiché à tout encadrant,
+    // ex. adjoint M8). Le sélecteur multi-cat (admin/bureau) continue de
+    // piloter ce même span via son propre _majTitre → cohérence. Repli
+    // honnête : span 'M14' en dur conservé si le périmètre n'est pas résolu.
+    if (State.perimetreCat
+        && typeof UXSelecteurCategorie !== 'undefined'
+        && typeof UXSelecteurCategorie.libelleActif === 'function') {
+      const _lib = UXSelecteurCategorie.libelleActif(State.perimetreCat);
+      if (_lib) {
+        const _span = document.querySelector('.seance-header__cat');
+        if (_span) _span.textContent = _lib;
+      }
+    }
+
     State.equipesCategorieActive = await _seanceResoudreEquipesCategorieActive();
     _seanceChoisirEquipeActive(); // pose State.equipeActive (repli M14 si vide)
 
