@@ -483,6 +483,7 @@
     blocs: [],              // blocs de la séance courante, triés par ordre (5.6.A)
     circuits: [],           // fiches de marche circuit (seances_etages_circuits, sql_241) — 1 par étage rotatif
     staffDisponible: [],    // [{personne_id,nom,prenom}] coachs assignables par bloc (v1.10, sql_108)
+    staffClubDisponible: [], // ENCADRANTS-BLOC-ELARGI — tout le staff club (toutes catégories), pioche « autres catégories »
     dedoublerOrdre: null,   // étage cible quand on ajoute une voie parallèle (v1.10)
     typesBlocsRef: null,    // référentiel des 11 types (data/types-blocs.json, 5.6.A)
     picker: null,           // état du popover "+ Ajouter un bloc" ({open: bool}, 5.6.A)
@@ -2333,18 +2334,29 @@
    * Noms des coachs d'un bloc à partir de sa liste encadrants_ids (v1.13).
    * Multi-coachs : renvoie un tableau de noms (ordre de la liste). Replie
    * sur encadrant_id (déprécié) si encadrants_ids est vide mais que
-   * l'ancien champ est encore renseigné (rétro-compat lecture). Un id non
-   * résolu dans State.staffDisponible est rendu '⚠️ hors liste' plutôt que
-   * masqué (honest degradation).
+   * l'ancien champ est encore renseigné (rétro-compat lecture).
+   * ENCADRANTS-BLOC-ELARGI — résout un id dans le staff de la catégorie PUIS
+   * dans le staff club (coachs d'autres catégories) ; id non résolu →
+   * '⚠️ hors liste' (honest degradation). Ajoute enfin les coachs en texte
+   * libre (encadrants_libres) tels quels, à la suite.
    */
   function _nomsCoachsBloc(b) {
     const liste = Array.isArray(State.staffDisponible) ? State.staffDisponible : [];
+    const club = Array.isArray(State.staffClubDisponible) ? State.staffClubDisponible : [];
     let ids = Array.isArray(b.encadrants_ids) ? b.encadrants_ids.slice() : [];
     if (ids.length === 0 && b.encadrant_id) ids = [b.encadrant_id]; // repli déprécié
-    return ids.map(function (id) {
-      const p = liste.find(function (x) { return x.personne_id === id; });
+    const noms = ids.map(function (id) {
+      let p = liste.find(function (x) { return x.personne_id === id; });
+      if (!p) p = club.find(function (x) { return x.personne_id === id; });
       return p ? (((p.prenom || '') + ' ' + (p.nom || '')).trim() || id) : '⚠️ hors liste';
     }).filter(Boolean);
+    // Coachs texte libre (ENCADRANTS-BLOC-ELARGI).
+    const libres = Array.isArray(b.encadrants_libres) ? b.encadrants_libres : [];
+    libres.forEach(function (txt) {
+      const t = String(txt || '').trim();
+      if (t) noms.push(t);
+    });
+    return noms;
   }
 
   function renderTrame() {
@@ -2922,40 +2934,105 @@
    *
    * @param {string[]} selectedIds liste courante encadrants_ids du bloc
    */
-  function buildCheckboxesCoachs(selectedIds) {
+  function buildCheckboxesCoachs(selectedIds, selectedLibres) {
     const sel = Array.isArray(selectedIds) ? selectedIds : [];
+    const libres = Array.isArray(selectedLibres) ? selectedLibres : [];
     const liste = Array.isArray(State.staffDisponible) ? State.staffDisponible : [];
-    let html = '<div class="seance-coachs-pioche" id="seance-coachs-pioche">';
+    const club = Array.isArray(State.staffClubDisponible) ? State.staffClubDisponible : [];
 
-    if (liste.length === 0) {
-      html += '<p class="seance-coachs-pioche__vide">Aucun coach disponible (pioche vide).</p>';
-    } else {
-      liste.forEach(function (p) {
-        const id = p.personne_id;
-        const nom = ((p.prenom || '') + ' ' + (p.nom || '')).trim() || id;
-        const checked = sel.indexOf(id) !== -1 ? ' checked' : '';
-        html +=
-          '<label class="seance-coachs-pioche__item">' +
-            '<input type="checkbox" class="seance-coachs-pioche__cb" data-coach-id="' + escapeHtml(id) + '"' + checked + '>' +
-            '<span>' + escapeHtml(nom) + '</span>' +
-          '</label>';
-      });
+    // Ensemble des ids de la catégorie active : sert à retrancher ces
+    // personnes de la section « autres catégories » (pas de doublon visuel).
+    const idsCategorie = {};
+    liste.forEach(function (p) { idsCategorie[p.personne_id] = true; });
+
+    // Rendu d'une case coach (personne réelle).
+    function _itemCoach(p) {
+      const id = p.personne_id;
+      const nom = ((p.prenom || '') + ' ' + (p.nom || '')).trim() || id;
+      const checked = sel.indexOf(id) !== -1 ? ' checked' : '';
+      return '<label class="seance-coachs-pioche__item">' +
+               '<input type="checkbox" class="seance-coachs-pioche__cb" data-coach-id="' + escapeHtml(id) + '"' + checked + '>' +
+               '<span>' + escapeHtml(nom) + '</span>' +
+             '</label>';
     }
 
-    // Coachs sélectionnés mais hors liste (conservés, cochés, signalés).
-    sel.forEach(function (id) {
-      const present = liste.some(function (p) { return p.personne_id === id; });
-      if (!present) {
-        html +=
-          '<label class="seance-coachs-pioche__item seance-coachs-pioche__item--orphelin">' +
-            '<input type="checkbox" class="seance-coachs-pioche__cb" data-coach-id="' + escapeHtml(id) + '" checked>' +
-            '<span>⚠️ Coach hors liste (conservé)</span>' +
-          '</label>';
-      }
+    let html = '<div class="seance-coachs-pioche" id="seance-coachs-pioche">';
+
+    // ----- Section 1 : coachs de la catégorie active -----
+    html += '<div class="seance-coachs-pioche__section">';
+    html += '<p class="seance-coachs-pioche__section-titre">Catégorie</p>';
+    if (liste.length === 0) {
+      html += '<p class="seance-coachs-pioche__vide">Aucun coach de la catégorie (pioche vide).</p>';
+    } else {
+      liste.forEach(function (p) { html += _itemCoach(p); });
+    }
+    html += '</div>';
+
+    // ----- Section 2 : coachs des AUTRES catégories (staff club) -----
+    // ENCADRANTS-BLOC-ELARGI. Le staff club moins ceux déjà listés en
+    // catégorie. Masquée si aucune autre personne (ou club non chargé,
+    // ex. hors contexte catégorie = garde M6).
+    const autres = club.filter(function (p) { return !idsCategorie[p.personne_id]; });
+    if (autres.length > 0) {
+      html += '<div class="seance-coachs-pioche__section">';
+      html += '<p class="seance-coachs-pioche__section-titre">Autres catégories</p>';
+      autres.forEach(function (p) { html += _itemCoach(p); });
+      html += '</div>';
+    }
+
+    // ----- Coachs sélectionnés mais hors des deux listes (conservés) -----
+    // Un id coché absent de la catégorie ET du club (personne retirée du
+    // staff mais encore référencée en base) : rendu coché + signalé, jamais
+    // perdu silencieusement (honest degradation).
+    const orphelins = sel.filter(function (id) {
+      return !liste.some(function (p) { return p.personne_id === id; })
+          && !club.some(function (p) { return p.personne_id === id; });
     });
+    if (orphelins.length > 0) {
+      html += '<div class="seance-coachs-pioche__section">';
+      orphelins.forEach(function (id) {
+        html += '<label class="seance-coachs-pioche__item seance-coachs-pioche__item--orphelin">' +
+                  '<input type="checkbox" class="seance-coachs-pioche__cb" data-coach-id="' + escapeHtml(id) + '" checked>' +
+                  '<span>⚠️ Coach hors liste (conservé)</span>' +
+                '</label>';
+      });
+      html += '</div>';
+    }
+
+    // ----- Section 3 : coachs en TEXTE LIBRE -----
+    // ENCADRANTS-BLOC-ELARGI. Chips supprimables agrégées en encadrants_libres
+    // au save. Chaque chip porte data-coach-libre ; l'input + bouton empilent
+    // de nouvelles chips (câblage dans renderBlocDetail post-injection DOM).
+    html += '<div class="seance-coachs-pioche__section">';
+    html += '<p class="seance-coachs-pioche__section-titre">Texte libre</p>';
+    html += '<div class="seance-coachs-libres" id="seance-coachs-libres">';
+    libres.forEach(function (txt) {
+      html += _chipLibre(txt);
+    });
+    html += '</div>';
+    html += '<div class="seance-coachs-libres__ajout">' +
+              '<input type="text" class="seance-field__input" id="seance-coach-libre-input" ' +
+                'placeholder="Nom d\'un coach (texte libre)" maxlength="80">' +
+              '<button type="button" class="seance-form__save-btn" id="seance-coach-libre-add">+ Ajouter</button>' +
+            '</div>';
+    html += '</div>';
 
     html += '</div>';
     return html;
+  }
+
+  /**
+   * Chip d'un coach en texte libre (ENCADRANTS-BLOC-ELARGI). Porte
+   * data-coach-libre (valeur = texte). Bouton × pour retirer. Agrégées
+   * en encadrants_libres au save.
+   */
+  function _chipLibre(txt) {
+    const t = String(txt || '').trim();
+    if (!t) return '';
+    return '<span class="seance-coachs-libres__chip" data-coach-libre="' + escapeHtml(t) + '">' +
+             '<span>' + escapeHtml(t) + '</span>' +
+             '<button type="button" class="seance-coachs-libres__del" aria-label="Retirer">×</button>' +
+           '</span>';
   }
 
   /**
@@ -3069,7 +3146,8 @@
           buildCheckboxesCoachs(
             (Array.isArray(b.encadrants_ids) && b.encadrants_ids.length)
               ? b.encadrants_ids
-              : (b.encadrant_id ? [b.encadrant_id] : [])
+              : (b.encadrant_id ? [b.encadrant_id] : []),
+            Array.isArray(b.encadrants_libres) ? b.encadrants_libres : []
           ) +
         '</div>' +
 
@@ -3237,6 +3315,47 @@
     document.querySelectorAll('.seance-coachs-pioche__cb').forEach(function (cb) {
       cb.addEventListener('change', function () { setBlocDirty(true); });
     });
+
+    // ENCADRANTS-BLOC-ELARGI — câblage des coachs en texte libre.
+    // Bouton « + Ajouter » : empile une chip depuis l'input (dédoublonnage
+    // insensible casse/accents, non vide). Boutons × : retirent la chip.
+    // Chaque action marque le bloc dirty. Les chips sont agrégées en
+    // encadrants_libres au save (collecte dans saveBloc via data-coach-libre).
+    (function _cablerCoachsLibres() {
+      const zone = document.getElementById('seance-coachs-libres');
+      const input = document.getElementById('seance-coach-libre-input');
+      const btnAdd = document.getElementById('seance-coach-libre-add');
+      if (!zone) return;
+
+      function _ajouter() {
+        if (!input) return;
+        const txt = (input.value || '').trim();
+        if (!txt) return;
+        const norme = normalizeForSearch(txt);
+        const existe = Array.prototype.some.call(
+          zone.querySelectorAll('[data-coach-libre]'),
+          function (c) { return normalizeForSearch(c.getAttribute('data-coach-libre') || '') === norme; }
+        );
+        if (existe) { input.value = ''; return; }
+        zone.insertAdjacentHTML('beforeend', _chipLibre(txt));
+        input.value = '';
+        setBlocDirty(true);
+      }
+
+      if (btnAdd) btnAdd.addEventListener('click', _ajouter);
+      if (input) {
+        input.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') { e.preventDefault(); _ajouter(); }
+        });
+      }
+      // Délégation suppression (les chips sont créées dynamiquement).
+      zone.addEventListener('click', function (e) {
+        const del = e.target.closest && e.target.closest('.seance-coachs-libres__del');
+        if (!del) return;
+        const chip = del.closest('.seance-coachs-libres__chip');
+        if (chip) { chip.remove(); setBlocDirty(true); }
+      });
+    })();
 
     // v1.14 — dirty sur les champs Contenu pédagogique (Axe 4). Ces champs
     // portent data-bloc-field-axe4 (et NON data-bloc-field), donc ils
@@ -6078,6 +6197,16 @@
     });
     patch.encadrants_ids = encadrantsIds;
 
+    // ENCADRANTS-BLOC-ELARGI — agrège les chips texte libre en
+    // encadrants_libres (text[]). Chips = data-coach-libre. Dédoublonnage
+    // déjà fait à l'ajout ; on trim par sécurité. Liste vide = aucun libre.
+    const encadrantsLibres = [];
+    document.querySelectorAll('#seance-coachs-libres [data-coach-libre]').forEach(function (chip) {
+      const txt = (chip.getAttribute('data-coach-libre') || '').trim();
+      if (txt && encadrantsLibres.indexOf(txt) === -1) encadrantsLibres.push(txt);
+    });
+    patch.encadrants_libres = encadrantsLibres;
+
     const res = await SupabaseHub.updateBloc(State.currentBloc.id, patch);
 
     if (!res.ok) {
@@ -6320,16 +6449,32 @@
       const categorieId = _catActive();
       if (!categorieId) {
         State.staffDisponible = [];
-        console.log('SeanceEditor: aucune catégorie active → pioche staff vide.');
+        State.staffClubDisponible = [];
+        console.log('SeanceEditor: aucune catégorie active → pioche staff vide (catégorie ET club, garde M6).');
         return;
       }
 
       const liste = await SupabaseHub.listStaffDisponibles(categorieId);
       State.staffDisponible = Array.isArray(liste) ? liste : [];
       console.log('SeanceEditor: staff disponible chargé (' + State.staffDisponible.length + ' personnes assignables par bloc, categorie=' + categorieId + ')');
+
+      // ENCADRANTS-BLOC-ELARGI — charge AUSSI tout le staff club (toutes
+      // catégories) pour la section « autres catégories » de la pioche.
+      // N'est chargé QUE si une catégorie est active (garde M6 ci-dessus) :
+      // hors contexte catégorie, aucune pioche ne s'affiche. Dégradation
+      // honnête : échec → liste club vide, la section ne s'affiche pas.
+      try {
+        const listeClub = await SupabaseHub.listStaffDisponibles(null);
+        State.staffClubDisponible = Array.isArray(listeClub) ? listeClub : [];
+        console.log('SeanceEditor: staff club chargé (' + State.staffClubDisponible.length + ' personnes toutes catégories).');
+      } catch (eClub) {
+        console.warn('SeanceEditor: chargement staff club KO, section autres catégories masquée', eClub);
+        State.staffClubDisponible = [];
+      }
     } catch (e) {
       console.warn('SeanceEditor: loadStaffDisponibles() KO, sélecteur coach vide', e);
       State.staffDisponible = [];
+      State.staffClubDisponible = [];
     }
   }
 
