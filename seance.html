@@ -2647,6 +2647,67 @@
       margin: 0;
     }
 
+    /* ENCADRANTS-BLOC-ELARGI — pioche en sections empilées (catégorie /
+       autres catégories / texte libre). Le conteneur passe en colonne ;
+       chaque section garde ses items en flex-wrap. */
+    .seance-coachs-pioche {
+      flex-direction: column;
+      gap: 10px;
+    }
+    .seance-coachs-pioche__section {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px 14px;
+    }
+    .seance-coachs-pioche__section-titre {
+      width: 100%;
+      margin: 0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--ink-mute);
+    }
+    .seance-coachs-libres {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      width: 100%;
+    }
+    .seance-coachs-libres__chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 6px 3px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--paper-warm);
+      font-size: 12.5px;
+      color: var(--ink-soft);
+    }
+    .seance-coachs-libres__del {
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-size: 15px;
+      line-height: 1;
+      color: var(--ink-mute);
+      padding: 0 2px;
+    }
+    .seance-coachs-libres__del:hover {
+      color: var(--clay);
+    }
+    .seance-coachs-libres__ajout {
+      display: flex;
+      gap: 8px;
+      width: 100%;
+      margin-top: 2px;
+    }
+    .seance-coachs-libres__ajout .seance-field__input {
+      flex: 1;
+    }
+
     @media print {
       /* Masque réellement toute l'app (pas seulement visibility, qui laisse
          les conteneurs occuper la place AVEC leur scrollbar -> barre + flèches
