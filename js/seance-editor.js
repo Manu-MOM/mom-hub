@@ -2972,12 +2972,24 @@
     // ENCADRANTS-BLOC-ELARGI. Le staff club moins ceux déjà listés en
     // catégorie. Masquée si aucune autre personne (ou club non chargé,
     // ex. hors contexte catégorie = garde M6).
+    // AUTRES-CAT-DEROULANT — présentée en <details> repliable pour ne pas
+    // surcharger la pioche de base (retour terrain). Compteur de cochés
+    // dans le summary ; ouverte d'office si au moins un coché (ne masque
+    // jamais une sélection existante à la réouverture du bloc).
     const autres = club.filter(function (p) { return !idsCategorie[p.personne_id]; });
     if (autres.length > 0) {
-      html += '<div class="seance-coachs-pioche__section">';
-      html += '<p class="seance-coachs-pioche__section-titre">Autres catégories</p>';
+      const nbCoches = autres.filter(function (p) { return sel.indexOf(p.personne_id) !== -1; }).length;
+      const ouvert = nbCoches > 0 ? ' open' : '';
+      const compteur = nbCoches > 0 ? ' · ' + nbCoches + ' sélectionné' + (nbCoches > 1 ? 's' : '') : '';
+      html += '<details class="seance-coachs-pioche__section seance-coachs-pioche__deroulant"' + ouvert + '>';
+      html += '<summary class="seance-coachs-pioche__deroulant-summary">' +
+                'Autres catégories (' + autres.length + ')' +
+                '<span class="seance-coachs-pioche__deroulant-compteur">' + escapeHtml(compteur) + '</span>' +
+              '</summary>';
+      html += '<div class="seance-coachs-pioche__deroulant-liste">';
       autres.forEach(function (p) { html += _itemCoach(p); });
       html += '</div>';
+      html += '</details>';
     }
 
     // ----- Coachs sélectionnés mais hors des deux listes (conservés) -----
@@ -3315,6 +3327,21 @@
     document.querySelectorAll('.seance-coachs-pioche__cb').forEach(function (cb) {
       cb.addEventListener('change', function () { setBlocDirty(true); });
     });
+
+    // AUTRES-CAT-DEROULANT — rafraîchit le compteur du summary « Autres
+    // catégories » à chaque coche/décoche dans le déroulant, sans re-render.
+    (function _cablerCompteurAutres() {
+      const det = document.querySelector('.seance-coachs-pioche__deroulant');
+      if (!det) return;
+      const compteurEl = det.querySelector('.seance-coachs-pioche__deroulant-compteur');
+      if (!compteurEl) return;
+      det.querySelectorAll('.seance-coachs-pioche__cb').forEach(function (cb) {
+        cb.addEventListener('change', function () {
+          const n = det.querySelectorAll('.seance-coachs-pioche__cb:checked').length;
+          compteurEl.textContent = n > 0 ? ' · ' + n + ' sélectionné' + (n > 1 ? 's' : '') : '';
+        });
+      });
+    })();
 
     // ENCADRANTS-BLOC-ELARGI — câblage des coachs en texte libre.
     // Bouton « + Ajouter » : empile une chip depuis l'input (dédoublonnage
