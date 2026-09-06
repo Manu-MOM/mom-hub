@@ -4342,7 +4342,9 @@
         // v1.63 — blocs parallèles + coach par bloc (sql_108)
         'voie', 'encadrant_id',
         // v1.65 — multi-coachs (sql_110) : liste plate uuid[]
-        'encadrants_ids'
+        'encadrants_ids',
+        // ENCADRANTS-BLOC-ELARGI — coachs texte libre (text[]).
+        'encadrants_libres'
       ];
       for (const k of optionalKeys) {
         if (params[k] !== undefined) payload[k] = params[k];
@@ -4383,7 +4385,9 @@
         // par un chemin distinct). Sans cela : « Aucun champ modifiable ».
         'ordre',
         // v1.65 — multi-coachs (sql_110) : liste plate uuid[]
-        'encadrants_ids'
+        'encadrants_ids',
+        // ENCADRANTS-BLOC-ELARGI — coachs texte libre (text[]).
+        'encadrants_libres'
       ];
       const cleanPatch = {};
       for (const k of allowedKeys) {
