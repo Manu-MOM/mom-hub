@@ -21,7 +21,8 @@
     - qualites_ffr text[] ; jointure base = numero_licence_ffr (col "Numéro Licence").
     - colonnes export OVAL-E : "Numéro Licence" (clé), "Qualité" (code FFR brut).
       Le format réel peut varier ; on détecte les colonnes par libellé (insensible accents/casse).
-    - 12 codes connus : A,DC4,RLSP,EDU,SOI,AM,ECF,B,RLO,PAR,RF2,ACF. Hors-liste = signalé.
+    - codes connus = référentiel SQL public.referentiel_qualites_ffr (autorité) ; miroir ci-dessous
+      (CODES_CONNUS / CODES_STAFF) = affichage seul, à garder synchro avec la table. Hors-liste = signalé.
     - JAMAIS de création de fiche (cas 2 = signalé). RPC n'écrit QUE qualites_ffr.
 -->
 <link rel="stylesheet" href="css/hub.css">
@@ -243,8 +244,9 @@
     const $ = (id) => document.getElementById(id);
 
     // Vocabulaire FFR connu (aligné sur la fonction SQL vocabulaire_ffr_connu).
-    const CODES_CONNUS = ['A','DC4','RLSP','EDU','SOI','AM','ECF','B','RLO','PAR','RF2','ACF'];
-    const CODES_STAFF  = ['DC4','EDU','ECF','SOI','B','ACF'];
+    // Miroir d'affichage de public.referentiel_qualites_ffr (autorité SQL). À garder synchro.
+    const CODES_CONNUS = ['A','ACF','AH4','AM','AN1','AN2','AN3','AN4','B','CAL','DC4','DR2','DR3','DST','ECF','EDU','MED','PAR','RF1','RF2','RF3','RFE','RLO','RLSP','SOI','VOL'];
+    const CODES_STAFF  = ['DC4','EDU','ECF','SOI','ACF'];
 
     // État courant de l'aperçu (payload prêt à envoyer).
     let payload = [];   // [{ lic, codes:[...] }]
