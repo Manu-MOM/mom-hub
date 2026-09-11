@@ -606,6 +606,7 @@ window.JoueursBrowser = (function () {
     if (t) parts.push(`📏 ${t}`);
     if (p) parts.push(`⚖️ ${p}`);
     if (j.qualite_ffr) parts.push(`🛡️ ${esc(j.qualite_ffr)}`);
+    if (j.potentiel_jeu) parts.push(`🎯 ${esc(j.potentiel_jeu)}`);
     if (parts.length === 0) return '';
     return `<div class="joueur-card-physique">${parts.join(' · ')}</div>`;
   }
@@ -913,7 +914,7 @@ window.JoueursBrowser = (function () {
     const hasContent =
       (d.postes_uuids && d.postes_uuids.length > 0)
       || (d.aptitudes_uuids && d.aptitudes_uuids.length > 0)
-      || taille || poids;
+      || d.potentiel_jeu || taille || poids;
 
     let body = '';
     if (d.postes_uuids && d.postes_uuids.length > 0) {
@@ -928,6 +929,11 @@ window.JoueursBrowser = (function () {
             + renderAptitudesPills(d.aptitudes_uuids) + '</div></div>';
     } else {
       body += '<div class="joueur-fiche-row"><div class="joueur-fiche-row-lbl">Aptitudes</div><div class="joueur-fiche-row-val joueur-fiche-empty">Non définies</div></div>';
+    }
+
+    if (d.potentiel_jeu) {
+      body += '<div class="joueur-fiche-row"><div class="joueur-fiche-row-lbl">Niveau</div><div class="joueur-fiche-row-val">'
+            + '🎯 ' + esc(d.potentiel_jeu) + '</div></div>';
     }
 
     if (taille || poids) {
