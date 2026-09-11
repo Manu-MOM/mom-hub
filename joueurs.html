@@ -1042,6 +1042,12 @@
     gap: 6px;
     margin-top: 4px;
   }
+  /* Conteneur racine des aptitudes : empilement vertical des catégories
+   * (les sous-grilles .joueur-modal-apt-grid-groupe gèrent les colonnes). */
+  #joueur-profil-aptitudes-grid.joueur-modal-apt-grid {
+    display: block;
+    margin-top: 4px;
+  }
   .joueur-modal-apt-cat-titre {
     font-size: 11px;
     font-weight: 600;
@@ -1055,8 +1061,9 @@
   }
   .joueur-modal-apt-grid-groupe {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
     gap: 6px;
+    margin-bottom: 4px;
   }
   .joueur-modal-apt-cell {
     display: flex;
