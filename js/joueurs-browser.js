@@ -267,6 +267,7 @@ window.JoueursBrowser = (function () {
   let POSTES_BY_ID = new Map();
   let POSTES_GROUPES_BY_ID = new Map();
   let APTITUDES_BY_ID = new Map();
+  let APTITUDES_CATEGORIES = [];  // [{code,libelle,items:[apt,...]}] — ordre d'affichage groupé (aptitudes.json v2.0)
 
   /** Filtres actifs */
   let state = {
@@ -302,14 +303,14 @@ window.JoueursBrowser = (function () {
         POSTES_GROUPES_BY_ID.set(g.uuid, g);
       });
 
-      // Aptitudes catégorie A (universelles, 6 entrées)
-      (aptitudesJson.categorie_A || []).forEach(a => {
-        APTITUDES_BY_ID.set(a.uuid, a);
-      });
-      // Aptitudes catégorie B M14 (7 entrées)
-      const aptB = (aptitudesJson.categorie_B_par_age || {})[APTITUDES_B_CAT_KEY] || [];
-      aptB.forEach(a => {
-        APTITUDES_BY_ID.set(a.uuid, a);
+      // Aptitudes v2.0 : 5 catégories fonctionnelles ordonnées (categories[].items[])
+      APTITUDES_CATEGORIES = (aptitudesJson.categories || []).map(cat => ({
+        code: cat.code,
+        libelle: cat.libelle,
+        items: (cat.items || [])
+      }));
+      APTITUDES_CATEGORIES.forEach(cat => {
+        cat.items.forEach(a => { APTITUDES_BY_ID.set(a.uuid, a); });
       });
 
       console.log('Joueurs: référentiels chargés —',
@@ -1467,6 +1468,10 @@ window.JoueursBrowser = (function () {
     // Génère la grille aptitudes
     renderModalProfilAptitudesGrid(d.aptitudes_uuids || []);
 
+    // Pré-remplit le potentiel de jeu
+    const selectPotentiel = document.getElementById('joueur-profil-potentiel');
+    if (selectPotentiel) selectPotentiel.value = (d.potentiel_jeu !== null && d.potentiel_jeu !== undefined) ? d.potentiel_jeu : '';
+
     // Pré-remplit taille / poids
     const inputTaille = document.getElementById('joueur-profil-taille');
     const inputPoids  = document.getElementById('joueur-profil-poids');
@@ -1508,15 +1513,29 @@ window.JoueursBrowser = (function () {
     const container = document.getElementById('joueur-profil-aptitudes-grid');
     if (!container) return;
     const html = [];
-    APTITUDES_BY_ID.forEach((a, uuid) => {
-      const isActive = activeUuids.includes(uuid);
-      const couleur = a.couleur || '#888';
-      html.push(
-        `<label class="joueur-modal-apt-cell${isActive ? ' is-active' : ''}" data-apt-uuid="${esc(uuid)}">`
-        + `<input type="checkbox" ${isActive ? 'checked' : ''} class="joueur-modal-apt-checkbox">`
-        + `<span class="joueur-pill joueur-pill-apt" style="background:${esc(couleur)}">${esc(a.libelle_court || '?')}</span>`
-        + `</label>`
-      );
+    // Rendu groupé par catégorie (aptitudes.json v2.0). Repli sur grille plate
+    // si APTITUDES_CATEGORIES est vide (référentiel non chargé).
+    const groupes = (APTITUDES_CATEGORIES && APTITUDES_CATEGORIES.length > 0)
+      ? APTITUDES_CATEGORIES
+      : [{ code: '_', libelle: '', items: Array.from(APTITUDES_BY_ID.values()) }];
+    groupes.forEach(cat => {
+      if (!cat.items || cat.items.length === 0) return;
+      if (cat.libelle) {
+        html.push(`<div class="joueur-modal-apt-cat-titre">${esc(cat.libelle)}</div>`);
+      }
+      html.push('<div class="joueur-modal-apt-grid-groupe">');
+      cat.items.forEach(a => {
+        const uuid = a.uuid;
+        const isActive = activeUuids.includes(uuid);
+        const couleur = a.couleur || '#888';
+        html.push(
+          `<label class="joueur-modal-apt-cell${isActive ? ' is-active' : ''}" data-apt-uuid="${esc(uuid)}">`
+          + `<input type="checkbox" ${isActive ? 'checked' : ''} class="joueur-modal-apt-checkbox">`
+          + `<span class="joueur-pill joueur-pill-apt" style="background:${esc(couleur)}">${esc(a.libelle_court || '?')}</span>`
+          + `</label>`
+        );
+      });
+      html.push('</div>');
     });
     container.innerHTML = html.join('');
     // Toggle visuel au clic
@@ -1578,9 +1597,14 @@ window.JoueursBrowser = (function () {
       // Conversion kg → g pour la RPC (entier)
       const poidsG = poidsKgVal !== null ? Math.round(poidsKgVal * 1000) : null;
 
+      // Lecture potentiel de jeu
+      const selectPotentiel = document.getElementById('joueur-profil-potentiel');
+      const potentielVal = selectPotentiel ? selectPotentiel.value : '';
+
       const patch = {
         postes_uuids:    postesActifs,
         aptitudes_uuids: aptitudesActives,
+        potentiel_jeu:   potentielVal,
         taille_cm:       tailleVal,
         poids_g:         poidsG
       };
