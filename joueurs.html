@@ -1042,6 +1042,22 @@
     gap: 6px;
     margin-top: 4px;
   }
+  .joueur-modal-apt-cat-titre {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--vert-prairie);
+    margin: 10px 0 3px;
+  }
+  .joueur-modal-apt-cat-titre:first-child {
+    margin-top: 0;
+  }
+  .joueur-modal-apt-grid-groupe {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 6px;
+  }
   .joueur-modal-apt-cell {
     display: flex;
     align-items: center;
@@ -1390,7 +1406,22 @@
         <div class="joueur-form-group">
           <label class="joueur-form-label">Aptitudes · cochez celles qui s'appliquent</label>
           <div id="joueur-profil-aptitudes-grid" class="joueur-modal-apt-grid"></div>
-          <div class="joueur-form-hint">Catégorie A universelle + Catégorie B M14</div>
+          <div class="joueur-form-hint">Regroupées par catégorie : Profil de joueur, Secteur, Spécialités, Super Pouvoir, Leadership</div>
+        </div>
+
+        <div class="joueur-form-group">
+          <label class="joueur-form-label" for="joueur-profil-potentiel">Potentiel de jeu</label>
+          <select class="joueur-form-input" id="joueur-profil-potentiel" name="potentiel_jeu">
+            <option value="">— Non défini —</option>
+            <option value="National +">National +</option>
+            <option value="National">National</option>
+            <option value="Régional +">Régional +</option>
+            <option value="Régional">Régional</option>
+            <option value="Performance">Performance</option>
+            <option value="Développement">Développement</option>
+            <option value="Initiation">Initiation</option>
+          </select>
+          <div class="joueur-form-hint">Potentiel / cible du joueur (propriété durable, indépendante de l'équipe)</div>
         </div>
 
         <div class="joueur-form-group-row">
