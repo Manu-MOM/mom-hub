@@ -53,7 +53,37 @@
       liseroAv: [144, 216, 240], liseroAr: [240, 216, 0],
       logoKey: 'entente', filigraneKey: null, filigraneAlpha: 0.07, filigraneBright: 1.0,
       badge: { SAR: [144, 216, 240], MOM: [240, 216, 0], ASCS: [120, 170, 220] },
-      badgeTxt: [8, 28, 60]
+      badgeTxt: [8, 28, 60],
+      badgeLabel: null
+    },
+    // Entente Offload M16 — Nationale (logo 6 clubs) et Régionale (logo 4 clubs).
+    // Palette identique au thème 'entente' ; seuls le logo (logoKey) et le
+    // badge de niveau (badgeLabel) diffèrent.
+    entente_nat: {
+      bgTop: [6, 18, 42], bgBot: [2, 8, 22],
+      card: [18, 34, 64], card2: [14, 26, 50], staffBg: [6, 16, 40],
+      headL: [0, 40, 90], headR: [20, 70, 45], headTxt: [255, 255, 255],
+      headSub: [144, 216, 240],
+      accent: [40, 80, 130], jaune: [240, 216, 0], blanc: [255, 255, 255],
+      sub: [144, 216, 240], pied: [90, 110, 140],
+      liseroAv: [144, 216, 240], liseroAr: [240, 216, 0],
+      logoKey: 'entente_nat', filigraneKey: null, filigraneAlpha: 0.07, filigraneBright: 1.0,
+      badge: { SAR: [144, 216, 240], MOM: [240, 216, 0], ASCS: [120, 170, 220] },
+      badgeTxt: [8, 28, 60],
+      badgeLabel: 'NATIONALE'
+    },
+    entente_reg: {
+      bgTop: [6, 18, 42], bgBot: [2, 8, 22],
+      card: [18, 34, 64], card2: [14, 26, 50], staffBg: [6, 16, 40],
+      headL: [0, 40, 90], headR: [20, 70, 45], headTxt: [255, 255, 255],
+      headSub: [144, 216, 240],
+      accent: [40, 80, 130], jaune: [240, 216, 0], blanc: [255, 255, 255],
+      sub: [144, 216, 240], pied: [90, 110, 140],
+      liseroAv: [144, 216, 240], liseroAr: [240, 216, 0],
+      logoKey: 'entente_reg', filigraneKey: null, filigraneAlpha: 0.07, filigraneBright: 1.0,
+      badge: { SAR: [144, 216, 240], MOM: [240, 216, 0], ASCS: [120, 170, 220] },
+      badgeTxt: [8, 28, 60],
+      badgeLabel: 'RÉGIONALE'
     }
   };
 
@@ -125,6 +155,31 @@
     ctx.arcTo(x, y + h, x, y, r);
     ctx.arcTo(x, y, x + w, y, r);
     ctx.closePath();
+  }
+
+  // Badge de niveau (NATIONALE / RÉGIONALE) dessiné en haut à droite du header.
+  // Ne s'affiche que si le thème définit t.badgeLabel. rightEdge = bord droit
+  // du header (largeur canvas), hd = hauteur du bandeau header. fs = taille police.
+  function drawBadgeNiveau(ctx, t, rightEdge, hd, fs) {
+    if (!t.badgeLabel) return;
+    var label = t.badgeLabel;
+    ctx.font = font(fs, 700);
+    var padX = fs * 0.7, padY = fs * 0.45;
+    var tw = ctx.measureText(label).width;
+    var bw = tw + padX * 2, bh = fs + padY * 2;
+    var bx = rightEdge - bw - fs * 0.9;
+    var by = (hd - bh) / 2;
+    // pastille jaune, texte bleu marine (contraste fort sur header sombre)
+    ctx.fillStyle = rgb(t.jaune);
+    roundRect(ctx, bx, by, bw, bh, bh / 2);
+    ctx.fill();
+    ctx.fillStyle = rgb(t.badgeTxt);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, bx + bw / 2, by + bh / 2 + 1);
+    // reset des alignements pour ne pas perturber la suite du rendu
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
   }
 
   // ── Chargement d'images (logos) avec cache ───────────────────────────────
@@ -209,6 +264,7 @@
       ctx.fillText(data.meta1 || '', tx, 148);
       ctx.font = font(30, 500);
       ctx.fillText(data.meta2 || '', tx, 186);
+      drawBadgeNiveau(ctx, t, W, hd, 42);
 
       // 4) Titre de section
       var top = hd + 40;
@@ -451,6 +507,7 @@
       ctx.fillStyle = rgb(t.headSub); ctx.font = font(26, 500);
       var metaLine = [data.meta1, data.meta2].filter(Boolean).join('  ·  ');
       ctx.fillText(metaLine, tx + (data.sousTitre ? 150 : 0), 78);
+      drawBadgeNiveau(ctx, t, PW, hd, 34);
 
       // Géométrie 2 colonnes principales (gauche = liste, droite = terrain)
       var leftW = Math.round(PW * 0.52);
@@ -630,6 +687,8 @@
         '<div class="compo-export-tabs">' +
           '<button type="button" class="compo-export-vtab is-active" data-version="mom">Version MOM</button>' +
           '<button type="button" class="compo-export-vtab" data-version="entente">Version entente</button>' +
+          '<button type="button" class="compo-export-vtab" data-version="entente_nat">Entente M16 Nat</button>' +
+          '<button type="button" class="compo-export-vtab" data-version="entente_reg">Entente M16 Rég</button>' +
         '</div>' +
         '<div class="compo-export-tabs compo-export-ftabs">' +
           '<button type="button" class="compo-export-ftab is-active" data-format="vertical">Vertical</button>' +
