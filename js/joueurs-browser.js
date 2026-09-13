@@ -232,6 +232,31 @@ window.JoueursBrowser = (function () {
   const PROFIL_COLOR_STAFF = '#8b3a3a';        // rouge bordeaux
   const PROFIL_COLOR_AUTRE = '#5f6b75';        // gris ardoise
 
+  /**
+   * Couleur de bordure d'un club partenaire, dérivée de sa couleur
+   * d'affiliation distinctive (clubs.couleur_affiliation_distinctive,
+   * remontée par les RPC via club_principal_couleur_distinctive).
+   * Source unique en base : ajouter un club = renseigner sa couleur en
+   * base, aucune modification de ce fichier requise. La correspondance
+   * nom FR -> hex ci-dessous ne fait que traduire pour l'affichage.
+   */
+  const COULEUR_CLUB_HEX = {
+    'noir':   '#1a1a1a',
+    'rouge':  '#a4161a',
+    'bleu':   '#2e63a8',
+    'vert':   '#2D7D46',
+    'jaune':  '#c9a227',
+    'terre':  '#8a5a3a',
+    'gris':   '#5f6b75',
+    'blanc':  '#8a8f96'
+  };
+
+  /** Traduit un libellé couleur club (FR) en hex, ou null si inconnu. */
+  function couleurClubHex(libelle) {
+    if (!libelle) return null;
+    return COULEUR_CLUB_HEX[String(libelle).trim().toLowerCase()] || null;
+  }
+
   /** Labels profil pour l'UI */
   const PROFIL_LABELS = {
     mom: 'MOM régulier',
@@ -339,6 +364,11 @@ window.JoueursBrowser = (function () {
   /** Retourne la couleur de stripe selon profil + club provenance */
   function getProfilColor(j) {
     if (j.profil === 'partenaire') {
+      // Voie principale (source unique base) : couleur du club de
+      // rattachement, dispo dès le vivier sans affectation d'équipe.
+      const hex = couleurClubHex(j.club_principal_couleur_distinctive);
+      if (hex) return hex;
+      // Fallback historique (non-régression) : provenance équipe.
       const code = (j.ej_club_provenance_code || '').toUpperCase();
       if (code === 'ASCS') return PROFIL_COLOR_PARTENAIRE_ASCS;
       return PROFIL_COLOR_PARTENAIRE_SAR;  // default partenaire
