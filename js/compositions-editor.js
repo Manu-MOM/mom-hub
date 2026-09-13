@@ -4677,7 +4677,9 @@
       staff: staff,
       logos: {
         mom: 'assets/ecusson-mom.png',
-        entente: 'assets/logo-entente.png'
+        entente: 'assets/logo-entente.png',
+        entente_nat: 'assets/logo-entente-offload-nat.png',
+        entente_reg: 'assets/logo-entente-offload-reg.png'
       }
     };
   }
