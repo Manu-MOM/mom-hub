@@ -197,6 +197,20 @@
   }
 
   // Dessine une image en préservant son ratio, dans une boîte de hauteur h.
+  // Halo clair radial derrière un logo (améliore le contraste d'un logo
+  // sombre sur fond sombre). Dessiné AVANT le logo.
+  function drawHaloLogo(ctx, im, x, y, h) {
+    var ratio = im.width / im.height;
+    var w = Math.round(h * ratio);
+    var cx = x + w / 2, cy = y + h / 2, r = h * 0.62;
+    var g = ctx.createRadialGradient(cx, cy, r * 0.4, cx, cy, r);
+    g.addColorStop(0, 'rgba(240,244,247,0.92)');
+    g.addColorStop(1, 'rgba(240,244,247,0)');
+    ctx.save(); ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
   function drawImgH(ctx, im, x, y, h, alpha) {
     if (!im) return 0;
     var ratio = im.width / im.height;
@@ -250,7 +264,12 @@
       ctx.fillStyle = rgb(t.jaune); ctx.fillRect(0, hd - 5, W, 5);
 
       var logoW = 0;
-      if (logoHead) logoW = drawImgH(ctx, logoHead, 40, 28, 174);
+      if (logoHead) {
+        var _lhv = t.badgeLabel ? 220 : 174;
+        var _lyv = t.badgeLabel ? Math.round((230 - _lhv) / 2) : 28;
+        if (t.badgeLabel) drawHaloLogo(ctx, logoHead, 40, _lyv, _lhv);
+        logoW = drawImgH(ctx, logoHead, 40, _lyv, _lhv);
+      }
       var tx = 40 + (logoW || 0) + (logoW ? 45 : 0);
 
       ctx.fillStyle = rgb(t.headTxt);
@@ -496,7 +515,12 @@
       ctx.fillStyle = gh; ctx.fillRect(0, 0, PW, hd);
       ctx.fillStyle = rgb(t.jaune); ctx.fillRect(0, hd - 5, PW, 5);
       var logoW = 0;
-      if (logoHead) logoW = drawImgH(ctx, logoHead, 36, 20, 96);
+      if (logoHead) {
+        var _lh = t.badgeLabel ? 150 : 96;      // versions Offload : logo agrandi
+        var _ly = t.badgeLabel ? Math.round((hd - _lh) / 2) : 20;
+        if (t.badgeLabel) drawHaloLogo(ctx, logoHead, 36, _ly, _lh);
+        logoW = drawImgH(ctx, logoHead, 36, _ly, _lh);
+      }
       var tx = 36 + (logoW || 0) + (logoW ? 30 : 0);
       ctx.textBaseline = 'top';
       ctx.fillStyle = rgb(t.headTxt); ctx.font = font(46, 700);
@@ -630,8 +654,8 @@
       roundRect(ctx, tX0c, fieldY, tW, fieldH, 12); ctx.clip();
       // filigrane derrière le terrain — MOM gardé, ENTENTE réduit (retour terrain)
       if (filigrane) {
-        var frac = (version === 'mom') ? 0.70 : 0.46;   // entente réduit
-        var alph = (version === 'mom') ? 0.16 : 0.12;
+        var frac = (version === 'mom') ? 0.70 : (t.badgeLabel ? 0.62 : 0.46);
+        var alph = (version === 'mom') ? 0.16 : (t.badgeLabel ? 0.10 : 0.12);
         var ffh = Math.round(fieldH * frac);
         var ffw = Math.round(ffh * (filigrane.width / filigrane.height));
         drawImgH(ctx, filigrane, Math.round(tX0c + tW / 2 - ffw / 2),
