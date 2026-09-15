@@ -671,7 +671,7 @@ window.JoueursBrowser = (function () {
         <div class="joueur-card-stripe" style="background:${color}"></div>
         <div class="joueur-card-body">
           <div class="joueur-card-head">
-            <div class="joueur-card-avatar" style="background:${color}">${esc(init)}</div>
+            <div class="joueur-card-avatar" style="background:${color}" data-photo-avatar="${esc(j.id)}">${esc(init)}</div>
             ${renderCardFFRPastille(j)}
             <div class="joueur-card-identite">
               <div class="joueur-card-name">
@@ -698,6 +698,71 @@ window.JoueursBrowser = (function () {
   // ============================================================
   // RENDU LISTE + BINDING CLICS CARTES
   // ============================================================
+
+  // ============================================================
+  // PHOTOS JOUEURS (chantier photos M16) — affichage avec repli initiales
+  // ============================================================
+  /**
+   * Pose une photo (URL signée) dans un avatar cible sans détruire l'initiale :
+   * on superpose une <img> en position absolue. Si l'URL charge → visible ;
+   * si erreur de chargement → on retire l'img, l'initiale redevient visible
+   * (dégradation honnête). Ne fait rien si url falsy.
+   */
+  function _poserPhotoAvatar(avatarEl, url) {
+    if (!avatarEl || !url) return;
+    avatarEl.classList.add('has-photo');
+    const img = document.createElement('img');
+    img.className = 'joueur-avatar-img';
+    img.alt = '';
+    img.loading = 'lazy';
+    img.onerror = function () {
+      // Repli honnête : la photo ne charge pas → on nettoie, initiale conservée
+      img.remove();
+      avatarEl.classList.remove('has-photo');
+    };
+    img.src = url;
+    avatarEl.appendChild(img);
+  }
+
+  /**
+   * Charge en lot les URLs signées des photos pour les cartes actuellement
+   * rendues, puis les injecte. Filtre RGPD assuré côté serveur (RPC +
+   * policy storage) : seules les personnes avec droit+photo reviennent.
+   * Dégradation honnête : wrapper absent (socle < v1.78) ou Map vide → rien
+   * ne se passe, avatars en initiales.
+   */
+  async function _chargerPhotosCartes() {
+    if (typeof SupabaseHub === 'undefined'
+        || typeof SupabaseHub.getPhotosSignedUrls !== 'function') return;
+    const avatars = document.querySelectorAll('.joueur-card-avatar[data-photo-avatar]');
+    if (!avatars.length) return;
+    const ids = Array.from(avatars).map(a => a.getAttribute('data-photo-avatar'))
+                     .filter(Boolean);
+    if (!ids.length) return;
+    let urls;
+    try { urls = await SupabaseHub.getPhotosSignedUrls(ids); }
+    catch (e) { return; /* honnête : cartes en initiales */ }
+    if (!urls || !urls.size) return;
+    avatars.forEach(function (av) {
+      const url = urls.get(av.getAttribute('data-photo-avatar'));
+      if (url) _poserPhotoAvatar(av, url);
+    });
+  }
+
+  /**
+   * Charge la photo d'UNE fiche ouverte (unitaire). Même filtre RGPD serveur.
+   */
+  async function _chargerPhotoFiche(personneId) {
+    if (!personneId
+        || typeof SupabaseHub === 'undefined'
+        || typeof SupabaseHub.getPhotoSignedUrl !== 'function') return;
+    const av = document.querySelector('.joueur-fiche-avatar[data-photo-avatar="' + personneId + '"]');
+    if (!av) return;
+    let url;
+    try { url = await SupabaseHub.getPhotoSignedUrl(personneId); }
+    catch (e) { return; /* honnête : fiche en initiales */ }
+    if (url) _poserPhotoAvatar(av, url);
+  }
 
   function render() {
     const listEl = document.getElementById('joueur-list');
@@ -726,6 +791,7 @@ window.JoueursBrowser = (function () {
 
     listEl.innerHTML = filtered.map(renderCard).join('');
     bindCardClicks();
+    _chargerPhotosCartes(); // asynchrone, non bloquant ; repli initiales si absent
   }
 
   function bindCardClicks() {
@@ -845,6 +911,8 @@ window.JoueursBrowser = (function () {
       currentEditDetail = detail;
       renderFiche(detail);
       bindFicheActions();
+      _chargerPhotoFiche(detail.id); // asynchrone, non bloquant ; repli initiales
+
     } catch (err) {
       console.error('Joueurs: openFiche()', err);
       bodyEl.innerHTML = '<div class="joueur-fiche-error">Erreur de chargement : ' + esc(err.message || err) + '</div>';
@@ -918,7 +986,7 @@ window.JoueursBrowser = (function () {
     return `
       <div class="joueur-fiche-identite">
         <div class="joueur-fiche-identite-head">
-          <div class="joueur-fiche-avatar" style="background:${profilColor}">${esc(getInitiales(d))}</div>
+          <div class="joueur-fiche-avatar" style="background:${profilColor}" data-photo-avatar="${esc(d.id)}">${esc(getInitiales(d))}</div>
           <div class="joueur-fiche-identite-meta-block">
             <div class="joueur-fiche-identite-meta">${esc(PROFIL_LABELS[d.profil] || 'Autre')}</div>
             <div class="joueur-fiche-identite-secondaire">
