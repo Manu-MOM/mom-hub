@@ -4854,6 +4854,69 @@
     },
 
     /**
+     * PHOTOS-JOUEURS (chantier photos M16) — URL signée de la photo courante
+     * d'UNE personne, filtrée RGPD au niveau SQL.
+     *
+     * Chaîne : RPC get_photo_courante (SECURITY DEFINER, renvoie le path
+     * SEULEMENT si droit_image_photos_individuelles = true, NULL sinon) →
+     * createSignedUrl sur le bucket privé 'photos-joueurs' (la policy RLS
+     * storage.objects redouble le filtre : double verrou). Dégradation
+     * honnête : pas de droit / pas de photo / erreur → renvoie null, le
+     * front garde l'avatar en initiales.
+     * @param {string} personneId
+     * @returns {Promise<string|null>} URL signée (1h) ou null
+     */
+    async getPhotoSignedUrl(personneId) {
+      if (!personneId) return null;
+      try {
+        const { data: path, error } = await client.rpc('get_photo_courante', {
+          p_personne_id: personneId
+        });
+        if (error || !path) return null;
+        const { data: signed, error: sErr } = await client
+          .storage.from('photos-joueurs').createSignedUrl(path, 3600);
+        if (sErr || !signed) return null;
+        return signed.signedUrl || null;
+      } catch (e) {
+        console.warn('MOM Hub: getPhotoSignedUrl()', e);
+        return null;
+      }
+    },
+
+    /**
+     * PHOTOS-JOUEURS (chantier photos M16) — URLs signées pour un LOT de
+     * personnes (listing), même filtre RGPD. Renvoie une Map(personne_id → url)
+     * ne contenant QUE les personnes ayant droit + photo (les autres absentes
+     * → repli initiales côté front). Dégradation honnête : [] ou erreur → Map
+     * vide.
+     * @param {string[]} ids
+     * @returns {Promise<Map<string,string>>}
+     */
+    async getPhotosSignedUrls(ids) {
+      const out = new Map();
+      if (!Array.isArray(ids) || ids.length === 0) return out;
+      try {
+        const { data, error } = await client.rpc('get_photos_courantes', {
+          p_ids: ids
+        });
+        if (error || !Array.isArray(data) || data.length === 0) return out;
+        await Promise.all(data.map(async function (row) {
+          if (!row || !row.personne_id || !row.path) return;
+          try {
+            const { data: signed, error: sErr } = await client
+              .storage.from('photos-joueurs').createSignedUrl(row.path, 3600);
+            if (!sErr && signed && signed.signedUrl) {
+              out.set(row.personne_id, signed.signedUrl);
+            }
+          } catch (e) { /* honnête : cette photo absente de la Map */ }
+        }));
+      } catch (e) {
+        console.warn('MOM Hub: getPhotosSignedUrls()', e);
+      }
+      return out;
+    },
+
+    /**
      * Met à jour les champs métier d'une fiche joueur via RPC partial-patch.
      * (RPC : update_joueur_metier — sql/34-fix v1.1, dette audit C10-J-j)
      *
@@ -8940,7 +9003,7 @@
   }
 
   console.log(
-    '%c🏉 MOM Hub · Supabase Client v1.77 chargé',
+    '%c🏉 MOM Hub · Supabase Client v1.78 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
