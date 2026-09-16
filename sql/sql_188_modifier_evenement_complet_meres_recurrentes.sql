@@ -59,6 +59,7 @@ DECLARE
   v_phase_id              UUID;
   v_engagement            JSONB;
   v_adversaire            JSONB;
+  v_adv_row               RECORD;  -- voie A : ligne evenement_adversaires (matérialisation plateau)
   v_phase_block           JSONB;
   v_phase                 JSONB;
   v_match                 JSONB;
@@ -216,6 +217,55 @@ BEGIN
             v_adversaire->>'adversaire_nom',
             NULLIF(v_adversaire->>'ordre', '')::integer,
             v_adversaire->>'notes'
+          );
+        END LOOP;
+      END IF;
+
+      -- (5b) MATÉRIALISATION PLATEAU (voie A, option 1 actée Manu).
+      --   PROBLÈME : un plateau stocke ses adversaires en M5
+      --   (evenement_adversaires) et ne crée AUCUN événement match enfant.
+      --   Or les onglets compo (listMatchsDeLequipe) ne reconnaissent un
+      --   match que comme une LIGNE evenements enfant portant adversaire_nom
+      --   + equipe_id = l'équipe engagée. Conséquence : un plateau n'a jamais
+      --   d'onglets compo, et le « + » libre ne peut créer qu'UNE feuille
+      --   (toutes partagent evenement_id = racine, bloquées par l'index
+      --   unique idx_compositions_active_match_per_base_cote — cf. sql/54).
+      --   CORRECTIF : pour un plateau UNIQUEMENT, on projette chaque
+      --   adversaire M5 en un match enfant (evenement_parent_id = racine,
+      --   equipe_id = l'équipe engagée, adversaire_nom posé), exactement
+      --   comme le bloc phases (6) matérialise les matchs d'un tournoi.
+      --   MODÈLE (option 1) : M5 reste la SOURCE ; l'enfant est une
+      --   PROJECTION régénérée à chaque modif. Sûr : l'étape 4 a supprimé
+      --   tous les enfants de la racine avant cette boucle, donc aucun
+      --   doublon. Patron INSERT identique à l'INSERT match du bloc (6)
+      --   (colonnes reprises de sql_171), evenement_parent_id = racine
+      --   (pas de phase intermédiaire), ordre_dans_phase = ordre M5.
+      --   Garde : p_type_competition = 'plateau' — les autres sous-types
+      --   multi-équipes (match_amical/championnat) gardent leur modèle,
+      --   les sous-types à phases matérialisent déjà via le bloc (6).
+      IF p_type_competition = 'plateau' THEN
+        v_match_ordre := 0;
+        FOR v_adv_row IN
+          SELECT * FROM public.evenement_adversaires
+          WHERE evenement_equipe_id = v_evenement_equipe_id
+          ORDER BY ordre NULLS LAST, date_creation
+        LOOP
+          v_match_ordre := v_match_ordre + 1;
+          v_match_code  := v_code || '-PLAT-' || v_equipe_id_for_phase::text
+                        || '-M' || v_match_ordre::text;
+          INSERT INTO public.evenements (
+            code, libelle, type_evenement, type_competition,
+            equipe_id, categorie_id, saison_id, format_de_jeu,
+            date_debut, organisateur_principal_id,
+            evenement_parent_id, ordre_dans_phase, adversaire_nom
+          ) VALUES (
+            v_match_code,
+            'vs ' || COALESCE(v_adv_row.adversaire_nom, 'Adversaire'),
+            'competition', p_type_competition,
+            v_equipe_id_for_phase, v_categorie_id, v_saison_id,
+            p_format_de_jeu,
+            p_date_debut, v_organisateur_id,
+            p_evenement_id, v_adv_row.ordre, v_adv_row.adversaire_nom
           );
         END LOOP;
       END IF;
