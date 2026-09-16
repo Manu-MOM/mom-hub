@@ -5327,6 +5327,21 @@
         const _eqs = await SupabaseHub.getEquipesEngagees(evtId);
         evt._equipesEngagees = Array.isArray(_eqs) ? _eqs : [];
       }
+      // EVT-ADV-EDITION-READBACK (préalable) — recharge AUSSI les adversaires
+      //   M5 sur `evt`. Motif identique aux équipes engagées ci-dessus : l'objet
+      //   `evt` vient des LISTINGS (get_evenements_a_venir/passes) qui ne portent
+      //   PAS `_adversaires` ; seul openFiche le peuplait, or l'édition NE passe
+      //   pas toujours par une fiche encore en cache. Sans ce rechargement,
+      //   evt._adversaires est undefined à l'édition → le readback de
+      //   réhydratation (plus bas, dans le _waitFor) ne s'exécute jamais et les
+      //   champs adversaires restent vides. Source getAdversairesEvenement
+      //   (equipe_id, adversaire_nom, ordre, notes). Non bloquant : échec = [].
+      if (evt.type_evenement === 'competition'
+          && window.SupabaseHub
+          && typeof SupabaseHub.getAdversairesEvenement === 'function') {
+        const _advs = await SupabaseHub.getAdversairesEvenement(evtId);
+        evt._adversaires = Array.isArray(_advs) ? _advs : [];
+      }
     } catch (e) {
       console.error('MOM Hub: openModalEditComplet() read-back', e);
     }
@@ -5504,6 +5519,89 @@
           if (_mjGroup2)  _mjGroup2.style.display = '';
         }
         updateMultiEquipesUI();   // construit l'éditeur de phases par équipe
+
+        // EVT-ADV-EDITION-READBACK — RÉHYDRATATION des adversaires à l'ÉDITION,
+        //   patron SYMÉTRIQUE du format (boucle _eqEng ci-dessus) et des phases
+        //   (_prefillPhasesEditor ci-dessous). buildAdvParEquipeLines construit
+        //   TOUJOURS des champs adversaire VIDES (départ création, D-PROD-1) ;
+        //   aucun code ne reposait les adversaires DÉJÀ ENREGISTRÉS
+        //   (evt._adversaires, source getAdversairesEvenement : clés equipe_id,
+        //   adversaire_nom, ordre, notes). Un 1er correctif posé DANS
+        //   buildAdvParEquipeLines échouait : cette fonction tourne plusieurs
+        //   fois dont AVANT le cochage des équipes → réhydratation au mauvais
+        //   moment du cycle de vie. On la déplace ICI, dans le _waitFor d'édition
+        //   APRÈS cochage, comme le format — les cases sont garanties cochées et
+        //   les lignes .evt-eng-adv-row construites (poll sur leur présence).
+        //   Conséquence terrain (plateau CRIG 19/09, 2 adversaires) : sans ce
+        //   readback, les champs partaient VIDES → le submit lisait du vide → la
+        //   RPC modifier_evenement_complet (DELETE des adversaires M5 puis
+        //   réinsertion du seul payload) perdait TOUS les adversaires, qui
+        //   disparaissaient de la fiche.
+        //   Variante plateau : nom de poule (notes M3) → .evt-eng-poule-input ;
+        //   N adversaires → 1re ligne existante + insertion des suivantes via le
+        //   MÊME _advRowHtml que le bouton « + Adversaire » (bindAdvEditor).
+        //   Variante match simple : 1 adversaire/équipe → l'unique input.
+        //   Source des noms : evt._adversaires (equipe_id + adversaire_nom).
+        //   STRICTEMENT NON BLOQUANT : absence de données → champs vides.
+        if (Array.isArray(evt._adversaires) && evt._adversaires.length > 0) {
+          _waitFor(function () {
+            const w = document.getElementById('evt-create-adv-par-equipe-lines');
+            return w && w.querySelectorAll('.evt-eng-adv-row').length > 0;
+          }, function () {
+            const wrapAdv = document.getElementById('evt-create-adv-par-equipe-lines');
+            if (!wrapAdv) return;
+            // Regroupement par equipe_id, ordre préservé (source déjà triée
+            // par getAdversairesEvenement : ORDER BY ordre).
+            const advByEq = {};
+            evt._adversaires.forEach(function (a) {
+              if (!a || !a.equipe_id) return;
+              if (!advByEq[a.equipe_id]) advByEq[a.equipe_id] = [];
+              advByEq[a.equipe_id].push(a);
+            });
+            Object.keys(advByEq).forEach(function (eqId) {
+              const list = advByEq[eqId];
+              const row = wrapAdv.querySelector(
+                '.evt-eng-adv-row[data-equipe-id="' + eqId + '"]');
+              if (!row) return;
+
+              // Nom de poule (notes M3) : 1re valeur non vide de l'équipe.
+              const pouleInput = row.querySelector('.evt-eng-poule-input');
+              if (pouleInput) {
+                for (let k = 0; k < list.length; k++) {
+                  if (list[k].notes && String(list[k].notes).trim()) {
+                    pouleInput.value = String(list[k].notes).trim();
+                    break;
+                  }
+                }
+              }
+
+              const listBox = row.querySelector('.evt-eng-adv-list');
+              if (listBox) {
+                // Variante plateau (liste empilable). On garantit autant de
+                // lignes .evt-eng-adv-item que d'adversaires, en réutilisant le
+                // MÊME HTML que le bouton « + Adversaire » (_advRowHtml), puis
+                // on pose les valeurs dans l'ordre.
+                list.forEach(function (adv, i) {
+                  let items = listBox.querySelectorAll('.evt-eng-adv-item');
+                  if (i >= items.length) {
+                    const tmp = document.createElement('div');
+                    tmp.innerHTML = _advRowHtml(i + 1);
+                    listBox.appendChild(tmp.firstChild);
+                    items = listBox.querySelectorAll('.evt-eng-adv-item');
+                  }
+                  const inp = items[i]
+                    ? items[i].querySelector('.evt-eng-adv-input') : null;
+                  if (inp) inp.value = adv.adversaire_nom || '';
+                });
+              } else {
+                // Variante match simple : 1 adversaire/équipe → 1er non vide.
+                const inpM = row.querySelector('.evt-eng-adv-input');
+                if (inpM) inpM.value = (list[0] && list[0].adversaire_nom) || '';
+              }
+            });
+          });
+        }
+
         // 2) Attendre que les blocs équipe soient construits, puis pré-remplir.
         _waitFor(function () {
           const w = document.getElementById('evt-create-phases-par-equipe-list');
@@ -6070,83 +6168,6 @@
     }).join('');
     wrap.innerHTML = html;
     if (isPlateau) bindAdvEditor();
-
-    // EVT-ADV-EDITION-READBACK — RÉHYDRATATION des adversaires à l'ÉDITION.
-    //   Symétrique du bloc EVT-FORMAT-EDITION-READBACK (format par équipe) :
-    //   buildAdvParEquipeLines construit TOUJOURS des champs adversaire VIDES
-    //   (départ création, D-PROD-1). En ÉDITION, aucun code ne reposait les
-    //   adversaires DÉJÀ ENREGISTRÉS (evt._adversaires, chargé par openFiche,
-    //   d'où part TOUJOURS l'édition : closeFiche(); openModalEditComplet(id)).
-    //   Conséquence terrain (match amical CRIG 19/09 passé en plateau, 3e
-    //   équipe) : au ré-enregistrement, le champ de la 1re équipe repartait
-    //   VIDE → la RPC modifier_evenement_complet (DELETE des adversaires puis
-    //   réinsertion du seul payload) perdait l'adversaire d'origine, et les
-    //   matchs enfants recréés depuis ce payload amputé ne peuplaient plus les
-    //   onglets compo. Même mécanisme silencieux que la perte de format.
-    //   Correctif : en mode édition (MODAL_CREATE_EDIT_ID posé), on relit
-    //   evt._adversaires (clés equipe_id, adversaire_nom, ordre, notes ; source
-    //   getAdversairesEvenement), groupé par equipe_id, et on repose les
-    //   valeurs dans les .evt-eng-adv-input de la ligne data-equipe-id.
-    //     • variante plateau : 1re valeur dans la ligne existante, puis
-    //       simulation du bouton « + Adversaire » (add-adv) pour les suivantes,
-    //       via le MÊME chemin que la saisie manuelle (aucun HTML dupliqué) ;
-    //       nom de poule (notes M3) → .evt-eng-poule-input.
-    //     • variante match simple : l'unique .evt-eng-adv-input reçoit le 1er
-    //       adversaire (structure = 1 adv/équipe).
-    //   STRICTEMENT NON BLOQUANT : absence de evt/_adversaires → champs vides
-    //   (état création honnête), jamais de faux. Ordre respecté (ordre asc,
-    //   déjà trié par getAdversairesEvenement).
-    if (typeof MODAL_CREATE_EDIT_ID !== 'undefined' && MODAL_CREATE_EDIT_ID) {
-      var _evtEdit = (typeof EVENTS_BY_ID !== 'undefined')
-        ? EVENTS_BY_ID[MODAL_CREATE_EDIT_ID] : null;
-      var _advStored = (_evtEdit && Array.isArray(_evtEdit._adversaires))
-        ? _evtEdit._adversaires : [];
-      if (_advStored.length > 0) {
-        // Regroupement par equipe_id, ordre préservé (source déjà triée).
-        var _advByEquipe = {};
-        _advStored.forEach(function (a) {
-          if (!a || !a.equipe_id) return;
-          if (!_advByEquipe[a.equipe_id]) _advByEquipe[a.equipe_id] = [];
-          _advByEquipe[a.equipe_id].push(a);
-        });
-        Object.keys(_advByEquipe).forEach(function (eqId) {
-          var list = _advByEquipe[eqId];
-          var row = wrap.querySelector(
-            '.evt-eng-adv-row[data-equipe-id="' + eqId + '"]');
-          if (!row) return;
-
-          if (isPlateau) {
-            // Nom de poule (notes M3) : 1re valeur non vide rencontrée.
-            var pouleInput = row.querySelector('.evt-eng-poule-input');
-            var pouleVal = null;
-            for (var k = 0; k < list.length; k++) {
-              if (list[k].notes && String(list[k].notes).trim()) {
-                pouleVal = String(list[k].notes).trim(); break;
-              }
-            }
-            if (pouleInput && pouleVal) pouleInput.value = pouleVal;
-
-            var listBox = row.querySelector('.evt-eng-adv-list');
-            var addBtn  = row.querySelector('[data-action="add-adv"]');
-            if (!listBox) return;
-            list.forEach(function (adv, i) {
-              // La 1re ligne existe déjà (_advRowHtml(1)) ; pour les
-              // suivantes, on déclenche le MÊME chemin que « + Adversaire »
-              // (add-adv) afin de ne dupliquer aucun HTML.
-              if (i > 0 && addBtn) addBtn.click();
-              var items = listBox.querySelectorAll('.evt-eng-adv-item');
-              var item  = items[i];
-              var inp   = item ? item.querySelector('.evt-eng-adv-input') : null;
-              if (inp) inp.value = adv.adversaire_nom || '';
-            });
-          } else {
-            // Variante match simple : 1 adversaire/équipe → 1er non vide.
-            var inpM = row.querySelector('.evt-eng-adv-input');
-            if (inpM) inpM.value = (list[0] && list[0].adversaire_nom) || '';
-          }
-        });
-      }
-    }
   }
 
   /**
