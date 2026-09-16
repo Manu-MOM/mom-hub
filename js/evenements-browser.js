@@ -5564,13 +5564,28 @@
                 '.evt-eng-adv-row[data-equipe-id="' + eqId + '"]');
               if (!row) return;
 
-              // Nom de poule (notes M3) : 1re valeur non vide de l'équipe.
+              // Nom de poule (notes M3) — POULE-EDITION-READBACK-SOURCE :
+              //   le nom de poule est porté par le M3 (evenement_equipes_engagees
+              //   .notes), PAS par le M5 (evenement_adversaires.notes, toujours
+              //   vide). L'ancien readback lisait list[k].notes (M5) → le champ
+              //   poule repartait TOUJOURS vide à l'édition, et le submit
+              //   réécrivait donc une poule vide (perte silencieuse). On lit
+              //   désormais le notes du M3 de cette équipe (_eqEng, déjà chargé
+              //   par getEquipesEngagees dont le SELECT porte 'notes'). Fallback
+              //   M5 conservé (robustesse : ancien enregistrement éventuel).
               const pouleInput = row.querySelector('.evt-eng-poule-input');
               if (pouleInput) {
-                for (let k = 0; k < list.length; k++) {
-                  if (list[k].notes && String(list[k].notes).trim()) {
-                    pouleInput.value = String(list[k].notes).trim();
-                    break;
+                const _m3 = _eqEng.find(function (x) {
+                  return x && x.equipe_id === eqId;
+                });
+                if (_m3 && _m3.notes && String(_m3.notes).trim()) {
+                  pouleInput.value = String(_m3.notes).trim();
+                } else {
+                  for (let k = 0; k < list.length; k++) {
+                    if (list[k].notes && String(list[k].notes).trim()) {
+                      pouleInput.value = String(list[k].notes).trim();
+                      break;
+                    }
                   }
                 }
               }
