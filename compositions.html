@@ -714,7 +714,7 @@
     }
     .slot__bench:hover { background: var(--vert-light); color: var(--vert-prairie); border-color: var(--vert-prairie); }
 
-    /* Bouton capitaine « C » : neutre par défaut, jaune actif si désigné. */
+    /* Bouton capitaine « C » (vue liste) : neutre par défaut, jaune actif si désigné. */
     .slot__capitaine {
       background: transparent; border: 1px solid var(--line); color: var(--ink-mute);
       font-size: 12px; font-weight: 700; font-family: 'JetBrains Mono', monospace;
@@ -723,8 +723,8 @@
     }
     .slot__capitaine:hover { border-color: #b8860b; color: #b8860b; }
     .slot__capitaine.is-capitaine {
-      background: #F0D800; border-color: #b8860b; color: #0E1A32;
-      box-shadow: 0 0 0 2px rgba(240, 216, 0, 0.25);
+      background: #f5c518; border-color: #b8860b; color: #0d2b4e;
+      box-shadow: 0 0 0 2px rgba(245,197,24,0.25);
     }
 
     /* Popover Picker */
@@ -848,6 +848,15 @@
       max-width: 110px; line-height: 1.2;
       overflow-wrap: anywhere; word-break: break-word;
       text-shadow: 0 1px 2px rgba(0,0,0,0.65);
+    }
+    /* Badge capitaine « C » sur le terrain : pastille jaune en coin du disque. */
+    .vt-mark__capitaine {
+      position: absolute; top: 12px; left: 50%; margin-left: 12px;
+      width: 22px; height: 22px; border-radius: 50%;
+      background: #f5c518; border: 2px solid #fff; color: #0d2b4e;
+      font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 13px;
+      display: flex; align-items: center; justify-content: center; line-height: 1;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.5); z-index: 2;
     }
     .vt-mark--vide { opacity: 0.55; }
     .vt-mark--vide .vt-mark__disc { border-style: dashed; background: rgba(13,43,78,0.5); }
