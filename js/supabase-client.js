@@ -3077,7 +3077,7 @@
           .select(`
             id, composition_id, joueur_id, poste_id, numero_maillot,
             role, ordre_remplacement, est_depannage_hors_categorie,
-            etat_joueur, notes_joueur, created_at,
+            etat_joueur, notes_joueur, created_at, est_capitaine,
             personnes ( id, nom, prenom, sexe, date_naissance,
                         categorie_id, club_principal_id, f15_integree )
           `)
@@ -3457,6 +3457,30 @@
         return { ok: false, error: 'etat invalide (base/modifie/independant/blesse)' };
       }
       return this.updateJoueurCompo(compoJoueurId, { etat_joueur: etat });
+    },
+
+    /**
+     * Désigne le capitaine d'une composition (versions Offload notamment).
+     * Chaîne : RPC definir_capitaine (SECURITY DEFINER, atomique : retire
+     * l'ancien capitaine + pose le nouveau, garde de droit interne répliquant
+     * la policy UPDATE, refuse si le joueur n'est pas titulaire de la compo).
+     * @param {string} compoId
+     * @param {string} compoJoueurId  ligne composition_joueurs à promouvoir
+     * @returns {Promise<{ok:boolean, error?:string}>}
+     */
+    async definirCapitaine(compoId, compoJoueurId) {
+      if (!compoId || !compoJoueurId) {
+        return { ok: false, error: 'compoId et compoJoueurId requis' };
+      }
+      const { error } = await client.rpc('definir_capitaine', {
+        p_composition_id: compoId,
+        p_compo_joueur_id: compoJoueurId
+      });
+      if (error) {
+        console.error('MOM Hub: definirCapitaine()', error);
+        return { ok: false, error: error.message };
+      }
+      return { ok: true };
     },
 
     /**
