@@ -5056,6 +5056,80 @@
     _bindHabillageToggle(el.querySelector('.view-terrain'), function () {
       renderEditorTerrain(el, compo);
     });
+    // PHOTOS-JOUEURS (2e temps terrain) — surcouche photo async, additive.
+    // Le rendu ci-dessus reste synchrone (numéros affichés d'emblée, DnD intact) ;
+    // on remplace ensuite les disques/pastilles des joueurs à droit RGPD + photo.
+    _injecterPhotosTerrain(el);
+  }
+
+  /**
+   * PHOTOS-JOUEURS (2e temps terrain) — après le rendu synchrone de la vue
+   * terrain, remplace le disque numéroté par la photo du joueur (variante C :
+   * le numéro migre dans l'étiquette de poste « N · Libellé »). Le banc reçoit
+   * la même photo ronde dans sa pastille. RGPD REJOUÉ : passe par le wrapper
+   * getPhotosSignedUrls → RPC get_photos_courantes (filtre droit_image = true) ;
+   * la Map ne contient QUE les ayants-droit avec photo, les autres restent en
+   * numéro (repli honnête). data-joueur-id = personne_id (cf. mapping export
+   * uuid:cj.joueur_id). Un seul appel batch pour tout le lot (terrain + banc).
+   * Dégradation honnête : pas de SupabaseHub / erreur / Map vide → aucun DOM
+   * touché, la vue garde ses numéros.
+   * @param {HTMLElement} el conteneur de la vue terrain déjà rendue
+   */
+  async function _injecterPhotosTerrain(el) {
+    try {
+      if (!el || !window.SupabaseHub || !SupabaseHub.getPhotosSignedUrls) return;
+      var marques = Array.prototype.slice.call(
+        el.querySelectorAll('[data-joueur-id]'));
+      if (!marques.length) return;
+      var ids = [];
+      marques.forEach(function (m) {
+        var id = m.getAttribute('data-joueur-id');
+        if (id && ids.indexOf(id) === -1) ids.push(id);
+      });
+      if (!ids.length) return;
+      var mapPhotos = await SupabaseHub.getPhotosSignedUrls(ids);
+      if (!mapPhotos || !mapPhotos.size) return;
+      marques.forEach(function (m) {
+        var id = m.getAttribute('data-joueur-id');
+        if (!id || !mapPhotos.has(id)) return; // pas de droit / pas de photo → numéro conservé
+        var url = mapPhotos.get(id);
+        if (!url) return;
+        if (m.classList.contains('vt-mark')) {
+          // Terrain : photo dans le disque + numéro basculé dans l'étiquette de poste.
+          var disc = m.querySelector('.vt-mark__disc');
+          var poste = m.querySelector('.vt-mark__poste');
+          if (!disc) return;
+          var numSpan = disc.querySelector('.vt-mark__num');
+          var num = numSpan ? (numSpan.textContent || '').trim() : '';
+          var img = document.createElement('img');
+          img.className = 'vt-mark__photo';
+          img.src = url;
+          img.alt = '';
+          img.loading = 'lazy';
+          disc.classList.add('vt-mark__disc--photo');
+          disc.textContent = '';
+          disc.appendChild(img);
+          if (poste && num) {
+            var libelle = (poste.textContent || '').trim();
+            poste.textContent = num + ' · ' + libelle;
+          }
+        } else if (m.classList.contains('vt-bench-item')) {
+          // Banc : photo ronde dans la pastille (le numéro y reste implicite via le titre).
+          var pastille = m.querySelector('.vt-bench-item__num');
+          if (!pastille) return;
+          var bimg = document.createElement('img');
+          bimg.className = 'vt-bench-item__photo';
+          bimg.src = url;
+          bimg.alt = '';
+          bimg.loading = 'lazy';
+          pastille.classList.add('vt-bench-item__num--photo');
+          pastille.textContent = '';
+          pastille.appendChild(bimg);
+        }
+      });
+    } catch (err) {
+      console.warn('MOM Hub: injection photos terrain échouée (non bloquant)', err);
+    }
   }
 
   // v3.18 — câblage drag & drop du terrain. Source = pastilles draggables
