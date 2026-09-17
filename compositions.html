@@ -714,6 +714,19 @@
     }
     .slot__bench:hover { background: var(--vert-light); color: var(--vert-prairie); border-color: var(--vert-prairie); }
 
+    /* Bouton capitaine « C » : neutre par défaut, jaune actif si désigné. */
+    .slot__capitaine {
+      background: transparent; border: 1px solid var(--line); color: var(--ink-mute);
+      font-size: 12px; font-weight: 700; font-family: 'JetBrains Mono', monospace;
+      width: 22px; height: 22px; padding: 0; border-radius: 50%; cursor: pointer;
+      line-height: 1; text-align: center; transition: all 0.1s; margin-right: 4px;
+    }
+    .slot__capitaine:hover { border-color: #b8860b; color: #b8860b; }
+    .slot__capitaine.is-capitaine {
+      background: #F0D800; border-color: #b8860b; color: #0E1A32;
+      box-shadow: 0 0 0 2px rgba(240, 216, 0, 0.25);
+    }
+
     /* Popover Picker */
     .popover-root {
       position: fixed; inset: 0; pointer-events: none; z-index: 100; display: none;
