@@ -40,6 +40,7 @@ DECLARE
   v_collectif_membre_id   UUID;
   v_engagement            JSONB;
   v_adversaire            JSONB;
+  v_adv_row               RECORD;    -- voie A : ligne evenement_adversaires (matérialisation plateau)
   v_phase_block           JSONB;
   v_phase                 JSONB;
   v_match                 JSONB;
@@ -140,6 +141,45 @@ BEGIN
           ) VALUES (
             v_evenement_equipe_id, v_adversaire->>'adversaire_nom',
             NULLIF(v_adversaire->>'ordre', '')::integer, v_adversaire->>'notes');
+        END LOOP;
+      END IF;
+
+      -- (3b) MATÉRIALISATION PLATEAU (voie A, option 1 actée Manu) — symétrique
+      --   de sql_188 (5b). Un plateau stocke ses adversaires en M5 et ne crée
+      --   aucun match enfant ; or les onglets compo (listMatchsDeLequipe) ne
+      --   reconnaissent un match que comme une LIGNE evenements enfant portant
+      --   adversaire_nom + equipe_id = l'équipe engagée. On projette donc, à la
+      --   CRÉATION d'un plateau, chaque adversaire M5 en un match enfant
+      --   (evenement_parent_id = racine, equipe_id = l'équipe engagée), comme
+      --   le bloc (4) matérialise les matchs d'un tournoi. M5 reste la SOURCE ;
+      --   l'enfant est une projection (régénérée par sql_188 à chaque modif).
+      --   Garde : p_type_competition = 'plateau'. Patron INSERT repris du
+      --   bloc (4) matchs. Valeurs de la racine = paramètres (p_code, p_saison_id,
+      --   p_organisateur_principal_id, p_format_de_jeu) + v_categorie_id résolue.
+      IF p_type_competition = 'plateau' THEN
+        v_match_ordre := 0;
+        FOR v_adv_row IN
+          SELECT * FROM public.evenement_adversaires
+          WHERE evenement_equipe_id = v_evenement_equipe_id
+          ORDER BY ordre NULLS LAST, date_creation
+        LOOP
+          v_match_ordre := v_match_ordre + 1;
+          v_match_code  := p_code || '-PLAT-' || (v_engagement->>'equipe_id')
+                        || '-M' || v_match_ordre::text;
+          INSERT INTO public.evenements (
+            code, libelle, type_evenement, type_competition,
+            equipe_id, categorie_id, saison_id, format_de_jeu,
+            date_debut, organisateur_principal_id,
+            evenement_parent_id, ordre_dans_phase, adversaire_nom
+          ) VALUES (
+            v_match_code,
+            'vs ' || COALESCE(v_adv_row.adversaire_nom, 'Adversaire'),
+            'competition', p_type_competition,
+            (v_engagement->>'equipe_id')::uuid, v_categorie_id, p_saison_id,
+            p_format_de_jeu,
+            p_date_debut, p_organisateur_principal_id,
+            v_evenement_id, v_adv_row.ordre, v_adv_row.adversaire_nom
+          );
         END LOOP;
       END IF;
     END LOOP;
