@@ -4607,12 +4607,14 @@
         return {
           num: (cj.numero_maillot != null ? cj.numero_maillot : (p.numero_xv || '')),
           ordre: p.numero_xv || 99,
+          uuid: cj.joueur_id || null,
           nom: (j.nom || '').trim(),
           prenom: (j.prenom || '').trim(),
           poste: (p.libelle_long || p.libelle_court || p.code || ''),
           code: (p.code || ''),
           club: (j.club_principal_nom_court || '').toUpperCase(),
-          ligne: _ligneDePoste(p)
+          ligne: _ligneDePoste(p),
+          photoUrl: null
         };
       })
       .sort(function (a, b) { return a.ordre - b.ordre; });
@@ -4665,8 +4667,28 @@
       staff = [];
     }
 
+    // Photos titulaires (versions Offload). Chaîne RGPD-safe : getPhotosSignedUrls
+    // renvoie une Map ne contenant QUE les joueurs ayant droit + photo. Les autres
+    // restent photoUrl=null → repli initiales côté rendu. Dégradation honnête :
+    // pas de SupabaseHub / erreur → aucune photo, l'export bascule tout en initiales.
+    try {
+      if (window.SupabaseHub && SupabaseHub.getPhotosSignedUrls) {
+        var idsPhotos = tit.map(function (t) { return t.uuid; })
+                           .filter(function (u) { return !!u; });
+        if (idsPhotos.length) {
+          var mapPhotos = await SupabaseHub.getPhotosSignedUrls(idsPhotos);
+          if (mapPhotos && mapPhotos.size) {
+            tit.forEach(function (t) {
+              if (t.uuid && mapPhotos.has(t.uuid)) t.photoUrl = mapPhotos.get(t.uuid);
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('MOM Hub: collecte photos export échouée (non bloquant)', err);
+    }
+
     return {
-      titre: titre.toUpperCase(),
       sousTitre: sousTitre,
       meta1: meta1,
       meta2: meta2,
