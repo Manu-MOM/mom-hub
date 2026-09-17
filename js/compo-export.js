@@ -815,8 +815,8 @@
         ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
         ctx.restore();
 
-        // capitaine (poste N°8 => num 8, ou flag data)
-        if (j.capitaine === true || String(num) === '8') {
+        // capitaine (flag réel issu de composition_joueurs.est_capitaine)
+        if (j.capitaine === true) {
           ctx.save();
           ctx.fillStyle = 'rgb(192,57,43)';
           ctx.beginPath(); ctx.arc(x + cw - 44, y + 44, 26, 0, Math.PI * 2); ctx.fill();
