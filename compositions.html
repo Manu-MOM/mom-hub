@@ -859,6 +859,17 @@
     .vt-mark.etat-independant .vt-mark__disc { border-color: var(--vert-prairie); }
     .vt-mark.etat-blesse      .vt-mark__disc { border-color: var(--rouge-blesse); }
 
+    /* PHOTOS-JOUEURS (2e temps terrain) — variante C : la photo REMPLIT le
+       disque (bordure or conservée), le numéro migre dans l'étiquette de poste
+       (« N · Libellé », injectée en JS). Filtre RGPD rejoué côté RPC ; sans
+       droit / sans photo → le disque garde le numéro (aucune de ces règles ne
+       s'applique). L'img à 100% s'adapte aux 3 tailles de disque (54/46/34px). */
+    .vt-mark__disc--photo { background: transparent; padding: 0; overflow: hidden; }
+    .vt-mark__photo {
+      width: 100%; height: 100%; border-radius: 50%;
+      object-fit: cover; display: block;
+    }
+
     /* UX-MOBILE-RESPONSIVE pt 75 (passe terrain mobile) : sous 480px, le
        terrain ratio 100/140 dans une colonne étroite tasse les pastilles
        (taille desktop) → on réduit marques/disques/polices pour les aérer.
@@ -900,6 +911,12 @@
       width: 18px; height: 18px; border-radius: 50%;
       background: var(--bleu-base, #0d2b4e); color: #f5c518;
       font-family: 'Oswald', sans-serif; font-size: 11px; font-weight: 600;
+    }
+    /* PHOTOS-JOUEURS (2e temps terrain) — photo ronde dans la pastille du banc,
+       même filtre RGPD. Sans droit / sans photo → numéro conservé. */
+    .vt-bench-item__num--photo { background: transparent; overflow: hidden; }
+    .vt-bench-item__num--photo .vt-bench-item__photo {
+      width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block;
     }
     /* ── pt 53 — Rapport de match v1 (thème clair, lecture seule) ── */
     .view-rapport { display: flex; flex-direction: column; gap: 16px; }
