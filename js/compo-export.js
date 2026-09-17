@@ -691,9 +691,205 @@
     });
   }
 
+
+  // ── Rendu "grille de portraits" (versions Offload, format vertical) ──────────
+  // Grille 4 colonnes de photos joueurs (titulaires), header bleu ciel, logo
+  // agrandi, cartes numéro + nom + poste, case remplaçants en liste, pied de page.
+  // RGPD : data.titulaires[i].photoUrl n'est renseigné QUE pour les joueurs ayant
+  // droit + photo (filtre fait en amont). Sinon repli initiales. Dégradation
+  // honnête : photo qui ne charge pas → repli initiales, jamais de trou.
+  function initiales(nom, prenom) {
+    var p = (prenom || '').trim(), n = (nom || '').trim();
+    var a = p ? p.charAt(0) : '', b = n ? n.charAt(0) : '';
+    return (a + b).toUpperCase() || '?';
+  }
+
+  function rendrePhotos(canvas, data, version) {
+    var t = THEMES[version] || THEMES.entente_nat;
+    canvas.width = W; canvas.height = H;
+    var ctx = canvas.getContext('2d');
+    ctx.textBaseline = 'alphabetic';
+
+    var logos = data.logos || {};
+    var tit = (data.titulaires || []).slice(0, 15);
+    var rem = data.remplacants || [];
+
+    // pré-charger le logo + toutes les photos titulaires (URLs signées).
+    var toLoad = [loadImage(logos[t.logoKey])];
+    tit.forEach(function (j) { toLoad.push(loadImage(j.photoUrl)); });
+
+    return Promise.all(toLoad).then(function (imgs) {
+      var logoHead = imgs[0];
+      var photos = imgs.slice(1); // index aligné sur tit
+
+      // Palette (charte Offload)
+      var NAVY = [14, 26, 50], DARK = [5, 16, 38], YELLOW = [240, 216, 0],
+          SKY = [144, 216, 240], WHITE = [243, 245, 248], CARD = [26, 44, 74];
+
+      // marge de grille commune (header/pied alignés dessus)
+      var x0 = 72, gap = 22, cols = 4;
+      var cw = Math.floor((W - 2 * x0 - (cols - 1) * gap) / cols);
+
+      // 1) Fond dégradé
+      var g = ctx.createLinearGradient(0, 0, W * 0.6, H);
+      g.addColorStop(0, 'rgb(22,41,77)'); g.addColorStop(0.55, rgb([18, 34, 64]));
+      g.addColorStop(1, rgb(DARK));
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      // chevrons latéraux subtils
+      ctx.save(); ctx.globalAlpha = 0.022; ctx.fillStyle = rgb(SKY);
+      for (var cy = 0; cy < H; cy += 96) {
+        ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(190, cy + 78); ctx.lineTo(0, cy + 156); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(W, cy); ctx.lineTo(W - 190, cy + 78); ctx.lineTo(W, cy + 156); ctx.closePath(); ctx.fill();
+      }
+      ctx.restore();
+
+      // 2) HEADER bleu ciel
+      var HH = 346;
+      var hg = ctx.createLinearGradient(0, 0, 0, HH);
+      hg.addColorStop(0, 'rgb(191,233,247)'); hg.addColorStop(1, rgb(SKY));
+      ctx.fillStyle = hg; ctx.fillRect(0, 0, W, HH);
+      ctx.fillStyle = rgb(NAVY); ctx.fillRect(0, HH, W, 11);
+      ctx.fillStyle = rgb(YELLOW); ctx.fillRect(0, HH + 11, W, 6);
+      // titre
+      ctx.fillStyle = rgb(DARK); ctx.font = font(112, 900, 'italic');
+      ctx.fillText('COMPOSITION', x0, 158);
+      ctx.font = font(42, 800);
+      ctx.fillStyle = rgb(NAVY);
+      var st = (data.sousTitre ? (data.sousTitre + ' · ') : '') +
+               [data.meta1, data.meta2].filter(Boolean).join(' · ');
+      ctx.fillText(st || (data.titre || ''), x0 + 3, 250);
+      // logo agrandi à droite
+      if (logoHead) {
+        var LS = 300, lx = W - LS - x0 + 10, ly = (HH - LS) / 2;
+        drawImgH(ctx, logoHead, lx, ly, LS);
+      }
+
+      // 3) GRILLE 4×4 (15 photos + case remplaçants)
+      var y0 = HH + 64, ch = 392, vgap = 22;
+      var phH = ch - 74;
+      for (var i = 0; i < 15; i++) {
+        var r = Math.floor(i / cols), c = i % cols;
+        var x = x0 + c * (cw + gap), y = y0 + r * (ch + vgap);
+        var j = tit[i] || {};
+        var num = (j.num != null && j.num !== '') ? j.num : (i + 1);
+
+        // ombre + carte
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 12; ctx.shadowOffsetY = 6;
+        ctx.fillStyle = rgb(CARD); roundRect(ctx, x, y, cw, ch, 18); ctx.fill();
+        ctx.restore();
+
+        // zone photo (clip arrondi)
+        var pxw = cw - 14, pxh = phH - 8, pxx = x + 7, pxy = y + 7;
+        ctx.save(); roundRect(ctx, pxx, pxy, pxw, pxh, 13); ctx.clip();
+        var im = photos[i];
+        if (im) {
+          // cover : recadre en gardant le ratio
+          var ir = im.width / im.height, tr = pxw / pxh, dw, dh, dx, dy;
+          if (ir > tr) { dh = pxh; dw = pxh * ir; dx = pxx - (dw - pxw) / 2; dy = pxy; }
+          else { dw = pxw; dh = pxw / ir; dx = pxx; dy = pxy - (dh - pxh) * 0.12; }
+          ctx.drawImage(im, dx, dy, dw, dh);
+        } else {
+          // repli initiales : fond dégradé + initiales
+          var ig = ctx.createLinearGradient(pxx, pxy, pxx, pxy + pxh);
+          ig.addColorStop(0, 'rgb(44,64,102)'); ig.addColorStop(1, 'rgb(26,42,72)');
+          ctx.fillStyle = ig; ctx.fillRect(pxx, pxy, pxw, pxh);
+          ctx.fillStyle = 'rgba(144,216,240,0.85)';
+          ctx.font = font(96, 900); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillText(initiales(j.nom, j.prenom), pxx + pxw / 2, pxy + pxh / 2);
+          ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+        }
+        // fondu bas pour lisibilité
+        var fg = ctx.createLinearGradient(0, pxy + pxh * 0.6, 0, pxy + pxh);
+        fg.addColorStop(0, 'rgba(11,26,51,0)'); fg.addColorStop(1, 'rgba(11,26,51,0.5)');
+        ctx.fillStyle = fg; ctx.fillRect(pxx, pxy + pxh * 0.6, pxw, pxh * 0.4);
+        ctx.restore();
+
+        // pastille numéro
+        ctx.save();
+        ctx.fillStyle = 'rgba(14,26,50,0.9)';
+        ctx.beginPath(); ctx.arc(x + 46, y + 46, 34, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = rgb(YELLOW); ctx.font = font(46, 900);
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(String(num), x + 46, y + 48);
+        ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+        ctx.restore();
+
+        // capitaine (poste N°8 => num 8, ou flag data)
+        if (j.capitaine === true || String(num) === '8') {
+          ctx.save();
+          ctx.fillStyle = 'rgb(192,57,43)';
+          ctx.beginPath(); ctx.arc(x + cw - 44, y + 44, 26, 0, Math.PI * 2); ctx.fill();
+          ctx.lineWidth = 3; ctx.strokeStyle = rgb(WHITE); ctx.stroke();
+          ctx.fillStyle = rgb(WHITE); ctx.font = font(30, 900);
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillText('C', x + cw - 44, y + 46);
+          ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+          ctx.restore();
+        }
+
+        // bandeau nom + poste
+        var by = y + phH;
+        var yg = ctx.createLinearGradient(0, by, 0, by + (ch - phH));
+        yg.addColorStop(0, 'rgb(255,233,77)'); yg.addColorStop(1, rgb(YELLOW));
+        ctx.fillStyle = yg;
+        ctx.save(); roundRect(ctx, x, by, cw, ch - phH, 0); ctx.fill(); ctx.restore();
+        // coins bas arrondis (masque)
+        ctx.fillStyle = rgb(DARK); // fin liseré haut du bandeau
+        ctx.fillRect(x, by, cw, 3);
+        ctx.fillStyle = rgb(DARK);
+        ctx.font = font(30, 900); ctx.textAlign = 'center';
+        ctx.fillText((j.nom || '').toUpperCase(), x + cw / 2, by + 40);
+        ctx.fillStyle = 'rgb(122,102,0)'; ctx.font = font(19, 700);
+        ctx.fillText(((j.poste || j.code || '')).toUpperCase(), x + cw / 2, by + 66);
+        ctx.textAlign = 'left';
+      }
+
+      // 4) Case remplaçants (16e emplacement, en bas à droite)
+      var rr = 3, rc = 3;
+      var rx = x0 + rc * (cw + gap), ry = y0 + rr * (ch + vgap);
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 12; ctx.shadowOffsetY = 6;
+      ctx.fillStyle = rgb(YELLOW); roundRect(ctx, rx, ry, cw, ch, 18); ctx.fill();
+      ctx.restore();
+      // en-tête marine
+      ctx.fillStyle = rgb(NAVY);
+      ctx.save(); roundRect(ctx, rx, ry, cw, 64, 18); ctx.fill(); ctx.restore();
+      ctx.fillRect(rx, ry + 32, cw, 32);
+      ctx.fillStyle = rgb(YELLOW); ctx.font = font(30, 900); ctx.textAlign = 'center';
+      ctx.fillText('REMPLAÇANTS', rx + cw / 2, ry + 44);
+      ctx.textAlign = 'left';
+      // liste
+      ctx.fillStyle = rgb(DARK); ctx.font = font(27, 700);
+      var ty = ry + 108;
+      for (var k = 0; k < rem.length && k < 8; k++) {
+        var rj = rem[k] || {};
+        ctx.fillText((rj.num != null ? rj.num : (16 + k)) + '  ·  ' + (rj.nom || '–'), rx + 26, ty);
+        ty += 36;
+      }
+      ctx.restore();
+
+      // 5) PIED signature
+      var fy = y0 + 4 * (ch + vgap) + 6;
+      ctx.fillStyle = rgb(DARK); ctx.fillRect(0, fy, W, H - fy);
+      ctx.fillStyle = rgb(YELLOW); ctx.fillRect(0, fy, W, 5);
+      ctx.fillStyle = rgb(WHITE); ctx.font = font(36, 900);
+      ctx.fillText('ENTENTE OFFLOAD', x0, fy + 62);
+      ctx.fillStyle = rgb(SKY); ctx.font = font(26, 600);
+      ctx.fillText('Unis pour viser plus haut · Saison 2026/2027', x0, fy + 104);
+
+      return canvas;
+    });
+  }
+
   // ── Dispatcher de rendu (rétrocompat : format défaut = 'vertical') ────────
   function rendre(canvas, data, version, format) {
     if (format === 'paysage') return rendrePaysage(canvas, data, version);
+    // Versions Offload (entente_nat/entente_reg) : le vertical devient la grille
+    // de portraits photos. Les autres versions gardent le vertical historique.
+    if (version === 'entente_nat' || version === 'entente_reg') {
+      return rendrePhotos(canvas, data, version);
+    }
     return rendreVertical(canvas, data, version);
   }
 
