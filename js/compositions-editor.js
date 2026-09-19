@@ -6444,6 +6444,25 @@
         }
       }
 
+      // Enrichissement club : la voie "groupe de base" (get_noms_personnes)
+      // ne remonte pas le club de rattachement. On le résout via la RPC gardée
+      // get_clubs_personnes pour que l'export compo (grille de logos clubs +
+      // couleur par club) fonctionne. Dégradation honnête : Map vide → club ''.
+      try {
+        const clubMap = await SupabaseHub._resolveClubs(
+          vivier.map(function (j) { return j.joueur_id; })
+        );
+        if (clubMap && clubMap.size) {
+          vivier.forEach(function (j) {
+            if (!j.club_principal_nom_court && clubMap.has(j.joueur_id)) {
+              j.club_principal_nom_court = clubMap.get(j.joueur_id);
+            }
+          });
+        }
+      } catch (e) {
+        console.warn('MOM Hub: enrichissement club vivier échoué (non bloquant)', e);
+      }
+
       State.vivier = vivier;
       State.vivierById = new Map();
       for (const j of State.vivier) State.vivierById.set(j.joueur_id, j);
