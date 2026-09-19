@@ -745,7 +745,11 @@
     ctx.textBaseline = 'alphabetic';
 
     var logos = data.logos || {};
-    var logosClubs = data.logosClubs || [];           // [{code, url}] pour la grille d'en-tête
+    // Grille de logos d'en-tête : FIXE par version (l'entente, pas la sélection).
+    // entente_reg → 4 clubs ; sinon (entente_nat) → 6 clubs. Fallback rétrocompat
+    // sur data.logosClubs si les listes par version ne sont pas fournies.
+    var logosClubs = (version === 'entente_reg' ? data.logosClubsReg : data.logosClubsNat)
+                     || data.logosClubs || [];   // [{code, url}] pour la grille d'en-tête
     var tit = (data.titulaires || []).slice(0, 15);
     var rem = data.remplacants || [];
 
