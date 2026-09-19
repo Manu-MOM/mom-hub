@@ -4705,7 +4705,8 @@
         entente_nat: 'assets/logo-entente-offload-nat.png',
         entente_reg: 'assets/logo-entente-offload-reg.png'
       },
-      logosClubs: _logosClubsDepuisEffectif(tit, rem)
+      logosClubsNat: _logosClubsListe(_CLUBS_NAT),
+      logosClubsReg: _logosClubsListe(_CLUBS_REG)
     };
   }
 
@@ -4724,6 +4725,20 @@
   function _clubKey(nomCourt) { return String(nomCourt || '').trim().toLowerCase(); }
   // Ordre d'affichage stable des logos d'en-tête.
   var _ORDRE_CLUBS = ['sar', 'mom', 'ascs', 'crig', 'colmar', 'sélestat'];
+  // Composition FIXE de l'entente par niveau (décision Manu : la grille de logos
+  // représente l'ENTENTE, pas la sélection du jour → indépendante des joueurs
+  // présents/remplaçants). National = 6 clubs ; Régional = 4 clubs.
+  var _CLUBS_NAT = ['sar', 'mom', 'ascs', 'crig', 'colmar', 'sélestat'];
+  var _CLUBS_REG = ['sar', 'mom', 'ascs', 'crig'];
+  function _logosClubsListe(codes) {
+    var out = [];
+    (codes || []).forEach(function (k) {
+      if (_CLUBS_ENTENTE[k]) out.push({ code: k, url: _CLUBS_ENTENTE[k].asset });
+    });
+    return out;
+  }
+  // Conservé pour rétrocompat éventuelle (non utilisé pour la grille depuis
+  // que les logos sont fixés par version).
   function _logosClubsDepuisEffectif(tit, rem) {
     var present = {};
     (tit || []).concat(rem || []).forEach(function (j) {
