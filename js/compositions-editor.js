@@ -4613,6 +4613,7 @@
           poste: (p.libelle_long || p.libelle_court || p.code || ''),
           code: (p.code || ''),
           club: (j.club_principal_nom_court || '').toUpperCase(),
+          clubCouleur: (function () { var e = _CLUBS_ENTENTE[_clubKey(j.club_principal_nom_court)]; return e ? e.couleur : null; })(),
           ligne: _ligneDePoste(p),
           capitaine: !!cj.est_capitaine,
           photoUrl: null
@@ -4703,8 +4704,37 @@
         entente: 'assets/logo-entente.png',
         entente_nat: 'assets/logo-entente-offload-nat.png',
         entente_reg: 'assets/logo-entente-offload-reg.png'
-      }
+      },
+      logosClubs: _logosClubsDepuisEffectif(tit, rem)
     };
+  }
+
+  // Table club (nom_court) -> logo asset + couleur d'affiliation (source : base
+  // clubs.couleur_affiliation_distinctive). Sert à la grille de logos d'en-tête
+  // et à la couleur par club des cartes de l'export photos.
+  var _CLUBS_ENTENTE = {
+    'sar':      { asset: 'assets/logo-club-sar.png',  couleur: 'Bleu'  },
+    'mom':      { asset: 'assets/logo-club-mom.png',  couleur: 'Vert'  },
+    'ascs':     { asset: 'assets/logo-club-ascs.png', couleur: 'Jaune' },
+    'crig':     { asset: 'assets/logo-club-crig.png', couleur: 'Noir'  },
+    'colmar':   { asset: 'assets/logo-club-crc.png',  couleur: 'Rouge' },
+    'sélestat': { asset: 'assets/logo-club-rcsg.png', couleur: 'Rouge' },
+    'selestat': { asset: 'assets/logo-club-rcsg.png', couleur: 'Rouge' }
+  };
+  function _clubKey(nomCourt) { return String(nomCourt || '').trim().toLowerCase(); }
+  // Ordre d'affichage stable des logos d'en-tête.
+  var _ORDRE_CLUBS = ['sar', 'mom', 'ascs', 'crig', 'colmar', 'sélestat'];
+  function _logosClubsDepuisEffectif(tit, rem) {
+    var present = {};
+    (tit || []).concat(rem || []).forEach(function (j) {
+      var k = _clubKey(j && j.club);
+      if (k && _CLUBS_ENTENTE[k]) present[k === 'selestat' ? 'sélestat' : k] = true;
+    });
+    var out = [];
+    _ORDRE_CLUBS.forEach(function (k) {
+      if (present[k]) out.push({ code: k, url: _CLUBS_ENTENTE[k].asset });
+    });
+    return out;
   }
 
   function bindExportImage() {
