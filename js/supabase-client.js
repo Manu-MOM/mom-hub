@@ -5575,6 +5575,35 @@
       return map;
     },
 
+    // Résout le club de rattachement (nom court) pour une liste de personnes,
+    // via la RPC gardée get_clubs_personnes (même modèle que _resolveNoms :
+    // authentifié, projection non sensible). Sert notamment à l'export compo
+    // (grille de logos clubs) quand le vivier est chargé par la voie "groupe
+    // de base" qui ne porte pas club_principal_nom_court. Dégradation honnête :
+    // erreur / Map vide → pas de club (l'export retombe sur ses fallbacks).
+    async _resolveClubs(uuids) {
+      const uniq = [];
+      const seen = new Set();
+      (Array.isArray(uuids) ? uuids : []).forEach(function (u) {
+        if (u && !seen.has(u)) { seen.add(u); uniq.push(u); }
+      });
+      const map = new Map();
+      if (uniq.length === 0) return map;
+      const { data, error } = await client.rpc('get_clubs_personnes', {
+        p_personne_uuids: uniq
+      });
+      if (error) {
+        console.error('MOM Hub: _resolveClubs() / get_clubs_personnes', error);
+        return map;
+      }
+      (Array.isArray(data) ? data : []).forEach(function (row) {
+        if (row && row.personne_id) {
+          map.set(row.personne_id, row.club_nom_court || '');
+        }
+      });
+      return map;
+    },
+
     async listCollectifMembres(ententeId, options) {
       if (!ententeId) {
         console.error('MOM Hub: listCollectifMembres() requiert un ententeId');
