@@ -704,6 +704,40 @@
     return (a + b).toUpperCase() || '?';
   }
 
+  // ── Rendu "grille de portraits" v2 (design Éclats — versions Offload) ────────
+  // Fond navy dégradé + rayons/cercles filigrane + bande néon multi-clubs.
+  // En-tête : grille des logos clubs (data.logosClubs) en pastilles blanches.
+  // Cartes photo blanches (photos déjà recadrées au visage à l'import) avec
+  // triangle numéro + pastille poste COLORÉS par le club du joueur, badge
+  // capitaine « C » (j.capitaine, jamais le n°8), bande remplaçants en bas.
+  // RGPD : photoUrl présent seulement si droit accordé → sinon repli initiales.
+  //
+  // Couleur club : libellé couleur_affiliation_distinctive du club (« Noir »,
+  // « Rouge »…) traduit en hex via COULEUR_PHOTO_HEX (aligné joueurs-browser).
+  // Fourni par data.titulaires[i].clubCouleur ; fallback via nom court.
+  const COULEUR_PHOTO_HEX = {
+    'noir': '#1a1a1a', 'rouge': '#a4161a', 'bleu': '#2e63a8',
+    'vert': '#2D7D46', 'jaune': '#c9a227', 'terre': '#8a5a3a',
+    'gris': '#5f6b75', 'blanc': '#8a8f96'
+  };
+  const COULEUR_PAR_NOMCOURT = {
+    'ascs': 'jaune', 'colmar': 'rouge', 'crig': 'noir',
+    'mom': 'vert', 'sar': 'bleu', 'sélestat': 'rouge', 'selestat': 'rouge'
+  };
+  function couleurClubPhoto(j) {
+    var lib = j && j.clubCouleur ? String(j.clubCouleur).trim().toLowerCase() : '';
+    if (!lib && j && j.club) lib = COULEUR_PAR_NOMCOURT[String(j.club).trim().toLowerCase()] || '';
+    return COULEUR_PHOTO_HEX[lib] || '#3b5ba5'; // fallback bleu neutre
+  }
+  function initialesPhoto(j) {
+    var p = (j.prenom || '').trim(), n = (j.nom || '').trim();
+    return ((p ? p.charAt(0) : '') + (n ? n.charAt(0) : '')).toUpperCase() || '?';
+  }
+  function texteSurCouleur(hex) {
+    // texte foncé sur jaune/clair, blanc sinon
+    return (hex === '#c9a227' || hex === '#8a8f96' || hex === '#8a5a3a') ? '#12203a' : '#ffffff';
+  }
+
   function rendrePhotos(canvas, data, version) {
     var t = THEMES[version] || THEMES.entente_nat;
     canvas.width = W; canvas.height = H;
@@ -711,173 +745,172 @@
     ctx.textBaseline = 'alphabetic';
 
     var logos = data.logos || {};
+    var logosClubs = data.logosClubs || [];           // [{code, url}] pour la grille d'en-tête
     var tit = (data.titulaires || []).slice(0, 15);
     var rem = data.remplacants || [];
 
-    // pré-charger le logo + toutes les photos titulaires (URLs signées).
-    var toLoad = [loadImage(logos[t.logoKey])];
+    // pré-charge : logos clubs (en-tête) + photos titulaires
+    var toLoad = [];
+    logosClubs.forEach(function (l) { toLoad.push(loadImage(l.url)); });
+    var nLogos = logosClubs.length;
     tit.forEach(function (j) { toLoad.push(loadImage(j.photoUrl)); });
 
     return Promise.all(toLoad).then(function (imgs) {
-      var logoHead = imgs[0];
-      var photos = imgs.slice(1); // index aligné sur tit
+      var logoImgs = imgs.slice(0, nLogos);
+      var photos = imgs.slice(nLogos);
 
-      // Palette (charte Offload)
-      var NAVY = [14, 26, 50], DARK = [5, 16, 38], YELLOW = [240, 216, 0],
-          SKY = [144, 216, 240], WHITE = [243, 245, 248], CARD = [26, 44, 74];
-
-      // marge de grille commune (header/pied alignés dessus)
-      var x0 = 72, gap = 22, cols = 4;
+      var NAVY = '#0e1a32', DARK = '#07101f', YELLOW = '#f0d800', SKY = '#90d8f0', WHITE = '#ffffff';
+      var x0 = 66, gap = 22, cols = 4;
       var cw = Math.floor((W - 2 * x0 - (cols - 1) * gap) / cols);
 
-      // 1) Fond dégradé
-      var g = ctx.createLinearGradient(0, 0, W * 0.6, H);
-      g.addColorStop(0, 'rgb(22,41,77)'); g.addColorStop(0.55, rgb([18, 34, 64]));
-      g.addColorStop(1, rgb(DARK));
+      // 1) Fond dégradé navy
+      var g = ctx.createLinearGradient(0, 0, W * 0.5, H);
+      g.addColorStop(0, '#16295a'); g.addColorStop(0.45, '#1e3a6e'); g.addColorStop(1, '#0c1730');
       ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-      // chevrons latéraux subtils
-      ctx.save(); ctx.globalAlpha = 0.022; ctx.fillStyle = rgb(SKY);
-      for (var cy = 0; cy < H; cy += 96) {
-        ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(190, cy + 78); ctx.lineTo(0, cy + 156); ctx.closePath(); ctx.fill();
-        ctx.beginPath(); ctx.moveTo(W, cy); ctx.lineTo(W - 190, cy + 78); ctx.lineTo(W, cy + 156); ctx.closePath(); ctx.fill();
+      // rayons obliques filigrane (coin haut-droit)
+      var rc = ['#8FD3E8', '#F2C500', '#2E7D46', '#D42E2E', '#3B5BA5', '#C4161C'];
+      var cx = W + 180, cy = -180, R = W * 2.4;
+      ctx.save(); ctx.globalAlpha = 0.06;
+      for (var k = 0; k < 16; k++) {
+        var a0 = (95 + k * 7) * Math.PI / 180, a1 = (95 + k * 7 + 4) * Math.PI / 180;
+        ctx.fillStyle = rc[k % rc.length];
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + R * Math.cos(a0), cy + R * Math.sin(a0));
+        ctx.lineTo(cx + R * Math.cos(a1), cy + R * Math.sin(a1));
+        ctx.closePath(); ctx.fill();
       }
       ctx.restore();
+      // grands cercles filigrane
+      ctx.save(); ctx.globalAlpha = 0.05;
+      ctx.fillStyle = '#8FD3E8'; ctx.beginPath(); ctx.arc(-90, H - 380, 480, 0, 7); ctx.fill();
+      ctx.fillStyle = '#F2C500'; ctx.beginPath(); ctx.arc(W + 60, H - 900, 360, 0, 7); ctx.fill();
+      ctx.restore();
 
-      // 2) HEADER bleu ciel
-      var HH = 346;
-      var hg = ctx.createLinearGradient(0, 0, 0, HH);
-      hg.addColorStop(0, 'rgb(191,233,247)'); hg.addColorStop(1, rgb(SKY));
-      ctx.fillStyle = hg; ctx.fillRect(0, 0, W, HH);
-      ctx.fillStyle = rgb(NAVY); ctx.fillRect(0, HH, W, 11);
-      ctx.fillStyle = rgb(YELLOW); ctx.fillRect(0, HH + 11, W, 6);
-      // titre
-      ctx.fillStyle = rgb(DARK); ctx.font = font(112, 900, 'italic');
-      ctx.fillText('COMPOSITION', x0, 158);
-      ctx.font = font(42, 800);
-      ctx.fillStyle = rgb(NAVY);
-      var st = (data.sousTitre ? (data.sousTitre + ' · ') : '') +
-               [data.meta1, data.meta2].filter(Boolean).join(' · ');
-      ctx.fillText(st || (data.titre || ''), x0 + 3, 250);
-      // logo agrandi à droite
-      if (logoHead) {
-        var LS = 300, lx = W - LS - x0 + 10, ly = (HH - LS) / 2;
-        drawImgH(ctx, logoHead, lx, ly, LS);
-      }
-
-      // 3) GRILLE 4×4 (15 photos + case remplaçants)
-      var y0 = HH + 64, ch = 392, vgap = 22;
-      var phH = ch - 74;
-      for (var i = 0; i < 15; i++) {
-        var r = Math.floor(i / cols), c = i % cols;
-        var x = x0 + c * (cw + gap), y = y0 + r * (ch + vgap);
-        var j = tit[i] || {};
-        var num = (j.num != null && j.num !== '') ? j.num : (i + 1);
-
-        // ombre + carte
+      // 2) En-tête : grille de logos clubs (pastilles blanches)
+      var ls = 138, lgap = 26;
+      var totalL = nLogos * ls + (nLogos - 1) * lgap;
+      var lsx = (W - totalL) / 2, lsy = 44;
+      for (var i = 0; i < nLogos; i++) {
+        var lx = lsx + i * (ls + lgap), lcx = lx + ls / 2, lcy = lsy + ls / 2;
         ctx.save();
-        ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 12; ctx.shadowOffsetY = 6;
-        ctx.fillStyle = rgb(CARD); roundRect(ctx, x, y, cw, ch, 18); ctx.fill();
+        ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 5;
+        ctx.fillStyle = WHITE; ctx.beginPath(); ctx.arc(lcx, lcy, ls / 2 + 10, 0, 7); ctx.fill();
         ctx.restore();
-
-        // zone photo (clip arrondi)
-        var pxw = cw - 14, pxh = phH - 8, pxx = x + 7, pxy = y + 7;
-        ctx.save(); roundRect(ctx, pxx, pxy, pxw, pxh, 13); ctx.clip();
-        var im = photos[i];
-        if (im) {
-          // cover : recadre en gardant le ratio
-          var ir = im.width / im.height, tr = pxw / pxh, dw, dh, dx, dy;
-          if (ir > tr) { dh = pxh; dw = pxh * ir; dx = pxx - (dw - pxw) / 2; dy = pxy; }
-          else { dw = pxw; dh = pxw / ir; dx = pxx; dy = pxy - (dh - pxh) * 0.12; }
-          ctx.drawImage(im, dx, dy, dw, dh);
-        } else {
-          // repli initiales : fond dégradé + initiales
-          var ig = ctx.createLinearGradient(pxx, pxy, pxx, pxy + pxh);
-          ig.addColorStop(0, 'rgb(44,64,102)'); ig.addColorStop(1, 'rgb(26,42,72)');
-          ctx.fillStyle = ig; ctx.fillRect(pxx, pxy, pxw, pxh);
-          ctx.fillStyle = 'rgba(144,216,240,0.85)';
-          ctx.font = font(96, 900); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-          ctx.fillText(initiales(j.nom, j.prenom), pxx + pxw / 2, pxy + pxh / 2);
-          ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-        }
-        // fondu bas pour lisibilité
-        var fg = ctx.createLinearGradient(0, pxy + pxh * 0.6, 0, pxy + pxh);
-        fg.addColorStop(0, 'rgba(11,26,51,0)'); fg.addColorStop(1, 'rgba(11,26,51,0.5)');
-        ctx.fillStyle = fg; ctx.fillRect(pxx, pxy + pxh * 0.6, pxw, pxh * 0.4);
-        ctx.restore();
-
-        // pastille numéro
-        ctx.save();
-        ctx.fillStyle = 'rgba(14,26,50,0.9)';
-        ctx.beginPath(); ctx.arc(x + 46, y + 46, 34, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = rgb(YELLOW); ctx.font = font(46, 900);
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(String(num), x + 46, y + 48);
-        ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-        ctx.restore();
-
-        // capitaine (flag réel issu de composition_joueurs.est_capitaine)
-        if (j.capitaine === true) {
+        var li = logoImgs[i];
+        if (li) {
           ctx.save();
-          ctx.fillStyle = 'rgb(192,57,43)';
-          ctx.beginPath(); ctx.arc(x + cw - 44, y + 44, 26, 0, Math.PI * 2); ctx.fill();
-          ctx.lineWidth = 3; ctx.strokeStyle = rgb(WHITE); ctx.stroke();
-          ctx.fillStyle = rgb(WHITE); ctx.font = font(30, 900);
-          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-          ctx.fillText('C', x + cw - 44, y + 46);
-          ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+          ctx.beginPath(); ctx.arc(lcx, lcy, ls / 2 + 2, 0, 7); ctx.clip();
+          // logo contenu dans le cercle (contain)
+          var lr = li.width / li.height, dw, dh;
+          if (lr > 1) { dw = ls; dh = ls / lr; } else { dh = ls; dw = ls * lr; }
+          ctx.drawImage(li, lcx - dw / 2, lcy - dh / 2, dw, dh);
           ctx.restore();
         }
+      }
+      // titre
+      ctx.fillStyle = WHITE; ctx.font = 'italic 900 84px Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('COMPOSITION', W / 2, lsy + ls + 92);
+      ctx.fillStyle = YELLOW; ctx.font = '800 34px Arial, sans-serif';
+      var sub = (data.sousTitre ? data.sousTitre + ' · ' : '') + [data.meta1, data.meta2].filter(Boolean).join(' · ');
+      ctx.fillText(sub || (data.titre || ''), W / 2, lsy + ls + 140);
+      ctx.textAlign = 'left';
+      // bande néon multi-clubs
+      var neon = ctx.createLinearGradient(x0, 0, W - x0, 0);
+      neon.addColorStop(0, '#8FD3E8'); neon.addColorStop(0.3, '#F2C500');
+      neon.addColorStop(0.55, '#2E7D46'); neon.addColorStop(0.8, '#D42E2E'); neon.addColorStop(1, '#111');
+      var neonY = lsy + ls + 168;
+      ctx.fillStyle = neon; roundRect(ctx, x0, neonY, W - 2 * x0, 8, 4); ctx.fill();
 
-        // bandeau nom + poste
+      // 3) Grille XV
+      var y0 = neonY + 40, ch = 376, vgap = 22, phH = ch - 84;
+      for (var idx = 0; idx < 15; idx++) {
+        var r = Math.floor(idx / cols), c = idx % cols;
+        var x = x0 + c * (cw + gap), y = y0 + r * (ch + vgap);
+        var j = tit[idx] || {};
+        var num = (j.num != null && j.num !== '') ? j.num : (idx + 1);
+        var col = couleurClubPhoto(j);
+        // carte blanche + ombre
+        ctx.save();
+        ctx.shadowColor = 'rgba(10,26,58,0.30)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 6;
+        ctx.fillStyle = WHITE; roundRect(ctx, x, y, cw, ch, 18); ctx.fill();
+        ctx.restore();
+        // photo (recadrée en amont → cover simple)
+        var pxx = x + 12, pxy = y + 12, pxw = cw - 24, pxh = phH - 12;
+        ctx.save(); roundRect(ctx, pxx, pxy, pxw, pxh, 12); ctx.clip();
+        var im = photos[idx];
+        if (im) {
+          var ir = im.width / im.height, tr = pxw / pxh, dw2, dh2, dx2, dy2;
+          if (ir > tr) { dh2 = pxh; dw2 = pxh * ir; dx2 = pxx - (dw2 - pxw) / 2; dy2 = pxy; }
+          else { dw2 = pxw; dh2 = pxw / ir; dx2 = pxx; dy2 = pxy - (dh2 - pxh) / 2; }
+          ctx.drawImage(im, dx2, dy2, dw2, dh2);
+        } else {
+          var ig = ctx.createLinearGradient(pxx, pxy, pxx, pxy + pxh);
+          ig.addColorStop(0, '#2c4066'); ig.addColorStop(1, '#1a2a48');
+          ctx.fillStyle = ig; ctx.fillRect(pxx, pxy, pxw, pxh);
+          ctx.fillStyle = 'rgba(144,216,240,0.9)'; ctx.font = '900 120px Arial, sans-serif';
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillText(initialesPhoto(j), pxx + pxw / 2, pxy + pxh / 2);
+          ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+        }
+        // triangle numéro couleur club (coin haut-gauche)
+        ctx.fillStyle = col;
+        ctx.beginPath(); ctx.moveTo(pxx, pxy); ctx.lineTo(pxx + 96, pxy); ctx.lineTo(pxx, pxy + 96); ctx.closePath(); ctx.fill();
+        // barre couleur bas de photo
+        ctx.fillStyle = col; ctx.fillRect(pxx, pxy + pxh - 9, pxw, 9);
+        ctx.restore();
+        // chiffre dans le triangle
+        ctx.fillStyle = texteSurCouleur(col); ctx.font = '900 40px Arial, sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(String(num), x + 40, y + 42);
+        // badge capitaine (haut-droite) si flag réel
+        if (j.capitaine === true) {
+          ctx.beginPath(); ctx.arc(x + cw - 40, y + 40, 26, 0, 7);
+          ctx.fillStyle = YELLOW; ctx.fill();
+          ctx.lineWidth = 3; ctx.strokeStyle = NAVY; ctx.stroke();
+          ctx.fillStyle = NAVY; ctx.font = '900 30px Arial, sans-serif';
+          ctx.fillText('C', x + cw - 40, y + 42);
+        }
+        ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+        // nom + pastille poste couleur club
         var by = y + phH;
-        var yg = ctx.createLinearGradient(0, by, 0, by + (ch - phH));
-        yg.addColorStop(0, 'rgb(255,233,77)'); yg.addColorStop(1, rgb(YELLOW));
-        ctx.fillStyle = yg;
-        ctx.save(); roundRect(ctx, x, by, cw, ch - phH, 0); ctx.fill(); ctx.restore();
-        // coins bas arrondis (masque)
-        ctx.fillStyle = rgb(DARK); // fin liseré haut du bandeau
-        ctx.fillRect(x, by, cw, 3);
-        ctx.fillStyle = rgb(DARK);
-        ctx.font = font(30, 900); ctx.textAlign = 'center';
-        ctx.fillText((j.nom || '').toUpperCase(), x + cw / 2, by + 40);
-        ctx.fillStyle = 'rgb(122,102,0)'; ctx.font = font(19, 700);
-        ctx.fillText(((j.poste || j.code || '')).toUpperCase(), x + cw / 2, by + 66);
+        ctx.fillStyle = NAVY; ctx.font = '900 30px Arial, sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText((j.nom || '').toUpperCase(), x + cw / 2, by + 34);
+        var poste = (j.poste || j.code || '').toUpperCase();
+        if (poste) {
+          ctx.font = '700 18px Arial, sans-serif';
+          var pw = ctx.measureText(poste).width + 28, px = x + cw / 2 - pw / 2, py = by + 46;
+          ctx.fillStyle = col; roundRect(ctx, px, py, pw, 28, 14); ctx.fill();
+          ctx.fillStyle = texteSurCouleur(col);
+          ctx.textBaseline = 'middle'; ctx.fillText(poste, x + cw / 2, py + 15); ctx.textBaseline = 'alphabetic';
+        }
         ctx.textAlign = 'left';
       }
 
-      // 4) Case remplaçants (16e emplacement, en bas à droite)
-      var rr = 3, rc = 3;
-      var rx = x0 + rc * (cw + gap), ry = y0 + rr * (ch + vgap);
+      // 4) Bande remplaçants
+      var ry = y0 + 4 * (ch + vgap) + 6;
       ctx.save();
-      ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 12; ctx.shadowOffsetY = 6;
-      ctx.fillStyle = rgb(YELLOW); roundRect(ctx, rx, ry, cw, ch, 18); ctx.fill();
+      ctx.shadowColor = 'rgba(0,0,0,0.3)'; ctx.shadowBlur = 12; ctx.shadowOffsetY = 5;
+      ctx.fillStyle = WHITE; roundRect(ctx, x0, ry, W - 2 * x0, 210, 18); ctx.fill();
       ctx.restore();
-      // en-tête marine
-      ctx.fillStyle = rgb(NAVY);
-      ctx.save(); roundRect(ctx, rx, ry, cw, 64, 18); ctx.fill(); ctx.restore();
-      ctx.fillRect(rx, ry + 32, cw, 32);
-      ctx.fillStyle = rgb(YELLOW); ctx.font = font(30, 900); ctx.textAlign = 'center';
-      ctx.fillText('REMPLAÇANTS', rx + cw / 2, ry + 44);
-      ctx.textAlign = 'left';
-      // liste
-      ctx.fillStyle = rgb(DARK); ctx.font = font(27, 700);
-      var ty = ry + 108;
-      for (var k = 0; k < rem.length && k < 8; k++) {
-        var rj = rem[k] || {};
-        ctx.fillText((rj.num != null ? rj.num : (16 + k)) + '  ·  ' + (rj.nom || '–'), rx + 26, ty);
-        ty += 36;
+      ctx.fillStyle = NAVY; roundRect(ctx, x0, ry, W - 2 * x0, 60, 18); ctx.fill();
+      ctx.fillRect(x0, ry + 40, W - 2 * x0, 20);
+      ctx.fillStyle = YELLOW; ctx.font = '900 30px Arial, sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('REMPLAÇANTS', W / 2, ry + 40); ctx.textAlign = 'left';
+      var per = 4, cwr = (W - 2 * x0 - 60) / per;
+      for (var m = 0; m < rem.length && m < 8; m++) {
+        var rj = rem[m] || {}, rr = Math.floor(m / per), rcx = m % per;
+        var rxp = x0 + 30 + rcx * cwr, ryp = ry + 108 + rr * 56;
+        var rcol = couleurClubPhoto(rj);
+        ctx.fillStyle = rcol; ctx.beginPath(); ctx.arc(rxp + 18, ryp - 8, 20, 0, 7); ctx.fill();
+        ctx.fillStyle = texteSurCouleur(rcol); ctx.font = '900 20px Arial, sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(String(rj.num != null ? rj.num : (16 + m)), rxp + 18, ryp - 7);
+        ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+        ctx.fillStyle = NAVY; ctx.font = '800 24px Arial, sans-serif';
+        ctx.fillText((rj.nom || '–'), rxp + 48, ryp);
       }
-      ctx.restore();
-
-      // 5) PIED signature
-      var fy = y0 + 4 * (ch + vgap) + 6;
-      ctx.fillStyle = rgb(DARK); ctx.fillRect(0, fy, W, H - fy);
-      ctx.fillStyle = rgb(YELLOW); ctx.fillRect(0, fy, W, 5);
-      ctx.fillStyle = rgb(WHITE); ctx.font = font(36, 900);
-      ctx.fillText('ENTENTE OFFLOAD', x0, fy + 62);
-      ctx.fillStyle = rgb(SKY); ctx.font = font(26, 600);
-      ctx.fillText('Unis pour viser plus haut · Saison 2026/2027', x0, fy + 104);
-
       return canvas;
     });
   }
