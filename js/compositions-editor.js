@@ -6,7 +6,13 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
- * Version : 3.69 — Picker poste : joueurs aptes au poste suggérés en tête de liste (28 sept. 2026)
+ * Version : 3.70 — Picker joueur : postes du joueur suggérés en tête (28 sept. 2026)
+ *   v3.70 : SUGGESTION-POSTE, sens JOUEUR → POSTE. Clic sur un joueur du
+ *           panneau Effectif (openPickerForJoueur) : les postes libres
+ *           déclarés sur sa fiche (j._postes, même enrichissement et même
+ *           correspondance codesLegacyDuPoste que v3.69) passent en tête
+ *           sous « Postes du joueur », puis « Autres postes ». Joueur sans
+ *           poste connu → rendu identique à v3.69. Item poste inchangé.
  *   v3.69 : SUGGESTION-POSTE. Au clic sur un poste titulaire vacant, le
  *           popover affiche d'abord « Suggérés — <poste> » : les joueurs du
  *           vivier dont la fiche déclare ce poste (personnes.postes_uuids),
@@ -5943,12 +5949,26 @@
     if (postesLibres.length === 0) {
       html += '<li class="popover__empty">Tous les postes XV sont déjà occupés.</li>';
     } else {
-      for (const p of postesLibres) {
-        html += '<li class="popover__item popover__item--poste" data-poste-id="' + escapeHtml(p.id) + '">';
-        html +=   '<span class="slot__num">' + escapeHtml(p.numero_xv) + '</span>';
-        html +=   '<span class="popover__poste-libelle">' + escapeHtml(p.libelle_long || p.libelle_court) + '</span>';
-        html += '</li>';
+      // v3.70 — SUGGESTION-POSTE (sens joueur → poste) : les postes libres
+      // déclarés sur la fiche du joueur passent en tête (« Postes du joueur »),
+      // les autres suivent (« Autres postes »). Joueur sans poste connu → liste
+      // identique à v3.69.
+      const joueur = getJoueurVivier(pv.joueurId);
+      const aptes = postesLibres.filter(p => joueurApteAuPoste(joueur, codesLegacyDuPoste(p)));
+      const setAptes = new Set(aptes);
+      const autresPostes = postesLibres.filter(p => !setAptes.has(p));
+      const itemPoste = function (p) {
+        return '<li class="popover__item popover__item--poste" data-poste-id="' + escapeHtml(p.id) + '">' +
+                 '<span class="slot__num">' + escapeHtml(p.numero_xv) + '</span>' +
+                 '<span class="popover__poste-libelle">' + escapeHtml(p.libelle_long || p.libelle_court) + '</span>' +
+               '</li>';
+      };
+      if (aptes.length > 0) {
+        html += '<li class="popover__group-label">Postes du joueur</li>';
+        html += aptes.map(itemPoste).join('');
+        if (autresPostes.length > 0) html += '<li class="popover__group-label">Autres postes</li>';
       }
+      html += autresPostes.map(itemPoste).join('');
     }
     html += '<li class="popover__item popover__item--remp" data-mode="remplacant">';
     html +=   '<span class="slot__num">R</span>';
