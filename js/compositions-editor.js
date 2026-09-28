@@ -6,7 +6,15 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
- * Version : 3.70 — Picker joueur : postes du joueur suggérés en tête (28 sept. 2026)
+ * Version : 3.71 — Fix : suggestions de poste absentes au premier chargement (28 sept. 2026)
+ *   v3.71 : FIX SUGGESTION-POSTE. Recette terrain J7 : tous les joueurs du
+ *           vivier sans _postes. Cause : init() exécute Promise.all([
+ *           loadEvenements(), loadVivier(), loadPostes()]) → en mode U-N3,
+ *           loadVivier lit State.evenementEquipeContext AVANT qu'il soit posé
+ *           → categorieId null → enrichirPostesVivier sautait en silence.
+ *           Correctif : si la catégorie manque, loadVivier la relit via
+ *           getEvenementEquipeContext pour le seul enrichissement. Mode
+ *           legacy (_catActive) non concerné. Ordre du boot inchangé.
  *   v3.70 : SUGGESTION-POSTE, sens JOUEUR → POSTE. Clic sur un joueur du
  *           panneau Effectif (openPickerForJoueur) : les postes libres
  *           déclarés sur sa fiche (j._postes, même enrichissement et même
@@ -6591,7 +6599,20 @@
       }
 
       // v3.69 — postes déclarés (suggestion au picker), non bloquant.
-      await enrichirPostesVivier(vivier, categorieId);
+      // v3.71 — au boot, init lance loadEvenements/loadVivier EN PARALLÈLE
+      // (Promise.all) : le contexte peut ne pas être encore posé → catégorie
+      // relue ici via getEvenementEquipeContext (lecture seule, locale à
+      // l'enrichissement ; aucun autre usage du contexte n'est modifié).
+      let catPostes = categorieId;
+      if (!catPostes) {
+        try {
+          const rc = await SupabaseHub.getEvenementEquipeContext(State.evenementEquipeId);
+          catPostes = (rc && rc.ok && rc.data && rc.data.entente) ? rc.data.entente.categorie_id : null;
+        } catch (e) {
+          console.warn('MOM Hub: catégorie pour enrichissement postes introuvable (non bloquant)', e);
+        }
+      }
+      await enrichirPostesVivier(vivier, catPostes);
 
       State.vivier = vivier;
       State.vivierById = new Map();
