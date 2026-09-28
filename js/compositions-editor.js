@@ -6,7 +6,22 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
- * Version : 3.63 — Boot : deep-link ?vue=rapport (onglet Rapport via la vignette de la fiche évènement) (4 juin 2026)
+ * Version : 3.69 — Picker poste : joueurs aptes au poste suggérés en tête de liste (28 sept. 2026)
+ *   v3.69 : SUGGESTION-POSTE. Au clic sur un poste titulaire vacant, le
+ *           popover affiche d'abord « Suggérés — <poste> » : les joueurs du
+ *           vivier dont la fiche déclare ce poste (personnes.postes_uuids),
+ *           puis les remplaçants (inchangé), puis « Autres joueurs ». Aucun
+ *           joueur n'est masqué ; sans joueur apte, rendu identique à v3.68.
+ *           Données : postes_uuids stocke les codes legacy « pst-0NN »
+ *           (= postes.uuid_legacy, vérifié base 28/09). Le vivier compo n'en
+ *           dispose pas → enrichissement NON BLOQUANT dans loadVivier (2
+ *           modes) via SupabaseHub.getJoueursCategorie(catégorie) (RPC
+ *           get_joueurs_categorie, EXECUTE authenticated) → j._postes.
+ *           Joueurs hors catégorie : pas de postes connus → jamais suggérés.
+ *           Postes sans uuid_legacy (variantes « unifiées ») rattachés par
+ *           famille de codes : 2LU→2LG/2LD, 3LU→3LG/3LD/N8, AIU→AG/AD,
+ *           CTU→CG/CD ; J1..J5 : pas de suggestion. Search + clic inchangés.
+ *   v3.63 : Boot : deep-link ?vue=rapport (onglet Rapport via la vignette de la fiche évènement) (4 juin 2026)
  *   v3.68 : COMPO-RATTACHEMENT-CATEGORIE — l'ANCRE du mode legacy passe
  *           de l'ÉQUIPE à la CATÉGORIE (dernier volet de la migration
  *           équipe→catégorie, patron Option B des pts 169/171/181/186).
@@ -1297,6 +1312,50 @@
     return (a.prenom || '').localeCompare(b.prenom || '', 'fr');
   }
   function getPoste(posteId) { return State.postesById.get(posteId); }
+
+  // v3.69 — SUGGESTION-POSTE : codes legacy (pst-0NN) couverts par un poste
+  // de slot. Poste avec uuid_legacy → lui-même ; variantes « unifiées » sans
+  // uuid_legacy → famille de codes ; sinon ensemble vide (pas de suggestion).
+  const FAMILLES_POSTE_UNIFIE = {
+    '2LU': ['2LG', '2LD'],
+    '3LU': ['3LG', '3LD', 'N8'],
+    'AIU': ['AG', 'AD'],
+    'CTU': ['CG', 'CD']
+  };
+  function codesLegacyDuPoste(poste) {
+    const out = new Set();
+    if (!poste) return out;
+    if (poste.uuid_legacy) { out.add(poste.uuid_legacy); return out; }
+    const fam = FAMILLES_POSTE_UNIFIE[poste.code];
+    if (!fam) return out;
+    (State.postes || []).forEach(function (p) {
+      if (p.uuid_legacy && fam.indexOf(p.code) !== -1) out.add(p.uuid_legacy);
+    });
+    return out;
+  }
+  function joueurApteAuPoste(j, codes) {
+    if (!j || !Array.isArray(j._postes) || !codes || codes.size === 0) return false;
+    return j._postes.some(function (c) { return codes.has(c); });
+  }
+  // Enrichissement NON BLOQUANT du vivier avec les postes déclarés sur la
+  // fiche (get_joueurs_categorie → postes_uuids). Échec → aucun _postes,
+  // le picker se comporte exactement comme en v3.68.
+  async function enrichirPostesVivier(vivier, categorieId) {
+    if (!categorieId || !Array.isArray(vivier) || vivier.length === 0) return;
+    try {
+      const effectif = await SupabaseHub.getJoueursCategorie(categorieId);
+      if (!Array.isArray(effectif)) return;
+      const parId = new Map();
+      effectif.forEach(function (p) {
+        if (p && p.id && Array.isArray(p.postes_uuids)) parId.set(p.id, p.postes_uuids);
+      });
+      vivier.forEach(function (j) {
+        if (parId.has(j.joueur_id)) j._postes = parId.get(j.joueur_id);
+      });
+    } catch (e) {
+      console.warn('MOM Hub: enrichissement postes vivier échoué (non bloquant)', e);
+    }
+  }
   function getJoueurVivier(joueurId) { return State.vivierById.get(joueurId); }
   function joueursDejaPlaces() {
     const set = new Set();
@@ -5748,6 +5807,27 @@
 
     let html = '';
 
+    // v3.69 — SUGGESTION-POSTE : sur un poste titulaire, les joueurs du
+    // vivier aptes (poste déclaré sur la fiche) passent EN TÊTE, sous
+    // « Suggérés — <poste> ». Les autres restent listés plus bas.
+    let suggeres = [];
+    let autres = candidates;
+    let labelAutresPose = false;
+    if (pv.role === 'titulaire' && pv.posteId) {
+      const codes = codesLegacyDuPoste(getPoste(pv.posteId));
+      if (codes.size > 0) {
+        suggeres = candidates.filter(j => joueurApteAuPoste(j, codes));
+        if (suggeres.length > 0) {
+          const setSug = new Set(suggeres);
+          autres = candidates.filter(j => !setSug.has(j));
+          const pSug = getPoste(pv.posteId);
+          const libSug = pSug ? (pSug.libelle_court || pSug.code || '') : '';
+          html += '<li class="popover__group-label">Suggérés — ' + escapeHtml(libSug) + '</li>';
+          html += suggeres.map(renderCandidatSlotVide).join('');
+        }
+      }
+    }
+
     // v3.19 — section « Remplaçants » : on propose AUSSI les joueurs du banc
     // pour les promouvoir sur ce poste (le clic appelle onPickJoueurPourSlot
     // comme pour le vivier ; addJoueurCompo réaffecte le joueur au poste →
@@ -5771,45 +5851,57 @@
           html +=   '<span class="effectif-item__tag effectif-item__tag--bench" title="Actuellement remplaçant">banc</span>';
           html += '</li>';
         }
-        html += '<li class="popover__group-label">Vivier</li>';
+        html += '<li class="popover__group-label">' + (suggeres.length > 0 ? 'Autres joueurs' : 'Vivier') + '</li>';
+        labelAutresPose = true;
       }
+    }
+    // v3.69 : sans section banc mais avec des suggérés, on sépare quand même.
+    if (suggeres.length > 0 && autres.length > 0 && !labelAutresPose) {
+      html += '<li class="popover__group-label">Autres joueurs</li>';
     }
 
     if (candidates.length === 0) {
       html += '<li class="popover__empty">Aucun joueur disponible.</li>';
     } else {
-      for (const j of candidates) {
-        if (State.evenementEquipeId) {
-          // U-N3 : warning = hors du groupe de base (dépannage)
-          const horsGroupe = !!j._horsGroupe;
-          html += '<li class="popover__item' + (horsGroupe ? ' popover__item--warning' : '') + '" data-joueur-id="' + escapeHtml(j.joueur_id) + '">';
-          html +=   '<span class="effectif-item__avatar">' + escapeHtml(initiales(j.prenom, j.nom)) + '</span>';
-          html +=   '<span class="effectif-item__name">';
-          html +=     '<span class="effectif-item__nom">' + escapeHtml(j.nom || '?') + '</span>';
-          html +=     '<span class="effectif-item__prenom">' + escapeHtml(j.prenom || '') + '</span>';
-          html +=   '</span>';
-          if (horsGroupe) {
-            html += '<span class="effectif-item__tag effectif-item__tag--renfort" title="Joueur hors du groupe de base">hors groupe</span>';
-            html += '<span class="popover__warning" title="Hors du groupe de base (dépannage)">⚠</span>';
-          }
-          html += '</li>';
-        } else {
-          // Legacy : warning = hors catégorie de référence (perimetreCat.active),
-          // repli null fail-safe — cf. _joueurHorsCategorieLegacy.
-          const horsCat = _joueurHorsCategorieLegacy(j);
-          const etq = etiquetteJoueur(j);
-          const tagHtml = etq ? '<span class="effectif-item__tag effectif-item__tag--' + etq.kind + '">' + etq.label + '</span>' : '';
-          html += '<li class="popover__item' + (horsCat ? ' popover__item--warning' : '') + '" data-joueur-id="' + escapeHtml(j.joueur_id) + '">';
-          html +=   '<span class="effectif-item__avatar">' + escapeHtml(initiales(j.prenom, j.nom)) + '</span>';
-          html +=   '<span class="effectif-item__name">';
-          html +=     '<span class="effectif-item__nom">' + escapeHtml(j.nom || '?') + '</span>';
-          html +=     '<span class="effectif-item__prenom">' + escapeHtml(j.prenom || '') + '</span>';
-          html +=   '</span>';
-          html +=   tagHtml;
-          if (horsCat) html += '<span class="popover__warning" title="Hors catégorie M14 (dépannage)">⚠</span>';
-          html += '</li>';
-        }
+      html += autres.map(renderCandidatSlotVide).join('');
+    }
+    return html;
+  }
+
+  // v3.69 : rendu d'un candidat du picker slot-vide, extrait À L'IDENTIQUE
+  // de la boucle v3.68 (U-N3 « hors groupe » / legacy « hors catégorie »)
+  // pour servir aux sections « Suggérés » et « Autres joueurs ».
+  function renderCandidatSlotVide(j) {
+    let html = '';
+    if (State.evenementEquipeId) {
+      // U-N3 : warning = hors du groupe de base (dépannage)
+      const horsGroupe = !!j._horsGroupe;
+      html += '<li class="popover__item' + (horsGroupe ? ' popover__item--warning' : '') + '" data-joueur-id="' + escapeHtml(j.joueur_id) + '">';
+      html +=   '<span class="effectif-item__avatar">' + escapeHtml(initiales(j.prenom, j.nom)) + '</span>';
+      html +=   '<span class="effectif-item__name">';
+      html +=     '<span class="effectif-item__nom">' + escapeHtml(j.nom || '?') + '</span>';
+      html +=     '<span class="effectif-item__prenom">' + escapeHtml(j.prenom || '') + '</span>';
+      html +=   '</span>';
+      if (horsGroupe) {
+        html += '<span class="effectif-item__tag effectif-item__tag--renfort" title="Joueur hors du groupe de base">hors groupe</span>';
+        html += '<span class="popover__warning" title="Hors du groupe de base (dépannage)">⚠</span>';
       }
+      html += '</li>';
+    } else {
+      // Legacy : warning = hors catégorie de référence (perimetreCat.active),
+      // repli null fail-safe — cf. _joueurHorsCategorieLegacy.
+      const horsCat = _joueurHorsCategorieLegacy(j);
+      const etq = etiquetteJoueur(j);
+      const tagHtml = etq ? '<span class="effectif-item__tag effectif-item__tag--' + etq.kind + '">' + etq.label + '</span>' : '';
+      html += '<li class="popover__item' + (horsCat ? ' popover__item--warning' : '') + '" data-joueur-id="' + escapeHtml(j.joueur_id) + '">';
+      html +=   '<span class="effectif-item__avatar">' + escapeHtml(initiales(j.prenom, j.nom)) + '</span>';
+      html +=   '<span class="effectif-item__name">';
+      html +=     '<span class="effectif-item__nom">' + escapeHtml(j.nom || '?') + '</span>';
+      html +=     '<span class="effectif-item__prenom">' + escapeHtml(j.prenom || '') + '</span>';
+      html +=   '</span>';
+      html +=   tagHtml;
+      if (horsCat) html += '<span class="popover__warning" title="Hors catégorie M14 (dépannage)">⚠</span>';
+      html += '</li>';
     }
     return html;
   }
@@ -6478,6 +6570,9 @@
         console.warn('MOM Hub: enrichissement club vivier échoué (non bloquant)', e);
       }
 
+      // v3.69 — postes déclarés (suggestion au picker), non bloquant.
+      await enrichirPostesVivier(vivier, categorieId);
+
       State.vivier = vivier;
       State.vivierById = new Map();
       for (const j of State.vivier) State.vivierById.set(j.joueur_id, j);
@@ -6487,6 +6582,8 @@
     // get_vivier_compo_categorie (pt 186, authenticated only). Même forme
     // de sortie que la voie équipe (colonnes equipe_joueurs à NULL).
     State.vivier = await SupabaseHub.getVivierCompoCategorie(_catActive());
+    // v3.69 — postes déclarés (suggestion au picker), non bloquant.
+    await enrichirPostesVivier(State.vivier, _catActive());
     State.vivierById = new Map();
     for (const j of State.vivier) State.vivierById.set(j.joueur_id, j);
     return State.vivier;
