@@ -19,7 +19,16 @@
  * écran dédié, pas une extension de l'éditeur (l'éditeur = U-N3,
  * étape c). Aucune logique d'éditeur dupliquée (P1).
  *
- * Version : 1.1 — flèches de parcours (← fiche évènement / compositions →) ; v1.0 étape (b) chantier Collectif & compo 3 niveaux.
+ * Version : 1.2 — vivier trié par ordre alphabétique (joueurs puis staff, nom puis prénom) (28 sept. 2026).
+ *   v1.2 : VIVIER-ALPHA. loadVivier trie State.vivier après chargement :
+ *          rôle (joueur avant staff, comme l'ORDER BY de la RPC), puis nom,
+ *          puis prénom (localeCompare 'fr', accents gérés). La RPC
+ *          list_vivier_collectif triait par rôle + date_debut et les noms
+ *          ne sont résolus que côté client (_resolveNoms) → tri côté front.
+ *          Tri EN PLACE avant tout rendu : les boutons « → » référencent
+ *          l'index dans State.vivier au moment du rendu, cohérent.
+ *          Groupe N2 (colonne droite) inchangé.
+ *   v1.1 : flèches de parcours (← fiche évènement / compositions →) ; v1.0 étape (b) chantier Collectif & compo 3 niveaux.
  *   v1.0 : 2 colonnes (vivier N1 / groupe N2) ; filtres rôle+statut
  *          + recherche nom (UN2-1/2/6) ; statut sous-ligne (UN2-2) ;
  *          cumul inter-équipes du même évènement visible non bloqué
@@ -145,6 +154,16 @@
   async function loadVivier() {
     // pt 213 : vivier FUSIONNÉ (collectif_membre + encadrants fonction_staff).
     State.vivier = await SupabaseHub.listVivierCollectif(State.ctx.entente.id) || [];
+    // v1.2 : ordre alphabétique (rôle joueur→staff, puis nom, puis prénom).
+    const rangRole = r => (r === 'staff' ? 1 : 0);
+    State.vivier.sort(function (a, b) {
+      const dr = rangRole(a.role) - rangRole(b.role);
+      if (dr !== 0) return dr;
+      const pa = a.personnes || {}, pb = b.personnes || {};
+      const dn = (pa.nom || '').localeCompare(pb.nom || '', 'fr', { sensitivity: 'base' });
+      if (dn !== 0) return dn;
+      return (pa.prenom || '').localeCompare(pb.prenom || '', 'fr', { sensitivity: 'base' });
+    });
   }
 
   async function loadGroupe() {
