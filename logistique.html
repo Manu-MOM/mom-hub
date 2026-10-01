@@ -213,6 +213,19 @@
     }
     .logi-col-main { min-width: 0; }
     .logi-col-side { min-width: 0; }
+    /* pt 276 · STICKY-GLOBAL (suite) — le calendrier .logi-cal (sticky)
+       était enfermé dans une colonne aussi haute que lui (align-items:
+       start de .logi-cols) : aucune course possible, il ne collait pas.
+       La colonne s'étire désormais sur toute la hauteur de la grille, et le
+       calendrier est borné à la hauteur de l'écran (défilement interne) pour
+       que son bas — détail du jour — reste toujours atteignable. Sous 860px,
+       la règle mobile existante (position: static) reste prioritaire et la
+       borne est levée. Ajout pur. */
+    .logi-col-side { align-self: stretch; }
+    .logi-cal { max-height: calc(100vh - 36px); overflow-y: auto; }
+    @media (max-width: 860px) {
+      .logi-cal { max-height: none; overflow-y: visible; }
+    }
 
     .logi-cal {
       position: sticky; top: 18px;
