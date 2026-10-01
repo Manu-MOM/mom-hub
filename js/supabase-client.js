@@ -18,7 +18,17 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.83 — 1er octobre 2026
+ * Version : 1.84 — 1er octobre 2026
+ *   v1.84 : HISTORIQUE-INDISPONIBILITES + SUSPENSION-NOTES (FAIT FOI gelé
+ *          01/10/2026, pt 274). 3 wrappers ADDITIFS → RPC sql_254, jumeaux
+ *          des wrappers blessures : listIndisponibilitesJoueur(personneId)
+ *          → list_indisponibilites_joueur ; saveIndisponibilite({id?,
+ *          personne_id, date_debut, date_fin, motif, notes}) →
+ *          upsert_indisponibilite ; deleteIndisponibilite(id) →
+ *          delete_indisponibilite. Doc de updateJoueurMetier complétée
+ *          (clé suspension_notes acceptée par la RPC depuis sql_254 ;
+ *          indisponibilite / blessure_resume ne sont plus lus par les RPC
+ *          d'état). Aucune ligne de code existante touchée. node --check OK.
  *   v1.83 : HISTORIQUE-BLESSURES (FAIT FOI gelé 01/10/2026, pt 274).
  *          3 wrappers ADDITIFS → RPC sql_253 (SECURITY DEFINER, table
  *          blessures sous RLS sans policy = donnée de santé) :
@@ -4964,6 +4974,9 @@
      *   - indisponibilite     string ou "" (idem)
      *   - blessure_resume     string ou "" (idem)
      *   - suspension_jusqu_au string ISO date "YYYY-MM-DD" ou ""
+     *   - suspension_notes    string ou "" (sql_254, pt 274 — conditions FFR)
+     *   NB pt 274 : indisponibilite / blessure_resume restent acceptés mais
+     *   ne sont plus lus par les RPC d'état (historiques sql_253 / sql_254).
      *
      * Comportement par clé :
      *   - clé absente du patch  → champ inchangé en base
@@ -5104,6 +5117,93 @@
       if (error) {
         console.error('MOM Hub: deleteBlessure()', error);
         return { ok: false, error: error.message || 'Erreur delete_blessure' };
+      }
+      return { ok: true };
+    },
+
+    /**
+     * HISTORIQUE-INDISPONIBILITES (pt 274, sql_254) — LECTURE de
+     * l'historique des indisponibilités (hors blessure) d'un joueur, de la
+     * plus récente à la plus ancienne. Jumelle de listBlessuresJoueur.
+     * Garde côté RPC : admin | bureau | puis_je_lire_categorie.
+     *
+     * @param {string} personneId UUID de la personne
+     * @returns {Promise<Array<Object>|null>} lignes { id, personne_id,
+     *   date_debut, date_fin, motif, notes, est_active, created_at,
+     *   updated_at }, [] si aucune, null si erreur (droit inclus).
+     */
+    async listIndisponibilitesJoueur(personneId) {
+      if (!personneId) {
+        console.error('MOM Hub: listIndisponibilitesJoueur() requiert un personneId');
+        return null;
+      }
+      const { data, error } = await client.rpc('list_indisponibilites_joueur', {
+        p_personne_id: personneId
+      });
+      if (error) {
+        console.error('MOM Hub: listIndisponibilitesJoueur()', error);
+        return null;
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * HISTORIQUE-INDISPONIBILITES (pt 274, sql_254) — CRÉATION ou
+     * MODIFICATION d'une indisponibilité. Jumelle de saveBlessure (champ
+     * motif au lieu de libelle). Garde côté RPC : admin | bureau |
+     * puis_je_ecrire_categorie.
+     *
+     * @param {Object} b { id?, personne_id?, date_debut, date_fin?,
+     *   motif, notes? } — dates ISO "YYYY-MM-DD".
+     * @returns {Promise<{ok: boolean, data?: Object, error?: string}>}
+     */
+    async saveIndisponibilite(b) {
+      if (!b || typeof b !== 'object' || Array.isArray(b)) {
+        return { ok: false, error: 'Indisponibilité requise' };
+      }
+      if (!b.id && !b.personne_id) {
+        return { ok: false, error: 'personne_id requis' };
+      }
+      if (!b.date_debut) {
+        return { ok: false, error: 'Date de début obligatoire' };
+      }
+      if (!b.motif || !String(b.motif).trim()) {
+        return { ok: false, error: 'Motif obligatoire' };
+      }
+      if (b.date_fin && b.date_fin < b.date_debut) {
+        return { ok: false, error: 'La date de fin doit être postérieure ou égale à la date de début' };
+      }
+      const { data, error } = await client.rpc('upsert_indisponibilite', {
+        p_id: b.id || null,
+        p_personne_id: b.personne_id || null,
+        p_date_debut: b.date_debut,
+        p_date_fin: b.date_fin || null,
+        p_motif: String(b.motif),
+        p_notes: b.notes ? String(b.notes) : null
+      });
+      if (error) {
+        console.error('MOM Hub: saveIndisponibilite()', error);
+        return { ok: false, error: error.message || 'Erreur upsert_indisponibilite' };
+      }
+      const row = Array.isArray(data) && data.length > 0 ? data[0] : null;
+      return { ok: true, data: row };
+    },
+
+    /**
+     * HISTORIQUE-INDISPONIBILITES (pt 274, sql_254) — SUPPRESSION d'une
+     * indisponibilité (erreur de saisie). Garde côté RPC identique.
+     *
+     * @param {string} id UUID de l'indisponibilité (indisponibilites.id)
+     * @returns {Promise<{ok: boolean, error?: string}>}
+     */
+    async deleteIndisponibilite(id) {
+      if (!id) {
+        return { ok: false, error: 'id requis' };
+      }
+      const { error } = await client.rpc('delete_indisponibilite', { p_id: id });
+      if (error) {
+        console.error('MOM Hub: deleteIndisponibilite()', error);
+        return { ok: false, error: error.message || 'Erreur delete_indisponibilite' };
       }
       return { ok: true };
     },
