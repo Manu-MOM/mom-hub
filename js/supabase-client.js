@@ -18,7 +18,17 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
- * Version : 1.82 — août 2026
+ * Version : 1.83 — 1er octobre 2026
+ *   v1.83 : HISTORIQUE-BLESSURES (FAIT FOI gelé 01/10/2026, pt 274).
+ *          3 wrappers ADDITIFS → RPC sql_253 (SECURITY DEFINER, table
+ *          blessures sous RLS sans policy = donnée de santé) :
+ *          listBlessuresJoueur(personneId) → list_blessures_joueur ;
+ *          saveBlessure({id?, personne_id, date_debut, date_fin, libelle,
+ *          notes}) → upsert_blessure (id absent = création) ;
+ *          deleteBlessure(id) → delete_blessure. Retour homogène
+ *          { ok, data|error } pour les écritures (patron
+ *          updateJoueurMetier), null en cas d'erreur pour la lecture.
+ *          Aucune ligne existante touchée. node --check OK.
  *   v1.82 : CIRCUIT-ATELIERS (FAIT FOI gelé, module Séance). 3 wrappers
  *          ADDITIFS pour la fiche de marche du circuit d'ateliers (socle
  *          SQL sql_241 déjà en prod) : listCircuits / saveCircuit /
@@ -5008,6 +5018,94 @@
       // La RPC retourne SETOF personnes : prendre la 1ère ligne
       const row = Array.isArray(data) && data.length > 0 ? data[0] : null;
       return { ok: true, data: row };
+    },
+
+    /**
+     * HISTORIQUE-BLESSURES (pt 274, sql_253) — LECTURE de l'historique des
+     * blessures d'un joueur, de la plus récente à la plus ancienne.
+     * Garde côté RPC : admin | bureau | puis_je_lire_categorie(catégorie du
+     * joueur). Donnée de santé : jamais de SELECT direct (RLS sans policy).
+     *
+     * @param {string} personneId UUID de la personne
+     * @returns {Promise<Array<Object>|null>} lignes { id, personne_id,
+     *   date_debut, date_fin, libelle, notes, est_active, created_at,
+     *   updated_at }, [] si aucune, null si erreur (droit inclus).
+     */
+    async listBlessuresJoueur(personneId) {
+      if (!personneId) {
+        console.error('MOM Hub: listBlessuresJoueur() requiert un personneId');
+        return null;
+      }
+      const { data, error } = await client.rpc('list_blessures_joueur', {
+        p_personne_id: personneId
+      });
+      if (error) {
+        console.error('MOM Hub: listBlessuresJoueur()', error);
+        return null;
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * HISTORIQUE-BLESSURES (pt 274, sql_253) — CRÉATION ou MODIFICATION
+     * d'une blessure. id absent/null = création (personne_id requis) ;
+     * id présent = modification (personne_id facultatif, contrôlé par la
+     * RPC). date_fin vide = retour non connu. Garde côté RPC : admin |
+     * bureau | puis_je_ecrire_categorie(catégorie du joueur).
+     *
+     * @param {Object} b { id?, personne_id?, date_debut, date_fin?,
+     *   libelle, notes? } — dates ISO "YYYY-MM-DD".
+     * @returns {Promise<{ok: boolean, data?: Object, error?: string}>}
+     */
+    async saveBlessure(b) {
+      if (!b || typeof b !== 'object' || Array.isArray(b)) {
+        return { ok: false, error: 'Blessure requise' };
+      }
+      if (!b.id && !b.personne_id) {
+        return { ok: false, error: 'personne_id requis' };
+      }
+      if (!b.date_debut) {
+        return { ok: false, error: 'Date de début obligatoire' };
+      }
+      if (!b.libelle || !String(b.libelle).trim()) {
+        return { ok: false, error: 'Libellé obligatoire' };
+      }
+      if (b.date_fin && b.date_fin < b.date_debut) {
+        return { ok: false, error: 'La date de fin doit être postérieure ou égale à la date de début' };
+      }
+      const { data, error } = await client.rpc('upsert_blessure', {
+        p_id: b.id || null,
+        p_personne_id: b.personne_id || null,
+        p_date_debut: b.date_debut,
+        p_date_fin: b.date_fin || null,
+        p_libelle: String(b.libelle),
+        p_notes: b.notes ? String(b.notes) : null
+      });
+      if (error) {
+        console.error('MOM Hub: saveBlessure()', error);
+        return { ok: false, error: error.message || 'Erreur upsert_blessure' };
+      }
+      const row = Array.isArray(data) && data.length > 0 ? data[0] : null;
+      return { ok: true, data: row };
+    },
+
+    /**
+     * HISTORIQUE-BLESSURES (pt 274, sql_253) — SUPPRESSION d'une blessure
+     * (erreur de saisie). Garde côté RPC identique à saveBlessure.
+     *
+     * @param {string} id UUID de la blessure (blessures.id)
+     * @returns {Promise<{ok: boolean, error?: string}>}
+     */
+    async deleteBlessure(id) {
+      if (!id) {
+        return { ok: false, error: 'id requis' };
+      }
+      const { error } = await client.rpc('delete_blessure', { p_id: id });
+      if (error) {
+        console.error('MOM Hub: deleteBlessure()', error);
+        return { ok: false, error: error.message || 'Erreur delete_blessure' };
+      }
+      return { ok: true };
     },
 
     /**
