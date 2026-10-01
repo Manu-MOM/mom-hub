@@ -1445,6 +1445,42 @@
       padding-bottom: 14px;
       border-bottom: 1px solid var(--line);
     }
+    /* v1.29 SEANCE-NAV-DETAIL (S1, pt 275) — en-tête du détail COLLANT :
+       « ← Retour à la trame », titre, pastille de sauvegarde et Supprimer
+       restent visibles quel que soit le défilement. */
+    .seance-bloc-detail__header {
+      position: sticky;
+      top: 0;
+      z-index: 30;              /* sous les modales (1000) */
+      background: #fff;
+      padding-top: 10px;
+    }
+    /* v1.29 — PRÉREQUIS du collant : la règle globale de css/hub.css
+       (INTERDIT) « html, body { overflow-x: hidden } » fait de <body> un
+       conteneur de défilement qui ne défile jamais → tout position:sticky de
+       la page est inopérant (vérifié sous Chromium : en-tête à -700 px).
+       overflow-x: clip coupe le débordement horizontal À L'IDENTIQUE sans
+       créer de conteneur de défilement. Restreint à cette page ; navigateurs
+       sans « clip » : repli sur hidden (comportement actuel, sans collant).
+       Effet de bord voulu : la barre latérale « Mes séances » (déjà déclarée
+       sticky, top 24px, desktop seulement) colle enfin comme prévu. */
+    @supports (overflow-x: clip) {
+      html, body { overflow-x: clip; }
+    }
+    /* v1.29 (S3) — surlignage bref de l'étage au retour du détail. */
+    .seance-trame__row--retour > td {
+      animation: seance-retour-flash 1.8s ease-out;
+    }
+    @keyframes seance-retour-flash {
+      0%, 35% { background-color: var(--vert-light); }
+      100%    { background-color: transparent; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .seance-trame__row--retour > td {
+        animation: none;
+        background-color: var(--vert-light);
+      }
+    }
     .seance-bloc-detail__btn-retour {
       padding: 7px 16px;
       font-family: inherit;
