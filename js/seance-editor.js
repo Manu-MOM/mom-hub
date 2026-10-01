@@ -11,6 +11,17 @@
  *   - 5.5.A : éditeur méta + sauvegarde manuelle (CETTE VERSION)
  *   - 5.5.B : autosave 30s + dropdowns lieu/événement + champs secondaires
  *
+ * Version : 1.29 — SEANCE-NAV-DETAIL (1er octobre 2026)
+ *   v1.29 : SEANCE-NAV-DETAIL (FAIT FOI gelé 01/10/2026, pt 275, retour
+ *           terrain : « Retour à la trame » unique en haut du détail,
+ *           pénible quand le bloc est long). (S1) en-tête du détail collant
+ *           — CSS seulement, dans seance.html (commit séparé). (S2) à
+ *           l'ouverture d'un bloc, la page se place en haut du détail
+ *           (onOpenBlocDetail). (S3) au retour, la page revient sur l'étage
+ *           du bloc quitté, surligné brièvement ; repli haut de trame si le
+ *           bloc n'existe plus (onCloseBlocDetail → _revenirSurBlocTrame).
+ *           Défilement fluide sauf prefers-reduced-motion (_defilerVers).
+ *           Aucune donnée ni RPC touchée. node --check OK.
  * Version : 1.28 — RENCONTRES vignette match + responsive mobile (août 2026)
  *   v1.28 : (1) La vignette de la voie « match » (mode rencontres) est 2x plus
  *           large que les voies atelier (classe seance-trame__voie--match, flex
@@ -6141,6 +6152,48 @@
     renderTrame();             // bascule la vue (renderTrame appelle renderBlocDetail si view='bloc-detail')
     setBlocAutosaveStatus('idle');
     startBlocAutosave();
+    // v1.29 SEANCE-NAV-DETAIL (S2) : on arrive en haut du détail, même si
+    // le bloc a été ouvert depuis le bas d'une longue trame.
+    const detail = DOM.blocDetailSection();
+    if (detail) _defilerVers(detail, 'start');
+  }
+
+  /**
+   * v1.29 SEANCE-NAV-DETAIL — défilement vers un élément, fluide sauf si
+   * l'utilisateur a demandé à réduire les animations.
+   * @param {Element} el
+   * @param {string} bloc 'start' | 'center'
+   */
+  function _defilerVers(el, bloc) {
+    if (!el || typeof el.scrollIntoView !== 'function') return;
+    const reduit = !!(window.matchMedia
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    el.scrollIntoView({ behavior: reduit ? 'auto' : 'smooth', block: bloc });
+  }
+
+  /**
+   * v1.29 SEANCE-NAV-DETAIL (S3) — au retour du détail, ramène la page sur
+   * l'étage du bloc quitté et le surligne brièvement. Repli : haut de la
+   * trame (bloc supprimé entre-temps, ou introuvable).
+   * @param {string|null} blocId
+   */
+  function _revenirSurBlocTrame(blocId) {
+    const section = DOM.trameSection();
+    if (!section) return;
+    let ligne = null;
+    if (blocId) {
+      const sel = '[data-action="open-detail"][data-bloc-id="'
+        + (window.CSS && CSS.escape ? CSS.escape(blocId) : blocId) + '"]';
+      const cellule = section.querySelector(sel);
+      ligne = cellule ? cellule.closest('tr') : null;
+    }
+    if (!ligne) {
+      _defilerVers(section, 'start');
+      return;
+    }
+    _defilerVers(ligne, 'center');
+    ligne.classList.add('seance-trame__row--retour');
+    setTimeout(function () { ligne.classList.remove('seance-trame__row--retour'); }, 1800);
   }
 
   /**
@@ -6156,6 +6209,7 @@
       if (!ok) return;
     }
     stopBlocAutosave();
+    const blocQuitteId = State.currentBloc ? State.currentBloc.id : null; // v1.29 (S3)
     State.view = 'trame';
     State.currentBloc = null;
     State.blocIsDirty = false;
@@ -6163,6 +6217,7 @@
     closeFichePicker();           // Phase 5.8 : fermer le picker si ouvert
     closeGroupePicker();          // Phase 5.9 : idem pour le picker groupe
     renderTrame();
+    _revenirSurBlocTrame(blocQuitteId); // v1.29 SEANCE-NAV-DETAIL (S3)
   }
 
   /**
