@@ -98,6 +98,19 @@ html, body { height: 100%; }
    la source. fullscreen-app a déjà overflow:hidden → non impacté. */
 html, body { max-width: 100%; overflow-x: hidden; }
 
+/* pt 276 · DÉROGATION INTERDIT accordée par Manu (01/10/2026) — STICKY-GLOBAL.
+   Combinée à « html, body { height: 100% } », la règle ci-dessus fait de
+   <body> le conteneur de défilement (la fenêtre ne défile plus) : tout
+   position:sticky déclaré par rapport à la page est inopérant et
+   window.scrollTo() / window.scrollY ne font rien. overflow-x: clip coupe le
+   débordement horizontal À L'IDENTIQUE sans créer de conteneur de
+   défilement. Navigateurs sans « clip » (Safari < 16) : la ligne ci-dessus
+   reste le repli (comportement antérieur). Pages fullscreen-app : règles
+   propres prioritaires, non impactées. Ajout pur : aucune ligne modifiée. */
+@supports (overflow-x: clip) {
+  html, body { overflow-x: clip; }
+}
+
 body {
   font-family: 'Manrope', sans-serif;
   background: var(--paper);
