@@ -4,6 +4,23 @@
  *
  * Module IIFE — initialise l'UI de la page joueurs.html.
  *
+ * Version : v1.8 — 1er octobre 2026
+ *   v1.8 : HISTORIQUE-BLESSURES (FAIT FOI gelé 01/10/2026, pt 274, socle
+ *          SQL sql_253 + supabase-client v1.83). (1) Fiche : la ligne
+ *          « Blessure » (libellé de la blessure ACTIVE, renvoyé par
+ *          get_joueur_detail) est complétée des dates, + historique
+ *          repliable « 🩹 Historique des blessures (n) » — chargement
+ *          asynchrone non bloquant (_chargerBlessuresFiche), vide honnête
+ *          si aucune blessure ou lecture refusée. (2) Modale État : le
+ *          textarea blessure_resume est remplacé par le bloc historique
+ *          (liste, + Ajouter, Modifier, Déclarer le retour, Supprimer) ;
+ *          chaque action est enregistrée immédiatement (upsert_blessure /
+ *          delete_blessure) puis cartes + fiche + liste rafraîchies ;
+ *          « Enregistrer » ne porte plus que indisponibilité + suspension
+ *          (blessure_resume retiré du patch). « Déclarer le retour » fixe
+ *          la fin à HIER (fin = dernier jour d'indisponibilité, D2) ou au
+ *          début si la blessure a commencé aujourd'hui. Aucun état
+ *          recalculé côté front (vérité SQL). node --check OK.
  * Version : v1.7 — 5 juillet 2026
  *   v1.7 : CATEGORIE-SECTION-RUGBY (FAIT FOI b67f451d + ADDENDUM 1).
  *          (1) Aiguillage Section : si la catégorie active est SECTION
@@ -912,6 +929,7 @@ window.JoueursBrowser = (function () {
       renderFiche(detail);
       bindFicheActions();
       _chargerPhotoFiche(detail.id); // asynchrone, non bloquant ; repli initiales
+      _chargerBlessuresFiche(detail.id); // pt 274 : asynchrone, non bloquant
 
     } catch (err) {
       console.error('Joueurs: openFiche()', err);
@@ -1058,7 +1076,9 @@ window.JoueursBrowser = (function () {
       body += `<div class="joueur-fiche-row"><div class="joueur-fiche-row-lbl">Indispo.</div><div class="joueur-fiche-row-val joueur-fiche-warn">${esc(d.indisponibilite)}</div></div>`;
     }
     if (hasBlessure) {
-      body += `<div class="joueur-fiche-row"><div class="joueur-fiche-row-lbl">Blessure</div><div class="joueur-fiche-row-val joueur-fiche-alert">${esc(d.blessure_resume)}</div></div>`;
+      // pt 274 : blessure_resume = libellé de la blessure ACTIVE (sql_253) ;
+      // les dates sont complétées en asynchrone par _chargerBlessuresFiche().
+      body += `<div class="joueur-fiche-row"><div class="joueur-fiche-row-lbl">Blessure</div><div class="joueur-fiche-row-val joueur-fiche-alert">${esc(d.blessure_resume)}<span id="joueur-fiche-bl-dates"></span></div></div>`;
     }
     if (hasSusp) {
       body += `<div class="joueur-fiche-row"><div class="joueur-fiche-row-lbl">Suspendu jusqu'au</div><div class="joueur-fiche-row-val joueur-fiche-alert">${esc(formatDate(d.suspension_jusqu_au))}</div></div>`;
@@ -1066,6 +1086,10 @@ window.JoueursBrowser = (function () {
     if (!hasIndispo && !hasBlessure && !hasSusp) {
       body = '<div class="joueur-fiche-empty">Aucun état métier déclaré · joueur disponible</div>';
     }
+
+    // pt 274 : conteneur de l'historique des blessures (rempli en asynchrone,
+    // reste vide si aucune blessure ou si la lecture est refusée).
+    body += '<div id="joueur-fiche-bl-histo"></div>';
 
     // Notes coach (seule fiche détail)
     if (d.notes_coach && d.notes_coach.trim().length > 0) {
@@ -1757,12 +1781,11 @@ window.JoueursBrowser = (function () {
         + 'État actuel : ' + esc(ETAT_LABELS[d.etat_calcule] || d.etat_calcule);
     }
 
-    // Pré-remplit les 3 champs
+    // Pré-remplit indisponibilité + suspension (pt 274 : la blessure n'est
+    // plus un champ texte, elle est gérée par le bloc historique ci-dessous).
     const tIndispo = document.getElementById('joueur-etat-indispo');
-    const tBlessure = document.getElementById('joueur-etat-blessure');
     const dSusp = document.getElementById('joueur-etat-suspension');
     if (tIndispo)  tIndispo.value  = d.indisponibilite || '';
-    if (tBlessure) tBlessure.value = d.blessure_resume || '';
     if (dSusp)     dSusp.value     = d.suspension_jusqu_au || '';
 
     const submitBtn = document.getElementById('joueur-etat-submit');
@@ -1770,6 +1793,17 @@ window.JoueursBrowser = (function () {
       submitBtn.disabled = false;
       submitBtn.onclick = submitModalEtat;
     }
+
+    // pt 274 · HISTORIQUE-BLESSURES : liste + boutons du bloc blessures.
+    clearModalMessage('joueur-bl-msg');
+    _fermerFormBlessure();
+    const btnAjouter = document.getElementById('joueur-bl-ajouter');
+    if (btnAjouter) btnAjouter.onclick = function () { _ouvrirFormBlessure(null); };
+    const btnAnnuler = document.getElementById('joueur-bl-annuler');
+    if (btnAnnuler) btnAnnuler.onclick = _fermerFormBlessure;
+    const btnEnregistrer = document.getElementById('joueur-bl-enregistrer');
+    if (btnEnregistrer) btnEnregistrer.onclick = _enregistrerBlessure;
+    _chargerBlessuresModal(d.id);
 
     overlay.classList.add('show');
   }
@@ -1783,12 +1817,13 @@ window.JoueursBrowser = (function () {
 
     try {
       const tIndispo  = document.getElementById('joueur-etat-indispo');
-      const tBlessure = document.getElementById('joueur-etat-blessure');
       const dSusp     = document.getElementById('joueur-etat-suspension');
 
+      // pt 274 : blessure_resume n'est plus envoyé (clé absente = colonne
+      // inchangée côté update_joueur_metier) ; les blessures passent par
+      // upsert_blessure / delete_blessure.
       const patch = {
         indisponibilite:     tIndispo  ? tIndispo.value  : '',
-        blessure_resume:     tBlessure ? tBlessure.value : '',
         suspension_jusqu_au: dSusp     ? dSusp.value     : ''
       };
 
@@ -1814,6 +1849,245 @@ window.JoueursBrowser = (function () {
       showModalMessage('joueur-etat-msg', 'joueur-etat-body', 'error',
         'Erreur inattendue : ' + (err.message || err));
       if (submitBtn) submitBtn.disabled = false;
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // pt 274 · HISTORIQUE-BLESSURES (FAIT FOI gelé 01/10/2026, sql_253)
+  // ----------------------------------------------------------------
+  // Règle (D2) : une blessure est ACTIVE si date_debut <= aujourd'hui ET
+  // (date_fin vide OU date_fin >= aujourd'hui). date_fin = dernier jour
+  // d'indisponibilité. La vérité de l'état est côté SQL (etat_calcule,
+  // est_active) : le front ne recalcule rien, il affiche.
+
+  /** Cache des blessures affichées dans la modale (id → ligne). */
+  let BLESSURES_MODALE = new Map();
+
+  /** Date locale ISO "YYYY-MM-DD" décalée de offsetJours (fuseau du poste). */
+  function _isoJour(offsetJours) {
+    const d = new Date();
+    d.setDate(d.getDate() + (offsetJours || 0));
+    return d.getFullYear() + '-'
+      + String(d.getMonth() + 1).padStart(2, '0') + '-'
+      + String(d.getDate()).padStart(2, '0');
+  }
+
+  /** Libellé de période d'une blessure selon qu'elle est active, à venir
+   *  ou terminée (est_active vient de la RPC : vérité SQL). */
+  function _periodeBlessure(b) {
+    const debut = formatDate(b.date_debut);
+    const fin = b.date_fin ? formatDate(b.date_fin) : null;
+    if (b.est_active) {
+      return 'depuis le ' + debut
+        + (fin ? ' · indisponible jusqu\'au ' + fin : ' · retour non connu');
+    }
+    if (b.date_debut > _isoJour(0)) {
+      return 'à partir du ' + debut + (fin ? ' jusqu\'au ' + fin : '');
+    }
+    return 'du ' + debut + (fin ? ' au ' + fin : '');
+  }
+
+  /** Fiche : complète la ligne « Blessure » (dates) + historique repliable. */
+  async function _chargerBlessuresFiche(personneId) {
+    if (typeof SupabaseHub.listBlessuresJoueur !== 'function') return; // socle < v1.83
+    const liste = await SupabaseHub.listBlessuresJoueur(personneId);
+    if (currentEditPersonneId !== personneId) return; // fiche changée entre-temps
+    if (!Array.isArray(liste) || liste.length === 0) return; // rien / refus : vide honnête
+
+    const active = liste.find(function (b) { return b.est_active; });
+    const datesEl = document.getElementById('joueur-fiche-bl-dates');
+    if (datesEl && active) datesEl.textContent = ' · ' + _periodeBlessure(active);
+
+    const histoEl = document.getElementById('joueur-fiche-bl-histo');
+    if (!histoEl) return;
+    const items = liste.map(function (b) {
+      return '<li><strong>' + esc(b.libelle) + '</strong>'
+        + (b.est_active ? ' <span class="joueur-bl-badge">En cours</span>' : '')
+        + ' — ' + esc(_periodeBlessure(b))
+        + (b.notes ? '<div class="joueur-fiche-bl-note">' + esc(b.notes) + '</div>' : '')
+        + '</li>';
+    }).join('');
+    histoEl.innerHTML = '<details class="joueur-fiche-bl-histo">'
+      + '<summary>🩹 Historique des blessures (' + liste.length + ')</summary>'
+      + '<ul>' + items + '</ul></details>';
+  }
+
+  /** Modale : (re)charge la liste des blessures du joueur. */
+  async function _chargerBlessuresModal(personneId) {
+    const listEl = document.getElementById('joueur-bl-list');
+    if (!listEl) return;
+    listEl.innerHTML = '<em>Chargement…</em>';
+    BLESSURES_MODALE = new Map();
+
+    if (typeof SupabaseHub.listBlessuresJoueur !== 'function') {
+      listEl.innerHTML = '<div class="joueur-fiche-empty">Historique indisponible (socle à mettre à jour).</div>';
+      return;
+    }
+    const liste = await SupabaseHub.listBlessuresJoueur(personneId);
+    if (currentEditPersonneId !== personneId) return;
+    if (liste === null) {
+      listEl.innerHTML = '<div class="joueur-fiche-empty">Lecture des blessures impossible (droit insuffisant ou erreur).</div>';
+      return;
+    }
+    if (liste.length === 0) {
+      listEl.innerHTML = '<div class="joueur-fiche-empty">Aucune blessure enregistrée.</div>';
+      return;
+    }
+    liste.forEach(function (b) { BLESSURES_MODALE.set(b.id, b); });
+    listEl.innerHTML = liste.map(function (b) {
+      return '<div class="joueur-bl-item' + (b.est_active ? ' is-active' : '') + '">'
+        + '<div class="joueur-bl-item-head">' + esc(b.libelle)
+        + (b.est_active ? '<span class="joueur-bl-badge">En cours</span>' : '') + '</div>'
+        + '<div class="joueur-bl-item-dates">' + esc(_periodeBlessure(b)) + '</div>'
+        + (b.notes ? '<div class="joueur-fiche-bl-note">' + esc(b.notes) + '</div>' : '')
+        + '<div class="joueur-bl-item-actions">'
+        + (b.est_active
+            ? '<button type="button" class="joueur-btn" data-bl-action="retour" data-bl-id="' + esc(b.id) + '">Déclarer le retour</button>'
+            : '')
+        + '<button type="button" class="joueur-btn" data-bl-action="modifier" data-bl-id="' + esc(b.id) + '">Modifier</button>'
+        + '<button type="button" class="joueur-btn" data-bl-action="supprimer" data-bl-id="' + esc(b.id) + '">Supprimer</button>'
+        + '</div></div>';
+    }).join('');
+
+    listEl.onclick = function (e) {
+      const btn = e.target.closest('[data-bl-action]');
+      if (!btn) return;
+      const b = BLESSURES_MODALE.get(btn.dataset.blId);
+      if (!b) return;
+      const action = btn.dataset.blAction;
+      if (action === 'modifier') _ouvrirFormBlessure(b);
+      else if (action === 'retour') _declarerRetourBlessure(b);
+      else if (action === 'supprimer') _supprimerBlessure(b);
+    };
+  }
+
+  /** Ouvre le formulaire (b = null → création ; sinon modification). */
+  function _ouvrirFormBlessure(b) {
+    const form = document.getElementById('joueur-bl-form');
+    if (!form) return;
+    clearModalMessage('joueur-bl-msg');
+    document.getElementById('joueur-bl-id').value = b ? b.id : '';
+    document.getElementById('joueur-bl-libelle').value = b ? (b.libelle || '') : '';
+    document.getElementById('joueur-bl-debut').value = b ? (b.date_debut || '') : _isoJour(0);
+    document.getElementById('joueur-bl-fin').value = b ? (b.date_fin || '') : '';
+    document.getElementById('joueur-bl-notes').value = b ? (b.notes || '') : '';
+    form.hidden = false;
+    const btnAjouter = document.getElementById('joueur-bl-ajouter');
+    if (btnAjouter) btnAjouter.hidden = true;
+    const lib = document.getElementById('joueur-bl-libelle');
+    if (lib) lib.focus();
+  }
+
+  function _fermerFormBlessure() {
+    const form = document.getElementById('joueur-bl-form');
+    if (form) form.hidden = true;
+    const btnAjouter = document.getElementById('joueur-bl-ajouter');
+    if (btnAjouter) btnAjouter.hidden = false;
+    const btnEnregistrer = document.getElementById('joueur-bl-enregistrer');
+    if (btnEnregistrer) btnEnregistrer.disabled = false;
+  }
+
+  /** Après toute écriture blessure : liste modale + cartes + fiche + état. */
+  async function _apresMajBlessure(message) {
+    const personneId = currentEditPersonneId;
+    _fermerFormBlessure();
+    await reloadJoueurs();
+    await reopenFicheCurrent();
+    if (currentEditPersonneId !== personneId) return;
+    await _chargerBlessuresModal(personneId);
+    const d = currentEditDetail;
+    const infoEl = document.getElementById('joueur-etat-info');
+    if (infoEl && d) {
+      infoEl.innerHTML = '<span class="joueur-modal-info-strong">'
+        + esc(d.prenom) + ' ' + esc(d.nom) + '</span> · '
+        + 'État actuel : ' + esc(ETAT_LABELS[d.etat_calcule] || d.etat_calcule);
+    }
+    showModalMessage('joueur-bl-msg', 'joueur-etat-body', 'success', message);
+  }
+
+  async function _enregistrerBlessure() {
+    if (!currentEditPersonneId) return;
+    clearModalMessage('joueur-bl-msg');
+    const btn = document.getElementById('joueur-bl-enregistrer');
+    if (btn) btn.disabled = true;
+
+    const id = document.getElementById('joueur-bl-id').value || null;
+    const payload = {
+      id: id,
+      personne_id: id ? null : currentEditPersonneId,
+      libelle: document.getElementById('joueur-bl-libelle').value.trim(),
+      date_debut: document.getElementById('joueur-bl-debut').value,
+      date_fin: document.getElementById('joueur-bl-fin').value || null,
+      notes: document.getElementById('joueur-bl-notes').value.trim()
+    };
+    try {
+      const res = await SupabaseHub.saveBlessure(payload);
+      if (!res || !res.ok) {
+        showModalMessage('joueur-bl-msg', 'joueur-etat-body', 'error',
+          'Échec : ' + ((res && res.error) || 'erreur inconnue'));
+        if (btn) btn.disabled = false;
+        return;
+      }
+      await _apresMajBlessure(id ? '✅ Blessure modifiée' : '✅ Blessure ajoutée');
+    } catch (err) {
+      console.error('Joueurs: _enregistrerBlessure()', err);
+      showModalMessage('joueur-bl-msg', 'joueur-etat-body', 'error',
+        'Erreur inattendue : ' + (err.message || err));
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  /**
+   * « Déclarer le retour » : le joueur est disponible AUJOURD'HUI, donc le
+   * dernier jour d'indisponibilité est HIER (cohérent avec D2). Si la
+   * blessure a commencé aujourd'hui, la fin ne peut pas précéder le début :
+   * elle est fixée à aujourd'hui (le joueur redevient disponible demain).
+   */
+  async function _declarerRetourBlessure(b) {
+    const hier = _isoJour(-1);
+    const fin = (b.date_debut > hier) ? b.date_debut : hier;
+    const ok = window.confirm('Déclarer le retour de blessure (« ' + b.libelle + ' ») ?\n'
+      + 'Dernier jour d\'indisponibilité : ' + formatDate(fin) + '.');
+    if (!ok) return;
+    clearModalMessage('joueur-bl-msg');
+    try {
+      const res = await SupabaseHub.saveBlessure({
+        id: b.id,
+        libelle: b.libelle,
+        date_debut: b.date_debut,
+        date_fin: fin,
+        notes: b.notes || ''
+      });
+      if (!res || !res.ok) {
+        showModalMessage('joueur-bl-msg', 'joueur-etat-body', 'error',
+          'Échec : ' + ((res && res.error) || 'erreur inconnue'));
+        return;
+      }
+      await _apresMajBlessure('✅ Retour déclaré');
+    } catch (err) {
+      console.error('Joueurs: _declarerRetourBlessure()', err);
+      showModalMessage('joueur-bl-msg', 'joueur-etat-body', 'error',
+        'Erreur inattendue : ' + (err.message || err));
+    }
+  }
+
+  async function _supprimerBlessure(b) {
+    const ok = window.confirm('Supprimer définitivement la blessure « ' + b.libelle + ' » ?\n'
+      + '(À réserver aux erreurs de saisie : pour un retour, utiliser « Déclarer le retour ».)');
+    if (!ok) return;
+    clearModalMessage('joueur-bl-msg');
+    try {
+      const res = await SupabaseHub.deleteBlessure(b.id);
+      if (!res || !res.ok) {
+        showModalMessage('joueur-bl-msg', 'joueur-etat-body', 'error',
+          'Échec : ' + ((res && res.error) || 'erreur inconnue'));
+        return;
+      }
+      await _apresMajBlessure('✅ Blessure supprimée');
+    } catch (err) {
+      console.error('Joueurs: _supprimerBlessure()', err);
+      showModalMessage('joueur-bl-msg', 'joueur-etat-body', 'error',
+        'Erreur inattendue : ' + (err.message || err));
     }
   }
 
@@ -2089,7 +2363,7 @@ window.JoueursBrowser = (function () {
     _byId: () => JOUEURS_BY_ID,
     _postesById: () => POSTES_BY_ID,
     _aptitudesById: () => APTITUDES_BY_ID,
-    _version: 'v1.6'  /* pt 110 : aiguillage par catégorie (RPC get_joueurs_categorie) */
+    _version: 'v1.8'  /* pt 274 : historique des blessures (sql_253) */
   };
 
 })();
