@@ -915,6 +915,9 @@
     border: 1px dashed var(--line); border-radius: 5px; padding: 9px;
   }
   .joueur-bl-form[hidden] { display: none; }
+  /* pt 274 · HISTORIQUE-INDISPONIBILITES — même gabarit, teinte « warn » */
+  #joueur-in-list .joueur-bl-item.is-active { border-left-color: #8b5a1a; }
+  #joueur-in-list .joueur-bl-badge { background: rgba(139, 90, 26, 0.12); color: #8b5a1a; }
   .joueur-bl-form-actions { display: flex; gap: 6px; justify-content: flex-end; }
 
   .joueur-fiche-empty {
@@ -1508,16 +1511,44 @@
         <em>Chargement…</em>
       </div>
       <form class="joueur-modal-form" id="joueur-etat-form" onsubmit="return false;">
-        <div class="joueur-form-group">
-          <label class="joueur-form-label" for="joueur-etat-indispo">Indisponibilité (motif court)</label>
-          <textarea class="joueur-form-textarea" id="joueur-etat-indispo" name="indisponibilite" placeholder="Ex : Vacances du 20 au 27 juillet" maxlength="500"></textarea>
-          <div class="joueur-form-hint">Laisser vide si pas d'indisponibilité</div>
+        <!-- pt 274 · HISTORIQUE-INDISPONIBILITES (sql_254) : le textarea
+             indisponibilite est remplacé par l'historique des
+             indisponibilités (même mécanique que les blessures). -->
+        <div class="joueur-form-group" id="joueur-in-group">
+          <div class="joueur-form-label">Indisponibilités</div>
+          <div id="joueur-in-msg"></div>
+          <div class="joueur-bl-list" id="joueur-in-list"><em>Chargement…</em></div>
+          <div class="joueur-bl-form" id="joueur-in-form" hidden>
+            <input type="hidden" id="joueur-in-id">
+            <label class="joueur-form-label required" for="joueur-in-libelle">Motif</label>
+            <input type="text" class="joueur-form-input" id="joueur-in-libelle" maxlength="200" placeholder="Ex : Vacances, voyage scolaire">
+            <div class="joueur-form-group-row">
+              <div class="joueur-form-group">
+                <label class="joueur-form-label required" for="joueur-in-debut">Début</label>
+                <input type="date" class="joueur-form-input" id="joueur-in-debut">
+              </div>
+              <div class="joueur-form-group">
+                <label class="joueur-form-label" for="joueur-in-fin">Fin</label>
+                <input type="date" class="joueur-form-input" id="joueur-in-fin">
+              </div>
+            </div>
+            <div class="joueur-form-hint">Fin = dernier jour d'indisponibilité. Laisser vide si le retour n'est pas connu. Une période à venir peut être saisie à l'avance.</div>
+            <label class="joueur-form-label" for="joueur-in-notes">Notes (facultatif)</label>
+            <textarea class="joueur-form-textarea" id="joueur-in-notes" maxlength="500"></textarea>
+            <div class="joueur-bl-form-actions">
+              <button type="button" class="joueur-btn" id="joueur-in-annuler">Annuler</button>
+              <button type="button" class="joueur-btn joueur-btn-primary" id="joueur-in-enregistrer">Enregistrer l'indisponibilité</button>
+            </div>
+          </div>
+          <div>
+            <button type="button" class="joueur-btn" id="joueur-in-ajouter">+ Ajouter une indisponibilité</button>
+          </div>
         </div>
         <!-- pt 274 · HISTORIQUE-BLESSURES (sql_253) : le textarea
              blessure_resume est remplacé par l'historique des blessures.
-             Chaque action blessure est enregistrée immédiatement (RPC
-             upsert_blessure / delete_blessure) ; le bouton « Enregistrer »
-             de la modale ne porte plus que indisponibilité + suspension. -->
+             Chaque action d'historique est enregistrée immédiatement ; le
+             bouton « Enregistrer » de la modale ne porte plus que la
+             suspension (date + notes, sql_254). -->
         <div class="joueur-form-group" id="joueur-bl-group">
           <div class="joueur-form-label">Blessures</div>
           <div id="joueur-bl-msg"></div>
@@ -1552,6 +1583,11 @@
           <label class="joueur-form-label" for="joueur-etat-suspension">Suspension jusqu'au (FFR)</label>
           <input type="date" class="joueur-form-input" id="joueur-etat-suspension" name="suspension_jusqu_au">
           <div class="joueur-form-hint">Laisser vide si pas de suspension active</div>
+        </div>
+        <div class="joueur-form-group">
+          <label class="joueur-form-label" for="joueur-etat-suspension-notes">Notes de suspension (conditions FFR)</label>
+          <textarea class="joueur-form-textarea" id="joueur-etat-suspension-notes" name="suspension_notes" placeholder="Ex : 2 matchs fermes, retour après la J5" maxlength="500"></textarea>
+          <div class="joueur-form-hint">Texte libre, aucun comptage de matchs par le Hub</div>
         </div>
       </form>
     </div>
