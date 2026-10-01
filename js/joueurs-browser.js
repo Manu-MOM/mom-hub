@@ -4,6 +4,24 @@
  *
  * Module IIFE — initialise l'UI de la page joueurs.html.
  *
+ * Version : v1.9 — 1er octobre 2026
+ *   v1.9 : HISTORIQUE-INDISPONIBILITES + SUSPENSION-NOTES (FAIT FOI gelé
+ *          01/10/2026, pt 274, socle SQL sql_254 + supabase-client v1.84).
+ *          (1) Le code d'historique v1.8 devient un mécanisme paramétré
+ *          unique (HISTO_CFG : 'bl' blessures / champ libelle, 'in'
+ *          indisponibilités / champ motif) — comportement blessures
+ *          inchangé, fonctions renommées (_chargerHistoFiche,
+ *          _initHistoModal, _ouvrirFormHisto, _enregistrerHisto,
+ *          _declarerFinHisto, _supprimerHisto). (2) Fiche : ligne
+ *          « Indispo. » (motif de l'indisponibilité ACTIVE) complétée des
+ *          dates + historique repliable « 📅 Historique des
+ *          indisponibilités (n) ». (3) Modale État : le textarea
+ *          indisponibilite est remplacé par le bloc historique (+ Ajouter,
+ *          Modifier, Fin d'indisponibilité = fin à HIER, Supprimer).
+ *          (4) Notes de suspension (personnes.suspension_notes) : champ
+ *          sous la date FFR, envoyé avec suspension_jusqu_au ; affichées
+ *          sur la fiche. « Enregistrer » ne porte plus que la suspension
+ *          (date + notes). node --check OK.
  * Version : v1.8 — 1er octobre 2026
  *   v1.8 : HISTORIQUE-BLESSURES (FAIT FOI gelé 01/10/2026, pt 274, socle
  *          SQL sql_253 + supabase-client v1.83). (1) Fiche : la ligne
@@ -929,7 +947,8 @@ window.JoueursBrowser = (function () {
       renderFiche(detail);
       bindFicheActions();
       _chargerPhotoFiche(detail.id); // asynchrone, non bloquant ; repli initiales
-      _chargerBlessuresFiche(detail.id); // pt 274 : asynchrone, non bloquant
+      _chargerHistoFiche('bl', detail.id); // pt 274 : asynchrone, non bloquant
+      _chargerHistoFiche('in', detail.id); // pt 274 : asynchrone, non bloquant
 
     } catch (err) {
       console.error('Joueurs: openFiche()', err);
@@ -1073,23 +1092,31 @@ window.JoueursBrowser = (function () {
 
     let body = '';
     if (hasIndispo) {
-      body += `<div class="joueur-fiche-row"><div class="joueur-fiche-row-lbl">Indispo.</div><div class="joueur-fiche-row-val joueur-fiche-warn">${esc(d.indisponibilite)}</div></div>`;
+      // pt 274 : indisponibilite = motif de l'indisponibilité ACTIVE (sql_254) ;
+      // les dates sont complétées en asynchrone par _chargerHistoFiche('in').
+      body += `<div class="joueur-fiche-row"><div class="joueur-fiche-row-lbl">Indispo.</div><div class="joueur-fiche-row-val joueur-fiche-warn">${esc(d.indisponibilite)}<span id="joueur-fiche-in-dates"></span></div></div>`;
     }
     if (hasBlessure) {
       // pt 274 : blessure_resume = libellé de la blessure ACTIVE (sql_253) ;
-      // les dates sont complétées en asynchrone par _chargerBlessuresFiche().
+      // les dates sont complétées en asynchrone par _chargerHistoFiche('bl').
       body += `<div class="joueur-fiche-row"><div class="joueur-fiche-row-lbl">Blessure</div><div class="joueur-fiche-row-val joueur-fiche-alert">${esc(d.blessure_resume)}<span id="joueur-fiche-bl-dates"></span></div></div>`;
     }
     if (hasSusp) {
       body += `<div class="joueur-fiche-row"><div class="joueur-fiche-row-lbl">Suspendu jusqu'au</div><div class="joueur-fiche-row-val joueur-fiche-alert">${esc(formatDate(d.suspension_jusqu_au))}</div></div>`;
     }
+    // pt 274 · SUSPENSION-NOTES (sql_254) : conditions FFR, affichées si
+    // renseignées (même sans date, pour ne pas masquer une saisie).
+    if (d.suspension_notes && String(d.suspension_notes).trim().length > 0) {
+      body += `<div class="joueur-fiche-row"><div class="joueur-fiche-row-lbl">Suspension</div><div class="joueur-fiche-row-val joueur-fiche-warn">${esc(d.suspension_notes)}</div></div>`;
+    }
     if (!hasIndispo && !hasBlessure && !hasSusp) {
       body = '<div class="joueur-fiche-empty">Aucun état métier déclaré · joueur disponible</div>';
     }
 
-    // pt 274 : conteneur de l'historique des blessures (rempli en asynchrone,
-    // reste vide si aucune blessure ou si la lecture est refusée).
+    // pt 274 : conteneurs des historiques (remplis en asynchrone, restent
+    // vides si aucune ligne ou si la lecture est refusée).
     body += '<div id="joueur-fiche-bl-histo"></div>';
+    body += '<div id="joueur-fiche-in-histo"></div>';
 
     // Notes coach (seule fiche détail)
     if (d.notes_coach && d.notes_coach.trim().length > 0) {
@@ -1781,12 +1808,12 @@ window.JoueursBrowser = (function () {
         + 'État actuel : ' + esc(ETAT_LABELS[d.etat_calcule] || d.etat_calcule);
     }
 
-    // Pré-remplit indisponibilité + suspension (pt 274 : la blessure n'est
-    // plus un champ texte, elle est gérée par le bloc historique ci-dessous).
-    const tIndispo = document.getElementById('joueur-etat-indispo');
+    // Pré-remplit la suspension (pt 274 : blessures et indisponibilités ne
+    // sont plus des champs texte, elles sont gérées par les blocs historiques).
     const dSusp = document.getElementById('joueur-etat-suspension');
-    if (tIndispo)  tIndispo.value  = d.indisponibilite || '';
-    if (dSusp)     dSusp.value     = d.suspension_jusqu_au || '';
+    const tSuspNotes = document.getElementById('joueur-etat-suspension-notes');
+    if (dSusp)      dSusp.value      = d.suspension_jusqu_au || '';
+    if (tSuspNotes) tSuspNotes.value = d.suspension_notes || '';
 
     const submitBtn = document.getElementById('joueur-etat-submit');
     if (submitBtn) {
@@ -1794,16 +1821,9 @@ window.JoueursBrowser = (function () {
       submitBtn.onclick = submitModalEtat;
     }
 
-    // pt 274 · HISTORIQUE-BLESSURES : liste + boutons du bloc blessures.
-    clearModalMessage('joueur-bl-msg');
-    _fermerFormBlessure();
-    const btnAjouter = document.getElementById('joueur-bl-ajouter');
-    if (btnAjouter) btnAjouter.onclick = function () { _ouvrirFormBlessure(null); };
-    const btnAnnuler = document.getElementById('joueur-bl-annuler');
-    if (btnAnnuler) btnAnnuler.onclick = _fermerFormBlessure;
-    const btnEnregistrer = document.getElementById('joueur-bl-enregistrer');
-    if (btnEnregistrer) btnEnregistrer.onclick = _enregistrerBlessure;
-    _chargerBlessuresModal(d.id);
+    // pt 274 : blocs historiques (indisponibilités + blessures).
+    _initHistoModal('in', d.id);
+    _initHistoModal('bl', d.id);
 
     overlay.classList.add('show');
   }
@@ -1816,15 +1836,15 @@ window.JoueursBrowser = (function () {
     if (submitBtn) submitBtn.disabled = true;
 
     try {
-      const tIndispo  = document.getElementById('joueur-etat-indispo');
-      const dSusp     = document.getElementById('joueur-etat-suspension');
+      const dSusp      = document.getElementById('joueur-etat-suspension');
+      const tSuspNotes = document.getElementById('joueur-etat-suspension-notes');
 
-      // pt 274 : blessure_resume n'est plus envoyé (clé absente = colonne
-      // inchangée côté update_joueur_metier) ; les blessures passent par
-      // upsert_blessure / delete_blessure.
+      // pt 274 : blessure_resume et indisponibilite ne sont plus envoyés
+      // (clé absente = colonne inchangée côté update_joueur_metier) ; ils
+      // passent par les RPC d'historique. suspension_notes : sql_254.
       const patch = {
-        indisponibilite:     tIndispo  ? tIndispo.value  : '',
-        suspension_jusqu_au: dSusp     ? dSusp.value     : ''
+        suspension_jusqu_au: dSusp      ? dSusp.value      : '',
+        suspension_notes:    tSuspNotes ? tSuspNotes.value : ''
       };
 
       const res = await SupabaseHub.updateJoueurMetier(currentEditPersonneId, patch);
@@ -1853,15 +1873,63 @@ window.JoueursBrowser = (function () {
   }
 
   // ----------------------------------------------------------------
-  // pt 274 · HISTORIQUE-BLESSURES (FAIT FOI gelé 01/10/2026, sql_253)
+  // pt 274 · HISTORIQUES BLESSURES (sql_253) + INDISPONIBILITÉS (sql_254)
   // ----------------------------------------------------------------
-  // Règle (D2) : une blessure est ACTIVE si date_debut <= aujourd'hui ET
+  // Un seul mécanisme paramétré pour les deux historiques (v1.9) :
+  //   'bl' = blessures (champ libelle), 'in' = indisponibilités (champ motif).
+  // Règle commune : une période est ACTIVE si date_debut <= aujourd'hui ET
   // (date_fin vide OU date_fin >= aujourd'hui). date_fin = dernier jour
   // d'indisponibilité. La vérité de l'état est côté SQL (etat_calcule,
   // est_active) : le front ne recalcule rien, il affiche.
 
-  /** Cache des blessures affichées dans la modale (id → ligne). */
-  let BLESSURES_MODALE = new Map();
+  const HISTO_CFG = {
+    bl: {
+      champ: 'libelle',
+      prefixe: 'joueur-bl',
+      listFn: 'listBlessuresJoueur',
+      saveFn: 'saveBlessure',
+      delFn: 'deleteBlessure',
+      ficheDatesId: 'joueur-fiche-bl-dates',
+      ficheHistoId: 'joueur-fiche-bl-histo',
+      histoTitre: '🩹 Historique des blessures',
+      vide: 'Aucune blessure enregistrée.',
+      refus: 'Lecture des blessures impossible (droit insuffisant ou erreur).',
+      btnFin: 'Déclarer le retour',
+      confirmFin: 'Déclarer le retour de blessure',
+      confirmSuppr: 'Supprimer définitivement la blessure',
+      msgAjout: '✅ Blessure ajoutée',
+      msgModif: '✅ Blessure modifiée',
+      msgFin: '✅ Retour déclaré',
+      msgSuppr: '✅ Blessure supprimée'
+    },
+    in: {
+      champ: 'motif',
+      prefixe: 'joueur-in',
+      listFn: 'listIndisponibilitesJoueur',
+      saveFn: 'saveIndisponibilite',
+      delFn: 'deleteIndisponibilite',
+      ficheDatesId: 'joueur-fiche-in-dates',
+      ficheHistoId: 'joueur-fiche-in-histo',
+      histoTitre: '📅 Historique des indisponibilités',
+      vide: 'Aucune indisponibilité enregistrée.',
+      refus: 'Lecture des indisponibilités impossible (droit insuffisant ou erreur).',
+      btnFin: 'Fin d\'indisponibilité',
+      confirmFin: 'Mettre fin à l\'indisponibilité',
+      confirmSuppr: 'Supprimer définitivement l\'indisponibilité',
+      msgAjout: '✅ Indisponibilité ajoutée',
+      msgModif: '✅ Indisponibilité modifiée',
+      msgFin: '✅ Fin d\'indisponibilité enregistrée',
+      msgSuppr: '✅ Indisponibilité supprimée'
+    }
+  };
+
+  /** Cache des lignes affichées dans la modale, par historique (id → ligne). */
+  const HISTO_MODALE = { bl: new Map(), in: new Map() };
+
+  /** Élément du bloc modal d'un historique (suffixe : list, form, id…). */
+  function _histoEl(kind, suffixe) {
+    return document.getElementById(HISTO_CFG[kind].prefixe + '-' + suffixe);
+  }
 
   /** Date locale ISO "YYYY-MM-DD" décalée de offsetJours (fuseau du poste). */
   function _isoJour(offsetJours) {
@@ -1872,9 +1940,9 @@ window.JoueursBrowser = (function () {
       + String(d.getDate()).padStart(2, '0');
   }
 
-  /** Libellé de période d'une blessure selon qu'elle est active, à venir
-   *  ou terminée (est_active vient de la RPC : vérité SQL). */
-  function _periodeBlessure(b) {
+  /** Libellé de période selon que la ligne est active, à venir ou terminée
+   *  (est_active vient de la RPC : vérité SQL). */
+  function _periodeHisto(b) {
     const debut = formatDate(b.date_debut);
     const fin = b.date_fin ? formatDate(b.date_fin) : null;
     if (b.est_active) {
@@ -1887,114 +1955,130 @@ window.JoueursBrowser = (function () {
     return 'du ' + debut + (fin ? ' au ' + fin : '');
   }
 
-  /** Fiche : complète la ligne « Blessure » (dates) + historique repliable. */
-  async function _chargerBlessuresFiche(personneId) {
-    if (typeof SupabaseHub.listBlessuresJoueur !== 'function') return; // socle < v1.83
-    const liste = await SupabaseHub.listBlessuresJoueur(personneId);
+  /** Fiche : complète la ligne de l'état (dates) + historique repliable. */
+  async function _chargerHistoFiche(kind, personneId) {
+    const cfg = HISTO_CFG[kind];
+    if (typeof SupabaseHub[cfg.listFn] !== 'function') return; // socle trop ancien
+    const liste = await SupabaseHub[cfg.listFn](personneId);
     if (currentEditPersonneId !== personneId) return; // fiche changée entre-temps
     if (!Array.isArray(liste) || liste.length === 0) return; // rien / refus : vide honnête
 
     const active = liste.find(function (b) { return b.est_active; });
-    const datesEl = document.getElementById('joueur-fiche-bl-dates');
-    if (datesEl && active) datesEl.textContent = ' · ' + _periodeBlessure(active);
+    const datesEl = document.getElementById(cfg.ficheDatesId);
+    if (datesEl && active) datesEl.textContent = ' · ' + _periodeHisto(active);
 
-    const histoEl = document.getElementById('joueur-fiche-bl-histo');
+    const histoEl = document.getElementById(cfg.ficheHistoId);
     if (!histoEl) return;
     const items = liste.map(function (b) {
-      return '<li><strong>' + esc(b.libelle) + '</strong>'
+      return '<li><strong>' + esc(b[cfg.champ]) + '</strong>'
         + (b.est_active ? ' <span class="joueur-bl-badge">En cours</span>' : '')
-        + ' — ' + esc(_periodeBlessure(b))
+        + ' — ' + esc(_periodeHisto(b))
         + (b.notes ? '<div class="joueur-fiche-bl-note">' + esc(b.notes) + '</div>' : '')
         + '</li>';
     }).join('');
     histoEl.innerHTML = '<details class="joueur-fiche-bl-histo">'
-      + '<summary>🩹 Historique des blessures (' + liste.length + ')</summary>'
+      + '<summary>' + cfg.histoTitre + ' (' + liste.length + ')</summary>'
       + '<ul>' + items + '</ul></details>';
   }
 
-  /** Modale : (re)charge la liste des blessures du joueur. */
-  async function _chargerBlessuresModal(personneId) {
-    const listEl = document.getElementById('joueur-bl-list');
+  /** Modale : (re)charge la liste d'un historique. */
+  async function _chargerHistoModal(kind, personneId) {
+    const cfg = HISTO_CFG[kind];
+    const listEl = _histoEl(kind, 'list');
     if (!listEl) return;
     listEl.innerHTML = '<em>Chargement…</em>';
-    BLESSURES_MODALE = new Map();
+    HISTO_MODALE[kind] = new Map();
 
-    if (typeof SupabaseHub.listBlessuresJoueur !== 'function') {
+    if (typeof SupabaseHub[cfg.listFn] !== 'function') {
       listEl.innerHTML = '<div class="joueur-fiche-empty">Historique indisponible (socle à mettre à jour).</div>';
       return;
     }
-    const liste = await SupabaseHub.listBlessuresJoueur(personneId);
+    const liste = await SupabaseHub[cfg.listFn](personneId);
     if (currentEditPersonneId !== personneId) return;
     if (liste === null) {
-      listEl.innerHTML = '<div class="joueur-fiche-empty">Lecture des blessures impossible (droit insuffisant ou erreur).</div>';
+      listEl.innerHTML = '<div class="joueur-fiche-empty">' + esc(cfg.refus) + '</div>';
       return;
     }
     if (liste.length === 0) {
-      listEl.innerHTML = '<div class="joueur-fiche-empty">Aucune blessure enregistrée.</div>';
+      listEl.innerHTML = '<div class="joueur-fiche-empty">' + esc(cfg.vide) + '</div>';
       return;
     }
-    liste.forEach(function (b) { BLESSURES_MODALE.set(b.id, b); });
+    liste.forEach(function (b) { HISTO_MODALE[kind].set(b.id, b); });
     listEl.innerHTML = liste.map(function (b) {
       return '<div class="joueur-bl-item' + (b.est_active ? ' is-active' : '') + '">'
-        + '<div class="joueur-bl-item-head">' + esc(b.libelle)
+        + '<div class="joueur-bl-item-head">' + esc(b[cfg.champ])
         + (b.est_active ? '<span class="joueur-bl-badge">En cours</span>' : '') + '</div>'
-        + '<div class="joueur-bl-item-dates">' + esc(_periodeBlessure(b)) + '</div>'
+        + '<div class="joueur-bl-item-dates">' + esc(_periodeHisto(b)) + '</div>'
         + (b.notes ? '<div class="joueur-fiche-bl-note">' + esc(b.notes) + '</div>' : '')
         + '<div class="joueur-bl-item-actions">'
         + (b.est_active
-            ? '<button type="button" class="joueur-btn" data-bl-action="retour" data-bl-id="' + esc(b.id) + '">Déclarer le retour</button>'
+            ? '<button type="button" class="joueur-btn" data-h-action="fin" data-h-id="' + esc(b.id) + '">' + esc(cfg.btnFin) + '</button>'
             : '')
-        + '<button type="button" class="joueur-btn" data-bl-action="modifier" data-bl-id="' + esc(b.id) + '">Modifier</button>'
-        + '<button type="button" class="joueur-btn" data-bl-action="supprimer" data-bl-id="' + esc(b.id) + '">Supprimer</button>'
+        + '<button type="button" class="joueur-btn" data-h-action="modifier" data-h-id="' + esc(b.id) + '">Modifier</button>'
+        + '<button type="button" class="joueur-btn" data-h-action="supprimer" data-h-id="' + esc(b.id) + '">Supprimer</button>'
         + '</div></div>';
     }).join('');
 
     listEl.onclick = function (e) {
-      const btn = e.target.closest('[data-bl-action]');
+      const btn = e.target.closest('[data-h-action]');
       if (!btn) return;
-      const b = BLESSURES_MODALE.get(btn.dataset.blId);
+      const b = HISTO_MODALE[kind].get(btn.dataset.hId);
       if (!b) return;
-      const action = btn.dataset.blAction;
-      if (action === 'modifier') _ouvrirFormBlessure(b);
-      else if (action === 'retour') _declarerRetourBlessure(b);
-      else if (action === 'supprimer') _supprimerBlessure(b);
+      const action = btn.dataset.hAction;
+      if (action === 'modifier') _ouvrirFormHisto(kind, b);
+      else if (action === 'fin') _declarerFinHisto(kind, b);
+      else if (action === 'supprimer') _supprimerHisto(kind, b);
     };
   }
 
+  /** Branche les boutons du bloc modal d'un historique et charge sa liste. */
+  function _initHistoModal(kind, personneId) {
+    clearModalMessage(HISTO_CFG[kind].prefixe + '-msg');
+    _fermerFormHisto(kind);
+    const btnAjouter = _histoEl(kind, 'ajouter');
+    if (btnAjouter) btnAjouter.onclick = function () { _ouvrirFormHisto(kind, null); };
+    const btnAnnuler = _histoEl(kind, 'annuler');
+    if (btnAnnuler) btnAnnuler.onclick = function () { _fermerFormHisto(kind); };
+    const btnEnregistrer = _histoEl(kind, 'enregistrer');
+    if (btnEnregistrer) btnEnregistrer.onclick = function () { _enregistrerHisto(kind); };
+    _chargerHistoModal(kind, personneId);
+  }
+
   /** Ouvre le formulaire (b = null → création ; sinon modification). */
-  function _ouvrirFormBlessure(b) {
-    const form = document.getElementById('joueur-bl-form');
+  function _ouvrirFormHisto(kind, b) {
+    const cfg = HISTO_CFG[kind];
+    const form = _histoEl(kind, 'form');
     if (!form) return;
-    clearModalMessage('joueur-bl-msg');
-    document.getElementById('joueur-bl-id').value = b ? b.id : '';
-    document.getElementById('joueur-bl-libelle').value = b ? (b.libelle || '') : '';
-    document.getElementById('joueur-bl-debut').value = b ? (b.date_debut || '') : _isoJour(0);
-    document.getElementById('joueur-bl-fin').value = b ? (b.date_fin || '') : '';
-    document.getElementById('joueur-bl-notes').value = b ? (b.notes || '') : '';
+    clearModalMessage(cfg.prefixe + '-msg');
+    _histoEl(kind, 'id').value = b ? b.id : '';
+    _histoEl(kind, 'libelle').value = b ? (b[cfg.champ] || '') : '';
+    _histoEl(kind, 'debut').value = b ? (b.date_debut || '') : _isoJour(0);
+    _histoEl(kind, 'fin').value = b ? (b.date_fin || '') : '';
+    _histoEl(kind, 'notes').value = b ? (b.notes || '') : '';
     form.hidden = false;
-    const btnAjouter = document.getElementById('joueur-bl-ajouter');
+    const btnAjouter = _histoEl(kind, 'ajouter');
     if (btnAjouter) btnAjouter.hidden = true;
-    const lib = document.getElementById('joueur-bl-libelle');
+    const lib = _histoEl(kind, 'libelle');
     if (lib) lib.focus();
   }
 
-  function _fermerFormBlessure() {
-    const form = document.getElementById('joueur-bl-form');
+  function _fermerFormHisto(kind) {
+    const form = _histoEl(kind, 'form');
     if (form) form.hidden = true;
-    const btnAjouter = document.getElementById('joueur-bl-ajouter');
+    const btnAjouter = _histoEl(kind, 'ajouter');
     if (btnAjouter) btnAjouter.hidden = false;
-    const btnEnregistrer = document.getElementById('joueur-bl-enregistrer');
+    const btnEnregistrer = _histoEl(kind, 'enregistrer');
     if (btnEnregistrer) btnEnregistrer.disabled = false;
   }
 
-  /** Après toute écriture blessure : liste modale + cartes + fiche + état. */
-  async function _apresMajBlessure(message) {
+  /** Après toute écriture : listes modales + cartes + fiche + état. */
+  async function _apresMajHisto(kind, message) {
     const personneId = currentEditPersonneId;
-    _fermerFormBlessure();
+    _fermerFormHisto(kind);
     await reloadJoueurs();
     await reopenFicheCurrent();
     if (currentEditPersonneId !== personneId) return;
-    await _chargerBlessuresModal(personneId);
+    await _chargerHistoModal(kind, personneId);
     const d = currentEditDetail;
     const infoEl = document.getElementById('joueur-etat-info');
     if (infoEl && d) {
@@ -2002,92 +2086,90 @@ window.JoueursBrowser = (function () {
         + esc(d.prenom) + ' ' + esc(d.nom) + '</span> · '
         + 'État actuel : ' + esc(ETAT_LABELS[d.etat_calcule] || d.etat_calcule);
     }
-    showModalMessage('joueur-bl-msg', 'joueur-etat-body', 'success', message);
+    showModalMessage(HISTO_CFG[kind].prefixe + '-msg', 'joueur-etat-body', 'success', message);
   }
 
-  async function _enregistrerBlessure() {
+  /** Affiche une erreur d'écriture dans le bloc de l'historique. */
+  function _erreurHisto(kind, texte) {
+    showModalMessage(HISTO_CFG[kind].prefixe + '-msg', 'joueur-etat-body', 'error', texte);
+  }
+
+  async function _enregistrerHisto(kind) {
+    const cfg = HISTO_CFG[kind];
     if (!currentEditPersonneId) return;
-    clearModalMessage('joueur-bl-msg');
-    const btn = document.getElementById('joueur-bl-enregistrer');
+    clearModalMessage(cfg.prefixe + '-msg');
+    const btn = _histoEl(kind, 'enregistrer');
     if (btn) btn.disabled = true;
 
-    const id = document.getElementById('joueur-bl-id').value || null;
+    const id = _histoEl(kind, 'id').value || null;
     const payload = {
       id: id,
       personne_id: id ? null : currentEditPersonneId,
-      libelle: document.getElementById('joueur-bl-libelle').value.trim(),
-      date_debut: document.getElementById('joueur-bl-debut').value,
-      date_fin: document.getElementById('joueur-bl-fin').value || null,
-      notes: document.getElementById('joueur-bl-notes').value.trim()
+      date_debut: _histoEl(kind, 'debut').value,
+      date_fin: _histoEl(kind, 'fin').value || null,
+      notes: _histoEl(kind, 'notes').value.trim()
     };
+    payload[cfg.champ] = _histoEl(kind, 'libelle').value.trim();
     try {
-      const res = await SupabaseHub.saveBlessure(payload);
+      const res = await SupabaseHub[cfg.saveFn](payload);
       if (!res || !res.ok) {
-        showModalMessage('joueur-bl-msg', 'joueur-etat-body', 'error',
-          'Échec : ' + ((res && res.error) || 'erreur inconnue'));
+        _erreurHisto(kind, 'Échec : ' + ((res && res.error) || 'erreur inconnue'));
         if (btn) btn.disabled = false;
         return;
       }
-      await _apresMajBlessure(id ? '✅ Blessure modifiée' : '✅ Blessure ajoutée');
+      await _apresMajHisto(kind, id ? cfg.msgModif : cfg.msgAjout);
     } catch (err) {
-      console.error('Joueurs: _enregistrerBlessure()', err);
-      showModalMessage('joueur-bl-msg', 'joueur-etat-body', 'error',
-        'Erreur inattendue : ' + (err.message || err));
+      console.error('Joueurs: _enregistrerHisto(' + kind + ')', err);
+      _erreurHisto(kind, 'Erreur inattendue : ' + (err.message || err));
       if (btn) btn.disabled = false;
     }
   }
 
   /**
-   * « Déclarer le retour » : le joueur est disponible AUJOURD'HUI, donc le
-   * dernier jour d'indisponibilité est HIER (cohérent avec D2). Si la
-   * blessure a commencé aujourd'hui, la fin ne peut pas précéder le début :
-   * elle est fixée à aujourd'hui (le joueur redevient disponible demain).
+   * « Déclarer le retour » / « Fin d'indisponibilité » : le joueur est
+   * disponible AUJOURD'HUI, donc le dernier jour d'indisponibilité est HIER.
+   * Si la période a commencé aujourd'hui, la fin ne peut pas précéder le
+   * début : elle est fixée à aujourd'hui (joueur disponible demain).
    */
-  async function _declarerRetourBlessure(b) {
+  async function _declarerFinHisto(kind, b) {
+    const cfg = HISTO_CFG[kind];
     const hier = _isoJour(-1);
     const fin = (b.date_debut > hier) ? b.date_debut : hier;
-    const ok = window.confirm('Déclarer le retour de blessure (« ' + b.libelle + ' ») ?\n'
+    const ok = window.confirm(cfg.confirmFin + ' (« ' + b[cfg.champ] + ' ») ?\n'
       + 'Dernier jour d\'indisponibilité : ' + formatDate(fin) + '.');
     if (!ok) return;
-    clearModalMessage('joueur-bl-msg');
+    clearModalMessage(cfg.prefixe + '-msg');
+    const payload = { id: b.id, date_debut: b.date_debut, date_fin: fin, notes: b.notes || '' };
+    payload[cfg.champ] = b[cfg.champ];
     try {
-      const res = await SupabaseHub.saveBlessure({
-        id: b.id,
-        libelle: b.libelle,
-        date_debut: b.date_debut,
-        date_fin: fin,
-        notes: b.notes || ''
-      });
+      const res = await SupabaseHub[cfg.saveFn](payload);
       if (!res || !res.ok) {
-        showModalMessage('joueur-bl-msg', 'joueur-etat-body', 'error',
-          'Échec : ' + ((res && res.error) || 'erreur inconnue'));
+        _erreurHisto(kind, 'Échec : ' + ((res && res.error) || 'erreur inconnue'));
         return;
       }
-      await _apresMajBlessure('✅ Retour déclaré');
+      await _apresMajHisto(kind, cfg.msgFin);
     } catch (err) {
-      console.error('Joueurs: _declarerRetourBlessure()', err);
-      showModalMessage('joueur-bl-msg', 'joueur-etat-body', 'error',
-        'Erreur inattendue : ' + (err.message || err));
+      console.error('Joueurs: _declarerFinHisto(' + kind + ')', err);
+      _erreurHisto(kind, 'Erreur inattendue : ' + (err.message || err));
     }
   }
 
-  async function _supprimerBlessure(b) {
-    const ok = window.confirm('Supprimer définitivement la blessure « ' + b.libelle + ' » ?\n'
-      + '(À réserver aux erreurs de saisie : pour un retour, utiliser « Déclarer le retour ».)');
+  async function _supprimerHisto(kind, b) {
+    const cfg = HISTO_CFG[kind];
+    const ok = window.confirm(cfg.confirmSuppr + ' « ' + b[cfg.champ] + ' » ?\n'
+      + '(À réserver aux erreurs de saisie : sinon, utiliser « ' + cfg.btnFin + ' ».)');
     if (!ok) return;
-    clearModalMessage('joueur-bl-msg');
+    clearModalMessage(cfg.prefixe + '-msg');
     try {
-      const res = await SupabaseHub.deleteBlessure(b.id);
+      const res = await SupabaseHub[cfg.delFn](b.id);
       if (!res || !res.ok) {
-        showModalMessage('joueur-bl-msg', 'joueur-etat-body', 'error',
-          'Échec : ' + ((res && res.error) || 'erreur inconnue'));
+        _erreurHisto(kind, 'Échec : ' + ((res && res.error) || 'erreur inconnue'));
         return;
       }
-      await _apresMajBlessure('✅ Blessure supprimée');
+      await _apresMajHisto(kind, cfg.msgSuppr);
     } catch (err) {
-      console.error('Joueurs: _supprimerBlessure()', err);
-      showModalMessage('joueur-bl-msg', 'joueur-etat-body', 'error',
-        'Erreur inattendue : ' + (err.message || err));
+      console.error('Joueurs: _supprimerHisto(' + kind + ')', err);
+      _erreurHisto(kind, 'Erreur inattendue : ' + (err.message || err));
     }
   }
 
@@ -2363,7 +2445,7 @@ window.JoueursBrowser = (function () {
     _byId: () => JOUEURS_BY_ID,
     _postesById: () => POSTES_BY_ID,
     _aptitudesById: () => APTITUDES_BY_ID,
-    _version: 'v1.8'  /* pt 274 : historique des blessures (sql_253) */
+    _version: 'v1.9'  /* pt 274 : historiques blessures + indisponibilités, notes de suspension */
   };
 
 })();
