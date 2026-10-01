@@ -886,6 +886,37 @@
   .joueur-fiche-row-val.joueur-fiche-alert { color: #8b3a1a; font-weight: 600; }
   .joueur-fiche-row-val.joueur-fiche-meta  { color: var(--ink-mute); font-family: 'JetBrains Mono', monospace; font-size: 11px; }
 
+  /* pt 274 · HISTORIQUE-BLESSURES — fiche (historique repliable) */
+  .joueur-fiche-bl-histo { margin-top: 8px; font-size: 12px; }
+  .joueur-fiche-bl-histo summary { cursor: pointer; color: var(--ink-mute); }
+  .joueur-fiche-bl-histo ul { margin: 6px 0 0; padding-left: 18px; }
+  .joueur-fiche-bl-histo li { margin: 3px 0; }
+  .joueur-fiche-bl-note { color: var(--ink-mute); font-style: italic; }
+
+  /* pt 274 · HISTORIQUE-BLESSURES — modale État (liste + formulaire) */
+  .joueur-bl-list { display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+  .joueur-bl-item {
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 7px 9px;
+    background: var(--paper);
+  }
+  .joueur-bl-item.is-active { border-left: 4px solid #8b3a1a; }
+  .joueur-bl-item-head { font-weight: 600; }
+  .joueur-bl-item-dates { color: var(--ink-mute); margin-top: 2px; }
+  .joueur-bl-item-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .joueur-bl-item-actions .joueur-btn { font-size: 11px; padding: 4px 8px; }
+  .joueur-bl-badge {
+    display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 8px;
+    font-size: 10px; font-weight: 600; background: rgba(139, 58, 26, 0.12); color: #8b3a1a;
+  }
+  .joueur-bl-form {
+    display: flex; flex-direction: column; gap: 6px;
+    border: 1px dashed var(--line); border-radius: 5px; padding: 9px;
+  }
+  .joueur-bl-form[hidden] { display: none; }
+  .joueur-bl-form-actions { display: flex; gap: 6px; justify-content: flex-end; }
+
   .joueur-fiche-empty {
     color: var(--ink-mute);
     font-style: italic;
@@ -1482,10 +1513,40 @@
           <textarea class="joueur-form-textarea" id="joueur-etat-indispo" name="indisponibilite" placeholder="Ex : Vacances du 20 au 27 juillet" maxlength="500"></textarea>
           <div class="joueur-form-hint">Laisser vide si pas d'indisponibilité</div>
         </div>
-        <div class="joueur-form-group">
-          <label class="joueur-form-label" for="joueur-etat-blessure">Blessure (résumé court)</label>
-          <textarea class="joueur-form-textarea" id="joueur-etat-blessure" name="blessure_resume" placeholder="Ex : Entorse cheville gauche, retour estimé fin mai" maxlength="500"></textarea>
-          <div class="joueur-form-hint">Laisser vide si pas de blessure</div>
+        <!-- pt 274 · HISTORIQUE-BLESSURES (sql_253) : le textarea
+             blessure_resume est remplacé par l'historique des blessures.
+             Chaque action blessure est enregistrée immédiatement (RPC
+             upsert_blessure / delete_blessure) ; le bouton « Enregistrer »
+             de la modale ne porte plus que indisponibilité + suspension. -->
+        <div class="joueur-form-group" id="joueur-bl-group">
+          <div class="joueur-form-label">Blessures</div>
+          <div id="joueur-bl-msg"></div>
+          <div class="joueur-bl-list" id="joueur-bl-list"><em>Chargement…</em></div>
+          <div class="joueur-bl-form" id="joueur-bl-form" hidden>
+            <input type="hidden" id="joueur-bl-id">
+            <label class="joueur-form-label required" for="joueur-bl-libelle">Blessure</label>
+            <input type="text" class="joueur-form-input" id="joueur-bl-libelle" maxlength="200" placeholder="Ex : Entorse cheville gauche">
+            <div class="joueur-form-group-row">
+              <div class="joueur-form-group">
+                <label class="joueur-form-label required" for="joueur-bl-debut">Début</label>
+                <input type="date" class="joueur-form-input" id="joueur-bl-debut">
+              </div>
+              <div class="joueur-form-group">
+                <label class="joueur-form-label" for="joueur-bl-fin">Fin</label>
+                <input type="date" class="joueur-form-input" id="joueur-bl-fin">
+              </div>
+            </div>
+            <div class="joueur-form-hint">Fin = dernier jour d'indisponibilité. Laisser vide si le retour n'est pas connu.</div>
+            <label class="joueur-form-label" for="joueur-bl-notes">Notes (facultatif)</label>
+            <textarea class="joueur-form-textarea" id="joueur-bl-notes" maxlength="500"></textarea>
+            <div class="joueur-bl-form-actions">
+              <button type="button" class="joueur-btn" id="joueur-bl-annuler">Annuler</button>
+              <button type="button" class="joueur-btn joueur-btn-primary" id="joueur-bl-enregistrer">Enregistrer la blessure</button>
+            </div>
+          </div>
+          <div>
+            <button type="button" class="joueur-btn" id="joueur-bl-ajouter">+ Ajouter une blessure</button>
+          </div>
         </div>
         <div class="joueur-form-group">
           <label class="joueur-form-label" for="joueur-etat-suspension">Suspension jusqu'au (FFR)</label>
