@@ -22,19 +22,26 @@ BEGIN;
 -- ---------------------------------------------------------------------
 -- 0. Instantané AVANT des états calculés (contrôle de non-régression)
 -- ---------------------------------------------------------------------
-CREATE TEMP TABLE _snap_avant ON COMMIT DROP AS
-SELECT 'categorie:' || c.id::text AS src, j.id, j.etat_calcule, j.blessure_resume
-FROM public.categories c, LATERAL public.get_joueurs_categorie(c.id) j
-UNION ALL
-SELECT 'equipe:' || e.id::text, j.id, j.etat_calcule, j.blessure_resume
-FROM public.equipes e, LATERAL public.get_joueurs_equipe(e.id) j
-UNION ALL
-SELECT 'f15', j.id, j.etat_calcule, j.blessure_resume FROM public.get_joueurs_f15() j
-UNION ALL
-SELECT 'section', j.id, j.etat_calcule, j.blessure_resume FROM public.get_joueurs_section() j
-UNION ALL
-SELECT 'detail', d.id, d.etat_calcule, d.blessure_resume
-FROM public.personnes p, LATERAL public.get_joueur_detail(p.id) d;
+-- Créé dans un bloc DO : l'éditeur SQL Supabase ajoute sinon, APRÈS le
+-- script, un « ALTER TABLE _snap_avant ENABLE ROW LEVEL SECURITY » qui
+-- échoue (table temporaire déjà supprimée par le ROLLBACK / COMMIT).
+DO $snap$
+BEGIN
+  CREATE TEMP TABLE _snap_avant ON COMMIT DROP AS
+  SELECT 'categorie:' || c.id::text AS src, j.id, j.etat_calcule, j.blessure_resume
+  FROM public.categories c, LATERAL public.get_joueurs_categorie(c.id) j
+  UNION ALL
+  SELECT 'equipe:' || e.id::text, j.id, j.etat_calcule, j.blessure_resume
+  FROM public.equipes e, LATERAL public.get_joueurs_equipe(e.id) j
+  UNION ALL
+  SELECT 'f15', j.id, j.etat_calcule, j.blessure_resume FROM public.get_joueurs_f15() j
+  UNION ALL
+  SELECT 'section', j.id, j.etat_calcule, j.blessure_resume FROM public.get_joueurs_section() j
+  UNION ALL
+  SELECT 'detail', d.id, d.etat_calcule, d.blessure_resume
+  FROM public.personnes p, LATERAL public.get_joueur_detail(p.id) d;
+END;
+$snap$;
 
 -- ---------------------------------------------------------------------
 -- 1. Table blessures (D1, D3, D6)
