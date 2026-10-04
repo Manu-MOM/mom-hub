@@ -6,6 +6,17 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.78 — Rapport : nom du PDF « Bilan <catégorie> - … » (4 oct. 2026)
+ *   v3.78 : avenant « Nom du PDF » (N1-A, N2-A, N3-A de Manu, 04/10 19:11).
+ *           Le nom proposé par « Imprimer / PDF » vient de document.title
+ *           (« Compositions M14 · MOM Hub », figé dans compositions.html).
+ *           Il est forcé le temps de l'impression puis restauré (même
+ *           mécanique que seance-editor _imprimerVue) :
+ *             match   → « Bilan M16 - SAR-MOM vs Compiègne - 2026-10-03 »
+ *             tournoi → « Bilan M16 - <libellé du tournoi> - <date> »
+ *           Catégorie = categories.code du match (SuiviRegl, préchargé) ;
+ *           date = date_debut de l'évènement (AAAA-MM-JJ, heure locale).
+ *           Titre de l'onglet (N3) : inchangé, tracé en dette.
  * Version : 3.77 — Suivi : en-avant et passe en avant comptés à part (4 oct. 2026)
  *   v3.77 : SUIVI-VEO avenant « En-avant » (décisions E1-B, E2-A, E3-A,
  *           E4-A de Manu, 04/10 18:53). Requiert observables-match.json
@@ -3362,6 +3373,7 @@
   // compo de BASE. Empile : tournoi (racine) puis chaque phase de l'équipe.
   function renderRapportNiveauxSuperieurs(el, compo) {
     SuiviChrono.desarmer();
+    SuiviRegl.charger();   // v3.78 — code catégorie pour le nom du PDF
 
     var ctx = State.evenementEquipeContext;
     var racine = (ctx && ctx.evenement) ? ctx.evenement : null;
@@ -3455,8 +3467,10 @@
     if (btnPrint) {
       btnPrint.addEventListener('click', function () {
         document.body.classList.add('printing-rapport');
-        window.print();
-        setTimeout(function () { document.body.classList.remove('printing-rapport'); }, 0);
+        // v3.78 — nom du PDF : « Bilan <cat> - <tournoi> - <date> ».
+        _imprimerAvecTitre(_titrePdfRapport(racine.libelle || 'Tournoi'), function () {
+          document.body.classList.remove('printing-rapport');
+        });
       });
     }
 
@@ -3539,8 +3553,43 @@
   }
 
 
+  // v3.78 — nom du PDF du rapport. Le navigateur propose document.title
+  // comme nom de fichier : on le force le temps de l'impression.
+  function _dateIsoLocale(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    var mm = String(d.getMonth() + 1), jj = String(d.getDate());
+    return d.getFullYear() + '-' + (mm.length < 2 ? '0' + mm : mm) + '-' + (jj.length < 2 ? '0' + jj : jj);
+  }
+  function _titrePdfRapport(objet) {
+    var code = SuiviRegl.code();
+    var ctx = State.evenementEquipeContext;
+    var date = (ctx && ctx.evenement) ? _dateIsoLocale(ctx.evenement.date_debut) : '';
+    var t = ['Bilan' + (code ? ' ' + code : ''), (objet || '').trim(), date]
+      .filter(function (x) { return !!x; }).join(' - ');
+    return t.replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim();
+  }
+  function _imprimerAvecTitre(titre, apres) {
+    var titreOriginal = document.title;
+    var restaure = false;
+    function restaurer() {
+      if (restaure) return;
+      restaure = true;
+      document.title = titreOriginal;
+      window.removeEventListener('afterprint', restaurer);
+    }
+    if (titre) document.title = titre;
+    window.addEventListener('afterprint', restaurer);
+    window.print();
+    setTimeout(function () { if (typeof apres === 'function') apres(); }, 0);
+    // Filet si afterprint ne se déclenche pas.
+    setTimeout(restaurer, 1500);
+  }
+
   function renderEditorRapport(el, compo) {
     SuiviChrono.desarmer();
+    SuiviRegl.charger();   // v3.78 — code catégorie pour le nom du PDF
 
     // Onglet « Rapport » CONTEXTUEL (pt 55, décision Manu option 2) :
     //   • compo de MATCH  → rapport de match (le code ci-dessous, INTACT) ;
@@ -3606,12 +3655,12 @@
         var det = document.querySelector('.view-rapport details.rapport-tdj');
         var etaitOuvert = det ? det.open : null;
         if (det) det.open = true;
-        window.print();
+        // v3.78 — nom du PDF : « Bilan <cat> - <nous> vs <adv> - <date> ».
         // Nettoyage après le dialogue d'impression.
-        setTimeout(function () {
+        _imprimerAvecTitre(_titrePdfRapport(nomNous + ' vs ' + nomAdv), function () {
           document.body.classList.remove('printing-rapport');
           if (det && etaitOuvert === false) det.open = false;
-        }, 0);
+        });
       });
     }
 
