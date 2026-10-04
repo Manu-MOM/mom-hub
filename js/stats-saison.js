@@ -5,6 +5,22 @@
  *   - Objet 1 : Fiche stats joueur (restitution famille, un joueur)
  *   - Objet 2 : Vue pilotage (équipe en haut + effectif en lignes triables)
  *
+ * Version : 1.4 — 4 oct. 2026. Avenant « Stats de saison » (S1-A…S5-A de
+ *           Manu, 04/10 20:26 ; requiert C15-a et supabase-client v1.88) :
+ *           (S1/S2) seuls comptent les matchs de la saison active datés à
+ *           partir de la date de départ de leur catégorie (M16 : 03/10/2026 ;
+ *           sinon début de saison) — règle serveur meta_evenements_stats ;
+ *           réglage de la date dans le pilotage catégorie (référent).
+ *           (S3) fiche joueur : faits de jeu alimentés par le suivi (points,
+ *           essais, transformations et pénalités réussies / tentées, drops,
+ *           cartons, fautes, en-avant, passes en avant) + détail par match.
+ *           (S4) temps de jeu : seuls les matchs réellement suivis comptent.
+ *           (S5) même filtre pour les deux vues de pilotage.
+ *           Correctifs : cartons comptés par identifiant (SuiviObs n'est pas
+ *           exposé hors de l'éditeur → 0 carton auparavant) ; pilotage
+ *           catégorie : temps de jeu / essais lus avec le bon identifiant
+ *           joueur (toujours « — » / 0 auparavant) ; pilotage de base :
+ *           categorieId non défini (ReferenceError → écran « Erreur »).
  * Version : 1.3 — 4 oct. 2026. SUIVI-VEO lot L4 : mêlées / touches de la
  *           conquête v1.2 (lanceur + issue) ramenées aux compteurs gagnée /
  *           perdue de notre point de vue (_conqueteNous) ; identifiants
@@ -84,6 +100,10 @@
     return { phase: phase, pourNous: (gagneeParLanceur === notreLancer) };
   }
 
+  // v1.4 — identifiants Cat A comptés par joueur (référentiel v1.2.2).
+  var OBS_CARTONS = { 'obs-A-blanc': 'blanc', 'obs-A-jaune': 'jaune', 'obs-A-rouge': 'rouge' };
+  var PREFIXE_FAUTE = 'obs-A-faute-';
+
   // ---- Utilitaires ----
   function _hub() {
     return (typeof window !== 'undefined' && window.SupabaseHub) ? window.SupabaseHub : null;
@@ -108,6 +128,59 @@
       var c = (cats || []).find(function (x) { return x && x.id === categorieId; });
       return c ? (c.libelle_court || c.code || null) : null;
     });
+  }
+
+  // ============================================================
+  // v1.4 — PÉRIMÈTRE DES STATS (C15-a) : métadonnées d'évènements (date et
+  // catégorie effectives, dans_stats calculé serveur) + chronologies en
+  // cache (une lecture par match pour toute la page).
+  // ============================================================
+  var _metaCache = {};
+  function chargerMeta(ids) {
+    var hub = _hub();
+    var manquants = (ids || []).filter(function (id) { return id && !_metaCache[id]; });
+    if (!hub || typeof hub.metaEvenementsStats !== 'function') return Promise.resolve({ ok: false, map: _metaCache });
+    if (!manquants.length) return Promise.resolve({ ok: true, map: _metaCache });
+    return Promise.resolve(hub.metaEvenementsStats(manquants)).then(function (res) {
+      if (!res || !res.ok) return { ok: false, map: _metaCache };
+      Object.keys(res.data || {}).forEach(function (k) { _metaCache[k] = res.data[k]; });
+      return { ok: true, map: _metaCache };
+    }).catch(function () { return { ok: false, map: _metaCache }; });
+  }
+  // Garde les évènements « dans les stats ». Service absent → tout est gardé
+  // (filtre = false : l'appelant l'affiche honnêtement).
+  function filtrerDansStats(ids) {
+    var uniques = [];
+    (ids || []).forEach(function (id) { if (id && uniques.indexOf(id) < 0) uniques.push(id); });
+    return chargerMeta(uniques).then(function (r) {
+      if (!r.ok) return { ids: uniques, exclus: [], meta: r.map, filtre: false };
+      var gardes = [], exclus = [];
+      uniques.forEach(function (id) {
+        var m = r.map[id];
+        if (m && m.dans_stats === true) gardes.push(id); else exclus.push(id);
+      });
+      return { ids: gardes, exclus: exclus, meta: r.map, filtre: true };
+    });
+  }
+  var _chronoCache = {};
+  function chargerChrono(evt) {
+    if (_chronoCache[evt]) return _chronoCache[evt];
+    var hub = _hub();
+    var p = (hub && typeof hub.getChronologieRencontreCoach === 'function')
+      ? Promise.resolve(hub.getChronologieRencontreCoach(evt, true))
+          .then(function (l) { return (Array.isArray(l) ? l : []).filter(function (x) { return x && x.annule !== true; }); })
+          .catch(function () { return []; })
+      : Promise.resolve([]);
+    _chronoCache[evt] = p;
+    return p;
+  }
+  // « 2026-10-03 » → « 3 oct. 2026 ».
+  function fmtDate(iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+    if (!m) return '';
+    try {
+      return new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+    } catch (e) { return m[3] + '/' + m[2] + '/' + m[1]; }
   }
 
   function escapeHtml(s) {
@@ -206,7 +279,18 @@
   // compo match), pas un DISTINCT (S61.1 : 4 lignes/joueur/base = 4 matchs).
   // ============================================================
   function agregerEffectifSaison(baseId) {
-    return listerComposMatch(baseId).then(function (compos) {
+    return listerComposMatch(baseId).then(function (toutes) {
+      // v1.4 (S5) — périmètre des stats (saison active, date de départ).
+      return filtrerDansStats(toutes.map(function (c) { return c.evenement_id; })).then(function (F) {
+        var gardes = {};
+        F.ids.forEach(function (id) { gardes[id] = true; });
+        var compos = toutes.filter(function (c) { return gardes[c.evenement_id]; });
+        var categorieId = null;
+        F.ids.forEach(function (id) { if (!categorieId && F.meta[id]) categorieId = F.meta[id].categorie_id; });
+        return { compos: compos, exclus: toutes.length - compos.length, filtre: F.filtre, categorieId: categorieId };
+      });
+    }).then(function (P) {
+      var compos = P.compos;
       var nbMatchs = compos.length;
       var evenements = [];
       var compoParEvt = {};
@@ -232,7 +316,8 @@
             if (l.est_depannage_hors_categorie === true) rec.depannage = true;
           });
         });
-        return { parJoueur: parJoueur, nbMatchs: nbMatchs, evenements: evenements, compoParEvt: compoParEvt };
+        return { parJoueur: parJoueur, nbMatchs: nbMatchs, evenements: evenements, compoParEvt: compoParEvt,
+                 exclus: P.exclus, filtre: P.filtre, categorieId: P.categorieId };   // v1.4
       });
     });
   }
@@ -264,6 +349,7 @@
     return null;
   }
   function _estCarton(oid) {
+    if (OBS_CARTONS[oid]) return true;   // v1.4 — par identifiant (fiable)
     var info = _libelleObs(oid);
     var lib = (info && info.libelle ? info.libelle : '').toLowerCase();
     return lib.indexOf('carton') !== -1;
@@ -282,9 +368,7 @@
     if (!evenements || evenements.length === 0) return Promise.resolve(base);
 
     return Promise.all(evenements.map(function (evt) {
-      return Promise.resolve(hub.getChronologieRencontreCoach(evt, true))
-        .then(function (lignes) { return Array.isArray(lignes) ? lignes : []; })
-        .catch(function () { return []; });
+      return chargerChrono(evt);   // v1.4 — cache partagé
     })).then(function (parMatch) {
       parMatch.forEach(function (arr) {
         var eff = arr.filter(function (l) { return l && l.annule !== true; });
@@ -327,6 +411,9 @@
   // Retourne { parJoueur:{joueurId:{minutes, chronoComplets, matchsChrono}},
   //            auMoinsUnChrono:bool }.
   // ============================================================
+  // v1.4 (S4) — seuls les matchs RÉELLEMENT SUIVIS (au moins une ligne de
+  // chronologie active) comptent : la RPC renvoie « complet » dès que les
+  // durées sont connues, même sans aucune saisie. parEvt = minutes par match.
   function agregerTempsDeJeu(evenements) {
     var hub = _hub();
     var out = { parJoueur: {}, auMoinsUnChrono: false };
@@ -334,23 +421,29 @@
       return Promise.resolve(out);
     }
     return Promise.all(evenements.map(function (evt) {
-      return Promise.resolve(hub.getTempsDeJeuRencontre(evt))
-        .then(function (res) { return (res && res.ok && Array.isArray(res.data)) ? res.data : []; })
-        .catch(function () { return []; });
+      return chargerChrono(evt).then(function (chrono) {
+        if (!chrono.length) return [];   // match non suivi → rien (jamais un faux chiffre)
+        return Promise.resolve(hub.getTempsDeJeuRencontre(evt))
+          .then(function (res) { return (res && res.ok && Array.isArray(res.data)) ? res.data : []; })
+          .catch(function () { return []; });
+      });
     })).then(function (parMatch) {
-      parMatch.forEach(function (lignes) {
+      parMatch.forEach(function (lignes, i) {
+        var evt = evenements[i];
         lignes.forEach(function (l) {
           var jid = l.joueur_id || l.out_joueur_id || l.personne_id;
           if (!jid) return;
-          if (!out.parJoueur[jid]) out.parJoueur[jid] = { minutes: 0, chronoComplets: 0, matchsChrono: 0 };
+          if (!out.parJoueur[jid]) out.parJoueur[jid] = { minutes: 0, chronoComplets: 0, matchsChrono: 0, parEvt: {} };
           var rec = out.parJoueur[jid];
           var complet = (l.out_chrono_complet === true);
           if (complet) {
             out.auMoinsUnChrono = true;
             rec.chronoComplets += 1;
-            var m = (typeof l.out_minutes_jeu === 'number') ? l.out_minutes_jeu : 0;
+            var m = Number(l.out_minutes_jeu);
+            if (!isFinite(m)) m = 0;
             rec.minutes += m;
             rec.matchsChrono += 1;
+            rec.parEvt[evt] = m;
           }
         });
       });
@@ -393,6 +486,46 @@
     return { rec: rec, evenements: evenements };
   }
 
+  // v1.4 (S3) — faits de jeu d'UN joueur sur les chronologies des matchs
+  // retenus. Lignes de NOTRE équipe attribuées au joueur (joueur_uuid).
+  function _faitsJoueur(joueurId, evenements, chronos) {
+    var f = { pts: 0, essais: 0, transfo: [0, 0], penalite: [0, 0], drops: 0,
+              blanc: 0, jaune: 0, rouge: 0, fautes: 0, enAvant: 0, passeAvant: 0, parEvt: {} };
+    evenements.forEach(function (evt, i) {
+      var pe = { pts: 0 };
+      (chronos[i] || []).forEach(function (l) {
+        if (l.equipe_concernee === 'adverse' || l.joueur_uuid !== joueurId) return;
+        var oid = l.observable_id || '';
+        var pts = (typeof l.valeur_points === 'number') ? l.valeur_points : 0;
+        f.pts += pts; pe.pts += pts;
+        if (oid === OBS_ESSAI) f.essais += 1;
+        else if (oid === 'obs-A-transfo') { f.transfo[0] += 1; f.transfo[1] += 1; }
+        else if (oid === 'obs-A-transfo-ratee') f.transfo[1] += 1;
+        else if (oid === 'obs-A-penalite') { f.penalite[0] += 1; f.penalite[1] += 1; }
+        else if (oid === 'obs-A-penalite-ratee') f.penalite[1] += 1;
+        else if (oid === 'obs-A-drop') f.drops += 1;
+        else if (OBS_CARTONS[oid]) f[OBS_CARTONS[oid]] += 1;
+        else if (oid.indexOf(PREFIXE_FAUTE) === 0) f.fautes += 1;
+        else if (oid === 'obs-A-en-avant') f.enAvant += 1;
+        else if (oid === 'obs-A-passe-avant') f.passeAvant += 1;
+      });
+      f.parEvt[evt] = pe;
+    });
+    return f;
+  }
+
+  // v1.4 — « M16 : depuis le 3 oct. 2026 » par catégorie rencontrée.
+  function _periodeTexte(meta, ids) {
+    var vus = {}, parts = [];
+    ids.forEach(function (id) {
+      var m = meta[id];
+      if (!m || !m.categorie_code || vus[m.categorie_code]) return;
+      vus[m.categorie_code] = true;
+      parts.push(m.categorie_code + ' depuis le ' + fmtDate(m.date_depart));
+    });
+    return parts.join(' · ');
+  }
+
   function renderFicheJoueur(joueurId, mount) {
     var el = (typeof mount === 'string') ? document.getElementById(mount) : mount;
     if (!el) return Promise.resolve();
@@ -412,46 +545,65 @@
     }).then(function (r) {
       var detail = r[0];
       var noms = r[1] || new Map();
-      var lignes = r[2] || [];
+      var toutes = r[2] || [];
       var nm = noms.get(joueurId) || {};
       var nom = (detail && detail.nom) || nm.nom || '';
       var prenom = (detail && detail.prenom) || nm.prenom || '';
       var label = labelJoueur(nom, prenom) || ('#' + String(joueurId).slice(0, 8));
+      var evtsTous = toutes.map(function (l) { return (l.compositions || {}).evenement_id; });
 
-      var agg = _agregerJoueurSaison(lignes);
-      var rec = agg.rec;
+      // v1.4 (S2) — périmètre : saison active, à partir de la date de départ
+      // de la catégorie du match.
+      return filtrerDansStats(evtsTous).then(function (F) {
+        var gardes = {};
+        F.ids.forEach(function (id) { gardes[id] = true; });
+        var lignes = toutes.filter(function (l) { return gardes[(l.compositions || {}).evenement_id]; });
+        var agg = _agregerJoueurSaison(lignes);
+        var rec = agg.rec;
+        var periode = F.filtre ? _periodeTexte(F.meta, F.ids.length ? F.ids : F.exclus) : '';
+        var nbExclus = toutes.length - lignes.length;
 
-      el.innerHTML =
-        '<header class="ss-fiche-head">' +
-          '<h1>' + escapeHtml(label) + '</h1>' +
-          '<p class="ss-sub">Saison en cours</p>' +
-        '</header>' +
-        '<div id="ss-fiche-body"><p class="ss-load">Calcul du temps de jeu…</p></div>';
+        el.innerHTML =
+          '<header class="ss-fiche-head">' +
+            '<h1>' + escapeHtml(label) + '</h1>' +
+            '<p class="ss-sub">Saison en cours' + (periode ? ' · ' + escapeHtml(periode) : '') + '</p>' +
+          '</header>' +
+          '<div id="ss-fiche-body"><p class="ss-load">Calcul des statistiques…</p></div>';
+        var body = document.getElementById('ss-fiche-body');
 
-      var body = document.getElementById('ss-fiche-body');
+        return Promise.all([
+          agregerTempsDeJeu(agg.evenements),
+          Promise.all(agg.evenements.map(chargerChrono))
+        ]).then(function (rr) {
+          var tdj = rr[0], chronos = rr[1];
+          var recT = tdj.parJoueur[joueurId] || null;
+          var faits = _faitsJoueur(joueurId, agg.evenements, chronos);
+          var suivis = agg.evenements.filter(function (e, i) { return (chronos[i] || []).length > 0; });
 
-      return agregerTempsDeJeu(agg.evenements).then(function (tdj) {
-        var recT = tdj.parJoueur[joueurId] || null;
+          // §2 Postes occupés (ordonnés par numero_xv)
+          var postesIds = Object.keys(rec.postes).sort(function (a, b) { return numeroXvPoste(a) - numeroXvPoste(b); });
+          var postesHtml = postesIds.length
+            ? '<ul class="ss-list">' + postesIds.map(function (pid) {
+                return '<li>' + escapeHtml(libellePoste(pid)) + ' · <strong>' + rec.postes[pid] + '</strong> match' + (rec.postes[pid] > 1 ? 's' : '') + '</li>';
+              }).join('') + '</ul>' + (rec.depannage ? '<p class="ss-flag">⚠️ A dépanné hors catégorie sur la saison.</p>' : '')
+            : '<p class="ss-attente">Aucune apparition en feuille de match sur la période.</p>';
 
-        // §2 Postes occupés (ordonnés par numero_xv)
-        var postesIds = Object.keys(rec.postes).sort(function (a, b) { return numeroXvPoste(a) - numeroXvPoste(b); });
-        var postesHtml = postesIds.length
-          ? '<ul class="ss-list">' + postesIds.map(function (pid) {
-              return '<li>' + escapeHtml(libellePoste(pid)) + ' · <strong>' + rec.postes[pid] + '</strong> match' + (rec.postes[pid] > 1 ? 's' : '') + '</li>';
-            }).join('') + '</ul>' + (rec.depannage ? '<p class="ss-flag">⚠️ A dépanné hors catégorie sur la saison.</p>' : '')
-          : '<p class="ss-attente">Aucune apparition en feuille de match sur la saison.</p>';
+          // §3 Matchs en compo
+          var matchsHtml = '<p><strong>' + rec.matchs + '</strong> match' + (rec.matchs > 1 ? 's' : '') + ' en compo · ' +
+            rec.titulaire + ' titulaire' + (rec.titulaire > 1 ? 's' : '') + ' / ' +
+            rec.remplacant + ' remplaçant' + (rec.remplacant > 1 ? 's' : '') + '</p>' +
+            (nbExclus > 0 ? '<p class="ss-attente">' + nbExclus + ' feuille' + (nbExclus > 1 ? 's' : '') +
+              ' de match hors période (saison précédente ou avant la date de départ) non comptée' + (nbExclus > 1 ? 's' : '') + '.</p>' : '') +
+            (F.filtre ? '' : '<p class="ss-flag">⚠️ Filtre de période indisponible : toutes les feuilles sont comptées.</p>');
 
-        // §3 Matchs en compo
-        var matchsHtml = '<p><strong>' + rec.matchs + '</strong> match' + (rec.matchs > 1 ? 's' : '') + ' en compo · ' +
-          rec.titulaire + ' titulaire' + (rec.titulaire > 1 ? 's' : '') + ' / ' +
-          rec.remplacant + ' remplaçant' + (rec.remplacant > 1 ? 's' : '') + '</p>';
-
-        body.innerHTML =
-          _bloc('Postes occupés', postesHtml) +
-          _bloc('Matchs en compo', matchsHtml) +
-          _sectionTempsJeu(recT) +
-          _sectionFaits() +
-          _sectionAssiduite();
+          body.innerHTML =
+            _bloc('Postes occupés', postesHtml) +
+            _bloc('Matchs en compo', matchsHtml) +
+            _sectionTempsJeu(recT) +
+            _sectionFaits(faits, suivis.length) +
+            _sectionDetailMatchs(agg.evenements, F.meta, chronos, faits, recT) +
+            _sectionAssiduite();
+        });
       });
     }).catch(function (e) {
       if (typeof console !== 'undefined') console.error('StatsSaison.renderFicheJoueur', e);
@@ -462,15 +614,53 @@
   function _sectionTempsJeu(recT) {
     var corps;
     if (recT && recT.chronoComplets > 0) {
-      corps = '<p><strong>' + recT.minutes + ' min</strong> sur ' + recT.chronoComplets + ' match' + (recT.chronoComplets > 1 ? 's' : '') + ' chronométré' + (recT.chronoComplets > 1 ? 's' : '') + '.</p>';
+      var moy = Math.round(recT.minutes / recT.chronoComplets);
+      corps = '<p><strong>' + recT.minutes + ' min</strong> sur ' + recT.chronoComplets + ' match' + (recT.chronoComplets > 1 ? 's' : '') +
+        ' suivi' + (recT.chronoComplets > 1 ? 's' : '') + (recT.chronoComplets > 1 ? ' · moyenne ' + moy + ' min par match' : '') + '.</p>';
     } else {
-      corps = '<p class="ss-attente">En attente du 1ᵉʳ match chronométré de bout en bout. Le détail apparaîtra dès qu\'un match sera suivi sur la même timeline.</p>';
+      corps = '<p class="ss-attente">Aucun match suivi sur la période. Le temps de jeu apparaîtra dès qu\'un match sera saisi (suivi, VEO ou import FFR).</p>';
     }
     return _bloc('Temps de jeu', corps);
   }
-  function _sectionFaits() {
+  // v1.4 (S3) — faits de jeu alimentés par le suivi.
+  function _sectionFaits(f, nbSuivis) {
+    if (!f || !nbSuivis) {
+      return _bloc('Faits de jeu',
+        '<p class="ss-attente">Aucun match suivi sur la période : les faits de jeu apparaîtront dès qu\'un match sera saisi.</p>');
+    }
+    var li = [];
+    li.push('<li><strong>' + f.pts + '</strong> point' + (f.pts > 1 ? 's' : '') + ' marqué' + (f.pts > 1 ? 's' : '') + '</li>');
+    if (f.essais) li.push('<li>Essais : <strong>' + f.essais + '</strong></li>');
+    if (f.transfo[1]) li.push('<li>Transformations : <strong>' + f.transfo[0] + ' / ' + f.transfo[1] + '</strong> (' + Math.round(100 * f.transfo[0] / f.transfo[1]) + ' %)</li>');
+    if (f.penalite[1]) li.push('<li>Pénalités : <strong>' + f.penalite[0] + ' / ' + f.penalite[1] + '</strong> (' + Math.round(100 * f.penalite[0] / f.penalite[1]) + ' %)</li>');
+    if (f.drops) li.push('<li>Drops : <strong>' + f.drops + '</strong></li>');
+    var disc = [];
+    if (f.blanc) disc.push(f.blanc + ' blanc' + (f.blanc > 1 ? 's' : ''));
+    if (f.jaune) disc.push(f.jaune + ' jaune' + (f.jaune > 1 ? 's' : ''));
+    if (f.rouge) disc.push(f.rouge + ' rouge' + (f.rouge > 1 ? 's' : ''));
+    li.push('<li>Cartons : <strong>' + (disc.length ? disc.join(', ') : 'aucun') + '</strong></li>');
+    li.push('<li>Fautes : <strong>' + f.fautes + '</strong> · En-avant : <strong>' + f.enAvant + '</strong> · Passes en avant : <strong>' + f.passeAvant + '</strong></li>');
     return _bloc('Faits de jeu',
-      '<p class="ss-attente">Essais, cartons et faits marquants se constitueront au fil des matchs suivis. Aucune statistique de saison consolidée à ce jour.</p>');
+      '<ul class="ss-list">' + li.join('') + '</ul>' +
+      '<p class="ss-attente">Sur ' + nbSuivis + ' match' + (nbSuivis > 1 ? 's' : '') + ' suivi' + (nbSuivis > 1 ? 's' : '') +
+      '. Seuls les faits attribués au joueur sont comptés (une faute saisie « équipe » ne l\'est pas).</p>');
+  }
+  // v1.4 (S3) — une ligne par match retenu (date, match, minutes, points).
+  function _sectionDetailMatchs(evenements, meta, chronos, f, recT) {
+    if (!evenements.length) return '';
+    var rows = evenements.map(function (evt, i) {
+      var m = meta[evt] || {};
+      return { d: m.date_match || '', lib: m.adversaire_nom ? ('vs ' + m.adversaire_nom) : (m.libelle || 'Match'),
+               suivi: (chronos[i] || []).length > 0,
+               min: (recT && recT.parEvt && typeof recT.parEvt[evt] === 'number') ? recT.parEvt[evt] : null,
+               pts: (f && f.parEvt[evt]) ? f.parEvt[evt].pts : 0 };
+    }).sort(function (a, b) { return a.d < b.d ? -1 : (a.d > b.d ? 1 : 0); });
+    return _bloc('Détail par match', '<ul class="ss-list">' + rows.map(function (r) {
+      var info = r.suivi
+        ? ((r.min !== null ? r.min + ' min' : 'temps de jeu indisponible') + ' · ' + r.pts + ' pt' + (r.pts > 1 ? 's' : ''))
+        : 'non suivi';
+      return '<li>' + escapeHtml(fmtDate(r.d)) + ' · ' + escapeHtml(r.lib) + ' — <strong>' + escapeHtml(info) + '</strong></li>';
+    }).join('') + '</ul>');
   }
   function _sectionAssiduite() {
     return _bloc('Assiduité',
@@ -581,18 +771,64 @@
     el.innerHTML =
       '<header class="ss-pilot-head"><h1>Pilotage de saison</h1><p class="ss-sub" id="ss-pilot-soustitre">vue staff + équipe</p></header>' +
       '<section class="ss-bloc ss-bloc--equipe"><h2>Niveau équipe</h2>' + equipeHtml + '</section>' +
-      '<section class="ss-bloc ss-bloc--effectif"><h2>Effectif</h2>' + effectifHtml + '</section>';
+      '<section class="ss-bloc ss-bloc--effectif"><h2>Effectif</h2>' + effectifHtml + '</section>' +
+      (effectif.exclus ? '<p class="ss-note">' + effectif.exclus + ' match' + (effectif.exclus > 1 ? 's' : '') +
+        ' hors période (avant la date de départ de la catégorie ou hors saison) non compté' + (effectif.exclus > 1 ? 's' : '') + '.</p>' : '');
 
     // Résout le vrai libellé de la catégorie pilotée et préfixe le
     // sous-titre (« M14 · vue staff + équipe »). Post-render async,
     // dégradation honnête : si le libellé est introuvable, le
     // sous-titre reste neutre (« vue staff + équipe »), jamais un
     // « M14 » faux quand on pilote une autre catégorie.
-    _libelleCategorie(categorieId).then(function (lib) {
+    // v1.4 — categorieId n'était pas défini ici (ReferenceError) : on prend
+    // la catégorie des matchs retenus (meta_evenements_stats).
+    _libelleCategorie(effectif.categorieId || null).then(function (lib) {
       if (!lib) return;
       var st = document.getElementById('ss-pilot-soustitre');
       if (st) st.textContent = lib + ' · vue staff + équipe';
     });
+  }
+
+  // v1.4 (S1) — réglage de la date de départ des stats de la catégorie.
+  // Écriture réservée (RPC enregistrer_debut_stats : admin, bureau ou
+  // référent de la catégorie) ; un refus est affiché tel quel.
+  function _peindreDebutStats(el, categorieId) {
+    var box = document.getElementById('ss-debut-stats');
+    var hub = _hub();
+    if (!box) return;
+    if (!hub || typeof hub.listerDebutStats !== 'function') { box.parentNode.removeChild(box); return; }
+    Promise.resolve(hub.listerDebutStats()).then(function (res) {
+      var r = (res && res.ok) ? (res.data || []).filter(function (x) { return x.categorie_id === categorieId; })[0] : null;
+      if (!r) { box.innerHTML = '<p class="ss-attente">Période des statistiques indisponible.</p>'; return; }
+      box.innerHTML =
+        '<h2>Période des statistiques</h2>' +
+        '<p>Saison ' + escapeHtml(r.saison_code || '') + ' : matchs comptés à partir du <strong>' + escapeHtml(fmtDate(r.date_effective)) + '</strong>' +
+        (r.date_reglee ? '' : ' (début de saison)') + '.</p>' +
+        '<div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-top:.5rem">' +
+          '<input type="date" id="ss-debut-date" value="' + escapeHtml(r.date_effective || '') + '" min="' + escapeHtml(r.saison_debut || '') +
+            '" max="' + escapeHtml(r.saison_fin || '') + '" style="padding:.3rem .5rem;border:1px solid #d8dee5;border-radius:6px">' +
+          '<button type="button" id="ss-debut-ok" style="padding:.35rem .8rem;border-radius:6px;border:1px solid #2D7D46;background:#2D7D46;color:#fff;cursor:pointer">Enregistrer</button>' +
+          (r.date_reglee ? '<button type="button" id="ss-debut-raz" style="padding:.35rem .8rem;border-radius:6px;border:1px solid #d8dee5;background:#fff;cursor:pointer">Revenir au début de saison</button>' : '') +
+          '<span id="ss-debut-msg" class="ss-note" style="margin:0"></span>' +
+        '</div>' +
+        '<p class="ss-note">Les matchs antérieurs (présaison) restent dans le Hub ; ils ne comptent simplement pas dans les statistiques.</p>';
+      function enregistrer(val) {
+        var msg = document.getElementById('ss-debut-msg');
+        if (msg) msg.textContent = 'Enregistrement…';
+        Promise.resolve(hub.enregistrerDebutStats(categorieId, val)).then(function (w) {
+          if (!w || !w.ok) { if (msg) msg.textContent = '⚠ ' + ((w && w.error) || 'Enregistrement impossible'); return; }
+          _metaCache = {};   // la règle a changé : métadonnées à relire
+          renderPilotageCategorie(categorieId, el);
+        });
+      }
+      document.getElementById('ss-debut-ok').addEventListener('click', function () {
+        var v = document.getElementById('ss-debut-date').value;
+        if (!v) return;
+        enregistrer(v);
+      });
+      var raz = document.getElementById('ss-debut-raz');
+      if (raz) raz.addEventListener('click', function () { enregistrer(null); });
+    }).catch(function () { box.innerHTML = '<p class="ss-attente">Période des statistiques indisponible.</p>'; });
   }
 
   function _kpi(label, valeur) {
@@ -699,8 +935,20 @@
       return Promise.resolve();
     }
 
-    return Promise.resolve(hub.listPilotageCategorie(categorieId)).then(function (lignes) {
+    return Promise.resolve(hub.listPilotageCategorie(categorieId)).then(function (brutes) {
+      brutes = Array.isArray(brutes) ? brutes : [];
+      // v1.4 (S5) — périmètre des stats (saison active, date de départ).
+      return filtrerDansStats(brutes.map(function (l) { return l.evenement_id; })).then(function (F) {
+        var gardes = {};
+        F.ids.forEach(function (id) { gardes[id] = true; });
+        return { lignes: brutes.filter(function (l) { return gardes[l.evenement_id]; }), F: F };
+      });
+    }).then(function (P) {
+      var lignes = P.lignes;
       var agg = _agregerCategorie(lignes);
+      agg.categorieId = categorieId;
+      agg.nbExclus = P.F.exclus.length;
+      agg.filtre = P.F.filtre;
       // Charger le collectif N1 D'ABORD, puis résoudre les noms de l'UNION
       // (joueurs vus en compo + joueurs du collectif à 0 match) — sinon les
       // joueurs à 0 match, absents de agg.parJoueur, n'ont pas de nom résolu
@@ -765,6 +1013,7 @@
           agg.tempsJeu = rr[2] || { parJoueur: {}, auMoinsUnChrono: false };
           agg.faitsJoueur = faitsJoueur;
           _peindrePilotageCategorie(el, agg, noms, collectifSet);
+          _peindreDebutStats(el, categorieId);   // v1.4 (S1)
         });
       });
     }).catch(function (e) {
@@ -831,7 +1080,7 @@
       var nm = noms.get(jid) || {};
       var label = labelJoueur(nm.nom, nm.prenom) || ('#' + String(jid).slice(0, 8));
       var nbM = Object.keys(rec.evts).length;
-      return { label: label, nbMatchs: nbM, rec: rec };
+      return { label: label, nbMatchs: nbM, rec: rec, joueur_id: jid };   // v1.4 — joueur_id manquait
     });
     // tri : plus de matchs d'abord, puis alpha
     lignes.sort(function (a, b) {
@@ -868,14 +1117,17 @@
       var tjTxt = (typeof fmtTempsJeu === 'function') ? fmtTempsJeu(recTj) : '—';
       var essais = (faits[l.joueur_id] && faits[l.joueur_id].essais) ? faits[l.joueur_id].essais : 0;
       var essaisTxt = (l.nbMatchs > 0) ? String(essais) : '—';
+      var pts = (faits[l.joueur_id] && faits[l.joueur_id].pts) ? faits[l.joueur_id].pts : 0;
+      var ptsTxt = (l.nbMatchs > 0) ? String(pts) : '—';
       return '<tr>' +
         '<td>' + escapeHtml(l.label) + dep + '</td>' +
         '<td class="ss-num">' + l.nbMatchs + '</td>' +
         '<td>' + detail + '</td>' +
         '<td class="ss-num">' + tjTxt + '</td>' +
         '<td class="ss-num">' + essaisTxt + '</td>' +
+        '<td class="ss-num">' + ptsTxt + '</td>' +
       '</tr>';
-    }).join('') : '<tr><td colspan="5" class="ss-attente">Aucune donnée de compétition sur la catégorie.</td></tr>';
+    }).join('') : '<tr><td colspan="6" class="ss-attente">Aucune donnée de compétition sur la catégorie.</td></tr>';
 
     // pt 65 — bloc Niveau équipe (1 carte par équipe)
     function blocEquipeHtml(blocEq) {
@@ -915,6 +1167,7 @@
     el.innerHTML =
       '<header class="ss-pilot-head"><h1>Pilotage de saison</h1>' +
         '<p class="ss-sub">Catégorie · collectif complet · ' + nbEq + ' équipe' + (nbEq > 1 ? 's' : '') + '</p></header>' +
+      '<section class="ss-bloc" id="ss-debut-stats"><p class="ss-load">Période des statistiques…</p></section>' +
       '<section class="ss-bloc">' +
         '<div class="ss-kpis">' +
           _kpi('Joueurs', String(lignes.length)) +
@@ -924,6 +1177,9 @@
           _kpi('Équipes', String(nbEq)) +
         '</div>' +
         '<p class="ss-note">' + escapeHtml(denomNote) + ecartEqNote + '</p>' +
+        (agg.nbExclus ? '<p class="ss-note">' + agg.nbExclus + ' match' + (agg.nbExclus > 1 ? 's' : '') +
+          ' hors période (avant la date de départ ou hors saison) non compté' + (agg.nbExclus > 1 ? 's' : '') + '.</p>' : '') +
+        (agg.filtre === false ? '<p class="ss-note">⚠️ Filtre de période indisponible : tous les matchs sont comptés.</p>' : '') +
       '</section>' +
       '<section class="ss-bloc">' +
         '<h2>Niveau équipe</h2>' +
@@ -933,7 +1189,7 @@
         '<h2>Participation par joueur</h2>' +
         '<table class="ss-table"><thead><tr>' +
           '<th>Joueur</th><th class="ss-num">Matchs</th><th>Détail par équipe · rôle · poste</th>' +
-          '<th class="ss-num">Temps de jeu</th><th class="ss-num">Essais</th>' +
+          '<th class="ss-num">Temps de jeu</th><th class="ss-num">Essais</th><th class="ss-num">Points</th>' +
         '</tr></thead><tbody>' + corps + '</tbody></table>' +
         tjGlobalNote +
         '<p class="ss-note">Compétition uniquement (matchs &amp; tournois). Un joueur peut figurer dans plusieurs équipes — chaque ligne d\'équipe détaille rôle et postes occupés.</p>' +
@@ -946,7 +1202,7 @@
 
   // ---- API publique ----
   window.StatsSaison = {
-    version: '1.1',
+    version: '1.4',
     renderFicheJoueur: renderFicheJoueur,
     renderPilotage: renderPilotage,
     renderPilotageCategorie: renderPilotageCategorie,
