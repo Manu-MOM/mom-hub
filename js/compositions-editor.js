@@ -6,6 +6,18 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.76 — Suivi : faute avec pioche par catégorie (4 oct. 2026)
+ *   v3.76 : SUIVI-VEO avenant « Faute » (décisions F1-A, F2-A, F3, F4-A de
+ *           Manu, 04/10 15:49). Requiert C14-d et supabase-client v1.87.
+ *           Palette, Discipline → « 🚩 Faute » : équipe fautive (Nous /
+ *           Adversaire), type tiré de la pioche de la catégorie (12 types
+ *           amorcés), joueur facultatif côté nous (« — Équipe — »), minute
+ *           chrono ou manuelle. Ligne : observable_id 'obs-A-faute-<id>'.
+ *           « ⚙ Gérer la pioche » = même écran que les observables à froid
+ *           (_ouvrirGestionFroid paramétré). Historique : « Faute — type ».
+ *           Modifier : types de faute proposés, 0 point. Rapport : section
+ *           « 🚩 Fautes » (type × équipe, total, par joueur). Import FFR non
+ *           concerné (les fautes ne sont pas des faits officiels FFR).
  * Version : 3.75 — Import FFR : contrôle bloquant + lecture tolérante (4 oct. 2026)
  *   v3.75 : CORRECTIF INCIDENT RECETTE L6 (04/10, 13:5x). Sur un vrai collage
  *           depuis le navigateur, seuls les 3 cartons ont été lus (faits
@@ -2220,6 +2232,11 @@
     },
     libelle: function (observableId) {
       if (!observableId) return null;
+      // v3.76 — faute : 'obs-A-faute-<id types_faute>' → libellé de la pioche.
+      if (observableId.indexOf(_PREFIXE_FAUTE) === 0) {
+        var lf = SuiviFautes.libelles[observableId.slice(_PREFIXE_FAUTE.length)];
+        return { libelle: 'Faute — ' + (lf || 'type retiré'), icone: '🚩' };
+      }
       if (this.catA) {
         var t = this.trouver(observableId);
         if (t) {
@@ -2615,6 +2632,7 @@
     // v3.72 — état de saisie propre à CE match (mode, minute manuelle…).
     SuiviSaisie.reinit(evtId);
     SuiviRegl.charger();
+    SuiviFautes.charger(null, true);   // v3.76 — pioche de la catégorie du match
     SuiviChrono.nomNous = _nomNotreEquipe();
     SuiviChrono.nomAdv = _nomAdversaireCourt(compo);
     var adversaire = _adversaireDeCompo(compo);
@@ -2675,6 +2693,7 @@
   // Famille d'un observable (score|discipline|mouvement|jeu_collectif)
   // dérivée du référentiel chargé. null si inconnu ou non chargé.
   function _familleDeObs(observableId) {
+    if (observableId && observableId.indexOf(_PREFIXE_FAUTE) === 0) return 'faute';   // v3.76
     if (!observableId || !SuiviObs.catA) return null;
     var t = SuiviObs.trouver(observableId);
     if (!t) return null;
@@ -3793,6 +3812,8 @@
     var compte = {};
     var subs = [];        // substitutions effectives (sortant→entrant)
     var conq = [];        // v3.74 — lignes conquête v1.2 {l, o}
+    var fautes = [];      // v3.76 — lignes « obs-A-faute-<id> »
+    var idFautes = 'rapport-fautes' + suffix;
     var buteurs = {};     // v3.74 — {uuid: {transfo:[réussies,tentées], penalite:[…], drop:[…]}}
     var BUT = {
       'obs-A-transfo':        { k: 'transfo',  ok: true },
@@ -3809,6 +3830,8 @@
         subs.push(l);
         continue;
       }
+      // v3.76 — fautes : section dédiée (type × équipe, par joueur).
+      if (oid.indexOf(_PREFIXE_FAUTE) === 0) { fautes.push(l); continue; }
       // v3.74 (L5) — conquête v1.2 : section dédiée (lanceur × issue).
       var tq = SuiviObs.trouver(oid);
       if (tq && tq.famille === 'conquete') { conq.push({ l: l, o: tq.o }); continue; }
@@ -3886,6 +3909,14 @@
     // v3.74 (L5) — CONQUÊTE détaillée : par phase, issue × lanceur.
     html += _rapportConqueteHTML(conq, nomNous, nomAdv);
 
+    // v3.76 — FAUTES (libellés de la pioche, noms : asynchrones).
+    if (fautes.length) {
+      html += '<section class="rapport-bloc">' +
+                '<h4 class="rapport-bloc__titre">🚩 Fautes <span class="rapport-bloc__n">(' + fautes.length + ')</span></h4>' +
+                '<div id="' + idFautes + '"><p class="view-suivi__hint">Chargement…</p></div>' +
+              '</section>';
+    }
+
     // v3.74 (L5) — BUTEURS : réussite au pied par joueur (noms asynchrones).
     if (Object.keys(buteurs).length) {
       html += '<section class="rapport-bloc">' +
@@ -3945,6 +3976,7 @@
 
     // v3.74 (L5) — blocs asynchrones.
     if (Object.keys(buteurs).length) _peindreButeursRapport(buteurs, idBut);
+    if (fautes.length) _peindreFautesRapport(fautes, idFautes, nomNous, nomAdv);   // v3.76
     if (evtId) {
       _peindreFroidRapport(evtId, idFroid);
       _peindreTdjRapport(evtId, idTdj);
@@ -4690,6 +4722,7 @@
       this.evtId = evtId;
       this.choix = null; this.minute = null; this.periode = null;
       this.campConquete = 'notre'; this.voirAnnulees = false;
+      this.campFaute = 'notre';   // v3.76
     }
   };
 
@@ -4868,12 +4901,16 @@
       });
       html += '</div>';
     }
+    // v3.76 — opts.sansJoueur : fait d'équipe possible (ex. faute non attribuée).
+    if (opts.sansJoueur) {
+      html += '<button type="button" class="suivi-chrono__btn suivi-attrib__joueur" data-uuid="" style="margin:8px 8px 0 0">— Équipe (sans joueur) —</button>';
+    }
     html += '<button type="button" class="suivi-chrono__btn" id="attrib-annuler">↩ Retour</button>';
     html += '</div>';
     pal.innerHTML = html;
 
     var annul = document.getElementById('attrib-annuler');
-    if (annul) annul.addEventListener('click', function () { _peindrePalette(evtId, perCourante); });
+    if (annul) annul.addEventListener('click', function () { (opts.surRetour || function () { _peindrePalette(evtId, perCourante); })(); });
 
     pal.querySelectorAll('.suivi-attrib__joueur').forEach(function (b) {
       b.addEventListener('click', function () {
@@ -4891,7 +4928,9 @@
           periode: ms.periode
         };
         if (opts.estBlessure) payload.estBlessure = true;
-        _saisirObservable(evtId, payload, function () { _peindrePalette(evtId, perCourante); });
+        _saisirObservable(evtId, payload, function () {
+          (opts.apresSaisie || function () { _peindrePalette(evtId, perCourante); })();   // v3.76
+        });
       });
     });
   }
@@ -5095,6 +5134,7 @@
     var pal = document.getElementById('suivi-palette');
     if (!pal) return;
     SuiviRegl.charger();   // non bloquant : prêt pour le retour d'exclusion
+    SuiviFautes.charger();  // v3.76 — non bloquant : pioche des fautes
     SuiviObs.charger(function (catA) {
       if (SuiviChrono.evtId !== evtId) return;
       if (!catA || !Array.isArray(catA.score)) {
@@ -5153,6 +5193,13 @@
       if (disc.length) {
         html += '<div class="suivi-palette__title suivi-palette__title--sep">Discipline</div>';
         html += '<div class="suivi-palette__grid">';
+        // v3.76 — Faute (pioche de la catégorie), Nous ou Adverse.
+        html += '<div class="suivi-palette__action">' +
+                  '<span class="suivi-palette__lbl">🚩 Faute</span>' +
+                  '<div class="suivi-palette__btns">' +
+                    '<button type="button" class="suivi-palette__btn suivi-palette__btn--disc" id="pal-faute">Saisir…</button>' +
+                  '</div>' +
+                '</div>';
         disc.forEach(function (obs, idx) {
           html +=
             '<div class="suivi-palette__action">' +
@@ -5306,6 +5353,9 @@
           });
         });
       });
+      // v3.76 — Faute.
+      var bFaute = document.getElementById('pal-faute');
+      if (bFaute) bFaute.addEventListener('click', function () { _ouvrirFaute(evtId, perCourante); });
       // T10 — remarque générale Conquête (note du match).
       var remBtn = document.getElementById('cq-remarque');
       if (remBtn) remBtn.addEventListener('click', function () { _ouvrirRemarqueConquete(evtId, perCourante); });
@@ -5509,17 +5559,24 @@
 
   // « ⚙ Gérer la liste » — observables de la catégorie du match : renommer,
   // monter / descendre, retirer / réactiver, ajouter. Jamais de suppression.
-  function _ouvrirGestionFroid(evtId, perCourante) {
+  // v3.76 — `cfg` optionnel : la même gestion sert à la pioche des fautes
+  // (_cfgGestionFautes). Sans cfg : observables à froid (comportement v3.73).
+  function _ouvrirGestionFroid(evtId, perCourante, cfg) {
     var pal = document.getElementById('suivi-palette');
     var hub = window.SupabaseHub;
-    if (!pal || !hub || typeof hub.listerObservablesFroid !== 'function') return;
+    cfg = cfg || {
+      fnLister: 'listerObservablesFroid', fnEnregistrer: 'enregistrerObservableFroid',
+      titre: 'Observables à froid',
+      note: 'La liste vaut pour toute la catégorie. Retirer ne supprime pas les notes déjà écrites.',
+      placeholder: 'Nouvel observable (ex. Circulation offensive)',
+      retour: function () { SuiviFroid.charger(evtId, function () { _peindrePalette(evtId, perCourante); }, true); }
+    };
+    if (!pal || !hub || typeof hub[cfg.fnLister] !== 'function') return;
     var catId = SuiviFroid.catId || _categorieCourante();
     if (!catId) { window.alert('Catégorie du match non résolue.'); return; }
-    var retour = function () {
-      SuiviFroid.charger(evtId, function () { _peindrePalette(evtId, perCourante); }, true);
-    };
+    var retour = cfg.retour;
     pal.innerHTML = '<div class="suivi-attrib"><div class="view-suivi__hint">Chargement de la liste…</div></div>';
-    hub.listerObservablesFroid(catId, true).then(function (res) {
+    hub[cfg.fnLister](catId, true).then(function (res) {
       if (!res || !res.ok) {
         pal.innerHTML = '<div class="suivi-attrib"><div class="view-suivi__hint">Liste indisponible : ' +
           escapeHtml((res && res.error) || 'erreur') + '</div><button type="button" class="suivi-chrono__btn" id="gf-retour">↩ Retour</button></div>';
@@ -5532,8 +5589,8 @@
       });
       var actifs = liste.filter(function (o) { return o.actif; });
       var h = '<div class="suivi-attrib">';
-      h += '<div class="suivi-attrib__title">⚙ Observables à froid — ' + escapeHtml(SuiviRegl.code() || 'catégorie du match') + '</div>';
-      h += '<div class="view-suivi__hint" style="text-align:left">La liste vaut pour toute la catégorie. Retirer ne supprime pas les notes déjà écrites.</div>';
+      h += '<div class="suivi-attrib__title">⚙ ' + escapeHtml(cfg.titre) + ' — ' + escapeHtml(SuiviRegl.code() || 'catégorie du match') + '</div>';
+      h += '<div class="view-suivi__hint" style="text-align:left">' + escapeHtml(cfg.note) + '</div>';
       liste.forEach(function (o) {
         var iA = actifs.indexOf(o);
         h += '<div class="suivi-palette__action" style="margin-top:8px' + (o.actif ? '' : ';opacity:.55') + '">' +
@@ -5549,7 +5606,7 @@
              '</div>';
       });
       h += '<div class="suivi-palette__action" style="margin-top:14px">' +
-             '<input type="text" maxlength="120" id="gf-nouveau" placeholder="Nouvel observable (ex. Circulation offensive)" style="' + _STYLE_SELECT + ';flex:1;min-width:160px">' +
+             '<input type="text" maxlength="120" id="gf-nouveau" placeholder="' + escapeHtml(cfg.placeholder) + '" style="' + _STYLE_SELECT + ';flex:1;min-width:160px">' +
              '<div class="suivi-palette__btns"><button type="button" class="suivi-palette__btn suivi-palette__btn--nous" id="gf-ajouter">Ajouter</button></div>' +
            '</div>';
       h += '<div style="margin-top:12px"><button type="button" class="suivi-chrono__btn" id="gf-retour">↩ Retour</button></div>';
@@ -5561,13 +5618,13 @@
       function envoyer(o, champs) {
         if (SuiviChrono.busy) return Promise.resolve(false);
         SuiviChrono.busy = true;
-        return hub.enregistrerObservableFroid(Object.assign({ categorieId: catId }, champs)).then(function (r) {
+        return hub[cfg.fnEnregistrer](Object.assign({ categorieId: catId }, champs)).then(function (r) {
           SuiviChrono.busy = false;
           if (!r || !r.ok) { window.alert('Modification refusée : ' + ((r && r.error) || 'erreur inconnue')); return false; }
           return true;
         });
       }
-      var rafraichir = function (ok) { if (ok) _ouvrirGestionFroid(evtId, perCourante); };
+      var rafraichir = function (ok) { if (ok) _ouvrirGestionFroid(evtId, perCourante, cfg); };
       document.getElementById('gf-retour').addEventListener('click', retour);
       document.getElementById('gf-ajouter').addEventListener('click', function () {
         var v = (document.getElementById('gf-nouveau').value || '').trim();
@@ -5598,7 +5655,7 @@
         if (oa === ob) { ob = oa + sens; }   // ordres égaux : on les départage
         envoyer(o, { id: o.id, libelle: o.libelle, ordre: ob }).then(function (ok) {
           if (!ok) return;
-          envoyer(v, { id: v.id, libelle: v.libelle, ordre: oa }).then(function () { _ouvrirGestionFroid(evtId, perCourante); });
+          envoyer(v, { id: v.id, libelle: v.libelle, ordre: oa }).then(function () { _ouvrirGestionFroid(evtId, perCourante, cfg); });
         });
       }
       pal.querySelectorAll('[data-gf-up]').forEach(function (b) {
@@ -6055,6 +6112,154 @@
     });
   }
 
+  // ════════════════════════════════════════════════════════════
+  // v3.76 — SUIVI-VEO avenant « Faute » (C14-d). Une faute = fait daté de
+  // la palette (Discipline) : équipe fautive, type tiré de la pioche de la
+  // catégorie (table types_faute, modifiable ici), joueur facultatif côté
+  // nous, minute. Ligne chronologie : observable_id 'obs-A-faute-<id>'.
+  // ════════════════════════════════════════════════════════════
+  var _PREFIXE_FAUTE = 'obs-A-faute-';
+  var SuiviFautes = {
+    catId: null, liste: null, libelles: {}, charge: false, enCours: false, _cb: [],
+    charger: function (cb, force) {
+      var catId = _categorieCourante();
+      if (!force && this.charge && this.catId === catId) { if (cb) cb(); return; }
+      if (cb) this._cb.push(cb);
+      if (this.enCours) return;
+      this.enCours = true;
+      var self = this, hub = window.SupabaseHub;
+      var p = (catId && hub && typeof hub.listerTypesFaute === 'function')
+        ? hub.listerTypesFaute(catId, true).catch(function () { return { ok: false }; })
+        : Promise.resolve({ ok: false });
+      p.then(function (res) {
+        self.catId = catId;
+        var toutes = (res && res.ok && Array.isArray(res.data)) ? res.data : null;
+        self.liste = toutes ? toutes.filter(function (t) { return t.actif; }) : null;
+        self.libelles = {};
+        (toutes || []).forEach(function (t) { self.libelles[t.id] = t.libelle; });
+        self.charge = true; self.enCours = false;
+        var q = self._cb; self._cb = [];
+        for (var i = 0; i < q.length; i++) { try { q[i](); } catch (e) {} }
+      });
+    }
+  };
+
+  function _cfgGestionFautes(evtId, perCourante) {
+    return {
+      fnLister: 'listerTypesFaute', fnEnregistrer: 'enregistrerTypeFaute',
+      titre: 'Pioche des fautes',
+      note: 'La pioche vaut pour toute la catégorie. Retirer un type ne touche pas aux fautes déjà saisies.',
+      placeholder: 'Nouveau type de faute (ex. Hors-jeu sur ruck)',
+      retour: function () { SuiviFautes.charger(function () { _ouvrirFaute(evtId, perCourante); }, true); }
+    };
+  }
+
+  // Écran de saisie d'une faute : équipe fautive, puis type ; côté nous, le
+  // joueur (facultatif) ; minute via _minuteSaisie (chrono ou manuelle).
+  function _ouvrirFaute(evtId, perCourante) {
+    var pal = document.getElementById('suivi-palette');
+    if (!pal) return;
+    if (!SuiviFautes.charge) { SuiviFautes.charger(function () { _ouvrirFaute(evtId, perCourante); }); return; }
+    var campN = (SuiviSaisie.campFaute !== 'adverse');
+    var actif = 'background:#1d9e75;border-color:#1d9e75;color:#fff';
+    var h = '<div class="suivi-attrib">';
+    h += '<div class="suivi-attrib__title">🚩 Faute</div>';
+    h += '<div class="suivi-palette__action">' +
+           '<span class="suivi-palette__lbl">Équipe fautive</span>' +
+           '<div class="suivi-palette__btns">' +
+             '<button type="button" class="suivi-palette__btn suivi-palette__btn--nous" data-faute-camp="notre"' + (campN ? ' style="' + actif + '"' : '') + '>' + escapeHtml(SuiviChrono.nomNous || 'Nous') + '</button>' +
+             '<button type="button" class="suivi-palette__btn suivi-palette__btn--adv" data-faute-camp="adverse"' + (!campN ? ' style="' + actif + '"' : '') + '>' + escapeHtml(SuiviChrono.nomAdv || 'Adversaire') + '</button>' +
+           '</div>' +
+         '</div>';
+    if (!Array.isArray(SuiviFautes.liste)) {
+      h += '<div class="view-suivi__hint">Pioche indisponible (catégorie du match non résolue ou base non à jour).</div>';
+    } else {
+      if (!SuiviFautes.liste.length) h += '<div class="view-suivi__hint">Pioche vide pour cette catégorie.</div>';
+      h += '<div class="suivi-obsb__grid" style="margin-top:10px">';
+      SuiviFautes.liste.forEach(function (t) {
+        h += '<button type="button" class="suivi-obsb__btn" data-faute="' + escapeHtml(t.id) + '">' + escapeHtml(t.libelle) + '</button>';
+      });
+      h += '</div>';
+    }
+    h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">' +
+         (Array.isArray(SuiviFautes.liste) ? '<button type="button" class="suivi-chrono__btn" id="faute-gerer">⚙ Gérer la pioche</button>' : '') +
+         '<button type="button" class="suivi-chrono__btn" id="faute-retour">↩ Retour</button></div>';
+    h += '</div>';
+    pal.innerHTML = h;
+
+    pal.querySelectorAll('[data-faute-camp]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        SuiviSaisie.campFaute = (b.getAttribute('data-faute-camp') === 'adverse') ? 'adverse' : 'notre';
+        _ouvrirFaute(evtId, perCourante);
+      });
+    });
+    document.getElementById('faute-retour').addEventListener('click', function () { _peindrePalette(evtId, perCourante); });
+    var g = document.getElementById('faute-gerer');
+    if (g) g.addEventListener('click', function () { _ouvrirGestionFroid(evtId, perCourante, _cfgGestionFautes(evtId, perCourante)); });
+    pal.querySelectorAll('[data-faute]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var id = b.getAttribute('data-faute');
+        var obs = { uuid: _PREFIXE_FAUTE + id, libelle_court: 'Faute — ' + (SuiviFautes.libelles[id] || ''), icone: '🚩', points: 0 };
+        if (SuiviSaisie.campFaute === 'adverse') {
+          var ms = _minuteSaisie();
+          if (!ms) return;
+          _saisirObservable(evtId, {
+            observableId: obs.uuid, categorieObs: 'A', valeurPoints: 0,
+            equipeConcernee: 'adverse', minuteMatch: ms.minute, periode: ms.periode
+          }, function () { _ouvrirFaute(evtId, perCourante); });
+        } else {
+          _ouvrirAttribution(evtId, perCourante, obs, {
+            sansJoueur: true,
+            surRetour: function () { _ouvrirFaute(evtId, perCourante); },
+            apresSaisie: function () { _ouvrirFaute(evtId, perCourante); }
+          });
+        }
+      });
+    });
+  }
+
+  // Rapport : fautes par type (nous / adverse) + par joueur (nous).
+  function _peindreFautesRapport(fautes, cibleId, nomNous, nomAdv) {
+    var box = document.getElementById(cibleId);
+    if (!box) return;
+    SuiviFautes.charger(function () {
+      var parType = {}, parJoueur = {}, totN = 0, totA = 0;
+      fautes.forEach(function (l) {
+        var id = l.observable_id.slice(_PREFIXE_FAUTE.length);
+        if (!parType[id]) parType[id] = { nous: 0, adv: 0 };
+        if (l.equipe_concernee === 'adverse') { parType[id].adv += 1; totA += 1; }
+        else {
+          parType[id].nous += 1; totN += 1;
+          if (l.joueur_uuid) parJoueur[l.joueur_uuid] = (parJoueur[l.joueur_uuid] || 0) + 1;
+        }
+      });
+      var ids = Object.keys(parType).sort(function (a, b) {
+        return (parType[b].nous + parType[b].adv) - (parType[a].nous + parType[a].adv);
+      });
+      var h = '<table class="rapport-tab"><thead><tr><th>Faute</th><th>' + escapeHtml(nomNous || 'Nous') +
+              '</th><th>' + escapeHtml(nomAdv || 'Adv.') + '</th></tr></thead><tbody>';
+      ids.forEach(function (id) {
+        h += '<tr><td>' + escapeHtml(SuiviFautes.libelles[id] || 'Type retiré') + '</td>' +
+             '<td class="rapport-tab__n">' + parType[id].nous + '</td><td class="rapport-tab__n">' + parType[id].adv + '</td></tr>';
+      });
+      h += '<tr><td><strong>Total</strong></td><td class="rapport-tab__n"><strong>' + totN + '</strong></td>' +
+           '<td class="rapport-tab__n"><strong>' + totA + '</strong></td></tr></tbody></table>';
+      var uuids = Object.keys(parJoueur);
+      if (!uuids.length) { box.innerHTML = h; return; }
+      var pNoms = (window.SupabaseHub && typeof SupabaseHub._resolveNoms === 'function')
+        ? SupabaseHub._resolveNoms(uuids).catch(function () { return new Map(); }) : Promise.resolve(new Map());
+      pNoms.then(function (map) {
+        var lst = uuids.sort(function (a, b) { return parJoueur[b] - parJoueur[a]; }).map(function (u) {
+          var e = map && map.get ? map.get(u) : null;
+          var n = e ? (((e.prenom || '').trim() + ' ' + (e.nom || '').trim()).trim()) : '';
+          return (n || _idCourt(u)) + ' ' + parJoueur[u];
+        });
+        box.innerHTML = h + '<p class="view-suivi__hint" style="text-align:left">Par joueur (' +
+          escapeHtml(nomNous || 'nous') + ') : ' + escapeHtml(lst.join(' · ')) + '</p>';
+      });
+    });
+  }
+
   // L3a/b — enregistre un observable (voie coach) puis rafraîchit le score.
   // onApres : callback optionnel après succès (ex. retour à la palette).
   function _saisirObservable(evtId, obs, onApres) {
@@ -6088,7 +6293,9 @@
     var titresFam = { score: 'Score', score_rate: 'Tentatives ratées', discipline: 'Discipline',
                       technique: 'Discipline', mouvement: 'Mouvement', conquete: 'Conquête',
                       jeu_collectif: 'Jeu collectif (ancien)' };
-    var connu = plats.some(function (p) { return p.o.uuid === ligne.observable_id; });
+    var connu = plats.some(function (p) { return p.o.uuid === ligne.observable_id; }) ||
+      (ligne.observable_id.indexOf(_PREFIXE_FAUTE) === 0 && Array.isArray(SuiviFautes.liste) &&
+       SuiviFautes.liste.some(function (t) { return _PREFIXE_FAUTE + t.id === ligne.observable_id; }));
     var optType = '';
     if (!connu) {
       var refL = SuiviObs.libelle(ligne.observable_id);
@@ -6108,6 +6315,16 @@
                  escapeHtml(lib) + '</option>';
     });
     if (famCour !== null) optType += '</optgroup>';
+    // v3.76 — types de faute de la pioche (catégorie du match).
+    if (Array.isArray(SuiviFautes.liste) && SuiviFautes.liste.length) {
+      optType += '<optgroup label="Fautes">';
+      SuiviFautes.liste.forEach(function (t) {
+        var v = _PREFIXE_FAUTE + t.id;
+        optType += '<option value="' + escapeHtml(v) + '"' + (v === ligne.observable_id ? ' selected' : '') + '>' +
+                   escapeHtml('Faute — ' + t.libelle) + '</option>';
+      });
+      optType += '</optgroup>';
+    }
 
     var effectif = _effectifPourSaisie();
     function optJoueurs(choisi, nomSecours) {
@@ -6185,12 +6402,13 @@
       var adverse = (selEq.value === 'adverse');
       var sansJoueur = adverse || (t && (t.famille === 'conquete' || t.famille === 'jeu_collectif'));
       var estSub = (uuidType === 'obs-A-substitution') && !adverse;
+      var estFaute = (uuidType.indexOf(_PREFIXE_FAUTE) === 0);   // v3.76
       var payload = {
         observableId: uuidType,
-        categorieObs: (uuidType.indexOf('obs-B-') === 0) ? 'B' : (t ? 'A' : (ligne.categorie_obs || 'A')),
+        categorieObs: (uuidType.indexOf('obs-B-') === 0) ? 'B' : ((t || estFaute) ? 'A' : (ligne.categorie_obs || 'A')),
         // Points : ceux du référentiel ; type inconnu (Cat B, ancien) → inchangés.
-        valeurPoints: t ? ((typeof t.o.points === 'number') ? t.o.points : 0)
-                        : ((typeof ligne.valeur_points === 'number') ? ligne.valeur_points : 0),
+        valeurPoints: estFaute ? 0 : (t ? ((typeof t.o.points === 'number') ? t.o.points : 0)
+                        : ((typeof ligne.valeur_points === 'number') ? ligne.valeur_points : 0)),
         equipeConcernee: adverse ? 'adverse' : 'notre',
         joueurUuid: sansJoueur ? null : (selJ.value || null),
         joueurUuidEntrant: estSub ? (selE.value || null) : null,
