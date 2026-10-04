@@ -18,6 +18,12 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 1.88 — 4 octobre 2026
+ *   v1.88 : avenant « Stats de saison » (S1-A…S5-A). 3 wrappers ADDITIFS →
+ *          RPC C15-a : listerDebutStats(saisonId?) ;
+ *          enregistrerDebutStats(categorieId, dateIso|null, saisonId?) ;
+ *          metaEvenementsStats(ids) → { ok, data: {evtId: meta} } (date et
+ *          catégorie effectives, date de départ, dans_stats).
  * Version : 1.87 — 4 octobre 2026
  *   v1.87 : SUIVI-VEO avenant Faute. 2 wrappers ADDITIFS → RPC C14-d :
  *          listerTypesFaute(categorieId, inclureInactifs) ;
@@ -7463,6 +7469,63 @@
       }
       const r = Array.isArray(data) ? (data[0] || null) : (data || null);
       return { ok: true, data: r };
+    },
+
+    /**
+     * v1.88 — Stats de saison (C15-a). Dates de départ des statistiques,
+     * toutes catégories, pour une saison (défaut : saison active).
+     * @param {string} [saisonId]
+     * @returns {Promise<{ok:boolean, data?:Array, error?:string}>}
+     *   data[] = {saison_id, saison_code, saison_debut, saison_fin,
+     *             categorie_id, categorie_code, date_reglee, date_effective}
+     */
+    async listerDebutStats(saisonId) {
+      const params = {};
+      if (saisonId) params.p_saison_id = saisonId;
+      const { data, error } = await client.rpc('lister_debut_stats', params);
+      if (error) {
+        console.error('MOM Hub: listerDebutStats()', error);
+        return { ok: false, error: error.message || 'Erreur lister_debut_stats' };
+      }
+      return { ok: true, data: Array.isArray(data) ? data : [] };
+    },
+
+    /**
+     * v1.88 — Stats de saison (C15-a). Règle la date de départ d'une
+     * catégorie (AAAA-MM-JJ) ; null = retour au début de la saison.
+     * Droits portés par la RPC enregistrer_debut_stats.
+     */
+    async enregistrerDebutStats(categorieId, dateIso, saisonId) {
+      if (!categorieId) return { ok: false, error: 'categorieId manquant' };
+      const params = { p_categorie_id: categorieId, p_date: dateIso || null };
+      if (saisonId) params.p_saison_id = saisonId;
+      const { data, error } = await client.rpc('enregistrer_debut_stats', params);
+      if (error) {
+        console.error('MOM Hub: enregistrerDebutStats()', error);
+        return { ok: false, error: error.message || 'Erreur enregistrer_debut_stats' };
+      }
+      const r = Array.isArray(data) ? (data[0] || null) : (data || null);
+      return { ok: true, data: r };
+    },
+
+    /**
+     * v1.88 — Stats de saison (C15-a). Métadonnées « stats » d'une liste
+     * d'évènements : date (Europe/Paris) et catégorie effectives, libellé,
+     * adversaire, date de départ applicable, dans_stats (règle serveur).
+     * @param {string[]} ids
+     * @returns {Promise<{ok:boolean, data?:Object, error?:string}>} data = {evtId: meta}
+     */
+    async metaEvenementsStats(ids) {
+      const uniques = Array.from(new Set((ids || []).filter(Boolean)));
+      if (!uniques.length) return { ok: true, data: {} };
+      const { data, error } = await client.rpc('meta_evenements_stats', { p_ids: uniques });
+      if (error) {
+        console.error('MOM Hub: metaEvenementsStats()', error);
+        return { ok: false, error: error.message || 'Erreur meta_evenements_stats' };
+      }
+      const map = {};
+      (Array.isArray(data) ? data : []).forEach(function (m) { if (m && m.evenement_id) map[m.evenement_id] = m; });
+      return { ok: true, data: map };
     },
 
     /**
