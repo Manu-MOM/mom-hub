@@ -18,6 +18,10 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 1.87 — 4 octobre 2026
+ *   v1.87 : SUIVI-VEO avenant Faute. 2 wrappers ADDITIFS → RPC C14-d :
+ *          listerTypesFaute(categorieId, inclureInactifs) ;
+ *          enregistrerTypeFaute({categorieId, libelle, id?, ordre?, actif?}).
  * Version : 1.86 — 4 octobre 2026
  *   v1.86 : SUIVI-VEO lots L4 et L6. Wrapper ADDITIF marquerSourceFfr(evt,
  *          ids) → marquer_source_observables_coach (C14-c). Doc de
@@ -7420,6 +7424,45 @@
       }
       const r = Array.isArray(data) ? (data[0] || null) : data;
       return { ok: true, data: r ? _mapRapport(r) : null };
+    },
+
+    /**
+     * v1.87 — SUIVI-VEO avenant Faute (C14-d). Pioche des types de faute
+     * d'une catégorie. RPC lister_types_faute (authentifié).
+     * @returns {Promise<{ok:boolean, data?:Array<{id,categorie_id,libelle,ordre,actif}>, error?:string}>}
+     */
+    async listerTypesFaute(categorieId, inclureInactifs) {
+      if (!categorieId) return { ok: false, error: 'categorieId manquant' };
+      const { data, error } = await client.rpc('lister_types_faute', {
+        p_categorie_id: categorieId,
+        p_inclure_inactifs: inclureInactifs === true
+      });
+      if (error) {
+        console.error('MOM Hub: listerTypesFaute()', error);
+        return { ok: false, error: error.message || 'Erreur lister_types_faute' };
+      }
+      return { ok: true, data: Array.isArray(data) ? data : [] };
+    },
+
+    /**
+     * v1.87 — SUIVI-VEO avenant Faute (C14-d). Crée / met à jour un type
+     * de faute (retirer = actif false). Droits portés par la RPC
+     * enregistrer_type_faute.
+     * @param {{categorieId:string, libelle:string, id?:string, ordre?:number, actif?:boolean}} o
+     */
+    async enregistrerTypeFaute(o) {
+      if (!o || !o.categorieId) return { ok: false, error: 'categorieId manquant' };
+      const params = { p_categorie_id: o.categorieId, p_libelle: o.libelle || '' };
+      if (o.id) params.p_id = o.id;
+      if (typeof o.ordre === 'number') params.p_ordre = o.ordre;
+      if (typeof o.actif === 'boolean') params.p_actif = o.actif;
+      const { data, error } = await client.rpc('enregistrer_type_faute', params);
+      if (error) {
+        console.error('MOM Hub: enregistrerTypeFaute()', error);
+        return { ok: false, error: error.message || 'Erreur enregistrer_type_faute' };
+      }
+      const r = Array.isArray(data) ? (data[0] || null) : (data || null);
+      return { ok: true, data: r };
     },
 
     /**
