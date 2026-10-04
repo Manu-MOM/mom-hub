@@ -6,6 +6,29 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.74 — Rapport enrichi + import de la feuille FFR (4 oct. 2026)
+ *   v3.74 : SUIVI-VEO lots L5 et L6 (FAIT FOI Conception-SUIVI-VEO-v1).
+ *           Requiert C14-b (temps de jeu), C14-c (source 'ffr') et
+ *           supabase-client v1.86 (marquerSourceFfr). Dégradation propre
+ *           si absents (messages, rien de bloqué).
+ *           L5 — Rapport de match : section Conquête détaillée (issue ×
+ *                lanceur, taux gagnées par le lanceur) ; section Buteurs
+ *                (transformations / pénalités réussies sur tentées, drops) ;
+ *                Observations à froid + remarque conquête (rapports.donnees) ;
+ *                Temps de jeu via la RPC C14-b (minute de match) avec
+ *                alerte « tous les inscrits doivent entrer » si le
+ *                règlement de la catégorie l'exige (M16) ; déroulé trié
+ *                en ordre de jeu (période → minute).
+ *           L6 — « 📥 Importer la feuille FFR » (barre Saisie) : copier-
+ *                coller des onglets Résumé (+ Statistiques facultatif) de
+ *                Mon Club House ; parse périodes / minutes / points /
+ *                remplacements « ENTRANT (SORTANT) » / cartons ; équipe par
+ *                rapprochement des noms (compo de match puis vivier) et
+ *                contrôle par le score ; aperçu modifiable avec anomalies ;
+ *                import = insertion, marquage 'ffr' (D5-A), puis annulation
+ *                des faits officiels déjà saisis (D6-A), joueur d'un carton
+ *                repris à ±2'. Essai de pénalité = essai + transformation
+ *                sans joueur. Remplacements adverses ignorés.
  * Version : 3.73 — Suivi : observations à froid avec notes, remarque conquête (4 oct. 2026)
  *   v3.73 : SUIVI-VEO lot L3 (FAIT FOI Conception-SUIVI-VEO-v1, D1-A, D2-A).
  *           Requiert C14-a (table observables_froid + RPC) et
@@ -3447,7 +3470,7 @@
             SupabaseHub.getChronologieRencontreCoach(mm.id, true).then(function (lignes) {
               if (!niveauActif()) return;
               var arr = Array.isArray(lignes) ? lignes : [];
-              _rendreRapportMatchDans(cible, arr, nomNous, advm, '-m' + idx);
+              _rendreRapportMatchDans(cible, arr, nomNous, advm, '-m' + idx, mm.id);
             }).catch(function () {
               cible.innerHTML = '<div class="rapport__vide">Lecture du suivi impossible.</div>';
             });
@@ -3657,7 +3680,7 @@
         // Anti-périmé : si on a quitté l'onglet entre-temps, ne rien peindre.
         if (State.viewMode !== 'rapport' || State.selectedCompoId !== compo.id) return;
         var arr = Array.isArray(lignes) ? lignes : [];
-        _peindreRapport(arr, nomNous, nomAdv);
+        _peindreRapport(arr, nomNous, nomAdv, evtId);
       }).catch(function () {
         var c = document.getElementById('rapport-corps');
         if (c) c.innerHTML = '<div class="view-suivi__hint">Lecture du suivi impossible.</div>';
@@ -3711,22 +3734,25 @@
   }
 
   // Agrège la chronologie et peint le corps du rapport. Lecture pure.
-  function _peindreRapport(lignes, nomNous, nomAdv) {
+  function _peindreRapport(lignes, nomNous, nomAdv, evtId) {
     // Wrapper historique (chemin match) : peint dans #rapport-corps, ids
     // non suffixés. Le rendu réel est factorisé dans _rendreRapportMatchDans
     // (réutilisé en série pour la queue du rapport tournoi, pt 55).
     var corps = document.getElementById('rapport-corps');
     if (!corps) return;
-    _rendreRapportMatchDans(corps, lignes, nomNous, nomAdv, '');
+    _rendreRapportMatchDans(corps, lignes, nomNous, nomAdv, '', evtId);
   }
 
   // Rendu d'un rapport de match dans un ÉLÉMENT donné, avec un SUFFIX d'ids
   // (vide pour le chemin match historique → ids 'rapport-subs'/'rapport-fil'/
   // 'rapport-tdj-detail' inchangés ; suffixé pour chaque match de la queue
   // tournoi → ids uniques). nomAdv passé explicitement (série multi-matchs).
-  function _rendreRapportMatchDans(corps, lignes, nomNous, nomAdv, suffix) {
+  function _rendreRapportMatchDans(corps, lignes, nomNous, nomAdv, suffix, evtId) {
     if (!corps) return;
     suffix = suffix || '';
+    // v3.74 (L5) — ids des blocs asynchrones (buteurs, notes, temps de jeu).
+    var idBut   = 'rapport-buteurs' + suffix;
+    var idFroid = 'rapport-froid' + suffix;
     var idSubs = 'rapport-subs' + suffix;
     var idFil  = 'rapport-fil' + suffix;
     var idTdj  = 'rapport-tdj-detail' + suffix;
@@ -3751,6 +3777,15 @@
     //    compte[observable_id] = { nous, adv }
     var compte = {};
     var subs = [];        // substitutions effectives (sortant→entrant)
+    var conq = [];        // v3.74 — lignes conquête v1.2 {l, o}
+    var buteurs = {};     // v3.74 — {uuid: {transfo:[réussies,tentées], penalite:[…], drop:[…]}}
+    var BUT = {
+      'obs-A-transfo':        { k: 'transfo',  ok: true },
+      'obs-A-transfo-ratee':  { k: 'transfo',  ok: false },
+      'obs-A-penalite':       { k: 'penalite', ok: true },
+      'obs-A-penalite-ratee': { k: 'penalite', ok: false },
+      'obs-A-drop':           { k: 'drop',     ok: true }
+    };
     for (var j = 0; j < eff.length; j++) {
       var l = eff[j];
       var oid = l.observable_id;
@@ -3759,6 +3794,16 @@
         subs.push(l);
         continue;
       }
+      // v3.74 (L5) — conquête v1.2 : section dédiée (lanceur × issue).
+      var tq = SuiviObs.trouver(oid);
+      if (tq && tq.famille === 'conquete') { conq.push({ l: l, o: tq.o }); continue; }
+      // v3.74 (L5) — tentatives au pied de NOTRE équipe, par buteur.
+      if (BUT[oid] && l.equipe_concernee !== 'adverse' && l.joueur_uuid) {
+        var bj = buteurs[l.joueur_uuid] || (buteurs[l.joueur_uuid] = { transfo: [0, 0], penalite: [0, 0], drop: [0, 0] });
+        var bc = bj[BUT[oid].k];
+        bc[1] += 1;
+        if (BUT[oid].ok) bc[0] += 1;
+      }
       if (!compte[oid]) compte[oid] = { nous: 0, adv: 0 };
       if (l.equipe_concernee === 'adverse') compte[oid].adv += 1;
       else compte[oid].nous += 1;
@@ -3766,7 +3811,9 @@
 
     // 3) Regroupe par famille pour l'affichage.
     var ordreFam = ['score', 'discipline', 'jeu_collectif'];
-    var titreFam = { score: 'Score', discipline: 'Discipline', jeu_collectif: 'Conquête' };
+    // v3.74 : la conquête v1.2 a sa propre section ; ici ne restent que les
+    // anciens identifiants (suivi bénévole / Mode Vidéo / matchs passés).
+    var titreFam = { score: 'Score', discipline: 'Discipline', jeu_collectif: 'Jeu collectif (ancien suivi)' };
     var parFamille = { score: [], discipline: [], jeu_collectif: [], autre: [] };
     for (var oid2 in compte) {
       if (!compte.hasOwnProperty(oid2)) continue;
@@ -3821,6 +3868,22 @@
       html += '</tbody></table></section>';
     }
 
+    // v3.74 (L5) — CONQUÊTE détaillée : par phase, issue × lanceur.
+    html += _rapportConqueteHTML(conq, nomNous, nomAdv);
+
+    // v3.74 (L5) — BUTEURS : réussite au pied par joueur (noms asynchrones).
+    if (Object.keys(buteurs).length) {
+      html += '<section class="rapport-bloc">' +
+                '<h4 class="rapport-bloc__titre">🎯 Buteurs</h4>' +
+                '<div id="' + idBut + '"><p class="view-suivi__hint">Résolution des noms…</p></div>' +
+              '</section>';
+    }
+
+    // v3.74 (L5) — OBSERVATIONS À FROID + remarque conquête (asynchrone).
+    if (evtId) {
+      html += '<section class="rapport-bloc" id="' + idFroid + '" hidden></section>';
+    }
+
     // SUBSTITUTIONS (nominatif sortant → entrant, côté nous).
     if (subs.length > 0) {
       html += '<section class="rapport-bloc">' +
@@ -3843,15 +3906,15 @@
             '</section>';
 
     // TEMPS DE JEU — panneau replié, incertitude assumée (SUIVI-COACH-7).
+    // v3.74 (L5) — calcul sur la MINUTE DE MATCH (RPC C14-b), asynchrone.
     html += '<details class="rapport-tdj">' +
-              '<summary class="rapport-tdj__sum">⏱ Temps de jeu (estimation indicative)</summary>' +
+              '<summary class="rapport-tdj__sum">⏱ Temps de jeu</summary>' +
               '<div class="rapport-tdj__corps">' +
-                '<p class="rapport-tdj__avert">Estimation <strong>indicative</strong> : le suivi n\'enregistre pas de minutage fiable ' +
-                'pour ce match. Les durées ci-dessous sont calculées à partir de l\'ordre des actions, ' +
-                'pas d\'un chronomètre — à lire comme un ordre de grandeur, jamais comme un temps officiel.</p>' +
+                '<p class="rapport-tdj__avert">Calcul sur la <strong>minute de match</strong> : arrondi à la minute, ' +
+                'temps additionnel non compté, exclusion temporaire déduite seulement si son retour est saisi. ' +
+                'Fiable si tous les remplacements et cartons sont saisis (import FFR ou VEO).</p>' +
                 '<div id="' + idTdj + '">' +
-                  '<p class="view-suivi__hint">' + subs.length + ' substitution(s) enregistrée(s). ' +
-                  'Le détail par joueur sera affiné avec un minutage fiable.</p>' +
+                  '<p class="view-suivi__hint">' + (evtId ? 'Calcul…' : 'Indisponible pour ce match.') + '</p>' +
                 '</div>' +
               '</div>' +
             '</details>';
@@ -3864,6 +3927,178 @@
 
     // Fil chronologique (noms résolus en asynchrone, même voie).
     _peindreFilRapport(eff, idFil, nomAdv);
+
+    // v3.74 (L5) — blocs asynchrones.
+    if (Object.keys(buteurs).length) _peindreButeursRapport(buteurs, idBut);
+    if (evtId) {
+      _peindreFroidRapport(evtId, idFroid);
+      _peindreTdjRapport(evtId, idTdj);
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // v3.74 — SUIVI-VEO lot L5 : blocs du rapport de match.
+  // ════════════════════════════════════════════════════════════
+
+  // Conquête v1.2 : pour chaque phase, issue (lignes) × lanceur (colonnes),
+  // plus le taux de ballons gagnés sur chaque lancer. Synchrone.
+  function _rapportConqueteHTML(conq, nomNous, nomAdv) {
+    if (!conq || !conq.length || !SuiviObs.catA || !SuiviObs.catA.conquete) return '';
+    var ref = SuiviObs.catA.conquete;
+    var html = '<section class="rapport-bloc"><h4 class="rapport-bloc__titre">Conquête</h4>';
+    [['touche', 'Touche', 'lancer'], ['melee', 'Mêlée', 'introduction']].forEach(function (ph) {
+      var issues = Array.isArray(ref[ph[0]]) ? ref[ph[0]] : [];
+      var lignes = conq.filter(function (c) { return c.o.phase === ph[0]; });
+      if (!lignes.length) return;
+      var n = {}, totN = 0, totA = 0, gagN = 0, gagA = 0;
+      lignes.forEach(function (c) {
+        var adv = (c.l.equipe_concernee === 'adverse');
+        var k = c.o.uuid;
+        if (!n[k]) n[k] = { nous: 0, adv: 0 };
+        if (adv) { n[k].adv += 1; totA += 1; if (c.o.issue === 'gagnee') gagA += 1; }
+        else { n[k].nous += 1; totN += 1; if (c.o.issue === 'gagnee') gagN += 1; }
+      });
+      function pct(a, b) { return b ? (' (' + Math.round(100 * a / b) + ' %)') : ''; }
+      html += '<table class="rapport-tab"><thead><tr><th>' + ph[1] + '</th>' +
+              '<th>' + escapeHtml((nomNous || 'Nous') + ' — ' + ph[2]) + '</th>' +
+              '<th>' + escapeHtml((nomAdv || 'Adv.') + ' — ' + ph[2]) + '</th></tr></thead><tbody>';
+      issues.forEach(function (o) {
+        var c = n[o.uuid];
+        if (!c) return;
+        html += '<tr><td>' + escapeHtml(o.libelle_court) + '</td>' +
+                '<td class="rapport-tab__n">' + c.nous + '</td><td class="rapport-tab__n">' + c.adv + '</td></tr>';
+      });
+      html += '<tr><td><strong>Gagnées par le lanceur</strong></td>' +
+              '<td class="rapport-tab__n"><strong>' + gagN + '/' + totN + pct(gagN, totN) + '</strong></td>' +
+              '<td class="rapport-tab__n"><strong>' + gagA + '/' + totA + pct(gagA, totA) + '</strong></td></tr>';
+      html += '</tbody></table>';
+    });
+    return html + '</section>';
+  }
+
+  // Buteurs : réussite par joueur (transformations, pénalités, drops réussis).
+  function _peindreButeursRapport(buteurs, cibleId) {
+    var box = document.getElementById(cibleId);
+    if (!box) return;
+    var ids = Object.keys(buteurs);
+    function cell(c) {
+      if (!c[1]) return '—';
+      return c[0] + '/' + c[1] + ' (' + Math.round(100 * c[0] / c[1]) + ' %)';
+    }
+    function peindre(map) {
+      var rows = ids.map(function (id) {
+        var e = map && map.get ? map.get(id) : null;
+        var nom = e ? (((e.prenom || '').trim() + ' ' + (e.nom || '').trim()).trim()) : '';
+        return { nom: nom || _idCourt(id), b: buteurs[id] };
+      }).sort(function (a, b) {
+        return (b.b.transfo[1] + b.b.penalite[1]) - (a.b.transfo[1] + a.b.penalite[1]);
+      });
+      var h = '<table class="rapport-tab"><thead><tr><th>Joueur</th><th>Transformations</th><th>Pénalités</th><th>Drops</th></tr></thead><tbody>';
+      rows.forEach(function (r) {
+        h += '<tr><td>' + escapeHtml(r.nom) + '</td>' +
+             '<td class="rapport-tab__n">' + cell(r.b.transfo) + '</td>' +
+             '<td class="rapport-tab__n">' + cell(r.b.penalite) + '</td>' +
+             '<td class="rapport-tab__n">' + (r.b.drop[0] ? String(r.b.drop[0]) : '—') + '</td></tr>';
+      });
+      h += '</tbody></table><p class="view-suivi__hint" style="text-align:left">Réussies / tentées. ' +
+           'Les tentatives ratées ne sont connues que si elles ont été saisies (VEO) ; la feuille FFR ne les donne pas.</p>';
+      box.innerHTML = h;
+    }
+    if (window.SupabaseHub && typeof SupabaseHub._resolveNoms === 'function') {
+      SupabaseHub._resolveNoms(ids).then(peindre).catch(function () { peindre(new Map()); });
+    } else {
+      peindre(new Map());
+    }
+  }
+
+  // Observations à froid + remarque conquête (rapports.donnees du match).
+  function _peindreFroidRapport(evtId, cibleId) {
+    var box = document.getElementById(cibleId);
+    var hub = window.SupabaseHub;
+    if (!box || !hub || typeof hub.getRapportMatch !== 'function') return;
+    var catId = _categorieCourante();
+    var pListe = (catId && typeof hub.listerObservablesFroid === 'function')
+      ? hub.listerObservablesFroid(catId, true).catch(function () { return { ok: false }; })
+      : Promise.resolve({ ok: false });
+    Promise.all([hub.getRapportMatch(evtId), pListe]).then(function (res) {
+      var d = (res[0] && res[0].ok && res[0].data && res[0].data.donnees) ? res[0].data.donnees : null;
+      var notes = (d && d.notes_froid && typeof d.notes_froid === 'object') ? d.notes_froid : {};
+      var remq = (d && typeof d.remarque_conquete === 'string') ? d.remarque_conquete.trim() : '';
+      var libs = {};
+      ((res[1] && res[1].ok && Array.isArray(res[1].data)) ? res[1].data : []).forEach(function (o) {
+        libs[o.id] = o;
+      });
+      var ids = Object.keys(notes).filter(function (k) { return String(notes[k] || '').trim(); });
+      if (!ids.length && !remq) return;   // rien à montrer : la section reste masquée
+      ids.sort(function (a, b) {
+        var oa = libs[a] ? libs[a].ordre : 9999, ob = libs[b] ? libs[b].ordre : 9999;
+        return oa - ob;
+      });
+      var h = '<h4 class="rapport-bloc__titre">📝 Observations à froid</h4>';
+      ids.forEach(function (k) {
+        var lib = libs[k] ? libs[k].libelle : 'Observable retiré';
+        h += '<p style="margin:8px 0"><strong>' + escapeHtml(lib) + '</strong><br>' +
+             escapeHtml(String(notes[k])).replace(/\n/g, '<br>') + '</p>';
+      });
+      if (remq) {
+        h += '<p style="margin:8px 0"><strong>Conquête — remarque générale</strong><br>' +
+             escapeHtml(remq).replace(/\n/g, '<br>') + '</p>';
+      }
+      box.innerHTML = h;
+      box.removeAttribute('hidden');
+    }).catch(function () { /* section optionnelle : silence */ });
+  }
+
+  // Temps de jeu (RPC C14-b, minute de match) + règle « tous les inscrits
+  // doivent entrer en jeu » de la catégorie (règlement, ex. M16).
+  function _peindreTdjRapport(evtId, cibleId) {
+    var box = document.getElementById(cibleId);
+    var hub = window.SupabaseHub;
+    if (!box || !hub || typeof hub.getTempsDeJeuRencontre !== 'function') return;
+    SuiviRegl.charger(function () {
+      hub.getTempsDeJeuRencontre(evtId).then(function (res) {
+        if (!res || !res.ok) {
+          box.innerHTML = '<p class="view-suivi__hint">Temps de jeu indisponible : ' + escapeHtml((res && res.error) || 'erreur') + '</p>';
+          return null;
+        }
+        var lignes = Array.isArray(res.data) ? res.data : [];
+        var p = (typeof hub._resolveNoms === 'function')
+          ? hub._resolveNoms(lignes.map(function (l) { return l.out_joueur_id; })).catch(function () { return new Map(); })
+          : Promise.resolve(new Map());
+        return p.then(function (map) {
+          function nom(id) {
+            var e = map && map.get ? map.get(id) : null;
+            var t = e ? (((e.prenom || '').trim() + ' ' + (e.nom || '').trim()).trim()) : '';
+            return t || _idCourt(id);
+          }
+          var complet = lignes.some(function (l) { return l.out_chrono_complet === true; });
+          var h = '';
+          if (!complet) {
+            h += '<p class="view-suivi__hint" style="text-align:left">Durées des périodes non configurées : ' +
+                 'renseigne-les dans l\'onglet Suivi pour obtenir les minutes.</p>';
+          }
+          h += '<table class="rapport-tab"><thead><tr><th>N°</th><th>Joueur</th><th>Temps</th></tr></thead><tbody>';
+          lignes.forEach(function (l) {
+            var t = !l.out_est_entre ? 'non entré'
+                  : (complet ? ('~' + Math.round(Number(l.out_minutes_jeu) || 0) + ' min') : 'entré');
+            h += '<tr><td class="rapport-tab__n">' + escapeHtml(l.out_numero_maillot != null ? String(l.out_numero_maillot) : '—') + '</td>' +
+                 '<td>' + escapeHtml(nom(l.out_joueur_id)) + '</td>' +
+                 '<td class="rapport-tab__n">' + escapeHtml(t) + '</td></tr>';
+          });
+          h += '</tbody></table>';
+          var regle = SuiviRegl.regle();
+          var nonEntres = lignes.filter(function (l) { return !l.out_est_entre; });
+          if (regle && regle.tous_inscrits_entrent === true && nonEntres.length) {
+            h += '<p class="rapport-tdj__avert">⚠ Règlement ' + escapeHtml(SuiviRegl.code() || '') +
+                 ' : tous les joueurs inscrits doivent entrer en jeu. Non entré(s) : ' +
+                 escapeHtml(nonEntres.map(function (l) { return nom(l.out_joueur_id); }).join(', ')) + '.</p>';
+          }
+          box.innerHTML = h;
+        });
+      }).catch(function () {
+        box.innerHTML = '<p class="view-suivi__hint">Temps de jeu indisponible pour le moment.</p>';
+      });
+    });
   }
 
   // Résout les noms (sortant/entrant) des substitutions via la RPC en
@@ -3948,11 +4183,9 @@
     // (chemin match historique). Évite d'afficher le mauvais adversaire en série.
     var _nomAdvFil = (nomAdvParam != null) ? nomAdvParam : (SuiviChrono.nomAdv || 'Adversaire');
 
-    // Ordre de jeu = horodatage (base de temps fiable). Tri stable.
-    var arr = eff.slice().sort(function (a, b) {
-      var ta = a.horodatage || ''; var tb = b.horodatage || '';
-      return ta < tb ? -1 : (ta > tb ? 1 : 0);
-    });
+    // v3.74 (L5) — ordre de JEU (période → minute → horodatage) : une
+    // action ajoutée après coup (VEO, import FFR) se range à sa place.
+    var arr = eff.slice().sort(_ordreChrono);
 
     // Substitution : on a besoin du nom de l'entrant aussi.
     var uuids = [];
@@ -4489,6 +4722,8 @@
          '" data-saisie-mode="chrono" aria-pressed="' + (mode === 'chrono') + '">⏱ Minute du chrono</button>';
     h += '<button type="button" class="suivi-chrono__btn' + (mode === 'manuel' ? ' suivi-chrono__btn--primary' : '') +
          '" data-saisie-mode="manuel" aria-pressed="' + (mode === 'manuel') + '">✍ Minute manuelle</button>';
+    // v3.74 (L6) — import de la feuille FFR (copier-coller Mon Club House).
+    h += '<button type="button" class="suivi-chrono__btn" id="saisie-import-ffr">📥 Importer la feuille FFR</button>';
     h += '</div>';
     if (mode === 'manuel') {
       var m = SuiviSaisie.minute;
@@ -4516,6 +4751,8 @@
         _peindreChrono();
       });
     });
+    var ffr = document.getElementById('saisie-import-ffr');
+    if (ffr) ffr.addEventListener('click', function () { _ouvrirImportFfr(evtId, perCourante); });
     var mi = document.getElementById('saisie-minute');
     var ps = document.getElementById('saisie-periode');
     if (mi) mi.addEventListener('input', function () {
@@ -5355,6 +5592,402 @@
       pal.querySelectorAll('[data-gf-down]').forEach(function (b) {
         b.addEventListener('click', function () { echanger(parId[b.getAttribute('data-gf-down')], 1); });
       });
+    });
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // v3.74 — SUIVI-VEO lot L6 : IMPORT FFR par copier-coller (Mon Club
+  // House, onglets « Résumé » et « Statistiques »). Aucune lecture
+  // automatique du site (robots.txt) : l'utilisateur colle le texte.
+  //   • Parse : périodes (Début de match / Mi-temps / Fin de match),
+  //     minutes cumulées, points réussis + buteur, remplacements
+  //     « ENTRANT (SORTANT) », cartons (sans joueur ni équipe côté FFR).
+  //   • Équipe d'un fait : rapprochement des noms (« C. BEAUDOIN ») avec
+  //     la compo de match puis le vivier ; contrôle par le score FFR.
+  //   • Aperçu OBLIGATOIRE, modifiable, anomalies signalées.
+  //   • D6-A : les faits officiels déjà saisis (points réussis, cartons,
+  //     remplacements) sont ANNULÉS après l'insertion des faits FFR ; le
+  //     joueur d'un carton déjà saisi à ±2' est repris. Conquête, ratées,
+  //     blessures, retours d'exclusion, notes : jamais touchés.
+  //   • D5-A : lignes marquées source 'ffr' (C14-c, marquerSourceFfr).
+  // ════════════════════════════════════════════════════════════
+  var FFR_POINTS = {
+    'ESSAI': { obs: 'obs-A-essai', pts: 5, lib: 'Essai' },
+    'TRANSFORMATION': { obs: 'obs-A-transfo', pts: 2, lib: 'Transformation' },
+    'PENALITE': { obs: 'obs-A-penalite', pts: 3, lib: 'Pénalité' },
+    'DROP': { obs: 'obs-A-drop', pts: 3, lib: 'Drop' },
+    'ESSAI DE PENALITE': { obs: null, pts: 7, lib: 'Essai de pénalité' }
+  };
+  var FFR_CARTONS = { 'JAUNE': 'obs-A-jaune', 'BLANC': 'obs-A-blanc', 'ROUGE': 'obs-A-rouge' };
+  var FFR_OFFICIELS = ['obs-A-essai', 'obs-A-transfo', 'obs-A-penalite', 'obs-A-drop',
+                       'obs-A-jaune', 'obs-A-blanc', 'obs-A-rouge', 'obs-A-substitution'];
+
+  function _normFfr(s) {
+    return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .toUpperCase().replace(/[^A-Z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+  // « C. BEAUDOIN » → « C BEAUDOIN » ; « Jules » + « JUNG » → « J JUNG ».
+  function _cleNomFfr(txt) { return _normFfr(txt); }
+  function _cleJoueur(prenom, nom) { return (_normFfr(prenom).charAt(0) + ' ' + _normFfr(nom)).trim(); }
+
+  function _lignesTexteFfr(texte) {
+    return String(texte || '').split(/\r?\n/).map(function (l) {
+      return l.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')   // liens markdown éventuels
+              .replace(/^\s*[*•\-]\s*/, '').trim();
+    }).filter(function (l) { return l.length > 0; });
+  }
+
+  function _lireFaitFfr(l) {
+    var m;
+    if ((m = /^carton\s+(jaune|blanc|rouge)\b/i.exec(l))) {
+      return { genre: 'carton', couleur: _normFfr(m[1]) };
+    }
+    if ((m = /^(.+?)\s*\(\s*(essai de p[ée]nalit[ée]|essai|transformation|p[ée]nalit[ée]|drop)\s*\)\s*$/i.exec(l))) {
+      return { genre: 'points', nom: m[1].trim(), quoi: _normFfr(m[2]) };
+    }
+    if ((m = /^(.+?)\s*\(\s*(.+?)\s*\)\s*$/.exec(l))) {
+      return { genre: 'remplacement', entrant: m[1].trim(), sortant: m[2].trim() };
+    }
+    return null;
+  }
+
+  function _parserResumeFfr(texte) {
+    var res = { faits: [], ignorees: [], scoreMT: null, scoreFin: null };
+    var periode = 1, minute = null;
+    _lignesTexteFfr(texte).forEach(function (l) {
+      var m;
+      if (/^d[ée]but de match$/i.test(l)) return;
+      if ((m = /^(\d+)\s*mi-temps\s*(\d+)$/i.exec(l))) { res.scoreMT = [+m[1], +m[2]]; periode = 2; minute = null; return; }
+      if ((m = /^(\d+)\s*fin de match\s*(\d+)$/i.exec(l))) { res.scoreFin = [+m[1], +m[2]]; minute = null; return; }
+      if ((m = /^(\d{1,3})\s*['’]\s*(.*)$/.exec(l))) {
+        minute = +m[1];
+        l = m[2].trim();
+        if (!l) return;
+      }
+      if (minute === null) { res.ignorees.push(l); return; }
+      var f = _lireFaitFfr(l);
+      if (!f) { res.ignorees.push(minute + "' " + l); return; }
+      f.minute = minute; f.periode = periode; f.brut = l;
+      res.faits.push(f);
+      minute = null;
+    });
+    return res;
+  }
+
+  // Statistiques : « 2Transformations1 », ou « Essais » puis « 2 » puis « 1 ».
+  function _parserStatsFfr(texte) {
+    var lignes = _lignesTexteFfr(texte), st = {}, attente = null, vals = [];
+    lignes.forEach(function (l) {
+      var m = /^(\d+)\s*([^\d].*?)\s*(\d+)$/.exec(l);
+      if (m) { st[_normFfr(m[2])] = [+m[1], +m[3]]; attente = null; return; }
+      if (/^\d+$/.test(l) && attente) {
+        vals.push(+l);
+        if (vals.length === 2) { st[attente] = vals; attente = null; vals = []; }
+        return;
+      }
+      if (!/\d/.test(l)) { attente = _normFfr(l); vals = []; }
+    });
+    return st;   // { 'ESSAIS':[d,e], 'CARTONS JAUNES':[d,e], … } (domicile, extérieur)
+  }
+
+  // Index des joueurs connus : compo de match d'abord, puis vivier.
+  function _indexJoueursFfr() {
+    var idx = {}, infos = {};
+    function ajouter(uuid, prenom, nom, source, num) {
+      if (!uuid) return;
+      var k = _cleJoueur(prenom, nom);
+      if (!k.trim()) return;
+      if (!idx[k]) idx[k] = [];
+      if (idx[k].indexOf(uuid) < 0) idx[k].push(uuid);
+      if (!infos[uuid]) infos[uuid] = { nom: _nomJoueur({ nom: nom, prenom: prenom, num: num }), source: source, num: num };
+    }
+    _effectifPourSaisie().forEach(function (jo) { ajouter(jo.uuid, jo.prenom, jo.nom, 'compo', jo.num); });
+    if (State.vivierById && typeof State.vivierById.forEach === 'function') {
+      State.vivierById.forEach(function (j, uuid) { ajouter(uuid, j.prenom, j.nom, 'vivier', null); });
+    }
+    return { idx: idx, infos: infos };
+  }
+
+  // Instant cumulé d'une ligne existante (ancienne convention par période).
+  function _tCumule(l) {
+    var off = _decalageMinutes(l.periode || 1);
+    var m = (l.minute_match != null) ? l.minute_match : 0;
+    return (m < off) ? off + m : m;
+  }
+
+  function _analyserFfr(resume, stats) {
+    var J = _indexJoueursFfr();
+    function trouver(nomFfr) {
+      var c = J.idx[_cleNomFfr(nomFfr)] || [];
+      return { uuid: c.length === 1 ? c[0] : null, ambigu: c.length > 1, candidats: c };
+    }
+    var lignes = [], ptsNous = 0, ptsAutres = 0;
+    resume.faits.forEach(function (f) {
+      var L = { f: f, minute: f.minute, periode: f.periode, alertes: [], inclure: true };
+      if (f.genre === 'points') {
+        var def = FFR_POINTS[f.quoi] || FFR_POINTS.ESSAI;
+        var t = trouver(f.nom);
+        L.def = def;
+        L.joueur = t.uuid;
+        L.equipe = (t.uuid || t.ambigu) ? 'notre' : 'adverse';
+        if (t.ambigu) L.alertes.push('homonymes : choisis le joueur');
+        if (!f.quoi || !FFR_POINTS[f.quoi]) L.alertes.push('type inconnu, lu comme essai');
+        if (!def.obs) L.alertes.push('enregistré en essai + transformation, sans joueur');
+        if (L.equipe === 'notre') ptsNous += def.pts; else ptsAutres += def.pts;
+      } else if (f.genre === 'remplacement') {
+        var te = trouver(f.entrant), ts = trouver(f.sortant);
+        L.entrant = te.uuid; L.sortant = ts.uuid;
+        L.equipe = (te.uuid || ts.uuid || te.ambigu || ts.ambigu) ? 'notre' : 'adverse';
+        if (L.equipe === 'notre') {
+          if (!te.uuid) L.alertes.push('entrant non reconnu : ' + f.entrant);
+          if (!ts.uuid) L.alertes.push('sortant non reconnu : ' + f.sortant);
+          [te.uuid, ts.uuid].forEach(function (u) {
+            if (u && J.infos[u] && J.infos[u].source !== 'compo') L.alertes.push(J.infos[u].nom + ' absent de la compo de match');
+          });
+        } else {
+          L.inclure = false;   // le Hub ne suit pas les joueurs adverses
+        }
+      } else {
+        L.obs = FFR_CARTONS[f.couleur];
+        L.equipe = '';         // à déduire des statistiques ou à choisir
+      }
+      lignes.push(L);
+    });
+
+    // Côté (domicile / extérieur) par le score FFR.
+    var cote = null;
+    if (resume.scoreFin) {
+      if (ptsNous === resume.scoreFin[0] && ptsAutres === resume.scoreFin[1]) cote = 'domicile';
+      else if (ptsNous === resume.scoreFin[1] && ptsAutres === resume.scoreFin[0]) cote = 'exterieur';
+    }
+    // Cartons : équipe déduite des statistiques quand c'est sans ambiguïté.
+    if (stats && cote) {
+      var iN = (cote === 'domicile') ? 0 : 1, iA = 1 - iN;
+      [['JAUNE', 'CARTONS JAUNES'], ['ROUGE', 'CARTONS ROUGES']].forEach(function (c) {
+        var s = stats[c[1]];
+        if (!s) return;
+        lignes.forEach(function (L) {
+          if (L.f.genre !== 'carton' || L.f.couleur !== c[0]) return;
+          if (s[iN] > 0 && s[iA] === 0) L.equipe = 'notre';
+          else if (s[iA] > 0 && s[iN] === 0) L.equipe = 'adverse';
+        });
+      });
+    }
+    // Cartons à nous : joueur repris d'un carton déjà saisi à ±2' (D6).
+    var existants = (SuiviChrono.lignes || []).filter(function (l) { return l && l.annule !== true; });
+    lignes.forEach(function (L) {
+      if (L.f.genre !== 'carton') return;
+      if (!L.equipe) L.alertes.push('équipe à choisir (la feuille FFR ne la donne pas)');
+      var c = existants.filter(function (l) {
+        return l.observable_id === L.obs && l.equipe_concernee !== 'adverse' && l.joueur_uuid &&
+               Math.abs(_tCumule(l) - L.minute) <= 2;
+      })[0];
+      if (c) { L.joueur = c.joueur_uuid; if (!L.equipe) L.equipe = 'notre'; }
+      else if (L.equipe === 'notre') L.alertes.push('joueur à choisir');
+    });
+    // Cohérence des remplacements (joueur déjà sorti / déjà entré).
+    var surTerrain = {};
+    (State.compoJoueurs || []).forEach(function (cj) { if (cj.role === 'titulaire') surTerrain[cj.joueur_id] = true; });
+    lignes.forEach(function (L) {
+      if (L.f.genre !== 'remplacement' || L.equipe !== 'notre') return;
+      if (L.sortant && !surTerrain[L.sortant]) L.alertes.push((J.infos[L.sortant] || {}).nom + ' sort sans être sur le terrain');
+      if (L.entrant && surTerrain[L.entrant]) L.alertes.push((J.infos[L.entrant] || {}).nom + ' entre alors qu\'il est déjà sur le terrain');
+      if (L.sortant) delete surTerrain[L.sortant];
+      if (L.entrant) surTerrain[L.entrant] = true;
+    });
+    var aRemplacer = existants.filter(function (l) { return FFR_OFFICIELS.indexOf(l.observable_id) >= 0; });
+    return { lignes: lignes, cote: cote, ptsNous: ptsNous, ptsAutres: ptsAutres, J: J,
+             resume: resume, aRemplacer: aRemplacer };
+  }
+
+  function _ouvrirImportFfr(evtId, perCourante) {
+    var pal = document.getElementById('suivi-palette');
+    if (!pal) return;
+    var h = '<div class="suivi-attrib">';
+    h += '<div class="suivi-attrib__title">📥 Importer la feuille de match FFR</div>';
+    h += '<div class="view-suivi__hint" style="text-align:left">Sur Mon Club House, ouvre le match, onglet <strong>Résumé</strong> : ' +
+         'sélectionne tout le déroulé (de « Début de match » à « Fin de match ») et colle-le ci-dessous. ' +
+         'L\'onglet <strong>Statistiques</strong> est facultatif (il aide à attribuer les cartons).</div>';
+    h += '<textarea id="ffr-resume" style="' + _STYLE_TEXTAREA + '" placeholder="Début de match&#10;1&#39;&#10;C. BEAUDOIN(Pénalité)&#10;…"></textarea>';
+    h += '<textarea id="ffr-stats" style="' + _STYLE_TEXTAREA + ';min-height:70px;margin-top:8px" placeholder="Statistiques (facultatif)"></textarea>';
+    h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">' +
+         '<button type="button" class="suivi-chrono__btn suivi-chrono__btn--primary" id="ffr-analyser">Analyser</button>' +
+         '<button type="button" class="suivi-chrono__btn" id="ffr-retour">↩ Retour</button></div>';
+    h += '</div>';
+    pal.innerHTML = h;
+    if (pal.scrollIntoView) pal.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.getElementById('ffr-retour').addEventListener('click', function () { _peindreChrono(); });
+    document.getElementById('ffr-analyser').addEventListener('click', function () {
+      var resume = _parserResumeFfr(document.getElementById('ffr-resume').value);
+      if (!resume.faits.length) {
+        window.alert('Aucun fait de match reconnu. Colle le texte de l\'onglet « Résumé » (minutes et actions).');
+        return;
+      }
+      var stats = _parserStatsFfr(document.getElementById('ffr-stats').value);
+      _apercuFfr(evtId, perCourante, _analyserFfr(resume, Object.keys(stats).length ? stats : null));
+    });
+  }
+
+  function _apercuFfr(evtId, perCourante, A) {
+    var pal = document.getElementById('suivi-palette');
+    if (!pal) return;
+    var eff = _effectifPourSaisie();
+    function optJ(choisi) {
+      var o = '<option value="">— à choisir —</option>', vu = false;
+      eff.forEach(function (jo) {
+        var sel = (jo.uuid === choisi); if (sel) vu = true;
+        o += '<option value="' + escapeHtml(jo.uuid) + '"' + (sel ? ' selected' : '') + '>' +
+             escapeHtml(String(jo.num || '?') + ' · ' + _nomJoueur(jo)) + '</option>';
+      });
+      if (choisi && !vu) {
+        o += '<option value="' + escapeHtml(choisi) + '" selected>' +
+             escapeHtml(((A.J.infos[choisi] || {}).nom || 'Joueur') + ' (hors compo)') + '</option>';
+      }
+      return o;
+    }
+    var sc = A.resume.scoreFin;
+    var h = '<div class="suivi-attrib">';
+    h += '<div class="suivi-attrib__title">📥 Aperçu de l\'import FFR</div>';
+    h += '<div class="view-suivi__hint" style="text-align:left">' +
+         (sc ? ('Score FFR ' + sc[0] + ' – ' + sc[1] + '. ') : 'Score final FFR non trouvé. ') +
+         'Points reconnus pour nous : ' + A.ptsNous + ', pour l\'adversaire : ' + A.ptsAutres + '. ' +
+         (A.cote ? ('Nous jouions à <strong>' + (A.cote === 'domicile' ? 'domicile' : 'l\'extérieur') + '</strong> : contrôle OK.')
+                 : '<strong>⚠ Les points ne correspondent pas au score FFR : vérifie l\'équipe de chaque fait.</strong>') +
+         '</div>';
+    if (A.aRemplacer.length) {
+      h += '<div class="view-suivi__hint" style="text-align:left">' + A.aRemplacer.length +
+           ' fait(s) officiel(s) déjà saisi(s) (points, cartons, remplacements) seront <strong>annulés</strong> et remplacés. ' +
+           'Conquête, tentatives ratées, blessures, retours d\'exclusion et notes sont conservés.</div>';
+    }
+    if (A.resume.ignorees.length) {
+      h += '<div class="view-suivi__hint" style="text-align:left">Lignes non reconnues (ignorées) : ' +
+           escapeHtml(A.resume.ignorees.slice(0, 6).join(' · ')) + (A.resume.ignorees.length > 6 ? '…' : '') + '</div>';
+    }
+    h += '<div style="overflow-x:auto"><table class="rapport-tab" style="width:100%;font-size:13px">' +
+         '<thead><tr><th></th><th>Min</th><th>Fait</th><th>Équipe</th><th>Joueur(s)</th></tr></thead><tbody>';
+    A.lignes.forEach(function (L, i) {
+      var f = L.f, lib, joueurs = '';
+      var eqSel = '<select data-ffr-eq="' + i + '" style="' + _STYLE_SELECT + '">' +
+        '<option value=""' + (!L.equipe ? ' selected' : '') + '>— à choisir —</option>' +
+        '<option value="notre"' + (L.equipe === 'notre' ? ' selected' : '') + '>' + escapeHtml(SuiviChrono.nomNous || 'Nous') + '</option>' +
+        '<option value="adverse"' + (L.equipe === 'adverse' ? ' selected' : '') + '>' + escapeHtml(SuiviChrono.nomAdv || 'Adversaire') + '</option></select>';
+      if (f.genre === 'points') {
+        lib = L.def.lib + ' — ' + f.nom;
+        joueurs = '<select data-ffr-j="' + i + '" style="' + _STYLE_SELECT + '">' + optJ(L.joueur) + '</select>';
+      } else if (f.genre === 'remplacement') {
+        lib = '🔄 ' + f.entrant + ' ← ' + f.sortant;
+        if (L.equipe === 'adverse') { eqSel = 'Adverse (ignoré)'; joueurs = '—'; }
+        else {
+          joueurs = 'Sort : <select data-ffr-s="' + i + '" style="' + _STYLE_SELECT + '">' + optJ(L.sortant) + '</select><br>' +
+                    'Entre : <select data-ffr-e="' + i + '" style="' + _STYLE_SELECT + '">' + optJ(L.entrant) + '</select>';
+        }
+      } else {
+        lib = 'Carton ' + f.couleur.toLowerCase();
+        joueurs = '<select data-ffr-j="' + i + '" style="' + _STYLE_SELECT + '">' + optJ(L.joueur) + '</select>';
+      }
+      h += '<tr' + (L.alertes.length ? ' style="background:#2e2814"' : '') + '>' +
+           '<td><input type="checkbox" data-ffr-on="' + i + '"' + (L.inclure ? ' checked' : '') + (f.genre === 'remplacement' && L.equipe === 'adverse' ? ' disabled' : '') + '></td>' +
+           '<td class="rapport-tab__n">' + f.minute + '\'' + (f.periode > 1 ? ' <small>P' + f.periode + '</small>' : '') + '</td>' +
+           '<td>' + escapeHtml(lib) + (L.alertes.length ? '<br><small style="color:#ffcf5a">⚠ ' + escapeHtml(L.alertes.join(' · ')) + '</small>' : '') + '</td>' +
+           '<td>' + eqSel + '</td><td>' + joueurs + '</td></tr>';
+    });
+    h += '</tbody></table></div>';
+    h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">' +
+         '<button type="button" class="suivi-chrono__btn suivi-chrono__btn--primary" id="ffr-importer">Importer</button>' +
+         '<button type="button" class="suivi-chrono__btn" id="ffr-retour2">↩ Retour</button></div>';
+    h += '</div>';
+    pal.innerHTML = h;
+
+    pal.querySelectorAll('[data-ffr-eq]').forEach(function (s) {
+      s.addEventListener('change', function () { A.lignes[+s.getAttribute('data-ffr-eq')].equipe = s.value; });
+    });
+    pal.querySelectorAll('[data-ffr-j]').forEach(function (s) {
+      s.addEventListener('change', function () { A.lignes[+s.getAttribute('data-ffr-j')].joueur = s.value || null; });
+    });
+    pal.querySelectorAll('[data-ffr-s]').forEach(function (s) {
+      s.addEventListener('change', function () { A.lignes[+s.getAttribute('data-ffr-s')].sortant = s.value || null; });
+    });
+    pal.querySelectorAll('[data-ffr-e]').forEach(function (s) {
+      s.addEventListener('change', function () { A.lignes[+s.getAttribute('data-ffr-e')].entrant = s.value || null; });
+    });
+    pal.querySelectorAll('[data-ffr-on]').forEach(function (c) {
+      c.addEventListener('change', function () { A.lignes[+c.getAttribute('data-ffr-on')].inclure = c.checked; });
+    });
+    document.getElementById('ffr-retour2').addEventListener('click', function () { _ouvrirImportFfr(evtId, perCourante); });
+    document.getElementById('ffr-importer').addEventListener('click', function () { _executerImportFfr(evtId, A); });
+  }
+
+  function _executerImportFfr(evtId, A) {
+    var hub = window.SupabaseHub;
+    if (!hub || !hub.insererObservableCoach || !hub.annulerObservableCoach) return;
+    var retenues = A.lignes.filter(function (L) { return L.inclure; });
+    var manque = retenues.filter(function (L) { return !L.equipe; });
+    if (manque.length) {
+      window.alert('Choisis l\'équipe pour : ' + manque.map(function (L) { return L.f.minute + '\' ' + L.f.brut; }).join(', '));
+      return;
+    }
+    var payloads = [];
+    retenues.forEach(function (L) {
+      var base = { categorieObs: 'A', equipeConcernee: L.equipe, minuteMatch: L.f.minute, periode: L.f.periode };
+      var j = (L.equipe === 'notre') ? (L.joueur || null) : null;
+      if (L.f.genre === 'points') {
+        if (L.def.obs) payloads.push(Object.assign({ observableId: L.def.obs, valeurPoints: L.def.pts, joueurUuid: j }, base));
+        else {   // essai de pénalité = essai + transformation, sans joueur
+          payloads.push(Object.assign({ observableId: 'obs-A-essai', valeurPoints: 5 }, base));
+          payloads.push(Object.assign({ observableId: 'obs-A-transfo', valeurPoints: 2 }, base));
+        }
+      } else if (L.f.genre === 'remplacement') {
+        if (L.equipe !== 'notre') return;
+        payloads.push(Object.assign({ observableId: 'obs-A-substitution', valeurPoints: 0,
+          joueurUuid: L.sortant || null, joueurUuidEntrant: L.entrant || null }, base));
+      } else if (L.obs) {
+        payloads.push(Object.assign({ observableId: L.obs, valeurPoints: 0, joueurUuid: j }, base));
+      }
+    });
+    if (!window.confirm('Importer ' + payloads.length + ' fait(s) FFR' +
+        (A.aRemplacer.length ? (' et annuler ' + A.aRemplacer.length + ' fait(s) officiel(s) déjà saisi(s)') : '') + ' ?')) return;
+    if (SuiviChrono.busy) return;
+    SuiviChrono.busy = true;
+    var pal = document.getElementById('suivi-palette');
+    function etat(t) { if (pal) pal.innerHTML = '<div class="suivi-attrib"><div class="view-suivi__hint">' + escapeHtml(t) + '</div></div>'; }
+    var ids = [], erreurs = [];
+    var chaine = Promise.resolve();
+    payloads.forEach(function (p, i) {
+      chaine = chaine.then(function () {
+        etat('Import… ' + (i + 1) + '/' + payloads.length);
+        return hub.insererObservableCoach(evtId, p).then(function (r) {
+          if (r && r.ok && r.data && r.data.id) ids.push(r.data.id);
+          else erreurs.push((r && r.error) || 'erreur');
+        });
+      });
+    });
+    chaine.then(function () {
+      if (erreurs.length) return null;   // on n'annule rien si l'insertion a échoué
+      var marque = (typeof hub.marquerSourceFfr === 'function') ? hub.marquerSourceFfr(evtId, ids) : Promise.resolve({ ok: false });
+      return marque.then(function (rm) {
+        if (!rm || !rm.ok) erreurs.push('marquage « FFR » non appliqué (' + ((rm && rm.error) || 'RPC absente') + ')');
+        var c2 = Promise.resolve();
+        A.aRemplacer.forEach(function (l, k) {
+          c2 = c2.then(function () {
+            etat('Annulation des anciens faits… ' + (k + 1) + '/' + A.aRemplacer.length);
+            return hub.annulerObservableCoach(evtId, l.id).then(function (r) {
+              if (!r || !r.ok) erreurs.push('annulation ' + l.id + ' : ' + ((r && r.error) || 'erreur'));
+            });
+          });
+        });
+        return c2;
+      });
+    }).then(function () {
+      SuiviChrono.busy = false;
+      var msg = ids.length + ' fait(s) importé(s).';
+      if (erreurs.length) msg += '\n\nProblèmes :\n- ' + erreurs.join('\n- ') +
+        (ids.length < payloads.length ? '\n\nAucun ancien fait n\'a été annulé.' : '');
+      window.alert(msg);
+      _rafraichirChrono(evtId, true);
+    }).catch(function (e) {
+      SuiviChrono.busy = false;
+      window.alert('Import interrompu : ' + (e && e.message ? e.message : e));
+      _rafraichirChrono(evtId, true);
     });
   }
 
