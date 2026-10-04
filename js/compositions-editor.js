@@ -6,6 +6,18 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.79 — Import FFR : noms composés, contrôle en direct (4 oct. 2026)
+ *   v3.79 : avenant « Import FFR — correctifs » (I1-A, I2-A, I3-A de Manu,
+ *           04/10 20:07), constaté sur Régionale 2 - J1 (86 – 12) :
+ *           (I1) nom composé : « M. MURAIL GIROLT » (FFR) rapproché de
+ *                « Marvin MURAIL » (Hub) — même initiale, l'un des noms
+ *                commence par l'autre, candidat UNIQUE ; alerte « rapproché ».
+ *           (I2) contrôle recalculé à chaque modification de l'aperçu
+ *                (équipe, case cochée) ; bouton Importer dès qu'il est bon.
+ *           (I3) écart limité aux points adverses (feuille FFR incohérente :
+ *                faits listés 14, score 12) : import autorisé si NOS points
+ *                = notre côté du score, avec avertissement. Annulation des
+ *                faits déjà saisis : toujours conditionnée à nos points exacts.
  * Version : 3.78 — Rapport : nom du PDF « Bilan <catégorie> - … » (4 oct. 2026)
  *   v3.78 : avenant « Nom du PDF » (N1-A, N2-A, N3-A de Manu, 04/10 19:11).
  *           Le nom proposé par « Imprimer / PDF » vient de document.title
@@ -5911,8 +5923,27 @@
   function _analyserFfr(resume, stats) {
     var J = _indexJoueursFfr();
     function trouver(nomFfr) {
-      var c = J.idx[_cleNomFfr(nomFfr)] || [];
-      return { uuid: c.length === 1 ? c[0] : null, ambigu: c.length > 1, candidats: c };
+      var cle = _cleNomFfr(nomFfr);
+      var c = J.idx[cle] || [];
+      var rapproche = false;
+      // v3.79 (I1) — nom composé : même initiale, et les mots du nom Hub
+      // sont le début des mots du nom FFR (ou l'inverse). Candidat unique.
+      if (!c.length) {
+        var tf = cle.split(' ');
+        if (tf.length >= 2) {
+          var vus = [];
+          Object.keys(J.idx).forEach(function (k) {
+            var th = k.split(' ');
+            if (th.length < 2 || th[0] !== tf[0]) return;
+            var a = th.slice(1), b = tf.slice(1);
+            var court = a.length <= b.length ? a : b, long = a.length <= b.length ? b : a;
+            for (var i = 0; i < court.length; i++) if (court[i] !== long[i]) return;
+            J.idx[k].forEach(function (u) { if (vus.indexOf(u) < 0) vus.push(u); });
+          });
+          if (vus.length) { c = vus; rapproche = true; }
+        }
+      }
+      return { uuid: c.length === 1 ? c[0] : null, ambigu: c.length > 1, candidats: c, rapproche: rapproche };
     }
     var lignes = [], ptsNous = 0, ptsAutres = 0;
     resume.faits.forEach(function (f) {
@@ -5924,14 +5955,16 @@
         L.joueur = t.uuid;
         L.equipe = (t.uuid || t.ambigu) ? 'notre' : 'adverse';
         if (t.ambigu) L.alertes.push('homonymes : choisis le joueur');
+        if (t.rapproche && t.uuid) L.alertes.push('nom rapproché (' + ((J.infos[t.uuid] || {}).nom || '') + ') : vérifie');
         if (!f.quoi || !FFR_POINTS[f.quoi]) L.alertes.push('type inconnu, lu comme essai');
         if (!def.obs) L.alertes.push('enregistré en essai + transformation, sans joueur');
-        if (L.equipe === 'notre') ptsNous += def.pts; else ptsAutres += def.pts;
       } else if (f.genre === 'remplacement') {
         var te = trouver(f.entrant), ts = trouver(f.sortant);
         L.entrant = te.uuid; L.sortant = ts.uuid;
         L.equipe = (te.uuid || ts.uuid || te.ambigu || ts.ambigu) ? 'notre' : 'adverse';
         if (L.equipe === 'notre') {
+          if (te.rapproche && te.uuid) L.alertes.push('entrant rapproché : vérifie');
+          if (ts.rapproche && ts.uuid) L.alertes.push('sortant rapproché : vérifie');
           if (!te.uuid) L.alertes.push('entrant non reconnu : ' + f.entrant);
           if (!ts.uuid) L.alertes.push('sortant non reconnu : ' + f.sortant);
           [te.uuid, ts.uuid].forEach(function (u) {
@@ -5947,12 +5980,10 @@
       lignes.push(L);
     });
 
-    // Côté (domicile / extérieur) par le score FFR.
-    var cote = null;
-    if (resume.scoreFin) {
-      if (ptsNous === resume.scoreFin[0] && ptsAutres === resume.scoreFin[1]) cote = 'domicile';
-      else if (ptsNous === resume.scoreFin[1] && ptsAutres === resume.scoreFin[0]) cote = 'exterieur';
-    }
+    // Côté (domicile / extérieur) par le score FFR — v3.79 : _controleFfr.
+    var K = _controleFfr({ lignes: lignes, resume: resume });
+    var cote = K.cote;
+    ptsNous = K.ptsNous; ptsAutres = K.ptsAutres;
     // Cartons : équipe déduite des statistiques quand c'est sans ambiguïté.
     if (stats && cote) {
       var iN = (cote === 'domicile') ? 0 : 1, iA = 1 - iN;
@@ -5990,7 +6021,30 @@
     });
     var aRemplacer = existants.filter(function (l) { return FFR_OFFICIELS.indexOf(l.observable_id) >= 0; });
     return { lignes: lignes, cote: cote, ptsNous: ptsNous, ptsAutres: ptsAutres, J: J,
-             resume: resume, aRemplacer: aRemplacer };
+             resume: resume, aRemplacer: aRemplacer, mode: K.mode };
+  }
+
+  // v3.79 (I2/I3) — contrôle par le score FFR, recalculé sur l'état courant
+  // de l'aperçu (lignes cochées, équipe choisie). mode :
+  //   'exact'    : nos points ET ceux de l'adversaire = score FFR ;
+  //   'ecartAdv' : nos points = notre côté du score, écart côté adverse
+  //                seulement (feuille FFR incohérente) → import permis ;
+  //   null       : nos points ne collent à aucun côté → bloqué.
+  function _controleFfr(A) {
+    var n = 0, a = 0;
+    A.lignes.forEach(function (L) {
+      if (L.f.genre !== 'points' || L.inclure === false || !L.def) return;
+      if (L.equipe === 'notre') n += L.def.pts;
+      else if (L.equipe === 'adverse') a += L.def.pts;
+    });
+    var sc = A.resume && A.resume.scoreFin, cote = null, mode = null;
+    if (sc) {
+      if (n === sc[0] && a === sc[1]) { cote = 'domicile'; mode = 'exact'; }
+      else if (n === sc[1] && a === sc[0]) { cote = 'exterieur'; mode = 'exact'; }
+      else if (n === sc[0] && n !== sc[1]) { cote = 'domicile'; mode = 'ecartAdv'; }
+      else if (n === sc[1] && n !== sc[0]) { cote = 'exterieur'; mode = 'ecartAdv'; }
+    }
+    return { ptsNous: n, ptsAutres: a, cote: cote, mode: mode };
   }
 
   function _ouvrirImportFfr(evtId, perCourante) {
@@ -6042,6 +6096,10 @@
     // v3.75 — CONTRÔLE BLOQUANT : l'import (et l'annulation des anciens
     // faits) n'est possible que si les points lus redonnent EXACTEMENT le
     // score final FFR. Sinon : diagnostic, aucun bouton d'import.
+    // v3.79 — recalculé ici à chaque modification (I2) ; écart limité aux
+    // points adverses toléré avec avertissement (I3).
+    var K = _controleFfr(A);
+    A.cote = K.cote; A.mode = K.mode; A.ptsNous = K.ptsNous; A.ptsAutres = K.ptsAutres;
     var controleOk = !!(sc && A.cote);
     var h = '<div class="suivi-attrib">';
     h += '<div class="suivi-attrib__title">📥 Aperçu de l\'import FFR</div>';
@@ -6051,6 +6109,12 @@
          (A.cote ? ('Nous jouions à <strong>' + (A.cote === 'domicile' ? 'domicile' : 'l\'extérieur') + '</strong> : contrôle OK.')
                  : '<strong>⚠ Les points ne correspondent pas au score FFR : vérifie l\'équipe de chaque fait.</strong>') +
          '</div>';
+    if (A.mode === 'ecartAdv') {
+      var scAdv = (A.cote === 'domicile') ? sc[1] : sc[0];
+      h += '<div class="view-suivi__hint" style="text-align:left;color:#ffcf5a">⚠ <strong>Feuille FFR incohérente côté adverse</strong> : ' +
+           'les faits listés donnent ' + A.ptsAutres + ' points à l\'adversaire pour ' + scAdv + ' au score. ' +
+           'Nos points sont exacts : l\'import est possible. Décoche le fait adverse en trop si la vidéo te dit lequel.</div>';
+    }
     if (!controleOk) {
       h += '<div class="view-suivi__hint" style="text-align:left;color:#ffcf5a">⛔ <strong>Import bloqué</strong> : ' +
            (sc ? 'les points reconnus ne redonnent pas le score FFR.' : 'le score final FFR (« 17Fin de match16 ») est introuvable dans le texte.') +
@@ -6103,8 +6167,12 @@
     h += '</div>';
     pal.innerHTML = h;
 
+    // v3.79 (I2) — équipe ou case modifiée → contrôle recalculé (re-rendu).
     pal.querySelectorAll('[data-ffr-eq]').forEach(function (s) {
-      s.addEventListener('change', function () { A.lignes[+s.getAttribute('data-ffr-eq')].equipe = s.value; });
+      s.addEventListener('change', function () {
+        A.lignes[+s.getAttribute('data-ffr-eq')].equipe = s.value;
+        _apercuFfr(evtId, perCourante, A);
+      });
     });
     pal.querySelectorAll('[data-ffr-j]').forEach(function (s) {
       s.addEventListener('change', function () { A.lignes[+s.getAttribute('data-ffr-j')].joueur = s.value || null; });
@@ -6116,7 +6184,10 @@
       s.addEventListener('change', function () { A.lignes[+s.getAttribute('data-ffr-e')].entrant = s.value || null; });
     });
     pal.querySelectorAll('[data-ffr-on]').forEach(function (c) {
-      c.addEventListener('change', function () { A.lignes[+c.getAttribute('data-ffr-on')].inclure = c.checked; });
+      c.addEventListener('change', function () {
+        A.lignes[+c.getAttribute('data-ffr-on')].inclure = c.checked;
+        _apercuFfr(evtId, perCourante, A);
+      });
     });
     document.getElementById('ffr-retour2').addEventListener('click', function () { _ouvrirImportFfr(evtId, perCourante); });
     var bImp = document.getElementById('ffr-importer');
@@ -6126,7 +6197,8 @@
   function _executerImportFfr(evtId, A) {
     var hub = window.SupabaseHub;
     if (!hub || !hub.insererObservableCoach || !hub.annulerObservableCoach) return;
-    if (!(A.resume.scoreFin && A.cote)) {   // v3.75 — garde-fou (double du bouton masqué)
+    var K = _controleFfr(A);   // v3.79 — recalcul sur l'état courant
+    if (!(A.resume.scoreFin && K.cote)) {   // v3.75 — garde-fou (double du bouton masqué)
       window.alert('Import bloqué : les points lus ne correspondent pas au score FFR.');
       return;
     }
@@ -6155,7 +6227,9 @@
       }
     });
     if (!window.confirm('Importer ' + payloads.length + ' fait(s) FFR' +
-        (A.aRemplacer.length ? (' et annuler ' + A.aRemplacer.length + ' fait(s) officiel(s) déjà saisi(s)') : '') + ' ?')) return;
+        (A.aRemplacer.length ? (' et annuler ' + A.aRemplacer.length + ' fait(s) officiel(s) déjà saisi(s)') : '') + ' ?' +
+        (K.mode === 'ecartAdv' ? ('\n\n⚠ Feuille FFR incohérente côté adverse : le score du Hub sera ' +
+          K.ptsNous + ' – ' + K.ptsAutres + ' (score officiel ' + A.resume.scoreFin[0] + ' – ' + A.resume.scoreFin[1] + ').') : ''))) return;
     if (SuiviChrono.busy) return;
     SuiviChrono.busy = true;
     var pal = document.getElementById('suivi-palette');
