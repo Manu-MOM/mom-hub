@@ -30,11 +30,27 @@
     .ss-attente { color: var(--attente); font-style: italic; margin: 0; }
     .ss-flag { color: #b06a00; margin: .5rem 0 0; font-size: .9rem; }
     .ss-load { color: var(--gris); }
+    /* Stats de saison v1.5 — retour (R1-A), tableaux par niveau (N3-A). */
+    .ss-retour {
+      display: inline-flex; align-items: center; gap: .35rem; margin-bottom: 1rem;
+      padding: .4rem .8rem; border: 1px solid var(--bord); border-radius: 8px;
+      background: var(--carte); color: var(--vert-fonce); text-decoration: none; font-weight: 600; font-size: .95rem;
+    }
+    .ss-retour:hover { background: var(--gris-clair); }
+    .ss-table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+    .ss-table th, .ss-table td { text-align: left; padding: .4rem .5rem; border-bottom: 1px solid var(--bord); }
+    .ss-table th { color: var(--gris); font-weight: 600; font-size: .82rem; }
+    .ss-num, .ss-table th.ss-num { text-align: right; }
+    .ss-niv {
+      display: inline-block; font-size: .75rem; font-weight: 600; color: var(--vert-fonce);
+      background: var(--gris-clair); border-radius: 4px; padding: 0 .35rem;
+    }
     footer { max-width: 680px; margin: 2rem auto 0; color: var(--attente); font-size: .8rem; text-align: center; }
   </style>
 </head>
 <body>
   <div class="ss-wrap">
+    <a href="joueurs.html" class="ss-retour" id="ss-retour">← Retour</a>
     <main id="ss-fiche"><p class="ss-load">Initialisation…</p></main>
   </div>
   <footer>MOM Hub · restitution famille — Mutzig Ovalie Molsheim</footer>
@@ -47,6 +63,14 @@
       var params = new URLSearchParams(window.location.search);
       var joueurId = params.get('joueur_id');
       var mount = document.getElementById('ss-fiche');
+      // R1-A — retour : page précédente du Hub si on en vient, sinon la
+      // liste des joueurs (lien par défaut).
+      var retour = document.getElementById('ss-retour');
+      if (retour) retour.addEventListener('click', function (ev) {
+        var memeSite = false;
+        try { memeSite = !!document.referrer && new URL(document.referrer).origin === window.location.origin; } catch (e) {}
+        if (memeSite && window.history.length > 1) { ev.preventDefault(); window.history.back(); }
+      });
       if (!window.StatsSaison) {
         mount.innerHTML = '<section class="ss-bloc"><h2>Erreur</h2><p>Module stats-saison indisponible.</p></section>';
         return;
