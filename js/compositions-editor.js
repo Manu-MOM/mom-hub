@@ -6,6 +6,43 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.72 — Suivi : saisie en différé (VEO), minute cumulée, conquête (4 oct. 2026)
+ *   v3.72 : SUIVI-VEO lot L2 (FAIT FOI Conception-SUIVI-VEO-v1, gelé 04/10).
+ *           Référentiel data/observables-match.json v1.2 + reglement-
+ *           exclusions.json v1.0 (lot L1). ZÉRO SQL : inserer_/annuler_
+ *           observable_coach existants (sondes L0 du 04/10).
+ *           T1 — bascule « ⏱ Minute du chrono » / « ✍ Minute manuelle »
+ *                (SuiviSaisie). En manuel : champ minute + période
+ *                (proposée d'après la minute et les durées, modifiable) ;
+ *                la palette est visible QUEL QUE SOIT l'état du chrono
+ *                (avant, entre périodes, après la fin). Défaut : manuel
+ *                si aucune période ne tourne.
+ *           T2 — minute CUMULÉE : décalage = somme des durées des
+ *                périodes précédentes. Chrono (mode écoulé) : la 2ᵉ MT
+ *                affiche 35:00, 36:12… Minute enregistrée = minute EN
+ *                COURS (décalage + secondes/60 arrondi bas + 1 : 0:10 →
+ *                1', aligné sur la feuille FFR). Matchs passés non migrés.
+ *           T3 — « modifier » sur chaque ligne de l'historique : type,
+ *                équipe, joueur(s), minute, période. Enregistrer =
+ *                recréer la ligne PUIS annuler l'ancienne (trace
+ *                conservée ; corriger_observable_coach absente en base).
+ *           T4 — historique trié période → minute → horodatage (plus
+ *                récent en tête) ; lignes annulées masquées par défaut.
+ *           T5 — tentatives ratées (transfo / pénalité) : Nous (buteur)
+ *                et Adverse, 0 point.
+ *           T6 — carton blanc ; à un blanc / jaune, minute de RETOUR
+ *                proposée = minute + durée de la catégorie (règlement),
+ *                modifiable → ligne obs-A-retour-exclusion. 2ᵉ jaune du
+ *                même joueur → proposé en rouge (confirmation).
+ *           T7 — « Jeu collectif » → « Conquête » : choix de qui lance /
+ *                introduit (equipe_concernee, sans joueur) puis l'issue.
+ *                Repli legacy si le référentiel n'a pas la famille.
+ *           T11 — catégorie du match = _categorieCourante() → code via
+ *                getCategories() (règlement). Observations Cat B
+ *                inchangées (notes à froid = lot L3).
+ *           Rapport : familles score_rate → Score, conquête → section
+ *           « Conquête » (ex « Jeu collectif »), retour d'exclusion →
+ *           Discipline. Lecture des anciens identifiants intacte.
  * Version : 3.71 — Fix : suggestions de poste absentes au premier chargement (28 sept. 2026)
  *   v3.71 : FIX SUGGESTION-POSTE. Recette terrain J7 : tous les joueurs du
  *           vivier sans _postes. Cause : init() exécute Promise.all([
@@ -1976,6 +2013,49 @@
     return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
   }
 
+  // v3.72 (T2) — durées des périodes (minutes) : config du chrono en base,
+  // sinon le défaut historique de l'écran de config [30, 30].
+  function _dureesPeriodes() {
+    var e = SuiviChrono.etat;
+    // Chrono jamais lancé : les durées en cours de saisie dans le formulaire
+    // de config font foi (sinon la période proposée en manuel serait fausse).
+    if ((!e || !e.coup_envoi_at) && document.querySelector('#chrono-durees .chrono-duree')) {
+      return _lireDureesConfig();
+    }
+    return (e && Array.isArray(e.durees_periodes) && e.durees_periodes.length)
+      ? e.durees_periodes : [30, 30];
+  }
+  // Minutes écoulées AVANT la période `per` (somme des durées précédentes).
+  function _decalageMinutes(per) {
+    var d = _dureesPeriodes();
+    var p = (per > 0) ? per : 1;
+    var cumul = 0;
+    for (var i = 0; i < p - 1 && i < d.length; i++) cumul += (d[i] > 0 ? d[i] : 0);
+    return cumul;
+  }
+  // Période proposée pour une minute cumulée (1' → P1 ; 36' → P2 si 2×35).
+  // Au-delà de la durée totale : dernière période. Modifiable par l'utilisateur
+  // (le temps additionnel d'une période est indiscernable par la minute seule).
+  function _periodeDeMinute(minute) {
+    var d = _dureesPeriodes();
+    var cumul = 0;
+    for (var i = 0; i < d.length; i++) {
+      cumul += (d[i] > 0 ? d[i] : 0);
+      if (minute <= cumul) return i + 1;
+    }
+    return d.length || 1;
+  }
+  // Minute EN COURS lue sur le chrono (cumulée) : 0:10 → 1', 34:30 → 35'.
+  function _minuteChrono() {
+    var per = (SuiviChrono.etat && SuiviChrono.etat.periode_courante) ? SuiviChrono.etat.periode_courante : 1;
+    return _decalageMinutes(per) + Math.floor(SuiviChrono.secondesEcoulees() / 60) + 1;
+  }
+  // Une période tourne-t-elle (palette « chrono » utilisable) ?
+  function _chronoEnCours() {
+    var e = SuiviChrono.etat;
+    return !!(e && e.coup_envoi_at && e.debut_periode_at && !e.termine_at);
+  }
+
   // Amélioration 1 — texte du chrono avec TEMPS ADDITIONNEL. Au-delà de
   // la durée réglementaire de la période, le chrono ne s'arrête pas :
   //   mode écoulé  : « 30:00 +2:15 » (durée figée + dépassement)
@@ -1991,7 +2071,10 @@
       var reste = d - ecoule;
       principal = _fmtMMSS(reste > 0 ? reste : 0);
     } else {
-      principal = _fmtMMSS(depassement > 0 ? d : ecoule);
+      // v3.72 (T2) — temps CUMULÉ du match : la 2ᵉ période démarre à la
+      // durée de la 1ʳᵉ (35:00 en M16), etc. Le rebours reste par période.
+      var decalage = _decalageMinutes(SuiviChrono.etat ? SuiviChrono.etat.periode_courante : 1) * 60;
+      principal = _fmtMMSS(decalage + (depassement > 0 ? d : ecoule));
     }
     return {
       principal: principal,
@@ -2053,19 +2136,42 @@
         });
     },
     // L4/L5 — libellé d'un observable par son uuid (catA) ou slug (catB).
+    // v3.72 — liste à plat des observables Cat A, avec leur famille. Couvre
+    // les familles v1.1 (score, discipline, mouvement, jeu_collectif) ET v1.2
+    // (score_rate, conquete.touche/melee, technique). [] si non chargé.
+    plats: function () {
+      var out = [];
+      if (!this.catA) return out;
+      var familles = ['score', 'score_rate', 'discipline', 'mouvement', 'jeu_collectif', 'technique'];
+      for (var f = 0; f < familles.length; f++) {
+        var arr = this.catA[familles[f]];
+        if (!Array.isArray(arr)) continue;
+        for (var i = 0; i < arr.length; i++) if (arr[i] && arr[i].uuid) out.push({ o: arr[i], famille: familles[f] });
+      }
+      var cq = this.catA.conquete;
+      if (cq && typeof cq === 'object') {
+        ['touche', 'melee'].forEach(function (ph) {
+          if (!Array.isArray(cq[ph])) return;
+          cq[ph].forEach(function (o) { if (o && o.uuid) out.push({ o: o, famille: 'conquete' }); });
+        });
+      }
+      return out;
+    },
+    // v3.72 — observable Cat A par uuid ({o, famille}) ou null.
+    trouver: function (observableId) {
+      var p = this.plats();
+      for (var i = 0; i < p.length; i++) if (p[i].o.uuid === observableId) return p[i];
+      return null;
+    },
     libelle: function (observableId) {
       if (!observableId) return null;
       if (this.catA) {
-        var familles = ['score', 'discipline', 'mouvement', 'jeu_collectif'];
-        for (var f = 0; f < familles.length; f++) {
-          var arr = this.catA[familles[f]];
-          if (Array.isArray(arr)) {
-            for (var i = 0; i < arr.length; i++) {
-              if (arr[i] && arr[i].uuid === observableId) {
-                return { libelle: arr[i].libelle_court, icone: arr[i].icone || '' };
-              }
-            }
-          }
+        var t = this.trouver(observableId);
+        if (t) {
+          // Conquête : libellé long (« Touche — Gagnée propre ») ; les autres
+          // gardent le libellé court historique.
+          var lib = (t.famille === 'conquete' && t.o.libelle_long) ? t.o.libelle_long : t.o.libelle_court;
+          return { libelle: lib, icone: t.o.icone || '' };
         }
       }
       if (observableId.indexOf('obs-B-') === 0 && this.catB) {
@@ -2451,6 +2557,9 @@
 
     var evtId = compo.evenement_id || null;
     SuiviChrono.evtId = evtId;
+    // v3.72 — état de saisie propre à CE match (mode, minute manuelle…).
+    SuiviSaisie.reinit(evtId);
+    SuiviRegl.charger();
     SuiviChrono.nomNous = _nomNotreEquipe();
     SuiviChrono.nomAdv = _nomAdversaireCourt(compo);
     var adversaire = _adversaireDeCompo(compo);
@@ -2512,16 +2621,16 @@
   // dérivée du référentiel chargé. null si inconnu ou non chargé.
   function _familleDeObs(observableId) {
     if (!observableId || !SuiviObs.catA) return null;
-    var familles = ['score', 'discipline', 'mouvement', 'jeu_collectif'];
-    for (var f = 0; f < familles.length; f++) {
-      var arr = SuiviObs.catA[familles[f]];
-      if (Array.isArray(arr)) {
-        for (var i = 0; i < arr.length; i++) {
-          if (arr[i] && arr[i].uuid === observableId) return familles[f];
-        }
-      }
-    }
-    return null;
+    var t = SuiviObs.trouver(observableId);
+    if (!t) return null;
+    // v3.72 — familles v1.2 rangées dans les sections existantes du rapport :
+    // tentatives ratées → Score ; conquête → section « Conquête » (clé
+    // jeu_collectif conservée) ; retour d'exclusion → Discipline. Le détail
+    // dédié (taux de réussite, conquête par lanceur) = lot L5.
+    if (t.famille === 'score_rate') return 'score';
+    if (t.famille === 'conquete') return 'jeu_collectif';
+    if (t.famille === 'technique') return 'discipline';
+    return t.famille;
   }
 
   // ============================================================
@@ -3640,7 +3749,7 @@
 
     // 3) Regroupe par famille pour l'affichage.
     var ordreFam = ['score', 'discipline', 'jeu_collectif'];
-    var titreFam = { score: 'Score', discipline: 'Discipline', jeu_collectif: 'Jeu collectif' };
+    var titreFam = { score: 'Score', discipline: 'Discipline', jeu_collectif: 'Conquête' };
     var parFamille = { score: [], discipline: [], jeu_collectif: [], autre: [] };
     for (var oid2 in compte) {
       if (!compte.hasOwnProperty(oid2)) continue;
@@ -3957,6 +4066,11 @@
 
   // L4 — historique annulable. Lignes anti-chronologiques (récent en
   // haut) ; annulées barrées sans bouton ; actives avec « annuler ».
+  // v3.72 (T3/T4) : ordre de JEU (période → minute → horodatage, plus récent
+  // en tête) — une action ajoutée après coup se range à sa place ; lignes
+  // annulées masquées par défaut (bouton d'affichage) ; « modifier » sur
+  // chaque ligne active ; remplacement affiché sortant → entrant ; conquête
+  // affichée avec le lanceur.
   function _peindreHistorique(evtId, lignes) {
     var box = document.getElementById('suivi-historique');
     if (!box) return;
@@ -3967,29 +4081,47 @@
       SuiviObs.charger(function () { _peindreHistorique(evtId, lignes); });
       return;
     }
-    var actives = (lignes || []).slice();
-    // Tri anti-chronologique par horodatage.
-    actives.sort(function (a, b) {
-      return new Date(b.horodatage).getTime() - new Date(a.horodatage).getTime();
-    });
-    if (!actives.length) { box.innerHTML = ''; return; }
+    var toutes = (lignes || []).slice();
+    toutes.sort(function (a, b) { return _ordreChrono(b, a); });
+    if (!toutes.length) { box.innerHTML = ''; return; }
+    var nbAnnulees = toutes.filter(function (l) { return l && l.annule === true; }).length;
+    var visibles = SuiviSaisie.voirAnnulees
+      ? toutes
+      : toutes.filter(function (l) { return l && l.annule !== true; });
 
     var html = '<div class="suivi-histo">';
-    html += '<div class="suivi-histo__title">Actions du match</div>';
+    html += '<div class="suivi-histo__title" style="display:flex;justify-content:space-between;align-items:center;gap:8px">' +
+              '<span>Actions du match</span>' +
+              (nbAnnulees
+                ? '<button type="button" class="suivi-histo__annuler" id="histo-voir-annulees" style="border-color:#3a4650;color:#aab8c4">' +
+                    (SuiviSaisie.voirAnnulees ? 'Masquer les annulées' : ('Voir les annulées (' + nbAnnulees + ')')) + '</button>'
+                : '') +
+            '</div>';
     html += '<div class="suivi-histo__list">';
-    actives.forEach(function (l) {
+    visibles.forEach(function (l) {
       var ref = (typeof SuiviObs.libelle === 'function') ? SuiviObs.libelle(l.observable_id) : null;
       var lib = ref ? ((ref.icone ? ref.icone + ' ' : '') + ref.libelle) : (l.observable_id || 'Action');
-      var qui = (l.equipe_concernee === 'adverse')
-        ? 'Adverse'
-        : (l.nom_court ? escapeHtml(l.nom_court) : 'Nous');
+      var t = SuiviObs.trouver(l.observable_id);
+      var qui;
+      if (t && t.famille === 'conquete') {
+        qui = (l.equipe_concernee === 'adverse') ? 'lancer adverse' : 'notre lancer';
+      } else if (l.equipe_concernee === 'adverse') {
+        qui = 'Adverse';
+      } else if (l.observable_id === 'obs-A-substitution' && (l.nom_court || l.nom_court_entrant)) {
+        qui = escapeHtml(l.nom_court || '?') + ' → ' + escapeHtml(l.nom_court_entrant || '?');
+      } else {
+        qui = l.nom_court ? escapeHtml(l.nom_court) : 'Nous';
+      }
       var min = (l.minute_match != null) ? (l.minute_match + "'") : '';
       var pts = (l.valeur_points ? ' (+' + l.valeur_points + ')' : '');
       var annulee = (l.annule === true);
       html += '<div class="suivi-histo__row' + (annulee ? ' suivi-histo__row--annulee' : '') + '">';
       html +=   '<span class="suivi-histo__txt">' + (min ? '<b>' + min + '</b> ' : '') + escapeHtml(lib) + pts + ' · ' + qui + '</span>';
       if (!annulee) {
-        html += '<button type="button" class="suivi-histo__annuler" data-id="' + escapeHtml(l.id) + '">annuler</button>';
+        html += '<span style="display:flex;gap:6px">' +
+                  '<button type="button" class="suivi-histo__annuler suivi-histo__modifier" data-mod="' + escapeHtml(l.id) + '" style="border-color:#3a4650;color:#aab8c4">modifier</button>' +
+                  '<button type="button" class="suivi-histo__annuler" data-id="' + escapeHtml(l.id) + '">annuler</button>' +
+                '</span>';
       } else {
         html += '<span class="suivi-histo__badge">annulée</span>';
       }
@@ -3998,7 +4130,19 @@
     html += '</div></div>';
     box.innerHTML = html;
 
-    box.querySelectorAll('.suivi-histo__annuler').forEach(function (b) {
+    var voir = document.getElementById('histo-voir-annulees');
+    if (voir) voir.addEventListener('click', function () {
+      SuiviSaisie.voirAnnulees = !SuiviSaisie.voirAnnulees;
+      _peindreHistorique(evtId, lignes);
+    });
+    box.querySelectorAll('[data-mod]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var id = b.getAttribute('data-mod');
+        var ligne = (lignes || []).filter(function (x) { return x && x.id === id; })[0];
+        if (ligne) _ouvrirEdition(evtId, ligne);
+      });
+    });
+    box.querySelectorAll('.suivi-histo__annuler[data-id]').forEach(function (b) {
       b.addEventListener('click', function () {
         var id = b.getAttribute('data-id');
         if (!id || SuiviChrono.busy) return;
@@ -4063,14 +4207,29 @@
     });
   }
 
+  // v3.72 (T1) — peint le bloc chrono PUIS décide de la palette : visible
+  // si une période tourne (mode chrono) OU en minute manuelle, quel que
+  // soit l'état du chrono (avant, entre périodes, après la fin).
   function _peindreChrono() {
+    _peindreChronoBloc();
+    var pal = document.getElementById('suivi-palette');
+    if (!pal || !SuiviChrono.evtId) return;
+    var e = SuiviChrono.etat;
+    var perCourante = (e && e.periode_courante) ? e.periode_courante : 1;
+    if (_chronoEnCours() || _modeSaisie() === 'manuel') {
+      _peindrePalette(SuiviChrono.evtId, perCourante);
+    } else {
+      pal.innerHTML = _barreModeHTML() +
+        '<div class="view-suivi__hint">Aucune période en cours : démarre le chrono ou passe en « Minute manuelle » pour saisir après coup.</div>';
+      _bindBarreMode(SuiviChrono.evtId, perCourante);
+    }
+  }
+
+  function _peindreChronoBloc() {
     var host = document.getElementById('suivi-chrono-host');
     if (!host) return;
     var e = SuiviChrono.etat;
     var evtId = SuiviChrono.evtId;
-    // L3a — palette vidée par défaut ; seul l'état « en cours » la remplit.
-    var palReset = document.getElementById('suivi-palette');
-    if (palReset) palReset.innerHTML = '';
 
     var durees = (e && Array.isArray(e.durees_periodes) && e.durees_periodes.length)
       ? e.durees_periodes : [30, 30];
@@ -4198,8 +4357,7 @@
       }
     });
     _bindReset(evtId);
-    // L3a — palette de saisie (uniquement période en cours, hors pause facultatif).
-    _peindrePalette(evtId, perCourante);
+    // v3.72 — la palette est peinte par _peindreChrono (wrapper, T1).
   }
 
   // L3b — effectif de la compo courante pour l'attribution, trié
@@ -4249,9 +4407,178 @@
     return plein || ('Joueur ' + (jo.num || '?'));
   }
 
+  // ════════════════════════════════════════════════════════════
+  // v3.72 — SUIVI-VEO (lot L2). Saisie en différé : mode de minute (T1),
+  // règlement des exclusions par catégorie (T6, T11), conquête (T7),
+  // correction de ligne (T3). Aucun stockage navigateur : état runtime,
+  // réinitialisé à chaque changement de match.
+  // ════════════════════════════════════════════════════════════
+  var SuiviSaisie = {
+    evtId: null,
+    choix: null,          // null = automatique ; 'chrono' | 'manuel' (bascule explicite)
+    minute: null,         // minute manuelle courante (cumulée), null = non saisie
+    periode: null,        // période manuelle choisie, null = proposée d'après la minute
+    campConquete: 'notre',// qui lance / introduit (T7)
+    voirAnnulees: false,  // historique : lignes annulées affichées (T4)
+    reinit: function (evtId) {
+      if (this.evtId === evtId) return;
+      this.evtId = evtId;
+      this.choix = null; this.minute = null; this.periode = null;
+      this.campConquete = 'notre'; this.voirAnnulees = false;
+    }
+  };
+
+  // Mode effectif : bascule explicite, sinon chrono si une période tourne,
+  // manuel sinon (T1).
+  function _modeSaisie() {
+    if (SuiviSaisie.choix) return SuiviSaisie.choix;
+    return _chronoEnCours() ? 'chrono' : 'manuel';
+  }
+
+  // Minute + période à enregistrer pour une action. null (avec alerte) si la
+  // minute manuelle n'est pas renseignée.
+  function _minuteSaisie() {
+    if (_modeSaisie() === 'chrono' && _chronoEnCours()) {
+      return { minute: _minuteChrono(), periode: SuiviChrono.etat.periode_courante || 1 };
+    }
+    var m = SuiviSaisie.minute;
+    if (!(typeof m === 'number' && m >= 0)) {
+      window.alert('Indique d\'abord la minute de l\'action (champ « Minute », lue sur la vidéo).');
+      return null;
+    }
+    return { minute: m, periode: SuiviSaisie.periode || _periodeDeMinute(m) };
+  }
+
+  var _STYLE_SELECT = 'padding:6px 8px;border-radius:6px;background:#14181c;color:#f6f3e8;border:1px solid #2a323a;font-size:14px;font-family:inherit';
+
+  function _optionsPeriodes(choisie) {
+    var nb = _dureesPeriodes().length || 1;
+    var h = '';
+    for (var p = 1; p <= nb; p++) {
+      h += '<option value="' + p + '"' + (p === choisie ? ' selected' : '') + '>' +
+             escapeHtml(_libellePeriode(p, nb)) + '</option>';
+    }
+    return h;
+  }
+
+  // Barre « Saisie » en tête de palette : bascule chrono / manuel et, en
+  // manuel, minute + période.
+  function _barreModeHTML() {
+    var mode = _modeSaisie();
+    var h = '<div class="suivi-palette" style="margin-top:12px">';
+    h += '<div class="suivi-palette__title">Saisie</div>';
+    h += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
+    h += '<button type="button" class="suivi-chrono__btn' + (mode === 'chrono' ? ' suivi-chrono__btn--primary' : '') +
+         '" data-saisie-mode="chrono" aria-pressed="' + (mode === 'chrono') + '">⏱ Minute du chrono</button>';
+    h += '<button type="button" class="suivi-chrono__btn' + (mode === 'manuel' ? ' suivi-chrono__btn--primary' : '') +
+         '" data-saisie-mode="manuel" aria-pressed="' + (mode === 'manuel') + '">✍ Minute manuelle</button>';
+    h += '</div>';
+    if (mode === 'manuel') {
+      var m = SuiviSaisie.minute;
+      var per = SuiviSaisie.periode || ((typeof m === 'number') ? _periodeDeMinute(m) : 1);
+      h += '<div class="suivi-chrono__config" style="max-width:none;margin-top:12px">';
+      h += '<div class="suivi-chrono__config-row"><label for="saisie-minute">Minute (lue sur la vidéo)</label>' +
+             '<input id="saisie-minute" type="number" min="0" max="200" inputmode="numeric" value="' +
+             ((typeof m === 'number') ? m : '') + '"></div>';
+      h += '<div class="suivi-chrono__config-row"><label for="saisie-periode">Période</label>' +
+             '<select id="saisie-periode" style="' + _STYLE_SELECT + '">' + _optionsPeriodes(per) + '</select></div>';
+      h += '<div class="view-suivi__hint" style="text-align:left">Minute du match en continu (2ᵉ mi-temps de 35\' : 36\', 37\'…). ' +
+           'La période est proposée d\'après la minute ; corrige-la pour le temps additionnel.</div>';
+      h += '</div>';
+    }
+    h += '</div>';
+    return h;
+  }
+
+  function _bindBarreMode(evtId, perCourante) {
+    var pal = document.getElementById('suivi-palette');
+    if (!pal) return;
+    pal.querySelectorAll('[data-saisie-mode]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        SuiviSaisie.choix = b.getAttribute('data-saisie-mode');
+        _peindreChrono();
+      });
+    });
+    var mi = document.getElementById('saisie-minute');
+    var ps = document.getElementById('saisie-periode');
+    if (mi) mi.addEventListener('input', function () {
+      var v = parseInt(mi.value, 10);
+      SuiviSaisie.minute = (v >= 0 && v <= 200) ? v : null;
+      SuiviSaisie.periode = null;  // la période suit la minute tant qu'on ne la force pas
+      if (ps && SuiviSaisie.minute !== null) ps.value = String(_periodeDeMinute(SuiviSaisie.minute));
+    });
+    if (ps) ps.addEventListener('change', function () {
+      var v = parseInt(ps.value, 10);
+      SuiviSaisie.periode = (v > 0) ? v : null;
+    });
+  }
+
+  // ── Règlement des exclusions (T6) + catégorie du match (T11) ──
+  var SuiviRegl = {
+    data: null, categories: null, charge: false, enCours: false, _cb: [],
+    charger: function (cb) {
+      if (this.charge) { if (cb) cb(); return; }
+      if (cb) this._cb.push(cb);
+      if (this.enCours) return;
+      this.enCours = true;
+      var self = this;
+      var pRegl = fetch('data/reglement-exclusions.json', { cache: 'no-store' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .catch(function () { return null; });
+      var pCat = (window.SupabaseHub && typeof SupabaseHub.getCategories === 'function')
+        ? Promise.resolve().then(function () { return SupabaseHub.getCategories(); }).catch(function () { return null; })
+        : Promise.resolve(null);
+      Promise.all([pRegl, pCat]).then(function (res) {
+        self.data = res[0]; self.categories = Array.isArray(res[1]) ? res[1] : null;
+        self.charge = true; self.enCours = false;
+        var q = self._cb; self._cb = [];
+        for (var i = 0; i < q.length; i++) { try { q[i](); } catch (e) {} }
+      });
+    },
+    // Code de la catégorie du match (categories.code), null si non résolu.
+    code: function () {
+      var id = _categorieCourante();
+      if (!id || !this.categories) return null;
+      for (var i = 0; i < this.categories.length; i++) {
+        if (this.categories[i] && this.categories[i].id === id) return this.categories[i].code || null;
+      }
+      return null;
+    },
+    regle: function () {
+      var c = this.code();
+      return (c && this.data && this.data.categories && this.data.categories[c]) || null;
+    },
+    // Durée (min) d'exclusion temporaire pour un blanc / jaune ; null = non paramétré.
+    duree: function (obsId) {
+      var r = this.regle();
+      if (!r) return null;
+      var v = (obsId === 'obs-A-blanc') ? r.duree_blanc_min : r.duree_jaune_min;
+      return (typeof v === 'number' && v > 0) ? v : null;
+    }
+  };
+
+  // Ordre de jeu d'une ligne : période → minute → horodatage (T4).
+  function _ordreChrono(a, b) {
+    var pa = a.periode || 1, pb = b.periode || 1;
+    if (pa !== pb) return pa - pb;
+    var ma = (a.minute_match != null) ? a.minute_match : -1;
+    var mb = (b.minute_match != null) ? b.minute_match : -1;
+    if (ma !== mb) return ma - mb;
+    return new Date(a.horodatage).getTime() - new Date(b.horodatage).getTime();
+  }
+
+  function _nomDansEffectif(uuid) {
+    if (!uuid) return '';
+    var eff = _effectifPourSaisie();
+    for (var i = 0; i < eff.length; i++) if (eff[i].uuid === uuid) return _nomJoueur(eff[i]);
+    return '';
+  }
+
   // L3b/c — ouvre la liste d'attribution dans #suivi-palette pour une
   // action « Nous » à 1 joueur ; au tap, enregistre puis revient à la palette.
   // opts.estBlessure : passe le flag (mouvement blessure).
+  // v3.72 : minute via _minuteSaisie (chrono ou manuelle) ; opts.surJoueur
+  // (uuid, ms) remplace l'enregistrement par défaut (discipline, T6).
   function _ouvrirAttribution(evtId, perCourante, obs, opts) {
     opts = opts || {};
     var pal = document.getElementById('suivi-palette');
@@ -4282,19 +4609,123 @@
     pal.querySelectorAll('.suivi-attrib__joueur').forEach(function (b) {
       b.addEventListener('click', function () {
         var uuid = b.getAttribute('data-uuid') || null;
-        var minute = Math.floor(SuiviChrono.secondesEcoulees() / 60);
+        var ms = _minuteSaisie();
+        if (!ms) return;
+        if (typeof opts.surJoueur === 'function') { opts.surJoueur(uuid, ms); return; }
         var payload = {
           observableId: obs.uuid,
           categorieObs: (obs._categorieObs === 'B') ? 'B' : 'A',
           valeurPoints: (typeof obs.points === 'number' ? obs.points : 0),
           equipeConcernee: 'notre',
           joueurUuid: uuid,
-          minuteMatch: minute,
-          periode: perCourante
+          minuteMatch: ms.minute,
+          periode: ms.periode
         };
         if (opts.estBlessure) payload.estBlessure = true;
         _saisirObservable(evtId, payload, function () { _peindrePalette(evtId, perCourante); });
       });
+    });
+  }
+
+  // v3.72 (T6) — discipline : attribution, 2ᵉ jaune → rouge proposé, puis
+  // minute de retour proposée pour un blanc / jaune.
+  function _aDejaJaune(uuid) {
+    return (SuiviChrono.lignes || []).some(function (l) {
+      return l && l.annule !== true && l.observable_id === 'obs-A-jaune' &&
+             l.equipe_concernee !== 'adverse' && l.joueur_uuid === uuid;
+    });
+  }
+
+  function _saisirDiscipline(evtId, perCourante, obs, catA) {
+    _ouvrirAttribution(evtId, perCourante, obs, {
+      surJoueur: function (uuid, ms) {
+        var o = obs;
+        if (obs.uuid === 'obs-A-jaune' && uuid && _aDejaJaune(uuid)) {
+          var r = SuiviRegl.regle();
+          var rouge = (Array.isArray(catA.discipline) ? catA.discipline : [])
+            .filter(function (x) { return x && x.uuid === 'obs-A-rouge'; })[0];
+          if (rouge && (!r || r.deux_jaunes_rouge !== false) &&
+              window.confirm('Ce joueur a déjà un carton jaune dans ce match.\n\n' +
+                             'OK = enregistrer un CARTON ROUGE (exclusion définitive)\n' +
+                             'Annuler = garder un 2ᵉ jaune')) {
+            o = rouge;
+          }
+        }
+        _saisirObservable(evtId, {
+          observableId: o.uuid,
+          categorieObs: 'A',
+          valeurPoints: 0,
+          equipeConcernee: 'notre',
+          joueurUuid: uuid,
+          minuteMatch: ms.minute,
+          periode: ms.periode
+        }, function () {
+          if (uuid && (o.uuid === 'obs-A-blanc' || o.uuid === 'obs-A-jaune')) {
+            _ouvrirRetour(evtId, perCourante, o, uuid, ms);
+          } else {
+            _peindrePalette(evtId, perCourante);
+          }
+        });
+      }
+    });
+  }
+
+  // Formulaire « retour en jeu » : minute proposée = sanction + durée du
+  // règlement de la catégorie ; modifiable ; « Plus tard » possible (le
+  // retour reste saisissable depuis Discipline → Retour d'exclusion).
+  function _ouvrirRetour(evtId, perCourante, obsCarton, uuid, ms) {
+    var pal = document.getElementById('suivi-palette');
+    if (!pal) return;
+    if (!SuiviRegl.charge) {
+      SuiviRegl.charger(function () { _ouvrirRetour(evtId, perCourante, obsCarton, uuid, ms); });
+      return;
+    }
+    var duree = SuiviRegl.duree(obsCarton.uuid);
+    var code = SuiviRegl.code();
+    var proposee = (duree !== null) ? (ms.minute + duree) : null;
+    var nom = _nomDansEffectif(uuid) || 'Le joueur';
+    var html = '<div class="suivi-attrib">';
+    html += '<div class="suivi-attrib__title">↩ Retour en jeu — ' + escapeHtml(nom) + '</div>';
+    html += '<div class="view-suivi__hint" style="text-align:left">' +
+      escapeHtml((obsCarton.libelle_court || 'Carton') + ' à ' + ms.minute + '\'. ') +
+      (duree !== null
+        ? escapeHtml('Exclusion de ' + duree + ' min minimum (règlement ' + (code || '?') + ', arrêts de jeu en plus) : vérifie la minute sur la vidéo.')
+        : escapeHtml('Durée non paramétrée pour la catégorie ' + (code || 'du match') + ' : indique la minute de retour.')) +
+      '</div>';
+    html += '<div class="suivi-chrono__config" style="max-width:none">';
+    html += '<div class="suivi-chrono__config-row"><label for="retour-minute">Minute de retour</label>' +
+            '<input id="retour-minute" type="number" min="0" max="200" value="' + (proposee !== null ? proposee : '') + '"></div>';
+    html += '<div class="suivi-chrono__config-row"><label for="retour-periode">Période</label>' +
+            '<select id="retour-periode" style="' + _STYLE_SELECT + '">' +
+            _optionsPeriodes(proposee !== null ? _periodeDeMinute(proposee) : ms.periode) + '</select></div>';
+    html += '</div>';
+    html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">' +
+            '<button type="button" class="suivi-chrono__btn suivi-chrono__btn--primary" id="retour-ok">Enregistrer le retour</button>' +
+            '<button type="button" class="suivi-chrono__btn" id="retour-plus-tard">Plus tard</button></div>';
+    html += '</div>';
+    pal.innerHTML = html;
+
+    var inp = document.getElementById('retour-minute');
+    var sel = document.getElementById('retour-periode');
+    if (inp && sel) inp.addEventListener('input', function () {
+      var v = parseInt(inp.value, 10);
+      if (v >= 0) sel.value = String(_periodeDeMinute(v));
+    });
+    var plusTard = document.getElementById('retour-plus-tard');
+    if (plusTard) plusTard.addEventListener('click', function () { _peindrePalette(evtId, perCourante); });
+    var ok = document.getElementById('retour-ok');
+    if (ok) ok.addEventListener('click', function () {
+      var v = parseInt(inp && inp.value, 10);
+      if (!(v >= 0)) { window.alert('Indique la minute de retour.'); return; }
+      _saisirObservable(evtId, {
+        observableId: 'obs-A-retour-exclusion',
+        categorieObs: 'A',
+        valeurPoints: 0,
+        equipeConcernee: 'notre',
+        joueurUuid: uuid,
+        minuteMatch: v,
+        periode: parseInt(sel && sel.value, 10) || _periodeDeMinute(v)
+      }, function () { _peindrePalette(evtId, perCourante); });
     });
   }
 
@@ -4304,17 +4735,25 @@
   // (titulaires sur le terrain, remplaçants au banc) et des SUBSTITUTIONS
   // non annulées (ordre chrono). Retourne { surTerrain:Set, auBanc:Set } d'uuid.
   // Version simple : ne tient compte que des substitutions (pas blessures/cartons).
-  function _etatTerrain() {
+  // v3.72 : ordre de JEU (période → minute), et `jusqua` {minute, periode}
+  // optionnel = état du terrain à cet instant (saisie d'un oubli en différé).
+  function _etatTerrain(jusqua) {
     var surTerrain = {}, auBanc = {};
     (State.compoJoueurs || []).forEach(function (cj) {
       if (cj.role === 'titulaire') surTerrain[cj.joueur_id] = true;
       else if (cj.role === 'remplacant') auBanc[cj.joueur_id] = true;
     });
-    // Substitutions dans l'ordre chronologique croissant.
+    // Substitutions dans l'ordre de jeu croissant.
     var subs = (SuiviChrono.lignes || [])
       .filter(function (l) { return l && l.observable_id === 'obs-A-substitution' && l.annule !== true; })
+      .filter(function (l) {
+        if (!jusqua) return true;
+        var p = l.periode || 1;
+        if (p !== jusqua.periode) return p < jusqua.periode;
+        return (l.minute_match != null ? l.minute_match : 0) <= jusqua.minute;
+      })
       .slice()
-      .sort(function (a, b) { return new Date(a.horodatage) - new Date(b.horodatage); });
+      .sort(_ordreChrono);
     subs.forEach(function (l) {
       var sortant = l.joueur_uuid, entrant = l.joueur_uuid_entrant;
       if (sortant) { delete surTerrain[sortant]; auBanc[sortant] = true; }
@@ -4326,14 +4765,18 @@
   function _ouvrirSubstitution(evtId, perCourante, obs) {
     var pal = document.getElementById('suivi-palette');
     if (!pal) return;
+    // v3.72 : minute fixée À L'OUVERTURE (le terrain affiché est celui de cet
+    // instant — utile pour un remplacement oublié saisi en différé).
+    var ms = _minuteSaisie();
+    if (!ms) return;
     var effectif = _effectifPourSaisie();
-    var etat = _etatTerrain();
+    var etat = _etatTerrain(_modeSaisie() === 'manuel' ? ms : null);
     var sortants = effectif.filter(function (jo) { return etat.surTerrain[jo.uuid]; });
     var entrants = effectif.filter(function (jo) { return etat.auBanc[jo.uuid]; });
 
     function rendreEtape(titre, liste, vide, onPick) {
       var html = '<div class="suivi-attrib">';
-      html += '<div class="suivi-attrib__title">' + (obs.icone || '') + ' ' + titre + '</div>';
+      html += '<div class="suivi-attrib__title">' + (obs.icone || '') + ' ' + titre + ' (' + ms.minute + '\')</div>';
       if (!liste.length) {
         html += '<div class="view-suivi__hint">' + vide + '</div>';
       } else {
@@ -4361,7 +4804,6 @@
     rendreEtape('Substitution — qui SORT ?', sortants, 'Aucun joueur sur le terrain.', function (sortant) {
       // Étape 2 : qui entre ? (joueurs au banc)
       rendreEtape('Substitution — qui ENTRE ?', entrants, 'Aucun joueur disponible au banc.', function (entrant) {
-        var minute = Math.floor(SuiviChrono.secondesEcoulees() / 60);
         _saisirObservable(evtId, {
           observableId: obs.uuid,
           categorieObs: 'A',
@@ -4369,38 +4811,56 @@
           equipeConcernee: 'notre',
           joueurUuid: sortant,
           joueurUuidEntrant: entrant,
-          minuteMatch: minute,
-          periode: perCourante
+          minuteMatch: ms.minute,
+          periode: ms.periode
         }, function () { _peindrePalette(evtId, perCourante); });
       });
     });
   }
 
-  // L3a — Palette de saisie Cat A (score d'abord). Rendue sous le chrono,
-  // dans #suivi-palette. En L3a : boutons « Adverse » câblés (score brut,
-  // sans attribution, D7) ; boutons « Nous » présents mais inertes
-  // (attribution nominative = L3b). minute_match = minute du chrono.
+  // L3a — Palette de saisie Cat A, rendue sous le chrono dans #suivi-palette.
+  // v3.72 : barre « Saisie » (T1) en tête, tentatives ratées (T5), discipline
+  // avec retour d'exclusion (T6), section Conquête (T7 ; repli legacy « Jeu
+  // collectif » si le référentiel n'a pas la famille).
   function _peindrePalette(evtId, perCourante) {
     var pal = document.getElementById('suivi-palette');
     if (!pal) return;
+    SuiviRegl.charger();   // non bloquant : prêt pour le retour d'exclusion
     SuiviObs.charger(function (catA) {
       if (SuiviChrono.evtId !== evtId) return;
       if (!catA || !Array.isArray(catA.score)) {
-        pal.innerHTML = '<div class="view-suivi__hint">Palette indisponible (référentiel non chargé).</div>';
+        pal.innerHTML = _barreModeHTML() + '<div class="view-suivi__hint">Palette indisponible (référentiel non chargé).</div>';
+        _bindBarreMode(evtId, perCourante);
         return;
       }
-      var html = '<div class="suivi-palette">';
+      var rates = Array.isArray(catA.score_rate) ? catA.score_rate : [];
+      var html = _barreModeHTML();
+      html += '<div class="suivi-palette">';
       html += '<div class="suivi-palette__title">Score</div>';
       html += '<div class="suivi-palette__grid">';
       catA.score.forEach(function (obs, idx) {
         html +=
           '<div class="suivi-palette__action suivi-palette__action--score">' +
-            '<button type="button" class="suivi-palette__btn suivi-palette__btn--nous" data-idx="' + idx + '">Nous</button>' +
+            '<button type="button" class="suivi-palette__btn suivi-palette__btn--nous" data-fam="score" data-idx="' + idx + '">Nous</button>' +
             '<span class="suivi-palette__lbl suivi-palette__lbl--center">' + (obs.icone || '') + ' ' + escapeHtml(obs.libelle_court) + ' <em>+' + obs.points + '</em></span>' +
             '<button type="button" class="suivi-palette__btn suivi-palette__btn--adv" data-obs="' + escapeHtml(obs.uuid) + '" data-pts="' + obs.points + '">Adverse</button>' +
           '</div>';
       });
       html += '</div>'; // fin grid score
+      // T5 — tentatives ratées (0 point), Nous = buteur.
+      if (rates.length) {
+        html += '<div class="suivi-palette__title suivi-palette__title--sep">Tentatives ratées</div>';
+        html += '<div class="suivi-palette__grid">';
+        rates.forEach(function (obs, idx) {
+          html +=
+            '<div class="suivi-palette__action suivi-palette__action--score">' +
+              '<button type="button" class="suivi-palette__btn suivi-palette__btn--nous" data-fam="score_rate" data-idx="' + idx + '">Nous</button>' +
+              '<span class="suivi-palette__lbl suivi-palette__lbl--center">' + (obs.icone || '') + ' ' + escapeHtml(obs.libelle_court) + '</span>' +
+              '<button type="button" class="suivi-palette__btn suivi-palette__btn--adv" data-obs="' + escapeHtml(obs.uuid) + '" data-pts="0">Adverse</button>' +
+            '</div>';
+        });
+        html += '</div>';
+      }
       // L3c — section Mouvement (substitution, blessure) côté nous.
       var mvt = Array.isArray(catA.mouvement) ? catA.mouvement : [];
       if (mvt.length) {
@@ -4417,8 +4877,10 @@
         });
         html += '</div>';
       }
-      // L3d — section Discipline (cartons, avertissement) : attribution joueur.
-      var disc = Array.isArray(catA.discipline) ? catA.discipline : [];
+      // L3d / v3.72 — Discipline (cartons dont blanc, avertissement) +
+      // « Retour d'exclusion » (famille technique) : attribution joueur.
+      var disc = (Array.isArray(catA.discipline) ? catA.discipline : [])
+        .concat(Array.isArray(catA.technique) ? catA.technique : []);
       if (disc.length) {
         html += '<div class="suivi-palette__title suivi-palette__title--sep">Discipline</div>';
         html += '<div class="suivi-palette__grid">';
@@ -4433,9 +4895,33 @@
         });
         html += '</div>';
       }
-      // L3d — section Jeu collectif (mêlées/touches) : sans attribution, 1 clic.
+      // T7 — Conquête : qui lance / introduit, puis l'issue (1 tap = 1 ligne).
+      var cq = (catA.conquete && typeof catA.conquete === 'object') ? catA.conquete : null;
       var jc = Array.isArray(catA.jeu_collectif) ? catA.jeu_collectif : [];
-      if (jc.length) {
+      if (cq) {
+        var campN = (SuiviSaisie.campConquete !== 'adverse');
+        var actif = 'background:#1d9e75;border-color:#1d9e75;color:#fff';
+        html += '<div class="suivi-palette__title suivi-palette__title--sep">Conquête</div>';
+        html += '<div class="suivi-palette__action">' +
+                  '<span class="suivi-palette__lbl">Lancer / introduction</span>' +
+                  '<div class="suivi-palette__btns">' +
+                    '<button type="button" class="suivi-palette__btn suivi-palette__btn--nous" data-cq-camp="notre" aria-pressed="' + campN + '"' + (campN ? ' style="' + actif + '"' : '') + '>Nous</button>' +
+                    '<button type="button" class="suivi-palette__btn suivi-palette__btn--adv" data-cq-camp="adverse" aria-pressed="' + (!campN) + '"' + (!campN ? ' style="' + actif + '"' : '') + '>Adversaire</button>' +
+                  '</div>' +
+                '</div>';
+        [['touche', 'Touche'], ['melee', 'Mêlée']].forEach(function (ph) {
+          var liste = Array.isArray(cq[ph[0]]) ? cq[ph[0]] : [];
+          if (!liste.length) return;
+          html += '<div class="suivi-palette__lbl" style="margin-top:12px;font-weight:600">' + ph[1] +
+                  (campN ? ' — notre lancer' : ' — lancer adverse').replace('lancer', ph[0] === 'melee' ? 'introduction' : 'lancer') + '</div>';
+          html += '<div class="suivi-obsb__grid">';
+          liste.forEach(function (o) {
+            html += '<button type="button" class="suivi-obsb__btn" data-cq="' + escapeHtml(o.uuid) + '">' + escapeHtml(o.libelle_court) + '</button>';
+          });
+          html += '</div>';
+        });
+      } else if (jc.length) {
+        // Repli legacy (référentiel v1.1) : section « Jeu collectif » historique.
         html += '<div class="suivi-palette__title suivi-palette__title--sep">Jeu collectif</div>';
         html += '<div class="suivi-palette__grid">';
         jc.forEach(function (obs, idx) {
@@ -4462,28 +4948,31 @@
       }
       html += '</div>'; // fin suivi-palette
       pal.innerHTML = html;
+      _bindBarreMode(evtId, perCourante);
 
-      // L3b — boutons « Nous » : ouvrent l'attribution nominative.
-      pal.querySelectorAll('.suivi-palette__btn--nous').forEach(function (b) {
+      // L3b — boutons « Nous » (score et ratées) : attribution nominative.
+      pal.querySelectorAll('.suivi-palette__btn--nous[data-idx]').forEach(function (b) {
         b.addEventListener('click', function () {
           var idx = parseInt(b.getAttribute('data-idx'), 10);
-          var obs = catA.score[idx];
+          var arr = (b.getAttribute('data-fam') === 'score_rate') ? rates : catA.score;
+          var obs = arr[idx];
           if (obs) _ouvrirAttribution(evtId, perCourante, obs);
         });
       });
-      // L3a — boutons « Adverse » : score brut, sans attribution.
-      pal.querySelectorAll('.suivi-palette__btn--adv').forEach(function (b) {
+      // L3a — boutons « Adverse » (score et ratées) : sans attribution.
+      pal.querySelectorAll('.suivi-palette__btn--adv[data-obs]').forEach(function (b) {
         b.addEventListener('click', function () {
           var obsId = b.getAttribute('data-obs');
           var pts = parseInt(b.getAttribute('data-pts'), 10) || 0;
-          var minute = Math.floor(SuiviChrono.secondesEcoulees() / 60);
+          var ms = _minuteSaisie();
+          if (!ms) return;
           _saisirObservable(evtId, {
             observableId: obsId,
             categorieObs: 'A',
             valeurPoints: pts,
             equipeConcernee: 'adverse',
-            minuteMatch: minute,
-            periode: perCourante
+            minuteMatch: ms.minute,
+            periode: ms.periode
           });
         });
       });
@@ -4501,33 +4990,58 @@
           }
         });
       });
-      // L3d — boutons « Discipline » : attribution nominative (joueur).
+      // L3d / v3.72 — Discipline : cartons (T6) ; retour d'exclusion et
+      // avertissement = attribution simple.
       pal.querySelectorAll('.suivi-palette__btn--disc').forEach(function (b) {
         b.addEventListener('click', function () {
           var idx = parseInt(b.getAttribute('data-didx'), 10);
           var obs = disc[idx];
-          if (obs) _ouvrirAttribution(evtId, perCourante, obs);
+          if (!obs) return;
+          if (obs.uuid === 'obs-A-jaune' || obs.uuid === 'obs-A-blanc') _saisirDiscipline(evtId, perCourante, obs, catA);
+          else _ouvrirAttribution(evtId, perCourante, obs);
         });
       });
-      // L3d — boutons « Jeu collectif » : fait d'équipe, sans joueur, 1 clic.
+      // T7 — Conquête : choix du lanceur (re-rendu) puis issue (1 tap).
+      pal.querySelectorAll('[data-cq-camp]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          SuiviSaisie.campConquete = (b.getAttribute('data-cq-camp') === 'adverse') ? 'adverse' : 'notre';
+          _peindrePalette(evtId, perCourante);
+        });
+      });
+      pal.querySelectorAll('[data-cq]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var ms = _minuteSaisie();
+          if (!ms) return;
+          _saisirObservable(evtId, {
+            observableId: b.getAttribute('data-cq'),
+            categorieObs: 'A',
+            valeurPoints: 0,
+            equipeConcernee: (SuiviSaisie.campConquete === 'adverse') ? 'adverse' : 'notre',
+            minuteMatch: ms.minute,
+            periode: ms.periode
+          });
+        });
+      });
+      // Repli legacy — boutons « Jeu collectif » : fait d'équipe, 1 clic.
       pal.querySelectorAll('.suivi-palette__btn--jc').forEach(function (b) {
         b.addEventListener('click', function () {
           var idx = parseInt(b.getAttribute('data-jidx'), 10);
           var obs = jc[idx];
           if (!obs) return;
-          var minute = Math.floor(SuiviChrono.secondesEcoulees() / 60);
+          var ms = _minuteSaisie();
+          if (!ms) return;
           _saisirObservable(evtId, {
             observableId: obs.uuid,
             categorieObs: 'A',
             valeurPoints: 0,
             equipeConcernee: 'notre',
-            minuteMatch: minute,
-            periode: perCourante
+            minuteMatch: ms.minute,
+            periode: ms.periode
           });
         });
       });
       // L5 — boutons « Observations » Cat B : attribution joueur, sans points.
-      pal.querySelectorAll('.suivi-obsb__btn').forEach(function (b) {
+      pal.querySelectorAll('.suivi-obsb__btn[data-bidx]').forEach(function (b) {
         b.addEventListener('click', function () {
           var idx = parseInt(b.getAttribute('data-bidx'), 10);
           var o = obsB[idx];
@@ -4559,6 +5073,152 @@
       // L4 — rafraîchir score + historique (relecture chronologie).
       _rafraichirScoreEtHistorique(evtId);
       if (typeof onApres === 'function') onApres();
+    });
+  }
+
+  // v3.72 (T3) — CORRIGER une ligne : formulaire complet (type, équipe,
+  // joueur(s), minute, période). Enregistrer = recréer la ligne corrigée PUIS
+  // annuler l'ancienne (jamais de DELETE ; corriger_observable_coach n'existe
+  // pas en base — sonde L0 S1). Ordre volontaire : en cas d'échec de
+  // l'annulation, on a un doublon visible plutôt qu'une perte.
+  function _ouvrirEdition(evtId, ligne) {
+    var pal = document.getElementById('suivi-palette');
+    if (!pal || !ligne || !ligne.id) return;
+    if (!SuiviObs.charge) { SuiviObs.charger(function () { _ouvrirEdition(evtId, ligne); }); return; }
+    var plats = SuiviObs.plats().filter(function (p) {
+      return !(p.famille === 'jeu_collectif' && p.o.legacy === true) || p.o.uuid === ligne.observable_id;
+    });
+    var titresFam = { score: 'Score', score_rate: 'Tentatives ratées', discipline: 'Discipline',
+                      technique: 'Discipline', mouvement: 'Mouvement', conquete: 'Conquête',
+                      jeu_collectif: 'Jeu collectif (ancien)' };
+    var connu = plats.some(function (p) { return p.o.uuid === ligne.observable_id; });
+    var optType = '';
+    if (!connu) {
+      var refL = SuiviObs.libelle(ligne.observable_id);
+      optType += '<option value="' + escapeHtml(ligne.observable_id) + '" selected>' +
+                 escapeHtml((refL && refL.libelle) || ligne.observable_id) + ' (actuel)</option>';
+    }
+    var famCour = null;
+    plats.forEach(function (p) {
+      var titre = titresFam[p.famille] || p.famille;
+      if (titre !== famCour) {
+        if (famCour !== null) optType += '</optgroup>';
+        optType += '<optgroup label="' + escapeHtml(titre) + '">';
+        famCour = titre;
+      }
+      var lib = (p.famille === 'conquete' && p.o.libelle_long) ? p.o.libelle_long : p.o.libelle_court;
+      optType += '<option value="' + escapeHtml(p.o.uuid) + '"' + (p.o.uuid === ligne.observable_id ? ' selected' : '') + '>' +
+                 escapeHtml(lib) + '</option>';
+    });
+    if (famCour !== null) optType += '</optgroup>';
+
+    var effectif = _effectifPourSaisie();
+    function optJoueurs(choisi, nomSecours) {
+      var h = '<option value="">— aucun (équipe) —</option>';
+      var trouve = false;
+      effectif.forEach(function (jo) {
+        var sel = (jo.uuid === choisi);
+        if (sel) trouve = true;
+        h += '<option value="' + escapeHtml(jo.uuid || '') + '"' + (sel ? ' selected' : '') + '>' +
+             escapeHtml(String(jo.num || '?') + ' · ' + _nomJoueur(jo)) + '</option>';
+      });
+      if (choisi && !trouve) {
+        h += '<option value="' + escapeHtml(choisi) + '" selected>' + escapeHtml(nomSecours || 'Joueur hors compo') + '</option>';
+      }
+      return h;
+    }
+    var minute = (ligne.minute_match != null) ? ligne.minute_match : '';
+    var per = ligne.periode || 1;
+    var row = function (lbl, id, champ) {
+      return '<div class="suivi-chrono__config-row"><label for="' + id + '">' + lbl + '</label>' + champ + '</div>';
+    };
+    var html = '<div class="suivi-attrib">';
+    html += '<div class="suivi-attrib__title">✎ Modifier l\'action</div>';
+    html += '<div class="suivi-chrono__config" style="max-width:none">';
+    html += row('Action', 'ed-type', '<select id="ed-type" style="' + _STYLE_SELECT + ';max-width:60%">' + optType + '</select>');
+    html += row('Équipe <small>(conquête : qui lance)</small>', 'ed-equipe',
+      '<select id="ed-equipe" style="' + _STYLE_SELECT + '">' +
+        '<option value="notre"' + (ligne.equipe_concernee !== 'adverse' ? ' selected' : '') + '>' + escapeHtml(SuiviChrono.nomNous || 'Nous') + '</option>' +
+        '<option value="adverse"' + (ligne.equipe_concernee === 'adverse' ? ' selected' : '') + '>' + escapeHtml(SuiviChrono.nomAdv || 'Adversaire') + '</option>' +
+      '</select>');
+    html += row('Joueur <small>(sortant pour un remplacement)</small>', 'ed-joueur',
+      '<select id="ed-joueur" style="' + _STYLE_SELECT + ';max-width:60%">' + optJoueurs(ligne.joueur_uuid, ligne.nom_court) + '</select>');
+    html += '<div id="ed-entrant-row">' + row('Entrant', 'ed-entrant',
+      '<select id="ed-entrant" style="' + _STYLE_SELECT + ';max-width:60%">' + optJoueurs(ligne.joueur_uuid_entrant, ligne.nom_court_entrant) + '</select>') + '</div>';
+    html += row('Minute', 'ed-minute', '<input id="ed-minute" type="number" min="0" max="200" value="' + minute + '">');
+    html += row('Période', 'ed-periode', '<select id="ed-periode" style="' + _STYLE_SELECT + '">' + _optionsPeriodes(per) + '</select>');
+    html += '</div>';
+    html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">' +
+            '<button type="button" class="suivi-chrono__btn suivi-chrono__btn--primary" id="ed-ok">Enregistrer la correction</button>' +
+            '<button type="button" class="suivi-chrono__btn" id="ed-retour">↩ Retour</button></div>';
+    html += '<div class="view-suivi__hint" style="text-align:left">L\'action d\'origine sera annulée (barrée, conservée) et remplacée par la version corrigée.</div>';
+    html += '</div>';
+    pal.innerHTML = html;
+    if (pal.scrollIntoView) pal.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    var selType = document.getElementById('ed-type');
+    var selEq = document.getElementById('ed-equipe');
+    var selJ = document.getElementById('ed-joueur');
+    var selE = document.getElementById('ed-entrant');
+    var rowE = document.getElementById('ed-entrant-row');
+    var inpM = document.getElementById('ed-minute');
+    var selP = document.getElementById('ed-periode');
+    function majVisibilite() {
+      var t = SuiviObs.trouver(selType.value);
+      var adverse = (selEq.value === 'adverse');
+      var sansJoueur = adverse || (t && t.famille === 'conquete') ||
+                       (t && t.famille === 'jeu_collectif');
+      selJ.disabled = !!sansJoueur;
+      if (rowE) rowE.style.display = (selType.value === 'obs-A-substitution' && !adverse) ? '' : 'none';
+    }
+    selType.addEventListener('change', majVisibilite);
+    selEq.addEventListener('change', majVisibilite);
+    inpM.addEventListener('input', function () {
+      var v = parseInt(inpM.value, 10);
+      if (v >= 0) selP.value = String(_periodeDeMinute(v));
+    });
+    majVisibilite();
+
+    document.getElementById('ed-retour').addEventListener('click', function () { _peindreChrono(); });
+    document.getElementById('ed-ok').addEventListener('click', function () {
+      var uuidType = selType.value;
+      var t = SuiviObs.trouver(uuidType);
+      var m = parseInt(inpM.value, 10);
+      if (!(m >= 0)) { window.alert('Indique la minute.'); return; }
+      var adverse = (selEq.value === 'adverse');
+      var sansJoueur = adverse || (t && (t.famille === 'conquete' || t.famille === 'jeu_collectif'));
+      var estSub = (uuidType === 'obs-A-substitution') && !adverse;
+      var payload = {
+        observableId: uuidType,
+        categorieObs: (uuidType.indexOf('obs-B-') === 0) ? 'B' : (t ? 'A' : (ligne.categorie_obs || 'A')),
+        // Points : ceux du référentiel ; type inconnu (Cat B, ancien) → inchangés.
+        valeurPoints: t ? ((typeof t.o.points === 'number') ? t.o.points : 0)
+                        : ((typeof ligne.valeur_points === 'number') ? ligne.valeur_points : 0),
+        equipeConcernee: adverse ? 'adverse' : 'notre',
+        joueurUuid: sansJoueur ? null : (selJ.value || null),
+        joueurUuidEntrant: estSub ? (selE.value || null) : null,
+        minuteMatch: m,
+        periode: parseInt(selP.value, 10) || _periodeDeMinute(m)
+      };
+      if (SuiviChrono.busy) return;
+      if (!window.SupabaseHub || !SupabaseHub.insererObservableCoach || !SupabaseHub.annulerObservableCoach) return;
+      SuiviChrono.busy = true;
+      SupabaseHub.insererObservableCoach(evtId, payload).then(function (res) {
+        if (!res || !res.ok) {
+          SuiviChrono.busy = false;
+          window.alert('Correction impossible : ' + ((res && res.error) || 'erreur inconnue'));
+          return;
+        }
+        return SupabaseHub.annulerObservableCoach(evtId, ligne.id).then(function (r2) {
+          SuiviChrono.busy = false;
+          if (!r2 || !r2.ok) {
+            window.alert('La version corrigée est enregistrée, mais l\'ancienne ligne n\'a pas pu être annulée : ' +
+                         ((r2 && r2.error) || 'erreur inconnue') + '\nAnnule-la à la main dans l\'historique.');
+          }
+          _rafraichirScoreEtHistorique(evtId);
+          _peindreChrono();
+        });
+      });
     });
   }
 
