@@ -6,6 +6,18 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.77 — Suivi : en-avant et passe en avant comptés à part (4 oct. 2026)
+ *   v3.77 : SUIVI-VEO avenant « En-avant » (décisions E1-B, E2-A, E3-A,
+ *           E4-A de Manu, 04/10 18:53). Requiert observables-match.json
+ *           v1.2.2 (famille faute_technique) ; C14-e reprend les lignes
+ *           déjà saisies avec la pioche et retire ces 2 types de la pioche.
+ *           Palette, Discipline → « ✋ En-avant / passe en avant » : équipe
+ *           (Nous / Adversaire), type, joueur facultatif côté nous, minute
+ *           chrono ou manuelle ; retour sur cet écran après saisie.
+ *           Lignes 'obs-A-en-avant' / 'obs-A-passe-avant' (0 point).
+ *           Rapport : section dédiée « ✋ En-avant / passe en avant »
+ *           (type × équipe, total, par joueur, minutes) — hors « 🚩 Fautes ».
+ *           Modifier : optgroup « En-avant / passe en avant ».
  * Version : 3.76 — Suivi : faute avec pioche par catégorie (4 oct. 2026)
  *   v3.76 : SUIVI-VEO avenant « Faute » (décisions F1-A, F2-A, F3, F4-A de
  *           Manu, 04/10 15:49). Requiert C14-d et supabase-client v1.87.
@@ -2209,7 +2221,8 @@
     plats: function () {
       var out = [];
       if (!this.catA) return out;
-      var familles = ['score', 'score_rate', 'discipline', 'mouvement', 'jeu_collectif', 'technique'];
+      var familles = ['score', 'score_rate', 'discipline', 'mouvement', 'jeu_collectif', 'technique',
+                      'faute_technique'];   // v3.77
       for (var f = 0; f < familles.length; f++) {
         var arr = this.catA[familles[f]];
         if (!Array.isArray(arr)) continue;
@@ -2704,6 +2717,7 @@
     if (t.famille === 'score_rate') return 'score';
     if (t.famille === 'conquete') return 'jeu_collectif';
     if (t.famille === 'technique') return 'discipline';
+    if (t.famille === 'faute_technique') return 'faute_technique';   // v3.77 — section dédiée
     return t.famille;
   }
 
@@ -3814,6 +3828,8 @@
     var conq = [];        // v3.74 — lignes conquête v1.2 {l, o}
     var fautes = [];      // v3.76 — lignes « obs-A-faute-<id> »
     var idFautes = 'rapport-fautes' + suffix;
+    var ftech = [];       // v3.77 — en-avant / passe en avant
+    var idFtech = 'rapport-ftech' + suffix;
     var buteurs = {};     // v3.74 — {uuid: {transfo:[réussies,tentées], penalite:[…], drop:[…]}}
     var BUT = {
       'obs-A-transfo':        { k: 'transfo',  ok: true },
@@ -3835,6 +3851,8 @@
       // v3.74 (L5) — conquête v1.2 : section dédiée (lanceur × issue).
       var tq = SuiviObs.trouver(oid);
       if (tq && tq.famille === 'conquete') { conq.push({ l: l, o: tq.o }); continue; }
+      // v3.77 — en-avant / passe en avant : section dédiée, hors fautes.
+      if (tq && tq.famille === 'faute_technique') { ftech.push({ l: l, o: tq.o }); continue; }
       // v3.74 (L5) — tentatives au pied de NOTRE équipe, par buteur.
       if (BUT[oid] && l.equipe_concernee !== 'adverse' && l.joueur_uuid) {
         var bj = buteurs[l.joueur_uuid] || (buteurs[l.joueur_uuid] = { transfo: [0, 0], penalite: [0, 0], drop: [0, 0] });
@@ -3917,6 +3935,14 @@
               '</section>';
     }
 
+    // v3.77 — EN-AVANT / PASSE EN AVANT (comptés à part des fautes).
+    if (ftech.length) {
+      html += '<section class="rapport-bloc">' +
+                '<h4 class="rapport-bloc__titre">✋ En-avant / passe en avant <span class="rapport-bloc__n">(' + ftech.length + ')</span></h4>' +
+                '<div id="' + idFtech + '">' + _fautesTechTableHTML(ftech, nomNous, nomAdv) + '</div>' +
+              '</section>';
+    }
+
     // v3.74 (L5) — BUTEURS : réussite au pied par joueur (noms asynchrones).
     if (Object.keys(buteurs).length) {
       html += '<section class="rapport-bloc">' +
@@ -3977,6 +4003,7 @@
     // v3.74 (L5) — blocs asynchrones.
     if (Object.keys(buteurs).length) _peindreButeursRapport(buteurs, idBut);
     if (fautes.length) _peindreFautesRapport(fautes, idFautes, nomNous, nomAdv);   // v3.76
+    if (ftech.length) _peindreFautesTechRapport(ftech, idFtech, nomNous, nomAdv);  // v3.77
     if (evtId) {
       _peindreFroidRapport(evtId, idFroid);
       _peindreTdjRapport(evtId, idTdj);
@@ -4723,6 +4750,7 @@
       this.choix = null; this.minute = null; this.periode = null;
       this.campConquete = 'notre'; this.voirAnnulees = false;
       this.campFaute = 'notre';   // v3.76
+      this.campFtech = 'notre';   // v3.77
     }
   };
 
@@ -5200,6 +5228,15 @@
                     '<button type="button" class="suivi-palette__btn suivi-palette__btn--disc" id="pal-faute">Saisir…</button>' +
                   '</div>' +
                 '</div>';
+        // v3.77 — En-avant / passe en avant (comptés à part des fautes).
+        if (Array.isArray(catA.faute_technique) && catA.faute_technique.length) {
+          html += '<div class="suivi-palette__action">' +
+                    '<span class="suivi-palette__lbl">✋ En-avant / passe en avant</span>' +
+                    '<div class="suivi-palette__btns">' +
+                      '<button type="button" class="suivi-palette__btn suivi-palette__btn--disc" id="pal-ftech">Saisir…</button>' +
+                    '</div>' +
+                  '</div>';
+        }
         disc.forEach(function (obs, idx) {
           html +=
             '<div class="suivi-palette__action">' +
@@ -5356,6 +5393,9 @@
       // v3.76 — Faute.
       var bFaute = document.getElementById('pal-faute');
       if (bFaute) bFaute.addEventListener('click', function () { _ouvrirFaute(evtId, perCourante); });
+      // v3.77 — En-avant / passe en avant.
+      var bFtech = document.getElementById('pal-ftech');
+      if (bFtech) bFtech.addEventListener('click', function () { _ouvrirFauteTech(evtId, perCourante); });
       // T10 — remarque générale Conquête (note du match).
       var remBtn = document.getElementById('cq-remarque');
       if (remBtn) remBtn.addEventListener('click', function () { _ouvrirRemarqueConquete(evtId, perCourante); });
@@ -6218,6 +6258,130 @@
     });
   }
 
+  // ════════════════════════════════════════════════════════════
+  // v3.77 — SUIVI-VEO avenant « En-avant » (C14-e). En-avant et passe en
+  // avant = observables du référentiel (famille faute_technique, v1.2.2),
+  // saisis comme une faute (équipe, type, joueur facultatif, minute) mais
+  // comptés à part. Ligne : 'obs-A-en-avant' / 'obs-A-passe-avant', 0 pt.
+  // ════════════════════════════════════════════════════════════
+  function _ouvrirFauteTech(evtId, perCourante) {
+    var pal = document.getElementById('suivi-palette');
+    if (!pal) return;
+    if (!SuiviObs.charge) { SuiviObs.charger(function () { _ouvrirFauteTech(evtId, perCourante); }); return; }
+    var types = (SuiviObs.catA && Array.isArray(SuiviObs.catA.faute_technique)) ? SuiviObs.catA.faute_technique : [];
+    var campN = (SuiviSaisie.campFtech !== 'adverse');
+    var actif = 'background:#1d9e75;border-color:#1d9e75;color:#fff';
+    var h = '<div class="suivi-attrib">';
+    h += '<div class="suivi-attrib__title">✋ En-avant / passe en avant</div>';
+    h += '<div class="suivi-palette__action">' +
+           '<span class="suivi-palette__lbl">Équipe</span>' +
+           '<div class="suivi-palette__btns">' +
+             '<button type="button" class="suivi-palette__btn suivi-palette__btn--nous" data-ftech-camp="notre"' + (campN ? ' style="' + actif + '"' : '') + '>' + escapeHtml(SuiviChrono.nomNous || 'Nous') + '</button>' +
+             '<button type="button" class="suivi-palette__btn suivi-palette__btn--adv" data-ftech-camp="adverse"' + (!campN ? ' style="' + actif + '"' : '') + '>' + escapeHtml(SuiviChrono.nomAdv || 'Adversaire') + '</button>' +
+           '</div>' +
+         '</div>';
+    if (!types.length) {
+      h += '<div class="view-suivi__hint">Référentiel non à jour (observables-match.json v1.2.2 requis).</div>';
+    } else {
+      h += '<div class="suivi-obsb__grid" style="margin-top:10px">';
+      types.forEach(function (o, idx) {
+        h += '<button type="button" class="suivi-obsb__btn" data-ftech="' + idx + '">' +
+             escapeHtml((o.icone ? o.icone + ' ' : '') + o.libelle_court) + '</button>';
+      });
+      h += '</div>';
+    }
+    h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">' +
+         '<button type="button" class="suivi-chrono__btn" id="ftech-retour">↩ Retour</button></div>';
+    h += '</div>';
+    pal.innerHTML = h;
+
+    pal.querySelectorAll('[data-ftech-camp]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        SuiviSaisie.campFtech = (b.getAttribute('data-ftech-camp') === 'adverse') ? 'adverse' : 'notre';
+        _ouvrirFauteTech(evtId, perCourante);
+      });
+    });
+    document.getElementById('ftech-retour').addEventListener('click', function () { _peindrePalette(evtId, perCourante); });
+    pal.querySelectorAll('[data-ftech]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var obs = types[parseInt(b.getAttribute('data-ftech'), 10)];
+        if (!obs) return;
+        if (SuiviSaisie.campFtech === 'adverse') {
+          var ms = _minuteSaisie();
+          if (!ms) return;
+          _saisirObservable(evtId, {
+            observableId: obs.uuid, categorieObs: 'A', valeurPoints: 0,
+            equipeConcernee: 'adverse', minuteMatch: ms.minute, periode: ms.periode
+          }, function () { _ouvrirFauteTech(evtId, perCourante); });
+        } else {
+          _ouvrirAttribution(evtId, perCourante, obs, {
+            sansJoueur: true,
+            surRetour: function () { _ouvrirFauteTech(evtId, perCourante); },
+            apresSaisie: function () { _ouvrirFauteTech(evtId, perCourante); }
+          });
+        }
+      });
+    });
+  }
+
+  // Rapport : tableau type × équipe + minutes (synchrone).
+  function _fautesTechTableHTML(ftech, nomNous, nomAdv) {
+    var ordre = [], parType = {}, totN = 0, totA = 0;
+    ftech.forEach(function (x) {
+      var id = x.o.uuid;
+      if (!parType[id]) { parType[id] = { o: x.o, nous: [], adv: [] }; ordre.push(id); }
+      var m = (x.l.minute_match != null) ? (x.l.minute_match + "'") : '?';
+      if (x.l.equipe_concernee === 'adverse') { parType[id].adv.push(m); totA += 1; }
+      else { parType[id].nous.push(m); totN += 1; }
+    });
+    var h = '<table class="rapport-tab"><thead><tr><th>Action</th><th>' + escapeHtml(nomNous || 'Nous') +
+            '</th><th>' + escapeHtml(nomAdv || 'Adv.') + '</th></tr></thead><tbody>';
+    ordre.forEach(function (id) {
+      var t = parType[id];
+      h += '<tr><td>' + escapeHtml((t.o.icone ? t.o.icone + ' ' : '') + t.o.libelle_court) + '</td>' +
+           '<td class="rapport-tab__n">' + t.nous.length + '</td><td class="rapport-tab__n">' + t.adv.length + '</td></tr>';
+    });
+    if (ordre.length > 1) {
+      h += '<tr><td><strong>Total</strong></td><td class="rapport-tab__n"><strong>' + totN + '</strong></td>' +
+           '<td class="rapport-tab__n"><strong>' + totA + '</strong></td></tr>';
+    }
+    h += '</tbody></table>';
+    ordre.forEach(function (id) {
+      var t = parType[id];
+      var parts = [];
+      if (t.nous.length) parts.push(escapeHtml(nomNous || 'Nous') + ' : ' + escapeHtml(t.nous.join(', ')));
+      if (t.adv.length) parts.push(escapeHtml(nomAdv || 'Adv.') + ' : ' + escapeHtml(t.adv.join(', ')));
+      h += '<p class="view-suivi__hint" style="text-align:left">' + escapeHtml(t.o.libelle_court) +
+           ' — minutes · ' + parts.join(' · ') + '</p>';
+    });
+    return h;
+  }
+
+  // Rapport : ajoute le détail par joueur (nous), noms résolus en asynchrone.
+  function _peindreFautesTechRapport(ftech, cibleId, nomNous, nomAdv) {
+    var parJoueur = {};
+    ftech.forEach(function (x) {
+      if (x.l.equipe_concernee !== 'adverse' && x.l.joueur_uuid) {
+        parJoueur[x.l.joueur_uuid] = (parJoueur[x.l.joueur_uuid] || 0) + 1;
+      }
+    });
+    var uuids = Object.keys(parJoueur);
+    if (!uuids.length) return;
+    var pNoms = (window.SupabaseHub && typeof SupabaseHub._resolveNoms === 'function')
+      ? SupabaseHub._resolveNoms(uuids).catch(function () { return new Map(); }) : Promise.resolve(new Map());
+    pNoms.then(function (map) {
+      var box = document.getElementById(cibleId);
+      if (!box) return;
+      var lst = uuids.sort(function (a, b) { return parJoueur[b] - parJoueur[a]; }).map(function (u) {
+        var e = map && map.get ? map.get(u) : null;
+        var n = e ? (((e.prenom || '').trim() + ' ' + (e.nom || '').trim()).trim()) : '';
+        return (n || _idCourt(u)) + ' ' + parJoueur[u];
+      });
+      box.insertAdjacentHTML('beforeend', '<p class="view-suivi__hint" style="text-align:left">Par joueur (' +
+        escapeHtml(nomNous || 'nous') + ') : ' + escapeHtml(lst.join(' · ')) + '</p>');
+    });
+  }
+
   // Rapport : fautes par type (nous / adverse) + par joueur (nous).
   function _peindreFautesRapport(fautes, cibleId, nomNous, nomAdv) {
     var box = document.getElementById(cibleId);
@@ -6292,7 +6456,8 @@
     });
     var titresFam = { score: 'Score', score_rate: 'Tentatives ratées', discipline: 'Discipline',
                       technique: 'Discipline', mouvement: 'Mouvement', conquete: 'Conquête',
-                      jeu_collectif: 'Jeu collectif (ancien)' };
+                      jeu_collectif: 'Jeu collectif (ancien)',
+                      faute_technique: 'En-avant / passe en avant' };   // v3.77
     var connu = plats.some(function (p) { return p.o.uuid === ligne.observable_id; }) ||
       (ligne.observable_id.indexOf(_PREFIXE_FAUTE) === 0 && Array.isArray(SuiviFautes.liste) &&
        SuiviFautes.liste.some(function (t) { return _PREFIXE_FAUTE + t.id === ligne.observable_id; }));
