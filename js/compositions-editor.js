@@ -6,6 +6,23 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.73 — Suivi : observations à froid avec notes, remarque conquête (4 oct. 2026)
+ *   v3.73 : SUIVI-VEO lot L3 (FAIT FOI Conception-SUIVI-VEO-v1, D1-A, D2-A).
+ *           Requiert C14-a (table observables_froid + RPC) et
+ *           supabase-client v1.85 (listerObservablesFroid /
+ *           enregistrerObservableFroid).
+ *           T9 — « Observations (à froid) » : liste de la CATÉGORIE du
+ *                match (_categorieCourante), un tap ouvre une NOTE libre
+ *                (✓ si déjà annotée) ; « ⚙ Gérer la liste » : ajouter,
+ *                renommer, monter/descendre, retirer/réactiver (droits
+ *                portés par la RPC). Plus d'attribution joueur ni de
+ *                ligne obs-B-* ; les anciennes lignes restent lisibles.
+ *                Repli : liste indisponible → anciens boutons Cat B.
+ *           T10 — « 📝 Remarque générale conquête » sous la Conquête.
+ *           Stockage des notes : rapports.donnees du match
+ *           { notes_froid: {id: texte}, remarque_conquete: texte } —
+ *           relecture + fusion + upsert en renvoyant le bilan courant.
+ *           Affichage des notes dans le rapport = lot L5.
  * Version : 3.72 — Suivi : saisie en différé (VEO), minute cumulée, conquête (4 oct. 2026)
  *   v3.72 : SUIVI-VEO lot L2 (FAIT FOI Conception-SUIVI-VEO-v1, gelé 04/10).
  *           Référentiel data/observables-match.json v1.2 + reglement-
@@ -4920,6 +4937,9 @@
           });
           html += '</div>';
         });
+        // T10 — remarque générale sur la conquête (stockée dans le rapport).
+        html += '<div style="margin-top:12px"><button type="button" class="suivi-chrono__btn" id="cq-remarque">📝 Remarque générale conquête' +
+                (SuiviFroid.estPour(evtId) && SuiviFroid.remarqueConquete ? ' ✓' : '') + '</button></div>';
       } else if (jc.length) {
         // Repli legacy (référentiel v1.1) : section « Jeu collectif » historique.
         html += '<div class="suivi-palette__title suivi-palette__title--sep">Jeu collectif</div>';
@@ -4935,17 +4955,11 @@
         });
         html += '</div>';
       }
-      // L5 — section Cat B « Observations » (repliable, en retrait, D8).
-      var obsB = SuiviObs.observablesB(SuiviChrono.nomNous);
-      if (obsB.length) {
-        html += '<details class="suivi-obsb">';
-        html += '<summary class="suivi-obsb__summary">Observations (à froid)</summary>';
-        html += '<div class="suivi-obsb__grid">';
-        obsB.forEach(function (o, idx) {
-          html += '<button type="button" class="suivi-obsb__btn" data-bidx="' + idx + '">' + escapeHtml(o.libelle) + '</button>';
-        });
-        html += '</div></details>';
-      }
+      // v3.73 (T9) — Observations « à froid » : rendues de façon asynchrone
+      // dans cet hôte (liste par catégorie + notes du match), sans bloquer
+      // la palette. Repli legacy (Cat B du référentiel) si la liste n'est
+      // pas disponible.
+      html += '<div id="suivi-froid-host"></div>';
       html += '</div>'; // fin suivi-palette
       pal.innerHTML = html;
       _bindBarreMode(evtId, perCourante);
@@ -5040,20 +5054,306 @@
           });
         });
       });
-      // L5 — boutons « Observations » Cat B : attribution joueur, sans points.
-      pal.querySelectorAll('.suivi-obsb__btn[data-bidx]').forEach(function (b) {
-        b.addEventListener('click', function () {
-          var idx = parseInt(b.getAttribute('data-bidx'), 10);
-          var o = obsB[idx];
-          if (!o) return;
-          _ouvrirAttribution(evtId, perCourante, {
-            uuid: _slugObsB(o.libelle),
-            libelle_court: o.libelle,
-            icone: '📝',
-            points: 0,
-            _categorieObs: 'B'
-          });
+      // T10 — remarque générale Conquête (note du match).
+      var remBtn = document.getElementById('cq-remarque');
+      if (remBtn) remBtn.addEventListener('click', function () { _ouvrirRemarqueConquete(evtId, perCourante); });
+      // T9 — observations « à froid » (asynchrone).
+      _peindreFroid(evtId, perCourante);
+    });
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // v3.73 — SUIVI-VEO lot L3. Observations « à froid » (T9) et remarque
+  // générale Conquête (T10).
+  //   • LISTE : table observables_froid par catégorie (C14-a, D1-A), lue
+  //     via listerObservablesFroid ; éditable ici (« ⚙ Gérer la liste »),
+  //     droits portés par la RPC (admin | bureau | catégorie écrivable).
+  //   • NOTES : rapports.donnees du MATCH (D2-A, zéro DDL) :
+  //       { notes_froid: { <id observable>: texte }, remarque_conquete: texte }
+  //     Écriture = relire le rapport, fusionner, upsert en RENVOYANT le
+  //     bilan courant (upsert_rapport_match écrase bilan, COALESCE donnees).
+  //   • Repli : liste indisponible (RPC absente / catégorie non résolue)
+  //     → anciens boutons Cat B du référentiel (attribution joueur).
+  // ════════════════════════════════════════════════════════════
+  var SuiviFroid = {
+    evtId: null,
+    catId: null,
+    liste: null,          // observables actifs [{id, libelle, ordre, actif}] ; null = indisponible
+    erreurListe: null,
+    notes: {},            // { id: texte }
+    remarqueConquete: '',
+    charge: false,
+    estPour: function (evtId) { return this.charge && this.evtId === evtId; },
+    // Charge (ou recharge) liste + notes pour le match.
+    charger: function (evtId, cb, force) {
+      var self = this;
+      if (!force && this.estPour(evtId)) { if (cb) cb(); return; }
+      this.evtId = evtId;
+      this.catId = _categorieCourante();
+      var hub = window.SupabaseHub;
+      var pListe = (this.catId && hub && typeof hub.listerObservablesFroid === 'function')
+        ? hub.listerObservablesFroid(this.catId, false).catch(function (e) { return { ok: false, error: String(e) }; })
+        : Promise.resolve({ ok: false, error: this.catId ? 'client' : 'categorie' });
+      var pRap = (hub && typeof hub.getRapportMatch === 'function')
+        ? hub.getRapportMatch(evtId).catch(function () { return { ok: false }; })
+        : Promise.resolve({ ok: false });
+      Promise.all([pListe, pRap]).then(function (res) {
+        if (self.evtId !== evtId) return;
+        self.liste = (res[0] && res[0].ok) ? res[0].data : null;
+        self.erreurListe = (res[0] && !res[0].ok) ? res[0].error : null;
+        var d = (res[1] && res[1].ok && res[1].data && res[1].data.donnees) ? res[1].data.donnees : null;
+        self.notes = (d && d.notes_froid && typeof d.notes_froid === 'object') ? Object.assign({}, d.notes_froid) : {};
+        self.remarqueConquete = (d && typeof d.remarque_conquete === 'string') ? d.remarque_conquete : '';
+        self.charge = true;
+        if (cb) cb();
+      });
+    }
+  };
+
+  // Enregistre une modification des notes du match dans rapports.donnees.
+  // patch(donnees) modifie l'objet en place. onOk / onErr optionnels.
+  function _enregistrerDonneesMatch(evtId, patch, onOk) {
+    var hub = window.SupabaseHub;
+    if (!hub || typeof hub.getRapportMatch !== 'function' || typeof hub.upsertRapportMatch !== 'function') {
+      window.alert('Enregistrement indisponible (client non chargé).');
+      return;
+    }
+    if (SuiviChrono.busy) return;
+    SuiviChrono.busy = true;
+    hub.getRapportMatch(evtId).then(function (res) {
+      if (!res || !res.ok) throw new Error((res && res.error) || 'lecture du rapport impossible');
+      var r = res.data || {};
+      var donnees = (r.donnees && typeof r.donnees === 'object') ? JSON.parse(JSON.stringify(r.donnees)) : {};
+      patch(donnees);
+      var bilan = (typeof r.bilan === 'string') ? r.bilan : null;   // renvoyé tel quel (sinon écrasé)
+      return hub.upsertRapportMatch(evtId, bilan, donnees);
+    }).then(function (res2) {
+      SuiviChrono.busy = false;
+      if (!res2 || !res2.ok) {
+        window.alert('Enregistrement impossible : ' + ((res2 && res2.error) || 'erreur inconnue'));
+        return;
+      }
+      var d = (res2.data && res2.data.donnees) ? res2.data.donnees : null;
+      if (d) {
+        SuiviFroid.notes = (d.notes_froid && typeof d.notes_froid === 'object') ? Object.assign({}, d.notes_froid) : {};
+        SuiviFroid.remarqueConquete = (typeof d.remarque_conquete === 'string') ? d.remarque_conquete : '';
+      }
+      if (typeof onOk === 'function') onOk();
+    }).catch(function (e) {
+      SuiviChrono.busy = false;
+      window.alert('Enregistrement impossible : ' + (e && e.message ? e.message : e));
+    });
+  }
+
+  var _STYLE_TEXTAREA = 'width:100%;min-height:140px;box-sizing:border-box;padding:10px;border-radius:8px;' +
+    'background:#14181c;color:#f6f3e8;border:1px solid #2a323a;font-size:14px;font-family:inherit;line-height:1.4';
+
+  // Peint la section « Observations (à froid) » dans #suivi-froid-host.
+  function _peindreFroid(evtId, perCourante) {
+    var host = document.getElementById('suivi-froid-host');
+    if (!host) return;
+    if (!SuiviFroid.estPour(evtId)) {
+      SuiviFroid.charger(evtId, function () { _peindreFroid(evtId, perCourante); });
+      return;
+    }
+    var h = '<details class="suivi-obsb"' + (SuiviFroid.ouvert ? ' open' : '') + '>';
+    h += '<summary class="suivi-obsb__summary">Observations (à froid)</summary>';
+    if (Array.isArray(SuiviFroid.liste)) {
+      if (!SuiviFroid.liste.length) {
+        h += '<div class="view-suivi__hint" style="text-align:left">Aucun observable pour cette catégorie.</div>';
+      }
+      h += '<div class="suivi-obsb__grid">';
+      SuiviFroid.liste.forEach(function (o) {
+        var aNote = !!(SuiviFroid.notes[o.id] && String(SuiviFroid.notes[o.id]).trim());
+        h += '<button type="button" class="suivi-obsb__btn" data-froid="' + escapeHtml(o.id) + '"' +
+             (aNote ? ' style="border-color:#1d9e75"' : '') + '>' + (aNote ? '✓ ' : '') + escapeHtml(o.libelle) + '</button>';
+      });
+      h += '</div>';
+      h += '<div style="margin-top:10px"><button type="button" class="suivi-chrono__btn" id="froid-gerer">⚙ Gérer la liste</button></div>';
+    } else {
+      // Repli legacy : Cat B du référentiel (attribution joueur).
+      var obsB = SuiviObs.observablesB(SuiviChrono.nomNous);
+      h += '<div class="view-suivi__hint" style="text-align:left">Liste par catégorie indisponible' +
+           (SuiviFroid.erreurListe === 'categorie' ? ' (catégorie du match non résolue)' : '') +
+           ' : anciens observables, à attribuer à un joueur.</div>';
+      h += '<div class="suivi-obsb__grid">';
+      obsB.forEach(function (o, idx) {
+        h += '<button type="button" class="suivi-obsb__btn" data-bidx="' + idx + '">' + escapeHtml(o.libelle) + '</button>';
+      });
+      h += '</div>';
+      host._obsB = obsB;
+    }
+    h += '</details>';
+    host.innerHTML = h;
+
+    var det = host.querySelector('details');
+    if (det) det.addEventListener('toggle', function () { SuiviFroid.ouvert = det.open; });
+    host.querySelectorAll('[data-froid]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var id = b.getAttribute('data-froid');
+        var o = (SuiviFroid.liste || []).filter(function (x) { return x.id === id; })[0];
+        if (o) _ouvrirNoteFroid(evtId, perCourante, o);
+      });
+    });
+    var gerer = document.getElementById('froid-gerer');
+    if (gerer) gerer.addEventListener('click', function () { _ouvrirGestionFroid(evtId, perCourante); });
+    host.querySelectorAll('[data-bidx]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var o = (host._obsB || [])[parseInt(b.getAttribute('data-bidx'), 10)];
+        if (!o) return;
+        _ouvrirAttribution(evtId, perCourante, {
+          uuid: _slugObsB(o.libelle), libelle_court: o.libelle, icone: '📝', points: 0, _categorieObs: 'B'
         });
+      });
+    });
+  }
+
+  // Formulaire de note générique (observable à froid ou remarque conquête).
+  function _ouvrirFormNote(titre, valeur, onEnregistrer, onRetour) {
+    var pal = document.getElementById('suivi-palette');
+    if (!pal) return;
+    var h = '<div class="suivi-attrib">';
+    h += '<div class="suivi-attrib__title">📝 ' + escapeHtml(titre) + '</div>';
+    h += '<textarea id="note-texte" style="' + _STYLE_TEXTAREA + '" maxlength="4000" placeholder="Ta remarque…">' +
+         escapeHtml(valeur || '') + '</textarea>';
+    h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">' +
+         '<button type="button" class="suivi-chrono__btn suivi-chrono__btn--primary" id="note-ok">Enregistrer</button>' +
+         (valeur ? '<button type="button" class="suivi-chrono__btn suivi-chrono__btn--danger" id="note-effacer">Effacer</button>' : '') +
+         '<button type="button" class="suivi-chrono__btn" id="note-retour">↩ Retour</button></div>';
+    h += '</div>';
+    pal.innerHTML = h;
+    if (pal.scrollIntoView) pal.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    var ta = document.getElementById('note-texte');
+    if (ta) ta.focus();
+    document.getElementById('note-retour').addEventListener('click', onRetour);
+    document.getElementById('note-ok').addEventListener('click', function () { onEnregistrer((ta.value || '').trim()); });
+    var eff = document.getElementById('note-effacer');
+    if (eff) eff.addEventListener('click', function () {
+      if (window.confirm('Effacer cette remarque ?')) onEnregistrer('');
+    });
+  }
+
+  function _ouvrirNoteFroid(evtId, perCourante, obs) {
+    var retour = function () { _peindrePalette(evtId, perCourante); };
+    _ouvrirFormNote(obs.libelle, SuiviFroid.notes[obs.id] || '', function (texte) {
+      _enregistrerDonneesMatch(evtId, function (d) {
+        if (!d.notes_froid || typeof d.notes_froid !== 'object') d.notes_froid = {};
+        if (texte) d.notes_froid[obs.id] = texte; else delete d.notes_froid[obs.id];
+      }, retour);
+    }, retour);
+  }
+
+  function _ouvrirRemarqueConquete(evtId, perCourante) {
+    var retour = function () { _peindrePalette(evtId, perCourante); };
+    var ouvrir = function () {
+      _ouvrirFormNote('Remarque générale — conquête', SuiviFroid.remarqueConquete || '', function (texte) {
+        _enregistrerDonneesMatch(evtId, function (d) {
+          if (texte) d.remarque_conquete = texte; else delete d.remarque_conquete;
+        }, retour);
+      }, retour);
+    };
+    if (SuiviFroid.estPour(evtId)) ouvrir(); else SuiviFroid.charger(evtId, ouvrir);
+  }
+
+  // « ⚙ Gérer la liste » — observables de la catégorie du match : renommer,
+  // monter / descendre, retirer / réactiver, ajouter. Jamais de suppression.
+  function _ouvrirGestionFroid(evtId, perCourante) {
+    var pal = document.getElementById('suivi-palette');
+    var hub = window.SupabaseHub;
+    if (!pal || !hub || typeof hub.listerObservablesFroid !== 'function') return;
+    var catId = SuiviFroid.catId || _categorieCourante();
+    if (!catId) { window.alert('Catégorie du match non résolue.'); return; }
+    var retour = function () {
+      SuiviFroid.charger(evtId, function () { _peindrePalette(evtId, perCourante); }, true);
+    };
+    pal.innerHTML = '<div class="suivi-attrib"><div class="view-suivi__hint">Chargement de la liste…</div></div>';
+    hub.listerObservablesFroid(catId, true).then(function (res) {
+      if (!res || !res.ok) {
+        pal.innerHTML = '<div class="suivi-attrib"><div class="view-suivi__hint">Liste indisponible : ' +
+          escapeHtml((res && res.error) || 'erreur') + '</div><button type="button" class="suivi-chrono__btn" id="gf-retour">↩ Retour</button></div>';
+        document.getElementById('gf-retour').addEventListener('click', retour);
+        return;
+      }
+      var liste = res.data.slice().sort(function (a, b) {
+        if (a.actif !== b.actif) return a.actif ? -1 : 1;
+        return (a.ordre - b.ordre) || String(a.libelle).localeCompare(String(b.libelle));
+      });
+      var actifs = liste.filter(function (o) { return o.actif; });
+      var h = '<div class="suivi-attrib">';
+      h += '<div class="suivi-attrib__title">⚙ Observables à froid — ' + escapeHtml(SuiviRegl.code() || 'catégorie du match') + '</div>';
+      h += '<div class="view-suivi__hint" style="text-align:left">La liste vaut pour toute la catégorie. Retirer ne supprime pas les notes déjà écrites.</div>';
+      liste.forEach(function (o) {
+        var iA = actifs.indexOf(o);
+        h += '<div class="suivi-palette__action" style="margin-top:8px' + (o.actif ? '' : ';opacity:.55') + '">' +
+               '<input type="text" maxlength="120" data-gf-lib="' + escapeHtml(o.id) + '" value="' + escapeHtml(o.libelle) + '" style="' + _STYLE_SELECT + ';flex:1;min-width:160px">' +
+               '<div class="suivi-palette__btns">' +
+                 (o.actif
+                   ? '<button type="button" class="suivi-palette__btn" data-gf-up="' + escapeHtml(o.id) + '"' + (iA <= 0 ? ' disabled' : '') + '>↑</button>' +
+                     '<button type="button" class="suivi-palette__btn" data-gf-down="' + escapeHtml(o.id) + '"' + (iA >= actifs.length - 1 ? ' disabled' : '') + '>↓</button>'
+                   : '') +
+                 '<button type="button" class="suivi-palette__btn" data-gf-save="' + escapeHtml(o.id) + '">Renommer</button>' +
+                 '<button type="button" class="suivi-palette__btn" data-gf-actif="' + escapeHtml(o.id) + '">' + (o.actif ? 'Retirer' : 'Réactiver') + '</button>' +
+               '</div>' +
+             '</div>';
+      });
+      h += '<div class="suivi-palette__action" style="margin-top:14px">' +
+             '<input type="text" maxlength="120" id="gf-nouveau" placeholder="Nouvel observable (ex. Circulation offensive)" style="' + _STYLE_SELECT + ';flex:1;min-width:160px">' +
+             '<div class="suivi-palette__btns"><button type="button" class="suivi-palette__btn suivi-palette__btn--nous" id="gf-ajouter">Ajouter</button></div>' +
+           '</div>';
+      h += '<div style="margin-top:12px"><button type="button" class="suivi-chrono__btn" id="gf-retour">↩ Retour</button></div>';
+      h += '</div>';
+      pal.innerHTML = h;
+
+      var parId = {};
+      liste.forEach(function (o) { parId[o.id] = o; });
+      function envoyer(o, champs) {
+        if (SuiviChrono.busy) return Promise.resolve(false);
+        SuiviChrono.busy = true;
+        return hub.enregistrerObservableFroid(Object.assign({ categorieId: catId }, champs)).then(function (r) {
+          SuiviChrono.busy = false;
+          if (!r || !r.ok) { window.alert('Modification refusée : ' + ((r && r.error) || 'erreur inconnue')); return false; }
+          return true;
+        });
+      }
+      var rafraichir = function (ok) { if (ok) _ouvrirGestionFroid(evtId, perCourante); };
+      document.getElementById('gf-retour').addEventListener('click', retour);
+      document.getElementById('gf-ajouter').addEventListener('click', function () {
+        var v = (document.getElementById('gf-nouveau').value || '').trim();
+        if (!v) { window.alert('Indique le libellé.'); return; }
+        envoyer(null, { libelle: v }).then(rafraichir);
+      });
+      pal.querySelectorAll('[data-gf-save]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var o = parId[b.getAttribute('data-gf-save')];
+          var inp = pal.querySelector('[data-gf-lib="' + o.id + '"]');
+          var v = (inp && inp.value || '').trim();
+          if (!v || v === o.libelle) return;
+          envoyer(o, { id: o.id, libelle: v }).then(rafraichir);
+        });
+      });
+      pal.querySelectorAll('[data-gf-actif]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var o = parId[b.getAttribute('data-gf-actif')];
+          envoyer(o, { id: o.id, libelle: o.libelle, actif: !o.actif }).then(rafraichir);
+        });
+      });
+      // Monter / descendre : échange des ordres avec le voisin actif (2 appels).
+      function echanger(o, sens) {
+        var i = actifs.indexOf(o), j = i + sens;
+        if (i < 0 || j < 0 || j >= actifs.length) return;
+        var v = actifs[j];
+        var oa = o.ordre, ob = v.ordre;
+        if (oa === ob) { ob = oa + sens; }   // ordres égaux : on les départage
+        envoyer(o, { id: o.id, libelle: o.libelle, ordre: ob }).then(function (ok) {
+          if (!ok) return;
+          envoyer(v, { id: v.id, libelle: v.libelle, ordre: oa }).then(function () { _ouvrirGestionFroid(evtId, perCourante); });
+        });
+      }
+      pal.querySelectorAll('[data-gf-up]').forEach(function (b) {
+        b.addEventListener('click', function () { echanger(parId[b.getAttribute('data-gf-up')], -1); });
+      });
+      pal.querySelectorAll('[data-gf-down]').forEach(function (b) {
+        b.addEventListener('click', function () { echanger(parId[b.getAttribute('data-gf-down')], 1); });
       });
     });
   }
