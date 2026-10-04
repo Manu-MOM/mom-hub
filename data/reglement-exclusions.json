@@ -1,0 +1,86 @@
+{
+  "_meta": {
+    "type": "referentiel",
+    "nom": "Règlement des exclusions par catégorie",
+    "version": "1.0",
+    "date_creation": "2026-10-04",
+    "chantier": "SUIVI-VEO (FAIT FOI gelé 04/10/2026, décision D4-A)",
+    "description": "Durées d'exclusion temporaire (carton blanc / jaune) et règles de cumul, par catégorie (clé = categories.code en base). Sert au Suivi coach : minute de retour proposée = minute de la sanction + durée, toujours modifiable (le règlement ajoute les arrêts de jeu, que le chrono ne connaît pas).",
+    "source": "FFR — Règles du jeu, Dispositions spécifiques F.F.R. saison 2025-2026 : Règle 3 §1 (tableau, note d) et §3.5 ; Règle 5 §3 ; Règle 9 §1.1, §1.2, §2, §2.3. https://api.www.ffr.fr/wp-content/uploads/2025/08/regles-du-jeu-dispositions-specifiques-ffr-saison-2025-2026-1.pdf",
+    "a_verifier": "Aucune version 2026-2027 des dispositions spécifiques trouvée en ligne au 04/10/2026 : valeurs 2025-2026 reprises telles quelles.",
+    "regle_de_remplissage": "AUCUNE valeur inventée. Une catégorie sans valeur sourcée a duree_*_min = null : le Hub affiche « durée non paramétrée » et laisse saisir la minute de retour à la main.",
+    "champs": {
+      "duree_blanc_min": "minutes minimum d'exclusion sur carton blanc (null = non paramétré)",
+      "duree_jaune_min": "minutes minimum d'exclusion sur carton jaune (null = non paramétré)",
+      "deux_jaunes_rouge": "true : un 2e jaune du même joueur dans le match vaut exclusion définitive",
+      "blanc_cumul_jaune": "false : le blanc ne se cumule ni avec un autre blanc ni avec un jaune (une récidive = nouveau blanc)",
+      "rouge_remplacable": "false : le joueur exclu définitivement n'est pas remplacé, l'équipe joue en infériorité",
+      "tous_inscrits_entrent": "true : tous les joueurs inscrits sur la feuille doivent entrer en jeu (alerte au rapport)"
+    }
+  },
+  "categories": {
+    "M16": {
+      "duree_blanc_min": 5,
+      "duree_jaune_min": 5,
+      "deux_jaunes_rouge": true,
+      "blanc_cumul_jaune": false,
+      "rouge_remplacable": false,
+      "tous_inscrits_entrent": true,
+      "source": "R5 §3-2 et R9 §1.1.1 / §1.2.1 (« moins de 16 ans » : 5 min minimum) ; R9 §1.2.3 ; R9 §2 ; R3 §3.5"
+    },
+    "M19": {
+      "duree_blanc_min": 5,
+      "duree_jaune_min": 5,
+      "deux_jaunes_rouge": true,
+      "blanc_cumul_jaune": false,
+      "rouge_remplacable": false,
+      "tous_inscrits_entrent": false,
+      "source": "R5 §3-2 et R9 §1.1.1 / §1.2.1 (« moins de 19 ans » : 5 min minimum) ; R9 §1.2.3 ; R9 §2"
+    },
+    "F18": {
+      "duree_blanc_min": 5,
+      "duree_jaune_min": 5,
+      "deux_jaunes_rouge": true,
+      "blanc_cumul_jaune": false,
+      "rouge_remplacable": false,
+      "tous_inscrits_entrent": false,
+      "source": "R5 §3-2 (« moins de 18 ans » féminines à XV : 5 min minimum) ; R9 §1.2.3 ; R9 §2. Jeu à X / XII (annexes 2-3) : 5 min également."
+    },
+    "SR-M": {
+      "duree_blanc_min": 10,
+      "duree_jaune_min": 10,
+      "deux_jaunes_rouge": true,
+      "blanc_cumul_jaune": false,
+      "rouge_remplacable": false,
+      "tous_inscrits_entrent": false,
+      "source": "R5 §3-1 et R9 §1.1.1 / §1.2.1 (plus de 18 ans à XV : 10 min minimum) ; R9 §1.2.3 ; R9 §2 (remplacement après 20 min = compétitions professionnelles uniquement). Jeu à X / XII (annexes 2-3) : 5 min."
+    },
+    "SR-F": {
+      "duree_blanc_min": 10,
+      "duree_jaune_min": 10,
+      "deux_jaunes_rouge": true,
+      "blanc_cumul_jaune": false,
+      "rouge_remplacable": false,
+      "tous_inscrits_entrent": false,
+      "source": "R5 §3-1 (plus de 18 ans à XV : 10 min minimum) ; carton blanc non applicable en Elite 1 et 2 Féminines (R3 note d / R9 §1.1). Jeu à X / XII (annexes 2-3) : 5 min."
+    },
+    "M14": {
+      "duree_blanc_min": null,
+      "duree_jaune_min": null,
+      "deux_jaunes_rouge": null,
+      "blanc_cumul_jaune": null,
+      "rouge_remplacable": null,
+      "tous_inscrits_entrent": null,
+      "source": "Non paramétré : relève du règlement Rugby éducatif / compétitions M14, non couvert par la source ci-dessus. Valeurs à fournir par Manu ou à sourcer."
+    },
+    "F15": {
+      "duree_blanc_min": null,
+      "duree_jaune_min": null,
+      "deux_jaunes_rouge": null,
+      "blanc_cumul_jaune": null,
+      "rouge_remplacable": null,
+      "tous_inscrits_entrent": null,
+      "source": "Non paramétré : valeurs à fournir ou à sourcer."
+    }
+  }
+}
