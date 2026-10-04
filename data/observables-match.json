@@ -2,10 +2,12 @@
   "_meta": {
     "type": "referentiel",
     "nom": "Observables match",
-    "version": "1.0",
+    "version": "1.2",
     "date_creation": "2026-05-08",
     "description": "Événements observables pendant un match. Catégorie A universelle + Catégorie B paramétrable par catégorie d'âge",
-    "asymetrie_sar_mom": "Interface détaillée pour SAR/MOM, simplifiée pour adversaire (+5/+2/+3/+3/-1)"
+    "asymetrie_sar_mom": "Interface détaillée pour SAR/MOM, simplifiée pour adversaire (+5/+2/+3/+3/-1)",
+    "date_mise_a_jour": "2026-10-04",
+    "changelog_1_2": "SUIVI-VEO (FAIT FOI gelé 04/10/2026). AJOUTS : carton blanc (discipline) ; nouvelles familles score_rate (tentatives ratées), conquete (touche/mêlée par issue, equipe_concernee = qui introduit), technique (retour d'exclusion, hors palette). jeu_collectif conservé en LEGACY (lecture des matchs passés, bénévole, Mode Vidéo) — retiré de la palette coach à partir de compositions-editor v3.72. Libellé long du jaune corrigé : durée selon la catégorie (data/reglement-exclusions.json)."
   },
   "categorie_A": {
     "score": [
@@ -56,15 +58,59 @@
         "reversible": true
       }
     ],
+    "score_rate": [
+      {
+        "uuid": "obs-A-transfo-ratee",
+        "libelle_court": "Transformation ratée",
+        "libelle_long": "Tentative de transformation manquée",
+        "type": "score_rate",
+        "points": 0,
+        "icone": "❌",
+        "couleur": "#4169E1",
+        "saisie_associee": [
+          "joueur"
+        ],
+        "reversible": true,
+        "tentative_de": "obs-A-transfo",
+        "filtre_aptitude": "apt-A-004"
+      },
+      {
+        "uuid": "obs-A-penalite-ratee",
+        "libelle_court": "Pénalité ratée",
+        "libelle_long": "Tentative de pénalité manquée",
+        "type": "score_rate",
+        "points": 0,
+        "icone": "❌",
+        "couleur": "#FF8C00",
+        "saisie_associee": [
+          "joueur"
+        ],
+        "reversible": true,
+        "tentative_de": "obs-A-penalite",
+        "filtre_aptitude": "apt-A-004"
+      }
+    ],
     "discipline": [
       {
         "uuid": "obs-A-jaune",
         "libelle_court": "Carton jaune",
-        "libelle_long": "Carton jaune (10 min d'exclusion)",
+        "libelle_long": "Carton jaune (exclusion temporaire, durée selon la catégorie)",
         "type": "discipline",
         "icone": "🟨",
         "couleur": "#FFD700",
         "saisie_associee": ["joueur", "motif_optionnel"],
+        "reversible": true
+      },
+      {
+        "uuid": "obs-A-blanc",
+        "libelle_court": "Carton blanc",
+        "libelle_long": "Carton blanc (exclusion temporaire, durée selon la catégorie)",
+        "type": "discipline",
+        "icone": "⬜",
+        "couleur": "#F5F5F5",
+        "saisie_associee": [
+          "joueur"
+        ],
         "reversible": true
       },
       {
@@ -110,34 +156,204 @@
         "reversible": true
       }
     ],
+    "conquete_note": "equipe_concernee = l'équipe qui LANCE / INTRODUIT (jamais de joueur). issue lue du point de vue de l'équipe qui introduit (gagnee/perdue/pas_droit) ; penalite/coup_franc : pour_nous indique le bénéficiaire, quel que soit le lanceur.",
+    "conquete": {
+      "touche": [
+        {
+          "uuid": "obs-A-touche-gagnee-propre",
+          "libelle_court": "Gagnée propre",
+          "libelle_long": "Touche — Gagnée propre",
+          "type": "conquete",
+          "phase": "touche",
+          "issue": "gagnee",
+          "reversible": true
+        },
+        {
+          "uuid": "obs-A-touche-gagnee-sale",
+          "libelle_court": "Gagnée sale",
+          "libelle_long": "Touche — Gagnée sale",
+          "type": "conquete",
+          "phase": "touche",
+          "issue": "gagnee",
+          "reversible": true
+        },
+        {
+          "uuid": "obs-A-touche-perdue",
+          "libelle_court": "Perdue / volée",
+          "libelle_long": "Touche — Perdue / volée",
+          "type": "conquete",
+          "phase": "touche",
+          "issue": "perdue",
+          "reversible": true
+        },
+        {
+          "uuid": "obs-A-touche-pen-pour",
+          "libelle_court": "Pénalité pour nous",
+          "libelle_long": "Touche — Pénalité pour nous",
+          "type": "conquete",
+          "phase": "touche",
+          "issue": "penalite",
+          "pour_nous": true,
+          "reversible": true
+        },
+        {
+          "uuid": "obs-A-touche-pen-contre",
+          "libelle_court": "Pénalité contre nous",
+          "libelle_long": "Touche — Pénalité contre nous",
+          "type": "conquete",
+          "phase": "touche",
+          "issue": "penalite",
+          "pour_nous": false,
+          "reversible": true
+        },
+        {
+          "uuid": "obs-A-touche-cf-pour",
+          "libelle_court": "Coup franc pour nous",
+          "libelle_long": "Touche — Coup franc pour nous",
+          "type": "conquete",
+          "phase": "touche",
+          "issue": "coup_franc",
+          "pour_nous": true,
+          "reversible": true
+        },
+        {
+          "uuid": "obs-A-touche-cf-contre",
+          "libelle_court": "Coup franc contre nous",
+          "libelle_long": "Touche — Coup franc contre nous",
+          "type": "conquete",
+          "phase": "touche",
+          "issue": "coup_franc",
+          "pour_nous": false,
+          "reversible": true
+        },
+        {
+          "uuid": "obs-A-touche-pas-droit",
+          "libelle_court": "Lancer pas droit",
+          "libelle_long": "Touche — Lancer pas droit",
+          "type": "conquete",
+          "phase": "touche",
+          "issue": "pas_droit",
+          "reversible": true
+        }
+      ],
+      "melee": [
+        {
+          "uuid": "obs-A-melee-gagnee-propre",
+          "libelle_court": "Gagnée propre",
+          "libelle_long": "Mêlée — Gagnée propre",
+          "type": "conquete",
+          "phase": "melee",
+          "issue": "gagnee",
+          "reversible": true
+        },
+        {
+          "uuid": "obs-A-melee-gagnee-sale",
+          "libelle_court": "Gagnée sale",
+          "libelle_long": "Mêlée — Gagnée sale",
+          "type": "conquete",
+          "phase": "melee",
+          "issue": "gagnee",
+          "reversible": true
+        },
+        {
+          "uuid": "obs-A-melee-perdue",
+          "libelle_court": "Perdue / volée",
+          "libelle_long": "Mêlée — Perdue / volée",
+          "type": "conquete",
+          "phase": "melee",
+          "issue": "perdue",
+          "reversible": true
+        },
+        {
+          "uuid": "obs-A-melee-pen-pour",
+          "libelle_court": "Pénalité pour nous",
+          "libelle_long": "Mêlée — Pénalité pour nous",
+          "type": "conquete",
+          "phase": "melee",
+          "issue": "penalite",
+          "pour_nous": true,
+          "reversible": true
+        },
+        {
+          "uuid": "obs-A-melee-pen-contre",
+          "libelle_court": "Pénalité contre nous",
+          "libelle_long": "Mêlée — Pénalité contre nous",
+          "type": "conquete",
+          "phase": "melee",
+          "issue": "penalite",
+          "pour_nous": false,
+          "reversible": true
+        },
+        {
+          "uuid": "obs-A-melee-cf-pour",
+          "libelle_court": "Coup franc pour nous",
+          "libelle_long": "Mêlée — Coup franc pour nous",
+          "type": "conquete",
+          "phase": "melee",
+          "issue": "coup_franc",
+          "pour_nous": true,
+          "reversible": true
+        },
+        {
+          "uuid": "obs-A-melee-cf-contre",
+          "libelle_court": "Coup franc contre nous",
+          "libelle_long": "Mêlée — Coup franc contre nous",
+          "type": "conquete",
+          "phase": "melee",
+          "issue": "coup_franc",
+          "pour_nous": false,
+          "reversible": true
+        }
+      ]
+    },
+    "jeu_collectif_legacy_note": "LEGACY depuis v1.2 : remplacé par 'conquete'. Conservé pour lire les matchs passés et les écrans bénévole / Mode Vidéo. Ne plus proposer en saisie coach.",
     "jeu_collectif": [
       {
         "uuid": "obs-A-melee-gagnee",
         "libelle_court": "Mêlée gagnée",
         "type": "jeu_collectif",
         "couleur": "#2E8B57",
-        "reversible": true
+        "reversible": true,
+        "legacy": true
       },
       {
         "uuid": "obs-A-melee-perdue",
         "libelle_court": "Mêlée perdue",
         "type": "jeu_collectif",
         "couleur": "#8B0000",
-        "reversible": true
+        "reversible": true,
+        "legacy": true
       },
       {
         "uuid": "obs-A-touche-gagnee",
         "libelle_court": "Touche gagnée",
         "type": "jeu_collectif",
         "couleur": "#2E8B57",
-        "reversible": true
+        "reversible": true,
+        "legacy": true
       },
       {
         "uuid": "obs-A-touche-perdue",
         "libelle_court": "Touche perdue",
         "type": "jeu_collectif",
         "couleur": "#8B0000",
-        "reversible": true
+        "reversible": true,
+        "legacy": true
+      }
+    ],
+    "technique": [
+      {
+        "uuid": "obs-A-retour-exclusion",
+        "libelle_court": "Retour d'exclusion",
+        "libelle_long": "Retour en jeu après exclusion temporaire (blanc / jaune)",
+        "type": "technique",
+        "icone": "↩",
+        "couleur": "#708090",
+        "saisie_associee": [
+          "joueur"
+        ],
+        "reversible": true,
+        "hors_palette": true
       }
     ]
   },
