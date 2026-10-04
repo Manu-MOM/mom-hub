@@ -6,6 +6,21 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.75 — Import FFR : contrôle bloquant + lecture tolérante (4 oct. 2026)
+ *   v3.75 : CORRECTIF INCIDENT RECETTE L6 (04/10, 13:5x). Sur un vrai collage
+ *           depuis le navigateur, seuls les 3 cartons ont été lus (faits
+ *           éclatés sur plusieurs lignes) et l'import a quand même annulé
+ *           les 13 faits officiels déjà saisis (restaurés en base le 04/10,
+ *           feu vert Manu). Corrections :
+ *           (1) CONTRÔLE BLOQUANT — import et annulation (D6-A) possibles
+ *               SEULEMENT si les points lus redonnent exactement le score
+ *               final FFR ; sinon bouton absent + garde dans l'exécution +
+ *               diagnostic du texte reçu (40 premières lignes).
+ *           (2) Lecture tolérante — recollage des faits éclatés : nom +
+ *               « (Type) » ou « Type » sur la ligne suivante, « (SORTANT) »
+ *               seul, score « 3 / Mi-temps / 9 » sur trois lignes ; espaces
+ *               insécables et tabulations normalisés.
+ *           (3) Sans séparateur « Mi-temps » : période déduite de la minute.
  * Version : 3.74 — Rapport enrichi + import de la feuille FFR (4 oct. 2026)
  *   v3.74 : SUIVI-VEO lots L5 et L6 (FAIT FOI Conception-SUIVI-VEO-v1).
  *           Requiert C14-b (temps de jeu), C14-c (source 'ffr') et
@@ -5631,10 +5646,37 @@
   function _cleJoueur(prenom, nom) { return (_normFfr(prenom).charAt(0) + ' ' + _normFfr(nom)).trim(); }
 
   function _lignesTexteFfr(texte) {
-    return String(texte || '').split(/\r?\n/).map(function (l) {
+    var brutes = String(texte || '').split(/\r?\n/).map(function (l) {
       return l.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')   // liens markdown éventuels
+              .replace(/[\u00a0\t]+/g, ' ')
               .replace(/^\s*[*•\-]\s*/, '').trim();
     }).filter(function (l) { return l.length > 0; });
+    return _fusionnerLignesFfr(brutes);
+  }
+
+  // v3.75 — un collage depuis le navigateur peut éclater un fait sur
+  // plusieurs lignes (bloc par élément HTML). On recolle :
+  //   « C. BEAUDOIN » + « (Pénalité) »      → « C. BEAUDOIN(Pénalité) »
+  //   « C. BEAUDOIN » + « Pénalité »        → « C. BEAUDOIN(Pénalité) »
+  //   « T. BOUVIER »  + « (M. BACOUEL) »    → « T. BOUVIER(M. BACOUEL) »
+  //   « 3 » + « Mi-temps » + « 9 »          → « 3Mi-temps9 » (idem Fin de match)
+  var _RE_TYPE_FFR = /^(essai de p[ée]nalit[ée]|essai|transformation|p[ée]nalit[ée]|drop)$/i;
+  function _estMinuteFfr(l) { return /^\d{1,3}\s*['’]$/.test(l); }
+  function _fusionnerLignesFfr(ls) {
+    var out = [];
+    for (var i = 0; i < ls.length; i++) {
+      var l = ls[i], prec = out.length ? out[out.length - 1] : null;
+      if (prec !== null && !_estMinuteFfr(prec) && /^\(.*\)$/.test(l)) { out[out.length - 1] = prec + l; continue; }
+      if (prec !== null && !_estMinuteFfr(prec) && _RE_TYPE_FFR.test(l) && !/\)$/.test(prec)) {
+        out[out.length - 1] = prec + '(' + l + ')'; continue;
+      }
+      if (/^(mi-temps|fin de match)$/i.test(l) && prec !== null && /^\d+$/.test(prec) &&
+          i + 1 < ls.length && /^\d+$/.test(ls[i + 1])) {
+        out[out.length - 1] = prec + l + ls[i + 1]; i++; continue;
+      }
+      out.push(l);
+    }
+    return out;
   }
 
   function _lireFaitFfr(l) {
@@ -5652,7 +5694,7 @@
   }
 
   function _parserResumeFfr(texte) {
-    var res = { faits: [], ignorees: [], scoreMT: null, scoreFin: null };
+    var res = { faits: [], ignorees: [], scoreMT: null, scoreFin: null, recues: _lignesTexteFfr(texte) };
     var periode = 1, minute = null;
     _lignesTexteFfr(texte).forEach(function (l) {
       var m;
@@ -5671,6 +5713,11 @@
       res.faits.push(f);
       minute = null;
     });
+    // v3.75 — séparateur « Mi-temps » introuvable : période déduite de la
+    // minute (durées du chrono) plutôt que tout en 1re période.
+    if (!res.scoreMT) {
+      res.faits.forEach(function (f) { f.periode = _periodeDeMinute(f.minute); });
+    }
     return res;
   }
 
@@ -5846,6 +5893,10 @@
       return o;
     }
     var sc = A.resume.scoreFin;
+    // v3.75 — CONTRÔLE BLOQUANT : l'import (et l'annulation des anciens
+    // faits) n'est possible que si les points lus redonnent EXACTEMENT le
+    // score final FFR. Sinon : diagnostic, aucun bouton d'import.
+    var controleOk = !!(sc && A.cote);
     var h = '<div class="suivi-attrib">';
     h += '<div class="suivi-attrib__title">📥 Aperçu de l\'import FFR</div>';
     h += '<div class="view-suivi__hint" style="text-align:left">' +
@@ -5854,7 +5905,15 @@
          (A.cote ? ('Nous jouions à <strong>' + (A.cote === 'domicile' ? 'domicile' : 'l\'extérieur') + '</strong> : contrôle OK.')
                  : '<strong>⚠ Les points ne correspondent pas au score FFR : vérifie l\'équipe de chaque fait.</strong>') +
          '</div>';
-    if (A.aRemplacer.length) {
+    if (!controleOk) {
+      h += '<div class="view-suivi__hint" style="text-align:left;color:#ffcf5a">⛔ <strong>Import bloqué</strong> : ' +
+           (sc ? 'les points reconnus ne redonnent pas le score FFR.' : 'le score final FFR (« 17Fin de match16 ») est introuvable dans le texte.') +
+           ' Rien ne sera modifié. Envoie le diagnostic ci-dessous pour adapter la lecture.</div>';
+      h += '<details open><summary class="view-suivi__hint" style="text-align:left;cursor:pointer">Diagnostic — texte reçu (' +
+           A.resume.recues.length + ' lignes)</summary><textarea readonly style="' + _STYLE_TEXTAREA + ';min-height:160px">' +
+           escapeHtml(A.resume.recues.slice(0, 40).join('\n')) + '</textarea></details>';
+    }
+    if (controleOk && A.aRemplacer.length) {
       h += '<div class="view-suivi__hint" style="text-align:left">' + A.aRemplacer.length +
            ' fait(s) officiel(s) déjà saisi(s) (points, cartons, remplacements) seront <strong>annulés</strong> et remplacés. ' +
            'Conquête, tentatives ratées, blessures, retours d\'exclusion et notes sont conservés.</div>';
@@ -5893,7 +5952,7 @@
     });
     h += '</tbody></table></div>';
     h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">' +
-         '<button type="button" class="suivi-chrono__btn suivi-chrono__btn--primary" id="ffr-importer">Importer</button>' +
+         (controleOk ? '<button type="button" class="suivi-chrono__btn suivi-chrono__btn--primary" id="ffr-importer">Importer</button>' : '') +
          '<button type="button" class="suivi-chrono__btn" id="ffr-retour2">↩ Retour</button></div>';
     h += '</div>';
     pal.innerHTML = h;
@@ -5914,12 +5973,17 @@
       c.addEventListener('change', function () { A.lignes[+c.getAttribute('data-ffr-on')].inclure = c.checked; });
     });
     document.getElementById('ffr-retour2').addEventListener('click', function () { _ouvrirImportFfr(evtId, perCourante); });
-    document.getElementById('ffr-importer').addEventListener('click', function () { _executerImportFfr(evtId, A); });
+    var bImp = document.getElementById('ffr-importer');
+    if (bImp) bImp.addEventListener('click', function () { _executerImportFfr(evtId, A); });
   }
 
   function _executerImportFfr(evtId, A) {
     var hub = window.SupabaseHub;
     if (!hub || !hub.insererObservableCoach || !hub.annulerObservableCoach) return;
+    if (!(A.resume.scoreFin && A.cote)) {   // v3.75 — garde-fou (double du bouton masqué)
+      window.alert('Import bloqué : les points lus ne correspondent pas au score FFR.');
+      return;
+    }
     var retenues = A.lignes.filter(function (L) { return L.inclure; });
     var manque = retenues.filter(function (L) { return !L.equipe; });
     if (manque.length) {
