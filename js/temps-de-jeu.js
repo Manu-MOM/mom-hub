@@ -84,6 +84,18 @@
  *   (l'accroche vit dans evenements.html, déjà coach-authentifié).
  *
  * Version : 1.0 — mai 2026 (conv Production, couloir Objet C).
+ * Version : 2.0 — 4 octobre 2026 (SUIVI-VEO lot L4, D3-A).
+ *   Le CALCUL client sur l'horodatage de saisie (sections CALCUL/RENDU
+ *   v1.0 ci-dessus) est REMPLACÉ par la lecture de la RPC
+ *   get_temps_de_jeu_rencontre (C14-b) : temps de jeu calculé côté base
+ *   sur la MINUTE DE MATCH (remplacements avec rentrées, rouge, exclusions
+ *   temporaires jusqu'au retour saisi), seule horloge fiable quand le
+ *   suivi est fait en différé sur la VEO. Plus de dépendance à
+ *   get_compo_reduite_rencontre_coach (absente en base, sonde 04/10 :
+ *   le panneau v1.0 affichait toujours « aucune composition ») : noms
+ *   via _resolveNoms (get_noms_personnes). Libellé d'incertitude conservé
+ *   (minute arrondie, temps additionnel non compté). API inchangée :
+ *   TempsDeJeu.monter(container, evenementUuid, opts).
  */
 (function (global) {
   'use strict';
@@ -183,109 +195,31 @@
   }
 
   // ============================================================
-  // CALCUL — dégradation honnête (voir en-tête)
+  // v2.0 — RENDU des lignes de la RPC C14-b (aucun calcul client)
   // ============================================================
-  function calculer(compo, chrono) {
-    // Lignes actives uniquement (annulées déjà exclues côté RPC ;
-    // re-filtre défensif).
-    var lignes = [];
-    for (var i = 0; i < chrono.length; i++) {
-      if (chrono[i] && chrono[i].annule === true) continue;
-      lignes.push(chrono[i]);
+  function nomDe(map, uuid) {
+    var e = (map && map.get) ? map.get(uuid) : null;
+    if (e) {
+      var lbl = ((e.prenom || '').trim() + ' ' + (e.nom || '').trim()).trim();
+      if (lbl) return lbl;
     }
-    // Tri horodatage ASC (déjà trié côté RPC ; défensif).
-    lignes.sort(function (a, b) {
-      return (ms(a.horodatage) || 0) - (ms(b.horodatage) || 0);
-    });
-
-    // Timeline : ancres = lignes LIVE uniquement (les lignes Mode
-    // Vidéo ont un horodatage de revue, pas de match).
-    var live = [];
-    for (var j = 0; j < lignes.length; j++) {
-      if (lignes[j].source_saisie === 'video') continue;
-      var t = ms(lignes[j].horodatage);
-      if (t != null) live.push(t);
-    }
-    var tDebut = live.length ? live[0] : null;
-    var tFin = live.length ? live[live.length - 1] : null;
-
-    // Sortie fiable par joueur (rouge / blessure), 1ʳᵉ occurrence.
-    // On accepte la ligne quelle que soit sa source ; mais si la
-    // ligne est vidéo (horodatage de revue), la durée n'est PAS
-    // chiffrable -> on marque la sortie sans nombre (honnête).
-    var sortie = {};   // joueur_uuid -> { t:ms|null, motif, chiffrable }
-    var nbSubs = 0, nbJaunes = 0, nbRouges = 0, nbBlessures = 0;
-    for (var k = 0; k < lignes.length; k++) {
-      var l = lignes[k];
-      if (l.observable_id === OBS_SUBSTITUTION) { nbSubs++; continue; }
-      if (l.observable_id === OBS_JAUNE) { nbJaunes++; continue; }
-      var motif = null;
-      if (l.observable_id === OBS_ROUGE) { motif = 'carton rouge'; nbRouges++; }
-      else if (l.observable_id === OBS_BLESSURE) { motif = 'blessure'; nbBlessures++; }
-      if (!motif) continue;
-      var ju = l.joueur_uuid;
-      if (!ju || sortie[ju]) continue;       // 1ʳᵉ sortie fiable
-      var estVideo = (l.source_saisie === 'video');
-      var tl = estVideo ? null : ms(l.horodatage);
-      sortie[ju] = { t: tl, motif: motif, chiffrable: (tl != null) };
-    }
-
-    // Estimation par joueur, à partir de la compo (effectif réel).
-    var titulaires = [], remplacants = [], reserves = [];
-    for (var c = 0; c < compo.length; c++) {
-      var p = compo[c];
-      var role = p.role || 'titulaire';
-      var ligneEst;
-      if (role === 'titulaire') {
-        var so = sortie[p.joueur_uuid];
-        if (so) {
-          if (so.chiffrable && tDebut != null && so.t != null && so.t >= tDebut) {
-            ligneEst = {
-              q: 'estime',
-              txt: '~' + minutes(so.t - tDebut) + ' min  ·  sorti (' + so.motif + ')'
-            };
-          } else {
-            ligneEst = {
-              q: 'indetermine',
-              txt: 'sorti (' + so.motif + ') · durée non chiffrable'
-            };
-          }
-        } else if (tDebut != null && tFin != null) {
-          ligneEst = { q: 'estime', txt: '~' + minutes(tFin - tDebut) + ' min' };
-        } else {
-          ligneEst = { q: 'indetermine', txt: 'durée indéterminée' };
-        }
-        titulaires.push({ p: p, est: ligneEst });
-      } else if (role === 'remplacant') {
-        // Entrée non reconstituable (subs mono-ligne, SUIVI-COACH-7).
-        remplacants.push({
-          p: p,
-          est: { q: 'indetermine', txt: 'entré en cours · durée indéterminée' }
-        });
-      } else {
-        // 'reserve' (ou inconnu, défensif)
-        reserves.push({
-          p: p,
-          est: { q: 'nonentre', txt: 'non entré' }
-        });
-      }
-    }
-
-    return {
-      titulaires: titulaires,
-      remplacants: remplacants,
-      reserves: reserves,
-      nbSubs: nbSubs,
-      nbJaunes: nbJaunes,
-      nbRouges: nbRouges,
-      nbBlessures: nbBlessures,
-      aLive: live.length > 0
-    };
+    return '#' + String(uuid || '').slice(0, 4);
   }
 
-  // ============================================================
-  // RENDU
-  // ============================================================
+  function itemDe(l, map) {
+    var p = { numero_maillot: l.out_numero_maillot, _nom: nomDe(map, l.out_joueur_id) };
+    var est;
+    if (!l.out_chrono_complet) {
+      est = { q: 'indetermine', txt: l.out_est_entre ? 'entré · durée indéterminée' : 'non entré' };
+    } else if (!l.out_est_entre) {
+      est = { q: 'nonentre', txt: 'non entré' };
+    } else {
+      est = { q: 'estime', txt: '~' + Math.round(Number(l.out_minutes_jeu) || 0) + ' min' };
+    }
+    return { p: p, est: est };
+  }
+
+  // Rangée / groupe (repris de v1.0 ; nom résolu passé dans p._nom).
   function rangee(item) {
     var li = doc.createElement('li');
     li.className = 'tdj-row';
@@ -295,7 +229,7 @@
       ? String(item.p.numero_maillot) : '—';
     var nom = doc.createElement('span');
     nom.className = 'tdj-nom';
-    nom.textContent = libelle(item.p);     // anti-injection
+    nom.textContent = item.p._nom || libelle(item.p);   // anti-injection
     var est = doc.createElement('span');
     est.className = 'tdj-est';
     est.setAttribute('data-q', item.est.q);
@@ -318,60 +252,38 @@
     corps.appendChild(ul);
   }
 
-  function rendre(corps, r) {
+  function rendre(corps, lignes, map) {
     corps.innerHTML = '';
-
-    // Libellé d'incertitude PERMANENT et CONSTITUTIF (C1-Q2 /
-    // S-5.4). Non refermable : c'est lui qui dit la fiabilité.
+    var complet = lignes.some(function (l) { return l.out_chrono_complet === true; });
     var note = doc.createElement('p');
     note.className = 'tdj-note';
     var strong = doc.createElement('strong');
-    strong.textContent = 'Estimation, pas une mesure. ';
+    strong.textContent = complet ? 'Calcul sur la minute de match. ' : 'Durées des périodes non configurées. ';
     note.appendChild(strong);
-    note.appendChild(doc.createTextNode(
-      'Calculée sur les actions saisies (heure de saisie, ≈ temps '
-      + 'réel : la mi-temps et les arrêts sont inclus, pas l\'horloge '
-      + 'de match). Les remplacements ne sont pas détaillés : seuls '
-      + 'les titulaires et les sorties sur carton rouge ou blessure '
-      + 'sont estimés ; les entrées de remplaçants ne sont pas '
-      + 'reconstituables. Indication de coup d\'œil, jamais une '
-      + 'donnée d\'autorité.'
-    ));
+    note.appendChild(doc.createTextNode(complet
+      ? 'Arrondi à la minute ; temps additionnel non compté ; exclusion temporaire déduite '
+        + 'seulement si son retour est saisi. Fiable si les remplacements et cartons sont '
+        + 'tous saisis (import FFR ou VEO).'
+      : 'Configure les durées dans l\'onglet Suivi de la feuille de match pour obtenir les minutes.'));
     corps.appendChild(note);
 
-    var aJoueurs = r.titulaires.length || r.remplacants.length
-      || r.reserves.length;
-    if (!aJoueurs) {
+    if (!lignes.length) {
       var vide = doc.createElement('p');
       vide.className = 'tdj-empty';
-      vide.textContent = 'Aucune composition disponible pour estimer '
-        + 'le temps de jeu.';
+      vide.textContent = 'Aucune composition de match active pour estimer le temps de jeu.';
       corps.appendChild(vide);
       return;
     }
-
-    groupe(corps, 'Titulaires', r.titulaires);
-    groupe(corps, 'Remplaçants', r.remplacants);
-    groupe(corps, 'Réserve', r.reserves);
-
-    // Événements non quantifiés, signalés honnêtement.
-    var ev = [];
-    if (r.nbSubs) ev.push(r.nbSubs + ' remplacement' + (r.nbSubs > 1 ? 's' : '')
-      + ' saisi' + (r.nbSubs > 1 ? 's' : '') + ' (non détaillé'
-      + (r.nbSubs > 1 ? 's' : '') + ')');
-    if (r.nbRouges) ev.push(r.nbRouges + ' carton' + (r.nbRouges > 1 ? 's' : '')
-      + ' rouge' + (r.nbRouges > 1 ? 's' : ''));
-    if (r.nbBlessures) ev.push(r.nbBlessures + ' blessure'
-      + (r.nbBlessures > 1 ? 's' : ''));
-    if (r.nbJaunes) ev.push(r.nbJaunes + ' carton' + (r.nbJaunes > 1 ? 's' : '')
-      + ' jaune' + (r.nbJaunes > 1 ? 's' : '')
-      + ' (exclusion temporaire, non décomptée)');
-    if (ev.length) {
-      var p = doc.createElement('p');
-      p.className = 'tdj-events';
-      p.textContent = 'Événements : ' + ev.join(' · ') + '.';
-      corps.appendChild(p);
-    }
+    var tit = [], rem = [], res = [];
+    lignes.forEach(function (l) {
+      var it = itemDe(l, map);
+      if (l.out_role === 'titulaire') tit.push(it);
+      else if (l.out_role === 'remplacant') rem.push(it);
+      else res.push(it);
+    });
+    groupe(corps, 'Titulaires', tit);
+    groupe(corps, 'Remplaçants', rem);
+    groupe(corps, 'Réserve', res);
   }
 
   function rendreErreur(corps, msg) {
@@ -400,7 +312,7 @@
 
     /**
      * Monte le panneau temps de jeu (replié) dans `container`.
-     * Lecture pure ; aucune écriture ; aucune RPC propre.
+     * Lecture pure ; aucune écriture. v2.0 : RPC get_temps_de_jeu_rencontre.
      *
      * @param {HTMLElement} container hôte (fourni par l'accroche)
      * @param {string} evenementUuid UUID de la rencontre
@@ -422,7 +334,7 @@
       det.className = 'tdj';
       var sum = doc.createElement('summary');
       var t = doc.createElement('span');
-      t.textContent = '⏱ Temps de jeu (estimation)';
+      t.textContent = '⏱ Temps de jeu';
       var chev = doc.createElement('span');
       chev.className = 'tdj-chev';
       chev.setAttribute('aria-hidden', 'true');
@@ -439,29 +351,31 @@
       det.appendChild(body);
       container.appendChild(det);
 
-      if (!global.SupabaseHub
-          || typeof global.SupabaseHub.getCompoReduiteRencontreCoach
-             !== 'function'
-          || typeof global.SupabaseHub.getChronologieRencontreCoach
-             !== 'function') {
+      var hub = global.SupabaseHub;
+      if (!hub
+          || typeof hub.getTempsDeJeuRencontre !== 'function'
+          || typeof hub.getChronologieRencontreCoach !== 'function') {
         rendreErreur(body, 'Temps de jeu indisponible (client non chargé).');
         return;
       }
 
       try {
-        var res = await Promise.all([
-          global.SupabaseHub.getCompoReduiteRencontreCoach(evenementUuid),
-          global.SupabaseHub.getChronologieRencontreCoach(evenementUuid)
-        ]);
-        var compo = Array.isArray(res[0]) ? res[0] : [];
-        var chrono = Array.isArray(res[1]) ? res[1] : [];
-
+        var chrono = await hub.getChronologieRencontreCoach(evenementUuid);
         // Pas commencé (chronologie vide) -> panneau retiré.
-        if (chrono.length === 0) {
+        if (!Array.isArray(chrono) || chrono.length === 0) {
           if (det.parentNode) det.parentNode.removeChild(det);
           return;
         }
-        rendre(body, calculer(compo, chrono));
+        var res = await hub.getTempsDeJeuRencontre(evenementUuid);
+        if (!res || !res.ok) {
+          rendreErreur(body, 'Temps de jeu indisponible : ' + ((res && res.error) || 'erreur'));
+          return;
+        }
+        var lignes = Array.isArray(res.data) ? res.data : [];
+        var map = (typeof hub._resolveNoms === 'function')
+          ? await hub._resolveNoms(lignes.map(function (l) { return l.out_joueur_id; }))
+          : new Map();
+        rendre(body, lignes, map);
       } catch (e) {
         console.error('MOM Hub: TempsDeJeu.monter()', e);
         rendreErreur(body,
@@ -473,7 +387,7 @@
   global.TempsDeJeu = TempsDeJeu;
 
   console.log(
-    '%c🏉 MOM Hub · Temps de jeu (C-1) v1.0 chargé',
+    '%c🏉 MOM Hub · Temps de jeu (C-1) v2.0 chargé',
     'color: #2D7D46; font-weight: bold;'
   );
 
