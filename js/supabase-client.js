@@ -18,6 +18,11 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 1.89 — 4 octobre 2026
+ *   v1.89 : avenant « Retour + niveaux » (N1-A). Wrapper ADDITIF →
+ *          RPC C15-b : niveauEvenementsStats(ids) → { ok, data: {evtId:
+ *          {equipe_id, equipe_code, equipe_libelle, championnat_nom,
+ *          numero_equipe}} } (équipe engagée de la feuille de match).
  * Version : 1.88 — 4 octobre 2026
  *   v1.88 : avenant « Stats de saison » (S1-A…S5-A). 3 wrappers ADDITIFS →
  *          RPC C15-a : listerDebutStats(saisonId?) ;
@@ -7525,6 +7530,25 @@
       }
       const map = {};
       (Array.isArray(data) ? data : []).forEach(function (m) { if (m && m.evenement_id) map[m.evenement_id] = m; });
+      return { ok: true, data: map };
+    },
+
+    /**
+     * v1.89 — Stats de saison (C15-b). Niveau de chaque match = équipe
+     * engagée côté MOM de sa feuille de match (Nationale / Régionale…).
+     * @param {string[]} ids
+     * @returns {Promise<{ok:boolean, data?:Object, error?:string}>} data = {evtId: niveau}
+     */
+    async niveauEvenementsStats(ids) {
+      const uniques = Array.from(new Set((ids || []).filter(Boolean)));
+      if (!uniques.length) return { ok: true, data: {} };
+      const { data, error } = await client.rpc('niveau_evenements_stats', { p_ids: uniques });
+      if (error) {
+        console.error('MOM Hub: niveauEvenementsStats()', error);
+        return { ok: false, error: error.message || 'Erreur niveau_evenements_stats' };
+      }
+      const map = {};
+      (Array.isArray(data) ? data : []).forEach(function (n) { if (n && n.evenement_id) map[n.evenement_id] = n; });
       return { ok: true, data: map };
     },
 
