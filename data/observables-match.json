@@ -2,12 +2,13 @@
   "_meta": {
     "type": "referentiel",
     "nom": "Observables match",
-    "version": "1.2",
+    "version": "1.2.1",
     "date_creation": "2026-05-08",
     "description": "Événements observables pendant un match. Catégorie A universelle + Catégorie B paramétrable par catégorie d'âge",
     "asymetrie_sar_mom": "Interface détaillée pour SAR/MOM, simplifiée pour adversaire (+5/+2/+3/+3/-1)",
     "date_mise_a_jour": "2026-10-04",
-    "changelog_1_2": "SUIVI-VEO (FAIT FOI gelé 04/10/2026). AJOUTS : carton blanc (discipline) ; nouvelles familles score_rate (tentatives ratées), conquete (touche/mêlée par issue, equipe_concernee = qui introduit), technique (retour d'exclusion, hors palette). jeu_collectif conservé en LEGACY (lecture des matchs passés, bénévole, Mode Vidéo) — retiré de la palette coach à partir de compositions-editor v3.72. Libellé long du jaune corrigé : durée selon la catégorie (data/reglement-exclusions.json)."
+    "changelog_1_2": "SUIVI-VEO (FAIT FOI gelé 04/10/2026). AJOUTS : carton blanc (discipline) ; nouvelles familles score_rate (tentatives ratées), conquete (touche/mêlée par issue, equipe_concernee = qui introduit), technique (retour d'exclusion, hors palette). jeu_collectif conservé en LEGACY (lecture des matchs passés, bénévole, Mode Vidéo) — retiré de la palette coach à partir de compositions-editor v3.72. Libellé long du jaune corrigé : durée selon la catégorie (data/reglement-exclusions.json).",
+    "changelog_1_2_1": "Correctif : les issues conquête « Perdue / volée » prennent les identifiants obs-A-touche-volee et obs-A-melee-volee (en v1.2 elles réutilisaient obs-A-touche-perdue / obs-A-melee-perdue, déjà portés par le jeu collectif legacy). Aucune ligne enregistrée avec ces issues (la palette coach ne les propose qu'à partir de compositions-editor v3.72)."
   },
   "categorie_A": {
     "score": [
@@ -178,7 +179,7 @@
           "reversible": true
         },
         {
-          "uuid": "obs-A-touche-perdue",
+          "uuid": "obs-A-touche-volee",
           "libelle_court": "Perdue / volée",
           "libelle_long": "Touche — Perdue / volée",
           "type": "conquete",
@@ -256,7 +257,7 @@
           "reversible": true
         },
         {
-          "uuid": "obs-A-melee-perdue",
+          "uuid": "obs-A-melee-volee",
           "libelle_court": "Perdue / volée",
           "libelle_long": "Mêlée — Perdue / volée",
           "type": "conquete",
