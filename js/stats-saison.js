@@ -5,6 +5,11 @@
  *   - Objet 1 : Fiche stats joueur (restitution famille, un joueur)
  *   - Objet 2 : Vue pilotage (équipe en haut + effectif en lignes triables)
  *
+ * Version : 1.3 — 4 oct. 2026. SUIVI-VEO lot L4 : mêlées / touches de la
+ *           conquête v1.2 (lanceur + issue) ramenées aux compteurs gagnée /
+ *           perdue de notre point de vue (_conqueteNous) ; identifiants
+ *           historiques inchangés. Temps de jeu : la RPC (C14-b) calcule
+ *           désormais sur la minute de match — aucun changement ici.
  * Version : 1.2 — pt 65. EXTENSION STATS du pilotage catégorie : bloc « Niveau
  *           équipe » (1 carte/équipe via agregerEquipe par lots d'evt disjoints —
  *           V/N/D, points, essais, mêlées/touches, cartons + note matchs
@@ -63,6 +68,21 @@
   var OBS_MELEE_P = 'obs-A-melee-perdue';
   var OBS_TOUCHE_G = 'obs-A-touche-gagnee';
   var OBS_TOUCHE_P = 'obs-A-touche-perdue';
+
+  // v1.3 (SUIVI-VEO L4) — conquête v1.2 (data/observables-match.json) :
+  // equipe_concernee = qui lance / introduit ; issue lue du côté du lanceur.
+  // Ramenée aux compteurs historiques « gagnée / perdue » DE NOTRE POINT DE
+  // VUE : ballon pour nous = (notre lancer & gagnée) ou (lancer adverse &
+  // volée) ; ballon pour eux = (notre lancer & volée) ou (lancer adverse &
+  // gagnée). Pénalités, coups francs, lancers pas droits : non comptés ici.
+  function _conqueteNous(l) {
+    var m = /^obs-A-(touche|melee)-(gagnee-propre|gagnee-sale|volee)$/.exec(l.observable_id || '');
+    if (!m) return null;
+    var phase = m[1];
+    var gagneeParLanceur = (m[2] !== 'volee');
+    var notreLancer = (l.equipe_concernee !== 'adverse');
+    return { phase: phase, pourNous: (gagneeParLanceur === notreLancer) };
+  }
 
   // ---- Utilitaires ----
   function _hub() {
@@ -278,7 +298,11 @@
           if (pts) { if (advLigne) adv += pts; else mom += pts; }
           if (oid === OBS_ESSAI) { if (advLigne) base.essaisAdv += 1; else base.essaisNous += 1; }
           if (!advLigne && _estCarton(oid)) base.cartons += 1;
-          if (!advLigne) {
+          var cq = _conqueteNous(l);
+          if (cq) {
+            if (cq.phase === 'melee') { if (cq.pourNous) base.meleeG += 1; else base.meleeP += 1; }
+            else { if (cq.pourNous) base.toucheG += 1; else base.toucheP += 1; }
+          } else if (!advLigne) {
             if (oid === OBS_MELEE_G) base.meleeG += 1;
             else if (oid === OBS_MELEE_P) base.meleeP += 1;
             else if (oid === OBS_TOUCHE_G) base.toucheG += 1;
