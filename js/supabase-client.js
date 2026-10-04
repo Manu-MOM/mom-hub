@@ -18,6 +18,10 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 1.86 — 4 octobre 2026
+ *   v1.86 : SUIVI-VEO lots L4 et L6. Wrapper ADDITIF marquerSourceFfr(evt,
+ *          ids) → marquer_source_observables_coach (C14-c). Doc de
+ *          getTempsDeJeuRencontre mise à jour (C14-b : minute de match).
  * Version : 1.85 — 4 octobre 2026
  *   v1.85 : SUIVI-VEO lot L3 (FAIT FOI Conception-SUIVI-VEO-v1, gelé
  *          04/10/2026, D1-A). 2 wrappers ADDITIFS → RPC C14-a :
@@ -6657,13 +6661,16 @@
      * LECTURE — Temps de jeu par joueur d'un match (coach authentifié).
      * RPC get_temps_de_jeu_rencontre (C12-w, chantier SUIVI-COACH-7).
      *
-     * Calcul backend = intersection [présence joueur] × [fenêtres de
-     * période archivées C12-v] ; n'utilise JAMAIS minute_match (non
-     * fiable, pt 53). Le front N'A AUCUN calcul à refaire : il affiche
-     * tel quel out_minutes_jeu (ou l'absence si chrono incomplet).
+     * v1.86 (C14-b, SUIVI-VEO L4) : calcul backend sur la MINUTE DE MATCH
+     * (minute_match cumulée) et les durées de périodes du chrono —
+     * remplacements avec rentrées, rouge, exclusions temporaires jusqu'au
+     * retour saisi. (C12-w, horodatage × fenêtres archivées, est remplacé ;
+     * la doctrine pt 53 est levée par décision D3-A.) Le front N'A AUCUN
+     * calcul à refaire : il affiche tel quel out_minutes_jeu.
      *
-     * DÉGRADATION HONNÊTE : si le chrono n'a pas été lancé/clôturé sur
-     * ce match, chaque ligne a chrono_complet=false et minutes_jeu=null.
+     * DÉGRADATION HONNÊTE : si les durées des périodes ne sont pas
+     * configurées pour ce match, chaque ligne a chrono_complet=false et
+     * minutes_jeu=null.
      * L'écran doit afficher « temps de jeu indisponible » dans ce cas,
      * JAMAIS un 0 ni une minute fabriquée (cohérent rapports pt 53).
      *
@@ -7413,6 +7420,29 @@
       }
       const r = Array.isArray(data) ? (data[0] || null) : data;
       return { ok: true, data: r ? _mapRapport(r) : null };
+    },
+
+    /**
+     * v1.86 — SUIVI-VEO L6 (C14-c). Marque comme importées de la FFR
+     * (source_saisie='ffr') des lignes de chronologie que CE compte vient
+     * d'insérer pour ce match. RPC marquer_source_observables_coach.
+     * @param {string}   evenementUuid  le MATCH
+     * @param {string[]} ids            ids renvoyés par insererObservableCoach
+     * @returns {Promise<{ok:boolean, data?:number, error?:string}>} data = nb de lignes marquées
+     */
+    async marquerSourceFfr(evenementUuid, ids) {
+      if (!evenementUuid) return { ok: false, error: 'evenementUuid manquant' };
+      if (!Array.isArray(ids) || ids.length === 0) return { ok: true, data: 0 };
+      const { data, error } = await client.rpc('marquer_source_observables_coach', {
+        p_evenement_uuid: evenementUuid,
+        p_ids: ids,
+        p_source: 'ffr'
+      });
+      if (error) {
+        console.error('MOM Hub: marquerSourceFfr()', error);
+        return { ok: false, error: error.message || 'Erreur marquer_source_observables_coach' };
+      }
+      return { ok: true, data: (typeof data === 'number') ? data : 0 };
     },
 
     /**
