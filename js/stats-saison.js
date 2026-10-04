@@ -5,6 +5,15 @@
  *   - Objet 1 : Fiche stats joueur (restitution famille, un joueur)
  *   - Objet 2 : Vue pilotage (équipe en haut + effectif en lignes triables)
  *
+ * Version : 1.5 — 4 oct. 2026. Avenant « Retour + niveaux » (R1-A, N1-A…N4-A
+ *           de Manu, 04/10 20:52 ; requiert C15-b et supabase-client v1.89) :
+ *           niveau d'un match = équipe engagée de sa feuille (M16 - Nat /
+ *           M16 - Reg). Fiche joueur : une colonne par niveau ; total pour
+ *           la PARTICIPATION seulement (matchs, minutes) — les performances
+ *           (points, essais, réussite au pied, cartons, fautes, en-avant) ne
+ *           s'additionnent jamais d'un niveau à l'autre ; détail par match
+ *           étiqueté. Pilotage catégorie : temps de jeu et points par équipe
+ *           dans la colonne « Détail par équipe ».
  * Version : 1.4 — 4 oct. 2026. Avenant « Stats de saison » (S1-A…S5-A de
  *           Manu, 04/10 20:26 ; requiert C15-a et supabase-client v1.88) :
  *           (S1/S2) seuls comptent les matchs de la saison active datés à
@@ -174,6 +183,18 @@
     _chronoCache[evt] = p;
     return p;
   }
+  // v1.5 — niveau (équipe engagée) de chaque match, en cache.
+  var _niveauCache = {};
+  function chargerNiveaux(ids) {
+    var hub = _hub();
+    var manquants = (ids || []).filter(function (id) { return id && !_niveauCache[id]; });
+    if (!hub || typeof hub.niveauEvenementsStats !== 'function' || !manquants.length) return Promise.resolve(_niveauCache);
+    return Promise.resolve(hub.niveauEvenementsStats(manquants)).then(function (res) {
+      if (res && res.ok) Object.keys(res.data || {}).forEach(function (k) { _niveauCache[k] = res.data[k]; });
+      return _niveauCache;
+    }).catch(function () { return _niveauCache; });
+  }
+
   // « 2026-10-03 » → « 3 oct. 2026 ».
   function fmtDate(iso) {
     var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
@@ -573,12 +594,43 @@
 
         return Promise.all([
           agregerTempsDeJeu(agg.evenements),
-          Promise.all(agg.evenements.map(chargerChrono))
+          Promise.all(agg.evenements.map(chargerChrono)),
+          chargerNiveaux(agg.evenements)
         ]).then(function (rr) {
-          var tdj = rr[0], chronos = rr[1];
+          var tdj = rr[0], chronos = rr[1], niveaux = rr[2] || {};
           var recT = tdj.parJoueur[joueurId] || null;
-          var faits = _faitsJoueur(joueurId, agg.evenements, chronos);
-          var suivis = agg.evenements.filter(function (e, i) { return (chronos[i] || []).length > 0; });
+
+          // v1.5 (N3) — regroupement par niveau (équipe engagée), ordonné
+          // par numéro d'équipe (1 = Nationale, 2 = Régionale…).
+          var NIV = {}, ordre = [];
+          function niv(evt) {
+            var n = niveaux[evt] || {};
+            var k = n.equipe_id || '_';
+            if (!NIV[k]) {
+              NIV[k] = { lib: n.equipe_libelle || 'Niveau non déterminé', num: (typeof n.numero_equipe === 'number' ? n.numero_equipe : 99),
+                         evts: [], chronos: [], matchs: 0, tit: 0, rempl: 0 };
+              ordre.push(k);
+            }
+            return NIV[k];
+          }
+          agg.evenements.forEach(function (evt, i) { var N = niv(evt); N.evts.push(evt); N.chronos.push(chronos[i]); });
+          lignes.forEach(function (l) {
+            var N = niv((l.compositions || {}).evenement_id);
+            N.matchs += 1;
+            if (l.role === 'titulaire') N.tit += 1; else if (l.role === 'remplacant') N.rempl += 1;
+          });
+          ordre.sort(function (x, y) { return NIV[x].num - NIV[y].num; });
+          var cols = ordre.map(function (k) {
+            var N = NIV[k];
+            N.faits = _faitsJoueur(joueurId, N.evts, N.chronos);
+            N.suivis = N.chronos.filter(function (c) { return (c || []).length > 0; }).length;
+            N.min = 0; N.nbMin = 0;
+            N.evts.forEach(function (evt) {
+              if (recT && recT.parEvt && typeof recT.parEvt[evt] === 'number') { N.min += recT.parEvt[evt]; N.nbMin += 1; }
+            });
+            return N;
+          });
+          var faitsTous = _faitsJoueur(joueurId, agg.evenements, chronos);
 
           // §2 Postes occupés (ordonnés par numero_xv)
           var postesIds = Object.keys(rec.postes).sort(function (a, b) { return numeroXvPoste(a) - numeroXvPoste(b); });
@@ -588,20 +640,16 @@
               }).join('') + '</ul>' + (rec.depannage ? '<p class="ss-flag">⚠️ A dépanné hors catégorie sur la saison.</p>' : '')
             : '<p class="ss-attente">Aucune apparition en feuille de match sur la période.</p>';
 
-          // §3 Matchs en compo
-          var matchsHtml = '<p><strong>' + rec.matchs + '</strong> match' + (rec.matchs > 1 ? 's' : '') + ' en compo · ' +
-            rec.titulaire + ' titulaire' + (rec.titulaire > 1 ? 's' : '') + ' / ' +
-            rec.remplacant + ' remplaçant' + (rec.remplacant > 1 ? 's' : '') + '</p>' +
-            (nbExclus > 0 ? '<p class="ss-attente">' + nbExclus + ' feuille' + (nbExclus > 1 ? 's' : '') +
+          var notes = (nbExclus > 0 ? '<p class="ss-attente">' + nbExclus + ' feuille' + (nbExclus > 1 ? 's' : '') +
               ' de match hors période (saison précédente ou avant la date de départ) non comptée' + (nbExclus > 1 ? 's' : '') + '.</p>' : '') +
             (F.filtre ? '' : '<p class="ss-flag">⚠️ Filtre de période indisponible : toutes les feuilles sont comptées.</p>');
 
           body.innerHTML =
             _bloc('Postes occupés', postesHtml) +
-            _bloc('Matchs en compo', matchsHtml) +
-            _sectionTempsJeu(recT) +
-            _sectionFaits(faits, suivis.length) +
-            _sectionDetailMatchs(agg.evenements, F.meta, chronos, faits, recT) +
+            (cols.length
+              ? _sectionParticipation(cols, notes) + _sectionFaitsNiveaux(cols)
+              : _bloc('Matchs en compo', '<p><strong>0</strong> match en compo sur la période.</p>' + notes)) +
+            _sectionDetailMatchs(agg.evenements, F.meta, chronos, faitsTous, recT, niveaux) +
             _sectionAssiduite();
         });
       });
@@ -611,46 +659,67 @@
     });
   }
 
-  function _sectionTempsJeu(recT) {
-    var corps;
-    if (recT && recT.chronoComplets > 0) {
-      var moy = Math.round(recT.minutes / recT.chronoComplets);
-      corps = '<p><strong>' + recT.minutes + ' min</strong> sur ' + recT.chronoComplets + ' match' + (recT.chronoComplets > 1 ? 's' : '') +
-        ' suivi' + (recT.chronoComplets > 1 ? 's' : '') + (recT.chronoComplets > 1 ? ' · moyenne ' + moy + ' min par match' : '') + '.</p>';
-    } else {
-      corps = '<p class="ss-attente">Aucun match suivi sur la période. Le temps de jeu apparaîtra dès qu\'un match sera saisi (suivi, VEO ou import FFR).</p>';
-    }
-    return _bloc('Temps de jeu', corps);
+  // v1.5 (N3) — tableau « niveau en colonnes ». Total : participation seule.
+  function _tableNiveaux(cols, lignes, total) {
+    var h = '<table class="ss-table"><thead><tr><th></th>' +
+      cols.map(function (N) { return '<th class="ss-num">' + escapeHtml(N.lib) + '</th>'; }).join('') +
+      (total ? '<th class="ss-num">Total</th>' : '') + '</tr></thead><tbody>';
+    lignes.forEach(function (L) {
+      h += '<tr><td>' + escapeHtml(L.lib) + '</td>' +
+        cols.map(function (N) { return '<td class="ss-num">' + L.val(N) + '</td>'; }).join('') +
+        (total ? '<td class="ss-num"><strong>' + (L.total ? L.total() : '') + '</strong></td>' : '') + '</tr>';
+    });
+    return h + '</tbody></table>';
   }
-  // v1.4 (S3) — faits de jeu alimentés par le suivi.
-  function _sectionFaits(f, nbSuivis) {
-    if (!f || !nbSuivis) {
+  function _sectionParticipation(cols, notes) {
+    var plusieurs = cols.length > 1;
+    function somme(f) { return cols.reduce(function (a, N) { return a + f(N); }, 0); }
+    function fmtMin(m, n) { return n ? (m + ' min') : '—'; }
+    var lignes = [
+      { lib: 'Matchs en compo', val: function (N) { return N.matchs; }, total: function () { return somme(function (N) { return N.matchs; }); } },
+      { lib: 'Titulaire / remplaçant', val: function (N) { return N.tit + ' / ' + N.rempl; },
+        total: function () { return somme(function (N) { return N.tit; }) + ' / ' + somme(function (N) { return N.rempl; }); } },
+      { lib: 'Matchs suivis', val: function (N) { return N.suivis; }, total: function () { return somme(function (N) { return N.suivis; }); } },
+      { lib: 'Temps de jeu', val: function (N) { return fmtMin(N.min, N.nbMin); },
+        total: function () { return fmtMin(somme(function (N) { return N.min; }), somme(function (N) { return N.nbMin; })); } },
+      { lib: 'Moyenne par match suivi', val: function (N) { return N.nbMin ? (Math.round(N.min / N.nbMin) + ' min') : '—'; },
+        total: function () { var n = somme(function (N) { return N.nbMin; }); return n ? (Math.round(somme(function (N) { return N.min; }) / n) + ' min') : '—'; } }
+    ];
+    return _bloc('Matchs et temps de jeu', _tableNiveaux(cols, lignes, plusieurs) +
+      '<p class="ss-attente">Temps de jeu compté sur les seuls matchs suivis (saisie, VEO ou import FFR).</p>' + notes);
+  }
+  // v1.5 (N3) — performances par niveau, JAMAIS additionnées.
+  function _sectionFaitsNiveaux(cols) {
+    var suivis = cols.reduce(function (a, N) { return a + N.suivis; }, 0);
+    if (!suivis) {
       return _bloc('Faits de jeu',
         '<p class="ss-attente">Aucun match suivi sur la période : les faits de jeu apparaîtront dès qu\'un match sera saisi.</p>');
     }
-    var li = [];
-    li.push('<li><strong>' + f.pts + '</strong> point' + (f.pts > 1 ? 's' : '') + ' marqué' + (f.pts > 1 ? 's' : '') + '</li>');
-    if (f.essais) li.push('<li>Essais : <strong>' + f.essais + '</strong></li>');
-    if (f.transfo[1]) li.push('<li>Transformations : <strong>' + f.transfo[0] + ' / ' + f.transfo[1] + '</strong> (' + Math.round(100 * f.transfo[0] / f.transfo[1]) + ' %)</li>');
-    if (f.penalite[1]) li.push('<li>Pénalités : <strong>' + f.penalite[0] + ' / ' + f.penalite[1] + '</strong> (' + Math.round(100 * f.penalite[0] / f.penalite[1]) + ' %)</li>');
-    if (f.drops) li.push('<li>Drops : <strong>' + f.drops + '</strong></li>');
-    var disc = [];
-    if (f.blanc) disc.push(f.blanc + ' blanc' + (f.blanc > 1 ? 's' : ''));
-    if (f.jaune) disc.push(f.jaune + ' jaune' + (f.jaune > 1 ? 's' : ''));
-    if (f.rouge) disc.push(f.rouge + ' rouge' + (f.rouge > 1 ? 's' : ''));
-    li.push('<li>Cartons : <strong>' + (disc.length ? disc.join(', ') : 'aucun') + '</strong></li>');
-    li.push('<li>Fautes : <strong>' + f.fautes + '</strong> · En-avant : <strong>' + f.enAvant + '</strong> · Passes en avant : <strong>' + f.passeAvant + '</strong></li>');
-    return _bloc('Faits de jeu',
-      '<ul class="ss-list">' + li.join('') + '</ul>' +
-      '<p class="ss-attente">Sur ' + nbSuivis + ' match' + (nbSuivis > 1 ? 's' : '') + ' suivi' + (nbSuivis > 1 ? 's' : '') +
-      '. Seuls les faits attribués au joueur sont comptés (une faute saisie « équipe » ne l\'est pas).</p>');
+    function ratio(t) { return t[1] ? (t[0] + ' / ' + t[1] + ' (' + Math.round(100 * t[0] / t[1]) + ' %)') : '—'; }
+    function si(N, v) { return N.suivis ? v : '—'; }
+    var lignes = [
+      { lib: 'Points', val: function (N) { return si(N, N.faits.pts); } },
+      { lib: 'Essais', val: function (N) { return si(N, N.faits.essais); } },
+      { lib: 'Transformations', val: function (N) { return si(N, ratio(N.faits.transfo)); } },
+      { lib: 'Pénalités', val: function (N) { return si(N, ratio(N.faits.penalite)); } },
+      { lib: 'Drops', val: function (N) { return si(N, N.faits.drops); } },
+      { lib: 'Cartons (blanc / jaune / rouge)', val: function (N) { return si(N, N.faits.blanc + ' / ' + N.faits.jaune + ' / ' + N.faits.rouge); } },
+      { lib: 'Fautes', val: function (N) { return si(N, N.faits.fautes); } },
+      { lib: 'En-avant', val: function (N) { return si(N, N.faits.enAvant); } },
+      { lib: 'Passes en avant', val: function (N) { return si(N, N.faits.passeAvant); } }
+    ];
+    return _bloc('Faits de jeu', _tableNiveaux(cols, lignes, false) +
+      '<p class="ss-attente">' + (cols.length > 1 ? 'Les performances ne s\'additionnent pas d\'un niveau à l\'autre. ' : '') +
+      'Seuls les faits attribués au joueur sont comptés (une faute saisie « équipe » ne l\'est pas).</p>');
   }
-  // v1.4 (S3) — une ligne par match retenu (date, match, minutes, points).
-  function _sectionDetailMatchs(evenements, meta, chronos, f, recT) {
+  // v1.4 (S3) / v1.5 — une ligne par match retenu, étiquetée par niveau.
+  function _sectionDetailMatchs(evenements, meta, chronos, f, recT, niveaux) {
     if (!evenements.length) return '';
     var rows = evenements.map(function (evt, i) {
       var m = meta[evt] || {};
+      var n = (niveaux || {})[evt] || {};
       return { d: m.date_match || '', lib: m.adversaire_nom ? ('vs ' + m.adversaire_nom) : (m.libelle || 'Match'),
+               niv: n.equipe_libelle || '',
                suivi: (chronos[i] || []).length > 0,
                min: (recT && recT.parEvt && typeof recT.parEvt[evt] === 'number') ? recT.parEvt[evt] : null,
                pts: (f && f.parEvt[evt]) ? f.parEvt[evt].pts : 0 };
@@ -659,7 +728,8 @@
       var info = r.suivi
         ? ((r.min !== null ? r.min + ' min' : 'temps de jeu indisponible') + ' · ' + r.pts + ' pt' + (r.pts > 1 ? 's' : ''))
         : 'non suivi';
-      return '<li>' + escapeHtml(fmtDate(r.d)) + ' · ' + escapeHtml(r.lib) + ' — <strong>' + escapeHtml(info) + '</strong></li>';
+      return '<li>' + (r.niv ? '<span class="ss-niv">' + escapeHtml(r.niv) + '</span> ' : '') +
+        escapeHtml(fmtDate(r.d)) + ' · ' + escapeHtml(r.lib) + ' — <strong>' + escapeHtml(info) + '</strong></li>';
     }).join('') + '</ul>');
   }
   function _sectionAssiduite() {
@@ -1039,8 +1109,26 @@
       }).join(', ');
     }
 
+    // v1.5 (N4) — temps de jeu et points par équipe (niveau).
+    var ptsParEquipe = {};
+    (agg.statsEquipes || []).forEach(function (b) { ptsParEquipe[b.equipe] = (b.stats && b.stats.parJoueur) || {}; });
+    function perfEquipe(eq, re, jid) {
+      var t = ((agg.tempsJeu && agg.tempsJeu.parJoueur) || {})[jid];
+      var min = 0, n = 0;
+      Object.keys(re.evts).forEach(function (evt) {
+        if (t && t.parEvt && typeof t.parEvt[evt] === 'number') { min += t.parEvt[evt]; n += 1; }
+      });
+      var pj = (ptsParEquipe[eq] || {})[jid];
+      var parts = [];
+      if (n) parts.push(min + ' min');
+      if (n || pj) {
+        parts.push(((pj && pj.pts) || 0) + ' pt' + ((pj && pj.pts) > 1 ? 's' : ''));
+        parts.push(((pj && pj.essais) || 0) + ' essai' + ((pj && pj.essais) > 1 ? 's' : ''));
+      }
+      return parts.length ? '<div class="ss-cat-eq__p"><strong>' + escapeHtml(parts.join(' · ')) + '</strong></div>' : '';
+    }
     // détail par équipe pour un joueur
-    function detailEquipes(parEquipe) {
+    function detailEquipes(parEquipe, jid) {
       var eqNames = Object.keys(parEquipe).sort();
       return eqNames.map(function (eq) {
         var re = parEquipe[eq];
@@ -1053,6 +1141,7 @@
           '<span class="ss-cat-eq__m">' + nbM + ' match' + (nbM > 1 ? 's' : '') + '</span> ' +
           '<span class="ss-cat-eq__r">' + escapeHtml(roleTxt.join(' · ')) + '</span>' +
           '<div class="ss-cat-eq__p">' + escapeHtml(postesEquipe(re.postes)) + '</div>' +
+          perfEquipe(eq, re, jid) +
         '</div>';
       }).join('');
     }
@@ -1110,7 +1199,7 @@
 
     var corps = lignes.length ? lignes.map(function (l) {
       var detail = (l.nbMatchs > 0)
-        ? detailEquipes(l.rec.parEquipe)
+        ? detailEquipes(l.rec.parEquipe, l.joueur_id)
         : '<span class="ss-attente">Aucun match disputé</span>';
       var dep = l.rec.depannage ? ' <span class="ss-cat-dep" title="A dépanné hors catégorie">⤴</span>' : '';
       var recTj = tj[l.joueur_id];
@@ -1124,10 +1213,8 @@
         '<td class="ss-num">' + l.nbMatchs + '</td>' +
         '<td>' + detail + '</td>' +
         '<td class="ss-num">' + tjTxt + '</td>' +
-        '<td class="ss-num">' + essaisTxt + '</td>' +
-        '<td class="ss-num">' + ptsTxt + '</td>' +
-      '</tr>';
-    }).join('') : '<tr><td colspan="6" class="ss-attente">Aucune donnée de compétition sur la catégorie.</td></tr>';
+      '</tr>';   // v1.5 — essais / points : par niveau dans le détail (jamais additionnés)
+    }).join('') : '<tr><td colspan="4" class="ss-attente">Aucune donnée de compétition sur la catégorie.</td></tr>';
 
     // pt 65 — bloc Niveau équipe (1 carte par équipe)
     function blocEquipeHtml(blocEq) {
@@ -1189,10 +1276,10 @@
         '<h2>Participation par joueur</h2>' +
         '<table class="ss-table"><thead><tr>' +
           '<th>Joueur</th><th class="ss-num">Matchs</th><th>Détail par équipe · rôle · poste</th>' +
-          '<th class="ss-num">Temps de jeu</th><th class="ss-num">Essais</th><th class="ss-num">Points</th>' +
+          '<th class="ss-num">Temps de jeu (total)</th>' +
         '</tr></thead><tbody>' + corps + '</tbody></table>' +
         tjGlobalNote +
-        '<p class="ss-note">Compétition uniquement (matchs &amp; tournois). Un joueur peut figurer dans plusieurs équipes — chaque ligne d\'équipe détaille rôle et postes occupés.</p>' +
+        '<p class="ss-note">Compétition uniquement (matchs &amp; tournois). Un joueur peut figurer dans plusieurs équipes — chaque ligne d\'équipe détaille rôle, postes, temps de jeu, points et essais à ce niveau (les performances ne s\'additionnent pas d\'un niveau à l\'autre).</p>' +
       '</section>' +
       '<section class="ss-bloc">' +
         '<h2>Assiduité</h2>' +
@@ -1202,7 +1289,7 @@
 
   // ---- API publique ----
   window.StatsSaison = {
-    version: '1.4',
+    version: '1.5',
     renderFicheJoueur: renderFicheJoueur,
     renderPilotage: renderPilotage,
     renderPilotageCategorie: renderPilotageCategorie,
