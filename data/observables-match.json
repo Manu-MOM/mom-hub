@@ -2,13 +2,14 @@
   "_meta": {
     "type": "referentiel",
     "nom": "Observables match",
-    "version": "1.2.1",
+    "version": "1.2.2",
     "date_creation": "2026-05-08",
     "description": "Événements observables pendant un match. Catégorie A universelle + Catégorie B paramétrable par catégorie d'âge",
     "asymetrie_sar_mom": "Interface détaillée pour SAR/MOM, simplifiée pour adversaire (+5/+2/+3/+3/-1)",
     "date_mise_a_jour": "2026-10-04",
     "changelog_1_2": "SUIVI-VEO (FAIT FOI gelé 04/10/2026). AJOUTS : carton blanc (discipline) ; nouvelles familles score_rate (tentatives ratées), conquete (touche/mêlée par issue, equipe_concernee = qui introduit), technique (retour d'exclusion, hors palette). jeu_collectif conservé en LEGACY (lecture des matchs passés, bénévole, Mode Vidéo) — retiré de la palette coach à partir de compositions-editor v3.72. Libellé long du jaune corrigé : durée selon la catégorie (data/reglement-exclusions.json).",
-    "changelog_1_2_1": "Correctif : les issues conquête « Perdue / volée » prennent les identifiants obs-A-touche-volee et obs-A-melee-volee (en v1.2 elles réutilisaient obs-A-touche-perdue / obs-A-melee-perdue, déjà portés par le jeu collectif legacy). Aucune ligne enregistrée avec ces issues (la palette coach ne les propose qu'à partir de compositions-editor v3.72)."
+    "changelog_1_2_1": "Correctif : les issues conquête « Perdue / volée » prennent les identifiants obs-A-touche-volee et obs-A-melee-volee (en v1.2 elles réutilisaient obs-A-touche-perdue / obs-A-melee-perdue, déjà portés par le jeu collectif legacy). Aucune ligne enregistrée avec ces issues (la palette coach ne les propose qu'à partir de compositions-editor v3.72).",
+    "changelog_1_2_2": "SUIVI-VEO avenant « En-avant » (04/10/2026, décisions E1-B à E4-A). AJOUT : famille faute_technique — obs-A-en-avant et obs-A-passe-avant (0 point, équipe Nous/Adversaire, joueur facultatif côté nous), sortis de la pioche des fautes et comptés à part au rapport (compositions-editor v3.77). Lignes déjà saisies avec la pioche reprises en base par sql/C14-e-en-avant.sql."
   },
   "categorie_A": {
     "score": [
@@ -355,6 +356,36 @@
         ],
         "reversible": true,
         "hors_palette": true
+      }
+    ],
+    "faute_technique": [
+      {
+        "uuid": "obs-A-en-avant",
+        "libelle_court": "En-avant",
+        "libelle_long": "En-avant (ballon perdu vers l'avant ; sanction : mêlée)",
+        "type": "faute_technique",
+        "points": 0,
+        "icone": "✋",
+        "couleur": "#B8860B",
+        "saisie_associee": [
+          "equipe",
+          "joueur_facultatif"
+        ],
+        "reversible": true
+      },
+      {
+        "uuid": "obs-A-passe-avant",
+        "libelle_court": "Passe en avant",
+        "libelle_long": "Passe en avant (sanction : mêlée)",
+        "type": "faute_technique",
+        "points": 0,
+        "icone": "↗",
+        "couleur": "#B8860B",
+        "saisie_associee": [
+          "equipe",
+          "joueur_facultatif"
+        ],
+        "reversible": true
       }
     ]
   },
