@@ -5,6 +5,11 @@
  *   - Objet 1 : Fiche stats joueur (restitution famille, un joueur)
  *   - Objet 2 : Vue pilotage (équipe en haut + effectif en lignes triables)
  *
+ * Version : 1.6 — 6 oct. 2026. Rubrique « Jeu au pied » (FAIT FOI
+ *           Conception-JEU-AU-PIED-v1, J5-A) : fiche joueur, par niveau,
+ *           lignes « Jeu au pied » (réussis / tentés, %) et « Contextes au
+ *           pied » (réussis / tentés par contexte). Identifiants
+ *           obs-A-pied-<contexte>-<issue> (référentiel v1.3) lus par motif.
  * Version : 1.5 — 4 oct. 2026. Avenant « Retour + niveaux » (R1-A, N1-A…N4-A
  *           de Manu, 04/10 20:52 ; requiert C15-b et supabase-client v1.89) :
  *           niveau d'un match = équipe engagée de sa feuille (M16 - Nat /
@@ -112,6 +117,11 @@
   // v1.4 — identifiants Cat A comptés par joueur (référentiel v1.2.2).
   var OBS_CARTONS = { 'obs-A-blanc': 'blanc', 'obs-A-jaune': 'jaune', 'obs-A-rouge': 'rouge' };
   var PREFIXE_FAUTE = 'obs-A-faute-';
+  // v1.6 — jeu au pied : 'obs-A-pied-<contexte>-<reussi|moyen|rate>-…'.
+  var RE_PIED = /^obs-A-pied-([a-z0-9]+)-(reussi|moyen|rate)\b/;
+  var CTX_PIED = { box: 'Box kick', degagement: 'Dégagement', occupation: 'Occupation', '5022': '50/22',
+                   penaltouche: 'Pénaltouche', pression: 'Pression', rasant: 'Rasant / transv.', renvoi: 'Envoi / renvoi' };
+  var ORDRE_PIED = ['box', 'degagement', 'occupation', '5022', 'penaltouche', 'pression', 'rasant', 'renvoi'];
 
   // ---- Utilitaires ----
   function _hub() {
@@ -511,7 +521,8 @@
   // retenus. Lignes de NOTRE équipe attribuées au joueur (joueur_uuid).
   function _faitsJoueur(joueurId, evenements, chronos) {
     var f = { pts: 0, essais: 0, transfo: [0, 0], penalite: [0, 0], drops: 0,
-              blanc: 0, jaune: 0, rouge: 0, fautes: 0, enAvant: 0, passeAvant: 0, parEvt: {} };
+              blanc: 0, jaune: 0, rouge: 0, fautes: 0, enAvant: 0, passeAvant: 0, parEvt: {},
+              pied: [0, 0], piedCtx: {} };   // v1.6 — [réussis, tentés]
     evenements.forEach(function (evt, i) {
       var pe = { pts: 0 };
       (chronos[i] || []).forEach(function (l) {
@@ -529,6 +540,14 @@
         else if (oid.indexOf(PREFIXE_FAUTE) === 0) f.fautes += 1;
         else if (oid === 'obs-A-en-avant') f.enAvant += 1;
         else if (oid === 'obs-A-passe-avant') f.passeAvant += 1;
+        else {
+          var mp = RE_PIED.exec(oid);   // v1.6 — jeu au pied
+          if (mp) {
+            var pc = f.piedCtx[mp[1]] || (f.piedCtx[mp[1]] = [0, 0]);
+            f.pied[1] += 1; pc[1] += 1;
+            if (mp[2] === 'reussi') { f.pied[0] += 1; pc[0] += 1; }
+          }
+        }
       });
       f.parEvt[evt] = pe;
     });
@@ -706,7 +725,17 @@
       { lib: 'Cartons (blanc / jaune / rouge)', val: function (N) { return si(N, N.faits.blanc + ' / ' + N.faits.jaune + ' / ' + N.faits.rouge); } },
       { lib: 'Fautes', val: function (N) { return si(N, N.faits.fautes); } },
       { lib: 'En-avant', val: function (N) { return si(N, N.faits.enAvant); } },
-      { lib: 'Passes en avant', val: function (N) { return si(N, N.faits.passeAvant); } }
+      { lib: 'Passes en avant', val: function (N) { return si(N, N.faits.passeAvant); } },
+      // v1.6 — jeu au pied (réussis / tentés).
+      { lib: 'Jeu au pied (réussis / tentés)', val: function (N) { return si(N, ratio(N.faits.pied)); } },
+      { lib: 'Contextes au pied', val: function (N) {
+          if (!N.suivis) return '—';
+          var parts = ORDRE_PIED.filter(function (c) { return N.faits.piedCtx[c]; }).map(function (c) {
+            var t = N.faits.piedCtx[c];
+            return escapeHtml(CTX_PIED[c] || c) + ' ' + t[0] + '/' + t[1];
+          });
+          return parts.length ? '<small>' + parts.join('<br>') + '</small>' : '—';
+        } }
     ];
     return _bloc('Faits de jeu', _tableNiveaux(cols, lignes, false) +
       '<p class="ss-attente">' + (cols.length > 1 ? 'Les performances ne s\'additionnent pas d\'un niveau à l\'autre. ' : '') +
@@ -1289,7 +1318,7 @@
 
   // ---- API publique ----
   window.StatsSaison = {
-    version: '1.5',
+    version: '1.6',
     renderFicheJoueur: renderFicheJoueur,
     renderPilotage: renderPilotage,
     renderPilotageCategorie: renderPilotageCategorie,
