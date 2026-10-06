@@ -6,6 +6,25 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.82 — Suivi : synchro VEO, lot 2 — import des clips (6 oct. 2026)
+ *   v3.82 : FAIT FOI Conception-SYNCHRO-VEO-v1, lot L2 (S4, S5, S6) +
+ *           avenant A1-A3 (gelé 06/10 17:21). « 🎥 Importer les clips VEO » :
+ *           liste collée (« Copier en tant que chemin d'accès ») ou fichiers
+ *           sélectionnés — seuls les NOMS sont lus (« NN HHMMSS_-_Libellé »).
+ *           Repères dans rapports.donnees.veo.reperes (idempotent : repère =
+ *           temps + libellé). Coups d'envoi : marqueurs « Début de mi-temps »
+ *           s'ils sont fournis, sinon estimés depuis les faits officiels
+ *           (essais / transformations / pénalités) → confirmés par l'entraîneur.
+ *           Rapprochement (jamais de fait officiel créé) : Essai / Transfo /
+ *           Pénalité / Drop → ligne existante du même type (±3') ; sinon « à
+ *           qualifier ». Mêlée / Touche → ligne de conquête existante (±1' ou
+ *           ±20 s de temps VEO) ; sinon « à compléter » (écran 1 repère = 1 à
+ *           2 taps). Libellé inconnu = clip perso (débrief, lot 3). Relancé
+ *           après chaque import FFR (ordre des imports indifférent).
+ *           A1 : minute recalée sur les faits officiels rapprochés (ancres,
+ *           interpolation) → arrêts de jeu absorbés. A2 : minute calculée
+ *           depuis la vidéo = minute RÉVOLUE (convention FFR). « ▶ » aussi
+ *           sur les lignes rapprochées (FFR, live) sans toucher la base.
  * Version : 3.81 — Suivi : synchro VEO, lot 1 (6 oct. 2026)
  *   v3.81 : FAIT FOI Conception-SYNCHRO-VEO-v1 (gelé par Manu le 06/10 à
  *           15:35), lot L1 (S2, S3, S7, S9). Barre « Saisie » : bouton
@@ -4115,7 +4134,11 @@
     if (ftech.length) _peindreFautesTechRapport(ftech, idFtech, nomNous, nomAdv);  // v3.77
     if (pied.length) _peindreBotteursPied(pied, idPied, nomNous);                  // v3.80
     if (evtId) {
-      _peindreFroidRapport(evtId, idFroid, idFil + '-veo');   // v3.81
+      // v3.81 / v3.82 — lien VEO ; si des repères VEO sont rapprochés, le
+      // déroulé est repeint avec leurs « ▶ ».
+      _peindreFroidRapport(evtId, idFroid, idFil + '-veo', function () {
+        _peindreFilRapport(eff, idFil, nomAdv, evtId);
+      });
       _peindreTdjRapport(evtId, idTdj);
     }
   }
@@ -4326,7 +4349,7 @@
   }
 
   // Observations à froid + remarque conquête (rapports.donnees du match).
-  function _peindreFroidRapport(evtId, cibleId, idVeo) {
+  function _peindreFroidRapport(evtId, cibleId, idVeo, onVeo) {
     var box = document.getElementById(cibleId);
     var hub = window.SupabaseHub;
     if (!box || !hub || typeof hub.getRapportMatch !== 'function') return;
@@ -4341,6 +4364,11 @@
       var remp = (d && typeof d.remarque_jeu_pied === 'string') ? d.remarque_jeu_pied.trim() : '';   // v3.80
       // v3.81 — lien vers la vidéo VEO du match, en tête du déroulé.
       var boxVeo = idVeo ? document.getElementById(idVeo) : null;
+      if (d && d.veo && typeof d.veo === 'object') {   // v3.82 — repères pour les « ▶ » du déroulé
+        _veoCacheRapport[evtId] = d.veo;
+        if (typeof onVeo === 'function' && Array.isArray(d.veo.reperes) &&
+            d.veo.reperes.some(function (r) { return r && r.lg; })) onVeo();
+      }
       if (boxVeo && d && d.veo && typeof d.veo.url === 'string' && /^https:\/\//i.test(d.veo.url)) {
         boxVeo.innerHTML = '<p class="view-suivi__hint" style="text-align:left"><a href="' + escapeHtml(d.veo.url) +
           '" target="_blank" rel="noopener">🎥 Ouvrir la vidéo VEO du match</a> — « ▶ mm:ss » = temps à atteindre dans la vidéo.</p>';
@@ -4501,7 +4529,7 @@
   // pure. La minute n'est affichée QUE si elle est strictement croissante
   // dans la période (sinon minute_match peu fiable → omise, jamais un
   // faux « 0' » ; même honnêteté que le panneau temps de jeu).
-  function _peindreFilRapport(eff, cibleId, nomAdvParam) {
+  function _peindreFilRapport(eff, cibleId, nomAdvParam, evtIdFil) {
     var box = document.getElementById(cibleId || 'rapport-fil');
     if (!box) return;
     // nomAdv : paramètre explicite (série multi-matchs) sinon SuiviChrono.nomAdv
@@ -4569,7 +4597,7 @@
         html += '<div class="rapport-fil__ligne">' +
                   '<span class="rapport-fil__min">' + escapeHtml(min) + '</span>' +
                   '<span class="rapport-fil__act">' + (icone ? (escapeHtml(icone) + ' ') : '') + escapeHtml(libelle) +
-                    _tcLigneHTML(l, null) + '</span>' +   // v3.81
+                    _tcLigneHTML(l, null, evtIdFil) + '</span>' +   // v3.81 / v3.82
                   '<span class="rapport-fil__who">' + escapeHtml(acteur) + '</span>' +
                   '<span class="rapport-fil__pts">' + escapeHtml(pts) + '</span>' +
                 '</div>';
@@ -4693,7 +4721,7 @@
       var annulee = (l.annule === true);
       html += '<div class="suivi-histo__row' + (annulee ? ' suivi-histo__row--annulee' : '') + '">';
       html +=   '<span class="suivi-histo__txt">' + (min ? '<b>' + min + '</b> ' : '') + escapeHtml(lib) + pts + ' · ' + qui +
-                  _tcLigneHTML(l, (_veoMatch(evtId) || {}).url) + '</span>';   // v3.81
+                  _tcLigneHTML(l, (_veoMatch(evtId) || {}).url, evtId) + '</span>';   // v3.81 / v3.82
       if (!annulee) {
         html += '<span style="display:flex;gap:6px">' +
                   '<button type="button" class="suivi-histo__annuler suivi-histo__modifier" data-mod="' + escapeHtml(l.id) + '" style="border-color:#3a4650;color:#aab8c4">modifier</button>' +
@@ -5081,8 +5109,13 @@
     return !!(v && Array.isArray(v.coups_envoi) && typeof v.coups_envoi[0] === 'number');
   }
   // Temps VEO → { minute (cumulée), periode } ; null si avant le 1er coup d'envoi.
-  function _minuteDepuisVeo(evtId, sec) {
-    var v = _veoMatch(evtId);
+  // v3.82 — A2 : minute RÉVOLUE (convention FFR : 1:50 écoulée → 1') ;
+  // A1 : recalage par interpolation entre ancres (coup d'envoi + faits
+  // officiels rapprochés de la période) → arrêts de jeu absorbés.
+  // sansAncres = calcul linéaire depuis le coup d'envoi ; vDirect = réglages
+  // à utiliser (brouillon en cours d'enregistrement).
+  function _minuteDepuisVeo(evtId, sec, sansAncres, vDirect) {
+    var v = vDirect || _veoMatch(evtId);
     if (!v || !Array.isArray(v.coups_envoi) || typeof sec !== 'number') return null;
     var per = null;
     for (var p = 1; p <= v.coups_envoi.length; p++) {
@@ -5090,12 +5123,27 @@
       if (typeof ke === 'number' && ke <= sec) per = p;
     }
     if (!per) return null;
-    var ecoule = sec - v.coups_envoi[per - 1];
-    return { minute: _decalageMinutes(per) + Math.floor(ecoule / 60) + 1, periode: per };
+    var A = [{ t: v.coups_envoi[per - 1], m: _decalageMinutes(per) }];
+    if (!sansAncres) {
+      (Array.isArray(v.reperes) ? v.reperes : []).forEach(function (r) {
+        if (r && r.st === 'lie' && typeof r.ma === 'number' && r.pe === per && r.t > A[0].t) A.push({ t: r.t, m: r.ma });
+      });
+      A.sort(function (a, b) { return a.t - b.t; });
+      // ancres strictement croissantes en temps ET en minute (sécurité)
+      A = A.filter(function (a, i, arr) { return i === 0 || (a.t > arr[i - 1].t && a.m >= arr[i - 1].m); });
+    }
+    var i = 0;
+    while (i + 1 < A.length && A[i + 1].t <= sec) i++;
+    var a = A[i], b = A[i + 1];
+    var mf = b ? a.m + (sec - a.t) * (b.m - a.m) / (b.t - a.t) : a.m + (sec - a.t) / 60;
+    var minute = Math.floor(mf + 1e-9);
+    if (per === 1 && minute < 1) minute = 1;
+    return { minute: minute, periode: per };
   }
   // « ▶ 41:27 » d'une ligne (clic : ouvre le match VEO si le lien est connu).
-  function _tcLigneHTML(l, url) {
+  function _tcLigneHTML(l, url, evtId) {
     var sec = _intervalVersSec(l && l.timecode_video);
+    if (sec === null && evtId && l) sec = _veoTempsLigne(evtId, l.id);   // v3.82 — ligne rapprochée
     if (sec === null) return '';
     var txt = '▶ ' + _fmtTempsVeo(sec);
     if (url) {
@@ -5105,6 +5153,385 @@
     }
     return ' <span class="veo-tc" style="color:#5ec8a0;white-space:nowrap">' + escapeHtml(txt) + '</span>';
   }
+  // ════════════════════════════════════════════════════════════
+  // v3.82 — SYNCHRO VEO, lot L2 : import des clips (noms de fichiers),
+  // rapprochement, coups d'envoi proposés, file « à compléter ».
+  // Repère (rapports.donnees.veo.reperes[]) :
+  //   { id: 'HHMMSS|LIBELLÉ', n, t (s), lib, k: melee|touche|essai|transfo|
+  //     penalite|drop|ke|fin|perso, st: lie|fait|a_completer|a_qualifier|
+  //     ignore|perso|ke, lg: id ligne, ma: minute d'ancre (A1), pe: période }
+  // ════════════════════════════════════════════════════════════
+  var _veoCacheRapport = {};   // evtId → donnees.veo lu par le rapport
+  var _VEO_OFFICIELS = {
+    essai: ['obs-A-essai'], transfo: ['obs-A-transfo', 'obs-A-transfo-ratee'],
+    penalite: ['obs-A-penalite', 'obs-A-penalite-ratee'], drop: ['obs-A-drop']
+  };
+  var _VEO_LIB_K = { essai: 'Essai', transfo: 'Transformation', penalite: 'Pénalité', drop: 'Drop',
+                     melee: 'Mêlée', touche: 'Touche', ke: 'Début de mi-temps', fin: 'Fin de mi-temps' };
+  function _veoKind(lib) {
+    var n = _normFfr(lib);
+    if (n === 'MELEE') return 'melee';
+    if (n === 'TOUCHE') return 'touche';
+    if (n === 'ESSAI') return 'essai';
+    if (n === 'TRANSFORMATION') return 'transfo';
+    if (n === 'PENALITE' || n === 'TIR AU BUT') return 'penalite';
+    if (n === 'DROP' || n === 'DROP GOAL') return 'drop';
+    if (n === 'DEBUT DE MI TEMPS' || n === 'COUP D ENVOI') return 'ke';
+    if (n === 'FIN DE MI TEMPS' || n === 'FIN DE MATCH') return 'fin';
+    return 'perso';
+  }
+  // « …\46 010300_-_Mêlée.mp4 » → { n:46, t:3780, lib:'Mêlée', k:'melee', id }
+  function _parserClipsVeo(texte) {
+    var out = [], vus = {};
+    String(texte || '').split(/\r?\n/).forEach(function (ligne) {
+      var nom = ligne.replace(/["']/g, '').trim().split(/[\\/]/).pop();
+      var m = /^(\d+)\s+(\d{2})(\d{2})(\d{2})_-_(.*?)(?:\.mp4)?$/i.exec(nom);
+      if (!m) return;
+      var lib = m[5].replace(/_/g, ' ').replace(/^[\s-]+/, '').replace(/\s+/g, ' ').trim() || 'Clip';
+      var t = (+m[2]) * 3600 + (+m[3]) * 60 + (+m[4]);
+      var id = m[2] + m[3] + m[4] + '|' + _normFfr(lib);
+      if (vus[id]) return;
+      vus[id] = true;
+      out.push({ id: id, n: +m[1], t: t, lib: lib, k: _veoKind(lib) });
+    });
+    return out.sort(function (a, b) { return a.t - b.t; });
+  }
+  function _veoCompter(evtId, st) {
+    var v = _veoMatch(evtId);
+    return (v && Array.isArray(v.reperes)) ? v.reperes.filter(function (r) { return r && r.st === st; }).length : 0;
+  }
+  // Temps VEO (s) d'une ligne rapprochée ; null sinon.
+  function _veoTempsLigne(evtId, ligneId) {
+    var v = _veoMatch(evtId) || _veoCacheRapport[evtId];
+    if (!v || !Array.isArray(v.reperes) || !ligneId) return null;
+    for (var i = 0; i < v.reperes.length; i++) {
+      var r = v.reperes[i];
+      if (r && r.lg === ligneId && (r.st === 'lie' || r.st === 'fait')) return r.t;
+    }
+    return null;
+  }
+  function _veoKindDeLigne(l) {
+    var oid = (l && l.observable_id) || '';
+    for (var k in _VEO_OFFICIELS) if (_VEO_OFFICIELS[k].indexOf(oid) >= 0) return k;
+    return null;
+  }
+  // Coups d'envoi : marqueurs « Début de mi-temps » sinon estimation par les
+  // faits officiels (mode des décalages à ±90 s, ≥ 2 concordances).
+  function _veoEstimerCoupsEnvoi(reps, lignes) {
+    var nb = _dureesPeriodes().length || 2;
+    var ke = reps.filter(function (r) { return r.k === 'ke'; }).map(function (r) { return r.t; }).sort(function (a, b) { return a - b; });
+    if (ke.length) return ke.slice(0, nb);
+    var res = [];
+    var act = (lignes || []).filter(function (l) { return l && l.annule !== true && _veoKindDeLigne(l); });
+    for (var p = 1; p <= nb; p++) {
+      var dec = _decalageMinutes(p), cands = [];
+      act.forEach(function (l) {
+        if ((l.periode || 1) !== p) return;
+        var k = _veoKindDeLigne(l), lm = _tCumule(l);
+        reps.forEach(function (r) {
+          if (r.k !== k) return;
+          var off = r.t - ((lm - dec) * 60 + 30);
+          if (off >= 0 && (p === 1 || (typeof res[p - 2] === 'number' && off > res[p - 2] + 60))) cands.push(off);
+        });
+      });
+      var meilleur = null, nbMax = 1;
+      cands.forEach(function (c) {
+        var proches = cands.filter(function (x) { return Math.abs(x - c) <= 90; });
+        if (proches.length > nbMax) { nbMax = proches.length; meilleur = proches; }
+      });
+      if (meilleur) {
+        meilleur.sort(function (a, b) { return a - b; });
+        res.push(Math.round(meilleur[Math.floor(meilleur.length / 2)]));
+      } else res.push(null);
+    }
+    return res;
+  }
+  // Rapprochement (S5) — modifie v.reperes en place. Jamais de ligne créée.
+  function _veoRapprocher(evtId, v, lignes) {
+    var reps = Array.isArray(v.reperes) ? v.reperes : [];
+    var act = (lignes || []).filter(function (l) { return l && l.annule !== true; });
+    var parId = {};
+    act.forEach(function (l) { parId[l.id] = l; });
+    // liens cassés (ligne annulée / remplacée, ex. import FFR) → réévalués
+    reps.forEach(function (r) {
+      if ((r.st === 'lie' || r.st === 'fait') && (!r.lg || !parId[r.lg])) { r.st = null; delete r.lg; delete r.ma; delete r.pe; }
+    });
+    var pris = {};
+    reps.forEach(function (r) { if (r.lg) pris[r.lg] = true; });
+    reps.sort(function (a, b) { return a.t - b.t; });
+    // 1) faits officiels — calcul linéaire (sans ancres), tolérance ±3'
+    reps.forEach(function (r) {
+      if (!_VEO_OFFICIELS[r.k]) return;
+      if (r.st && r.st !== 'a_qualifier') return;
+      var mm = _minuteDepuisVeo(evtId, r.t, true, v);
+      var best = null, bd = 99;
+      if (mm) act.forEach(function (l) {
+        if (pris[l.id] || _VEO_OFFICIELS[r.k].indexOf(l.observable_id) < 0 || (l.periode || 1) !== mm.periode) return;
+        var d = Math.abs(_tCumule(l) - mm.minute);
+        if (d <= 3 && d < bd) { bd = d; best = l; }
+      });
+      if (best) {
+        r.st = 'lie'; r.lg = best.id; r.ma = _tCumule(best) + 0.5; r.pe = mm.periode;
+        pris[best.id] = true;
+      } else r.st = 'a_qualifier';
+    });
+    // 2) conquête — avec ancres (A1), ±20 s de temps VEO ou ±1'
+    reps.forEach(function (r) {
+      if (r.k !== 'melee' && r.k !== 'touche') return;
+      if (r.st && r.st !== 'a_completer') return;
+      var mm = _minuteDepuisVeo(evtId, r.t, false, v);
+      var pref = 'obs-A-' + r.k + '-';
+      var best = null, bd = 1e9;
+      act.forEach(function (l) {
+        if (pris[l.id] || String(l.observable_id || '').indexOf(pref) !== 0) return;
+        var tc = _intervalVersSec(l.timecode_video), d;
+        if (tc !== null) d = Math.abs(tc - r.t) <= 20 ? Math.abs(tc - r.t) / 60 : null;
+        else if (mm && (l.periode || 1) === mm.periode) d = Math.abs(_tCumule(l) - mm.minute) <= 1 ? Math.abs(_tCumule(l) - mm.minute) : null;
+        else d = null;
+        if (d !== null && d < bd) { bd = d; best = l; }
+      });
+      if (best) { r.st = 'lie'; r.lg = best.id; pris[best.id] = true; }
+      else r.st = 'a_completer';
+    });
+    reps.forEach(function (r) {
+      if (r.k === 'ke' || r.k === 'fin') r.st = 'ke';
+      else if (r.k === 'perso' && !r.st) r.st = 'perso';
+    });
+    v.reperes = reps;
+    return v;
+  }
+  function _veoLireLignes(evtId) {
+    var hub = window.SupabaseHub;
+    if (!hub || typeof hub.getChronologieRencontreCoach !== 'function') return Promise.resolve(SuiviChrono.lignes || []);
+    return Promise.resolve(hub.getChronologieRencontreCoach(evtId, true)).then(function (l) {
+      return Array.isArray(l) ? l : [];
+    }).catch(function () { return SuiviChrono.lignes || []; });
+  }
+  // Après un import FFR : si des repères existent, rapprochement relancé.
+  function _veoRapprocherApresImport(evtId) {
+    SuiviFroid.charger(evtId, function () {
+      var v = _veoMatch(evtId);
+      if (!v || !Array.isArray(v.reperes) || !v.reperes.length) return;
+      _veoLireLignes(evtId).then(function (lignes) {
+        _enregistrerDonneesMatch(evtId, function (d) {
+          if (!d.veo || !Array.isArray(d.veo.reperes)) return;
+          _veoRapprocher(evtId, d.veo, lignes);
+        }, function () { _peindreChrono(); });
+      });
+    }, true);
+  }
+
+  // Écran d'import : coller la liste ou sélectionner les fichiers (noms seuls).
+  function _ouvrirImportClipsVeo(evtId, perCourante) {
+    var pal = document.getElementById('suivi-palette');
+    if (!pal) return;
+    var h = '<div class="suivi-attrib">';
+    h += '<div class="suivi-attrib__title">🎥 Importer les clips VEO</div>';
+    h += '<div class="view-suivi__hint" style="text-align:left">Dans VEO, télécharge les clips du match. Dans le dossier : <strong>Ctrl + A</strong>, ' +
+         '<strong>Maj + clic droit</strong> → « Copier en tant que chemin d\'accès », puis colle ci-dessous. Ou sélectionne les fichiers. ' +
+         '<strong>Seuls les noms sont lus</strong> : aucune vidéo n\'est envoyée.</div>';
+    h += '<textarea id="veo-clips-texte" style="' + _STYLE_TEXTAREA + '" placeholder="…\\01 000313_-_Mêlée.mp4&#10;…\\02 000411_-_Pénalité.mp4"></textarea>';
+    h += '<div style="margin-top:8px"><input type="file" id="veo-clips-fichiers" multiple accept="video/mp4,.mp4"></div>';
+    h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">' +
+         '<button type="button" class="suivi-chrono__btn suivi-chrono__btn--primary" id="veo-clips-lire">Lire la liste</button>' +
+         '<button type="button" class="suivi-chrono__btn" id="veo-clips-retour">↩ Retour</button></div>';
+    h += '</div>';
+    pal.innerHTML = h;
+    var ta = document.getElementById('veo-clips-texte');
+    document.getElementById('veo-clips-retour').addEventListener('click', function () { _peindreChrono(); });
+    document.getElementById('veo-clips-fichiers').addEventListener('change', function (e) {
+      var f = (e.target && e.target.files) ? Array.prototype.map.call(e.target.files, function (x) { return x.name; }) : [];
+      ta.value = (ta.value ? ta.value + '\n' : '') + f.join('\n');
+    });
+    document.getElementById('veo-clips-lire').addEventListener('click', function () {
+      var reps = _parserClipsVeo(ta.value);
+      if (!reps.length) { window.alert('Aucun clip VEO reconnu (noms attendus : « 01 000313_-_Mêlée.mp4 »).'); return; }
+      _veoLireLignes(evtId).then(function (lignes) { _ouvrirCoupsEnvoiVeo(evtId, perCourante, reps, lignes); });
+    });
+  }
+
+  // Coups d'envoi proposés → confirmés ; puis fusion + rapprochement + enregistrement.
+  function _ouvrirCoupsEnvoiVeo(evtId, perCourante, repsNeufs, lignes) {
+    var pal = document.getElementById('suivi-palette');
+    if (!pal) return;
+    var v = _veoMatch(evtId) || {};
+    var nb = _dureesPeriodes().length || 2;
+    var estim = _veoEstimerCoupsEnvoi(repsNeufs, lignes);
+    var parMarqueur = repsNeufs.some(function (r) { return r.k === 'ke'; });
+    var cpt = {};
+    repsNeufs.forEach(function (r) { var k = r.k === 'perso' ? 'perso' : (_VEO_LIB_K[r.k] || r.k); cpt[k] = (cpt[k] || 0) + 1; });
+    var h = '<div class="suivi-attrib">';
+    h += '<div class="suivi-attrib__title">🎥 ' + repsNeufs.length + ' clips lus</div>';
+    h += '<div class="view-suivi__hint" style="text-align:left">' +
+         Object.keys(cpt).map(function (k) { return escapeHtml(k === 'perso' ? 'Clips perso' : k) + ' ' + cpt[k]; }).join(' · ') + '</div>';
+    h += '<div class="view-suivi__hint" style="text-align:left">Coups d\'envoi ' +
+         (parMarqueur ? 'lus dans les marqueurs « Début de mi-temps ».' :
+          'estimés d\'après les faits déjà saisis. <strong>Vérifie-les dans VEO</strong> (marqueurs « Début de mi-temps » de la liste des clips) et corrige si besoin.') + '</div>';
+    h += '<div class="suivi-chrono__config" style="max-width:none">';
+    for (var p = 1; p <= nb; p++) {
+      var deja = (Array.isArray(v.coups_envoi) && typeof v.coups_envoi[p - 1] === 'number') ? v.coups_envoi[p - 1] : null;
+      var prop = (deja !== null && !parMarqueur) ? deja : estim[p - 1];
+      h += '<div class="suivi-chrono__config-row"><label for="veo-cke-' + p + '">Coup d\'envoi — ' + escapeHtml(_libellePeriode(p, nb)) +
+           (deja === null && typeof prop === 'number' && !parMarqueur ? ' <small>(estimé)</small>' : '') + '</label>' +
+           '<input id="veo-cke-' + p + '" type="text" inputmode="numeric" placeholder="mm:ss" value="' +
+           escapeHtml(typeof prop === 'number' ? _fmtTempsVeo(prop) : '') + '" style="' + _STYLE_SELECT + ';width:90px"></div>';
+    }
+    h += '</div>';
+    h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">' +
+         '<button type="button" class="suivi-chrono__btn suivi-chrono__btn--primary" id="veo-cke-ok">Valider et rapprocher</button>' +
+         '<button type="button" class="suivi-chrono__btn" id="veo-cke-retour">↩ Retour</button></div>';
+    h += '</div>';
+    pal.innerHTML = h;
+    document.getElementById('veo-cke-retour').addEventListener('click', function () { _ouvrirImportClipsVeo(evtId, perCourante); });
+    document.getElementById('veo-cke-ok').addEventListener('click', function () {
+      var ke = [], prec = -1;
+      for (var p2 = 1; p2 <= nb; p2++) {
+        var raw = (document.getElementById('veo-cke-' + p2).value || '').trim();
+        var sec = _parseTempsVeo(raw);
+        if (sec === null) { window.alert('Indique le coup d\'envoi de ' + _libellePeriode(p2, nb) + ' (mm:ss).'); return; }
+        if (sec <= prec) { window.alert('Les coups d\'envoi doivent se suivre dans le temps.'); return; }
+        prec = sec; ke.push(sec);
+      }
+      _enregistrerDonneesMatch(evtId, function (d) {
+        var cur = (d.veo && typeof d.veo === 'object') ? d.veo : {};
+        cur.coups_envoi = ke;
+        var exist = {};
+        (Array.isArray(cur.reperes) ? cur.reperes : []).forEach(function (r) { if (r && r.id) exist[r.id] = r; });
+        repsNeufs.forEach(function (r) { if (!exist[r.id]) exist[r.id] = r; });   // idempotent
+        cur.reperes = Object.keys(exist).map(function (k) { return exist[k]; });
+        // coups d'envoi changés → ancres à recalculer : liens officiels revus
+        cur.reperes.forEach(function (r) { if (r.st === 'lie' && _VEO_OFFICIELS[r.k]) { r.st = null; delete r.lg; delete r.ma; delete r.pe; } });
+        _veoRapprocher(evtId, cur, lignes);
+        d.veo = cur;
+      }, function () { _ouvrirBilanVeo(evtId, perCourante); });
+    });
+  }
+
+  // Bilan : compteurs + accès aux files.
+  function _ouvrirBilanVeo(evtId, perCourante) {
+    var pal = document.getElementById('suivi-palette');
+    var v = _veoMatch(evtId);
+    if (!pal || !v) return;
+    var reps = Array.isArray(v.reperes) ? v.reperes : [];
+    function n(st) { return reps.filter(function (r) { return r.st === st; }).length; }
+    var h = '<div class="suivi-attrib">';
+    h += '<div class="suivi-attrib__title">🎥 Clips VEO du match (' + reps.length + ')</div>';
+    h += '<div class="view-suivi__hint" style="text-align:left">Coups d\'envoi : ' +
+         (Array.isArray(v.coups_envoi) ? v.coups_envoi.map(function (t, i) { return _libellePeriode(i + 1, v.coups_envoi.length) + ' ' + _fmtTempsVeo(t); }).join(' · ') : '—') + '</div>';
+    h += '<ul style="margin:8px 0;padding-left:18px;line-height:1.7">' +
+         '<li>✅ <strong>' + (n('lie') + n('fait')) + '</strong> rapproché(s) d\'une action du Hub (▶ affiché)</li>' +
+         '<li>✍ <strong>' + n('a_completer') + '</strong> mêlée(s) / touche(s) à compléter</li>' +
+         '<li>❓ <strong>' + n('a_qualifier') + '</strong> à qualifier (fait officiel non retrouvé)</li>' +
+         '<li>🎬 <strong>' + n('perso') + '</strong> clip(s) perso (débrief vidéo)</li>' +
+         (n('ignore') ? '<li>⏭ ' + n('ignore') + ' ignoré(s)</li>' : '') + '</ul>';
+    h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">' +
+         (n('a_completer') ? '<button type="button" class="suivi-chrono__btn suivi-chrono__btn--primary" id="veo-b-comp">✍ À compléter (' + n('a_completer') + ')</button>' : '') +
+         (n('a_qualifier') ? '<button type="button" class="suivi-chrono__btn" id="veo-b-qual">❓ À qualifier (' + n('a_qualifier') + ')</button>' : '') +
+         '<button type="button" class="suivi-chrono__btn" id="veo-b-import">📥 Réimporter / ajouter des clips</button>' +
+         '<button type="button" class="suivi-chrono__btn" id="veo-b-retour">↩ Retour</button></div>';
+    if (n('perso')) {
+      h += '<div class="view-suivi__hint" style="text-align:left;margin-top:10px">Clips perso : ' +
+           reps.filter(function (r) { return r.st === 'perso'; }).map(function (r) { return escapeHtml(_fmtTempsVeo(r.t) + ' ' + r.lib); }).join(' · ') + '</div>';
+    }
+    h += '</div>';
+    pal.innerHTML = h;
+    var b;
+    if ((b = document.getElementById('veo-b-comp'))) b.addEventListener('click', function () { _ouvrirReperVeo(evtId, perCourante, 'a_completer', null); });
+    if ((b = document.getElementById('veo-b-qual'))) b.addEventListener('click', function () { _ouvrirReperVeo(evtId, perCourante, 'a_qualifier', null); });
+    document.getElementById('veo-b-import').addEventListener('click', function () { _ouvrirImportClipsVeo(evtId, perCourante); });
+    document.getElementById('veo-b-retour').addEventListener('click', function () { _peindreChrono(); });
+  }
+
+  // File « à compléter » / « à qualifier » : un repère par écran (S6).
+  function _ouvrirReperVeo(evtId, perCourante, st, apresId) {
+    var pal = document.getElementById('suivi-palette');
+    var v = _veoMatch(evtId);
+    if (!pal || !v) return;
+    var file = (v.reperes || []).filter(function (r) { return r.st === st; }).sort(function (a, b) { return a.t - b.t; });
+    var r = null;
+    for (var i = 0; i < file.length; i++) { if (apresId === null || file[i].t > apresId) { r = file[i]; break; } }
+    if (!r) { _ouvrirBilanVeo(evtId, perCourante); return; }
+    var mm = _minuteDepuisVeo(evtId, r.t);
+    var reste = file.length;
+    var titre = (_VEO_LIB_K[r.k] || r.lib) + ' · ▶ ' + _fmtTempsVeo(r.t) +
+                (mm ? ' · ' + mm.minute + '\' (' + _libellePeriode(mm.periode, (v.coups_envoi || []).length || 2) + ')' : '');
+    var h = '<div class="suivi-attrib">';
+    h += '<div class="suivi-attrib__title">' + (st === 'a_completer' ? '✍ ' : '❓ ') + escapeHtml(titre) + '</div>';
+    h += '<div class="view-suivi__hint" style="text-align:left">' + reste + ' restant(s). Place-toi à ' + escapeHtml(_fmtTempsVeo(r.t)) + ' dans VEO.</div>';
+    var opts = [];   // { lib, obs, eq, pts }
+    var catA = SuiviObs.catA || {};
+    if (r.k === 'melee' || r.k === 'touche') {
+      var cq = (catA.conquete && Array.isArray(catA.conquete[r.k])) ? catA.conquete[r.k] : [];
+      [['notre', (r.k === 'melee' ? 'Notre introduction' : 'Notre lancer')], ['adverse', (r.k === 'melee' ? 'Introduction adverse' : 'Lancer adverse')]].forEach(function (c) {
+        h += '<div class="suivi-palette__lbl" style="margin-top:12px;font-weight:600">' + c[1] + '</div><div class="suivi-obsb__grid">';
+        cq.forEach(function (o) {
+          opts.push({ obs: o.uuid, eq: c[0], pts: 0 });
+          h += '<button type="button" class="suivi-obsb__btn" data-vr="' + (opts.length - 1) + '">' + escapeHtml(o.libelle_court) + '</button>';
+        });
+        h += '</div>';
+      });
+    } else {
+      var choix = [];
+      if (r.k === 'penalite') {
+        choix = [['Pénalité réussie — Nous', 'obs-A-penalite', 'notre', 3], ['Pénalité réussie — Adversaire', 'obs-A-penalite', 'adverse', 3],
+                 ['Pénalité ratée — Nous', 'obs-A-penalite-ratee', 'notre', 0], ['Pénalité ratée — Adversaire', 'obs-A-penalite-ratee', 'adverse', 0],
+                 ['Pénaltouche — Nous', 'obs-A-pied-penaltouche-reussi-touche', 'notre', 0], ['Pénaltouche — Adversaire', 'obs-A-pied-penaltouche-reussi-touche', 'adverse', 0]];
+      } else if (r.k === 'transfo') {
+        choix = [['Transformation réussie — Nous', 'obs-A-transfo', 'notre', 2], ['Transformation réussie — Adversaire', 'obs-A-transfo', 'adverse', 2],
+                 ['Transformation ratée — Nous', 'obs-A-transfo-ratee', 'notre', 0], ['Transformation ratée — Adversaire', 'obs-A-transfo-ratee', 'adverse', 0]];
+      } else if (r.k === 'essai') {
+        choix = [['Essai — Nous', 'obs-A-essai', 'notre', 5], ['Essai — Adversaire', 'obs-A-essai', 'adverse', 5]];
+      } else if (r.k === 'drop') {
+        choix = [['Drop — Nous', 'obs-A-drop', 'notre', 3], ['Drop — Adversaire', 'obs-A-drop', 'adverse', 3]];
+      }
+      h += '<div class="view-suivi__hint" style="text-align:left">Ce fait n\'a pas été retrouvé parmi les actions du Hub (feuille FFR). ' +
+           'Si tu importes la feuille FFR plus tard, il sera rapproché automatiquement.</div><div class="suivi-obsb__grid">';
+      choix.forEach(function (c) {
+        opts.push({ obs: c[1], eq: c[2], pts: c[3] });
+        h += '<button type="button" class="suivi-obsb__btn" data-vr="' + (opts.length - 1) + '">' + escapeHtml(c[0]) + '</button>';
+      });
+      h += '</div>';
+    }
+    h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">' +
+         '<button type="button" class="suivi-chrono__btn" id="vr-passer">⏭ Passer</button>' +
+         '<button type="button" class="suivi-chrono__btn" id="vr-ignorer">🚫 Ignorer ce clip</button>' +
+         '<button type="button" class="suivi-chrono__btn" id="vr-fin">↩ Terminer</button></div>';
+    h += '</div>';
+    pal.innerHTML = h;
+    function marquer(patchR, suite) {
+      _enregistrerDonneesMatch(evtId, function (d) {
+        if (!d.veo || !Array.isArray(d.veo.reperes)) return;
+        d.veo.reperes.forEach(function (x) { if (x.id === r.id) patchR(x); });
+      }, suite);
+    }
+    document.getElementById('vr-passer').addEventListener('click', function () { _ouvrirReperVeo(evtId, perCourante, st, r.t); });
+    document.getElementById('vr-fin').addEventListener('click', function () { _ouvrirBilanVeo(evtId, perCourante); });
+    document.getElementById('vr-ignorer').addEventListener('click', function () {
+      marquer(function (x) { x.st = 'ignore'; }, function () { _ouvrirReperVeo(evtId, perCourante, st, r.t); });
+    });
+    pal.querySelectorAll('[data-vr]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var o = opts[+b.getAttribute('data-vr')];
+        if (!o || !mm || SuiviChrono.busy) { if (!mm) window.alert('Repère avant le coup d\'envoi : vérifie les coups d\'envoi.'); return; }
+        var hub = window.SupabaseHub;
+        if (!hub || !hub.insererObservableCoach) return;
+        SuiviChrono.busy = true;
+        hub.insererObservableCoach(evtId, {
+          observableId: o.obs, categorieObs: 'A', valeurPoints: o.pts, equipeConcernee: o.eq,
+          minuteMatch: mm.minute, periode: mm.periode, timecodeVideo: _secVersInterval(r.t)
+        }).then(function (res) {
+          SuiviChrono.busy = false;
+          if (!res || !res.ok) { window.alert('Saisie impossible : ' + ((res && res.error) || 'erreur inconnue')); return; }
+          var idL = res.data && res.data.id;
+          marquer(function (x) { x.st = 'fait'; if (idL) x.lg = idL; }, function () {
+            _rafraichirScoreEtHistorique(evtId);
+            _ouvrirReperVeo(evtId, perCourante, st, r.t);
+          });
+        });
+      });
+    });
+  }
+
   // Écran « 🎥 VEO » : lien du match + temps vidéo de chaque coup d'envoi.
   function _ouvrirReglageVeo(evtId, perCourante) {
     var pal = document.getElementById('suivi-palette');
@@ -5180,6 +5607,9 @@
     // v3.81 — synchro VEO (lien + coups d'envoi).
     var evtB = SuiviChrono.evtId;
     h += '<button type="button" class="suivi-chrono__btn" id="saisie-veo">🎥 VEO' + (_veoPret(evtB) ? ' ✓' : '') + '</button>';
+    // v3.82 — import des clips VEO + file « à compléter ».
+    var nbAf = _veoCompter(evtB, 'a_completer') + _veoCompter(evtB, 'a_qualifier');
+    h += '<button type="button" class="suivi-chrono__btn" id="saisie-veo-clips">🎥 Clips VEO' + (nbAf ? ' (' + nbAf + ' à traiter)' : '') + '</button>';
     h += '</div>';
     if (mode === 'manuel') {
       var m = SuiviSaisie.minute;
@@ -5222,6 +5652,11 @@
     // premier chargement, re-rendu si des repères existent (champ temps VEO).
     var bVeo = document.getElementById('saisie-veo');
     if (bVeo) bVeo.addEventListener('click', function () { _ouvrirReglageVeo(evtId, perCourante); });
+    var bClips = document.getElementById('saisie-veo-clips');
+    if (bClips) bClips.addEventListener('click', function () {
+      if (Array.isArray((_veoMatch(evtId) || {}).reperes) && _veoMatch(evtId).reperes.length) _ouvrirBilanVeo(evtId, perCourante);
+      else _ouvrirImportClipsVeo(evtId, perCourante);
+    });
     if (!SuiviFroid.estPour(evtId)) {
       SuiviFroid.charger(evtId, function () { if (_veoMatch(evtId)) _peindreChrono(); });
     }
@@ -6678,6 +7113,7 @@
         (ids.length < payloads.length ? '\n\nAucun ancien fait n\'a été annulé.' : '');
       window.alert(msg);
       _rafraichirChrono(evtId, true);
+      _veoRapprocherApresImport(evtId);   // v3.82 — S1 : ordre des imports indifférent
     }).catch(function (e) {
       SuiviChrono.busy = false;
       window.alert('Import interrompu : ' + (e && e.message ? e.message : e));
