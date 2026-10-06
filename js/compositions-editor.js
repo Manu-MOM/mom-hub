@@ -6,6 +6,20 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.83 — Rapport : débrief vidéo, synchro VEO lot 3 (6 oct. 2026)
+ *   v3.83 : FAIT FOI Conception-SYNCHRO-VEO-v1, lot L3 (S8). Rapport du match,
+ *           section « 🎬 Débrief vidéo » : clips des coachs (repères VEO
+ *           « perso ») dans l'ordre du match, chacun avec message clé, thème
+ *           (observations à froid de la catégorie) et joueurs concernés
+ *           (facultatif) ; ordre modifiable (↑ ↓), retrait, ajout en un clic
+ *           de tout autre clip VEO importé. Stockage : rapports.donnees.veo.
+ *           debrief = { items: [{ id, msg, th, j }], retires: [id] } (zéro
+ *           DDL, fusion comme les notes à froid). « ▶ Lancer le débrief » :
+ *           choix du dossier des clips SUR LE PC, lecture locale plein écran
+ *           (aucune vidéo envoyée), titre / minute / message en surimpression,
+ *           clavier ou télécommande (→ / PageDown suivant, ← / PageUp
+ *           précédent, ↑ revoir, espace pause, M message, F plein écran,
+ *           Échap quitter). Minutes du débrief : durées du chrono du match.
  * Version : 3.82 — Suivi : synchro VEO, lot 2 — import des clips (6 oct. 2026)
  *   v3.82 : FAIT FOI Conception-SYNCHRO-VEO-v1, lot L2 (S4, S5, S6) +
  *           avenant A1-A3 (gelé 06/10 17:21). « 🎥 Importer les clips VEO » :
@@ -4082,6 +4096,10 @@
     if (evtId) {
       html += '<section class="rapport-bloc" id="' + idFroid + '" hidden></section>';
     }
+    // v3.83 — DÉBRIEF VIDÉO (rapport de match seul ; asynchrone).
+    if (evtId && !suffix) {
+      html += '<section class="rapport-bloc" id="rapport-debrief" hidden></section>';
+    }
 
     // SUBSTITUTIONS (nominatif sortant → entrant, côté nous).
     if (subs.length > 0) {
@@ -4133,6 +4151,7 @@
     if (fautes.length) _peindreFautesRapport(fautes, idFautes, nomNous, nomAdv);   // v3.76
     if (ftech.length) _peindreFautesTechRapport(ftech, idFtech, nomNous, nomAdv);  // v3.77
     if (pied.length) _peindreBotteursPied(pied, idPied, nomNous);                  // v3.80
+    if (evtId && !suffix) _peindreDebrief(evtId, 'rapport-debrief', lignes);      // v3.83
     if (evtId) {
       // v3.81 / v3.82 — lien VEO ; si des repères VEO sont rapprochés, le
       // déroulé est repeint avec leurs « ▶ ».
@@ -5114,7 +5133,7 @@
   // officiels rapprochés de la période) → arrêts de jeu absorbés.
   // sansAncres = calcul linéaire depuis le coup d'envoi ; vDirect = réglages
   // à utiliser (brouillon en cours d'enregistrement).
-  function _minuteDepuisVeo(evtId, sec, sansAncres, vDirect) {
+  function _minuteDepuisVeo(evtId, sec, sansAncres, vDirect, durees) {   // v3.83 : durees (rapport)
     var v = vDirect || _veoMatch(evtId);
     if (!v || !Array.isArray(v.coups_envoi) || typeof sec !== 'number') return null;
     var per = null;
@@ -5123,7 +5142,7 @@
       if (typeof ke === 'number' && ke <= sec) per = p;
     }
     if (!per) return null;
-    var A = [{ t: v.coups_envoi[per - 1], m: _decalageMinutes(per) }];
+    var A = [{ t: v.coups_envoi[per - 1], m: (Array.isArray(durees) ? _decalageDurees(durees, per) : _decalageMinutes(per)) }];
     if (!sansAncres) {
       (Array.isArray(v.reperes) ? v.reperes : []).forEach(function (r) {
         if (r && r.st === 'lie' && typeof r.ma === 'number' && r.pe === per && r.t > A[0].t) A.push({ t: r.t, m: r.ma });
@@ -5579,6 +5598,427 @@
         if (Object.keys(cur).length) d.veo = cur; else delete d.veo;
       }, function () { _peindreChrono(); });
     });
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // v3.83 — SYNCHRO VEO, lot L3 : DÉBRIEF VIDÉO (FAIT FOI S8).
+  //   • rapports.donnees.veo.debrief = { items: [{ id, msg, th, j: [uuid] }],
+  //     retires: [id] } — id = id du repère VEO ('HHMMSS|LIBELLÉ').
+  //   • Liste effective = items (ordre de la séance) + clips perso (coachs)
+  //     ni présents ni retirés, ajoutés dans l'ordre du match. Sans débrief
+  //     enregistré : tous les clips perso, dans l'ordre du match.
+  //   • Mode présentation : dossier des clips choisi SUR LE PC, lecture
+  //     locale (URL.createObjectURL) — aucune vidéo envoyée sur Internet.
+  // ════════════════════════════════════════════════════════════
+  var Debrief = { evtId: null, cibleId: null, v: null, themes: [], durees: null, lignes: [], edit: null, ajout: false };
+
+  function _decalageDurees(durees, per) {
+    var cumul = 0;
+    for (var i = 0; i < per - 1 && i < durees.length; i++) cumul += (durees[i] > 0 ? durees[i] : 0);
+    return cumul;
+  }
+  function _debriefRepere(v, id) {
+    var reps = (v && Array.isArray(v.reperes)) ? v.reperes : [];
+    for (var i = 0; i < reps.length; i++) if (reps[i] && reps[i].id === id) return reps[i];
+    return null;
+  }
+  // Liste effective [{id, msg, th, j}] (repères existants seulement).
+  function _debriefListe(v) {
+    var db = (v && v.debrief && typeof v.debrief === 'object') ? v.debrief : {};
+    var items = Array.isArray(db.items) ? db.items : [];
+    var retires = Array.isArray(db.retires) ? db.retires : [];
+    var out = [], vus = {};
+    items.forEach(function (it) {
+      if (!it || !it.id || vus[it.id] || !_debriefRepere(v, it.id)) return;
+      vus[it.id] = true;
+      out.push({ id: it.id, msg: it.msg || '', th: it.th || null, j: Array.isArray(it.j) ? it.j.slice() : [] });
+    });
+    var reps = (v && Array.isArray(v.reperes)) ? v.reperes.slice() : [];
+    reps.sort(function (a, b) { return a.t - b.t; });
+    reps.forEach(function (r) {
+      if (r && r.k === 'perso' && !vus[r.id] && retires.indexOf(r.id) < 0) {
+        vus[r.id] = true;
+        out.push({ id: r.id, msg: '', th: null, j: [] });
+      }
+    });
+    return out;
+  }
+  // Applique une opération sur le débrief de v (objet veo frais, en place).
+  function _debriefAppliquer(v, op) {
+    var liste = _debriefListe(v);
+    var db = (v.debrief && typeof v.debrief === 'object') ? v.debrief : {};
+    var retires = Array.isArray(db.retires) ? db.retires.slice() : [];
+    var idx = -1;
+    for (var i = 0; i < liste.length; i++) if (liste[i].id === op.id) idx = i;
+    if (op.type === 'monter' && idx > 0) {
+      liste.splice(idx - 1, 0, liste.splice(idx, 1)[0]);
+    } else if (op.type === 'descendre' && idx >= 0 && idx < liste.length - 1) {
+      liste.splice(idx + 1, 0, liste.splice(idx, 1)[0]);
+    } else if (op.type === 'retirer' && idx >= 0) {
+      liste.splice(idx, 1);
+      if (retires.indexOf(op.id) < 0) retires.push(op.id);
+    } else if (op.type === 'ajouter' && idx < 0) {
+      var r = _debriefRepere(v, op.id);
+      if (!r) return;
+      var pos = liste.length;
+      for (var k = 0; k < liste.length; k++) {
+        var rk = _debriefRepere(v, liste[k].id);
+        if (rk && rk.t > r.t) { pos = k; break; }
+      }
+      liste.splice(pos, 0, { id: op.id, msg: '', th: null, j: [] });
+      retires = retires.filter(function (x) { return x !== op.id; });
+    } else if (op.type === 'modifier' && idx >= 0) {
+      liste[idx].msg = op.msg || '';
+      liste[idx].th = op.th || null;
+      liste[idx].j = Array.isArray(op.j) ? op.j : [];
+    }
+    v.debrief = {
+      items: liste.map(function (it) {
+        var o = { id: it.id };
+        if (it.msg) o.msg = it.msg;
+        if (it.th) o.th = it.th;
+        if (it.j && it.j.length) o.j = it.j;
+        return o;
+      }),
+      retires: retires
+    };
+  }
+  // Libellé d'un repère : action Hub liée (ex. « Mêlée volée ») sinon titre VEO.
+  function _debriefLibelle(r) {
+    if (r && r.lg && (r.st === 'lie' || r.st === 'fait')) {
+      for (var i = 0; i < Debrief.lignes.length; i++) {
+        var l = Debrief.lignes[i];
+        if (l && l.id === r.lg && l.annule !== true) {
+          var info = (typeof SuiviObs.libelle === 'function') ? SuiviObs.libelle(l.observable_id) : null;
+          if (info && info.libelle) return info.libelle;
+        }
+      }
+    }
+    return (r && r.lib) || 'Clip';
+  }
+  function _debriefMinute(r) {
+    if (!r) return '';
+    if (r.st === 'lie' && typeof r.ma === 'number') return Math.floor(r.ma) + '\'';
+    var m = _minuteDepuisVeo(Debrief.evtId, r.t, false, Debrief.v, Debrief.durees);
+    return m ? (m.minute + '\'') : '';
+  }
+  function _debriefTheme(id) {
+    for (var i = 0; i < Debrief.themes.length; i++) if (Debrief.themes[i].id === id) return Debrief.themes[i].libelle;
+    return id ? 'Thème retiré' : '';
+  }
+  function _debriefNoms(uuids) {
+    var eff = _effectifPourSaisie(), parId = {};
+    eff.forEach(function (jo) { parId[jo.uuid] = jo; });
+    return (uuids || []).map(function (u) { return parId[u] ? _nomJoueur(parId[u]) : null; })
+      .filter(function (x) { return !!x; });
+  }
+
+  // Charge (rapport + thèmes + durées) puis peint la section du rapport.
+  function _peindreDebrief(evtId, cibleId, lignes) {
+    var box = document.getElementById(cibleId);
+    var hub = window.SupabaseHub;
+    if (!box || !hub || typeof hub.getRapportMatch !== 'function') return;
+    var catId = _categorieCourante();
+    var pTh = (catId && typeof hub.listerObservablesFroid === 'function')
+      ? hub.listerObservablesFroid(catId, true).catch(function () { return { ok: false }; })
+      : Promise.resolve({ ok: false });
+    var pCh = (typeof hub.getChronoRencontreCoach === 'function')
+      ? hub.getChronoRencontreCoach(evtId).catch(function () { return null; }) : Promise.resolve(null);
+    Promise.all([hub.getRapportMatch(evtId), pTh, pCh]).then(function (res) {
+      var d = (res[0] && res[0].ok && res[0].data && res[0].data.donnees) ? res[0].data.donnees : null;
+      var v = (d && d.veo && typeof d.veo === 'object') ? d.veo : null;
+      if (Debrief.evtId !== evtId) { Debrief.edit = null; Debrief.ajout = false; }
+      Debrief.evtId = evtId;
+      Debrief.cibleId = cibleId;
+      Debrief.v = v;
+      Debrief.lignes = Array.isArray(lignes) ? lignes : Debrief.lignes;
+      Debrief.themes = (res[1] && res[1].ok && Array.isArray(res[1].data)) ? res[1].data : [];
+      var ch = res[2];
+      Debrief.durees = (ch && Array.isArray(ch.durees_periodes) && ch.durees_periodes.length) ? ch.durees_periodes : null;
+      _rendreDebrief();
+    }).catch(function () { /* section optionnelle : silence */ });
+  }
+
+  function _rendreDebrief() {
+    var box = document.getElementById(Debrief.cibleId);
+    if (!box) return;
+    var v = Debrief.v;
+    if (!v || !Array.isArray(v.reperes) || !v.reperes.length) { box.setAttribute('hidden', ''); box.innerHTML = ''; return; }
+    var liste = _debriefListe(v);
+    var url = (typeof v.url === 'string' && /^https:\/\//i.test(v.url)) ? v.url : null;
+    var h = '<h4 class="rapport-bloc__titre">🎬 Débrief vidéo <span class="rapport-bloc__n">(' + liste.length + ' clip' + (liste.length > 1 ? 's' : '') + ')</span></h4>';
+    h += '<div class="rapport__saisi-actions" style="margin:0 0 8px">' +
+         '<button type="button" class="rapport__btn rapport__btn--primary" id="dbf-lancer"' + (liste.length ? '' : ' disabled') + '>▶ Lancer le débrief</button>' +
+         '<button type="button" class="rapport__btn" id="dbf-ajout">' + (Debrief.ajout ? '✕ Fermer l\'ajout' : '＋ Ajouter un clip VEO') + '</button>' +
+         '</div>';
+    h += '<p class="view-suivi__hint rapport__saisi-actions" style="text-align:left;margin:0 0 8px">Clips des coachs dans l\'ordre du match, puis ceux ajoutés. ' +
+         '« Lancer » : choisis le dossier des clips téléchargés depuis VEO — lecture sur ce PC, aucune vidéo envoyée sur Internet. ' +
+         'Clavier / télécommande : → suivant, ← précédent, ↑ revoir, espace pause, M message, F plein écran, Échap quitter.</p>';
+    if (Debrief.ajout) h += _debriefAjoutHTML(v, liste);
+    if (!liste.length) {
+      h += '<p class="view-suivi__hint" style="text-align:left">Aucun clip au débrief.</p>';
+    } else {
+      h += '<ol style="margin:0;padding-left:22px">';
+      liste.forEach(function (it, i) {
+        var r = _debriefRepere(v, it.id);
+        var tc = '▶ ' + _fmtTempsVeo(r.t);
+        var tcH = url ? '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener" style="color:#5ec8a0;text-decoration:none">' + escapeHtml(tc) + '</a>'
+                      : '<span style="color:#5ec8a0">' + escapeHtml(tc) + '</span>';
+        var mn = _debriefMinute(r);
+        var lib = _debriefLibelle(r);
+        h += '<li style="margin:0 0 10px" data-dbf-item="' + escapeHtml(it.id) + '">';
+        h += '<div><strong>' + escapeHtml(lib) + '</strong>' + (lib !== r.lib ? ' <span style="opacity:.7">(' + escapeHtml(r.lib) + ')</span>' : '') +
+             ' · ' + tcH + (mn ? ' · ' + escapeHtml(mn) : '') + (r.k === 'perso' ? ' · <span style="opacity:.7">clip coach</span>' : '') + '</div>';
+        if (it.msg) h += '<div style="margin-top:2px">💬 ' + escapeHtml(it.msg).replace(/\n/g, '<br>') + '</div>';
+        var th = _debriefTheme(it.th), noms = _debriefNoms(it.j);
+        if (th || noms.length) {
+          h += '<div style="margin-top:2px;opacity:.85;font-size:.92em">' +
+               (th ? '🏷 ' + escapeHtml(th) : '') + (th && noms.length ? ' · ' : '') +
+               (noms.length ? '👤 ' + escapeHtml(noms.join(', ')) : '') + '</div>';
+        }
+        h += '<div class="rapport__saisi-actions" style="margin-top:4px;gap:4px">' +
+             '<button type="button" class="rapport__btn" data-dbf-op="modifier" data-id="' + escapeHtml(it.id) + '">✎ Message</button>' +
+             '<button type="button" class="rapport__btn" data-dbf-op="monter" data-id="' + escapeHtml(it.id) + '"' + (i === 0 ? ' disabled' : '') + ' title="Monter">↑</button>' +
+             '<button type="button" class="rapport__btn" data-dbf-op="descendre" data-id="' + escapeHtml(it.id) + '"' + (i === liste.length - 1 ? ' disabled' : '') + ' title="Descendre">↓</button>' +
+             '<button type="button" class="rapport__btn" data-dbf-op="retirer" data-id="' + escapeHtml(it.id) + '" title="Retirer du débrief">✕</button>' +
+             '</div>';
+        if (Debrief.edit === it.id) h += _debriefFormHTML(it);
+        h += '</li>';
+      });
+      h += '</ol>';
+    }
+    box.innerHTML = h;
+    box.removeAttribute('hidden');
+    _brancherDebrief(box, liste);
+  }
+
+  function _debriefAjoutHTML(v, liste) {
+    var dans = {};
+    liste.forEach(function (it) { dans[it.id] = true; });
+    var dispo = v.reperes.filter(function (r) { return r && !dans[r.id] && r.k !== 'ke' && r.k !== 'fin'; })
+      .sort(function (a, b) { return a.t - b.t; });
+    var h = '<div class="rapport__saisi-actions" style="display:block;margin:0 0 10px;padding:8px;border:1px solid #2a323a;border-radius:8px">';
+    if (!dispo.length) return h + '<p class="view-suivi__hint">Tous les clips sont déjà au débrief.</p></div>';
+    h += '<div style="max-height:300px;overflow:auto">';
+    dispo.forEach(function (r) {
+      var mn = _debriefMinute(r);
+      h += '<div style="display:flex;align-items:center;gap:8px;margin:2px 0">' +
+           '<button type="button" class="rapport__btn" data-dbf-op="ajouter" data-id="' + escapeHtml(r.id) + '">＋</button>' +
+           '<span>' + escapeHtml(_fmtTempsVeo(r.t)) + (mn ? ' · ' + escapeHtml(mn) : '') + ' · ' + escapeHtml(_debriefLibelle(r)) +
+           (r.k === 'perso' ? ' <span style="opacity:.7">(clip coach retiré)</span>' : '') + '</span></div>';
+    });
+    return h + '</div></div>';
+  }
+
+  function _debriefFormHTML(it) {
+    var h = '<div class="rapport__saisi-actions" style="display:block;margin-top:6px;padding:8px;border:1px solid #2a323a;border-radius:8px">';
+    h += '<label style="display:block;margin-bottom:4px">Message clé</label>';
+    h += '<textarea id="dbf-msg" maxlength="600" style="' + _STYLE_TEXTAREA + ';min-height:70px" placeholder="Ce que les joueurs doivent retenir de ce clip…">' +
+         escapeHtml(it.msg || '') + '</textarea>';
+    h += '<label style="display:block;margin:8px 0 4px">Thème (observations à froid)</label>';
+    h += '<select id="dbf-th" style="width:100%;padding:6px;border-radius:6px"><option value="">— aucun —</option>';
+    Debrief.themes.forEach(function (t) {
+      if (t.actif === false && t.id !== it.th) return;
+      h += '<option value="' + escapeHtml(t.id) + '"' + (t.id === it.th ? ' selected' : '') + '>' + escapeHtml(t.libelle) + '</option>';
+    });
+    h += '</select>';
+    var eff = _effectifPourSaisie();
+    if (eff.length) {
+      h += '<label style="display:block;margin:8px 0 4px">Joueurs concernés (facultatif)</label>';
+      h += '<div style="display:flex;flex-wrap:wrap;gap:4px 12px">';
+      eff.forEach(function (jo) {
+        h += '<label style="white-space:nowrap"><input type="checkbox" data-dbf-j="' + escapeHtml(jo.uuid) + '"' +
+             ((it.j || []).indexOf(jo.uuid) >= 0 ? ' checked' : '') + '> ' + escapeHtml((jo.num ? jo.num + ' · ' : '') + _nomJoueur(jo)) + '</label>';
+      });
+      h += '</div>';
+    }
+    h += '<div style="display:flex;gap:8px;margin-top:10px">' +
+         '<button type="button" class="rapport__btn rapport__btn--primary" id="dbf-ok">💾 Enregistrer</button>' +
+         '<button type="button" class="rapport__btn" id="dbf-annuler">Annuler</button></div>';
+    return h + '</div>';
+  }
+
+  function _brancherDebrief(box, liste) {
+    var evtId = Debrief.evtId;
+    var bL = box.querySelector('#dbf-lancer');
+    if (bL) bL.addEventListener('click', function () { _lancerDebrief(); });
+    var bA = box.querySelector('#dbf-ajout');
+    if (bA) bA.addEventListener('click', function () { Debrief.ajout = !Debrief.ajout; _rendreDebrief(); });
+    box.querySelectorAll('[data-dbf-op]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var op = b.getAttribute('data-dbf-op'), id = b.getAttribute('data-id');
+        if (op === 'modifier') { Debrief.edit = (Debrief.edit === id) ? null : id; _rendreDebrief(); return; }
+        if (op === 'retirer' && !window.confirm('Retirer ce clip du débrief ?')) return;
+        _enregistrerDebrief(evtId, { type: op, id: id });
+      });
+    });
+    var ok = box.querySelector('#dbf-ok');
+    if (ok) ok.addEventListener('click', function () {
+      var js = [];
+      box.querySelectorAll('[data-dbf-j]').forEach(function (c) { if (c.checked) js.push(c.getAttribute('data-dbf-j')); });
+      var id = Debrief.edit;
+      Debrief.edit = null;
+      _enregistrerDebrief(evtId, {
+        type: 'modifier', id: id,
+        msg: (box.querySelector('#dbf-msg').value || '').trim(),
+        th: box.querySelector('#dbf-th').value || null,
+        j: js
+      });
+    });
+    var an = box.querySelector('#dbf-annuler');
+    if (an) an.addEventListener('click', function () { Debrief.edit = null; _rendreDebrief(); });
+  }
+
+  // Écriture : relit le rapport (fusion), applique l'opération, upsert.
+  function _enregistrerDebrief(evtId, op) {
+    SuiviFroid.charger(evtId, function () {
+      _enregistrerDonneesMatch(evtId, function (d) {
+        if (!d.veo || typeof d.veo !== 'object') return;
+        _debriefAppliquer(d.veo, op);
+      }, function () {
+        Debrief.v = (SuiviFroid.estPour(evtId) && SuiviFroid.veo) ? SuiviFroid.veo : Debrief.v;
+        _veoCacheRapport[evtId] = Debrief.v;
+        _rendreDebrief();
+      });
+    });
+  }
+
+  // ── Mode présentation (lecture locale des clips) ───────────────────
+  function _lancerDebrief() {
+    var inp = document.createElement('input');
+    inp.type = 'file';
+    inp.multiple = true;
+    inp.setAttribute('webkitdirectory', '');
+    inp.setAttribute('directory', '');
+    inp.style.display = 'none';
+    document.body.appendChild(inp);
+    inp.addEventListener('change', function () {
+      var fichiers = Array.prototype.slice.call(inp.files || []);
+      document.body.removeChild(inp);
+      _ouvrirPresentation(fichiers);
+    });
+    inp.click();
+  }
+
+  function _ouvrirPresentation(fichiers) {
+    var v = Debrief.v;
+    var parId = {};
+    fichiers.forEach(function (f) {
+      var p = _parserClipsVeo(f.name);
+      if (p.length && !parId[p[0].id]) parId[p[0].id] = f;
+    });
+    var liste = _debriefListe(v).map(function (it) {
+      var r = _debriefRepere(v, it.id);
+      return { it: it, r: r, f: parId[it.id] || null };
+    });
+    var trouves = liste.filter(function (x) { return !!x.f; }).length;
+    var P = { liste: liste, i: 0, urls: [], texte: true, ecran: null, video: null };
+
+    var ecran = document.createElement('div');
+    ecran.id = 'debrief-ecran';
+    ecran.setAttribute('style', 'position:fixed;inset:0;z-index:100000;background:#000;color:#f6f3e8;' +
+      'display:flex;flex-direction:column;font-family:inherit');
+    document.body.appendChild(ecran);
+    P.ecran = ecran;
+
+    function fermer() {
+      document.removeEventListener('keydown', clavier, true);
+      P.urls.forEach(function (u) { try { URL.revokeObjectURL(u); } catch (e) { /* rien */ } });
+      if (document.fullscreenElement && document.exitFullscreen) { try { document.exitFullscreen(); } catch (e) { /* rien */ } }
+      if (ecran.parentNode) ecran.parentNode.removeChild(ecran);
+    }
+    function pleinEcran() {
+      if (document.fullscreenElement) { if (document.exitFullscreen) document.exitFullscreen(); return; }
+      if (ecran.requestFullscreen) { try { var pr = ecran.requestFullscreen(); if (pr && pr.catch) pr.catch(function () {}); } catch (e) { /* rien */ } }
+    }
+    function bouton(id, txt, titre) {
+      return '<button type="button" id="' + id + '" title="' + escapeHtml(titre) + '" style="background:rgba(255,255,255,.12);color:#fff;' +
+             'border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:8px 14px;font-size:18px;cursor:pointer">' + txt + '</button>';
+    }
+    function accueil() {
+      var h = '<div style="margin:auto;max-width:640px;padding:24px;text-align:center">' +
+              '<div style="font-size:28px;font-weight:700;margin-bottom:12px">🎬 Débrief vidéo</div>' +
+              '<div style="font-size:18px;margin-bottom:12px">' + liste.length + ' clip' + (liste.length > 1 ? 's' : '') +
+              ' — ' + trouves + ' trouvé' + (trouves > 1 ? 's' : '') + ' dans le dossier (' + fichiers.length + ' fichier' + (fichiers.length > 1 ? 's' : '') + ').</div>';
+      var manq = liste.filter(function (x) { return !x.f; });
+      if (manq.length) {
+        h += '<div style="text-align:left;font-size:14px;opacity:.85;margin:0 auto 12px;max-height:180px;overflow:auto">Introuvables (le message sera affiché sans vidéo) :<br>' +
+             manq.map(function (x) { return escapeHtml(_fmtTempsVeo(x.r.t) + ' · ' + x.r.lib); }).join('<br>') + '</div>';
+      }
+      h += '<div style="display:flex;gap:10px;justify-content:center">' + bouton('dbe-go', '▶ Démarrer', 'Démarrer en plein écran') +
+           bouton('dbe-x', '✕ Fermer', 'Fermer') + '</div></div>';
+      ecran.innerHTML = h;
+      ecran.querySelector('#dbe-go').addEventListener('click', function () { pleinEcran(); montrer(0); });
+      ecran.querySelector('#dbe-x').addEventListener('click', fermer);
+    }
+    function montrer(i) {
+      if (i < 0 || i >= liste.length) return;
+      P.i = i;
+      var x = liste[i];
+      var mn = _debriefMinute(x.r);
+      var th = _debriefTheme(x.it.th), noms = _debriefNoms(x.it.j);
+      var h = '<div style="position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center">';
+      if (x.f) {
+        var u = URL.createObjectURL(x.f);
+        P.urls.push(u);
+        h += '<video id="dbe-video" src="' + escapeHtml(u) + '" autoplay playsinline style="max-width:100%;max-height:100%;width:100%;height:100%;object-fit:contain"></video>';
+      } else {
+        h += '<div style="font-size:20px;opacity:.7">Clip introuvable dans le dossier choisi.</div>';
+      }
+      h += '<div id="dbe-haut" style="position:absolute;top:0;left:0;right:0;padding:12px 16px;background:linear-gradient(rgba(0,0,0,.75),rgba(0,0,0,0));font-size:20px;font-weight:700' + (P.texte ? '' : ';display:none') + '">' +
+           escapeHtml((i + 1) + ' / ' + liste.length + (mn ? ' · ' + mn : '') + ' · ' + _debriefLibelle(x.r)) +
+           ' <span style="font-weight:400;opacity:.75;font-size:16px">▶ ' + escapeHtml(_fmtTempsVeo(x.r.t)) + '</span></div>';
+      if (x.it.msg || th || noms.length) {
+        h += '<div id="dbe-bas" style="position:absolute;left:0;right:0;bottom:0;padding:16px 20px 64px;background:linear-gradient(rgba(0,0,0,0),rgba(0,0,0,.85))' + (P.texte ? '' : ';display:none') + '">' +
+             (x.it.msg ? '<div style="font-size:26px;font-weight:700;line-height:1.3">' + escapeHtml(x.it.msg).replace(/\n/g, '<br>') + '</div>' : '') +
+             ((th || noms.length) ? '<div style="font-size:16px;opacity:.85;margin-top:6px">' + (th ? '🏷 ' + escapeHtml(th) : '') +
+               (th && noms.length ? ' · ' : '') + (noms.length ? '👤 ' + escapeHtml(noms.join(', ')) : '') + '</div>' : '') + '</div>';
+      }
+      h += '</div>';
+      h += '<div style="position:absolute;right:12px;bottom:12px;display:flex;gap:6px">' +
+           bouton('dbe-prec', '◀', 'Précédent (←)') + bouton('dbe-revoir', '↻', 'Revoir (↑)') + bouton('dbe-pause', '⏯', 'Pause / lecture (espace)') +
+           bouton('dbe-suiv', '▶', 'Suivant (→)') + bouton('dbe-txt', '💬', 'Masquer / afficher le message (M)') +
+           bouton('dbe-fs', '⛶', 'Plein écran (F)') + bouton('dbe-x', '✕', 'Quitter (Échap)') + '</div>';
+      ecran.innerHTML = h;
+      P.video = ecran.querySelector('#dbe-video');
+      if (P.video && P.video.play) { try { var pp = P.video.play(); if (pp && pp.catch) pp.catch(function () {}); } catch (e) { /* rien */ } }
+      ecran.querySelector('#dbe-prec').addEventListener('click', function () { montrer(P.i - 1); });
+      ecran.querySelector('#dbe-suiv').addEventListener('click', function () { montrer(P.i + 1); });
+      ecran.querySelector('#dbe-revoir').addEventListener('click', revoir);
+      ecran.querySelector('#dbe-pause').addEventListener('click', pause);
+      ecran.querySelector('#dbe-txt').addEventListener('click', texte);
+      ecran.querySelector('#dbe-fs').addEventListener('click', pleinEcran);
+      ecran.querySelector('#dbe-x').addEventListener('click', fermer);
+    }
+    function revoir() {
+      if (!P.video) return;
+      P.video.currentTime = 0;
+      try { var pp = P.video.play(); if (pp && pp.catch) pp.catch(function () {}); } catch (e) { /* rien */ }
+    }
+    function pause() {
+      if (!P.video) return;
+      if (P.video.paused) { try { var pp = P.video.play(); if (pp && pp.catch) pp.catch(function () {}); } catch (e) { /* rien */ } }
+      else P.video.pause();
+    }
+    function texte() {
+      P.texte = !P.texte;
+      ['#dbe-haut', '#dbe-bas'].forEach(function (s) { var e = ecran.querySelector(s); if (e) e.style.display = P.texte ? '' : 'none'; });
+    }
+    function clavier(ev) {
+      if (!ecran.parentNode) return;
+      var k = ev.key;
+      var enCours = !!ecran.querySelector('#dbe-suiv');
+      if (k === 'Escape') { ev.preventDefault(); fermer(); return; }
+      if (!enCours) return;
+      if (k === 'ArrowRight' || k === 'PageDown' || k === 'Enter') { ev.preventDefault(); montrer(P.i + 1); }
+      else if (k === 'ArrowLeft' || k === 'PageUp') { ev.preventDefault(); montrer(P.i - 1); }
+      else if (k === 'ArrowUp' || k === 'r' || k === 'R') { ev.preventDefault(); revoir(); }
+      else if (k === ' ' || k === 'Spacebar') { ev.preventDefault(); pause(); }
+      else if (k === 'm' || k === 'M') { ev.preventDefault(); texte(); }
+      else if (k === 'f' || k === 'F') { ev.preventDefault(); pleinEcran(); }
+    }
+    document.addEventListener('keydown', clavier, true);
+    accueil();
   }
 
   function _optionsPeriodes(choisie) {
