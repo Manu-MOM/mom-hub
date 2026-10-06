@@ -6,6 +6,19 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.81 — Suivi : synchro VEO, lot 1 (6 oct. 2026)
+ *   v3.81 : FAIT FOI Conception-SYNCHRO-VEO-v1 (gelé par Manu le 06/10 à
+ *           15:35), lot L1 (S2, S3, S7, S9). Barre « Saisie » : bouton
+ *           « 🎥 VEO » → lien VEO du match + temps vidéo de chaque coup
+ *           d'envoi (rapports.donnees.veo, zéro DDL). En mode ✍, champ
+ *           « Temps VEO » (mm:ss) : période et minute cumulée calculées ;
+ *           la saisie à la minute reste possible. Le temps est enregistré
+ *           dans chronologie_suivi.timecode_video (p_timecode_video, RPC
+ *           déployée, sondée 06/10). « ▶ mm:ss » dans l'historique (clic =
+ *           ouvre le match VEO) et dans le déroulé du rapport ; lien
+ *           « 🎥 Ouvrir la vidéo VEO » en tête du déroulé. Modifier :
+ *           champ « Temps VEO » (conservé ou corrigé). Aucun temps déduit
+ *           pour les actions existantes (S9).
  * Version : 3.80 — Suivi : rubrique « Jeu au pied » (6 oct. 2026)
  *   v3.80 : FAIT FOI Conception-JEU-AU-PIED-v1 (gelé par Manu le 06/10 à
  *           11:47). Requiert observables-match.json v1.3 (famille
@@ -4067,6 +4080,7 @@
     // famille ci-dessus donne le « combien » ; ce fil donne le déroulé.
     html += '<section class="rapport-bloc">' +
               '<h4 class="rapport-bloc__titre">📋 Déroulé du match <span class="rapport-bloc__n">(' + eff.length + ')</span></h4>' +
+              '<div id="' + idFil + '-veo"></div>' +   // v3.81 — lien VEO (asynchrone)
               '<div id="' + idFil + '" class="rapport-fil">' +
                 '<p class="view-suivi__hint">Résolution des noms…</p>' +
               '</div>' +
@@ -4101,7 +4115,7 @@
     if (ftech.length) _peindreFautesTechRapport(ftech, idFtech, nomNous, nomAdv);  // v3.77
     if (pied.length) _peindreBotteursPied(pied, idPied, nomNous);                  // v3.80
     if (evtId) {
-      _peindreFroidRapport(evtId, idFroid);
+      _peindreFroidRapport(evtId, idFroid, idFil + '-veo');   // v3.81
       _peindreTdjRapport(evtId, idTdj);
     }
   }
@@ -4312,7 +4326,7 @@
   }
 
   // Observations à froid + remarque conquête (rapports.donnees du match).
-  function _peindreFroidRapport(evtId, cibleId) {
+  function _peindreFroidRapport(evtId, cibleId, idVeo) {
     var box = document.getElementById(cibleId);
     var hub = window.SupabaseHub;
     if (!box || !hub || typeof hub.getRapportMatch !== 'function') return;
@@ -4325,6 +4339,12 @@
       var notes = (d && d.notes_froid && typeof d.notes_froid === 'object') ? d.notes_froid : {};
       var remq = (d && typeof d.remarque_conquete === 'string') ? d.remarque_conquete.trim() : '';
       var remp = (d && typeof d.remarque_jeu_pied === 'string') ? d.remarque_jeu_pied.trim() : '';   // v3.80
+      // v3.81 — lien vers la vidéo VEO du match, en tête du déroulé.
+      var boxVeo = idVeo ? document.getElementById(idVeo) : null;
+      if (boxVeo && d && d.veo && typeof d.veo.url === 'string' && /^https:\/\//i.test(d.veo.url)) {
+        boxVeo.innerHTML = '<p class="view-suivi__hint" style="text-align:left"><a href="' + escapeHtml(d.veo.url) +
+          '" target="_blank" rel="noopener">🎥 Ouvrir la vidéo VEO du match</a> — « ▶ mm:ss » = temps à atteindre dans la vidéo.</p>';
+      }
       var libs = {};
       ((res[1] && res[1].ok && Array.isArray(res[1].data)) ? res[1].data : []).forEach(function (o) {
         libs[o.id] = o;
@@ -4548,7 +4568,8 @@
 
         html += '<div class="rapport-fil__ligne">' +
                   '<span class="rapport-fil__min">' + escapeHtml(min) + '</span>' +
-                  '<span class="rapport-fil__act">' + (icone ? (escapeHtml(icone) + ' ') : '') + escapeHtml(libelle) + '</span>' +
+                  '<span class="rapport-fil__act">' + (icone ? (escapeHtml(icone) + ' ') : '') + escapeHtml(libelle) +
+                    _tcLigneHTML(l, null) + '</span>' +   // v3.81
                   '<span class="rapport-fil__who">' + escapeHtml(acteur) + '</span>' +
                   '<span class="rapport-fil__pts">' + escapeHtml(pts) + '</span>' +
                 '</div>';
@@ -4671,7 +4692,8 @@
       var pts = (l.valeur_points ? ' (+' + l.valeur_points + ')' : '');
       var annulee = (l.annule === true);
       html += '<div class="suivi-histo__row' + (annulee ? ' suivi-histo__row--annulee' : '') + '">';
-      html +=   '<span class="suivi-histo__txt">' + (min ? '<b>' + min + '</b> ' : '') + escapeHtml(lib) + pts + ' · ' + qui + '</span>';
+      html +=   '<span class="suivi-histo__txt">' + (min ? '<b>' + min + '</b> ' : '') + escapeHtml(lib) + pts + ' · ' + qui +
+                  _tcLigneHTML(l, (_veoMatch(evtId) || {}).url) + '</span>';   // v3.81
       if (!annulee) {
         html += '<span style="display:flex;gap:6px">' +
                   '<button type="button" class="suivi-histo__annuler suivi-histo__modifier" data-mod="' + escapeHtml(l.id) + '" style="border-color:#3a4650;color:#aab8c4">modifier</button>' +
@@ -4983,6 +5005,7 @@
       this.campFaute = 'notre';   // v3.76
       this.campFtech = 'notre';   // v3.77
       this.campPied = 'notre';    // v3.80
+      this.tvideo = null;         // v3.81 — temps VEO saisi (secondes), lié à la minute courante
     }
   };
 
@@ -5007,7 +5030,129 @@
     return { minute: m, periode: SuiviSaisie.periode || _periodeDeMinute(m) };
   }
 
+  // v3.81 — temps VEO à joindre à une saisie : seulement en mode manuel, si
+  // la minute envoyée est bien celle calculée depuis le temps VEO saisi.
+  function _timecodeCourant(obs) {
+    if (_modeSaisie() !== 'manuel' || typeof SuiviSaisie.tvideo !== 'number') return null;
+    if (!obs || obs.minuteMatch !== SuiviSaisie.minute) return null;
+    return _secVersInterval(SuiviSaisie.tvideo);
+  }
+
   var _STYLE_SELECT = 'padding:6px 8px;border-radius:6px;background:#14181c;color:#f6f3e8;border:1px solid #2a323a;font-size:14px;font-family:inherit';
+
+  // ════════════════════════════════════════════════════════════
+  // v3.81 — SYNCHRO VEO, lot L1. Le lecteur VEO affiche un temps vidéo
+  // continu (« 41:27 / 88:42 ») ; un lien VEO ne peut pas viser un moment
+  // (testé : ?t= ignoré, « Partager » sans option de temps).
+  //   • rapports.donnees.veo = { url, coups_envoi: [sec P1, sec P2, …] }
+  //   • temps VEO d'une action créée dans le Hub → timecode_video (INTERVAL)
+  // ════════════════════════════════════════════════════════════
+  // « 41:27 », « 64:51 », « 1:04:51 » → secondes ; null si illisible.
+  function _parseTempsVeo(txt) {
+    var m = /^\s*(?:(\d{1,2}):)?(\d{1,3}):(\d{2})\s*$/.exec(String(txt || ''));
+    if (!m || +m[3] > 59) return null;
+    return (m[1] ? +m[1] * 3600 : 0) + (+m[2]) * 60 + (+m[3]);
+  }
+  // secondes → « 41:27 » (minutes au-delà de 59 comme le lecteur VEO : 64:51).
+  function _fmtTempsVeo(sec) {
+    if (typeof sec !== 'number' || !(sec >= 0)) return '';
+    var mm = Math.floor(sec / 60), ss = Math.floor(sec % 60);
+    return mm + ':' + (ss < 10 ? '0' : '') + ss;
+  }
+  // INTERVAL Postgres (« 00:41:27 », « 01:04:51 », « 00:41:27.5 ») → secondes.
+  function _intervalVersSec(v) {
+    if (v === null || v === undefined || v === '') return null;
+    var m = /(?:(\d+) days? )?(\d+):(\d{2}):(\d{2})(?:\.\d+)?/.exec(String(v));
+    if (!m) return null;
+    return (m[1] ? +m[1] * 86400 : 0) + (+m[2]) * 3600 + (+m[3]) * 60 + (+m[4]);
+  }
+  function _secVersInterval(sec) {
+    var h = Math.floor(sec / 3600), mn = Math.floor((sec % 3600) / 60), ss = Math.floor(sec % 60);
+    function d2(x) { return (x < 10 ? '0' : '') + x; }
+    return d2(h) + ':' + d2(mn) + ':' + d2(ss);
+  }
+  // Réglages VEO du match courant (chargés avec les notes : SuiviFroid).
+  function _veoMatch(evtId) {
+    var v = (SuiviFroid.estPour(evtId) && SuiviFroid.veo) ? SuiviFroid.veo : null;
+    return (v && typeof v === 'object') ? v : null;
+  }
+  function _veoPret(evtId) {
+    var v = _veoMatch(evtId);
+    return !!(v && Array.isArray(v.coups_envoi) && typeof v.coups_envoi[0] === 'number');
+  }
+  // Temps VEO → { minute (cumulée), periode } ; null si avant le 1er coup d'envoi.
+  function _minuteDepuisVeo(evtId, sec) {
+    var v = _veoMatch(evtId);
+    if (!v || !Array.isArray(v.coups_envoi) || typeof sec !== 'number') return null;
+    var per = null;
+    for (var p = 1; p <= v.coups_envoi.length; p++) {
+      var ke = v.coups_envoi[p - 1];
+      if (typeof ke === 'number' && ke <= sec) per = p;
+    }
+    if (!per) return null;
+    var ecoule = sec - v.coups_envoi[per - 1];
+    return { minute: _decalageMinutes(per) + Math.floor(ecoule / 60) + 1, periode: per };
+  }
+  // « ▶ 41:27 » d'une ligne (clic : ouvre le match VEO si le lien est connu).
+  function _tcLigneHTML(l, url) {
+    var sec = _intervalVersSec(l && l.timecode_video);
+    if (sec === null) return '';
+    var txt = '▶ ' + _fmtTempsVeo(sec);
+    if (url) {
+      return ' <a href="' + escapeHtml(url) + '" target="_blank" rel="noopener" class="veo-tc" ' +
+             'title="Ouvrir la vidéo VEO, puis se placer à ' + escapeHtml(_fmtTempsVeo(sec)) + '" ' +
+             'style="color:#5ec8a0;text-decoration:none;white-space:nowrap">' + escapeHtml(txt) + '</a>';
+    }
+    return ' <span class="veo-tc" style="color:#5ec8a0;white-space:nowrap">' + escapeHtml(txt) + '</span>';
+  }
+  // Écran « 🎥 VEO » : lien du match + temps vidéo de chaque coup d'envoi.
+  function _ouvrirReglageVeo(evtId, perCourante) {
+    var pal = document.getElementById('suivi-palette');
+    if (!pal) return;
+    if (!SuiviFroid.estPour(evtId)) { SuiviFroid.charger(evtId, function () { _ouvrirReglageVeo(evtId, perCourante); }); return; }
+    var v = _veoMatch(evtId) || {};
+    var nb = _dureesPeriodes().length || 2;
+    var h = '<div class="suivi-attrib">';
+    h += '<div class="suivi-attrib__title">🎥 Synchro VEO</div>';
+    h += '<div class="view-suivi__hint" style="text-align:left">Relève sur le lecteur VEO le temps de la vidéo à chaque coup d\'envoi. ' +
+         'Tu pourras ensuite saisir une action avec le temps VEO : le Hub calcule la minute. ' +
+         'VEO ne permet pas d\'ouvrir la vidéo à un moment précis : le lien ouvre le match, à toi de te placer au temps indiqué.</div>';
+    h += '<div class="suivi-chrono__config" style="max-width:none">';
+    h += '<div class="suivi-chrono__config-row"><label for="veo-url">Lien du match VEO</label>' +
+         '<input id="veo-url" type="url" placeholder="https://app.veo.co/matches/…" value="' + escapeHtml(v.url || '') + '" style="' + _STYLE_SELECT + ';width:60%"></div>';
+    for (var p = 1; p <= nb; p++) {
+      var ke = (Array.isArray(v.coups_envoi) && typeof v.coups_envoi[p - 1] === 'number') ? _fmtTempsVeo(v.coups_envoi[p - 1]) : '';
+      h += '<div class="suivi-chrono__config-row"><label for="veo-ke-' + p + '">Coup d\'envoi — ' + escapeHtml(_libellePeriode(p, nb)) + '</label>' +
+           '<input id="veo-ke-' + p + '" class="veo-ke" type="text" inputmode="numeric" placeholder="mm:ss" value="' + escapeHtml(ke) + '" style="' + _STYLE_SELECT + ';width:90px"></div>';
+    }
+    h += '</div>';
+    h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">' +
+         '<button type="button" class="suivi-chrono__btn suivi-chrono__btn--primary" id="veo-ok">Enregistrer</button>' +
+         '<button type="button" class="suivi-chrono__btn" id="veo-retour">↩ Retour</button></div>';
+    h += '</div>';
+    pal.innerHTML = h;
+    document.getElementById('veo-retour').addEventListener('click', function () { _peindreChrono(); });
+    document.getElementById('veo-ok').addEventListener('click', function () {
+      var url = (document.getElementById('veo-url').value || '').trim();
+      if (url && !/^https:\/\//i.test(url)) { window.alert('Le lien doit commencer par https://'); return; }
+      var ke = [], prec = -1;
+      for (var p2 = 1; p2 <= nb; p2++) {
+        var raw = (document.getElementById('veo-ke-' + p2).value || '').trim();
+        if (!raw) { ke.push(null); continue; }
+        var sec = _parseTempsVeo(raw);
+        if (sec === null) { window.alert('Temps illisible pour ' + _libellePeriode(p2, nb) + ' : « ' + raw + ' » (format mm:ss).'); return; }
+        if (sec <= prec) { window.alert('Les coups d\'envoi doivent se suivre dans le temps.'); return; }
+        prec = sec; ke.push(sec);
+      }
+      while (ke.length && ke[ke.length - 1] === null) ke.pop();
+      _enregistrerDonneesMatch(evtId, function (d) {
+        var cur = (d.veo && typeof d.veo === 'object') ? d.veo : {};
+        if (url) cur.url = url; else delete cur.url;
+        if (ke.length) cur.coups_envoi = ke; else delete cur.coups_envoi;
+        if (Object.keys(cur).length) d.veo = cur; else delete d.veo;
+      }, function () { _peindreChrono(); });
+    });
+  }
 
   function _optionsPeriodes(choisie) {
     var nb = _dureesPeriodes().length || 1;
@@ -5032,17 +5177,29 @@
          '" data-saisie-mode="manuel" aria-pressed="' + (mode === 'manuel') + '">✍ Minute manuelle</button>';
     // v3.74 (L6) — import de la feuille FFR (copier-coller Mon Club House).
     h += '<button type="button" class="suivi-chrono__btn" id="saisie-import-ffr">📥 Importer la feuille FFR</button>';
+    // v3.81 — synchro VEO (lien + coups d'envoi).
+    var evtB = SuiviChrono.evtId;
+    h += '<button type="button" class="suivi-chrono__btn" id="saisie-veo">🎥 VEO' + (_veoPret(evtB) ? ' ✓' : '') + '</button>';
     h += '</div>';
     if (mode === 'manuel') {
       var m = SuiviSaisie.minute;
       var per = SuiviSaisie.periode || ((typeof m === 'number') ? _periodeDeMinute(m) : 1);
       h += '<div class="suivi-chrono__config" style="max-width:none;margin-top:12px">';
+      // v3.81 — temps VEO (si les coups d'envoi sont réglés) → minute + période.
+      if (_veoPret(evtB)) {
+        h += '<div class="suivi-chrono__config-row"><label for="saisie-tveo">Temps VEO (mm:ss)</label>' +
+               '<input id="saisie-tveo" type="text" inputmode="numeric" placeholder="ex. 41:27" value="' +
+               escapeHtml(typeof SuiviSaisie.tvideo === 'number' ? _fmtTempsVeo(SuiviSaisie.tvideo) : '') +
+               '" style="' + _STYLE_SELECT + ';width:110px"></div>';
+      }
       h += '<div class="suivi-chrono__config-row"><label for="saisie-minute">Minute (lue sur la vidéo)</label>' +
              '<input id="saisie-minute" type="number" min="0" max="200" inputmode="numeric" value="' +
              ((typeof m === 'number') ? m : '') + '"></div>';
       h += '<div class="suivi-chrono__config-row"><label for="saisie-periode">Période</label>' +
              '<select id="saisie-periode" style="' + _STYLE_SELECT + '">' + _optionsPeriodes(per) + '</select></div>';
-      h += '<div class="view-suivi__hint" style="text-align:left">Minute du match en continu (2ᵉ mi-temps de 35\' : 36\', 37\'…). ' +
+      h += '<div class="view-suivi__hint" style="text-align:left">' +
+           (_veoPret(evtB) ? 'Tape le temps affiché par le lecteur VEO : minute et période se calculent seules (temps mémorisé sur l\'action). Ou saisis directement la minute. ' : '') +
+           'Minute du match en continu (2ᵉ mi-temps de 35\' : 36\', 37\'…). ' +
            'La période est proposée d\'après la minute ; corrige-la pour le temps additionnel.</div>';
       h += '</div>';
     }
@@ -5061,9 +5218,30 @@
     });
     var ffr = document.getElementById('saisie-import-ffr');
     if (ffr) ffr.addEventListener('click', function () { _ouvrirImportFfr(evtId, perCourante); });
+    // v3.81 — synchro VEO : réglages chargés avec les notes du match ; au
+    // premier chargement, re-rendu si des repères existent (champ temps VEO).
+    var bVeo = document.getElementById('saisie-veo');
+    if (bVeo) bVeo.addEventListener('click', function () { _ouvrirReglageVeo(evtId, perCourante); });
+    if (!SuiviFroid.estPour(evtId)) {
+      SuiviFroid.charger(evtId, function () { if (_veoMatch(evtId)) _peindreChrono(); });
+    }
     var mi = document.getElementById('saisie-minute');
     var ps = document.getElementById('saisie-periode');
+    var tv = document.getElementById('saisie-tveo');
+    if (tv) tv.addEventListener('input', function () {
+      var sec = _parseTempsVeo(tv.value);
+      var r = (sec !== null) ? _minuteDepuisVeo(evtId, sec) : null;
+      tv.style.borderColor = (tv.value && !r) ? '#c0392b' : '';
+      if (!r) { SuiviSaisie.tvideo = null; return; }
+      SuiviSaisie.tvideo = sec;
+      SuiviSaisie.minute = r.minute;
+      SuiviSaisie.periode = r.periode;
+      if (mi) mi.value = String(r.minute);
+      if (ps) ps.value = String(r.periode);
+    });
     if (mi) mi.addEventListener('input', function () {
+      SuiviSaisie.tvideo = null;                 // v3.81 — minute tapée : plus de temps VEO
+      if (tv) tv.value = '';
       var v = parseInt(mi.value, 10);
       SuiviSaisie.minute = (v >= 0 && v <= 200) ? v : null;
       SuiviSaisie.periode = null;  // la période suit la minute tant qu'on ne la force pas
@@ -5699,6 +5877,7 @@
     notes: {},            // { id: texte }
     remarqueConquete: '',
     remarquePied: '',     // v3.80 — remarque générale jeu au pied
+    veo: null,            // v3.81 — { url, coups_envoi: [sec, …] } (rapports.donnees.veo)
     charge: false,
     estPour: function (evtId) { return this.charge && this.evtId === evtId; },
     // Charge (ou recharge) liste + notes pour le match.
@@ -5722,6 +5901,7 @@
         self.notes = (d && d.notes_froid && typeof d.notes_froid === 'object') ? Object.assign({}, d.notes_froid) : {};
         self.remarqueConquete = (d && typeof d.remarque_conquete === 'string') ? d.remarque_conquete : '';
         self.remarquePied = (d && typeof d.remarque_jeu_pied === 'string') ? d.remarque_jeu_pied : '';   // v3.80
+        self.veo = (d && d.veo && typeof d.veo === 'object') ? d.veo : null;                               // v3.81
         self.charge = true;
         if (cb) cb();
       });
@@ -5756,6 +5936,7 @@
         SuiviFroid.notes = (d.notes_froid && typeof d.notes_froid === 'object') ? Object.assign({}, d.notes_froid) : {};
         SuiviFroid.remarqueConquete = (typeof d.remarque_conquete === 'string') ? d.remarque_conquete : '';
         SuiviFroid.remarquePied = (typeof d.remarque_jeu_pied === 'string') ? d.remarque_jeu_pied : '';   // v3.80
+        SuiviFroid.veo = (d.veo && typeof d.veo === 'object') ? d.veo : null;                               // v3.81
       }
       if (typeof onOk === 'function') onOk();
     }).catch(function (e) {
@@ -6781,6 +6962,11 @@
   function _saisirObservable(evtId, obs, onApres) {
     if (SuiviChrono.busy) return;
     if (!window.SupabaseHub || !SupabaseHub.insererObservableCoach) return;
+    // v3.81 — temps VEO saisi joint à l'action (S3).
+    if (obs && obs.timecodeVideo === undefined) {
+      var tc = _timecodeCourant(obs);
+      if (tc) obs.timecodeVideo = tc;
+    }
     SuiviChrono.busy = true;
     SupabaseHub.insererObservableCoach(evtId, obs).then(function (res) {
       SuiviChrono.busy = false;
@@ -6879,6 +7065,10 @@
       '<select id="ed-entrant" style="' + _STYLE_SELECT + ';max-width:60%">' + optJoueurs(ligne.joueur_uuid_entrant, ligne.nom_court_entrant) + '</select>') + '</div>';
     html += row('Minute', 'ed-minute', '<input id="ed-minute" type="number" min="0" max="200" value="' + minute + '">');
     html += row('Période', 'ed-periode', '<select id="ed-periode" style="' + _STYLE_SELECT + '">' + _optionsPeriodes(per) + '</select>');
+    // v3.81 — temps VEO de la ligne (conservé à la correction, modifiable).
+    var secL = _intervalVersSec(ligne.timecode_video);
+    html += row('Temps VEO <small>(mm:ss, facultatif)</small>', 'ed-tveo',
+      '<input id="ed-tveo" type="text" inputmode="numeric" placeholder="mm:ss" value="' + escapeHtml(secL !== null ? _fmtTempsVeo(secL) : '') + '">');
     html += '</div>';
     html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">' +
             '<button type="button" class="suivi-chrono__btn suivi-chrono__btn--primary" id="ed-ok">Enregistrer la correction</button>' +
@@ -6909,6 +7099,13 @@
       var v = parseInt(inpM.value, 10);
       if (v >= 0) selP.value = String(_periodeDeMinute(v));
     });
+    // v3.81 — temps VEO tapé → minute + période recalculées (si repères réglés).
+    var inpT = document.getElementById('ed-tveo');
+    if (inpT) inpT.addEventListener('input', function () {
+      var sec = _parseTempsVeo(inpT.value);
+      var r = (sec !== null) ? _minuteDepuisVeo(evtId, sec) : null;
+      if (r) { inpM.value = String(r.minute); selP.value = String(r.periode); }
+    });
     majVisibilite();
 
     document.getElementById('ed-retour').addEventListener('click', function () { _peindreChrono(); });
@@ -6933,6 +7130,13 @@
         minuteMatch: m,
         periode: parseInt(selP.value, 10) || _periodeDeMinute(m)
       };
+      // v3.81 — temps VEO : conservé / corrigé ; vide = aucun.
+      var rawT = inpT ? (inpT.value || '').trim() : '';
+      if (rawT) {
+        var secT = _parseTempsVeo(rawT);
+        if (secT === null) { window.alert('Temps VEO illisible : « ' + rawT + ' » (format mm:ss).'); return; }
+        payload.timecodeVideo = _secVersInterval(secT);
+      }
       if (SuiviChrono.busy) return;
       if (!window.SupabaseHub || !SupabaseHub.insererObservableCoach || !SupabaseHub.annulerObservableCoach) return;
       SuiviChrono.busy = true;
