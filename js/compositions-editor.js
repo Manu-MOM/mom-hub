@@ -6,6 +6,18 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.84 — Suivi : synchro VEO, correctifs « À qualifier » (6 oct. 2026)
+ *   v3.84 : correctif L2 (écart à la FAIT FOI S1 / S5, constaté le 06/10 :
+ *           4 doublons de points créés sur le match du 03/10). (1) Écran
+ *           « ❓ À qualifier » : PLUS AUCUN bouton qui marque des points
+ *           (essai, transformation / pénalité réussie, drop) — la feuille FFR
+ *           reste la seule source des faits officiels. Il propose : relier le
+ *           clip à un fait existant du même type (liste triée par écart de
+ *           minute), pénalité / transformation ratée, pénaltouche, passer,
+ *           ignorer. (2) « 🎥 VEO » : si les coups d'envoi changent, les
+ *           rapprochements des faits officiels sont recalculés (ils
+ *           dépendaient des anciens coups d'envoi ; un lien posé à la main
+ *           est alors réévalué).
  * Version : 3.83 — Rapport : débrief vidéo, synchro VEO lot 3 (6 oct. 2026)
  *   v3.83 : FAIT FOI Conception-SYNCHRO-VEO-v1, lot L3 (S8). Rapport du match,
  *           section « 🎬 Débrief vidéo » : clips des coachs (repères VEO
@@ -5490,21 +5502,42 @@
         h += '</div>';
       });
     } else {
+      // v3.84 — aucun fait qui marque des points (FAIT FOI S1 / S5) : relier
+      // à un fait existant, ou fait sans points (ratée, pénaltouche).
       var choix = [];
       if (r.k === 'penalite') {
-        choix = [['Pénalité réussie — Nous', 'obs-A-penalite', 'notre', 3], ['Pénalité réussie — Adversaire', 'obs-A-penalite', 'adverse', 3],
-                 ['Pénalité ratée — Nous', 'obs-A-penalite-ratee', 'notre', 0], ['Pénalité ratée — Adversaire', 'obs-A-penalite-ratee', 'adverse', 0],
+        choix = [['Pénalité ratée — Nous', 'obs-A-penalite-ratee', 'notre', 0], ['Pénalité ratée — Adversaire', 'obs-A-penalite-ratee', 'adverse', 0],
                  ['Pénaltouche — Nous', 'obs-A-pied-penaltouche-reussi-touche', 'notre', 0], ['Pénaltouche — Adversaire', 'obs-A-pied-penaltouche-reussi-touche', 'adverse', 0]];
       } else if (r.k === 'transfo') {
-        choix = [['Transformation réussie — Nous', 'obs-A-transfo', 'notre', 2], ['Transformation réussie — Adversaire', 'obs-A-transfo', 'adverse', 2],
-                 ['Transformation ratée — Nous', 'obs-A-transfo-ratee', 'notre', 0], ['Transformation ratée — Adversaire', 'obs-A-transfo-ratee', 'adverse', 0]];
-      } else if (r.k === 'essai') {
-        choix = [['Essai — Nous', 'obs-A-essai', 'notre', 5], ['Essai — Adversaire', 'obs-A-essai', 'adverse', 5]];
-      } else if (r.k === 'drop') {
-        choix = [['Drop — Nous', 'obs-A-drop', 'notre', 3], ['Drop — Adversaire', 'obs-A-drop', 'adverse', 3]];
+        choix = [['Transformation ratée — Nous', 'obs-A-transfo-ratee', 'notre', 0], ['Transformation ratée — Adversaire', 'obs-A-transfo-ratee', 'adverse', 0]];
       }
-      h += '<div class="view-suivi__hint" style="text-align:left">Ce fait n\'a pas été retrouvé parmi les actions du Hub (feuille FFR). ' +
-           'Si tu importes la feuille FFR plus tard, il sera rapproché automatiquement.</div><div class="suivi-obsb__grid">';
+      var liesAilleurs = {};
+      (v.reperes || []).forEach(function (x) { if (x.id !== r.id && x.lg && (x.st === 'lie' || x.st === 'fait')) liesAilleurs[x.lg] = true; });
+      var cands = (Array.isArray(SuiviChrono.lignes) ? SuiviChrono.lignes : []).filter(function (l) {
+        return l && l.annule !== true && !liesAilleurs[l.id] && (_VEO_OFFICIELS[r.k] || []).indexOf(l.observable_id) >= 0;
+      }).sort(function (a, b) {
+        var ma = mm ? Math.abs(_tCumule(a) - mm.minute) : 0, mb = mm ? Math.abs(_tCumule(b) - mm.minute) : 0;
+        return (ma - mb) || (_tCumule(a) - _tCumule(b));
+      });
+      h += '<div class="view-suivi__hint" style="text-align:left">Ce clip n\'a pas été rapproché automatiquement. ' +
+           'Les faits qui marquent des points viennent uniquement de la feuille FFR : relie le clip au bon fait, ' +
+           'ou qualifie-le sans points.</div>';
+      h += '<div class="suivi-palette__lbl" style="margin-top:12px;font-weight:600">Relier à un fait existant</div>';
+      if (cands.length) {
+        h += '<div class="suivi-obsb__grid">';
+        cands.forEach(function (l) {
+          var info = (typeof SuiviObs.libelle === 'function') ? SuiviObs.libelle(l.observable_id) : null;
+          var lib = (info && info.libelle) ? info.libelle : l.observable_id;
+          h += '<button type="button" class="suivi-obsb__btn" data-vr-lien="' + escapeHtml(l.id) + '">' +
+               escapeHtml(lib + ' — ' + (l.equipe_concernee === 'adverse' ? 'Adversaire' : 'Nous') + ' · ' + _tCumule(l) + '\'' +
+               (l.source_saisie === 'ffr' ? ' (FFR)' : '')) + '</button>';
+        });
+        h += '</div>';
+      } else {
+        h += '<div class="view-suivi__hint" style="text-align:left">Aucun fait de ce type à relier (importe la feuille FFR : le rapprochement se refera).</div>';
+      }
+      if (choix.length) h += '<div class="suivi-palette__lbl" style="margin-top:12px;font-weight:600">Fait sans points</div>';
+      h += '<div class="suivi-obsb__grid">';
       choix.forEach(function (c) {
         opts.push({ obs: c[1], eq: c[2], pts: c[3] });
         h += '<button type="button" class="suivi-obsb__btn" data-vr="' + (opts.length - 1) + '">' + escapeHtml(c[0]) + '</button>';
@@ -5527,6 +5560,17 @@
     document.getElementById('vr-fin').addEventListener('click', function () { _ouvrirBilanVeo(evtId, perCourante); });
     document.getElementById('vr-ignorer').addEventListener('click', function () {
       marquer(function (x) { x.st = 'ignore'; }, function () { _ouvrirReperVeo(evtId, perCourante, st, r.t); });
+    });
+    pal.querySelectorAll('[data-vr-lien]').forEach(function (b) {   // v3.84 — lien manuel
+      b.addEventListener('click', function () {
+        if (SuiviChrono.busy) return;
+        var idL = b.getAttribute('data-vr-lien');
+        var l = (SuiviChrono.lignes || []).filter(function (x) { return x && x.id === idL; })[0];
+        if (!l) return;
+        marquer(function (x) {
+          x.st = 'lie'; x.lg = l.id; x.ma = _tCumule(l) + 0.5; x.pe = l.periode || 1;
+        }, function () { _ouvrirReperVeo(evtId, perCourante, st, r.t); });
+      });
     });
     pal.querySelectorAll('[data-vr]').forEach(function (b) {
       b.addEventListener('click', function () {
@@ -5591,12 +5635,22 @@
         prec = sec; ke.push(sec);
       }
       while (ke.length && ke[ke.length - 1] === null) ke.pop();
-      _enregistrerDonneesMatch(evtId, function (d) {
-        var cur = (d.veo && typeof d.veo === 'object') ? d.veo : {};
-        if (url) cur.url = url; else delete cur.url;
-        if (ke.length) cur.coups_envoi = ke; else delete cur.coups_envoi;
-        if (Object.keys(cur).length) d.veo = cur; else delete d.veo;
-      }, function () { _peindreChrono(); });
+      // v3.84 — coups d'envoi changés + repères présents → rapprochement des
+      // faits officiels recalculé (lignes lues avant l'écriture).
+      var keAvant = JSON.stringify(Array.isArray(v.coups_envoi) ? v.coups_envoi : []);
+      var aRecaler = keAvant !== JSON.stringify(ke) && Array.isArray(v.reperes) && v.reperes.length > 0;
+      (aRecaler ? _veoLireLignes(evtId) : Promise.resolve(null)).then(function (lignes) {
+        _enregistrerDonneesMatch(evtId, function (d) {
+          var cur = (d.veo && typeof d.veo === 'object') ? d.veo : {};
+          if (url) cur.url = url; else delete cur.url;
+          if (ke.length) cur.coups_envoi = ke; else delete cur.coups_envoi;
+          if (lignes && Array.isArray(cur.reperes) && ke.length) {
+            cur.reperes.forEach(function (r) { if (r.st === 'lie' && _VEO_OFFICIELS[r.k]) { r.st = null; delete r.lg; delete r.ma; delete r.pe; } });
+            _veoRapprocher(evtId, cur, lignes);
+          }
+          if (Object.keys(cur).length) d.veo = cur; else delete d.veo;
+        }, function () { _peindreChrono(); });
+      });
     });
   }
 
