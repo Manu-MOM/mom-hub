@@ -4,7 +4,13 @@
  *
  * Module IIFE — initialise l'UI de la page joueurs.html.
  *
- * Version : v1.9 — 1er octobre 2026
+ * Version : v1.10 — 7 octobre 2026
+ *   v1.10 : BADGE-FILLES-EDR (07/10/2026, enchaîné sur IMPORT-CATEGORIE).
+ *          Vignette : badge rose « F-6 / F-8 / F-10 / F-12 » (classe
+ *          joueur-badge-f15, comme F-15) pour une joueuse (sexe F) en
+ *          catégorie EDR mixte M6–M12, hors F-15 intégrée. Dérivé de
+ *          sexe + categorie_libelle_court déjà renvoyés par
+ *          get_joueurs_categorie — aucun SQL. Helper badgeFilleEdr().
  *   v1.9 : HISTORIQUE-INDISPONIBILITES + SUSPENSION-NOTES (FAIT FOI gelé
  *          01/10/2026, pt 274, socle SQL sql_254 + supabase-client v1.84).
  *          (1) Le code d'historique v1.8 devient un mécanisme paramétré
@@ -658,6 +664,16 @@ window.JoueursBrowser = (function () {
     return `<div class="joueur-card-aptitudes">${pills}</div>`;
   }
 
+  // v1.10 (BADGE-FILLES-EDR) — joueuse en catégorie EDR mixte (M6/M8/M10/M12) :
+  // badge rose « F-6 » … « F-12 », même style que F-15 (nomenclature OVAL-E).
+  // Dérivé de sexe + catégorie (doctrine OVAL-E v1.4 §5) ; la F-15 intégrée
+  // garde son propre badge.
+  function badgeFilleEdr(j) {
+    if (!j || j.sexe !== 'F' || j.f15_integree === true || j.profil === 'f15') return '';
+    const m = /^M(6|8|10|12)$/.exec(String(j.categorie_libelle_court || '').trim());
+    return m ? 'F-' + m[1] : '';
+  }
+
   function renderEtatBadge(etat) {
     if (etat === 'actif') return '';
     const cls = 'joueur-badge-etat joueur-badge-etat-' + etat;
@@ -716,6 +732,7 @@ window.JoueursBrowser = (function () {
                 ${j.club_principal_code ? `<span class="joueur-badge joueur-badge-club">${esc(j.club_principal_code)}</span>` : ''}
                 ${j.categorie_libelle_court ? `<span class="joueur-badge joueur-badge-cat">${esc(j.categorie_libelle_court)}</span>` : ''}
                 ${(j.profil === 'f15' || j.f15_integree === true) ? `<span class="joueur-badge joueur-badge-f15">F-15</span>` : ''}
+                ${badgeFilleEdr(j) ? `<span class="joueur-badge joueur-badge-f15">${badgeFilleEdr(j)}</span>` : ''}
                 ${j.profil === 'coach' ? `<span class="joueur-badge joueur-badge-coach">${j.fonction_staff ? esc(j.fonction_staff) : 'Coach'}</span>` : ''}
                 ${j.profil === 'staff' ? `<span class="joueur-badge joueur-badge-staff">Staff</span>` : ''}
               </div>
@@ -2445,7 +2462,7 @@ window.JoueursBrowser = (function () {
     _byId: () => JOUEURS_BY_ID,
     _postesById: () => POSTES_BY_ID,
     _aptitudesById: () => APTITUDES_BY_ID,
-    _version: 'v1.9'  /* pt 274 : historiques blessures + indisponibilités, notes de suspension */
+    _version: 'v1.10'  /* BADGE-FILLES-EDR : badge F-6…F-12 (07/10/2026) */
   };
 
 })();
