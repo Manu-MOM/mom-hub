@@ -6,7 +6,12 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
- * Version : 3.85 — Format X : retour à la consigne d'origine (7 oct. 2026)
+ * Version : 3.86 — Étiquette filles EDR (7 oct. 2026)
+ *   v3.86 : BADGE-FILLES-EDR (07/10/2026, enchaîné sur IMPORT-CATEGORIE).
+ *           etiquetteJoueur() : une joueuse (sexe F) en catégorie EDR mixte
+ *           M6–M12 reçoit l'étiquette « F-6 / F-8 / F-10 / F-12 », même
+ *           style que F-15 (kind 'f15'). F-15 intégrée prioritaire. Champs
+ *           sexe + categorie_libelle_court déjà renvoyés par le vivier.
  *   v3.85 : FAIT FOI X-ORIGINE (Manu, 07/10/2026 — retour terrain M16
  *           Régionale, match du 10/10 joué à X). Le X revient à la compo
  *           dictée par Manu (sql/70, v3.22), écrasée au pt 225 par celle de
@@ -1553,6 +1558,12 @@
   }
   function etiquetteJoueur(j) {
     if (j.f15_integree) return { label: 'F-15', kind: 'f15' };
+    // v3.86 (BADGE-FILLES-EDR) — joueuse en catégorie EDR mixte : « F-6 » … « F-12 »,
+    // même étiquette que F-15 (sexe + categorie_libelle_court du vivier).
+    if (j.sexe === 'F') {
+      const mEdr = /^M(6|8|10|12)$/.exec(String(j.categorie_libelle_court || '').trim());
+      if (mEdr) return { label: 'F-' + mEdr[1], kind: 'f15' };
+    }
     if (j.est_partenaire_entente) {
       const club = (j.club_principal_nom_court || '').toUpperCase();
       if (club === 'SAR' || club === 'ASCS') return { label: club, kind: 'partenaire' };
