@@ -6,6 +6,21 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.85 — Format X : retour à la consigne d'origine (7 oct. 2026)
+ *   v3.85 : FAIT FOI X-ORIGINE (Manu, 07/10/2026 — retour terrain M16
+ *           Régionale, match du 10/10 joué à X). Le X revient à la compo
+ *           dictée par Manu (sql/70, v3.22), écrasée au pt 225 par celle de
+ *           SAR×MOM : 1-2-3, DEUX 2L sur les extérieurs (2LG/2LD), 9-10,
+ *           centre 12 (CG), ailier 14 (AD), arrière 15. Volet base :
+ *           sql/C17-a. Front : (1) TERRAIN_POS_X refaite sur ces 10 postes,
+ *           2L écartés gauche/droite ; (2) D4 — en X la feuille est
+ *           numérotée aux NUMÉROS DE MAILLOT (1 2 3 4 5 9 10 12 14 15 =
+ *           poste.numero_xv) en Liste ET en Terrain, au lieu de la suite
+ *           1..10 (décision A du pt 225, conservée pour tous les autres
+ *           formats). Drapeau `numMaillot` dans COMPO_FORMATS. Remplaçants
+ *           du X : numérotés à partir de 16 (plus grand numéro titulaire + 1,
+ *           évite la collision 11..20 / 12-14-15 — décision mineure tracée).
+ *           Formats XV, 13, 12, 9, 8, 7, 5 inchangés.
  * Version : 3.84 — Suivi : synchro VEO, correctifs « À qualifier » (6 oct. 2026)
  *   v3.84 : correctif L2 (écart à la FAIT FOI S1 / S5, constaté le 06/10 :
  *           4 doublons de points créés sur le match du 03/10). (1) Écran
@@ -1137,8 +1152,10 @@
     '15': { subs: 8,  label: 'XV',  fmtBase: 'XV' },
     '13': { subs: 6,  label: 'XIII', fmtBase: '13' },
     '12': { subs: 4,  label: 'XII', fmtBase: '12' },
-    'X':  { subs: 10, label: 'X',   fmtBase: 'X'  },
-    '10': { subs: 10, label: 'X',   fmtBase: 'X'  },
+    // v3.85 (X-ORIGINE, D4) — numMaillot : feuille numérotée aux numéros de
+    // maillot (poste.numero_xv : 1 2 3 4 5 9 10 12 14 15) et non 1..N.
+    'X':  { subs: 10, label: 'X',   fmtBase: 'X', numMaillot: true },
+    '10': { subs: 10, label: 'X',   fmtBase: 'X', numMaillot: true },
     '9':  { subs: 3,  label: 'IX',  fmtBase: '9'  },
     '8':  { subs: 2,  label: 'VIII', fmtBase: '8' },
     '7':  { subs: 6,  label: 'VII', fmtBase: '7'  },
@@ -1241,6 +1258,26 @@
   function _nbRemplacantsCourant() {
     const m = _metaFormatCourant();
     return (m && typeof m.subs === 'number') ? m.subs : NB_REMPLACANTS;
+  }
+
+  // v3.85 (X-ORIGINE, D4) — numéro affiché d'un poste titulaire.
+  // Format à numMaillot (X) : numéro de maillot du poste (numero_xv).
+  // Autres formats : rang 1..N dans le format (décision A, pt 225).
+  function _numeroTitulaire(poste, idx) {
+    const m = _metaFormatCourant();
+    if (m && m.numMaillot && poste && poste.numero_xv) return poste.numero_xv;
+    return idx + 1;
+  }
+
+  // v3.85 — 1er numéro de remplaçant : juste après le plus grand numéro
+  // titulaire affiché (X : 15 + 1 = 16 ; autres formats : N + 1, inchangé).
+  function _numDepartRemplacants() {
+    let max = 0;
+    _postesCourants().forEach(function (p, idx) {
+      const n = Number(_numeroTitulaire(p, idx)) || 0;
+      if (n > max) max = n;
+    });
+    return max + 1;
   }
 
   // Clé localStorage de l'équipe active de Compositions (mode legacy
@@ -2059,7 +2096,7 @@
     const _postesFmt   = _postesCourants();
     const _metaFmt     = _metaFormatCourant();
     const _nbRempl     = _nbRemplacantsCourant();
-    const _numDepart   = _postesFmt.length + 1;   // 1er numéro de remplaçant
+    const _numDepart   = _numDepartRemplacants();   // 1er numéro de remplaçant (v3.85)
 
     let html = '<div class="view-liste">';
     html += '<section class="view-liste__section">';
@@ -2068,7 +2105,7 @@
             +   ' <span class="view-liste__fmt">· ' + escapeHtml(_metaFmt.label) + '</span>'
             + '</h3>';
     html +=   '<ul class="view-liste__slots">';
-    _postesFmt.forEach(function (poste, idx) { html += renderSlotPoste(poste, idx + 1); });
+    _postesFmt.forEach(function (poste, idx) { html += renderSlotPoste(poste, _numeroTitulaire(poste, idx)); });
     html +=   '</ul>';
     html += '</section>';
 
@@ -8439,23 +8476,22 @@
     'AD':  { x: 87.5, y: 75.9 },
     'AR':  { x: 50.0, y: 93.4 }
   };
-  // COMPO-MULTI-FORMAT (pt 225) — table X ALIGNÉE sur les postes réels.
-  // Elle référençait 2LG/2LD/CG/AD, retirés du format X par sql_207 (le X se
-  // joue avec des postes UNIQUES : 2LU, 3LU, CTU, AIU). Ces 4 postes n'étaient
-  // donc jamais placés, et les 4 nouveaux n'avaient aucune coordonnée.
-  // La consigne antérieure de Manu « 2L sur l'extérieur » est préservée et
-  // reportée sur le poste unique 2LU (côté gauche, l'unique deuxième ligne).
-  // Occupation resserrée par rapport au XV : y de 20 à 88 pour 10 joueurs.
+  // v3.85 — FAIT FOI X-ORIGINE (Manu, 07/10/2026) : table X REFAITE sur la
+  // compo d'origine dictée par Manu (sql/70, v3.22), rétablie en base par
+  // sql/C17-a : 1-2-3, DEUX 2L sur les EXTÉRIEURS (2LG à gauche, 2LD à
+  // droite), charnière 9-10 en diagonale, centre 12 (CG) à gauche, ailier
+  // 14 (AD) écarté à droite, arrière 15 dans l'axe. Remplace la table du
+  // pt 225 (2LU/3LU/CTU/AIU, compo SAR×MOM). Occupation y 20 → 88 conservée.
   const TERRAIN_POS_X = {
     'PG':  { x: 34.0, y: 20.0 },
     'TAL': { x: 47.0, y: 20.0 },
     'PD':  { x: 60.0, y: 20.0 },
-    '2LU': { x: 18.0, y: 30.0 },   // 2L sur l'extérieur (consigne Manu, v3.22)
-    '3LU': { x: 47.0, y: 33.0 },
+    '2LG': { x: 16.0, y: 31.0 },   // 2L sur l'extérieur gauche (consigne Manu)
+    '2LD': { x: 78.0, y: 31.0 },   // 2L sur l'extérieur droit  (consigne Manu)
     'DM':  { x: 36.0, y: 46.0 },
     'DO':  { x: 54.0, y: 55.0 },
-    'CTU': { x: 40.0, y: 68.0 },
-    'AIU': { x: 72.0, y: 72.0 },
+    'CG':  { x: 40.0, y: 68.0 },
+    'AD':  { x: 80.0, y: 72.0 },
     'AR':  { x: 47.0, y: 88.0 }
   };
   // COMPO-MULTI-FORMAT (pt 225) — table VII REFAITE. Deux défauts corrigés :
@@ -8643,7 +8679,8 @@
     // compo. On construit ici le même index rang→numéro que la Liste, à
     // partir de _postesCourants() (source unique de l'ordre des postes).
     const _numParPosteId = new Map();
-    _postesCourants().forEach(function (p, idx) { _numParPosteId.set(p.id, idx + 1); });
+    // v3.85 — même règle que la Liste (_numeroTitulaire : maillot en X).
+    _postesCourants().forEach(function (p, idx) { _numParPosteId.set(p.id, _numeroTitulaire(p, idx)); });
     for (const code in TERRAIN_POS) {
       const pos = TERRAIN_POS[code];
       const poste = posteParCode.get(code);
