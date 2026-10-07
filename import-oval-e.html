@@ -24,6 +24,15 @@
     - codes connus = référentiel SQL public.referentiel_qualites_ffr (autorité) ; miroir ci-dessous
       (CODES_CONNUS / CODES_STAFF) = affichage seul, à garder synchro avec la table. Hors-liste = signalé.
     - JAMAIS de création de fiche (cas 2 = signalé). RPC n'écrit QUE qualites_ffr.
+
+  CHANTIER IMPORT-CATEGORIE (FAIT FOI gelé 07/10/2026, sql_255) :
+    - Colonne « Classe d'âge » lue (M-14, F-15, M+18…) — doctrine OVAL-E v1.4 §3.4.
+      La classe n'est portée que par la ligne joueur : agrégée sur TOUTES les lignes de la
+      licence (1re valeur non vide), pas seulement la 1re ligne rencontrée.
+    - Envoyée en « classe » à import_qualites_ffr (complète catégorie/sexe/pôle/F15 des fiches
+      qui n'en ont PAS — jamais d'écrasement) et à creer_personne_depuis_import.
+    - Mapping classe → catégorie : côté SQL uniquement (classe_oval_e_vers_categorie).
+    - Rapport : « Catégories posées » + liste « À vérifier » (joueurs A/AM restés sans catégorie).
 -->
 <link rel="stylesheet" href="css/hub.css">
 <style>
@@ -129,8 +138,9 @@
     <h1>Import OVAL-E</h1>
     <p class="imp-sub">
       Mettre à jour les qualités FFR des licenciés (entraîneur, éducateur, soigneur…) à partir d'un
-      export OVAL-E. L'import ne touche QUE les qualités FFR — il ne crée jamais de fiche et ne
-      modifie ni les catégories, ni les rôles, ni le statut salarié.
+      export OVAL-E. L'import met à jour les qualités FFR et complète la catégorie des joueurs qui
+      n'en ont pas encore (d'après la classe d'âge OVAL-E). Il ne crée jamais de fiche tout seul et
+      ne modifie jamais une catégorie déjà renseignée, ni les rôles, ni le statut salarié.
     </p>
 
     <div class="imp-msg" id="impMsg"></div>
@@ -182,7 +192,14 @@
         <div class="imp-stat"><div class="num" id="rpMatch">0</div><div class="lbl">Fiches mises à jour</div></div>
         <div class="imp-stat"><div class="num" id="rpCas2">0</div><div class="lbl">Sans fiche (cas 2)</div></div>
         <div class="imp-stat"><div class="num" id="rpCas3">0</div><div class="lbl">Hors export (cas 3)</div></div>
+        <div class="imp-stat"><div class="num" id="rpCats">0</div><div class="lbl">Catégories posées</div></div>
+        <div class="imp-stat"><div class="num" id="rpVerif">0</div><div class="lbl">À vérifier</div></div>
       </div>
+
+      <div class="imp-section-title">À vérifier — joueurs de l'export sans catégorie</div>
+      <p class="imp-step">Joueurs (A/AM) dont la fiche reste sans catégorie : classe d'âge absente ou non
+        reconnue. Ils n'apparaissent dans aucune liste tant qu'une catégorie n'est pas affectée à la main.</p>
+      <div id="rpVerifList"></div>
 
       <div class="imp-section-title">Cas 2 — licences de l'export sans fiche en base</div>
       <p class="imp-step">Signalées, jamais créées automatiquement. À traiter à la main si besoin.</p>
@@ -344,6 +361,8 @@
       const idxNaiss    = headers.findIndex(h => h.includes('date naissance') || h.includes('naissance'));
       const idxNat      = headers.findIndex(h => h.includes('nationalite'));
       const idxFinAff   = headers.findIndex(h => h.includes('fin d affiliation') || h.includes('fin affiliation'));
+      // Classe d'âge (IMPORT-CATEGORIE) — « Classe d'âge » normalisé = "classe d'age".
+      const idxClasse   = headers.findIndex(h => h.includes('classe'));
       const cellAt = (row, idx) => idx === -1 ? '' : String(row[idx] == null ? '' : row[idx]).trim();
 
       // Agrégation : { licence -> { codes:Set, ...identité } }.
@@ -367,10 +386,15 @@
             ville:    cellAt(rows[i], idxVille),
             date_naissance: toISODate(idxNaiss === -1 ? '' : rows[i][idxNaiss]),
             nationalite:    cellAt(rows[i], idxNat),
-            date_fin_affiliation: toISODate(idxFinAff === -1 ? '' : rows[i][idxFinAff])
+            date_fin_affiliation: toISODate(idxFinAff === -1 ? '' : rows[i][idxFinAff]),
+            classe: ''
           });
         }
-        map.get(lic).codes.add(code);
+        const ent = map.get(lic);
+        ent.codes.add(code);
+        // La classe n'est portée que par la ligne joueur (lignes staff vides) :
+        // on garde la 1re valeur non vide, quelle que soit la ligne.
+        if (!ent.classe) ent.classe = cellAt(rows[i], idxClasse).toUpperCase();
       }
       if (map.size === 0) {
         flash("Aucune ligne exploitable (licence + qualité) dans l'export.", 'err');
@@ -390,12 +414,17 @@
           nom: obj.nom, prenom: obj.prenom, email: obj.email, tel: obj.tel,
           adresse: obj.adresse, cp: obj.cp, ville: obj.ville,
           date_naissance: obj.date_naissance, nationalite: obj.nationalite,
-          date_fin_affiliation: obj.date_fin_affiliation
+          date_fin_affiliation: obj.date_fin_affiliation,
+          classe: obj.classe
         });
       }
       payload.sort((a, b) => a.lic.localeCompare(b.lic));
 
       renderPreview(nbLignes, Array.from(tousCodes).sort());
+      if (idxClasse === -1) {
+        flash("Colonne « Classe d'âge » introuvable : les qualités seront importées, "
+          + "mais aucune catégorie ne pourra être posée.", 'warn');
+      }
     }
 
     function renderPreview(nbLignes, codesVus) {
@@ -441,7 +470,8 @@
         // La RPC renvoie une seule ligne-rapport.
         const r = Array.isArray(data) ? data[0] : data;
         renderReport(r);
-        flash('Import terminé : ' + (r.out_matchees || 0) + ' fiche(s) mise(s) à jour.', 'ok');
+        flash('Import terminé : ' + (r.out_matchees || 0) + ' fiche(s) mise(s) à jour, '
+          + (r.out_categories_posees || 0) + ' catégorie(s) posée(s).', 'ok');
       } catch (e) {
         flash("Échec de l'import : " + errMsg(e), 'err');
       } finally {
@@ -466,14 +496,21 @@
           nom: p.nom, prenom: p.prenom, email: p.email, tel: p.tel,
           adresse: p.adresse, cp: p.cp, ville: p.ville,
           date_naissance: p.date_naissance, nationalite: p.nationalite,
-          date_fin_affiliation: p.date_fin_affiliation
+          date_fin_affiliation: p.date_fin_affiliation,
+          classe: p.classe || ''
         }});
         if (error) throw error;
         const r = Array.isArray(data) ? data[0] : data;
         const row = btn.closest('tr');
         if (r && r.statut === 'cree') {
           if (row) row.querySelector('td:last-child').innerHTML = '<span class="imp-ok">✓ fiche créée</span>';
-          flash('Fiche créée : ' + (r.prenom || '') + ' ' + (r.nom || '') + '.', 'ok');
+          const estJoueur = (p.codes || []).some(c => c === 'A' || c === 'AM');
+          if (estJoueur && !p.classe) {
+            flash('Fiche créée : ' + (r.prenom || '') + ' ' + (r.nom || '')
+              + " — sans classe d'âge dans l'export : catégorie à affecter à la main.", 'warn');
+          } else {
+            flash('Fiche créée : ' + (r.prenom || '') + ' ' + (r.nom || '') + '.', 'ok');
+          }
         } else {
           if (row) row.querySelector('td:last-child').innerHTML = '<span class="imp-ok">déjà en base</span>';
           flash('Cette licence a déjà une fiche (aucune création).', 'warn');
@@ -494,10 +531,24 @@
       const cas2 = asArray(r.out_cas2);
       const cas3 = asArray(r.out_cas3);
       const inconnus = asArray(r.out_codes_inconnus);
+      const aVerifier = asArray(r.out_a_verifier);
 
       $('rpMatch').textContent = r.out_matchees || 0;
       $('rpCas2').textContent = cas2.length;
       $('rpCas3').textContent = cas3.length;
+      $('rpCats').textContent = r.out_categories_posees || 0;
+      $('rpVerif').textContent = aVerifier.length;
+
+      // À vérifier — joueurs restés sans catégorie (IMPORT-CATEGORIE, D5)
+      if (aVerifier.length) {
+        $('rpVerifList').innerHTML =
+          '<table class="imp-tbl"><thead><tr><th>Nom</th><th>Prénom</th><th>Licence</th><th>Classe OVAL-E</th></tr></thead><tbody>' +
+          aVerifier.map(x => '<tr><td>' + escapeHtml(x.nom) + '</td><td>' + escapeHtml(x.prenom) +
+            '</td><td>' + escapeHtml(x.lic) + '</td><td>' + escapeHtml(x.classe || '—') + '</td></tr>').join('') +
+          '</tbody></table>';
+      } else {
+        $('rpVerifList').innerHTML = '<p class="imp-empty">Aucun — tous les joueurs de l\'export ont une catégorie.</p>';
+      }
 
       // Cas 2 — croisement avec le payload enrichi (identité) + bouton de création (pt 210).
       if (cas2.length) {
