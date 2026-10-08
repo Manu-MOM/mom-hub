@@ -14,6 +14,17 @@
  *     'paysage' (1920×1080, liste+staff à gauche / terrain à droite)
  *   • export PNG téléchargeable
  *
+ * EXPORT-RETOUR-TERRAIN-1008 (08/10/2026, retour terrain M16) :
+ *   • paysage Offload (entente_nat/entente_reg) : logo entente d'en-tête remplacé
+ *     par la rangée des logos clubs ; vignette photo ronde avant chaque nom
+ *     (repli initiales). Logo entente conservé en filigrane du terrain.
+ *   • vertical Offload (grille photos) : adaptatif au nombre de titulaires
+ *     (match à 10, à 12…) — plus de cases « ? » fantômes numérotées 11→15.
+ *   • fix : doublon initiales(nom, prenom) supprimé (inversait les pastilles).
+ *   • terrain paysage : placement selon la table du FORMAT (data.terrainPos,
+ *     fournie par l'éditeur) au lieu du XV en dur → X, 12, 7… corrects.
+ *   • pied de page : saison active (data.saisonLibelle) au lieu de 2025/2026 en dur.
+ *
  * API publique :
  *   CompoExport.ouvrir(data)  → modale (choix version MOM/entente + format + DL)
  *   CompoExport.rendre(canvas, data, version, format) → dessine (format défaut 'vertical')
@@ -23,7 +34,9 @@
  *   titulaires:   [{num, nom, prenom, poste, code, club, ligne}],  // code = code poste (placement terrain), ligne ∈ 'av'|'ch'|'ar'
  *   remplacants:  [{num, nom}],
  *   staff:        [{nom, prenom, roles}],          // roles = roles_encadrement[]
- *   logos: { mom, entente }
+ *   logos: { mom, entente },
+ *   terrainPos:   { CODE: {x, y} },               // table terrain du format (repli XV)
+ *   saisonLibelle: '…'                            // libellé saison active (pied de page)
  * }
  */
 (function () {
@@ -88,6 +101,8 @@
   };
 
   // ── Placement terrain (format paysage) ───────────────────────────────────
+  // REPLI UNIQUEMENT depuis EXPORT-RETOUR-TERRAIN-1008 : le rendu utilise
+  // data.terrainPos (table du format courant transmise par l'éditeur).
   // Copie EXACTE de TERRAIN_POS_XV de compositions-editor.js (vue Terrain de
   // l'app) : clés = code poste, valeurs = { x:%, y:% }, PACK EN HAUT → ARRIÈRE
   // EN BAS. Les deux écrans partagent ainsi rigoureusement le même placement.
@@ -219,6 +234,15 @@
     ctx.drawImage(im, x, y, w, h);
     if (alpha != null) ctx.restore();
     return w;
+  }
+
+  // Pied de page : « titre · SAISON <libellé saison active> ». La saison vient de
+  // data.saisonLibelle (SupabaseHub.getSaisonActive, collecte éditeur) — fin du
+  // « SAISON 2025/2026 » en dur. Absente → simplement omise (jamais de valeur
+  // inventée) ; plus de « · » orphelin quand le titre est vide.
+  function piedDePage(data) {
+    var sais = data.saisonLibelle ? ('SAISON ' + String(data.saisonLibelle).toUpperCase()) : '';
+    return [data.titre, sais].filter(Boolean).join(' · ');
   }
 
   // ── Dégradé vertical de fond ──────────────────────────────────────────────
@@ -412,7 +436,7 @@
       // 7) Pied de page
       ctx.fillStyle = rgb(t.pied);
       ctx.font = font(20, 400);
-      ctx.fillText((data.titre || '') + ' · SAISON 2025/2026', 40, H - 40);
+      ctx.fillText(piedDePage(data), 40, H - 40);
       ctx.textAlign = 'right';
       ctx.fillText(data.dateExport || '', W - 40, H - 40);
       ctx.textAlign = 'left';
@@ -496,12 +520,32 @@
     ctx.textBaseline = 'top';
 
     var logos = data.logos || {};
-    return Promise.all([
+    // EXPORT-RETOUR-TERRAIN-1008 — versions Offload (entente_nat / entente_reg) :
+    //   • en-tête : le logo entente est remplacé par la rangée des logos clubs
+    //     (même liste FIXE par version que l'export vertical photos) ;
+    //   • liste : vignette photo ronde (cerclée couleur club) avant chaque nom,
+    //     repli initiales si pas de photo (RGPD : photoUrl filtré en amont).
+    // Le logo entente reste utilisé en filigrane du terrain. Versions MOM /
+    // entente historique : rendu inchangé.
+    var offload = (version === 'entente_nat' || version === 'entente_reg');
+    var logosClubs = offload
+      ? ((version === 'entente_reg' ? data.logosClubsReg : data.logosClubsNat) || data.logosClubs || [])
+      : [];
+    var titPre = data.titulaires || [];
+    var aCharger = [
       loadImage(logos[t.logoKey]),
       loadImage(logos[t.filigraneKey] || logos[t.logoKey])
-    ]).then(function (imgs) {
+    ];
+    logosClubs.forEach(function (l) { aCharger.push(loadImage(l.url)); });
+    if (offload) titPre.forEach(function (j) { aCharger.push(loadImage(j && j.photoUrl)); });
+    return Promise.all(aCharger).then(function (imgs) {
       var logoHead = imgs[0];
       var filigrane = imgs[1];
+      var logoClubImgs = imgs.slice(2, 2 + logosClubs.length);
+      var photoDe = new Map();
+      if (offload) {
+        titPre.forEach(function (j, k) { photoDe.set(j, imgs[2 + logosClubs.length + k] || null); });
+      }
 
       // 1) Fond
       var g = ctx.createLinearGradient(0, 0, 0, PH);
@@ -515,7 +559,29 @@
       ctx.fillStyle = gh; ctx.fillRect(0, 0, PW, hd);
       ctx.fillStyle = rgb(t.jaune); ctx.fillRect(0, hd - 5, PW, 5);
       var logoW = 0;
-      if (logoHead) {
+      if (offload && logosClubs.length) {
+        // Rangée de logos clubs en pastilles blanches (style export vertical photos)
+        var ls = 84, lgap = 24, lhalo = 8;
+        var lcy = hd / 2 - 2;
+        for (var li = 0; li < logosClubs.length; li++) {
+          var lcx = 36 + lhalo + ls / 2 + li * (ls + lgap);
+          ctx.save();
+          ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 3;
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath(); ctx.arc(lcx, lcy, ls / 2 + lhalo, 0, Math.PI * 2); ctx.fill();
+          ctx.restore();
+          var lim = logoClubImgs[li];
+          if (lim) {
+            ctx.save();
+            ctx.beginPath(); ctx.arc(lcx, lcy, ls / 2 + 2, 0, Math.PI * 2); ctx.clip();
+            var lr = lim.width / lim.height, ldw, ldh;
+            if (lr > 1) { ldw = ls; ldh = ls / lr; } else { ldh = ls; ldw = ls * lr; }
+            ctx.drawImage(lim, lcx - ldw / 2, lcy - ldh / 2, ldw, ldh);
+            ctx.restore();
+          }
+        }
+        logoW = logosClubs.length * ls + (logosClubs.length - 1) * lgap + 2 * lhalo;
+      } else if (logoHead) {
         var _lh = t.badgeLabel ? 150 : 96;      // versions Offload : logo agrandi
         var _ly = t.badgeLabel ? Math.round((hd - _lh) / 2) : 20;
         if (t.badgeLabel) drawHaloLogo(ctx, logoHead, 36, _ly, _lh);
@@ -563,11 +629,15 @@
       // Liste sur 2 colonnes internes : col gauche 1→8, col droite 9→15
       var innerGap = 16;
       var colW = Math.floor((lw - innerGap) / 2);
-      var col1 = titulaires.slice(0, 8);
-      var col2 = titulaires.slice(8);
+      // EXPORT-RETOUR-TERRAIN-1008 : coupure équilibrée selon le format
+      // (XV → 8/7 inchangé ; à 12 → 6/6 ; à 10 → 5/5) et hauteur de ligne
+      // plafonnée à celle d'un XV pour ne pas étirer les cartes.
+      var coupe = Math.min(8, Math.ceil(titulaires.length / 2));
+      var col1 = titulaires.slice(0, coupe);
+      var col2 = titulaires.slice(coupe);
       var nbRows = Math.max(col1.length, col2.length, 1);
       var zone = (PH - 30 - basReserve) - y;
-      var rowh = Math.max(30, Math.floor(zone / nbRows));
+      var rowh = Math.max(30, Math.min(Math.floor(zone / 8), Math.floor(zone / nbRows)));
       var ch = rowh - 5;
 
       function carteL(cx0, yy, j) {
@@ -579,15 +649,40 @@
         // numéro
         ctx.fillStyle = rgb(t.jaune); ctx.font = font(Math.min(24, ch - 6), 700);
         ctx.fillText(String(j.num != null ? j.num : ''), cx0 + 12, yy + ch / 2 - Math.min(24, ch - 6) / 2);
-        // pastille initiales
-        var rr = Math.min(15, (ch - 6) / 2);
-        var pcx = cx0 + 52, pcy = yy + ch / 2;
-        ctx.fillStyle = rgb(t.card2);
-        ctx.beginPath(); ctx.arc(pcx, pcy, rr, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = rgb(version === 'mom' ? t.jaune : t.sub);
-        ctx.font = font(Math.max(10, rr - 1), 700);
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(initiales(j.prenom, j.nom), pcx, pcy + 1);
+        // pastille : vignette photo (Offload) ou initiales
+        var rr, pcx, pcy = yy + ch / 2;
+        if (offload) {
+          rr = Math.max(12, Math.min(27, (ch - 10) / 2));
+          pcx = cx0 + 46 + rr;
+          // cerclage couleur club
+          ctx.fillStyle = couleurClubPhoto(j);
+          ctx.beginPath(); ctx.arc(pcx, pcy, rr + 3, 0, Math.PI * 2); ctx.fill();
+          var ph = photoDe.get(j);
+          ctx.save();
+          ctx.beginPath(); ctx.arc(pcx, pcy, rr, 0, Math.PI * 2); ctx.clip();
+          if (ph) {
+            // cover, cadré haut (photos déjà recadrées visage à l'import)
+            var d = rr * 2, pr0 = ph.width / ph.height, pdw, pdh;
+            if (pr0 > 1) { pdh = d; pdw = d * pr0; } else { pdw = d; pdh = d / pr0; }
+            ctx.drawImage(ph, pcx - pdw / 2, pcy - rr, pdw, pdh);
+          } else {
+            ctx.fillStyle = rgb(t.card2); ctx.fillRect(pcx - rr, pcy - rr, rr * 2, rr * 2);
+            ctx.fillStyle = rgb(t.sub);
+            ctx.font = font(Math.max(10, Math.round(rr * 0.8)), 700);
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(initiales(j.prenom, j.nom), pcx, pcy + 1);
+          }
+          ctx.restore();
+        } else {
+          rr = Math.min(15, (ch - 6) / 2);
+          pcx = cx0 + 52;
+          ctx.fillStyle = rgb(t.card2);
+          ctx.beginPath(); ctx.arc(pcx, pcy, rr, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = rgb(version === 'mom' ? t.jaune : t.sub);
+          ctx.font = font(Math.max(10, rr - 1), 700);
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillText(initiales(j.prenom, j.nom), pcx, pcy + 1);
+        }
         ctx.textAlign = 'left'; ctx.textBaseline = 'top';
         // nom + sous-ligne
         var nX = pcx + rr + 10;
@@ -669,10 +764,15 @@
       ctx.globalAlpha = 1;
       ctx.restore();
 
-      // maillots joueurs par CODE POSTE
+      // maillots joueurs par CODE POSTE — table du FORMAT de la compo
+      // (EXPORT-RETOUR-TERRAIN-1008 : data.terrainPos fourni par l'éditeur =
+      // terrainPosCourant(), même table que la vue Terrain de l'app pour tous
+      // les formats XV/13/12/X/9/8/7/5). Repli TERRAIN_POS_XV si absent.
+      var posTerrain = (data.terrainPos && typeof data.terrainPos === 'object')
+        ? data.terrainPos : TERRAIN_POS_XV;
       var mH = Math.max(48, Math.min(72, Math.round(tW / 9)));
       function placerMaillot(j) {
-        var pos = j.code ? TERRAIN_POS_XV[j.code] : null;
+        var pos = j.code ? posTerrain[j.code] : null;
         if (!pos) return;
         var px = tX0c + tW * (pos.x / 100);
         var py = fieldY + fieldH * (pos.y / 100);
@@ -682,7 +782,7 @@
 
       // 5) Pied de page
       ctx.fillStyle = rgb(t.pied); ctx.font = font(18, 400);
-      ctx.fillText((data.titre || '') + ' · SAISON 2025/2026', 36, PH - 26);
+      ctx.fillText(piedDePage(data), 36, PH - 26);
       ctx.textAlign = 'right';
       ctx.fillText(data.dateExport || '', PW - 36, PH - 26);
       ctx.textAlign = 'left';
@@ -698,11 +798,10 @@
   // RGPD : data.titulaires[i].photoUrl n'est renseigné QUE pour les joueurs ayant
   // droit + photo (filtre fait en amont). Sinon repli initiales. Dégradation
   // honnête : photo qui ne charge pas → repli initiales, jamais de trou.
-  function initiales(nom, prenom) {
-    var p = (prenom || '').trim(), n = (nom || '').trim();
-    var a = p ? p.charAt(0) : '', b = n ? n.charAt(0) : '';
-    return (a + b).toUpperCase() || '?';
-  }
+  // (EXPORT-RETOUR-TERRAIN-1008 : doublon de initiales(nom, prenom) supprimé ici —
+  //  déclaré après celui du haut, il l'écrasait par hoisting avec les arguments
+  //  inversés → pastilles « NP » au lieu de « PN ». Le rendu photos utilise
+  //  initialesPhoto(j), non concerné.)
 
   // ── Rendu "grille de portraits" v2 (design Éclats — versions Offload) ────────
   // Fond navy dégradé + rayons/cercles filigrane + bande néon multi-clubs.
@@ -827,11 +926,27 @@
       var neonY = lsy + ls + 168;
       ctx.fillStyle = neon; roundRect(ctx, x0, neonY, W - 2 * x0, 8, 4); ctx.fill();
 
-      // 3) Grille XV
-      var y0 = neonY + 40, ch = 376, vgap = 22, phH = ch - 84;
-      for (var idx = 0; idx < 15; idx++) {
+      // 3) Grille des titulaires — ADAPTATIVE au format (à 10, à 12, à XV…).
+      // EXPORT-RETOUR-TERRAIN-1008 : la grille ne boucle plus en dur sur 15 cases
+      // (cases « ? » numérotées 11→15 sur un match à 10). On ne dessine que les
+      // titulaires réels ; la hauteur de carte s'adapte au nombre de rangées dans
+      // la même zone qu'un XV (4 rangées × 376 px), plafonnée pour garder des
+      // portraits proportionnés, et la grille est centrée. Dernière rangée
+      // incomplète centrée horizontalement. Bande remplaçants à position fixe.
+      var nTit = tit.length;
+      var vgap = 22;
+      var gridTop = neonY + 40;
+      var zoneH = 4 * 376 + 3 * vgap;                       // zone d'un XV (référence v2)
+      var nRows = Math.max(1, Math.ceil(nTit / cols));
+      var ch = Math.min(520, Math.floor((zoneH - (nRows - 1) * vgap) / nRows));
+      var phH = ch - 84;
+      var gridH = nRows * ch + (nRows - 1) * vgap;
+      var y0 = gridTop + Math.max(0, Math.round((zoneH - gridH) / 2));
+      for (var idx = 0; idx < nTit; idx++) {
         var r = Math.floor(idx / cols), c = idx % cols;
-        var x = x0 + c * (cw + gap), y = y0 + r * (ch + vgap);
+        var nDansRangee = Math.min(cols, nTit - r * cols);
+        var xDecal = Math.round((cols - nDansRangee) * (cw + gap) / 2);
+        var x = x0 + xDecal + c * (cw + gap), y = y0 + r * (ch + vgap);
         var j = tit[idx] || {};
         var num = (j.num != null && j.num !== '') ? j.num : (idx + 1);
         var col = couleurClubPhoto(j);
@@ -893,7 +1008,7 @@
       }
 
       // 4) Bande remplaçants
-      var ry = y0 + 4 * (ch + vgap) + 6;
+      var ry = gridTop + zoneH + vgap + 6;   // = position v2 d'origine (XV), indépendante du format
       ctx.save();
       ctx.shadowColor = 'rgba(0,0,0,0.3)'; ctx.shadowBlur = 12; ctx.shadowOffsetY = 5;
       ctx.fillStyle = WHITE; roundRect(ctx, x0, ry, W - 2 * x0, 210, 18); ctx.fill();
