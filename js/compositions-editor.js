@@ -6,6 +6,17 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.87 — Export compo : format terrain + saison ; X : 12 en diagonale (8 oct. 2026)
+ *   v3.87 : EXPORT-RETOUR-TERRAIN-1008 (08/10/2026, retour terrain M16,
+ *           enchaîné par Manu sur le lot compo-export.js — écart de
+ *           gouvernance « on enchaîne » à tracer dans STATE).
+ *           (1) TERRAIN_POS_X : 12 (CG) déplacé de (40, 68) à (67, 63.5) =
+ *               milieu exact du segment 10 (DO 54,55) → 14 (AD 80,72),
+ *               consigne Manu. Vue Terrain de l'app ET export paysage.
+ *           (2) _collecterDonneesExport : transmet terrainPos =
+ *               terrainPosCourant() (table du format) et saisonLibelle
+ *               (SupabaseHub.getSaisonActive, non bloquant) à CompoExport.
+ *           Aucun autre format, aucune écriture base, aucun autre rendu touché.
  * Version : 3.86 — Étiquette filles EDR (7 oct. 2026)
  *   v3.86 : BADGE-FILLES-EDR (07/10/2026, enchaîné sur IMPORT-CATEGORIE).
  *           etiquetteJoueur() : une joueuse (sexe F) en catégorie EDR mixte
@@ -8338,6 +8349,19 @@
       console.warn('MOM Hub: collecte photos export échouée (non bloquant)', err);
     }
 
+    // v3.87 — saison active pour le pied de page de l'export (fin du
+    // « SAISON 2025/2026 » en dur côté compo-export.js). Dégradation honnête :
+    // pas de RPC / erreur → libellé absent, l'export omet simplement la saison.
+    var saisonLibelle = '';
+    try {
+      if (window.SupabaseHub && typeof SupabaseHub.getSaisonActive === 'function') {
+        var sa = await SupabaseHub.getSaisonActive();
+        if (sa && sa.libelle) saisonLibelle = String(sa.libelle);
+      }
+    } catch (err) {
+      console.warn('MOM Hub: collecte saison export échouée (non bloquant)', err);
+    }
+
     return {
       sousTitre: sousTitre,
       meta1: meta1,
@@ -8354,7 +8378,12 @@
         entente_reg: 'assets/logo-entente-offload-reg.png'
       },
       logosClubsNat: _logosClubsListe(_CLUBS_NAT),
-      logosClubsReg: _logosClubsListe(_CLUBS_REG)
+      logosClubsReg: _logosClubsListe(_CLUBS_REG),
+      // v3.87 — table terrain du FORMAT courant (même source que la vue
+      // Terrain : terrainPosCourant()) → l'export paysage place X/12/7… comme
+      // l'app, au lieu de sa copie XV en dur.
+      terrainPos: terrainPosCourant(),
+      saisonLibelle: saisonLibelle
     };
   }
 
@@ -8501,7 +8530,7 @@
     '2LD': { x: 78.0, y: 31.0 },   // 2L sur l'extérieur droit  (consigne Manu)
     'DM':  { x: 36.0, y: 46.0 },
     'DO':  { x: 54.0, y: 55.0 },
-    'CG':  { x: 40.0, y: 68.0 },
+    'CG':  { x: 67.0, y: 63.5 },   // v3.87 : 12 au MILIEU EXACT de la diagonale 10 (DO) → 14 (AD) — consigne Manu 08/10/2026
     'AD':  { x: 80.0, y: 72.0 },
     'AR':  { x: 47.0, y: 88.0 }
   };
