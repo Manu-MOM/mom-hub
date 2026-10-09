@@ -6,6 +6,20 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.88 — Bandeau entente : logos des clubs partenaires (9 oct. 2026)
+ *   v3.88 : LOGOS-ENTENTE-BANDEAU (retour terrain M16, 09/10/2026).
+ *           _bandeauHTML (Suivi, Rapport match/phase/tournoi, PDF du
+ *           rapport = impression du même DOM, Terrain) : en habillage
+ *           ENTENTE, rangée des logos des clubs de l'entente au lieu de
+ *           logo-entente.png. Source BASE (ententes.club_principal_id +
+ *           clubs_partenaires_ids, supabase-client v1.90 ; noms via
+ *           getClubs, cache ClubsEntente) ; exception M16 Rég = 4 clubs
+ *           (_CLUBS_REG) — décisions Manu 09/10. Repli logo-entente.png
+ *           (Solo / clubs non chargés), pastille texte si club sans logo.
+ *           Recette 09/10 : M16 Nat + Rég vertes ; périmètre RESTREINT à
+ *           l'entente M16 (_estEntenteM16) — M14, M18 et autres ententes
+ *           gardent logo-entente.png (getClubs non appelé hors M16).
+ *           Habillage MOM inchangé. Aucune écriture base.
  * Version : 3.87 — Export compo : format terrain + saison ; X : 12 en diagonale (8 oct. 2026)
  *   v3.87 : EXPORT-RETOUR-TERRAIN-1008 (08/10/2026, retour terrain M16,
  *           enchaîné par Manu sur le lot compo-export.js — écart de
@@ -2503,11 +2517,102 @@
   function _logoHabillage(hab) {
     return (hab === 'entente') ? 'assets/logo-entente.png' : 'assets/ecusson-mom.png';
   }
+  // ── v3.88 — LOGOS-ENTENTE-BANDEAU (retour terrain M16, 09/10/2026) ──
+  // En habillage ENTENTE, le bandeau (Suivi, Rapport match/phase/tournoi,
+  // PDF = impression du même DOM, Terrain) affiche la rangée des logos des
+  // CLUBS de l'entente au lieu de logo-entente.png. Décisions Manu 09/10 :
+  //   • source = BASE : ententes.club_principal_id + clubs_partenaires_ids
+  //     (exposés par getEvenementEquipeContext, supabase-client v1.90),
+  //     résolus en nom_court via SupabaseHub.getClubs() (1 appel, mis en
+  //     cache) puis en logo via _CLUBS_ENTENTE (même table que l'export) ;
+  //   • exception M16 RÉGIONALE : l'entente M16 porte 6 clubs en base mais
+  //     l'équipe Rég n'en engage que 4 → filtre sur _CLUBS_REG (même liste
+  //     que l'export compo). Détection : entente.code « ENTENTE-M16-… » ET
+  //     libellé/nom officiel de l'équipe contenant « Reg » / « Rég » (mot
+  //     entier) — seule donnée disponible, tracée comme telle ;
+  //   • appliqué PARTOUT où le bandeau est utilisé (Terrain compris) ;
+  //   • recette 09/10 : M16 Nat + Rég VERTES ; périmètre RESTREINT à
+  //     l'entente M16 — M14, M18 et autres gardent logo-entente.png.
+  // Dégradation honnête : entente Solo / < 2 clubs résolus / clubs pas
+  // encore chargés → logo-entente.png comme avant. Club sans logo connu →
+  // pastille texte (nom_court), jamais de club omis ni inventé.
+  // Ordre d'affichage = _ORDRE_CLUBS (identique à l'export compo).
+  var ClubsEntente = { parId: null, enCours: null };
+  function _chargerClubsEntente() {
+    if (ClubsEntente.parId || ClubsEntente.enCours) return ClubsEntente.enCours;
+    if (!window.SupabaseHub || typeof SupabaseHub.getClubs !== 'function') return null;
+    ClubsEntente.enCours = Promise.resolve(SupabaseHub.getClubs()).then(function (rows) {
+      var m = new Map();
+      (Array.isArray(rows) ? rows : []).forEach(function (c) { if (c && c.id) m.set(c.id, c); });
+      ClubsEntente.parId = m;
+      // Repeint les bandeaux déjà affichés (rendu synchrone avant chargement).
+      document.querySelectorAll('[data-logos-entente]').forEach(function (n) {
+        n.innerHTML = _logosBandeauHTML(_habillageCourant());
+      });
+    }).catch(function (err) {
+      console.warn('MOM Hub: chargement clubs pour logos entente échoué (non bloquant)', err);
+      ClubsEntente.enCours = null;
+    });
+    return ClubsEntente.enCours;
+  }
+  function _estEquipeM16Reg(ctx) {
+    var ent = ctx && ctx.entente, eq = ctx && ctx.equipe;
+    if (!ent || !/^ENTENTE-M16-/i.test(String(ent.code || ''))) return false;
+    var lib = [eq && eq.libelle_court, eq && eq.nom_officiel].filter(Boolean).join(' ');
+    return /(^|[^a-zà-ÿ])r[ée]g(ionale)?([^a-zà-ÿ]|$)/i.test(lib);
+  }
+  // Clubs de l'entente du contexte courant : [{ key, nom, asset|null }] ou
+  // null si indéterminable (contexte / clubs non chargés).
+  function _clubsEntenteCourants() {
+    var ctx = State.evenementEquipeContext;
+    var ent = ctx && ctx.entente;
+    if (!ent) return null;
+    if (!ClubsEntente.parId) { _chargerClubsEntente(); return null; }
+    var ids = [ent.club_principal_id].concat(Array.isArray(ent.clubs_partenaires_ids) ? ent.clubs_partenaires_ids : []);
+    var vus = {}, out = [];
+    ids.forEach(function (id) {
+      var c = id ? ClubsEntente.parId.get(id) : null;   // (appelé seulement pour M16)
+      if (!c) return;
+      var k = _clubKey(c.nom_court);
+      if (k === 'selestat') k = 'sélestat';
+      if (!k || vus[k]) return;
+      vus[k] = true;
+      out.push({ key: k, nom: c.nom_court, asset: _CLUBS_ENTENTE[k] ? _CLUBS_ENTENTE[k].asset : null });
+    });
+    if (_estEquipeM16Reg(ctx)) {
+      out = out.filter(function (c) { return _CLUBS_REG.indexOf(c.key) !== -1; });
+    }
+    out.sort(function (a, b) {
+      var ia = _ORDRE_CLUBS.indexOf(a.key), ib = _ORDRE_CLUBS.indexOf(b.key);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+    });
+    return out;
+  }
+  // Périmètre (recette Manu 09/10) : logos clubs pour l'entente M16 UNIQUEMENT
+  // (Nat + Rég). M14, M18 et autres ententes gardent logo-entente.png.
+  function _estEntenteM16(ctx) {
+    var ent = ctx && ctx.entente;
+    return !!ent && /^ENTENTE-M16-/i.test(String(ent.code || ''));
+  }
+  function _logosBandeauHTML(hab) {
+    if (hab === 'entente' && _estEntenteM16(State.evenementEquipeContext)) {
+      var clubs = _clubsEntenteCourants();
+      if (clubs && clubs.length >= 2) {
+        return clubs.map(function (c) {
+          return c.asset
+            ? '<img class="view-suivi__logo view-suivi__logo--club" src="' + escapeHtml(c.asset) + '" alt="' + escapeHtml(c.nom) + '" title="' + escapeHtml(c.nom) + '">'
+            : '<span class="view-suivi__logo view-suivi__logo--club view-suivi__logo--txt" title="' + escapeHtml(c.nom) + '">' + escapeHtml(c.nom) + '</span>';
+        }).join('');
+      }
+    }
+    return '<img class="view-suivi__logo" src="' + _logoHabillage(hab) + '" alt="" aria-hidden="true">';
+  }
+
   function _bandeauHTML(nomEq, sousTitre) {
     var hab = _habillageCourant();
     return '<div class="view-suivi__bandeau">' +
         '<div class="view-suivi__brand">' +
-          '<img class="view-suivi__logo" src="' + _logoHabillage(hab) + '" alt="" aria-hidden="true">' +
+          '<span class="view-suivi__logos" data-logos-entente>' + _logosBandeauHTML(hab) + '</span>' +
           '<div class="view-suivi__brand-txt">' +
             '<div class="view-suivi__brand-eq">' + escapeHtml(nomEq || '') + '</div>' +
             '<div class="view-suivi__brand-sub">' + escapeHtml(sousTitre || '') + '</div>' +
@@ -10018,6 +10123,7 @@
         return State.evenements;
       }
       State.evenementEquipeContext = ctx.data;
+      if (_estEntenteM16(ctx.data)) _chargerClubsEntente();   // v3.88 — logos clubs du bandeau entente M16 (non bloquant)
       const evt = ctx.data.evenement || null;
       State.evenements = evt ? [{
         id: evt.id,
