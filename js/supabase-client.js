@@ -18,6 +18,14 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 1.90 — 9 octobre 2026
+ *   v1.90 : LOGOS-ENTENTE-BANDEAU (retour terrain M16, 09/10/2026).
+ *          getEvenementEquipeContext : l'embed ententes lit en plus
+ *          club_principal_id + clubs_partenaires_ids (colonnes NOT NULL de
+ *          sql/01, sondées en base le 09/10). L'objet `entente` étant renvoyé
+ *          tel quel, les 2 champs sont exposés sans autre retouche. Source
+ *          des logos clubs du bandeau entente (Suivi / Rapport / PDF /
+ *          Terrain) dans compositions-editor.js v3.88. Additif pur.
  * Version : 1.89 — 4 octobre 2026
  *   v1.89 : avenant « Retour + niveaux » (N1-A). Wrapper ADDITIF →
  *          RPC C15-b : niveauEvenementsStats(ids) → { ok, data: {evtId:
@@ -6382,7 +6390,8 @@
           equipes (
             id, code, libelle_court, nom_officiel, entente_id, format_jeu_code,
             ententes ( id, code, libelle_court, libelle_moyen,
-                        categorie_id, saison_id )
+                        categorie_id, saison_id,
+                        club_principal_id, clubs_partenaires_ids )
           ),
           evenement_adversaires ( adversaire_nom, ordre, notes )
         `)
