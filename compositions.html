@@ -333,6 +333,30 @@
     .view-suivi--entente .view-suivi__bandeau { background: linear-gradient(90deg, #00285a, #14462d); border-bottom-color: #90d8f0; }
     .view-suivi--entente .view-suivi__brand-sub { color: #90d8f0; }
     .view-suivi--entente .view-suivi__hbtn[aria-pressed="true"] { background: #90d8f0; border-color: #90d8f0; color: #0a1428; }
+    /* v3.88 — LOGOS-ENTENTE-BANDEAU : rangée des logos clubs de l'entente
+       (pastilles blanches, comme l'export compo). Additif pur ; le logo
+       unique (MOM / repli entente) garde son style .view-suivi__logo. */
+    .view-suivi__logos { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    .view-suivi__logo--club {
+      background: #fff; border-radius: 50%; padding: 3px; box-sizing: border-box;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+    .view-suivi__logo--txt {
+      display: inline-flex; align-items: center; justify-content: center;
+      font-family: 'Oswald', sans-serif; font-size: 9px; font-weight: 600;
+      color: #0a1428; text-transform: uppercase; overflow: hidden;
+    }
+    @media (max-width: 600px) {
+      .view-suivi__logos { gap: 4px; }
+      .view-suivi__logo--club { width: 28px; height: 28px; padding: 2px; }
+      /* Rangée de 4 à 6 logos : le nom d'équipe passe SOUS les logos quand
+         la largeur manque (évite le chevauchement avec le toggle). */
+      .view-suivi--entente .view-suivi__brand,
+      .view-rapport--entente .view-suivi__brand { flex-wrap: wrap; row-gap: 6px; }
+      .view-suivi--entente .view-suivi__brand-txt,
+      .view-rapport--entente .view-suivi__brand-txt { flex: 1 1 140px; min-width: 0; }
+    }
     .view-suivi__match-label { color: #7c8a99; }
     .view-suivi__hint { color: #7c8a99; }
     /* Score */
