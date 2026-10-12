@@ -6,6 +6,16 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.90 — Suivi : actions marquantes (12 oct. 2026)
+ *   v3.90 : FAIT FOI Conception-SUIVI-THEO-v1, lot L2 (D3-A+B). Palette
+ *           « ⭐ Actions marquantes » : socle FIXE de 12 actions (référentiel
+ *           v1.4, famille actions_marquantes, obs-A-marq-<code>) puis AJOUTS
+ *           de la catégorie (table types_action_marquante C18-a,
+ *           obs-A-marq-<uuid>, « ⚙ Gérer les ajouts », jamais supprimés).
+ *           Nous uniquement, joueur OBLIGATOIRE, minute ou temps VEO, 0 point.
+ *           Rapport : section « ⭐ Actions marquantes » (action × nombre, puis
+ *           décompte par joueur) ; libellés dans l'historique, le déroulé et
+ *           l'écran « Modifier » (types proposés).
  * Version : 3.89 — Rapport : déroulé au temps VEO (12 oct. 2026)
  *   v3.89 : FAIT FOI Conception-SUIVI-THEO-v1 (gelée par Manu le 12/10 à
  *           10:55), lot L1 (D1-A). Déroulé du match : dans chaque période,
@@ -2398,7 +2408,8 @@
       var out = [];
       if (!this.catA) return out;
       var familles = ['score', 'score_rate', 'discipline', 'mouvement', 'jeu_collectif', 'technique',
-                      'faute_technique'];   // v3.77
+                      'faute_technique',    // v3.77
+                      'actions_marquantes'];   // v3.90 — socle fixe
       for (var f = 0; f < familles.length; f++) {
         var arr = this.catA[familles[f]];
         if (!Array.isArray(arr)) continue;
@@ -2431,6 +2442,11 @@
       if (observableId.indexOf(_PREFIXE_FAUTE) === 0) {
         var lf = SuiviFautes.libelles[observableId.slice(_PREFIXE_FAUTE.length)];
         return { libelle: 'Faute — ' + (lf || 'type retiré'), icone: '🚩' };
+      }
+      // v3.90 — action marquante AJOUTÉE par la catégorie (hors socle).
+      if (observableId.indexOf(_PREFIXE_MARQ) === 0 && !(this.catA && this.trouver(observableId))) {
+        var lm = SuiviMarq.libelles[observableId.slice(_PREFIXE_MARQ.length)];
+        return { libelle: lm || 'Action marquante retirée', icone: '⭐' };
       }
       if (this.catA) {
         var t = this.trouver(observableId);
@@ -2920,6 +2936,7 @@
     SuiviSaisie.reinit(evtId);
     SuiviRegl.charger();
     SuiviFautes.charger(null, true);   // v3.76 — pioche de la catégorie du match
+    SuiviMarq.charger(null, true);     // v3.90 — ajouts d'actions marquantes
     SuiviChrono.nomNous = _nomNotreEquipe();
     SuiviChrono.nomAdv = _nomAdversaireCourt(compo);
     var adversaire = _adversaireDeCompo(compo);
@@ -2981,6 +2998,7 @@
   // dérivée du référentiel chargé. null si inconnu ou non chargé.
   function _familleDeObs(observableId) {
     if (observableId && observableId.indexOf(_PREFIXE_FAUTE) === 0) return 'faute';   // v3.76
+    if (observableId && observableId.indexOf(_PREFIXE_MARQ) === 0) return 'action_marquante';   // v3.90
     if (!observableId || !SuiviObs.catA) return null;
     var t = SuiviObs.trouver(observableId);
     if (!t) return null;
@@ -4143,6 +4161,8 @@
     var idFautes = 'rapport-fautes' + suffix;
     var ftech = [];       // v3.77 — en-avant / passe en avant
     var pied = [];        // v3.80 — jeu au pied {l, o}
+    var marq = [];        // v3.90 — actions marquantes (lignes)
+    var idMarq = 'rapport-marq' + suffix;
     var idPied = 'rapport-pied' + suffix;
     var idFtech = 'rapport-ftech' + suffix;
     var buteurs = {};     // v3.74 — {uuid: {transfo:[réussies,tentées], penalite:[…], drop:[…]}}
@@ -4163,6 +4183,8 @@
       }
       // v3.76 — fautes : section dédiée (type × équipe, par joueur).
       if (oid.indexOf(_PREFIXE_FAUTE) === 0) { fautes.push(l); continue; }
+      // v3.90 — actions marquantes (socle + ajouts) : section dédiée, nous.
+      if (oid.indexOf(_PREFIXE_MARQ) === 0) { if (l.equipe_concernee !== 'adverse') marq.push(l); continue; }
       // v3.74 (L5) — conquête v1.2 : section dédiée (lanceur × issue).
       var tq = SuiviObs.trouver(oid);
       if (tq && tq.famille === 'conquete') { conq.push({ l: l, o: tq.o }); continue; }
@@ -4261,6 +4283,14 @@
               '</section>';
     }
 
+    // v3.90 — ACTIONS MARQUANTES (libellés + noms : asynchrones).
+    if (marq.length) {
+      html += '<section class="rapport-bloc">' +
+                '<h4 class="rapport-bloc__titre">⭐ Actions marquantes <span class="rapport-bloc__n">(' + marq.length + ')</span></h4>' +
+                '<div id="' + idMarq + '"><p class="view-suivi__hint">Chargement…</p></div>' +
+              '</section>';
+    }
+
     // v3.77 — EN-AVANT / PASSE EN AVANT (comptés à part des fautes).
     if (ftech.length) {
       html += '<section class="rapport-bloc">' +
@@ -4336,6 +4366,7 @@
     if (fautes.length) _peindreFautesRapport(fautes, idFautes, nomNous, nomAdv);   // v3.76
     if (ftech.length) _peindreFautesTechRapport(ftech, idFtech, nomNous, nomAdv);  // v3.77
     if (pied.length) _peindreBotteursPied(pied, idPied, nomNous);                  // v3.80
+    if (marq.length) _peindreMarqRapport(marq, idMarq);                             // v3.90
     if (evtId && !suffix) _peindreDebrief(evtId, 'rapport-debrief', lignes);      // v3.83
     if (evtId) {
       // v3.81 / v3.82 — lien VEO ; si des repères VEO sont rapprochés, le
@@ -6716,6 +6747,7 @@
       if (_estEcoleDeRugby() && document.querySelector('#suivi-palette [data-pied-ctx]')) _peindrePalette(evtId, perCourante);
     });
     SuiviFautes.charger();  // v3.76 — non bloquant : pioche des fautes
+    SuiviMarq.charger();    // v3.90 — non bloquant : ajouts d'actions marquantes
     SuiviObs.charger(function (catA) {
       if (SuiviChrono.evtId !== evtId) return;
       if (!catA || !Array.isArray(catA.score)) {
@@ -6844,6 +6876,16 @@
         });
         html += '</div>';
       }
+      // v3.90 — Actions marquantes (nous, joueur obligatoire).
+      if (Array.isArray(catA.actions_marquantes) && catA.actions_marquantes.length) {
+        html += '<div class="suivi-palette__title suivi-palette__title--sep">⭐ Actions marquantes</div>';
+        html += '<div class="suivi-palette__action">' +
+                  '<span class="suivi-palette__lbl">Grattage, plaquage offensif, franchissement…</span>' +
+                  '<div class="suivi-palette__btns">' +
+                    '<button type="button" class="suivi-palette__btn suivi-palette__btn--nous" id="pal-marq">Saisir…</button>' +
+                  '</div>' +
+                '</div>';
+      }
       // v3.80 — Jeu au pied : botteur (Nous / Adversaire), puis contexte →
       // écran des issues. Masqué en école de rugby (J6-A).
       var ctxPied = _contextesPied();
@@ -6969,6 +7011,9 @@
       // v3.76 — Faute.
       var bFaute = document.getElementById('pal-faute');
       if (bFaute) bFaute.addEventListener('click', function () { _ouvrirFaute(evtId, perCourante); });
+      // v3.90 — Actions marquantes.
+      var bMarq = document.getElementById('pal-marq');
+      if (bMarq) bMarq.addEventListener('click', function () { _ouvrirMarq(evtId, perCourante); });
       // v3.77 — En-avant / passe en avant.
       var bFtech = document.getElementById('pal-ftech');
       if (bFtech) bFtech.addEventListener('click', function () { _ouvrirFauteTech(evtId, perCourante); });
@@ -7929,6 +7974,148 @@
   }
 
   // ════════════════════════════════════════════════════════════
+  // v3.90 — SUIVI-THEO D3-A+B. Actions marquantes : actions individuelles
+  // à impact positif. Socle FIXE (référentiel v1.4, famille
+  // actions_marquantes, 'obs-A-marq-<code>') + AJOUTS de la catégorie
+  // (table types_action_marquante C18-a, 'obs-A-marq-<uuid>'). Nous
+  // uniquement, joueur obligatoire, 0 point.
+  // ════════════════════════════════════════════════════════════
+  var _PREFIXE_MARQ = 'obs-A-marq-';
+  var SuiviMarq = {
+    catId: null, liste: null, libelles: {}, charge: false, enCours: false, _cb: [],
+    charger: function (cb, force) {
+      var catId = _categorieCourante();
+      if (!force && this.charge && this.catId === catId) { if (cb) cb(); return; }
+      if (cb) this._cb.push(cb);
+      if (this.enCours) return;
+      this.enCours = true;
+      var self = this, hub = window.SupabaseHub;
+      var p = (catId && hub && typeof hub.listerTypesActionMarquante === 'function')
+        ? hub.listerTypesActionMarquante(catId, true).catch(function () { return { ok: false }; })
+        : Promise.resolve({ ok: false });
+      p.then(function (res) {
+        self.catId = catId;
+        var toutes = (res && res.ok && Array.isArray(res.data)) ? res.data : null;
+        self.liste = toutes ? toutes.filter(function (t) { return t.actif; }) : null;
+        self.libelles = {};
+        (toutes || []).forEach(function (t) { self.libelles[t.id] = t.libelle; });
+        self.charge = true; self.enCours = false;
+        var q = self._cb; self._cb = [];
+        for (var i = 0; i < q.length; i++) { try { q[i](); } catch (e) {} }
+      });
+    }
+  };
+
+  // Libellé court d'une action marquante (socle ou ajout) ; null si autre.
+  function _libMarq(observableId) {
+    if (!observableId || observableId.indexOf(_PREFIXE_MARQ) !== 0) return null;
+    var t = SuiviObs.catA ? SuiviObs.trouver(observableId) : null;
+    if (t) return t.o.libelle_court;
+    return SuiviMarq.libelles[observableId.slice(_PREFIXE_MARQ.length)] || 'Action marquante retirée';
+  }
+
+  function _cfgGestionMarq(evtId, perCourante) {
+    return {
+      fnLister: 'listerTypesActionMarquante', fnEnregistrer: 'enregistrerTypeActionMarquante',
+      titre: 'Actions marquantes ajoutées',
+      note: 'Ces actions complètent le socle commun (12 actions fixes) pour toute la catégorie. ' +
+            'Retirer une action ne touche pas à celles déjà saisies.',
+      placeholder: 'Nouvelle action (ex. Ballon porté gagnant)',
+      retour: function () { SuiviMarq.charger(function () { _ouvrirMarq(evtId, perCourante); }, true); }
+    };
+  }
+
+  // Écran de saisie : socle, puis ajouts de la catégorie ; joueur obligatoire.
+  function _ouvrirMarq(evtId, perCourante) {
+    var pal = document.getElementById('suivi-palette');
+    if (!pal) return;
+    if (!SuiviObs.charge) { SuiviObs.charger(function () { _ouvrirMarq(evtId, perCourante); }); return; }
+    if (!SuiviMarq.charge) { SuiviMarq.charger(function () { _ouvrirMarq(evtId, perCourante); }); return; }
+    var socle = (SuiviObs.catA && Array.isArray(SuiviObs.catA.actions_marquantes)) ? SuiviObs.catA.actions_marquantes : [];
+    var opts = [];
+    var h = '<div class="suivi-attrib">';
+    h += '<div class="suivi-attrib__title">⭐ Action marquante — ' + escapeHtml(SuiviChrono.nomNous || 'Nous') + '</div>';
+    h += '<div class="view-suivi__hint" style="text-align:left">Action individuelle qui a eu un impact positif ; le joueur est demandé ensuite.</div>';
+    h += '<div class="suivi-obsb__grid" style="margin-top:10px">';
+    socle.forEach(function (o) {
+      opts.push({ uuid: o.uuid, libelle_court: o.libelle_court, icone: o.icone || '⭐', points: 0 });
+      h += '<button type="button" class="suivi-obsb__btn" data-marq="' + (opts.length - 1) + '" title="' + escapeHtml(o.libelle_long || o.libelle_court) + '">' +
+           escapeHtml((o.icone ? o.icone + ' ' : '') + o.libelle_court) + '</button>';
+    });
+    h += '</div>';
+    if (Array.isArray(SuiviMarq.liste) && SuiviMarq.liste.length) {
+      h += '<div class="suivi-palette__lbl" style="margin-top:12px;font-weight:600">Ajouts de la catégorie</div>';
+      h += '<div class="suivi-obsb__grid">';
+      SuiviMarq.liste.forEach(function (t) {
+        opts.push({ uuid: _PREFIXE_MARQ + t.id, libelle_court: t.libelle, icone: '⭐', points: 0 });
+        h += '<button type="button" class="suivi-obsb__btn" data-marq="' + (opts.length - 1) + '">' + escapeHtml('⭐ ' + t.libelle) + '</button>';
+      });
+      h += '</div>';
+    }
+    h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">' +
+         (Array.isArray(SuiviMarq.liste) ? '<button type="button" class="suivi-chrono__btn" id="marq-gerer">⚙ Gérer les ajouts</button>' : '') +
+         '<button type="button" class="suivi-chrono__btn" id="marq-retour">↩ Retour</button></div>';
+    h += '</div>';
+    pal.innerHTML = h;
+    document.getElementById('marq-retour').addEventListener('click', function () { _peindrePalette(evtId, perCourante); });
+    var g = document.getElementById('marq-gerer');
+    if (g) g.addEventListener('click', function () { _ouvrirGestionFroid(evtId, perCourante, _cfgGestionMarq(evtId, perCourante)); });
+    pal.querySelectorAll('[data-marq]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var obs = opts[+b.getAttribute('data-marq')];
+        if (!obs) return;
+        _ouvrirAttribution(evtId, perCourante, obs, {
+          surRetour: function () { _ouvrirMarq(evtId, perCourante); },
+          apresSaisie: function () { _ouvrirMarq(evtId, perCourante); }
+        });
+      });
+    });
+  }
+
+  // Rapport : action × nombre, puis décompte par joueur (noms asynchrones).
+  function _peindreMarqRapport(marq, cibleId) {
+    SuiviMarq.charger(function () {
+      var parAct = {}, parJ = {};
+      marq.forEach(function (l) {
+        var lib = _libMarq(l.observable_id) || l.observable_id;
+        parAct[lib] = (parAct[lib] || 0) + 1;
+        if (l.joueur_uuid) {
+          var j = parJ[l.joueur_uuid] || (parJ[l.joueur_uuid] = { t: 0, d: {} });
+          j.t += 1; j.d[lib] = (j.d[lib] || 0) + 1;
+        }
+      });
+      var ids = Object.keys(parJ);
+      var pNoms = (ids.length && window.SupabaseHub && typeof SupabaseHub._resolveNoms === 'function')
+        ? SupabaseHub._resolveNoms(ids).catch(function () { return new Map(); }) : Promise.resolve(new Map());
+      pNoms.then(function (map) {
+        var box = document.getElementById(cibleId);
+        if (!box) return;
+        var acts = Object.keys(parAct).sort(function (a, b) { return (parAct[b] - parAct[a]) || a.localeCompare(b); });
+        var h = '<table class="rapport-tab"><thead><tr><th>Action</th><th>Nombre</th></tr></thead><tbody>';
+        acts.forEach(function (a) {
+          h += '<tr><td>' + escapeHtml(a) + '</td><td class="rapport-tab__n">' + parAct[a] + '</td></tr>';
+        });
+        h += '</tbody></table>';
+        if (ids.length) {
+          var rows = ids.map(function (u) {
+            var e = map && map.get ? map.get(u) : null;
+            var n = e ? (((e.prenom || '').trim() + ' ' + (e.nom || '').trim()).trim()) : '';
+            return { nom: n || _idCourt(u), j: parJ[u] };
+          }).sort(function (a, b) { return (b.j.t - a.j.t) || a.nom.localeCompare(b.nom); });
+          h += '<table class="rapport-tab" style="margin-top:8px"><thead><tr><th>Joueur</th><th>Total</th><th>Détail</th></tr></thead><tbody>';
+          rows.forEach(function (r) {
+            var det = Object.keys(r.j.d).sort(function (a, b) { return r.j.d[b] - r.j.d[a]; })
+              .map(function (a) { return a + (r.j.d[a] > 1 ? ' ×' + r.j.d[a] : ''); }).join(' · ');
+            h += '<tr><td>' + escapeHtml(r.nom) + '</td><td class="rapport-tab__n">' + r.j.t + '</td><td><small>' + escapeHtml(det) + '</small></td></tr>';
+          });
+          h += '</tbody></table>';
+        }
+        box.innerHTML = h;
+      });
+    });
+  }
+
+  // ════════════════════════════════════════════════════════════
   // v3.77 — SUIVI-VEO avenant « En-avant » (C14-e). En-avant et passe en
   // avant = observables du référentiel (famille faute_technique, v1.2.2),
   // saisis comme une faute (équipe, type, joueur facultatif, minute) mais
@@ -8133,10 +8320,13 @@
                       technique: 'Discipline', mouvement: 'Mouvement', conquete: 'Conquête',
                       jeu_collectif: 'Jeu collectif (ancien)',
                       faute_technique: 'En-avant / passe en avant',     // v3.77
-                      jeu_au_pied: 'Jeu au pied' };                     // v3.80
+                      jeu_au_pied: 'Jeu au pied',                       // v3.80
+                      actions_marquantes: 'Actions marquantes' };       // v3.90
     var connu = plats.some(function (p) { return p.o.uuid === ligne.observable_id; }) ||
       (ligne.observable_id.indexOf(_PREFIXE_FAUTE) === 0 && Array.isArray(SuiviFautes.liste) &&
-       SuiviFautes.liste.some(function (t) { return _PREFIXE_FAUTE + t.id === ligne.observable_id; }));
+       SuiviFautes.liste.some(function (t) { return _PREFIXE_FAUTE + t.id === ligne.observable_id; })) ||
+      (Array.isArray(SuiviMarq.liste) &&                                                   // v3.90
+       SuiviMarq.liste.some(function (t) { return _PREFIXE_MARQ + t.id === ligne.observable_id; }));
     var optType = '';
     if (!connu) {
       var refL = SuiviObs.libelle(ligne.observable_id);
@@ -8163,6 +8353,16 @@
         var v = _PREFIXE_FAUTE + t.id;
         optType += '<option value="' + escapeHtml(v) + '"' + (v === ligne.observable_id ? ' selected' : '') + '>' +
                    escapeHtml('Faute — ' + t.libelle) + '</option>';
+      });
+      optType += '</optgroup>';
+    }
+    // v3.90 — actions marquantes ajoutées par la catégorie.
+    if (Array.isArray(SuiviMarq.liste) && SuiviMarq.liste.length) {
+      optType += '<optgroup label="Actions marquantes (catégorie)">';
+      SuiviMarq.liste.forEach(function (t) {
+        var v = _PREFIXE_MARQ + t.id;
+        optType += '<option value="' + escapeHtml(v) + '"' + (v === ligne.observable_id ? ' selected' : '') + '>' +
+                   escapeHtml(t.libelle) + '</option>';
       });
       optType += '</optgroup>';
     }
@@ -8254,7 +8454,8 @@
       var adverse = (selEq.value === 'adverse');
       var sansJoueur = adverse || (t && (t.famille === 'conquete' || t.famille === 'jeu_collectif'));
       var estSub = (uuidType === 'obs-A-substitution') && !adverse;
-      var estFaute = (uuidType.indexOf(_PREFIXE_FAUTE) === 0);   // v3.76
+      var estFaute = (uuidType.indexOf(_PREFIXE_FAUTE) === 0) ||  // v3.76
+                     (!t && uuidType.indexOf(_PREFIXE_MARQ) === 0);  // v3.90 — ajout catégorie : 0 pt
       var payload = {
         observableId: uuidType,
         categorieObs: (uuidType.indexOf('obs-B-') === 0) ? 'B' : ((t || estFaute) ? 'A' : (ligne.categorie_obs || 'A')),
