@@ -18,6 +18,11 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 1.92 — 12 octobre 2026
+ *   v1.92 : SUIVI-THEO lot L3 (D2-A). 2 wrappers ADDITIFS → RPC C18-b :
+ *          definirJoueursAssocies(evt, ligneId, joueurs[]) et
+ *          listerJoueursAssocies(evt) → Map ligneId → [uuid] (joueurs en
+ *          plus du joueur principal d'une action, ex. hors-jeu collectif).
  * Version : 1.91 — 12 octobre 2026
  *   v1.91 : SUIVI-THEO lot L2 (FAIT FOI Conception-SUIVI-THEO-v1, D3-B).
  *          2 wrappers ADDITIFS → RPC C18-a : listerTypesActionMarquante(cat,
@@ -7489,6 +7494,45 @@
       }
       const r = Array.isArray(data) ? (data[0] || null) : (data || null);
       return { ok: true, data: r };
+    },
+
+    /**
+     * v1.92 — SUIVI-THEO D2-A (C18-b). Pose la liste des joueurs associés
+     * d'une action (en plus de joueur_uuid ; doublons et joueur principal
+     * retirés côté base). Liste vide = aucun associé.
+     * @returns {Promise<{ok:boolean, data?:string[], error?:string}>}
+     */
+    async definirJoueursAssocies(evenementUuid, ligneId, joueurs) {
+      if (!evenementUuid || !ligneId) return { ok: false, error: 'evenementUuid / ligneId manquant' };
+      const { data, error } = await client.rpc('definir_joueurs_associes', {
+        p_evenement_uuid: evenementUuid,
+        p_ligne_id: ligneId,
+        p_joueurs: Array.isArray(joueurs) ? joueurs.filter(Boolean) : []
+      });
+      if (error) {
+        console.error('MOM Hub: definirJoueursAssocies()', error);
+        return { ok: false, error: error.message || 'Erreur definir_joueurs_associes' };
+      }
+      return { ok: true, data: Array.isArray(data) ? data : [] };
+    },
+
+    /**
+     * v1.92 — SUIVI-THEO D2-A (C18-b). Joueurs associés des actions d'un
+     * match (annulées comprises).
+     * @returns {Promise<{ok:boolean, data?:Map<string,string[]>, error?:string}>}
+     */
+    async listerJoueursAssocies(evenementUuid) {
+      if (!evenementUuid) return { ok: false, error: 'evenementUuid manquant' };
+      const { data, error } = await client.rpc('lister_joueurs_associes', { p_evenement_uuid: evenementUuid });
+      if (error) {
+        console.error('MOM Hub: listerJoueursAssocies()', error);
+        return { ok: false, error: error.message || 'Erreur lister_joueurs_associes' };
+      }
+      const m = new Map();
+      (Array.isArray(data) ? data : []).forEach(function (r) {
+        if (r && r.ligne_id && Array.isArray(r.joueurs)) m.set(r.ligne_id, r.joueurs);
+      });
+      return { ok: true, data: m };
     },
 
     /**
