@@ -6,6 +6,15 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.89 — Rapport : déroulé au temps VEO (12 oct. 2026)
+ *   v3.89 : FAIT FOI Conception-SUIVI-THEO-v1 (gelée par Manu le 12/10 à
+ *           10:55), lot L1 (D1-A). Déroulé du match : dans chaque période,
+ *           les actions dont le temps VEO est connu (saisi ou repère VEO
+ *           rapproché) sont classées par temps VEO ; une action sans temps
+ *           VEO (ex. ligne FFR non rapprochée) se place à sa minute, entre
+ *           ses voisines datées (après celles de même minute). Avant : période
+ *           → minute → heure de saisie (ordre de frappe dans une minute).
+ *           Historique du Suivi inchangé.
  * Version : 3.88 — Bandeau entente : logos des clubs partenaires (9 oct. 2026)
  *   v3.88 : LOGOS-ENTENTE-BANDEAU (retour terrain M16, 09/10/2026).
  *           _bandeauHTML (Suivi, Rapport match/phase/tournoi, PDF du
@@ -4733,7 +4742,8 @@
 
     // v3.74 (L5) — ordre de JEU (période → minute → horodatage) : une
     // action ajoutée après coup (VEO, import FFR) se range à sa place.
-    var arr = eff.slice().sort(_ordreChrono);
+    // v3.89 (D1-A) — puis temps VEO prioritaire (saisi ou rapproché).
+    var arr = _ordreFilVeo(eff, evtIdFil);
 
     // Substitution : on a besoin du nom de l'entrant aussi.
     var uuids = [];
@@ -6391,6 +6401,39 @@
   };
 
   // Ordre de jeu d'une ligne : période → minute → horodatage (T4).
+  // v3.89 (SUIVI-THEO D1-A) — ordre du déroulé : par période, temps VEO
+  // (saisi : timecode_video ; sinon repère VEO rapproché si evtId fourni) ;
+  // une ligne sans temps VEO est fusionnée à sa minute (placée avant la
+  // première ligne datée de la même période dont la minute est supérieure).
+  function _ordreFilVeo(lignes, evtId) {
+    var dates = [], sans = [];
+    (lignes || []).forEach(function (l) {
+      var t = _intervalVersSec(l && l.timecode_video);
+      if (t === null && evtId && l) t = _veoTempsLigne(evtId, l.id);
+      if (t === null) sans.push(l); else dates.push({ l: l, t: t });
+    });
+    if (!dates.length) return sans.sort(_ordreChrono);
+    dates.sort(function (a, b) {
+      var pa = a.l.periode || 1, pb = b.l.periode || 1;
+      if (pa !== pb) return pa - pb;
+      return (a.t - b.t) || _ordreChrono(a.l, b.l);
+    });
+    sans.sort(_ordreChrono);
+    function minute(l) { return (l.minute_match != null) ? l.minute_match : -1; }
+    // u (sans temps) passe avant d (daté) ?
+    function avant(u, d) {
+      var pu = u.periode || 1, pd = d.periode || 1;
+      if (pu !== pd) return pu < pd;
+      return minute(u) < minute(d);
+    }
+    var out = [], i = 0, j = 0;
+    while (i < sans.length || j < dates.length) {
+      if (j >= dates.length || (i < sans.length && avant(sans[i], dates[j].l))) out.push(sans[i++]);
+      else out.push(dates[j++].l);
+    }
+    return out;
+  }
+
   function _ordreChrono(a, b) {
     var pa = a.periode || 1, pb = b.periode || 1;
     if (pa !== pb) return pa - pb;
