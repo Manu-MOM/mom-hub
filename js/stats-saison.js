@@ -5,6 +5,13 @@
  *   - Objet 1 : Fiche stats joueur (restitution famille, un joueur)
  *   - Objet 2 : Vue pilotage (équipe en haut + effectif en lignes triables)
  *
+ * Version : 1.8 — 12 oct. 2026. FAIT FOI Conception-SUIVI-THEO-v1, lot L3 :
+ *           (D2-A) une faute à plusieurs joueurs compte pour CHACUN dans sa
+ *           fiche (joueurs associés lus via listerJoueursAssocies,
+ *           supabase-client v1.92 / C18-b ; repli : joueur principal seul).
+ *           (D5) conquête du pilotage : une mêlée dont l'issue est une
+ *           pénalité ou un coup franc POUR NOUS compte comme mêlée gagnée
+ *           (ballon pour nous), CONTRE NOUS comme perdue. Touches inchangées.
  * Version : 1.7 — 12 oct. 2026. Rubrique « Actions marquantes » (FAIT FOI
  *           Conception-SUIVI-THEO-v1, D3-A+B) : fiche joueur, par niveau,
  *           lignes « Actions marquantes » (nombre) et « Détail des actions
@@ -114,6 +121,9 @@
   // volée) ; ballon pour eux = (notre lancer & volée) ou (lancer adverse &
   // gagnée). Pénalités, coups francs, lancers pas droits : non comptés ici.
   function _conqueteNous(l) {
+    // v1.8 (D5) — mêlée : pénalité / coup franc pour nous = ballon pour nous.
+    var mp = /^obs-A-melee-(pen|cf)-(pour|contre)$/.exec(l.observable_id || '');
+    if (mp) return { phase: 'melee', pourNous: (mp[2] === 'pour') };
     var m = /^obs-A-(touche|melee)-(gagnee-propre|gagnee-sale|volee)$/.exec(l.observable_id || '');
     if (!m) return null;
     var phase = m[1];
@@ -215,9 +225,17 @@
   function chargerChrono(evt) {
     if (_chronoCache[evt]) return _chronoCache[evt];
     var hub = _hub();
+    // v1.8 (D2-A) — joueurs associés (C18-b) posés sur chaque ligne.
+    var pA = (hub && typeof hub.listerJoueursAssocies === 'function')
+      ? Promise.resolve(hub.listerJoueursAssocies(evt)).catch(function () { return null; })
+      : Promise.resolve(null);
     var p = (hub && typeof hub.getChronologieRencontreCoach === 'function')
-      ? Promise.resolve(hub.getChronologieRencontreCoach(evt, true))
-          .then(function (l) { return (Array.isArray(l) ? l : []).filter(function (x) { return x && x.annule !== true; }); })
+      ? Promise.all([Promise.resolve(hub.getChronologieRencontreCoach(evt, true)), pA])
+          .then(function (r) {
+            var m = (r[1] && r[1].ok && r[1].data && typeof r[1].data.get === 'function') ? r[1].data : null;
+            return (Array.isArray(r[0]) ? r[0] : []).filter(function (x) { return x && x.annule !== true; })
+              .map(function (x) { x.joueurs_associes = (m && m.get(x.id)) || []; return x; });
+          })
           .catch(function () { return []; })
       : Promise.resolve([]);
     _chronoCache[evt] = p;
@@ -557,7 +575,13 @@
     evenements.forEach(function (evt, i) {
       var pe = { pts: 0 };
       (chronos[i] || []).forEach(function (l) {
-        if (l.equipe_concernee === 'adverse' || l.joueur_uuid !== joueurId) return;
+        if (l.equipe_concernee === 'adverse') return;
+        if (l.joueur_uuid !== joueurId) {
+          // v1.8 (D2-A) — faute à plusieurs : comptée aussi pour les associés.
+          if (String(l.observable_id || '').indexOf(PREFIXE_FAUTE) === 0 &&
+              Array.isArray(l.joueurs_associes) && l.joueurs_associes.indexOf(joueurId) >= 0) f.fautes += 1;
+          return;
+        }
         var oid = l.observable_id || '';
         var pts = (typeof l.valeur_points === 'number') ? l.valeur_points : 0;
         f.pts += pts; pe.pts += pts;
