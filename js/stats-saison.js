@@ -5,6 +5,14 @@
  *   - Objet 1 : Fiche stats joueur (restitution famille, un joueur)
  *   - Objet 2 : Vue pilotage (équipe en haut + effectif en lignes triables)
  *
+ * Version : 1.7 — 12 oct. 2026. Rubrique « Actions marquantes » (FAIT FOI
+ *           Conception-SUIVI-THEO-v1, D3-A+B) : fiche joueur, par niveau,
+ *           lignes « Actions marquantes » (nombre) et « Détail des actions
+ *           marquantes ». Socle obs-A-marq-<code> (libellés du référentiel
+ *           v1.4, recopiés ici comme CTX_PIED) ; ajouts obs-A-marq-<uuid>
+ *           libellés via listerTypesActionMarquante (supabase-client v1.91,
+ *           C18-a) pour les catégories des matchs retenus ; repli « Action
+ *           ajoutée » si indisponible.
  * Version : 1.6 — 6 oct. 2026. Rubrique « Jeu au pied » (FAIT FOI
  *           Conception-JEU-AU-PIED-v1, J5-A) : fiche joueur, par niveau,
  *           lignes « Jeu au pied » (réussis / tentés, %) et « Contextes au
@@ -122,6 +130,28 @@
   var CTX_PIED = { box: 'Box kick', degagement: 'Dégagement', occupation: 'Occupation', '5022': '50/22',
                    penaltouche: 'Pénaltouche', pression: 'Pression', rasant: 'Rasant / transv.', renvoi: 'Envoi / renvoi' };
   var ORDRE_PIED = ['box', 'degagement', 'occupation', '5022', 'penaltouche', 'pression', 'rasant', 'renvoi'];
+  // v1.7 — actions marquantes : socle (référentiel v1.4) + ajouts (C18-a).
+  var PREFIXE_MARQ = 'obs-A-marq-';
+  var LIB_MARQ = { 'grattage': 'Grattage', 'plaquage-offensif': 'Plaquage offensif', 'plaquage-decisif': 'Plaquage décisif',
+                   'ras': 'Départ au ras efficace', 'penalite-vite': 'Pénalité vite jouée', 'franchissement': 'Franchissement',
+                   'offload': 'Passe après contact', 'interception': 'Interception', 'contre-ruck': 'Contre-ruck gagné',
+                   'ballon-haut': 'Ballon haut récupéré', 'contre-pied': 'Coup de pied contré', 'arrache': 'Ballon arraché' };
+  var LIB_MARQ_AJ = {};   // id ajout → libellé (rempli par chargerLibMarq)
+  function _libMarq(oid) {
+    var code = oid.slice(PREFIXE_MARQ.length);
+    return LIB_MARQ[code] || LIB_MARQ_AJ[code] || 'Action ajoutée';
+  }
+  function chargerLibMarq(catIds) {
+    var hub = _hub();
+    if (!hub || typeof hub.listerTypesActionMarquante !== 'function' || !catIds.length) return Promise.resolve();
+    return Promise.all(catIds.map(function (c) {
+      return Promise.resolve(hub.listerTypesActionMarquante(c, true)).catch(function () { return null; });
+    })).then(function (rs) {
+      rs.forEach(function (r) {
+        ((r && r.ok && Array.isArray(r.data)) ? r.data : []).forEach(function (t) { LIB_MARQ_AJ[t.id] = t.libelle; });
+      });
+    });
+  }
 
   // ---- Utilitaires ----
   function _hub() {
@@ -522,7 +552,8 @@
   function _faitsJoueur(joueurId, evenements, chronos) {
     var f = { pts: 0, essais: 0, transfo: [0, 0], penalite: [0, 0], drops: 0,
               blanc: 0, jaune: 0, rouge: 0, fautes: 0, enAvant: 0, passeAvant: 0, parEvt: {},
-              pied: [0, 0], piedCtx: {} };   // v1.6 — [réussis, tentés]
+              pied: [0, 0], piedCtx: {},     // v1.6 — [réussis, tentés]
+              marq: 0, marqDet: {} };        // v1.7 — actions marquantes
     evenements.forEach(function (evt, i) {
       var pe = { pts: 0 };
       (chronos[i] || []).forEach(function (l) {
@@ -540,6 +571,7 @@
         else if (oid.indexOf(PREFIXE_FAUTE) === 0) f.fautes += 1;
         else if (oid === 'obs-A-en-avant') f.enAvant += 1;
         else if (oid === 'obs-A-passe-avant') f.passeAvant += 1;
+        else if (oid.indexOf(PREFIXE_MARQ) === 0) { f.marq += 1; f.marqDet[oid] = (f.marqDet[oid] || 0) + 1; }   // v1.7
         else {
           var mp = RE_PIED.exec(oid);   // v1.6 — jeu au pied
           if (mp) {
@@ -611,10 +643,17 @@
           '<div id="ss-fiche-body"><p class="ss-load">Calcul des statistiques…</p></div>';
         var body = document.getElementById('ss-fiche-body');
 
+        // v1.7 — libellés des actions marquantes ajoutées (catégories des matchs).
+        var catsMarq = [];
+        agg.evenements.forEach(function (evt) {
+          var c = (F.meta[evt] || {}).categorie_id;
+          if (c && catsMarq.indexOf(c) < 0) catsMarq.push(c);
+        });
         return Promise.all([
           agregerTempsDeJeu(agg.evenements),
           Promise.all(agg.evenements.map(chargerChrono)),
-          chargerNiveaux(agg.evenements)
+          chargerNiveaux(agg.evenements),
+          chargerLibMarq(catsMarq).catch(function () { return null; })
         ]).then(function (rr) {
           var tdj = rr[0], chronos = rr[1], niveaux = rr[2] || {};
           var recT = tdj.parJoueur[joueurId] || null;
@@ -733,6 +772,16 @@
           var parts = ORDRE_PIED.filter(function (c) { return N.faits.piedCtx[c]; }).map(function (c) {
             var t = N.faits.piedCtx[c];
             return escapeHtml(CTX_PIED[c] || c) + ' ' + t[0] + '/' + t[1];
+          });
+          return parts.length ? '<small>' + parts.join('<br>') + '</small>' : '—';
+        } },
+      // v1.7 — actions marquantes.
+      { lib: 'Actions marquantes', val: function (N) { return si(N, N.faits.marq); } },
+      { lib: 'Détail des actions marquantes', val: function (N) {
+          if (!N.suivis) return '—';
+          var d = N.faits.marqDet;
+          var parts = Object.keys(d).sort(function (a, b) { return d[b] - d[a]; }).map(function (oid) {
+            return escapeHtml(_libMarq(oid)) + ' ' + d[oid];
           });
           return parts.length ? '<small>' + parts.join('<br>') + '</small>' : '—';
         } }
