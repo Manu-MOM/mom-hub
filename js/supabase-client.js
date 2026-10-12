@@ -18,6 +18,12 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 1.91 — 12 octobre 2026
+ *   v1.91 : SUIVI-THEO lot L2 (FAIT FOI Conception-SUIVI-THEO-v1, D3-B).
+ *          2 wrappers ADDITIFS → RPC C18-a : listerTypesActionMarquante(cat,
+ *          inclureInactifs) et enregistrerTypeActionMarquante({categorieId,
+ *          libelle, id?, ordre?, actif?}) — ajouts par catégorie des
+ *          actions marquantes (calque des wrappers de fautes v1.87).
  * Version : 1.90 — 9 octobre 2026
  *   v1.90 : LOGOS-ENTENTE-BANDEAU (retour terrain M16, 09/10/2026).
  *          getEvenementEquipeContext : l'embed ententes lit en plus
@@ -7480,6 +7486,46 @@
       if (error) {
         console.error('MOM Hub: enregistrerTypeFaute()', error);
         return { ok: false, error: error.message || 'Erreur enregistrer_type_faute' };
+      }
+      const r = Array.isArray(data) ? (data[0] || null) : (data || null);
+      return { ok: true, data: r };
+    },
+
+    /**
+     * v1.91 — SUIVI-THEO D3-B (C18-a). Actions marquantes AJOUTÉES par la
+     * catégorie (le socle fixe est dans data/observables-match.json).
+     * RPC lister_types_action_marquante (authentifié).
+     * @returns {Promise<{ok:boolean, data?:Array<{id,categorie_id,libelle,ordre,actif}>, error?:string}>}
+     */
+    async listerTypesActionMarquante(categorieId, inclureInactifs) {
+      if (!categorieId) return { ok: false, error: 'categorieId manquant' };
+      const { data, error } = await client.rpc('lister_types_action_marquante', {
+        p_categorie_id: categorieId,
+        p_inclure_inactifs: inclureInactifs === true
+      });
+      if (error) {
+        console.error('MOM Hub: listerTypesActionMarquante()', error);
+        return { ok: false, error: error.message || 'Erreur lister_types_action_marquante' };
+      }
+      return { ok: true, data: Array.isArray(data) ? data : [] };
+    },
+
+    /**
+     * v1.91 — SUIVI-THEO D3-B (C18-a). Crée / met à jour une action
+     * marquante ajoutée (retirer = actif false). Droits portés par la RPC
+     * enregistrer_type_action_marquante.
+     * @param {{categorieId:string, libelle:string, id?:string, ordre?:number, actif?:boolean}} o
+     */
+    async enregistrerTypeActionMarquante(o) {
+      if (!o || !o.categorieId) return { ok: false, error: 'categorieId manquant' };
+      const params = { p_categorie_id: o.categorieId, p_libelle: o.libelle || '' };
+      if (o.id) params.p_id = o.id;
+      if (typeof o.ordre === 'number') params.p_ordre = o.ordre;
+      if (typeof o.actif === 'boolean') params.p_actif = o.actif;
+      const { data, error } = await client.rpc('enregistrer_type_action_marquante', params);
+      if (error) {
+        console.error('MOM Hub: enregistrerTypeActionMarquante()', error);
+        return { ok: false, error: error.message || 'Erreur enregistrer_type_action_marquante' };
       }
       const r = Array.isArray(data) ? (data[0] || null) : (data || null);
       return { ok: true, data: r };
