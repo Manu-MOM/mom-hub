@@ -6,6 +6,19 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.91 — Suivi : faute à plusieurs joueurs + conquête (12 oct. 2026)
+ *   v3.91 : FAIT FOI Conception-SUIVI-THEO-v1, lot L3. (D2-A) Faute de notre
+ *           équipe : sélection de 0 à n joueurs (« ✔ Valider ») ; 1 seule
+ *           action pour l'équipe, joueur principal = 1er choisi, les autres en
+ *           joueurs associés (C18-b, definirJoueursAssocies, supabase-client
+ *           v1.92). Correction : liste « Autres joueurs » modifiable, reportée
+ *           sur la ligne recréée. Noms de tous les joueurs dans l'historique et
+ *           le déroulé ; fautes comptées pour chacun au rapport. Chronologie
+ *           lue avec ses joueurs associés (_lireChronologie). (Avenant D4)
+ *           Rapport conquête : « Gagnées par l'équipe qui a introduit » (mêlées)
+ *           / « qui a lancé » (touches). (D5) Mêlée gagnée par l'équipe qui
+ *           introduit = ballon gagné OU pénalité OU coup franc obtenu ; perdue
+ *           si l'adversaire les obtient. Touches inchangées.
  * Version : 3.90 — Suivi : actions marquantes (12 oct. 2026)
  *   v3.90 : FAIT FOI Conception-SUIVI-THEO-v1, lot L2 (D3-A+B). Palette
  *           « ⭐ Actions marquantes » : socle FIXE de 12 actions (référentiel
@@ -3811,7 +3824,7 @@
               cible.innerHTML = '<div class="rapport__vide">Suivi indisponible.</div>';
               return;
             }
-            SupabaseHub.getChronologieRencontreCoach(mm.id, true).then(function (lignes) {
+            _lireChronologie(mm.id).then(function (lignes) {   // v3.91
               if (!niveauActif()) return;
               var arr = Array.isArray(lignes) ? lignes : [];
               _rendreRapportMatchDans(cible, arr, nomNous, advm, '-m' + idx, mm.id);
@@ -4055,7 +4068,7 @@
     // Charge le référentiel (familles/libellés) ET la chronologie, puis
     // peint. Le référentiel est mémo (SuiviObs.charger idempotent).
     SuiviObs.charger(function () {
-      SupabaseHub.getChronologieRencontreCoach(evtId, true).then(function (lignes) {
+      _lireChronologie(evtId).then(function (lignes) {   // v3.91 — avec joueurs associés
         // Anti-périmé : si on a quitté l'onglet entre-temps, ne rien peindre.
         if (State.viewMode !== 'rapport' || State.selectedCompoId !== compo.id) return;
         var arr = Array.isArray(lignes) ? lignes : [];
@@ -4527,8 +4540,12 @@
         var adv = (c.l.equipe_concernee === 'adverse');
         var k = c.o.uuid;
         if (!n[k]) n[k] = { nous: 0, adv: 0 };
-        if (adv) { n[k].adv += 1; totA += 1; if (c.o.issue === 'gagnee') gagA += 1; }
-        else { n[k].nous += 1; totN += 1; if (c.o.issue === 'gagnee') gagN += 1; }
+        // v3.91 (D5) — mêlée : pénalité / coup franc obtenus par l'équipe qui
+        // introduit = gagnée par elle (pour_nous est vu de NOTRE côté).
+        var gagne = (c.o.issue === 'gagnee') ||
+          (ph[0] === 'melee' && (c.o.issue === 'penalite' || c.o.issue === 'coup_franc') && c.o.pour_nous === !adv);
+        if (adv) { n[k].adv += 1; totA += 1; if (gagne) gagA += 1; }
+        else { n[k].nous += 1; totN += 1; if (gagne) gagN += 1; }
       });
       function pct(a, b) { return b ? (' (' + Math.round(100 * a / b) + ' %)') : ''; }
       html += '<table class="rapport-tab"><thead><tr><th>' + ph[1] + '</th>' +
@@ -4540,7 +4557,9 @@
         html += '<tr><td>' + escapeHtml(o.libelle_court) + '</td>' +
                 '<td class="rapport-tab__n">' + c.nous + '</td><td class="rapport-tab__n">' + c.adv + '</td></tr>';
       });
-      html += '<tr><td><strong>Gagnées par le lanceur</strong></td>' +
+      html += '<tr><td><strong>' + (ph[0] === 'melee'                                   // v3.91 (D4)
+                ? 'Gagnées par l\'équipe qui a introduit</strong><br><small>ballon, pénalité ou coup franc obtenus</small>'
+                : 'Gagnées par l\'équipe qui a lancé</strong>') + '</td>' +
               '<td class="rapport-tab__n"><strong>' + gagN + '/' + totN + pct(gagN, totN) + '</strong></td>' +
               '<td class="rapport-tab__n"><strong>' + gagA + '/' + totA + pct(gagA, totA) + '</strong></td></tr>';
       html += '</tbody></table>';
@@ -4781,6 +4800,7 @@
     for (var i = 0; i < arr.length; i++) {
       if (arr[i].joueur_uuid) uuids.push(arr[i].joueur_uuid);
       if (arr[i].joueur_uuid_entrant) uuids.push(arr[i].joueur_uuid_entrant);
+      (arr[i].joueurs_associes || []).forEach(function (u) { if (u) uuids.push(u); });   // v3.91
     }
 
     function nomDe(map, uuid) {
@@ -4822,7 +4842,7 @@
         } else if (l.equipe_concernee === 'adverse') {
           acteur = escapeHtml(_nomAdvFil);
         } else if (l.joueur_uuid) {
-          acteur = nomDe(map, l.joueur_uuid);
+          acteur = _joueursDeLigne(l).map(function (u) { return nomDe(map, u); }).join(', ');   // v3.91
         } else {
           acteur = ''; // fait d'équipe sans joueur nommé (ex. mêlée gagnée)
         }
@@ -4893,7 +4913,7 @@
   // le score ET l'historique. Source unique de rafraîchissement.
   function _rafraichirScoreEtHistorique(evtId) {
     if (!window.SupabaseHub || !SupabaseHub.getChronologieRencontreCoach) return;
-    SupabaseHub.getChronologieRencontreCoach(evtId, true).then(function (lignes) {
+    _lireChronologie(evtId).then(function (lignes) {   // v3.91 — avec joueurs associés
       if (SuiviChrono.evtId !== evtId) return;
       var arr = Array.isArray(lignes) ? lignes : [];
       SuiviChrono.lignes = arr; // #3 — mémo pour le calcul d'état terrain (substitutions)
@@ -4951,6 +4971,10 @@
         qui = escapeHtml(l.nom_court || '?') + ' → ' + escapeHtml(l.nom_court_entrant || '?');
       } else {
         qui = l.nom_court ? escapeHtml(l.nom_court) : 'Nous';
+        // v3.91 — joueurs associés (faute à plusieurs).
+        if (Array.isArray(l.joueurs_associes) && l.joueurs_associes.length) {
+          qui += ', ' + l.joueurs_associes.map(function (u) { return escapeHtml(_nomDansEffectif(u) || _idCourt(u)); }).join(', ');
+        }
       }
       var min = (l.minute_match != null) ? (l.minute_match + "'") : '';
       var pts = (l.valeur_points ? ' (+' + l.valeur_points + ')' : '');
@@ -6432,6 +6456,31 @@
   };
 
   // Ordre de jeu d'une ligne : période → minute → horodatage (T4).
+  // v3.91 (SUIVI-THEO D2-A) — chronologie (annulées incluses) avec, sur
+  // chaque ligne, joueurs_associes (C18-b) ; [] si service indisponible.
+  function _lireChronologie(evtId) {
+    var hub = window.SupabaseHub;
+    var pL = Promise.resolve(hub.getChronologieRencontreCoach(evtId, true));
+    var pA = (typeof hub.listerJoueursAssocies === 'function')
+      ? Promise.resolve(hub.listerJoueursAssocies(evtId)).catch(function () { return null; })
+      : Promise.resolve(null);
+    return Promise.all([pL, pA]).then(function (r) {
+      var arr = Array.isArray(r[0]) ? r[0] : [];
+      var m = (r[1] && r[1].ok && r[1].data && typeof r[1].data.get === 'function') ? r[1].data : null;
+      arr.forEach(function (l) {
+        if (l && !Array.isArray(l.joueurs_associes)) l.joueurs_associes = (m && m.get(l.id)) || [];
+      });
+      return arr;
+    });
+  }
+  // Tous les joueurs d'une ligne (principal puis associés).
+  function _joueursDeLigne(l) {
+    var out = [];
+    if (l && l.joueur_uuid) out.push(l.joueur_uuid);
+    ((l && l.joueurs_associes) || []).forEach(function (u) { if (u && out.indexOf(u) < 0) out.push(u); });
+    return out;
+  }
+
   // v3.89 (SUIVI-THEO D1-A) — ordre du déroulé : par période, temps VEO
   // (saisi : timecode_video ; sinon repère VEO rapproché si evtId fourni) ;
   // une ligne sans temps VEO est fusionnée à sa minute (placée avant la
@@ -7899,6 +7948,61 @@
     }
   };
 
+  // v3.91 (D2-A) — joueurs fautifs (0 à n) : 1 action, 1er = principal.
+  function _ouvrirFauteJoueurs(evtId, perCourante, obs) {
+    var pal = document.getElementById('suivi-palette');
+    if (!pal) return;
+    var effectif = _effectifPourSaisie();
+    var choisis = [];
+    function peindre() {
+      var h = '<div class="suivi-attrib">';
+      h += '<div class="suivi-attrib__title">🚩 ' + escapeHtml(obs.libelle_court) + ' — qui ? <small>(un ou plusieurs)</small></div>';
+      if (!effectif.length) {
+        h += '<div class="view-suivi__hint">Aucun joueur dans la compo.</div>';
+      } else {
+        h += '<div class="suivi-attrib__list">';
+        effectif.forEach(function (jo) {
+          var on = choisis.indexOf(jo.uuid) >= 0;
+          h += '<button type="button" class="suivi-attrib__joueur" data-fj="' + escapeHtml(jo.uuid || '') + '"' +
+               (on ? ' style="background:#1d9e75;border-color:#1d9e75;color:#fff"' : '') + '>' +
+                 '<span class="suivi-attrib__nom">' + (on ? '✔ ' : '') + escapeHtml(_nomJoueur(jo)) + '</span>' +
+                 '<span class="suivi-attrib__num">' + escapeHtml(String(jo.num || '?')) + '</span>' +
+               '</button>';
+        });
+        h += '</div>';
+      }
+      h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">' +
+           '<button type="button" class="suivi-chrono__btn suivi-chrono__btn--primary" id="fj-ok"' + (choisis.length ? '' : ' disabled') + '>✔ Valider (' +
+             choisis.length + ' joueur' + (choisis.length > 1 ? 's' : '') + ')</button>' +
+           '<button type="button" class="suivi-chrono__btn" id="fj-equipe">— Équipe (sans joueur) —</button>' +
+           '<button type="button" class="suivi-chrono__btn" id="fj-retour">↩ Retour</button></div>';
+      h += '</div>';
+      pal.innerHTML = h;
+      pal.querySelectorAll('[data-fj]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var u = b.getAttribute('data-fj');
+          if (!u) return;
+          var i = choisis.indexOf(u);
+          if (i >= 0) choisis.splice(i, 1); else choisis.push(u);
+          peindre();
+        });
+      });
+      document.getElementById('fj-retour').addEventListener('click', function () { _ouvrirFaute(evtId, perCourante); });
+      function enregistrer(liste) {
+        var ms = _minuteSaisie();
+        if (!ms) return;
+        _saisirObservable(evtId, {
+          observableId: obs.uuid, categorieObs: 'A', valeurPoints: 0, equipeConcernee: 'notre',
+          joueurUuid: liste[0] || null, joueursAssocies: liste.slice(1),
+          minuteMatch: ms.minute, periode: ms.periode
+        }, function () { _ouvrirFaute(evtId, perCourante); });
+      }
+      document.getElementById('fj-ok').addEventListener('click', function () { if (choisis.length) enregistrer(choisis.slice()); });
+      document.getElementById('fj-equipe').addEventListener('click', function () { enregistrer([]); });
+    }
+    peindre();
+  }
+
   function _cfgGestionFautes(evtId, perCourante) {
     return {
       fnLister: 'listerTypesFaute', fnEnregistrer: 'enregistrerTypeFaute',
@@ -7963,11 +8067,7 @@
             equipeConcernee: 'adverse', minuteMatch: ms.minute, periode: ms.periode
           }, function () { _ouvrirFaute(evtId, perCourante); });
         } else {
-          _ouvrirAttribution(evtId, perCourante, obs, {
-            sansJoueur: true,
-            surRetour: function () { _ouvrirFaute(evtId, perCourante); },
-            apresSaisie: function () { _ouvrirFaute(evtId, perCourante); }
-          });
+          _ouvrirFauteJoueurs(evtId, perCourante, obs);   // v3.91 — 0 à n joueurs
         }
       });
     });
@@ -8251,7 +8351,7 @@
         if (l.equipe_concernee === 'adverse') { parType[id].adv += 1; totA += 1; }
         else {
           parType[id].nous += 1; totN += 1;
-          if (l.joueur_uuid) parJoueur[l.joueur_uuid] = (parJoueur[l.joueur_uuid] || 0) + 1;
+          _joueursDeLigne(l).forEach(function (u) { parJoueur[u] = (parJoueur[u] || 0) + 1; });   // v3.91
         }
       });
       var ids = Object.keys(parType).sort(function (a, b) {
@@ -8291,16 +8391,29 @@
       var tc = _timecodeCourant(obs);
       if (tc) obs.timecodeVideo = tc;
     }
+    // v3.91 — joueurs associés (faute à plusieurs) : posés après l'insertion.
+    var assoc = (obs && Array.isArray(obs.joueursAssocies)) ? obs.joueursAssocies.filter(Boolean) : [];
+    if (obs) delete obs.joueursAssocies;
     SuiviChrono.busy = true;
     SupabaseHub.insererObservableCoach(evtId, obs).then(function (res) {
-      SuiviChrono.busy = false;
       if (!res || !res.ok) {
+        SuiviChrono.busy = false;
         window.alert('Saisie impossible : ' + ((res && res.error) || 'erreur inconnue'));
         return;
       }
-      // L4 — rafraîchir score + historique (relecture chronologie).
-      _rafraichirScoreEtHistorique(evtId);
-      if (typeof onApres === 'function') onApres();
+      var idL = res.data && res.data.id;
+      var pAssoc = (assoc.length && idL && typeof SupabaseHub.definirJoueursAssocies === 'function')
+        ? SupabaseHub.definirJoueursAssocies(evtId, idL, assoc).then(function (r) {
+            if (!r || !r.ok) window.alert('Action enregistrée, mais les autres joueurs n\'ont pas pu être rattachés : ' +
+                                          ((r && r.error) || 'erreur inconnue') + '\nCorrige-la avec « modifier ».');
+          })
+        : Promise.resolve();
+      pAssoc.then(function () {
+        SuiviChrono.busy = false;
+        // L4 — rafraîchir score + historique (relecture chronologie).
+        _rafraichirScoreEtHistorique(evtId);
+        if (typeof onApres === 'function') onApres();
+      });
     });
   }
 
@@ -8398,6 +8511,14 @@
       '</select>');
     html += row('Joueur <small>(sortant pour un remplacement)</small>', 'ed-joueur',
       '<select id="ed-joueur" style="' + _STYLE_SELECT + ';max-width:60%">' + optJoueurs(ligne.joueur_uuid, ligne.nom_court) + '</select>');
+    // v3.91 (D2-A) — faute : autres joueurs rattachés.
+    var assocL = Array.isArray(ligne.joueurs_associes) ? ligne.joueurs_associes : [];
+    html += '<div id="ed-assoc-row">' + row('Autres joueurs <small>(faute)</small>', 'ed-assoc',
+      '<div id="ed-assoc" style="display:flex;flex-wrap:wrap;gap:4px 12px;max-width:60%">' +
+        effectif.map(function (jo) {
+          return '<label style="white-space:nowrap"><input type="checkbox" data-ed-assoc="' + escapeHtml(jo.uuid || '') + '"' +
+                 (assocL.indexOf(jo.uuid) >= 0 ? ' checked' : '') + '> ' + escapeHtml(String(jo.num || '?') + ' · ' + _nomJoueur(jo)) + '</label>';
+        }).join('') + '</div>') + '</div>';
     html += '<div id="ed-entrant-row">' + row('Entrant', 'ed-entrant',
       '<select id="ed-entrant" style="' + _STYLE_SELECT + ';max-width:60%">' + optJoueurs(ligne.joueur_uuid_entrant, ligne.nom_court_entrant) + '</select>') + '</div>';
     html += row('Minute', 'ed-minute', '<input id="ed-minute" type="number" min="0" max="200" value="' + minute + '">');
@@ -8429,6 +8550,8 @@
                        (t && t.famille === 'jeu_collectif');
       selJ.disabled = !!sansJoueur;
       if (rowE) rowE.style.display = (selType.value === 'obs-A-substitution' && !adverse) ? '' : 'none';
+      var rowA = document.getElementById('ed-assoc-row');   // v3.91
+      if (rowA) rowA.style.display = (selType.value.indexOf(_PREFIXE_FAUTE) === 0 && !adverse) ? '' : 'none';
     }
     selType.addEventListener('change', majVisibilite);
     selEq.addEventListener('change', majVisibilite);
@@ -8475,6 +8598,15 @@
         if (secT === null) { window.alert('Temps VEO illisible : « ' + rawT + ' » (format mm:ss).'); return; }
         payload.timecodeVideo = _secVersInterval(secT);
       }
+      // v3.91 — faute de notre équipe : autres joueurs cochés.
+      var assocE = [];
+      if (estFaute && uuidType.indexOf(_PREFIXE_FAUTE) === 0 && !adverse) {
+        pal.querySelectorAll('[data-ed-assoc]').forEach(function (c) {
+          var u = c.getAttribute('data-ed-assoc');
+          if (c.checked && u && u !== payload.joueurUuid) assocE.push(u);
+        });
+        if (assocE.length && !payload.joueurUuid) { payload.joueurUuid = assocE.shift(); }
+      }
       if (SuiviChrono.busy) return;
       if (!window.SupabaseHub || !SupabaseHub.insererObservableCoach || !SupabaseHub.annulerObservableCoach) return;
       SuiviChrono.busy = true;
@@ -8484,7 +8616,11 @@
           window.alert('Correction impossible : ' + ((res && res.error) || 'erreur inconnue'));
           return;
         }
-        return SupabaseHub.annulerObservableCoach(evtId, ligne.id).then(function (r2) {
+        var idN = res.data && res.data.id;
+        var pAs = (assocE.length && idN && typeof SupabaseHub.definirJoueursAssocies === 'function')
+          ? SupabaseHub.definirJoueursAssocies(evtId, idN, assocE).catch(function () { return null; })
+          : Promise.resolve(null);
+        return pAs.then(function () { return SupabaseHub.annulerObservableCoach(evtId, ligne.id); }).then(function (r2) {
           SuiviChrono.busy = false;
           if (!r2 || !r2.ok) {
             window.alert('La version corrigée est enregistrée, mais l\'ancienne ligne n\'a pas pu être annulée : ' +
