@@ -2,15 +2,16 @@
   "_meta": {
     "type": "referentiel",
     "nom": "Observables match",
-    "version": "1.3",
+    "version": "1.4",
     "date_creation": "2026-05-08",
     "description": "Événements observables pendant un match. Catégorie A universelle + Catégorie B paramétrable par catégorie d'âge",
     "asymetrie_sar_mom": "Interface détaillée pour SAR/MOM, simplifiée pour adversaire (+5/+2/+3/+3/-1)",
-    "date_mise_a_jour": "2026-10-04",
+    "date_mise_a_jour": "2026-10-12",
     "changelog_1_2": "SUIVI-VEO (FAIT FOI gelé 04/10/2026). AJOUTS : carton blanc (discipline) ; nouvelles familles score_rate (tentatives ratées), conquete (touche/mêlée par issue, equipe_concernee = qui introduit), technique (retour d'exclusion, hors palette). jeu_collectif conservé en LEGACY (lecture des matchs passés, bénévole, Mode Vidéo) — retiré de la palette coach à partir de compositions-editor v3.72. Libellé long du jaune corrigé : durée selon la catégorie (data/reglement-exclusions.json).",
     "changelog_1_2_1": "Correctif : les issues conquête « Perdue / volée » prennent les identifiants obs-A-touche-volee et obs-A-melee-volee (en v1.2 elles réutilisaient obs-A-touche-perdue / obs-A-melee-perdue, déjà portés par le jeu collectif legacy). Aucune ligne enregistrée avec ces issues (la palette coach ne les propose qu'à partir de compositions-editor v3.72).",
     "changelog_1_2_2": "SUIVI-VEO avenant « En-avant » (04/10/2026, décisions E1-B à E4-A). AJOUT : famille faute_technique — obs-A-en-avant et obs-A-passe-avant (0 point, équipe Nous/Adversaire, joueur facultatif côté nous), sortis de la pioche des fautes et comptés à part au rapport (compositions-editor v3.77). Lignes déjà saisies avec la pioche reprises en base par sql/C14-e-en-avant.sql.",
-    "changelog_1_3": "Rubrique JEU AU PIED (FAIT FOI Conception-JEU-AU-PIED-v1, gelé le 06/10/2026). AJOUT : famille jeu_au_pied — 8 contextes (box kick, dégagement, occupation, 50/22, pénaltouche, pression / à suivre, rasant / transversal, coup d'envoi / renvoi) × issues détaillées (réussites : touche trouvée, terrain gagné, récupéré en l'air, récupéré au sol, faute adverse provoquée, essai / occasion ; moyen ; ratés : contré, dehors / touche directe, contre-attaque subie, touche manquée), selon une grille contexte × issue. Identifiants obs-A-pied-<contexte>-<issue>, 0 point, équipe Nous / Adversaire, joueur facultatif côté nous. Ajout pur."
+    "changelog_1_3": "Rubrique JEU AU PIED (FAIT FOI Conception-JEU-AU-PIED-v1, gelé le 06/10/2026). AJOUT : famille jeu_au_pied — 8 contextes (box kick, dégagement, occupation, 50/22, pénaltouche, pression / à suivre, rasant / transversal, coup d'envoi / renvoi) × issues détaillées (réussites : touche trouvée, terrain gagné, récupéré en l'air, récupéré au sol, faute adverse provoquée, essai / occasion ; moyen ; ratés : contré, dehors / touche directe, contre-attaque subie, touche manquée), selon une grille contexte × issue. Identifiants obs-A-pied-<contexte>-<issue>, 0 point, équipe Nous / Adversaire, joueur facultatif côté nous. Ajout pur.",
+    "changelog_1_4": "Rubrique ACTIONS MARQUANTES (FAIT FOI Conception-SUIVI-THEO-v1, gelée le 12/10/2026, D3-A+B). AJOUT : famille actions_marquantes = SOCLE FIXE de 12 actions individuelles à impact positif (grattage, plaquage offensif, plaquage décisif, départ au ras efficace, pénalité vite jouée, franchissement, passe après contact, interception, contre-ruck gagné, ballon haut récupéré, coup de pied contré, ballon arraché). Identifiants obs-A-marq-<code>, 0 point, Nous uniquement, joueur OBLIGATOIRE. Les AJOUTS par catégorie vivent en base (table types_action_marquante, C18-a, identifiants obs-A-marq-<uuid>). Ajout pur."
   },
   "categorie_A": {
     "score": [
@@ -1320,7 +1321,153 @@
           "reversible": true
         }
       ]
-    }
+    },
+    "actions_marquantes": [
+      {
+        "uuid": "obs-A-marq-grattage",
+        "libelle_court": "Grattage",
+        "libelle_long": "Grattage / ballon récupéré au sol (contest gagné au ruck)",
+        "type": "action_marquante",
+        "points": 0,
+        "icone": "🦅",
+        "saisie_associee": [
+          "joueur_obligatoire"
+        ],
+        "reversible": true
+      },
+      {
+        "uuid": "obs-A-marq-plaquage-offensif",
+        "libelle_court": "Plaquage offensif",
+        "libelle_long": "Plaquage offensif (dominant : le porteur recule)",
+        "type": "action_marquante",
+        "points": 0,
+        "icone": "💥",
+        "saisie_associee": [
+          "joueur_obligatoire"
+        ],
+        "reversible": true
+      },
+      {
+        "uuid": "obs-A-marq-plaquage-decisif",
+        "libelle_court": "Plaquage décisif",
+        "libelle_long": "Plaquage décisif (sauve un essai)",
+        "type": "action_marquante",
+        "points": 0,
+        "icone": "🛡",
+        "saisie_associee": [
+          "joueur_obligatoire"
+        ],
+        "reversible": true
+      },
+      {
+        "uuid": "obs-A-marq-ras",
+        "libelle_court": "Départ au ras efficace",
+        "libelle_long": "Départ au ras efficace (gain franc près du ruck)",
+        "type": "action_marquante",
+        "points": 0,
+        "icone": "🔨",
+        "saisie_associee": [
+          "joueur_obligatoire"
+        ],
+        "reversible": true
+      },
+      {
+        "uuid": "obs-A-marq-penalite-vite",
+        "libelle_court": "Pénalité vite jouée",
+        "libelle_long": "Pénalité vite jouée à la main (prise de vitesse de la défense)",
+        "type": "action_marquante",
+        "points": 0,
+        "icone": "⚡",
+        "saisie_associee": [
+          "joueur_obligatoire"
+        ],
+        "reversible": true
+      },
+      {
+        "uuid": "obs-A-marq-franchissement",
+        "libelle_court": "Franchissement",
+        "libelle_long": "Franchissement / ligne d'avantage cassée",
+        "type": "action_marquante",
+        "points": 0,
+        "icone": "🚀",
+        "saisie_associee": [
+          "joueur_obligatoire"
+        ],
+        "reversible": true
+      },
+      {
+        "uuid": "obs-A-marq-offload",
+        "libelle_court": "Passe après contact",
+        "libelle_long": "Passe après contact décisive (offload)",
+        "type": "action_marquante",
+        "points": 0,
+        "icone": "🤲",
+        "saisie_associee": [
+          "joueur_obligatoire"
+        ],
+        "reversible": true
+      },
+      {
+        "uuid": "obs-A-marq-interception",
+        "libelle_court": "Interception",
+        "libelle_long": "Interception",
+        "type": "action_marquante",
+        "points": 0,
+        "icone": "🧲",
+        "saisie_associee": [
+          "joueur_obligatoire"
+        ],
+        "reversible": true
+      },
+      {
+        "uuid": "obs-A-marq-contre-ruck",
+        "libelle_court": "Contre-ruck gagné",
+        "libelle_long": "Contre-ruck gagné (ballon récupéré en poussant)",
+        "type": "action_marquante",
+        "points": 0,
+        "icone": "🔁",
+        "saisie_associee": [
+          "joueur_obligatoire"
+        ],
+        "reversible": true
+      },
+      {
+        "uuid": "obs-A-marq-ballon-haut",
+        "libelle_court": "Ballon haut récupéré",
+        "libelle_long": "Ballon haut récupéré (réception ou contest aérien gagné)",
+        "type": "action_marquante",
+        "points": 0,
+        "icone": "🪂",
+        "saisie_associee": [
+          "joueur_obligatoire"
+        ],
+        "reversible": true
+      },
+      {
+        "uuid": "obs-A-marq-contre-pied",
+        "libelle_court": "Coup de pied contré",
+        "libelle_long": "Coup de pied adverse contré",
+        "type": "action_marquante",
+        "points": 0,
+        "icone": "🧱",
+        "saisie_associee": [
+          "joueur_obligatoire"
+        ],
+        "reversible": true
+      },
+      {
+        "uuid": "obs-A-marq-arrache",
+        "libelle_court": "Ballon arraché",
+        "libelle_long": "Ballon arraché au contact (debout ou en maul)",
+        "type": "action_marquante",
+        "points": 0,
+        "icone": "🫳",
+        "saisie_associee": [
+          "joueur_obligatoire"
+        ],
+        "reversible": true
+      }
+    ]
   },
   "categorie_B_pre_suggestions": {
     "EDR_M-6_M-8_M-10_M-12": [
