@@ -238,6 +238,11 @@
                  color: var(--ink, #0c3d24); white-space: nowrap; }
   .pe-emis-btn:hover { border-color: var(--gold, #d4a93a); }
   /* FACTURE-ECOLES : modale d'émission + factures émises */
+  /* Correctif recette 16/10 : les deux blocs facture occupent toute la largeur
+     de la grille (sinon colonne de ~210 px, boutons coupés). */
+  #peRefacEmission, #peFactures { grid-column: 1 / -1; }
+  #peRefacEmission .pe-emis-row, #peFactures .pe-emis-row { flex-wrap: wrap; }
+  #peRefacEmission .pe-emis-info, #peFactures .pe-emis-info { flex: 1 1 320px; }
   .fa-overlay { position: fixed; inset: 0; background: rgba(12, 61, 36, .35); display: none;
                 align-items: flex-start; justify-content: center; padding: 40px 16px; z-index: 50; overflow-y: auto; }
   .fa-overlay.open { display: flex; }
