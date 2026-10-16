@@ -93,6 +93,20 @@
       durée ET appelle EXPLICITEMENT ponctPrefillHeures() (assigner .value ne
       déclenche PAS le listener input — remontée de recette pt 140) ; pré-remplissage
       seulement si le champ heures est vide (même sémantique que la saisie manuelle).
+  MAJ : VALIDATION-SEANCES-PAR-MISSION (16/10/2026, sql_256 + front — FAIT FOI gelé
+  par Manu le 16/10/2026). Constat terrain 15/10 : 13 classes x 5 séances validées
+  une par une (Déclarer puis Valider, ~130 clics).
+    - Bouton « ✅ Tout valider (N) » dans l'en-tête de CHAQUE mission (D3 : toutes
+      les missions, pas seulement le scolaire), admin|bureau seulement (peutEcrire).
+    - N = séances PASSÉES de la mission (date <= aujourd'hui) à l'état prevue OU
+      realisee (D1 : les jamais déclarées sont incluses). Compté sur occByMission,
+      INDÉPENDAMMENT du filtre d'état affiché. Bouton absent si N = 0.
+    - Confirmation (modale générique ssConfirm) puis RPC
+      valider_occurrences_mission(p_mission_id, p_nb_attendu = N) : lot atomique
+      serveur, refusé si le périmètre réel ne vaut plus N (écran périmé).
+    - D2 : jamais déclarée -> heures_reelles vide -> compteur = durée prévue
+      (repli existant de sync_releve_depuis_occurrence).
+    - Futures et annulées jamais touchées ; retour arrière = Dévalider unitaire.
 
   ARCHITECTURE (calque gestion-salarie.html, vérifié à la source 26/06) :
     - charge supabase.min.js (CDN jsDelivr) puis js/supabase-client.js (SupabaseHub).
@@ -112,6 +126,7 @@
     list_missions / list_mission_seances / list_entites ;
     declarer_occurrence(p_id, p_heures_reelles) [Lohann OU admin] ;
     valider_occurrence(p_id) / devalider_occurrence(p_id) [admin SEUL] ;
+    valider_occurrences_mission(p_mission_id, p_nb_attendu) [admin SEUL, sql_256] ;
     upsert_mission(...) / upsert_entite(...) [admin SEUL] ;
     generer_occurrences_recurrentes(p_mission_id, p_from, p_to) ;
     list_contrats_salaries / list_compteur_annualisation / list_releve_heures ;
@@ -1316,6 +1331,16 @@
       headRight.appendChild(mkBtn('✎ Éditer', 'ss-btn ss-btn-sm ss-btn-ghost', function () {
         openMission(m);
       }));
+      // VALIDATION-SEANCES-PAR-MISSION : validation en lot des séances passées
+      // (prevue|realisee) de la mission. Absent s'il n'y a rien à valider.
+      const aValider = seancesAValiderDeMission(m);
+      if (aValider.length) {
+        const vb = mkBtn('✅ Tout valider (' + aValider.length + ')', 'ss-btn ss-btn-sm', function () {
+          askValiderMission(m);
+        });
+        vb.title = 'Valider d’un coup les séances passées de cette mission';
+        headRight.appendChild(vb);
+      }
       // UNIFICATION-SEANCES-MISSION : le bouton « Générer les séances » est SUPPRIMÉ
       // du bandeau — la génération est déclenchée à l'enregistrement de la mission
       // (saveMission -> genMission). « + Ponctuelle » reste (voie 3 salarié, invariant).
@@ -1691,6 +1716,54 @@
       await refreshAll();
       await loadCompteur();
     } catch (e) { flash('Dévalidation impossible : ' + errMsg(e), 'err'); }
+  }
+
+  // ---- VALIDATION-SEANCES-PAR-MISSION (sql_256) ----
+  // Périmètre = MÊME règle que le serveur : séances de la mission à l'état
+  // prevue|realisee dont la date est passée ou aujourd'hui. Lu sur occByMission
+  // (toutes les séances), PAS sur la liste filtrée à l'écran.
+  function seancesAValiderDeMission(m) {
+    const auj = isoDate(new Date());
+    return (occByMission[m.id] || []).filter(function (o) {
+      return (o.etat === 'prevue' || o.etat === 'realisee')
+        && String(o.date_seance).slice(0, 10) <= auj;
+    }).sort(function (a, b) { return String(a.date_seance).localeCompare(String(b.date_seance)); });
+  }
+  function askValiderMission(m) {
+    const lot = seancesAValiderDeMission(m);
+    if (!lot.length) { flash('Aucune séance passée à valider sur cette mission.', 'err'); return; }
+    const nbPrev = lot.filter(function (o) { return o.etat === 'prevue'; }).length;
+    const nb = lot.length;
+    openConfirm(
+      'Valider ' + nb + (nb > 1 ? ' séances ?' : ' séance ?'),
+      (m.libelle || '(sans libellé)') + ' · séances passées du '
+        + fmtDateFR(lot[0].date_seance) + ' au ' + fmtDateFR(lot[nb - 1].date_seance),
+      (nbPrev > 0
+        ? 'Dont ' + nbPrev + ' jamais déclarée' + (nbPrev > 1 ? 's' : '')
+          + ' : comptée' + (nbPrev > 1 ? 's' : '') + ' sur la durée prévue. '
+        : '')
+        + 'Les séances futures et annulées ne sont pas touchées. Retour arrière possible séance par séance (« Dévalider »).',
+      'Valider ' + nb + (nb > 1 ? ' séances' : ' séance'),
+      function () { return doValiderMission(m, nb); }
+    );
+  }
+  async function doValiderMission(m, nb) {
+    $('ssConfirmOk').disabled = true;
+    try {
+      const rows = (await rpc('valider_occurrences_mission', {
+        p_mission_id: m.id, p_nb_attendu: nb
+      })) || [];
+      const r = rows[0] || {};
+      const n = r.out_nb_validees != null ? r.out_nb_validees : nb;
+      flash(n + (n > 1 ? ' séances validées' : ' séance validée') + '. Compteur mis à jour.', 'ok');
+      closeConfirm();
+      await refreshAll();
+      await loadCompteur();
+    } catch (e) {
+      flash('Validation impossible : ' + errMsg(e), 'err');
+    } finally {
+      $('ssConfirmOk').disabled = false;
+    }
   }
 
   // ---- Confirmation générique (annuler / réactiver) ----
