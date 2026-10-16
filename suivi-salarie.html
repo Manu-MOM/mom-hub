@@ -107,6 +107,20 @@
     - D2 : jamais déclarée -> heures_reelles vide -> compteur = durée prévue
       (repli existant de sync_releve_depuis_occurrence).
     - Futures et annulées jamais touchées ; retour arrière = Dévalider unitaire.
+  MAJ : CLORE-CYCLE (16/10/2026, sql_259 + front — conception 29/06, décisions
+  complétées par Manu le 16/10/2026). En-tête des missions « intervention_scolaire »,
+  visible pour le SALARIÉ de la mission ET pour admin|bureau (garde serveur voie 3) :
+    - Cycle terminé (toutes séances validées ou annulées, >= 1 validée) et mission
+      non close -> « 🏁 Clore le cycle » : modale bilan (obligatoire) -> RPC
+      clore_cycle (bilan_text + etat 'terminee').
+    - Mission close -> badge « Cycle clos » + « ✎ Bilan » (même RPC, bilan modifiable).
+    - Questionnaire (bouton séparé, après clôture) : « ✉️ Questionnaire » prépare UN
+      mail pour l'école (mail-type data/mail-types.json, clé « satisfaction »,
+      variables {nom_ecole} {contact_nom} {classes} {periode}) couvrant TOUTES ses
+      classes closes sans questionnaire ; destinataire = entites.contact_email ;
+      après ouverture du client mail, confirmation « le mail est-il parti ? » ->
+      RPC marquer_questionnaire_envoye(ids) ; ensuite badge « Questionnaire envoyé ».
+      Aucune collecte des réponses dans le Hub.
 
   ARCHITECTURE (calque gestion-salarie.html, vérifié à la source 26/06) :
     - charge supabase.min.js (CDN jsDelivr) puis js/supabase-client.js (SupabaseHub).
@@ -532,6 +546,23 @@
     </table>
   </section>
 
+</div>
+
+<!-- ============ MODALE BILAN DE CYCLE (CLORE-CYCLE, sql_259) ============ -->
+<div class="ss-overlay" id="ssBilanOverlay">
+  <div class="ss-modal" style="max-width:560px;">
+    <h3 id="ssBilanTitre">Clore le cycle</h3>
+    <p class="ss-sub" id="ssBilanSub" style="margin-bottom:10px;"></p>
+    <div class="ss-field">
+      <label for="ssBilanTexte">Bilan du cycle (interne au club, ne part pas à l'école)</label>
+      <textarea id="ssBilanTexte" rows="7" placeholder="Déroulé du cycle, progrès et réactions des élèves, relation avec l'enseignant(e), difficultés, points à retenir pour la prochaine fois…"></textarea>
+      <p class="ss-hint">Obligatoire. Modifiable ensuite avec « ✎ Bilan ».</p>
+    </div>
+    <div class="ss-modal-act">
+      <button class="ss-btn ss-btn-ghost" id="ssBilanCancel" type="button">Annuler</button>
+      <button class="ss-btn" id="ssBilanOk" type="button">Clore le cycle</button>
+    </div>
+  </div>
 </div>
 
 <!-- ============ MODALE CONFIRMATION (annuler / réactiver) ============ -->
@@ -1326,6 +1357,24 @@
     const headRight = document.createElement('div');
     headRight.className = 'ss-mission-head-right';
     headRight.appendChild(count);
+    // CLORE-CYCLE (sql_259) : gestes de fin de cycle, salarie ET admin|bureau.
+    if (m.type_mission === 'intervention_scolaire') {
+      if (m.etat === 'terminee') {
+        const b1 = document.createElement('span');
+        b1.className = 'ss-badge validee'; b1.textContent = 'Cycle clos';
+        headRight.appendChild(b1);
+        headRight.appendChild(mkBtn('✎ Bilan', 'ss-btn ss-btn-sm ss-btn-ghost', function () { ouvrirBilan(m); }));
+        if (m.questionnaire_fait) {
+          const b2 = document.createElement('span');
+          b2.className = 'ss-badge validee'; b2.textContent = 'Questionnaire envoyé';
+          headRight.appendChild(b2);
+        } else {
+          headRight.appendChild(mkBtn('✉️ Questionnaire', 'ss-btn ss-btn-sm', function () { envoyerQuestionnaire(m); }));
+        }
+      } else if (m.etat !== 'annulee' && cycleScolaireTermine(m)) {
+        headRight.appendChild(mkBtn('🏁 Clore le cycle', 'ss-btn ss-btn-sm', function () { ouvrirBilan(m); }));
+      }
+    }
     // Bouton « ✎ Éditer » réservé à l'administration (peutEcrire) ; masqué pour Lohann.
     if (peutEcrire) {
       headRight.appendChild(mkBtn('✎ Éditer', 'ss-btn ss-btn-sm ss-btn-ghost', function () {
@@ -1716,6 +1765,115 @@
       await refreshAll();
       await loadCompteur();
     } catch (e) { flash('Dévalidation impossible : ' + errMsg(e), 'err'); }
+  }
+
+  // ---- CLORE-CYCLE (sql_259) ----
+  // Cycle termine = MEME regle que clore_cycle : aucune seance prevue|realisee,
+  // au moins une validee (lu sur toutes les seances, pas sur le filtre).
+  function cycleScolaireTermine(m) {
+    const occ = occByMission[m.id] || [];
+    return occ.some(function (o) { return o.etat === 'validee'; })
+      && !occ.some(function (o) { return o.etat === 'prevue' || o.etat === 'realisee'; });
+  }
+  let bilanMission = null;
+  function ouvrirBilan(m) {
+    bilanMission = m;
+    const clos = m.etat === 'terminee';
+    $('ssBilanTitre').textContent = clos ? 'Bilan du cycle' : 'Clore le cycle';
+    const nbVal = (occByMission[m.id] || []).filter(function (o) { return o.etat === 'validee'; }).length;
+    $('ssBilanSub').textContent = (m.libelle || '') + ' · ' + nbVal + ' séance' + (nbVal > 1 ? 's' : '') + ' validée' + (nbVal > 1 ? 's' : '')
+      + (clos ? '' : ' · la mission passera à l’état « terminée ».');
+    $('ssBilanTexte').value = m.bilan_text || '';
+    $('ssBilanOk').textContent = clos ? 'Enregistrer le bilan' : 'Clore le cycle';
+    $('ssBilanOverlay').classList.add('open');
+    setTimeout(function () { $('ssBilanTexte').focus(); }, 50);
+  }
+  function fermerBilan() { $('ssBilanOverlay').classList.remove('open'); bilanMission = null; }
+  async function enregistrerBilan() {
+    const m = bilanMission;
+    if (!m) return;
+    const txt = $('ssBilanTexte').value.trim();
+    if (!txt) { flash('Le bilan du cycle est obligatoire.', 'err'); return; }
+    const etaitClos = m.etat === 'terminee';
+    $('ssBilanOk').disabled = true;
+    try {
+      await rpc('clore_cycle', { p_mission_id: m.id, p_bilan: txt });
+      fermerBilan();
+      flash(etaitClos ? 'Bilan enregistré.' : 'Cycle clos. Vous pouvez maintenant envoyer le questionnaire à l’école.', 'ok');
+      await refreshAll();
+    } catch (e) {
+      flash('Clôture impossible : ' + errMsg(e), 'err');
+    } finally {
+      $('ssBilanOk').disabled = false;
+    }
+  }
+
+  // Questionnaire : UN mail par ecole couvrant ses classes closes sans questionnaire.
+  const MOIS_FR_Q = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet',
+                     'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+  function joinFrQ(a) { return a.length <= 1 ? a.join('') : a.slice(0, -1).join(', ') + ' et ' + a[a.length - 1]; }
+  function periodeQ(lot) {
+    const mois = new Set();
+    lot.forEach(function (m) {
+      (occByMission[m.id] || []).forEach(function (o) {
+        if (o.etat === 'validee' && o.date_seance) mois.add(String(o.date_seance).slice(0, 7));
+      });
+    });
+    const parAn = new Map();
+    Array.from(mois).sort().forEach(function (k) {
+      if (!parAn.has(k.slice(0, 4))) parAn.set(k.slice(0, 4), []);
+      parAn.get(k.slice(0, 4)).push(MOIS_FR_Q[Number(k.slice(5, 7)) - 1]);
+    });
+    return joinFrQ(Array.from(parAn.entries()).map(function (e) { return joinFrQ(e[1]) + ' ' + e[0]; }));
+  }
+  let mailTypesQ = null;
+  async function envoyerQuestionnaire(m) {
+    const e = entites.find(function (x) { return x.id === m.entite_id; });
+    if (!e) { flash('École introuvable pour cette mission.', 'err'); return; }
+    if (!e.contact_email || !String(e.contact_email).trim()) {
+      flash('Pas d’adresse mail de contact sur la fiche de l’école : impossible de préparer le questionnaire.', 'err');
+      return;
+    }
+    const lot = missions.filter(function (x) {
+      return x.entite_id === m.entite_id && x.type_mission === 'intervention_scolaire'
+        && x.etat === 'terminee' && !x.questionnaire_fait;
+    });
+    try {
+      if (mailTypesQ === null) {
+        const r = await fetch('data/mail-types.json?nocache=' + Date.now());
+        if (!r.ok) throw new Error('mail-types.json introuvable');
+        mailTypesQ = await r.json();
+      }
+      const sat = mailTypesQ.satisfaction || {};
+      const tpl = sat[e.type_entite] || sat.ecole_elementaire;
+      if (!tpl) { flash('Aucun mail-type « satisfaction » dans data/mail-types.json.', 'err'); return; }
+      const classes = lot.length > 1 ? 'vos ' + lot.length + ' classes' : 'votre classe';
+      const inject = function (s) {
+        return String(s || '')
+          .replace(/\{nom_ecole\}/g, e.libelle || '')
+          .replace(/\{contact_nom\}/g, e.contact_nom || 'Madame, Monsieur')
+          .replace(/\{classes\}/g, classes)
+          .replace(/\{periode\}/g, periodeQ(lot));
+      };
+      window.location.href = 'mailto:' + encodeURIComponent(e.contact_email.trim())
+        + '?subject=' + encodeURIComponent(inject(tpl.objet))
+        + '&body=' + encodeURIComponent(inject(tpl.corps));
+    } catch (err) {
+      flash('Préparation du mail impossible : ' + errMsg(err), 'err');
+      return;
+    }
+    // Laisse le client mail s'ouvrir, puis demande confirmation de l'envoi.
+    setTimeout(async function () {
+      if (!window.confirm('Le questionnaire a-t-il bien été envoyé à ' + (e.libelle || 'l’école') + ' ?\n\n'
+          + lot.length + ' classe' + (lot.length > 1 ? 's' : '') + ' seront marquées « questionnaire envoyé ».')) return;
+      try {
+        await rpc('marquer_questionnaire_envoye', { p_mission_ids: lot.map(function (x) { return x.id; }) });
+        flash('Questionnaire marqué envoyé (' + lot.length + ' classe' + (lot.length > 1 ? 's' : '') + ').', 'ok');
+        await refreshAll();
+      } catch (err2) {
+        flash('Enregistrement impossible : ' + errMsg(err2), 'err');
+      }
+    }, 1200);
   }
 
   // ---- VALIDATION-SEANCES-PAR-MISSION (sql_256) ----
@@ -3285,6 +3443,10 @@
     // Confirmation (annuler / réactiver)
     $('ssConfirmCancel').addEventListener('click', closeConfirm);
     $('ssConfirmOk').addEventListener('click', function () { if (confirmAction) confirmAction(); });
+    // CLORE-CYCLE : modale bilan.
+    $('ssBilanCancel').addEventListener('click', fermerBilan);
+    $('ssBilanOk').addEventListener('click', enregistrerBilan);
+    $('ssBilanOverlay').addEventListener('click', function (e) { if (e.target === $('ssBilanOverlay')) fermerBilan(); });
     $('ssConfirmOverlay').addEventListener('click', function (e) { if (e.target === $('ssConfirmOverlay')) closeConfirm(); });
     // Mission
     $('ssMisCancel').addEventListener('click', closeMission);
