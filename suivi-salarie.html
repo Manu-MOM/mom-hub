@@ -121,6 +121,12 @@
       après ouverture du client mail, confirmation « le mail est-il parti ? » ->
       RPC marquer_questionnaire_envoye(ids) ; ensuite badge « Questionnaire envoyé ».
       Aucune collecte des réponses dans le Hub.
+  MAJ : QUESTIONNAIRE-RECRUTEMENT (16/10/2026, front + data, retour de recette Manu) :
+    chapitre « recrutement » à relayer aux familles (3 séances d'essai gratuites,
+    variable {lien_essai}), adresse de l'EDR en copie (cc du mailto) lue dans
+    data/mail-types.json › satisfaction._config.cc. Réponses : envoi depuis la boîte
+    de l'EDR (décision Manu, « Répondre à » non fiable en mailto). Logo : signature
+    de la messagerie (le mailto ne transporte que du texte).
 
   ARCHITECTURE (calque gestion-salarie.html, vérifié à la source 26/06) :
     - charge supabase.min.js (CDN jsDelivr) puis js/supabase-client.js (SupabaseHub).
@@ -1848,15 +1854,23 @@
       const tpl = sat[e.type_entite] || sat.ecole_elementaire;
       if (!tpl) { flash('Aucun mail-type « satisfaction » dans data/mail-types.json.', 'err'); return; }
       const classes = lot.length > 1 ? 'vos ' + lot.length + ' classes' : 'votre classe';
+      // QUESTIONNAIRE-RECRUTEMENT : adresse EDR en copie + lien d'essai (satisfaction._config).
+      const cfgQ = sat._config || {};
+      const ccQ = String(cfgQ.cc || '').trim();
+      const lienQ = String(cfgQ.lien_essai || '').trim()
+        || (ccQ ? 'écrivez-nous à ' + ccQ : 'répondez simplement à ce mail');
       const inject = function (s) {
         return String(s || '')
           .replace(/\{nom_ecole\}/g, e.libelle || '')
           .replace(/\{contact_nom\}/g, e.contact_nom || 'Madame, Monsieur')
           .replace(/\{classes\}/g, classes)
-          .replace(/\{periode\}/g, periodeQ(lot));
+          .replace(/\{periode\}/g, periodeQ(lot))
+          .replace(/\{lien_essai\}/g, lienQ)
+          .replace(/\{contact_club\}/g, ccQ);
       };
       window.location.href = 'mailto:' + encodeURIComponent(e.contact_email.trim())
         + '?subject=' + encodeURIComponent(inject(tpl.objet))
+        + (ccQ ? '&cc=' + encodeURIComponent(ccQ) : '')
         + '&body=' + encodeURIComponent(inject(tpl.corps));
     } catch (err) {
       flash('Préparation du mail impossible : ' + errMsg(err), 'err');
