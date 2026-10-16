@@ -2,7 +2,7 @@
   "_meta": {
     "type": "mail-types",
     "nom": "Mails-types (prospection + satisfaction)",
-    "version": "1.1",
+    "version": "1.2",
     "date_creation": "2026-06-28",
     "date_maj": "2026-10-16",
     "description": "Gabarits de mail de démarchage, indexés par type_entite. Hand-editable : le bureau modifie le contenu par commit, aucun backend, aucun SMTP. Envoi via le client mail (mailto / copier-coller).",
@@ -14,13 +14,16 @@
     "_note_creneau": "Le créneau proposé n'est PAS une variable : il dépend du planning de Lohann, instable à la rentrée. Il est saisi à la main par Lohann dans son client mail.",
     "_changelog": [
       "1.0 (2026-06-28) - Création initiale. Seule clé remplie : ecole_elementaire (cible v1). Structure dict par type_entite extensible (collège, lycée, mjc… à remplir au besoin, hors v1).",
-      "1.1 (2026-10-16) - Ajout de la clé « satisfaction » (questionnaire de fin de cycle, chantier CLORE-CYCLE, sql_259), indexée par type_entite comme « mails ». Les réponses arrivent par mail : aucune collecte dans le Hub."
+      "1.1 (2026-10-16) - Ajout de la clé « satisfaction » (questionnaire de fin de cycle, chantier CLORE-CYCLE, sql_259), indexée par type_entite comme « mails ». Les réponses arrivent par mail : aucune collecte dans le Hub.",
+      "1.2 (2026-10-16) - Questionnaire : chapitre « recrutement » à relayer aux familles (3 séances d'essai gratuites), adresse de l'EDR en copie (satisfaction._config.cc), lien du formulaire d'essai à renseigner dans satisfaction._config.lien_essai."
     ],
     "_variables_satisfaction": {
       "{nom_ecole}": "entites.libelle",
       "{contact_nom}": "entites.contact_nom (à défaut : Madame, Monsieur)",
       "{classes}": "« votre classe » ou « vos N classes » (classes closes de l'école couvertes par le mail)",
-      "{periode}": "mois des séances validées, ex. « septembre et octobre 2026 »"
+      "{periode}": "mois des séances validées, ex. « septembre et octobre 2026 »",
+      "{lien_essai}": "satisfaction._config.lien_essai (formulaire Google d'inscription aux séances d'essai) ; vide -> invitation à écrire à {contact_club}",
+      "{contact_club}": "satisfaction._config.cc (adresse de l'École de rugby, mise aussi en copie du mail)"
     }
   },
   "mails": {
@@ -36,9 +39,14 @@
     "autre": null
   },
   "satisfaction": {
+    "_config": {
+      "_note": "cc : adresse de l'École de rugby, mise en copie de chaque questionnaire (et citée dans le chapitre recrutement). lien_essai : lien du formulaire Google destiné aux parents ; tant qu'il est vide, le mail invite à écrire à cette adresse.",
+      "cc": "ecolederugby.mom@gmail.com",
+      "lien_essai": ""
+    },
     "ecole_elementaire": {
       "objet": "Mutzig Ovalie Molsheim — votre avis sur le cycle rugby à {nom_ecole}",
-      "corps": "Bonjour {contact_nom},\n\nLe cycle de rugby éducatif mené par notre éducateur auprès de {classes} ({periode}) est terminé. Merci pour votre accueil et pour votre confiance !\n\nPour améliorer nos interventions, pourriez-vous prendre deux minutes pour répondre aux questions ci-dessous, directement en réponse à ce mail ? Une note de 1 (pas du tout) à 5 (tout à fait) suffit ; un commentaire est toujours le bienvenu.\n\n1. Globalement, êtes-vous satisfait(e) du cycle ? (1 à 5)\n2. Le contenu des séances était-il adapté à l'âge et au niveau des élèves ? (1 à 5)\n3. L'organisation vous a-t-elle convenu (horaires, ponctualité, matériel, communication) ? (1 à 5)\n4. Les élèves ont-ils pris plaisir et progressé ? (1 à 5)\n5. Souhaiteriez-vous renouveler l'expérience l'an prochain ? (oui / non / peut-être)\n\nUne remarque, une suggestion ? N'hésitez pas à nous en faire part.\n\nBien cordialement,\n\nMutzig Ovalie Molsheim\nÉcole de rugby"
+      "corps": "Bonjour {contact_nom},\n\nLe cycle de rugby éducatif mené par notre éducateur auprès de {classes} ({periode}) est terminé. Merci pour votre accueil et pour votre confiance !\n\nPour améliorer nos interventions, pourriez-vous prendre deux minutes pour répondre aux questions ci-dessous, directement en réponse à ce mail ? Une note de 1 (pas du tout) à 5 (tout à fait) suffit ; un commentaire est toujours le bienvenu.\n\n1. Globalement, êtes-vous satisfait(e) du cycle ? (1 à 5)\n2. Le contenu des séances était-il adapté à l'âge et au niveau des élèves ? (1 à 5)\n3. L'organisation vous a-t-elle convenu (horaires, ponctualité, matériel, communication) ? (1 à 5)\n4. Les élèves ont-ils pris plaisir et progressé ? (1 à 5)\n5. Souhaiteriez-vous renouveler l'expérience l'an prochain ? (oui / non / peut-être)\n\nUne remarque, une suggestion ? N'hésitez pas à nous en faire part.\n\nET SI L'AVENTURE CONTINUAIT AU CLUB ?\nPlusieurs élèves ont pris goût au rugby pendant ce cycle : c'est le meilleur moment pour leur proposer de continuer. L'École de rugby du MOM accueille les enfants dès 5 ans, filles et garçons, et propose 3 séances d'essai gratuites, sans engagement.\nPourriez-vous relayer le petit mot ci-dessous aux familles (cahier de liaison, ENT, mail aux parents) ?\n\n- - - - - - - - - - - - - - - - - - - -\nVotre enfant a découvert le rugby à l'école avec le club de Mutzig Ovalie Molsheim. Il a aimé ? Venez essayer en club ! 3 séances d'essai gratuites, sans engagement, matériel prêté. Inscription à une séance d'essai : {lien_essai}\n- - - - - - - - - - - - - - - - - - - -\n\nBien cordialement,\n\nMutzig Ovalie Molsheim\nÉcole de rugby"
     }
   }
 }
