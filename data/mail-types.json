@@ -2,7 +2,7 @@
   "_meta": {
     "type": "mail-types",
     "nom": "Mails-types (prospection + satisfaction)",
-    "version": "1.3",
+    "version": "1.4",
     "date_creation": "2026-06-28",
     "date_maj": "2026-10-16",
     "description": "Gabarits de mail de démarchage, indexés par type_entite. Hand-editable : le bureau modifie le contenu par commit, aucun backend, aucun SMTP. Envoi via le client mail (mailto / copier-coller).",
@@ -16,7 +16,8 @@
       "1.0 (2026-06-28) - Création initiale. Seule clé remplie : ecole_elementaire (cible v1). Structure dict par type_entite extensible (collège, lycée, mjc… à remplir au besoin, hors v1).",
       "1.1 (2026-10-16) - Ajout de la clé « satisfaction » (questionnaire de fin de cycle, chantier CLORE-CYCLE, sql_259), indexée par type_entite comme « mails ». Les réponses arrivent par mail : aucune collecte dans le Hub.",
       "1.2 (2026-10-16) - Questionnaire : chapitre « recrutement » à relayer aux familles (3 séances d'essai gratuites), adresse de l'EDR en copie (satisfaction._config.cc), lien du formulaire d'essai à renseigner dans satisfaction._config.lien_essai.",
-      "1.3 (2026-10-16) - lien_essai renseigné : formulaire Google « Initiation au RUGBY dans les écoles » (https://forms.gle/3nzx4rkrENNyb8X77)."
+      "1.3 (2026-10-16) - lien_essai renseigné : formulaire Google « Initiation au RUGBY dans les écoles » (https://forms.gle/3nzx4rkrENNyb8X77).",
+      "1.4 (2026-10-16) - Copie du questionnaire aux deux boîtes de l'EDR : responsableedrmom@gmail.com et ecolederugby.mom@gmail.com."
     ],
     "_variables_satisfaction": {
       "{nom_ecole}": "entites.libelle",
@@ -41,8 +42,8 @@
   },
   "satisfaction": {
     "_config": {
-      "_note": "cc : adresse de l'École de rugby, mise en copie de chaque questionnaire (et citée dans le chapitre recrutement). lien_essai : lien du formulaire Google destiné aux parents ; tant qu'il est vide, le mail invite à écrire à cette adresse.",
-      "cc": "ecolederugby.mom@gmail.com",
+      "_note": "cc : adresse(s) de l'École de rugby mises en copie de chaque questionnaire, séparées par une virgule. lien_essai : lien du formulaire Google destiné aux parents ; tant qu'il est vide, le mail invite à écrire à ces adresses.",
+      "cc": "responsableedrmom@gmail.com, ecolederugby.mom@gmail.com",
       "lien_essai": "https://forms.gle/3nzx4rkrENNyb8X77"
     },
     "ecole_elementaire": {
