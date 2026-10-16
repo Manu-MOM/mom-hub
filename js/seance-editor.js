@@ -11,6 +11,22 @@
  *   - 5.5.A : éditeur méta + sauvegarde manuelle (CETTE VERSION)
  *   - 5.5.B : autosave 30s + dropdowns lieu/événement + champs secondaires
  *
+ * Version : 1.30 — CIRCUIT-SUIT-ETAGE (16 octobre 2026)
+ *   v1.30 : CIRCUIT-SUIT-ETAGE (FAIT FOI gelé 16/10/2026, retour terrain
+ *           Corentin M14 : pause boisson réglée à 2 min affichée 8 min).
+ *           Cause : la fiche circuit (seances_etages_circuits) est clée sur
+ *           (seance_id, ordre) ; déplacer un étage ou supprimer une voie
+ *           laissait la fiche sur l'ancien ordre, et le bloc qui y arrivait
+ *           héritait de la durée du circuit.
+ *           (V1) Garde-fou : _circuitDeLetage ne renvoie un circuit que si
+ *           l'étage compte ≥ 2 voies (durée, écran et PDF couverts d'un coup).
+ *           Lecture brute conservée dans _circuitBrutDeLetage (bascule).
+ *           (V2) Le circuit suit son étage : _swapEtages déplace aussi les
+ *           fiches circuit (même danse de parking que les blocs) ; verrou
+ *           anti double-clic (State.swapEnCours). onRemoveBloc supprime la
+ *           fiche quand l'étage passe sous 2 voies. onAddBloc (dédoublement)
+ *           purge une fiche résiduelle avant de recréer un parallèle.
+ *           Aucune RPC ni colonne nouvelle. node --check OK.
  * Version : 1.29 — SEANCE-NAV-DETAIL (1er octobre 2026)
  *   v1.29 : SEANCE-NAV-DETAIL (FAIT FOI gelé 01/10/2026, pt 275, retour
  *           terrain : « Retour à la trame » unique en haut du détail,
@@ -493,6 +509,7 @@
     autosaveStatus: 'idle', // 'idle' | 'saving' | 'error' (5.5.B2)
     blocs: [],              // blocs de la séance courante, triés par ordre (5.6.A)
     circuits: [],           // fiches de marche circuit (seances_etages_circuits, sql_241) — 1 par étage rotatif
+    swapEnCours: false,     // v1.30 — verrou anti double-clic sur ↑↓ d'étage
     staffDisponible: [],    // [{personne_id,nom,prenom}] coachs assignables par bloc (v1.10, sql_108)
     staffClubDisponible: [], // ENCADRANTS-BLOC-ELARGI — tout le staff club (toutes catégories), pioche « autres catégories »
     dedoublerOrdre: null,   // étage cible quand on ajoute une voie parallèle (v1.10)
@@ -5211,6 +5228,10 @@
       const voieMax = blocsEtage.reduce(function (m, b) { return Math.max(m, b.voie || 0); }, 0);
       params.ordre = ordreCible;
       params.voie = voieMax + 1;
+      // v1.30 (V2) — l'étage cible n'a qu'une voie : une fiche circuit
+      // résiduelle sur cet ordre se « réveillerait » dès la 2e voie. On la
+      // purge avant de créer le parallèle (bascule circuit = choix explicite).
+      await _purgerCircuitSiEtageSimple(ordreCible);
     }
 
     // Phase 5.9 : héritage auto des groupes du bloc précédent.
@@ -5314,6 +5335,9 @@
     // (les ordres restent valides : il y a juste un trou, ce qui est OK
     // pour un ORDER BY ordre côté DB)
     State.blocs = State.blocs.filter(function (b) { return b.id !== blocId; });
+    // v1.30 (V2) — l'étage repasse à 0 ou 1 voie : sa fiche circuit n'a plus
+    // d'objet et ne doit pas contaminer le prochain bloc posé sur cet ordre.
+    await _purgerCircuitSiEtageSimple(bloc.ordre || 0);
     renderTrame();
   }
 
@@ -5335,18 +5359,32 @@
    * @param {number} ordreB étage cible (adjacent)
    */
   async function _swapEtages(ordreA, ordreB) {
+    // v1.30 (V2) — verrou : un second clic ↑↓ pendant un échange en cours
+    // lançait un échange concurrent et pouvait laisser des blocs au parking.
+    if (State.swapEnCours) return;
+
     const blocsA = State.blocs.filter(function (b) { return (b.ordre || 0) === ordreA; });
     const blocsB = State.blocs.filter(function (b) { return (b.ordre || 0) === ordreB; });
     if (blocsA.length === 0 || blocsB.length === 0) return;
 
+    // v1.30 (V2) — fiches circuit des deux étages (lecture brute : on
+    // déplace la fiche telle qu'elle est stockée, le garde-fou V1 décide
+    // ensuite de son usage).
+    const circA = _circuitBrutDeLetage(ordreA);
+    const circB = _circuitBrutDeLetage(ordreB);
+
     const maxOrdre = State.blocs.reduce(function (m, b) { return Math.max(m, b.ordre || 0); }, 0);
-    const parking = maxOrdre + 1000;
+    const maxOrdreCirc = (State.circuits || []).reduce(function (m, c) { return Math.max(m, c.ordre || 0); }, 0);
+    const parking = Math.max(maxOrdre, maxOrdreCirc) + 1000;
 
     // Mise à jour optimiste en mémoire d'abord (render immédiat)
     blocsA.forEach(function (b) { b.ordre = ordreB; });
     blocsB.forEach(function (b) { b.ordre = ordreA; });
+    if (circA) circA.ordre = ordreB;
+    if (circB) circB.ordre = ordreA;
     renderTrame();
 
+    State.swapEnCours = true;
     try {
       // Passe 1 : parquer A (ordre source -> parking, voie préservée)
       for (let i = 0; i < blocsA.length; i++) {
@@ -5363,11 +5401,31 @@
         const r = await SupabaseHub.updateBloc(b.id, { ordre: ordreB });
         if (!r.ok) throw new Error(r.error);
       }
+
+      // v1.30 (V2) — les fiches circuit suivent leur étage. Même danse
+      // anti-collision que les blocs (unicité seance_id, ordre) : A au
+      // parking, B prend l'ordre de A, A sort du parking vers l'ordre de B.
+      if (circA) {
+        const r = await SupabaseHub.saveCircuit(_payloadCircuit(circA, { ordre: parking }));
+        if (!r || !r.ok) throw new Error((r && r.error) || 'circuit (parking)');
+      }
+      if (circB) {
+        const r = await SupabaseHub.saveCircuit(_payloadCircuit(circB, { ordre: ordreA }));
+        if (!r || !r.ok) throw new Error((r && r.error) || 'circuit (étage cible)');
+        Object.assign(circB, r.data);
+      }
+      if (circA) {
+        const r = await SupabaseHub.saveCircuit(_payloadCircuit(circA, { ordre: ordreB }));
+        if (!r || !r.ok) throw new Error((r && r.error) || 'circuit (étage source)');
+        Object.assign(circA, r.data);
+      }
     } catch (e) {
       console.error('SeanceEditor: _swapEtages() KO', e);
       alert('Erreur réordonnancement des étages : ' + e.message + '\n\nRechargement…');
       await loadBlocs();
       renderTrame();
+    } finally {
+      State.swapEnCours = false;
     }
   }
 
@@ -6613,8 +6671,50 @@
    * @returns {object|null}
    */
   function _circuitDeLetage(ordre) {
+    // v1.30 (V1) — un circuit n'a de sens que sur un étage parallèle
+    // (≥ 2 voies). Une fiche restée sur un étage à 0 ou 1 bloc est ignorée :
+    // elle ne pilote ni la durée, ni l'écran, ni le PDF.
+    const circ = _circuitBrutDeLetage(ordre);
+    if (!circ) return null;
+    return _nbVoiesEtage(ordre) >= 2 ? circ : null;
+  }
+
+  /**
+   * v1.30 — Fiche circuit stockée sur cet ordre, SANS contrôle du nombre de
+   * voies. Réservé aux opérations d'écriture (bascule, déplacement, purge).
+   * @param {number} ordre
+   * @returns {object|null}
+   */
+  function _circuitBrutDeLetage(ordre) {
     if (!Array.isArray(State.circuits)) return null;
     return State.circuits.find(function (c) { return c.ordre === ordre; }) || null;
+  }
+
+  /**
+   * v1.30 — Nombre de blocs (voies) présents sur un ordre d'étage.
+   * @param {number} ordre
+   * @returns {number}
+   */
+  function _nbVoiesEtage(ordre) {
+    if (!Array.isArray(State.blocs)) return 0;
+    return State.blocs.filter(function (b) { return (b.ordre || 0) === ordre; }).length;
+  }
+
+  /**
+   * v1.30 (V2) — Supprime la fiche circuit d'un ordre si l'étage compte
+   * moins de 2 voies. Silencieux en cas d'échec (le garde-fou V1 neutralise
+   * de toute façon une fiche résiduelle).
+   * @param {number} ordre
+   */
+  async function _purgerCircuitSiEtageSimple(ordre) {
+    const circ = _circuitBrutDeLetage(ordre);
+    if (!circ || _nbVoiesEtage(ordre) >= 2) return;
+    const r = await SupabaseHub.deleteCircuit(circ.id);
+    if (r && r.ok) {
+      State.circuits = State.circuits.filter(function (c) { return c.id !== circ.id; });
+    } else {
+      console.warn('SeanceEditor: purge circuit résiduel KO (ordre ' + ordre + ')', r && r.error);
+    }
   }
 
   // ============================================================
