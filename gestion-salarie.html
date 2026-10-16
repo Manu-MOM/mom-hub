@@ -68,6 +68,29 @@
     (créneaux, tarif, 6 bornes, taux) mémorisée en localStorage clé
     gcProjEcoles — aucune écriture en base, jamais exportée (la projection
     n'entre dans aucun xlsx). Front pur, zéro SQL, zéro RPC nouvelle.
+
+  MAJ : FACTURE-ECOLES (16/10/2026, sql_257 + front — FAIT FOI gelé par Manu le
+  16/10/2026, modèle = facture Excel MOM-FAC-2026-005). Le bloc « Émettre un
+  justificatif » devient « Facturer les écoles » (genererJustificatif conservée,
+  plus câblée) :
+    - Classe facturable = mission statut 'facturable', non encore facturée
+      (facture_id vide), cycle TERMINÉ (aucune séance prevue|realisee, >= 1
+      validee — même règle que la garde serveur). Agrégat seancesAgg enrichi
+      (nbOuvertes, nbValidees, moisValides) dans la boucle existante.
+    - Une ligne par école -> modale : classes cochables (cochées par défaut ;
+      sans montant = grisée et signalée), désignation générée « Interventions
+      rugby par <salarié> en <mois> pour N classes » (modifiable, regénérée tant
+      qu'elle n'est pas éditée), Vos Réf., échéance (défaut « À réception »),
+      mode de règlement (défaut emetteur-mom.json), aperçu du destinataire.
+    - Émission : RPC emettre_facture (numéro F1 : 1 classe -> sa référence ;
+      plusieurs -> compteur du Hub). Facture FIGÉE côté base (destinataire,
+      émetteur public, lignes, total).
+    - Bloc « Factures émises » (list_factures) : réimpression à l'identique.
+    - Rendu calqué sur le modèle Excel (logo MOM, cadre école, bandeau vert
+      FACTURE, références, tableau, mention TVA, RIB, logo École de rugby,
+      pied jaune). Coordonnées bancaires lues en base (get_emetteur_bancaire,
+      admin|bureau) — jamais dans le dépôt public. Titre du document =
+      « Facture MOM <numéro> - <école> » (nom de fichier PDF proposé).
 -->
 <link rel="stylesheet" href="css/hub.css">
 <style>
@@ -199,6 +222,31 @@
                  padding: 6px 12px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
                  color: var(--ink, #0c3d24); white-space: nowrap; }
   .pe-emis-btn:hover { border-color: var(--gold, #d4a93a); }
+  /* FACTURE-ECOLES : modale d'émission + factures émises */
+  .fa-overlay { position: fixed; inset: 0; background: rgba(12, 61, 36, .35); display: none;
+                align-items: flex-start; justify-content: center; padding: 40px 16px; z-index: 50; overflow-y: auto; }
+  .fa-overlay.open { display: flex; }
+  .fa-modal { background: #fff; border-radius: 12px; max-width: 620px; width: 100%; padding: 20px 22px;
+              box-shadow: 0 12px 40px rgba(0,0,0,.18); }
+  .fa-modal h3 { margin: 0 0 4px; font-size: 17px; color: var(--ink, #0c3d24); }
+  .fa-sub { margin: 0 0 14px; font-size: 13px; color: var(--ink-mute, #6b7a74); }
+  .fa-lbl { display: block; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+            color: var(--ink-mute, #6b7a74); margin: 14px 0 6px; }
+  .fa-classe { display: flex; align-items: flex-start; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--paper-warm, #e3e0d8); font-size: 13px; }
+  .fa-classe:last-child { border-bottom: none; }
+  .fa-classe input { margin-top: 3px; }
+  .fa-classe .fa-mt { margin-left: auto; white-space: nowrap; font-weight: 600; }
+  .fa-classe.off { color: var(--ink-mute, #6b7a74); }
+  .fa-classe .fa-warn { color: #993c1d; font-weight: 600; }
+  .fa-modal textarea, .fa-modal input[type="text"] { width: 100%; box-sizing: border-box; font: inherit; font-size: 14px;
+            padding: 8px 10px; border: 1px solid var(--line, #cabe9f); border-radius: 8px; }
+  .fa-modal textarea { min-height: 58px; resize: vertical; }
+  .fa-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+  .fa-dest { font-size: 13px; background: var(--paper, #f7f4ec); border-radius: 8px; padding: 8px 10px; line-height: 1.45; }
+  .fa-total { margin: 14px 0 0; font-size: 15px; font-weight: 700; color: var(--ink, #0c3d24); }
+  .fa-act { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+  .fa-ghost { background: #fff !important; color: var(--ink, #0c3d24) !important; border: 1px solid var(--line, #cabe9f) !important; }
+  @media (max-width: 560px) { .fa-grid { grid-template-columns: 1fr; } }
   .pe-sig { font-size: 12.5px; color: var(--ink-mute, #6b7a74); margin: 4px 0 0; }
   .pe-sig.alert { color: var(--rouge-blesse, #c0392b); }
   .pe-filters { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 16px; }
@@ -386,8 +434,14 @@
 
     <!-- Bloc EMISSION justificatif (B-facturation v1, greffe additive D6) -->
     <div class="pe-band" id="peRefacEmission" style="display:none">
-      <p class="pe-band-lbl">Émettre un justificatif</p>
+      <p class="pe-band-lbl">Facturer les écoles</p>
       <div id="peEmissionListe"></div>
+    </div>
+
+    <!-- Bloc FACTURES ÉMISES (FACTURE-ECOLES, sql_257) -->
+    <div class="pe-band" id="peFactures" style="display:none">
+      <p class="pe-band-lbl">Factures émises</p>
+      <div id="peFacturesListe"></div>
     </div>
 
     <!-- Bloc EXPORT comptable (B-facturation-export pt 132, greffe additive E1=c/E3=a/E4=a/E5=a) -->
@@ -536,6 +590,37 @@
 
   <p class="pe-foot">Chaque donnée affichée existe déjà en base (chantiers A→D). La page ne fait que
   les remonter et les agréger côté front — zéro SQL de modèle.</p>
+</div>
+
+<!-- ============ MODALE ÉMISSION FACTURE (FACTURE-ECOLES) ============ -->
+<div class="fa-overlay" id="faOverlay">
+  <div class="fa-modal" role="dialog" aria-labelledby="faTitre">
+    <h3 id="faTitre">Facture</h3>
+    <p class="fa-sub" id="faSub"></p>
+    <span class="fa-lbl">Classes facturées</span>
+    <div id="faClasses"></div>
+    <span class="fa-lbl">Désignation</span>
+    <textarea id="faDesignation"></textarea>
+    <div class="fa-grid">
+      <div>
+        <span class="fa-lbl">Vos Réf. (facultatif)</span>
+        <input type="text" id="faVosRef" placeholder="Référence de l'école">
+      </div>
+      <div>
+        <span class="fa-lbl">Échéance</span>
+        <input type="text" id="faEcheance">
+      </div>
+    </div>
+    <span class="fa-lbl">Mode de règlement</span>
+    <input type="text" id="faReglement">
+    <span class="fa-lbl">Destinataire</span>
+    <div class="fa-dest" id="faDest"></div>
+    <p class="fa-total" id="faTotal"></p>
+    <div class="fa-act">
+      <button type="button" class="gs-btn fa-ghost" id="faAnnuler">Annuler</button>
+      <button type="button" class="gs-btn" id="faEmettre">Émettre la facture</button>
+    </div>
+  </div>
 </div>
 
 <!-- xlsx-js-style 1.2.0 (EXPORT-XLSX-MISE-EN-FORME 02/07/2026) : remplace
@@ -713,13 +798,19 @@
         seances = (await rpc('list_mission_seances', { p_mission_id: mid })) || [];
       } catch (e) { seances = []; }
       let nb = 0, hPrev = 0, hReel = 0;
+      // FACTURE-ECOLES : etat du cycle (ouvertes = prevue|realisee) + mois des validees.
+      let nbOuvertes = 0, nbValidees = 0;
+      const moisValides = new Set();
       seances.forEach(s => {
         if (s.etat === 'annulee') return;               // exclut les seances annulees
         nb++;
         if (s.duree_min != null) hPrev += Number(s.duree_min) / 60;
         if (s.heures_reelles != null) { hReel += Number(s.heures_reelles); aDuReel = true; }
+        if (s.etat === 'prevue' || s.etat === 'realisee') nbOuvertes++;
+        if (s.etat === 'validee') { nbValidees++; if (s.date_seance) moisValides.add(String(s.date_seance).slice(0, 7)); }
       });
-      seancesAgg.set(mid, { nbSeances: nb, hPrevues: hPrev, hReelles: hReel });
+      seancesAgg.set(mid, { nbSeances: nb, hPrevues: hPrev, hReelles: hReel,
+                            nbOuvertes: nbOuvertes, nbValidees: nbValidees, moisValides: moisValides });
     }
   }
 
@@ -822,46 +913,345 @@
       m.entite_id === entiteId &&
       !(m.reference_commande && String(m.reference_commande).trim())).length;
   }
+  // ---------- FACTURE-ECOLES (sql_257) ----------
+  // Classe facturable = statut 'facturable', pas encore facturee, cycle termine
+  // (aucune seance prevue|realisee, >= 1 validee) : MEME regle que emettre_facture.
+  function cycleTermine(m) {
+    const a = seancesAgg.get(m.id);
+    return !!(a && a.nbOuvertes === 0 && a.nbValidees > 0);
+  }
+  function classesAFacturer(entiteId) {
+    return missions.filter(m =>
+      m.statut === 'facturable' && m.entite_id === entiteId && !m.facture_id && cycleTermine(m))
+      .sort((a, b) => String(a.libelle || '').localeCompare(String(b.libelle || ''), 'fr'));
+  }
+  function aMontant(m) { return m.montant != null && Number(m.montant) > 0; }
+
   function renderEmission() {
     const box = $('peRefacEmission');
     const liste = $('peEmissionListe');
     liste.innerHTML = '';
-    // Beneficiaires emissibles : entite_id distinct ayant >=1 mission cadree.
     const ids = [];
     const vus = new Set();
     missions.forEach(m => {
-      if (m.statut !== 'facturable') return;
       if (!m.entite_id || vus.has(m.entite_id)) return;
-      if (lignesCadrees(m.entite_id).length) { vus.add(m.entite_id); ids.push(m.entite_id); }
+      if (classesAFacturer(m.entite_id).length) { vus.add(m.entite_id); ids.push(m.entite_id); }
     });
-    if (!ids.length) { box.style.display = 'none'; return; }
+    if (!ids.length) {
+      box.style.display = 'block';
+      liste.innerHTML = '<div class="pe-band-vide">Aucune classe terminée à facturer.</div>';
+      return;
+    }
     box.style.display = 'block';
-    // Tri par montant cadre decroissant.
-    ids.sort((a, b) => {
-      const sa = lignesCadrees(a).reduce((s, m) => s + Number(m.montant || 0), 0);
-      const sb = lignesCadrees(b).reduce((s, m) => s + Number(m.montant || 0), 0);
-      return sb - sa;
-    });
+    ids.sort((a, b) => String(benefLabel(a) || '').localeCompare(String(benefLabel(b) || ''), 'fr'));
     ids.forEach(id => {
-      const lignes = lignesCadrees(id);
-      const total = lignes.reduce((s, m) => s + Number(m.montant || 0), 0);
-      const aCadrer = nbACadrer(id);
+      const cl = classesAFacturer(id);
+      const ok = cl.filter(aMontant);
+      const total = ok.reduce((s, m) => s + Number(m.montant), 0);
+      const sansMt = cl.length - ok.length;
+      const enCours = missions.filter(m => m.statut === 'facturable' && m.entite_id === id
+        && !m.facture_id && !cycleTermine(m)).length;
       const row = document.createElement('div');
       row.className = 'pe-emis-row';
       const info = document.createElement('span');
       info.className = 'pe-emis-info';
-      info.textContent = (benefLabel(id) || 'sans bénéficiaire')
-        + ' · ' + fmtEur(total) + ' € · '
-        + lignes.length + ' ligne' + (lignes.length > 1 ? 's' : '')
-        + (aCadrer > 0 ? ' · ' + aCadrer + ' à cadrer non incluse' + (aCadrer > 1 ? 's' : '') : '');
+      info.textContent = (benefLabel(id) || '—')
+        + ' · ' + cl.length + ' classe' + (cl.length > 1 ? 's' : '') + ' terminée' + (cl.length > 1 ? 's' : '')
+        + ' · ' + fmtEur(total) + ' €'
+        + (enCours > 0 ? ' · ' + enCours + ' en cours' : '');
+      if (sansMt > 0) {
+        const w = document.createElement('span');
+        w.className = 'pe-cadre-no';
+        w.textContent = ' · ' + sansMt + ' sans montant';
+        info.appendChild(w);
+      }
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'pe-emis-btn';
-      btn.textContent = '📄 Justificatif';
-      btn.addEventListener('click', () => { genererJustificatif(id); });
+      btn.textContent = '🧾 Préparer la facture';
+      btn.addEventListener('click', () => { ouvrirFacture(id); });
       row.appendChild(info); row.appendChild(btn);
       liste.appendChild(row);
     });
+  }
+
+  // Emetteur public (data/emetteur-mom.json), charge une fois a la demande.
+  let emetteurCache = null;
+  async function chargerEmetteur() {
+    if (emetteurCache) return emetteurCache;
+    const r = await fetch('data/emetteur-mom.json?nocache=' + Date.now());
+    if (!r.ok) throw new Error('data/emetteur-mom.json : HTTP ' + r.status);
+    emetteurCache = await r.json();
+    return emetteurCache;
+  }
+
+  // Destinataire : raison sociale + adresse de facturation si renseignees,
+  // sinon libelle + adresse postale (CP + COMMUNE en capitales, comme le modele).
+  function destinataireDe(e) {
+    const nom = (e.raison_sociale && e.raison_sociale.trim()) || e.libelle || e.code || '—';
+    let lignes = [];
+    if (e.adresse_facturation && e.adresse_facturation.trim()) {
+      lignes = e.adresse_facturation.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    } else {
+      if (e.adresse && e.adresse.trim()) lignes.push(e.adresse.trim());
+      const cpv = [e.code_postal, e.commune ? String(e.commune).toUpperCase() : '']
+        .filter(x => x && String(x).trim()).join(' ');
+      if (cpv) lignes.push(cpv);
+    }
+    return { nom: nom, lignes: lignes };
+  }
+
+  const MOIS_NOMS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet',
+                     'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+  function joinFr(arr) {
+    if (arr.length <= 1) return arr.join('');
+    return arr.slice(0, -1).join(', ') + ' et ' + arr[arr.length - 1];
+  }
+  // « en septembre et octobre 2026 » / « en novembre et décembre 2026 et janvier 2027 »
+  function periodeFr(selection) {
+    const mois = new Set();
+    selection.forEach(m => { const a = seancesAgg.get(m.id); if (a) a.moisValides.forEach(k => mois.add(k)); });
+    const parAn = new Map();
+    Array.from(mois).sort().forEach(k => {
+      const an = k.slice(0, 4), mo = Number(k.slice(5, 7));
+      if (!parAn.has(an)) parAn.set(an, []);
+      parAn.get(an).push(MOIS_NOMS[mo - 1]);
+    });
+    const blocs = Array.from(parAn.entries()).map(e => joinFr(e[1]) + ' ' + e[0]);
+    return blocs.length ? 'en ' + joinFr(blocs) : '';
+  }
+  function designationAuto(selection) {
+    const n = selection.length;
+    return ('Interventions rugby par ' + (salarieNomFacture() || 'le club') + ' '
+      + periodeFr(selection) + ' pour ' + n + ' classe' + (n > 1 ? 's' : '')).replace(/\s+/g, ' ').trim();
+  }
+  // Convention Hub : Prenom NOM.
+  function salarieNomFacture() {
+    const s = staff[0];
+    if (!s) return salarieNom || '';
+    return [s.prenom, s.nom ? String(s.nom).toUpperCase() : ''].filter(Boolean).join(' ');
+  }
+
+  let faEntite = null;
+  let faDesignationEditee = false;
+  function faSelection() {
+    const ids = Array.prototype.map.call(
+      $('faClasses').querySelectorAll('input[type="checkbox"]:checked'), cb => cb.value);
+    return missions.filter(m => ids.indexOf(m.id) !== -1);
+  }
+  function faMaj() {
+    const sel = faSelection();
+    if (!faDesignationEditee) $('faDesignation').value = sel.length ? designationAuto(sel) : '';
+    const total = sel.reduce((s, m) => s + Number(m.montant || 0), 0);
+    $('faTotal').textContent = sel.length
+      ? ('Total : ' + fmtEur(total) + ' € · ' + sel.length + ' classe' + (sel.length > 1 ? 's' : '')
+         + ' · numéro : ' + (sel.length === 1
+            ? (sel[0].reference_commande || 'référence générée à l’émission')
+            : 'suivant du compteur du Hub'))
+      : 'Aucune classe cochée.';
+    $('faEmettre').disabled = sel.length === 0;
+  }
+
+  async function ouvrirFacture(entiteId) {
+    let em;
+    try { em = await chargerEmetteur(); }
+    catch (e) { flash('Émetteur introuvable : ' + (e.message || e), 'err'); return; }
+    const e = entiteById.get(entiteId);
+    if (!e) { flash('École introuvable.', 'err'); return; }
+    faEntite = entiteId;
+    faDesignationEditee = false;
+    $('faTitre').textContent = 'Facture · ' + (benefLabel(entiteId) || '—');
+    $('faSub').textContent = 'Classes au cycle terminé, pas encore facturées. Une facture émise ne peut plus être modifiée.';
+    const box = $('faClasses');
+    box.innerHTML = '';
+    classesAFacturer(entiteId).forEach(m => {
+      const ok = aMontant(m);
+      const lab = document.createElement('label');
+      lab.className = 'fa-classe' + (ok ? '' : ' off');
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.value = m.id; cb.checked = ok; cb.disabled = !ok;
+      cb.addEventListener('change', faMaj);
+      const txt = document.createElement('span');
+      const a = seancesAgg.get(m.id);
+      txt.textContent = (m.libelle || '—')
+        + (m.reference_commande ? ' · ' + m.reference_commande : '')
+        + (a ? ' · ' + a.nbValidees + ' séance' + (a.nbValidees > 1 ? 's' : '') + ' validée' + (a.nbValidees > 1 ? 's' : '') : '');
+      const mt = document.createElement('span');
+      if (ok) { mt.className = 'fa-mt'; mt.textContent = fmtEur(m.montant) + ' €'; }
+      else { mt.className = 'fa-mt fa-warn'; mt.textContent = 'sans montant'; mt.title = 'Renseigner le montant dans la mission (Activité du salarié › Éditer)'; }
+      lab.appendChild(cb); lab.appendChild(txt); lab.appendChild(mt);
+      box.appendChild(lab);
+    });
+    $('faVosRef').value = '';
+    $('faEcheance').value = (em && em.echeance_defaut) || 'À réception';
+    $('faReglement').value = (em && em.mode_reglement_defaut) || 'Chèque ou Virement';
+    const d = destinataireDe(e);
+    $('faDest').innerHTML = '<strong>' + escapeHtml(d.nom) + '</strong>'
+      + d.lignes.map(l => '<br>' + escapeHtml(l)).join('')
+      + (d.lignes.length ? '' : '<br><span class="pe-cadre-no">Adresse absente de la fiche école</span>');
+    faMaj();
+    $('faOverlay').classList.add('open');
+  }
+  function fermerFacture() { $('faOverlay').classList.remove('open'); faEntite = null; }
+
+  async function emettreFacture() {
+    const sel = faSelection();
+    if (!sel.length || !faEntite) return;
+    const designation = $('faDesignation').value.trim();
+    if (!designation) { window.alert('La désignation est obligatoire.'); return; }
+    const total = sel.reduce((s, m) => s + Number(m.montant || 0), 0);
+    const ecole = benefLabel(faEntite) || '';
+    if (!window.confirm('Émettre la facture de ' + fmtEur(total) + ' € pour ' + ecole + ' ('
+        + sel.length + ' classe' + (sel.length > 1 ? 's' : '') + ') ?\n\nUne facture émise est définitive : '
+        + 'son numéro est attribué et elle ne peut plus être modifiée.')) return;
+    const btn = $('faEmettre');
+    btn.disabled = true;
+    // Fenetre d'impression ouverte DANS le geste utilisateur (sinon bloquee
+    // comme popup apres les appels reseau) ; refermee si l'emission echoue.
+    const wImp = window.open('', '_blank');
+    try {
+      const em = await chargerEmetteur();
+      const f = await rpc('emettre_facture', {
+        p_mission_ids: sel.map(m => m.id),
+        p_designation: designation,
+        p_vos_ref: $('faVosRef').value.trim() || null,
+        p_echeance: $('faEcheance').value.trim() || null,
+        p_mode_reglement: $('faReglement').value.trim() || null,
+        p_destinataire: destinataireDe(entiteById.get(faEntite)),
+        p_emetteur: em
+      });
+      const fac = Array.isArray(f) ? f[0] : f;
+      fermerFacture();
+      flash('Facture ' + (fac && fac.numero ? fac.numero : '') + ' émise.', 'ok');
+      await chargerMissionsEntites();
+      await chargerFactures();
+      renderRefac(); renderEmission(); renderExport(); renderFacturesEmises(); renderTraiter(); renderListe();
+      if (fac) imprimerFacture(fac, wImp);
+    } catch (e) {
+      if (wImp) wImp.close();
+      flash('Émission impossible : ' + errMsg(e), 'err');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  // ---------- Factures emises ----------
+  let factures = [];
+  async function chargerFactures() {
+    try { factures = (await rpc('list_factures', { p_saison_id: null })) || []; }
+    catch (e) { factures = []; flash('Factures émises illisibles : ' + errMsg(e), 'err'); }
+  }
+  function renderFacturesEmises() {
+    const box = $('peFactures');
+    const liste = $('peFacturesListe');
+    liste.innerHTML = '';
+    if (!factures.length) { box.style.display = 'none'; return; }
+    box.style.display = 'block';
+    factures.forEach(f => {
+      const row = document.createElement('div');
+      row.className = 'pe-emis-row';
+      const info = document.createElement('span');
+      info.className = 'pe-emis-info';
+      info.textContent = f.numero + ' · ' + fmtDateFR(f.date_emission) + ' · '
+        + ((f.destinataire && f.destinataire.nom) || benefLabel(f.entite_id) || '—')
+        + ' · ' + fmtEur(f.total) + ' €';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'pe-emis-btn';
+      btn.textContent = '🖨 Imprimer';
+      btn.addEventListener('click', () => { imprimerFacture(f); });
+      row.appendChild(info); row.appendChild(btn);
+      liste.appendChild(row);
+    });
+  }
+
+  // ---------- Rendu imprimable (calque du modele Excel MOM-FAC-2026-005) ----------
+  async function imprimerFacture(f, wDejaOuverte) {
+    // Fenetre ouverte AVANT les await (sinon bloquee comme popup).
+    const w = wDejaOuverte || window.open('', '_blank');
+    if (!w) { flash('Fenêtre bloquée (popup). Autorisez les popups pour imprimer.', 'err'); return; }
+    let bank = null;
+    try {
+      const rows = (await rpc('get_emetteur_bancaire')) || [];
+      bank = rows[0] || null;
+    } catch (e) { bank = null; }
+    const em = f.emetteur || {};
+    const emt = em.emetteur || {};
+    const abs = (p) => new URL(p, window.location.href).href;
+    const logos = em.logos || {};
+    const logoClub = abs(logos.club || 'assets/logo-club-mom.png');
+    const logoLabel = logos.label ? abs(logos.label) : '';
+    const d = f.destinataire || {};
+    const lignes = Array.isArray(f.lignes) ? f.lignes : [];
+    const H = escapeHtml;
+    const raison = emt.raison_sociale || ('Association ' + (emt.nom || 'MOM'));
+    const adr = [emt.adresse, [emt.code_postal, emt.ville].filter(Boolean).join(' ')].filter(Boolean).join(' - ');
+    const idLegal = [emt.siret ? 'SIRET : ' + emt.siret : '', emt.ape ? 'APE : ' + emt.ape : ''].filter(Boolean).join(' ');
+    const nomCourt = (d.nom || '').replace(/\s+—\s+/g, ' ').trim();
+
+    const lignesHtml = lignes.map(l =>
+      '<tr class="ln"><td class="c-ref">' + (Array.isArray(l.references) ? l.references.map(H).join('<br>') : '') + '</td>'
+      + '<td class="c-des">' + H(l.designation).replace(/\n/g, '<br>') + '</td>'
+      + '<td class="c-num">' + H(l.quantite) + '</td>'
+      + '<td class="c-num">' + fmtEur(l.prix_unitaire) + '</td>'
+      + '<td class="c-num">' + fmtEur(l.montant) + '</td></tr>').join('');
+
+    const ribHtml = bank
+      ? ((bank.out_rib ? 'RIB - ' + H(bank.out_rib) + (bank.out_banque ? ' - ' + H(bank.out_banque) : '') + '<br>' : '')
+         + (bank.out_iban ? 'IBAN - ' + H(bank.out_iban) + '<br>' : '')
+         + (bank.out_bic ? 'BIC - ' + H(bank.out_bic) : ''))
+      : '<span style="color:#c0392b">Coordonnées bancaires indisponibles</span>';
+
+    const doc = '<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8">'
+      + '<title>Facture MOM ' + H(f.numero) + ' - ' + H(nomCourt) + '</title><style>'
+      + '@page{size:A4;margin:12mm 14mm;}'
+      + '*{box-sizing:border-box;}body{font:11px/1.35 Arial,Helvetica,sans-serif;color:#000;margin:0;background:#eee;}'
+      + '.page{width:182mm;min-height:268mm;margin:10mm auto;background:#fff;padding:6mm 4mm;position:relative;}'
+      + '.top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:9mm;}'
+      + '.logo-club{width:30mm;height:auto;margin-left:10mm;}'
+      + '.dest{width:78mm;margin-top:6mm;border:1px solid #00B050;border-radius:5mm;padding:5mm 6mm;text-align:center;'
+      + 'font-family:Calibri,Carlito,Arial,sans-serif;font-weight:700;font-size:13px;line-height:1.4;}'
+      + '.bar{background:#00B050;border:1.5px solid #000;text-align:center;font-weight:700;font-size:13px;padding:1mm;margin-bottom:9mm;}'
+      + 'table{border-collapse:collapse;width:100%;}'
+      + '.refs{margin-bottom:6mm;border:1px solid #000;}.refs td{padding:.6mm 2mm;font-style:italic;font-size:9.5px;vertical-align:top;}'
+      + '.refs .k{font-weight:700;width:22mm;}.refs .k2{font-weight:700;width:34mm;border-left:1px solid #000;}'
+      + '.refs .v{width:46mm;}.refs .sep td{border-top:1px solid #000;}.jaune{background:#FFFF00;}'
+      + '.lines th{border:1px solid #000;font-weight:400;font-size:10px;padding:1mm;}'
+      + '.lines td{border-left:1px solid #000;border-right:1px solid #000;padding:3mm 2mm 0;vertical-align:top;}'
+      + '.c-ref{width:20mm;font-size:8.5px;color:#333;}.c-des{font-weight:700;font-style:italic;}'
+      + '.c-num{text-align:center;width:22mm;}'
+      + '.fill td{height:auto;}'
+      + '.foot td{border:1px solid #000;padding:1.5mm 2mm;}.tot{background:#c8c8c8;text-align:center;font-weight:700;}'
+      + '.bottom{display:flex;justify-content:space-between;align-items:flex-end;margin-top:12mm;}'
+      + '.rib{font-weight:700;font-size:10px;line-height:1.5;}.logo-label{width:24mm;height:auto;margin-right:14mm;}'
+      + '.pied{margin-top:10mm;background:#FFFF00;border:1px solid #000;text-align:center;font-weight:700;padding:1.5mm;line-height:1.35;}'
+      + '.pied .n{font-size:11.5px;}.pied .a{font-size:9.5px;}'
+      + '.pbtn{display:block;margin:12px auto;padding:9px 18px;border:1px solid #0c3d24;border-radius:8px;background:#fff;'
+      + 'font:600 14px Arial,sans-serif;cursor:pointer;color:#0c3d24;}'
+      + '@media print{body{background:#fff;}.page{margin:0;width:auto;min-height:0;padding:0;}.pbtn{display:none;}}'
+      + '</style></head><body>'
+      + '<button class="pbtn" onclick="window.print()">Imprimer / Enregistrer en PDF</button>'
+      + '<div class="page">'
+      + '<div class="top"><img class="logo-club" src="' + H(logoClub) + '" alt="MOM">'
+      + '<div class="dest">' + H(d.nom || '') + (Array.isArray(d.lignes) ? d.lignes.map(l => '<br>' + H(l)).join('') : '') + '</div></div>'
+      + '<div class="bar">FACTURE</div>'
+      + '<table class="refs">'
+      + '<tr><td class="k">Nos Réf. :</td><td class="v">' + H(f.numero) + '</td><td class="k2">Vos Réf. :</td><td>' + H(f.vos_ref || '') + '</td></tr>'
+      + '<tr><td class="k"></td><td class="v"></td><td class="k2">Échéance :</td><td>' + H(f.echeance || '') + '</td></tr>'
+      + '<tr class="sep"><td class="k">Date :</td><td class="v">' + H(fmtDateFR(f.date_emission)) + '</td><td class="k2">Mode de règlement :</td>'
+      + '<td class="jaune">' + H(f.mode_reglement || '') + '</td></tr></table>'
+      + '<table class="lines"><thead><tr><th class="c-ref">Réf.</th><th>DESIGNATION</th><th class="c-num">Quantité</th>'
+      + '<th class="c-num">P.U. €</th><th class="c-num">Montant €</th></tr></thead><tbody>'
+      + lignesHtml
+      + '<tr class="fill"><td style="height:' + Math.max(20, 62 - lignes.length * 12) + 'mm"></td><td></td><td></td><td></td><td></td></tr>'
+      + '</tbody><tfoot class="foot"><tr><td colspan="3" style="text-align:center">' + H(em.mention_tva || '') + '</td>'
+      + '<td class="tot">TOTAL</td><td class="c-num" style="font-weight:700">' + fmtEur(f.total) + ' €</td></tr></tfoot></table>'
+      + '<div class="bottom"><div class="rib">' + ribHtml + '</div>'
+      + (logoLabel ? '<img class="logo-label" src="' + H(logoLabel) + '" alt="École de rugby">' : '') + '</div>'
+      + '<div class="pied"><div class="n">' + H(raison) + '</div><div class="a">' + H(adr) + '</div>'
+      + '<div class="a">' + H(idLegal) + '</div></div>'
+      + '</div></body></html>';
+    w.document.open(); w.document.write(doc); w.document.close();
   }
 
   // Genere le document imprimable (D1 = window.print, D2 = groupe par beneficiaire,
@@ -2165,6 +2555,13 @@
     renderRefac();
     renderEmission();
     renderExport();
+    // FACTURE-ECOLES : factures emises + cablage de la modale.
+    await chargerFactures();
+    renderFacturesEmises();
+    $('faAnnuler').addEventListener('click', fermerFacture);
+    $('faEmettre').addEventListener('click', emettreFacture);
+    $('faDesignation').addEventListener('input', function () { faDesignationEditee = true; });
+    $('faOverlay').addEventListener('click', function (e) { if (e.target === $('faOverlay')) fermerFacture(); });
     renderTraiter();
     wireFiltres();
     renderListe();
