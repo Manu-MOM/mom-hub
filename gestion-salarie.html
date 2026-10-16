@@ -91,8 +91,23 @@
       pied jaune). Coordonnées bancaires lues en base (get_emetteur_bancaire,
       admin|bureau) — jamais dans le dépôt public. Titre du document =
       « Facture MOM <numéro> - <école> » (nom de fichier PDF proposé).
+
+  MAJ : FACTURE-DOUBLE-NUMEROTATION (16/10/2026, sql_258 + front — FAIT FOI gelé
+  par Manu le 16/10/2026, demande de la trésorière : les numéros de facture
+  doivent suivre la facturation générale du club).
+    - Le numéro Hub (factures.numero) devient la RÉFÉRENCE INTERNE (« Réf. Hub »
+      sur le PDF). Le NUMÉRO OFFICIEL (factures.numero_officiel) est saisi par
+      admin|bureau (la trésorière) après préparation : seul « Nos Réf. ».
+    - « Factures émises » : statut par facture (⏳ en attente de numéro /
+      numérotée, à envoyer / envoyée le …) + boutons « 🔢 Attribuer le n° »
+      (saisie libre, dernier numéro saisi rappelé), « ✎ Corriger le n° » tant que
+      non envoyée, « 📨 Marquer envoyée » (fige le numéro), « 🖨 Imprimer ».
+    - PDF sans numéro officiel = BROUILLON : bandeau « EN ATTENTE DE NUMÉROTATION
+      — NE PAS ENVOYER », Nos Réf. vide. Date de la facture = date d'attribution
+      du numéro (N2) ; à défaut, date de préparation marquée comme telle.
 -->
 <link rel="stylesheet" href="css/hub.css">
+
 <style>
   body.auth-pending { visibility: hidden; }
   .gs-wrap { max-width: 980px; margin: 0 auto; padding: 24px 24px 48px; }
@@ -1102,8 +1117,9 @@
     const total = sel.reduce((s, m) => s + Number(m.montant || 0), 0);
     const ecole = benefLabel(faEntite) || '';
     if (!window.confirm('Émettre la facture de ' + fmtEur(total) + ' € pour ' + ecole + ' ('
-        + sel.length + ' classe' + (sel.length > 1 ? 's' : '') + ') ?\n\nUne facture émise est définitive : '
-        + 'son numéro est attribué et elle ne peut plus être modifiée.')) return;
+        + sel.length + ' classe' + (sel.length > 1 ? 's' : '') + ') ?\n\nSon contenu sera figé. '
+        + 'Elle restera « en attente de numéro » jusqu’à ce que la trésorière lui attribue '
+        + 'son numéro de facture officiel.')) return;
     const btn = $('faEmettre');
     btn.disabled = true;
     // Fenetre d'impression ouverte DANS le geste utilisateur (sinon bloquee
@@ -1122,7 +1138,8 @@
       });
       const fac = Array.isArray(f) ? f[0] : f;
       fermerFacture();
-      flash('Facture ' + (fac && fac.numero ? fac.numero : '') + ' émise.', 'ok');
+      flash('Facture préparée (réf. Hub ' + (fac && fac.numero ? fac.numero : '—')
+        + ') : en attente de son numéro de facture officiel.', 'ok');
       await chargerMissionsEntites();
       await chargerFactures();
       renderRefac(); renderEmission(); renderExport(); renderFacturesEmises(); renderTraiter(); renderListe();
@@ -1152,17 +1169,74 @@
       row.className = 'pe-emis-row';
       const info = document.createElement('span');
       info.className = 'pe-emis-info';
-      info.textContent = f.numero + ' · ' + fmtDateFR(f.date_emission) + ' · '
+      // FACTURE-DOUBLE-NUMEROTATION : numero officiel en tete, ref Hub en second.
+      const tete = f.numero_officiel
+        ? ('N° ' + f.numero_officiel + ' · ' + fmtDateFR(f.date_officielle))
+        : ('Réf. Hub ' + f.numero + ' · préparée le ' + fmtDateFR(f.date_emission));
+      info.textContent = tete + ' · '
         + ((f.destinataire && f.destinataire.nom) || benefLabel(f.entite_id) || '—')
-        + ' · ' + fmtEur(f.total) + ' €';
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'pe-emis-btn';
-      btn.textContent = '🖨 Imprimer';
-      btn.addEventListener('click', () => { imprimerFacture(f); });
-      row.appendChild(info); row.appendChild(btn);
+        + ' · ' + fmtEur(f.total) + ' €'
+        + (f.numero_officiel ? ' · réf. Hub ' + f.numero : '');
+      const st = document.createElement('span');
+      if (!f.numero_officiel) { st.className = 'pe-cadre-no'; st.textContent = ' · ⏳ en attente de numéro'; }
+      else if (!f.envoyee_le) { st.className = 'pe-cadre-no'; st.textContent = ' · à envoyer'; }
+      else { st.className = 'pe-cadre-ok'; st.textContent = ' · envoyée le ' + fmtDateFR(f.envoyee_le); }
+      info.appendChild(st);
+      const acts = document.createElement('span');
+      acts.style.display = 'flex'; acts.style.gap = '6px'; acts.style.flexWrap = 'wrap'; acts.style.justifyContent = 'flex-end';
+      const mk = (label, fn) => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'pe-emis-btn'; b.textContent = label;
+        b.addEventListener('click', fn);
+        acts.appendChild(b);
+      };
+      if (!f.envoyee_le) mk(f.numero_officiel ? '✎ Corriger le n°' : '🔢 Attribuer le n°', () => { attribuerNumero(f); });
+      if (f.numero_officiel && !f.envoyee_le) mk('📨 Marquer envoyée', () => { marquerEnvoyee(f); });
+      mk('🖨 Imprimer', () => { imprimerFacture(f); });
+      row.appendChild(info); row.appendChild(acts);
       liste.appendChild(row);
     });
+  }
+
+  // Dernier numero officiel saisi dans le Hub (rappel pour la tresoriere).
+  function dernierNumeroOfficiel() {
+    const n = factures.filter(x => x.numero_officiel)
+      .sort((a, b) => String(b.date_officielle || '').localeCompare(String(a.date_officielle || ''))
+        || String(b.numero_officiel).localeCompare(String(a.numero_officiel), 'fr', { numeric: true }));
+    return n.length ? n[0].numero_officiel : null;
+  }
+  async function attribuerNumero(f) {
+    const dernier = dernierNumeroOfficiel();
+    const ecole = (f.destinataire && f.destinataire.nom) || '';
+    const saisie = window.prompt(
+      (f.numero_officiel ? 'Corriger le numéro de facture' : 'Numéro de facture officiel')
+      + ' — ' + ecole + ' · ' + fmtEur(f.total) + ' € (réf. Hub ' + f.numero + ')\n\n'
+      + 'Saisissez le numéro suivant dans la facturation générale du club.'
+      + (dernier ? '\nDernier numéro saisi dans le Hub : ' + dernier : '')
+      + '\nLa facture sera datée d’aujourd’hui.',
+      f.numero_officiel || '');
+    if (saisie == null) return;
+    if (!saisie.trim()) { flash('Numéro de facture vide : rien n’a été enregistré.', 'err'); return; }
+    try {
+      await rpc('attribuer_numero_facture', { p_facture_id: f.id, p_numero: saisie.trim() });
+      flash('Numéro ' + saisie.trim() + ' attribué. La facture peut être imprimée et envoyée.', 'ok');
+      await chargerFactures();
+      renderFacturesEmises();
+    } catch (e) {
+      flash('Numérotation impossible : ' + errMsg(e), 'err');
+    }
+  }
+  async function marquerEnvoyee(f) {
+    if (!window.confirm('Marquer la facture n° ' + f.numero_officiel + ' comme envoyée ?\n\n'
+        + 'Son numéro ne pourra plus être corrigé.')) return;
+    try {
+      await rpc('marquer_facture_envoyee', { p_facture_id: f.id });
+      flash('Facture n° ' + f.numero_officiel + ' marquée envoyée.', 'ok');
+      await chargerFactures();
+      renderFacturesEmises();
+    } catch (e) {
+      flash('Action impossible : ' + errMsg(e), 'err');
+    }
   }
 
   // ---------- Rendu imprimable (calque du modele Excel MOM-FAC-2026-005) ----------
@@ -1188,6 +1262,12 @@
     const adr = [emt.adresse, [emt.code_postal, emt.ville].filter(Boolean).join(' ')].filter(Boolean).join(' - ');
     const idLegal = [emt.siret ? 'SIRET : ' + emt.siret : '', emt.ape ? 'APE : ' + emt.ape : ''].filter(Boolean).join(' ');
     const nomCourt = (d.nom || '').replace(/\s+—\s+/g, ' ').trim();
+    // FACTURE-DOUBLE-NUMEROTATION : sans numero officiel = brouillon a ne pas envoyer.
+    const brouillon = !f.numero_officiel;
+    const dateFacture = brouillon ? fmtDateFR(f.date_emission) + ' (préparation)' : fmtDateFR(f.date_officielle);
+    const titreDoc = brouillon
+      ? 'BROUILLON Facture MOM réf. Hub ' + f.numero + ' - ' + nomCourt
+      : 'Facture MOM ' + f.numero_officiel + ' - ' + nomCourt;
 
     const lignesHtml = lignes.map(l =>
       '<tr class="ln"><td class="c-ref">' + (Array.isArray(l.references) ? l.references.map(H).join('<br>') : '') + '</td>'
@@ -1203,7 +1283,8 @@
       : '<span style="color:#c0392b">Coordonnées bancaires indisponibles</span>';
 
     const doc = '<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8">'
-      + '<title>Facture MOM ' + H(f.numero) + ' - ' + H(nomCourt) + '</title><style>'
+      + '<title>' + H(titreDoc) + '</title><style>'
+      + '.brouillon{border:2px dashed #c0392b;color:#c0392b;text-align:center;font-weight:700;font-size:12px;padding:2mm;margin-bottom:5mm;}'
       + '@page{size:A4;margin:12mm 14mm;}'
       + '*{box-sizing:border-box;}body{font:11px/1.35 Arial,Helvetica,sans-serif;color:#000;margin:0;background:#eee;}'
       + '.page{width:182mm;min-height:268mm;margin:10mm auto;background:#fff;padding:6mm 4mm;position:relative;}'
@@ -1234,11 +1315,13 @@
       + '<div class="page">'
       + '<div class="top"><img class="logo-club" src="' + H(logoClub) + '" alt="MOM">'
       + '<div class="dest">' + H(d.nom || '') + (Array.isArray(d.lignes) ? d.lignes.map(l => '<br>' + H(l)).join('') : '') + '</div></div>'
+      + (brouillon ? '<div class="brouillon">EN ATTENTE DE NUMÉROTATION — NE PAS ENVOYER<br>'
+          + '<span style="font-weight:400;font-size:10px">Le numéro de facture doit être attribué par la trésorière dans le Hub.</span></div>' : '')
       + '<div class="bar">FACTURE</div>'
       + '<table class="refs">'
-      + '<tr><td class="k">Nos Réf. :</td><td class="v">' + H(f.numero) + '</td><td class="k2">Vos Réf. :</td><td>' + H(f.vos_ref || '') + '</td></tr>'
-      + '<tr><td class="k"></td><td class="v"></td><td class="k2">Échéance :</td><td>' + H(f.echeance || '') + '</td></tr>'
-      + '<tr class="sep"><td class="k">Date :</td><td class="v">' + H(fmtDateFR(f.date_emission)) + '</td><td class="k2">Mode de règlement :</td>'
+      + '<tr><td class="k">Nos Réf. :</td><td class="v">' + H(f.numero_officiel || '') + '</td><td class="k2">Vos Réf. :</td><td>' + H(f.vos_ref || '') + '</td></tr>'
+      + '<tr><td class="k">Réf. Hub :</td><td class="v">' + H(f.numero) + '</td><td class="k2">Échéance :</td><td>' + H(f.echeance || '') + '</td></tr>'
+      + '<tr class="sep"><td class="k">Date :</td><td class="v">' + H(dateFacture) + '</td><td class="k2">Mode de règlement :</td>'
       + '<td class="jaune">' + H(f.mode_reglement || '') + '</td></tr></table>'
       + '<table class="lines"><thead><tr><th class="c-ref">Réf.</th><th>DESIGNATION</th><th class="c-num">Quantité</th>'
       + '<th class="c-num">P.U. €</th><th class="c-num">Montant €</th></tr></thead><tbody>'
