@@ -1,10 +1,10 @@
 {
   "_meta": {
     "type": "mail-types",
-    "nom": "Mails-types de prospection",
-    "version": "1.0",
+    "nom": "Mails-types (prospection + satisfaction)",
+    "version": "1.1",
     "date_creation": "2026-06-28",
-    "date_maj": "2026-06-28",
+    "date_maj": "2026-10-16",
     "description": "Gabarits de mail de démarchage, indexés par type_entite. Hand-editable : le bureau modifie le contenu par commit, aucun backend, aucun SMTP. Envoi via le client mail (mailto / copier-coller).",
     "source": "Module B « Prospection / Développement scolaire » (FAIT FOI §3.5)",
     "_variables": {
@@ -13,8 +13,15 @@
     },
     "_note_creneau": "Le créneau proposé n'est PAS une variable : il dépend du planning de Lohann, instable à la rentrée. Il est saisi à la main par Lohann dans son client mail.",
     "_changelog": [
-      "1.0 (2026-06-28) - Création initiale. Seule clé remplie : ecole_elementaire (cible v1). Structure dict par type_entite extensible (collège, lycée, mjc… à remplir au besoin, hors v1)."
-    ]
+      "1.0 (2026-06-28) - Création initiale. Seule clé remplie : ecole_elementaire (cible v1). Structure dict par type_entite extensible (collège, lycée, mjc… à remplir au besoin, hors v1).",
+      "1.1 (2026-10-16) - Ajout de la clé « satisfaction » (questionnaire de fin de cycle, chantier CLORE-CYCLE, sql_259), indexée par type_entite comme « mails ». Les réponses arrivent par mail : aucune collecte dans le Hub."
+    ],
+    "_variables_satisfaction": {
+      "{nom_ecole}": "entites.libelle",
+      "{contact_nom}": "entites.contact_nom (à défaut : Madame, Monsieur)",
+      "{classes}": "« votre classe » ou « vos N classes » (classes closes de l'école couvertes par le mail)",
+      "{periode}": "mois des séances validées, ex. « septembre et octobre 2026 »"
+    }
   },
   "mails": {
     "ecole_elementaire": {
@@ -27,5 +34,11 @@
     "club": null,
     "interne": null,
     "autre": null
+  },
+  "satisfaction": {
+    "ecole_elementaire": {
+      "objet": "Mutzig Ovalie Molsheim — votre avis sur le cycle rugby à {nom_ecole}",
+      "corps": "Bonjour {contact_nom},\n\nLe cycle de rugby éducatif mené par notre éducateur auprès de {classes} ({periode}) est terminé. Merci pour votre accueil et pour votre confiance !\n\nPour améliorer nos interventions, pourriez-vous prendre deux minutes pour répondre aux questions ci-dessous, directement en réponse à ce mail ? Une note de 1 (pas du tout) à 5 (tout à fait) suffit ; un commentaire est toujours le bienvenu.\n\n1. Globalement, êtes-vous satisfait(e) du cycle ? (1 à 5)\n2. Le contenu des séances était-il adapté à l'âge et au niveau des élèves ? (1 à 5)\n3. L'organisation vous a-t-elle convenu (horaires, ponctualité, matériel, communication) ? (1 à 5)\n4. Les élèves ont-ils pris plaisir et progressé ? (1 à 5)\n5. Souhaiteriez-vous renouveler l'expérience l'an prochain ? (oui / non / peut-être)\n\nUne remarque, une suggestion ? N'hésitez pas à nous en faire part.\n\nBien cordialement,\n\nMutzig Ovalie Molsheim\nÉcole de rugby"
+    }
   }
 }
