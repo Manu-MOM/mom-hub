@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Gestion du salarié · MOM Hub</title>
+<title>Espace salarié — Écoles &amp; facturation · MOM Hub</title>
 <link rel="icon" type="image/png" href="assets/logo-m2m.png">
 <!--
   MOM Hub · Gestion du salarié — écrans entités + missions (socle pt 78).
@@ -105,6 +105,34 @@
     - PDF sans numéro officiel = BROUILLON : bandeau « EN ATTENTE DE NUMÉROTATION
       — NE PAS ENVOYER », Nos Réf. vide. Date de la facture = date d'attribution
       du numéro (N2) ; à défaut, date de préparation marquée comme telle.
+
+  MAJ : ESPACE-SALARIE · LOT L1 « tri et actualité d'abord » (17/10/2026, front pur,
+  zéro SQL — FAIT FOI gelé par Manu le 17/10/2026, décision D6) :
+    - seancesAgg porte en plus nbATraiter (prevue|realisee passée ou du jour),
+      nbAVenir, derniereATraiter, derniere, prochaine (aucune requête en plus).
+    - Liste des missions triée par actualité (même règle que suivi-salarie.html) :
+      à traiter (la plus récente d'abord) > cycle scolaire à clore / questionnaire
+      à envoyer > en cours / à venir (prochaine séance d'abord) ; missions
+      terminées regroupées dans « Missions terminées (n) », replié par défaut
+      (hors vue « Par bénéficiaire », triée par actualité dans chaque groupe).
+    - Bandeau « À traiter » recalculé sur ce qui attend vraiment une action :
+      séances à valider, cycles scolaires à clore, questionnaires à envoyer,
+      missions facturables (non annulées) sans réf. commande / sans coordonnées.
+      L'ancien calcul comptait toutes les missions sans bilan (202) et toutes
+      celles dont questionnaire_fait = false, bilan et questionnaire n'ayant de
+      sens que pour un cycle scolaire terminé.
+    - Filtre « À clôturer » : cycles scolaires terminés (≥ 1 validée, plus rien
+      d'ouvert) et non encore clos. L'ancien filtre (terminee ET bilan vide) était
+      vide par construction (clore_cycle exige le bilan).
+    - Correctif constaté en test : la vue « Par bénéficiaire » était toujours vide
+      (Array.prototype.slice.call sur un itérateur Map.keys()) -> Array.from.
+  MAJ : ESPACE-SALARIE · LOT L2 (17/10/2026, même FAIT FOI, S1 option B) : la page
+  porte l'onglet « Écoles & facturation » (défaut) et, avec ?vue=heures, la
+  profondeur employeur de l'onglet « Heures & congés » (compteur détaillé,
+  prévisionnel). Bascule par classe body.es-vue-* + CSS. La « Projection
+  démarchage écoles » est déplacée (DOM, mêmes id) dans sa propre section de
+  l'onglet Écoles. Titre « Suivi et Facturation » -> « Écoles & facturation ».
+  Chargements, gardes, RPC INCHANGÉS.
 -->
 <link rel="stylesheet" href="css/hub.css">
 
@@ -285,6 +313,19 @@
   .pe-card-meta.nomb { margin-bottom: 0; }
   .pe-grp-titre { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-mute, #6b7a74); margin: 18px 0 8px; }
   .pe-grp-titre:first-child { margin-top: 0; }
+  /* ESPACE-SALARIE L2 : une page, deux onglets (?vue=heures = profondeur employeur
+     de l'onglet « Heures & congés » ; sinon « Écoles & facturation »). */
+  body.es-vue-ecoles #peBandAnnu, body.es-vue-ecoles #gcCompteur, body.es-vue-ecoles #gcPrev { display: none !important; }
+  body.es-vue-heures #peBandRefac, body.es-vue-heures #peRefacEmission, body.es-vue-heures #peFactures,
+  body.es-vue-heures #peRefacExport, body.es-vue-heures #peBandTraiter, body.es-vue-heures #peFilters,
+  body.es-vue-heures #peListe, body.es-vue-heures #peListeVide, body.es-vue-heures #gcEcoProj,
+  body.es-vue-heures #peNewMission, body.es-vue-heures .pe-foot { display: none !important; }
+  /* ESPACE-SALARIE L1 : actualité des missions */
+  .pe-actu { display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 6px;
+             background: var(--feedback-warning-bg, #fbf1dd); color: #8a5a0b; }
+  .pe-terminees-toggle { display: flex; align-items: center; gap: 8px; width: 100%; margin: 18px 0 12px; padding: 12px 16px;
+                         border: 1px dashed var(--line, #cabe9f); border-radius: 12px; background: var(--paper, #f8f5ec);
+                         color: var(--ink, #0c3d24); font: inherit; font-size: 14px; font-weight: 700; text-align: left; cursor: pointer; }
   /* Badges statut (reutilise le gabarit visuel des .gs-badge existants) */
   .pe-pill { font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 12px; white-space: nowrap; }
   .pe-pill.st-interne { background: var(--paper, #f0ede6); color: var(--ink-soft, #2a4836); }
@@ -405,6 +446,10 @@
 
   <script src="js/hub-nav.js"></script>
 
+  <!-- ESPACE-SALARIE L2 : barre d'onglets commune (js/espace-salarie.js). -->
+  <nav class="es-bar" data-espace-salarie></nav>
+  <script src="js/espace-salarie.js"></script>
+
 
 <div class="gs-wrap">
   <!-- POSTE DE PILOTAGE EMPLOYEUR (refonte pt 128, etape 1 : structure + annualisation).
@@ -417,7 +462,7 @@
 
   <div class="pe-hd">
     <div>
-      <h1>Suivi et Facturation</h1>
+      <h1 id="peTitre">Écoles &amp; facturation</h1>
       <p class="gs-sub" id="peSub" style="margin:4px 0 0;">Chargement…</p>
     </div>
     <a class="gs-btn gs-btn-sm" id="peNewMission" href="suivi-salarie.html"
@@ -571,7 +616,7 @@
          gcPrevSeances (type intervention_scolaire, fenêtres de dates) ;
          curseur taux de remplissage ; synthèses heures + tarification.
          Estimation de pilotage : rien en base, rien dans les exports. -->
-    <h3 class="gc-prev-h3">Projection démarchage écoles</h3>
+    <h3 class="gc-prev-h3" id="gcEcoH3">Projection démarchage écoles</h3>
     <div class="gc-eco-cfg">
       <label>Créneaux hebdo
         <input type="number" id="gcEcoCreneaux" min="0" step="1" value="0">
@@ -690,6 +735,39 @@
   } catch (_) { /* libelle statique conserve */ }
 
   const client = SupabaseHub.client;
+
+  // ESPACE-SALARIE L2 : deux onglets de l'Espace salarié sur cette page.
+  // Défaut -> « Écoles & facturation » ; ?vue=heures -> compteur employeur
+  // (profondeur de l'onglet « Heures & congés »). Bascule d'affichage seule
+  // (classe body + CSS) ; chargements, gardes et RPC inchangés.
+  const VUE = (new URLSearchParams(window.location.search).get('vue') === 'heures') ? 'heures' : 'ecoles';
+  document.body.classList.add('es-vue-' + VUE);
+  if (VUE === 'heures') {
+    document.title = 'Espace salarié — Heures (vue employeur) · MOM Hub';
+    document.getElementById('peTitre').textContent = 'Heures · vue employeur';
+  }
+  // La « Projection démarchage écoles » (DOM jusqu'ici dans le bloc prévisionnel)
+  // est DÉPLACÉE telle quelle (mêmes id, même code) dans sa propre section,
+  // affichée dans l'onglet « Écoles & facturation ». Les calculs restent nourris
+  // par chargerPrevisionnel (gcPrevSeances), chargé quel que soit l'onglet.
+  (function deplacerProjection() {
+    const h3 = document.getElementById('gcEcoH3');
+    const ancre = document.getElementById('peListeVide');
+    if (!h3 || !ancre) return;
+    const sec = document.createElement('section');
+    sec.className = 'gc-compteur';
+    sec.id = 'gcEcoProj';
+    const hd = document.createElement('div');
+    hd.className = 'gc-compteur-hd';
+    const h2 = document.createElement('h2');
+    h2.textContent = 'Projection démarchage écoles';
+    hd.appendChild(h2);
+    sec.appendChild(hd);
+    let n = h3.nextSibling;
+    while (n) { const suiv = n.nextSibling; sec.appendChild(n); n = suiv; }
+    h3.parentNode.removeChild(h3);
+    ancre.parentNode.insertBefore(sec, ancre.nextSibling);
+  })();
   const $ = (id) => document.getElementById(id);
 
   // ---------- Helpers (repris a l'identique de l'ancienne page) ----------
@@ -811,6 +889,7 @@
     // ici une fois ; cartes ET bandeaux reutilisent seancesAgg (zero requete en plus).
     seancesAgg.clear();
     aDuReel = false;
+    const auj = aujourdhuiISO();
     for (let i = 0; i < missions.length; i++) {
       const mid = missions[i].id;
       let seances = [];
@@ -821,8 +900,16 @@
       // FACTURE-ECOLES : etat du cycle (ouvertes = prevue|realisee) + mois des validees.
       let nbOuvertes = 0, nbValidees = 0;
       const moisValides = new Set();
+      // ESPACE-SALARIE L1 (D6) : actualité de la mission.
+      let nbATraiter = 0, nbAVenir = 0, derniereATraiter = '', derniere = '', prochaine = '';
       seances.forEach(s => {
         if (s.etat === 'annulee') return;               // exclut les seances annulees
+        const d = String(s.date_seance || '').slice(0, 10);
+        if (s.etat === 'prevue' || s.etat === 'realisee') {
+          if (d <= auj) { nbATraiter++; if (d > derniereATraiter) derniereATraiter = d; }
+          else { nbAVenir++; if (!prochaine || d < prochaine) prochaine = d; }
+        }
+        if (d && d <= auj && d > derniere) derniere = d;
         nb++;
         if (s.duree_min != null) hPrev += Number(s.duree_min) / 60;
         if (s.heures_reelles != null) { hReel += Number(s.heures_reelles); aDuReel = true; }
@@ -830,9 +917,49 @@
         if (s.etat === 'validee') { nbValidees++; if (s.date_seance) moisValides.add(String(s.date_seance).slice(0, 7)); }
       });
       seancesAgg.set(mid, { nbSeances: nb, hPrevues: hPrev, hReelles: hReel,
-                            nbOuvertes: nbOuvertes, nbValidees: nbValidees, moisValides: moisValides });
+                            nbOuvertes: nbOuvertes, nbValidees: nbValidees, moisValides: moisValides,
+                            nbATraiter: nbATraiter, nbAVenir: nbAVenir, derniereATraiter: derniereATraiter,
+                            derniere: derniere, prochaine: prochaine });
     }
   }
+
+  // ESPACE-SALARIE L1 (D6) : date du jour (heure locale) au format AAAA-MM-JJ.
+  function aujourdhuiISO() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  // Cycle scolaire terminé (≥ 1 validée, plus rien d'ouvert) mais pas encore clos.
+  function aClore(m) {
+    return m.type_mission === 'intervention_scolaire' && m.etat !== 'terminee' && m.etat !== 'annulee' && cycleTermine(m);
+  }
+  function questionnaireAEnvoyer(m) {
+    return m.type_mission === 'intervention_scolaire' && m.etat === 'terminee' && !m.questionnaire_fait;
+  }
+  // Rang d'actualité : 0 à traiter · 1 fin de cycle · 2 en cours / à venir · 3 terminée.
+  function rangActu(m) {
+    const a = seancesAgg.get(m.id) || {};
+    if (a.nbATraiter > 0) return 0;
+    if (aClore(m) || questionnaireAEnvoyer(m)) return 1;
+    if (m.etat === 'terminee' || m.etat === 'annulee') return 3;
+    if (a.nbAVenir > 0 || !a.nbSeances) return 2;
+    return 3;
+  }
+  function trierParActualite(rows) {
+    return rows.slice().sort((x, y) => {
+      const rx = rangActu(x), ry = rangActu(y);
+      if (rx !== ry) return rx - ry;
+      const ax = seancesAgg.get(x.id) || {}, ay = seancesAgg.get(y.id) || {};
+      if (rx === 0) return String(ay.derniereATraiter || '').localeCompare(String(ax.derniereATraiter || ''));
+      if (rx === 2 && (ax.prochaine || ay.prochaine)) {
+        if (!ax.prochaine) return 1;
+        if (!ay.prochaine) return -1;
+        if (ax.prochaine !== ay.prochaine) return ax.prochaine.localeCompare(ay.prochaine);
+      }
+      const c = String(ay.derniere || '').localeCompare(String(ax.derniere || ''));
+      return c || String(x.libelle || '').localeCompare(String(y.libelle || ''), 'fr');
+    });
+  }
+  let termineesOuvertes = false;   // bloc « Missions terminées » (session de page)
 
   // Libelle heures d'une mission : « N séances · H h prévues » (+ « · R h réelles »
   // des qu'une heure reelle existe en base, bascule auto via aDuReel a la rentree).
@@ -1568,12 +1695,14 @@
   //  - beneficiaire facturable sans coordonnees (ni raison_sociale ni email_facturation,
   //    ou entite_id absent) -> refacturation materiellement impossible.
   function renderTraiter() {
-    let bilans = 0, quest = 0, sansRef = 0, sansCoord = 0;
+    // ESPACE-SALARIE L1 (D6) : seuls les éléments qui attendent réellement une action.
+    let seances = 0, clore = 0, quest = 0, sansRef = 0, sansCoord = 0;
     missions.forEach(m => {
-      const bilanVide = !(m.bilan_text && String(m.bilan_text).trim());
-      if (bilanVide) bilans++;
-      if (m.questionnaire_fait === false) quest++;
-      if (m.statut === 'facturable') {
+      const a = seancesAgg.get(m.id) || {};
+      seances += (a.nbATraiter || 0);
+      if (aClore(m)) clore++;
+      if (questionnaireAEnvoyer(m)) quest++;
+      if (m.statut === 'facturable' && m.etat !== 'annulee') {
         const aRef = !!(m.reference_commande && String(m.reference_commande).trim());
         if (!aRef) sansRef++;
         const e = m.entite_id ? entiteById.get(m.entite_id) : null;
@@ -1581,7 +1710,7 @@
         if (!aCoord) sansCoord++;
       }
     });
-    const total = bilans + quest + sansRef + sansCoord;
+    const total = seances + clore + quest + sansRef + sansCoord;
     $('peTraiterTotal').textContent = String(total);
 
     const detail = $('peTraiterDetail');
@@ -1598,8 +1727,9 @@
       p.textContent = n + ' ' + txt;
       detail.appendChild(p);
     }
-    sig(bilans, bilans > 1 ? 'bilans manquants' : 'bilan manquant', false);
-    sig(quest, quest > 1 ? 'questionnaires non faits' : 'questionnaire non fait', false);
+    sig(seances, seances > 1 ? 'séances passées à valider' : 'séance passée à valider', false);
+    sig(clore, clore > 1 ? 'cycles scolaires à clore' : 'cycle scolaire à clore', false);
+    sig(quest, quest > 1 ? 'questionnaires à envoyer' : 'questionnaire à envoyer', false);
     sig(sansRef, sansRef > 1 ? 'missions sans réf. commande' : 'mission sans réf. commande', true);
     sig(sansCoord, sansCoord > 1 ? 'bénéficiaires sans coordonnées' : 'bénéficiaire sans coordonnées', true);
   }
@@ -1635,7 +1765,7 @@
     switch (filtreCourant) {
       case 'facturables': return missions.filter(m => m.statut === 'facturable');
       case 'encours':     return missions.filter(m => m.etat === 'prevue');
-      case 'aclore':      return missions.filter(m => m.etat === 'terminee' && !(m.bilan_text && String(m.bilan_text).trim()));
+      case 'aclore':      return missions.filter(aClore);   // ESPACE-SALARIE L1 (D6)
       default:            return missions.slice();  // toutes | benef
     }
   }
@@ -1674,6 +1804,18 @@
       bCad.className = 'pe-pill ' + c.cls;
       bCad.textContent = c.txt;
       titrow.appendChild(bCad);
+    }
+    // ESPACE-SALARIE L1 (D6) : ce qui attend une action, en évidence.
+    const agg = seancesAgg.get(m.id) || {};
+    let actu = '';
+    if (agg.nbATraiter > 0) actu = agg.nbATraiter + (agg.nbATraiter > 1 ? ' séances à valider' : ' séance à valider');
+    else if (aClore(m)) actu = 'cycle à clore';
+    else if (questionnaireAEnvoyer(m)) actu = 'questionnaire à envoyer';
+    if (actu) {
+      const bActu = document.createElement('span');
+      bActu.className = 'pe-actu';
+      bActu.textContent = actu;
+      titrow.appendChild(bActu);
     }
     main.appendChild(titrow);
 
@@ -1744,7 +1886,9 @@
         if (!groupes.has(lbl)) groupes.set(lbl, []);
         groupes.get(lbl).push(m);
       });
-      const noms = Array.prototype.slice.call(groupes.keys()).sort((a, b) => {
+      // ESPACE-SALARIE L1 : Array.from (slice.call sur l'itérateur Map.keys() rendait
+      // un tableau VIDE -> la vue « Par bénéficiaire » n'affichait jamais rien).
+      const noms = Array.from(groupes.keys()).sort((a, b) => {
         if (a === 'Sans bénéficiaire') return 1;
         if (b === 'Sans bénéficiaire') return -1;
         return a.localeCompare(b, 'fr');
@@ -1754,10 +1898,30 @@
         h.className = 'pe-grp-titre';
         h.textContent = nom;
         wrap.appendChild(h);
-        groupes.get(nom).forEach(m => wrap.appendChild(buildCarte(m)));
+        trierParActualite(groupes.get(nom)).forEach(m => wrap.appendChild(buildCarte(m)));
       });
     } else {
-      rows.forEach(m => wrap.appendChild(buildCarte(m)));
+      // ESPACE-SALARIE L1 (D6) : actualité d'abord, terminées repliées.
+      const tries = trierParActualite(rows);
+      const actives = tries.filter(m => rangActu(m) < 3);
+      const terminees = tries.filter(m => rangActu(m) === 3);
+      actives.forEach(m => wrap.appendChild(buildCarte(m)));
+      if (terminees.length) {
+        const tg = document.createElement('button');
+        tg.type = 'button';
+        tg.className = 'pe-terminees-toggle';
+        const body = document.createElement('div');
+        const maj = function () {
+          tg.textContent = (termineesOuvertes ? '▾ ' : '▸ ') + 'Missions terminées (' + terminees.length + ')';
+          tg.setAttribute('aria-expanded', termineesOuvertes ? 'true' : 'false');
+          body.hidden = !termineesOuvertes;
+        };
+        terminees.forEach(m => body.appendChild(buildCarte(m)));
+        tg.addEventListener('click', function () { termineesOuvertes = !termineesOuvertes; maj(); });
+        maj();
+        wrap.appendChild(tg);
+        wrap.appendChild(body);
+      }
     }
   }
 
