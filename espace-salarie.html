@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Espace salarié — À traiter · MOM Hub</title>
+<link rel="icon" type="image/png" href="assets/logo-m2m.png">
+<!--
+  MOM Hub · Espace salarié — onglet « À traiter » (ACCUEIL de l'espace).
+  Chantier ESPACE-SALARIE, LOT L3 (17/10/2026, FAIT FOI gelé par Manu le 17/10/2026 ;
+  maquette validée « ça me va » : artboards « 1 · À traiter » et « 4 · téléphone »).
+
+  RÔLE : une seule page qui répond à « qu'est-ce que je dois faire maintenant ? »
+    - « Aujourd'hui » : les séances du jour, bouton « ✅ Séance faite » (déclaration).
+    - « Séances passées à traiter » : prevue|realisee dont la date est passée ou du
+      jour (même règle que l'onglet Séances, L1), groupées par jour, les plus récentes
+      d'abord ; 7 jours affichés, les plus anciennes repliées. « Tout traiter » par jour
+      (deux clics : le second confirme).
+    - « Fin de cycle » : cycles scolaires à clore, questionnaires à envoyer -> liens
+      vers l'onglet Séances ouvert sur les interventions scolaires (?type=).
+    - admin|bureau : « Facturation » (factures en attente de numéro, classes à
+      facturer) -> lien vers l'onglet « Écoles & facturation ».
+
+  ACTIONS (RPC existantes, AUCUN SQL nouveau ; gardes serveur inchangées) :
+    - salarié : prevue -> declarer_occurrence(p_id, null) (voie 3, garde de date sql_243).
+      Une séance déjà « réalisée » attend la validation du bureau (affichée, sans bouton).
+    - admin|bureau : « Valider » = declarer_occurrence (si prevue) PUIS
+      valider_occurrence (sql_120 : n'accepte que realisee). Heures réelles non
+      saisies ici (null), comme « Tout valider » (sql_256) ; la saisie fine reste
+      dans l'onglet Séances.
+
+  LECTURES : list_contrats_salaries, list_missions(saison, salarié),
+    list_mission_seances (par mission, par paquets de 8 en parallèle),
+    list_compteur_annualisation(contrat), list_factures (admin|bureau seul).
+  GARDE DE PAGE : identique à suivi-salarie.html (admin|bureau, OU salarié relié
+    dont qui_suis_je() porte des missions ; sinon retour au portail).
+  Pas de badge dans la barre d'onglets : doctrine nav « zéro contenu vivant »
+    (hub-nav N6) — le compte vit dans la page.
+-->
+<link rel="stylesheet" href="css/hub.css">
+<style>
+  body.auth-pending { visibility: hidden; }
+  .at-wrap { max-width: 980px; margin: 0 auto; padding: 18px 24px 48px; }
+  .at-wrap h1 { font-size: 20px; margin: 0 0 4px; color: var(--ink, #0c3d24); }
+  .at-sub { color: var(--ink-mute, #6b7a74); margin: 0 0 18px; font-size: 13px; }
+  .at-msg { margin: 0 0 14px; }
+  .at-flash { padding: 10px 14px; border-radius: 8px; font-size: 14px; }
+  .at-flash.ok  { background: var(--feedback-success-bg, #e7f3ec); color: var(--feedback-success-fg, #1f5a32); }
+  .at-flash.err { background: var(--feedback-error-bg, #fdecea); color: var(--feedback-error-fg, #8a1b14); }
+
+  .at-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0 0 18px; }
+  .at-kpi { background: #fff; border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 12px; padding: 12px 14px; }
+  .at-kpi-lbl { margin: 0; font-size: 12px; color: var(--ink-mute, #6b7a74); }
+  .at-kpi-val { margin: 2px 0 0; font-size: 22px; font-weight: 700; color: var(--ink, #0c3d24); }
+  .at-kpi-val small { font-size: 13px; font-weight: 600; color: var(--ink-mute, #6b7a74); }
+  .at-kpi.warn .at-kpi-val { color: #8a5a0b; }
+  .at-bar { height: 6px; border-radius: 3px; background: var(--paper, #f1ede2); margin-top: 8px; overflow: hidden; }
+  .at-bar span { display: block; height: 100%; background: var(--vert-prairie, #2d7a3e); }
+
+  .at-cols { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; align-items: start; }
+  .at-side { display: flex; flex-direction: column; gap: 14px; }
+  .at-card { background: #fff; border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 12px; padding: 14px 16px; }
+  .at-card h2 { margin: 0 0 10px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+                color: var(--ink-mute, #6b7a74); }
+  .at-card.today { border: 2px solid var(--vert-prairie, #2d7a3e); }
+  .at-card.today h2 { color: var(--vert-prairie, #2d7a3e); }
+  .at-today-item + .at-today-item { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--paper-warm, #e3e0d8); }
+  .at-today-lib { margin: 0; font-size: 17px; font-weight: 700; color: var(--ink, #0c3d24); }
+  .at-today-meta { margin: 2px 0 10px; font-size: 13px; color: var(--ink-mute, #6b7a74); }
+  .at-big { display: block; width: 100%; min-height: 48px; border: 0; border-radius: 10px; font: inherit; font-size: 16px;
+            font-weight: 700; cursor: pointer; background: var(--vert-prairie, #2d7a3e); color: #fff; }
+  .at-big:disabled { opacity: .5; cursor: default; }
+  .at-done { margin: 0; padding: 10px 12px; border-radius: 10px; text-align: center; font-weight: 700; font-size: 14px;
+             background: var(--feedback-success-bg, #e7f3ec); color: var(--feedback-success-fg, #1f5a32); }
+  .at-empty { margin: 0; font-size: 13px; color: var(--ink-mute, #6b7a74); }
+  .at-li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 7px 0; font-size: 14px;
+           border-top: 1px solid var(--paper-warm, #e3e0d8); }
+  .at-li:first-of-type { border-top: 0; }
+  .at-li a { color: var(--vert-prairie, #2d7a3e); font-weight: 600; white-space: nowrap; text-decoration: none; }
+  .at-li a:hover { text-decoration: underline; }
+  .at-pill { display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 6px;
+             background: var(--feedback-warning-bg, #fbf1dd); color: #8a5a0b; }
+
+  .at-main h2.at-h2 { margin: 0 0 10px; font-size: 16px; color: var(--ink, #0c3d24); }
+  .at-day { background: #fff; border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 12px; margin: 0 0 12px; overflow: hidden; }
+  .at-day-hd { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 9px 14px;
+               background: var(--paper, #f8f5ec); border-bottom: 1px solid var(--paper-warm, #e3e0d8); }
+  .at-day-hd strong { font-size: 14px; color: var(--ink, #0c3d24); }
+  .at-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-top: 1px solid var(--paper-warm, #e3e0d8); }
+  .at-row:first-of-type { border-top: 0; }
+  .at-row-main { flex: 1 1 auto; min-width: 0; }
+  .at-row-lib { margin: 0; font-size: 14px; font-weight: 700; color: var(--ink, #0c3d24); }
+  .at-row-meta { margin: 2px 0 0; font-size: 12px; color: var(--ink-mute, #6b7a74); }
+  .at-type { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 5px;
+             background: var(--paper, #f1ede2); color: var(--ink, #0c3d24); margin-right: 6px; }
+  .at-badge { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 6px; white-space: nowrap; }
+  .at-badge.prevue   { background: var(--feedback-info-bg, #eaf1fa); color: var(--feedback-info-fg, #1f4a82); }
+  .at-badge.realisee { background: var(--feedback-warning-bg, #fbf1dd); color: #8a5a0b; }
+  .at-btn { padding: 7px 12px; min-height: 36px; border: 0; border-radius: 8px; font: inherit; font-size: 13px; font-weight: 700;
+            cursor: pointer; background: var(--vert-prairie, #2d7a3e); color: #fff; white-space: nowrap; }
+  .at-btn.ghost { background: #fff; color: var(--vert-prairie, #2d7a3e); border: 1px solid var(--vert-prairie, #2d7a3e); }
+  .at-btn.confirm { background: #8a5a0b; color: #fff; border: 0; }
+  .at-btn:disabled { opacity: .5; cursor: default; }
+  .at-wait { font-size: 12px; color: var(--ink-mute, #6b7a74); white-space: nowrap; }
+  .at-older { display: block; width: 100%; padding: 12px 16px; margin: 0 0 12px; border: 1px dashed var(--line, #cabe9f);
+              border-radius: 12px; background: var(--paper, #f8f5ec); font: inherit; font-size: 14px; font-weight: 700;
+              color: var(--ink, #0c3d24); text-align: left; cursor: pointer; }
+  .at-allgood { background: #fff; border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 12px; padding: 22px;
+                text-align: center; color: var(--vert-prairie, #2d7a3e); font-weight: 700; }
+  .at-loading { color: var(--ink-mute, #6b7a74); font-size: 14px; padding: 18px 0; }
+
+  @media (max-width: 860px) {
+    .at-cols { grid-template-columns: 1fr; }
+    .at-side { order: -1; }
+    .at-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 520px) {
+    .at-wrap { padding: 14px 16px 40px; }
+    .at-row { flex-wrap: wrap; }
+    .at-row .at-btn, .at-row .at-wait { margin-left: auto; }
+  }
+</style>
+</head>
+<body class="auth-pending">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo"><img src="assets/logo-m2m.png" alt="MOM Rugby"></div>
+      <div class="brand-text">
+        <h1>MOM Hub</h1>
+        <p>Mutzig Ovalie Molsheim</p>
+      </div>
+    </div>
+
+    <div class="season-pill" id="season-pill">SAISON</div>
+
+    <nav class="main-nav hub-nav" data-hub-nav="salarie"></nav>
+
+    <div class="user-profile">
+      <div class="avatar">EJ</div>
+      <div class="user-info">
+        <div class="user-name">Emmanuel Jung</div>
+        <div class="user-role">Administrateur</div>
+      </div>
+      <a href="./" class="user-action" title="Retour au portail" aria-label="Retour au portail">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/></svg>
+      </a>
+      <button type="button" class="user-action" id="btn-signout" title="Se déconnecter" aria-label="Se déconnecter">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <script src="js/hub-nav.js"></script>
+
+  <nav class="es-bar" data-espace-salarie></nav>
+  <script src="js/espace-salarie.js"></script>
+
+<div class="at-wrap">
+  <h1>À traiter</h1>
+  <p class="at-sub" id="atSub">Ce qui attend une action, le plus récent d’abord</p>
+  <div class="at-msg" id="atMsg"></div>
+
+  <div class="at-kpis" id="atKpis"></div>
+
+  <div class="at-cols">
+    <section class="at-main" aria-label="Séances passées à traiter">
+      <h2 class="at-h2" id="atMainTitre">Séances passées à traiter</h2>
+      <div id="atJours"><p class="at-loading">Chargement…</p></div>
+    </section>
+    <aside class="at-side">
+      <div class="at-card today" id="atToday"><h2>Aujourd’hui</h2><p class="at-empty">Chargement…</p></div>
+      <div class="at-card" id="atCycles" hidden></div>
+      <div class="at-card" id="atFactu" hidden></div>
+    </aside>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/season-pill.js"></script>
+<script>
+(async function () {
+  'use strict';
+
+  const client = SupabaseHub.client;
+  function $(id) { return document.getElementById(id); }
+
+  // Libellés des types : copie de la table TYPES de suivi-salarie.html.
+  const TYPE_LIB = {
+    intervention_scolaire: 'Scolaire', entrainement_section: 'Section', entrainement_sr_m: 'SR-M',
+    autre_entrainement_mom: 'Entraînement', reunion: 'Réunion', suivi_competition: 'Compétition',
+    accompagnement_terrain: 'Terrain', travail_personnel: 'Travail perso', stage: 'Stage',
+    evenement_extra_sportif: 'Extra-sportif', divers: 'Divers'
+  };
+  const JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+  const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+  const JOURS_VISIBLES = 7;
+
+  let saisonActive = null;
+  let peutEcrire = false;
+  let salarieId = null;
+  let missions = [];
+  let occByMission = {};
+  let factures = [];
+  let periode = null;
+  let anciennesOuvertes = false;
+  const enCours = new Set();     // ids de séances en cours d'écriture (anti double clic)
+  let confirmJour = null;        // jour dont le « Tout traiter » attend sa confirmation
+
+  // ---------- Utilitaires ----------
+  async function rpc(name, params) {
+    const { data, error } = await client.rpc(name, params || {});
+    if (error) throw error;
+    return data;
+  }
+  function errMsg(e) {
+    const m = (e && (e.message || e.error_description || e.error)) || String(e);
+    return /permission|denied/i.test(m) ? "Action réservée à l'administration." : m;
+  }
+  function flash(msg, kind) {
+    const box = $('atMsg');
+    box.innerHTML = '';
+    const el = document.createElement('div');
+    el.className = 'at-flash ' + (kind === 'err' ? 'err' : 'ok');
+    el.textContent = msg;
+    box.appendChild(el);
+    if (kind !== 'err') setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 4000);
+  }
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+  function aujISO() { const d = new Date(); return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+  function jourDe(o) { return String(o.date_seance || '').slice(0, 10); }
+  function dateLongue(iso) {
+    const p = iso.split('-');
+    const d = new Date(+p[0], +p[1] - 1, +p[2]);
+    return JOURS[d.getDay()] + ' ' + d.getDate() + ' ' + MOIS[d.getMonth()];
+  }
+  function heureDe(o) {
+    const h = o.heure_debut ? String(o.heure_debut).slice(0, 5).replace(':', 'h') : '';
+    return h;
+  }
+  function dureeDe(o) {
+    if (o.duree_min == null) return '';
+    const h = Math.floor(o.duree_min / 60), m = o.duree_min % 60;
+    return h ? (h + ' h' + (m ? ' ' + pad2(m) : '')) : (m + ' min');
+  }
+  function fmtH(n) { return (Math.round(Number(n) * 10) / 10).toLocaleString('fr-FR'); }
+  function el(tag, cls, txt) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (txt != null) e.textContent = txt;
+    return e;
+  }
+
+  // ---------- Accès (calque resoudreAcces de suivi-salarie.html) ----------
+  async function resoudreAcces() {
+    let moi = null;
+    try { moi = await SupabaseHub.quiSuisJe(); } catch (e) { moi = null; }
+    const roles = await SupabaseHub.getMyRoles();
+    peutEcrire = (roles.indexOf('admin') !== -1 || roles.indexOf('bureau') !== -1);
+    if (peutEcrire) {
+      let resolu = null;
+      try {
+        const contrats = (await rpc('list_contrats_salaries', { p_inclure_inactifs: false })) || [];
+        if (contrats.length) resolu = contrats[0].personne_id || null;
+      } catch (e) { resolu = null; }
+      if (!resolu) {
+        const all = (await rpc('list_missions', { p_saison_id: saisonActive.id, p_salarie_id: null, p_entite_id: null })) || [];
+        resolu = all.length ? all[0].salarie_id : moi;
+      }
+      salarieId = resolu;
+      return true;
+    }
+    if (!moi) return false;
+    const mine = (await rpc('list_missions', { p_saison_id: saisonActive.id, p_salarie_id: moi, p_entite_id: null })) || [];
+    if (mine.length) { salarieId = moi; return true; }
+    return false;
+  }
+
+  // ---------- Chargements ----------
+  async function charger() {
+    missions = (await rpc('list_missions', {
+      p_saison_id: saisonActive.id, p_salarie_id: salarieId, p_entite_id: null
+    })) || [];
+    occByMission = {};
+    // Par paquets de 8 en parallèle (même RPC que l'onglet Séances, plus rapide).
+    for (let i = 0; i < missions.length; i += 8) {
+      const lot = missions.slice(i, i + 8);
+      const res = await Promise.all(lot.map(function (m) {
+        return rpc('list_mission_seances', { p_mission_id: m.id }).catch(function () { return []; });
+      }));
+      lot.forEach(function (m, k) { occByMission[m.id] = res[k] || []; });
+    }
+    if (peutEcrire) {
+      try { factures = (await rpc('list_factures', { p_saison_id: null })) || []; } catch (e) { factures = []; }
+    }
+  }
+  async function chargerAnnualisation() {
+    periode = null;
+    try {
+      const contrats = (await rpc('list_contrats_salaries', { p_inclure_inactifs: false })) || [];
+      const contrat = contrats.find(function (c) { return c.personne_id === salarieId; }) || contrats[0];
+      if (!contrat) return;
+      const synth = (await rpc('list_compteur_annualisation', { p_contrat_id: contrat.id })) || [];
+      const auj = aujISO();
+      periode = synth.find(function (p) { return p.date_debut <= auj && auj <= p.date_fin; }) || synth[0] || null;
+    } catch (e) { periode = null; }
+  }
+
+  // ---------- Calculs ----------
+  function toutesSeances() {
+    const out = [];
+    missions.forEach(function (m) {
+      (occByMission[m.id] || []).forEach(function (o) { out.push(Object.assign({}, o, { _m: m })); });
+    });
+    return out;
+  }
+  function cycleTermine(m) {
+    const occ = occByMission[m.id] || [];
+    return occ.some(function (o) { return o.etat === 'validee'; })
+      && !occ.some(function (o) { return o.etat === 'prevue' || o.etat === 'realisee'; });
+  }
+  function aClore(m) {
+    return m.type_mission === 'intervention_scolaire' && m.etat !== 'terminee' && m.etat !== 'annulee' && cycleTermine(m);
+  }
+  function questionnaireAEnvoyer(m) {
+    return m.type_mission === 'intervention_scolaire' && m.etat === 'terminee' && !m.questionnaire_fait;
+  }
+  // Une séance appelle une action de CE compte : salarié -> prevue ; admin -> prevue|realisee.
+  function actionnable(o) { return o.etat === 'prevue' || (peutEcrire && o.etat === 'realisee'); }
+
+  // ---------- Actions ----------
+  async function traiter(o) {
+    if (o.etat === 'prevue') await rpc('declarer_occurrence', { p_id: o.id, p_heures_reelles: null });
+    if (peutEcrire) await rpc('valider_occurrence', { p_id: o.id });
+  }
+  async function traiterLot(lot, libelle) {
+    lot.forEach(function (o) { enCours.add(o.id); });
+    render();
+    let ok = 0, erreur = null;
+    for (let i = 0; i < lot.length; i++) {
+      try { await traiter(lot[i]); ok++; } catch (e) { erreur = e; break; }
+    }
+    lot.forEach(function (o) { enCours.delete(o.id); });
+    try { await charger(); if (peutEcrire) await chargerAnnualisation(); } catch (e) { /* affichage précédent conservé */ }
+    render();
+    const verbe = peutEcrire ? (ok > 1 ? 'validées' : 'validée') : (ok > 1 ? 'déclarées' : 'déclarée');
+    if (erreur) flash(ok + ' ' + (ok > 1 ? 'séances ' : 'séance ') + verbe + ', puis arrêt : ' + errMsg(erreur), 'err');
+    else flash((libelle || (ok + (ok > 1 ? ' séances ' : ' séance ') + verbe)) + '.', 'ok');
+  }
+
+  // ---------- Rendu ----------
+  function render() {
+    const auj = aujISO();
+    const toutes = toutesSeances();
+    const passees = toutes.filter(function (o) {
+      return (o.etat === 'prevue' || o.etat === 'realisee') && jourDe(o) <= auj;
+    });
+    const aTraiter = passees.filter(actionnable);
+    const enAttente = passees.filter(function (o) { return !actionnable(o); });   // salarié : réalisées à valider
+    const dans7 = (function () { const d = new Date(); d.setDate(d.getDate() + 7); return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); })();
+    const aVenir7 = toutes.filter(function (o) {
+      return (o.etat === 'prevue' || o.etat === 'realisee') && jourDe(o) > auj && jourDe(o) <= dans7;
+    }).length;
+    const finCycle = missions.filter(function (m) { return aClore(m) || questionnaireAEnvoyer(m); });
+
+    renderKpis(aTraiter.length, enAttente.length, aVenir7, finCycle.length);
+    renderToday(toutes.filter(function (o) { return jourDe(o) === auj && o.etat !== 'annulee'; }), toutes, auj);
+    // Le jour même vit dans la carte « Aujourd'hui » : la liste montre les jours passés.
+    // Salarié : seules les séances qu'il peut déclarer (les réalisées attendent le
+    // bureau, comptées dans la carte « En attente du bureau ») -> moins de bruit.
+    renderJours(passees.filter(function (o) { return jourDe(o) < auj && (peutEcrire || actionnable(o)); }));
+    renderCycles();
+    renderFactu();
+  }
+
+  function renderKpis(nTraiter, nAttente, nVenir, nCycle) {
+    const box = $('atKpis');
+    box.innerHTML = '';
+    const k = function (lbl, val, sub, warn, barPct) {
+      const d = el('div', 'at-kpi' + (warn ? ' warn' : ''));
+      d.appendChild(el('p', 'at-kpi-lbl', lbl));
+      const v = el('p', 'at-kpi-val', val);
+      if (sub) { v.appendChild(document.createTextNode(' ')); v.appendChild(el('small', null, sub)); }
+      d.appendChild(v);
+      if (barPct != null) {
+        const b = el('div', 'at-bar'); const s = el('span'); s.style.width = barPct + '%'; b.appendChild(s); d.appendChild(b);
+      }
+      box.appendChild(d);
+    };
+    if (periode) {
+      const cible = Number(periode.cible_heures || 0), real = Number(periode.realise_heures || 0);
+      k('Heures annualisées', fmtH(real) + ' h', '/ ' + fmtH(cible) + ' h', false, cible > 0 ? Math.min(100, Math.round(real / cible * 100)) : 0);
+    } else {
+      k('Heures annualisées', '—', null, false, null);
+    }
+    k(peutEcrire ? 'Séances à valider' : 'Séances à déclarer', String(nTraiter), null, nTraiter > 0, null);
+    if (peutEcrire) k('À venir (7 jours)', String(nVenir), null, false, null);
+    else k('En attente du bureau', String(nAttente), null, false, null);
+    k('Fin de cycle', String(nCycle), nCycle ? 'à finir' : null, nCycle > 0, null);
+  }
+
+  function renderToday(duJour, toutes, auj) {
+    const box = $('atToday');
+    box.innerHTML = '';
+    box.appendChild(el('h2', null, duJour.length > 1 ? 'Mes séances d’aujourd’hui' : 'Ma séance d’aujourd’hui'));
+    if (!duJour.length) {
+      box.appendChild(el('p', 'at-empty', 'Aucune séance prévue aujourd’hui.'));
+      const prochaines = toutes.filter(function (o) { return (o.etat === 'prevue') && jourDe(o) > auj; })
+        .sort(function (a, b) { return (jourDe(a) + heureDe(a)).localeCompare(jourDe(b) + heureDe(b)); });
+      if (prochaines.length) {
+        const p = prochaines[0];
+        box.appendChild(el('p', 'at-today-meta', 'Prochaine : ' + dateLongue(jourDe(p)) + (heureDe(p) ? ' à ' + heureDe(p) : '') + ' · ' + (p.libelle || p._m.libelle || '')));
+      }
+      return;
+    }
+    duJour.sort(function (a, b) { return heureDe(a).localeCompare(heureDe(b)); }).forEach(function (o) {
+      const it = el('div', 'at-today-item');
+      it.appendChild(el('p', 'at-today-lib', o.libelle || o._m.libelle || '(sans libellé)'));
+      const meta = [heureDe(o), dureeDe(o), TYPE_LIB[o._m.type_mission] || ''].filter(Boolean).join(' · ');
+      it.appendChild(el('p', 'at-today-meta', meta));
+      if (o.etat === 'prevue') {
+        const b = el('button', 'at-big', enCours.has(o.id) ? 'Enregistrement…' : (peutEcrire ? '✅ Faite et validée' : '✅ Séance faite'));
+        b.type = 'button';
+        b.disabled = enCours.has(o.id);
+        b.addEventListener('click', function () { traiterLot([o], peutEcrire ? 'Séance du jour validée' : 'Séance du jour déclarée — le bureau validera'); });
+        it.appendChild(b);
+      } else if (o.etat === 'realisee') {
+        if (peutEcrire) {
+          const b = el('button', 'at-big', '✅ Valider');
+          b.type = 'button';
+          b.disabled = enCours.has(o.id);
+          b.addEventListener('click', function () { traiterLot([o], 'Séance du jour validée'); });
+          it.appendChild(b);
+        } else {
+          it.appendChild(el('p', 'at-done', 'Déclarée ✓ · le bureau validera'));
+        }
+      } else {
+        it.appendChild(el('p', 'at-done', 'Validée ✓'));
+      }
+      box.appendChild(it);
+    });
+  }
+
+  function renderJours(passees) {
+    const box = $('atJours');
+    box.innerHTML = '';
+    $('atMainTitre').textContent = peutEcrire ? 'Séances passées à valider' : 'Séances passées à déclarer';
+    if (!passees.length) {
+      box.appendChild(el('div', 'at-allgood', 'Tout est à jour 👍'));
+      return;
+    }
+    // Groupes par jour, les plus récents d'abord.
+    const parJour = {};
+    passees.forEach(function (o) { (parJour[jourDe(o)] = parJour[jourDe(o)] || []).push(o); });
+    const jours = Object.keys(parJour).sort().reverse();
+    const visibles = anciennesOuvertes ? jours : jours.slice(0, JOURS_VISIBLES);
+    visibles.forEach(function (j) { box.appendChild(buildJour(j, parJour[j])); });
+    if (jours.length > JOURS_VISIBLES) {
+      const reste = jours.slice(JOURS_VISIBLES).reduce(function (n, j) { return n + parJour[j].length; }, 0);
+      const t = el('button', 'at-older', anciennesOuvertes ? '▴ Masquer les plus anciennes'
+        : '▾ Plus anciennes : ' + reste + (reste > 1 ? ' séances' : ' séance') + ' sur ' + (jours.length - JOURS_VISIBLES) + ' jours');
+      t.type = 'button';
+      t.addEventListener('click', function () { anciennesOuvertes = !anciennesOuvertes; render(); });
+      box.appendChild(t);
+    }
+  }
+
+  function buildJour(j, liste) {
+    const day = el('div', 'at-day');
+    const hd = el('div', 'at-day-hd');
+    const t = el('strong', null, dateLongue(j).replace(/^./, function (c) { return c.toUpperCase(); }) + (j === aujISO() ? ' · aujourd’hui' : ''));
+    hd.appendChild(t);
+    const lot = liste.filter(function (o) { return actionnable(o) && !enCours.has(o.id); });
+    if (lot.length > 1) {
+      const conf = confirmJour === j;
+      const b = el('button', 'at-btn ' + (conf ? 'confirm' : 'ghost'),
+        conf ? ('Confirmer : ' + (peutEcrire ? 'valider ' : 'déclarer ') + lot.length + ' séances')
+             : ('Tout traiter (' + lot.length + ')'));
+      b.type = 'button';
+      b.addEventListener('click', function () {
+        if (confirmJour !== j) { confirmJour = j; render(); return; }
+        confirmJour = null;
+        traiterLot(lot, null);
+      });
+      hd.appendChild(b);
+    }
+    day.appendChild(hd);
+    liste.sort(function (a, b) { return heureDe(a).localeCompare(heureDe(b)); }).forEach(function (o) {
+      const row = el('div', 'at-row');
+      const main = el('div', 'at-row-main');
+      main.appendChild(el('p', 'at-row-lib', o.libelle || o._m.libelle || '(sans libellé)'));
+      const meta = el('p', 'at-row-meta');
+      meta.appendChild(el('span', 'at-type', TYPE_LIB[o._m.type_mission] || o._m.type_mission || ''));
+      meta.appendChild(document.createTextNode([heureDe(o), dureeDe(o), (o.libelle && o._m.libelle) ? o._m.libelle : ''].filter(Boolean).join(' · ')));
+      main.appendChild(meta);
+      row.appendChild(main);
+      row.appendChild(el('span', 'at-badge ' + o.etat, o.etat === 'prevue' ? 'Prévue' : 'Réalisée'));
+      if (enCours.has(o.id)) {
+        row.appendChild(el('span', 'at-wait', 'Enregistrement…'));
+      } else if (actionnable(o)) {
+        const b = el('button', 'at-btn', peutEcrire ? 'Valider' : 'Déclarer faite');
+        b.type = 'button';
+        b.addEventListener('click', function () { traiterLot([o], null); });
+        row.appendChild(b);
+      } else {
+        row.appendChild(el('span', 'at-wait', 'attend le bureau'));
+      }
+      day.appendChild(row);
+    });
+    return day;
+  }
+
+  function renderCycles() {
+    const box = $('atCycles');
+    const clore = missions.filter(aClore);
+    const quest = missions.filter(questionnaireAEnvoyer);
+    box.innerHTML = '';
+    if (!clore.length && !quest.length) { box.hidden = true; return; }
+    box.hidden = false;
+    box.appendChild(el('h2', null, 'Fin de cycle scolaire'));
+    const lien = 'suivi-salarie.html?type=intervention_scolaire';
+    const ligne = function (txt, pill, href, action) {
+      const li = el('div', 'at-li');
+      const g = el('span');
+      g.appendChild(document.createTextNode(txt + ' '));
+      g.appendChild(el('span', 'at-pill', pill));
+      li.appendChild(g);
+      const a = el('a', null, action);
+      a.href = href;
+      li.appendChild(a);
+      box.appendChild(li);
+    };
+    clore.sort(function (a, b) { return String(a.libelle).localeCompare(String(b.libelle), 'fr'); })
+      .forEach(function (m) { ligne(m.libelle || '(sans libellé)', 'à clore', lien, 'Clore →'); });
+    quest.sort(function (a, b) { return String(a.libelle).localeCompare(String(b.libelle), 'fr'); })
+      .forEach(function (m) { ligne(m.libelle || '(sans libellé)', 'questionnaire', lien, 'Envoyer →'); });
+  }
+
+  function renderFactu() {
+    const box = $('atFactu');
+    box.innerHTML = '';
+    if (!peutEcrire) { box.hidden = true; return; }
+    const attente = factures.filter(function (f) { return !f.numero_officiel; });
+    const aEnvoyer = factures.filter(function (f) { return f.numero_officiel && !f.envoyee_le; });
+    const classes = missions.filter(function (m) {
+      return m.statut === 'facturable' && !m.facture_id && m.etat !== 'annulee' && cycleTermine(m);
+    });
+    if (!attente.length && !aEnvoyer.length && !classes.length) { box.hidden = true; return; }
+    box.hidden = false;
+    box.appendChild(el('h2', null, 'Facturation'));
+    const ligne = function (txt) {
+      const li = el('div', 'at-li');
+      li.appendChild(el('span', null, txt));
+      const a = el('a', null, 'Ouvrir →');
+      a.href = 'gestion-salarie.html';
+      li.appendChild(a);
+      box.appendChild(li);
+    };
+    if (attente.length) ligne(attente.length + (attente.length > 1 ? ' factures attendent leur numéro' : ' facture attend son numéro'));
+    if (aEnvoyer.length) ligne(aEnvoyer.length + (aEnvoyer.length > 1 ? ' factures numérotées à envoyer' : ' facture numérotée à envoyer'));
+    if (classes.length) ligne(classes.length + (classes.length > 1 ? ' classes terminées à facturer' : ' classe terminée à facturer'));
+  }
+
+  // ---------- Boot ----------
+  const session = await SupabaseHub.getSession();
+  if (!session) { window.location.replace('login.html'); return; }
+  try {
+    saisonActive = await SupabaseHub.getSaisonActive();
+  } catch (e) {
+    document.body.classList.remove('auth-pending');
+    flash('Chargement impossible : ' + errMsg(e), 'err');
+    return;
+  }
+  const ok = await resoudreAcces();
+  if (!ok) { window.location.replace('./'); return; }
+  document.body.classList.remove('auth-pending');
+  if ($('season-pill') && saisonActive && saisonActive.libelle) {
+    $('season-pill').textContent = String(saisonActive.libelle).toUpperCase();
+  }
+  const so = $('btn-signout');
+  if (so) so.addEventListener('click', async function () { try { await SupabaseHub.signOut(); } catch (e) {} window.location.replace('login.html'); });
+
+  try {
+    await Promise.all([charger(), chargerAnnualisation()]);
+    render();
+  } catch (e) {
+    $('atJours').innerHTML = '';
+    flash('Chargement impossible : ' + errMsg(e), 'err');
+  }
+
+  SupabaseHub.onAuthChange(function (event) {
+    if (event === 'SIGNED_OUT') window.location.replace('login.html');
+  });
+})();
+</script>
+</body>
+</html>
