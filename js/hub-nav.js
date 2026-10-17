@@ -110,13 +110,22 @@
  *   - La nav MASQUE, la garde de page PROTÈGE (la garde reste LA vérité).
  *   - css/hub.css JAMAIS touché : surcharges scopées .hub-nav.
  *
+ * HUB-NAV v1.11 — chantier ESPACE-SALARIE, lot L2 (FAIT FOI gelé par Manu
+ * le 17/10/2026, décision S3). Sous DÉROGATION EXPLICITE de Manu (module
+ * INTERDIT). Thème « salarie » : les 4 destinations (Gestion salarié / Suivi
+ * salarié / Agenda salarié / Import agenda) sont REMPLACÉES par UNE seule
+ * entrée « Espace salarié » (jeton 'staff') qui mène à l'accueil de l'espace
+ * (espace-salarie.html, onglet « À traiter », lot L3), la navigation interne passant
+ * par la barre d'onglets de js/espace-salarie.js. Seule la table THEMES
+ * change ; aucun comportement du module ne change. Le module reste INTERDIT.
+ *
  * INVARIANTS : aucun SQL ; hub-agenda.js / hub-agenda.css intacts ;
  * échec silencieux = liens filtrés masqués.
  */
 (function () {
   'use strict';
 
-  var VERSION = '1.10';
+  var VERSION = '1.11';
 
   /* ------------------------------------------------------------------ *
    * TRONC COMMUN — présent en tête de chaque nav (lexique unifié).
@@ -231,11 +240,11 @@
       //  - Agenda salarié   : garde admin|bureau OU salarié relié (voie 3, lecture seule) → 'staff'
       //  - Import agenda    : garde admin|bureau OU salarié (suis_je_salarie) → 'staff'
       // La nav reflète la garde : un salarié relié voit Suivi + Agenda + Import, pas Gestion.
+      // v1.11 (ESPACE-SALARIE L2, S3) : une seule entrée « Espace salarié » ; les
+      // anciennes destinations sont devenues les onglets de js/espace-salarie.js
+      // (qui porte lui-même le jeton admin|bureau de « Écoles & facturation »).
       liens: tronc().concat([
-        { label: 'Gestion salarié', href: 'gestion-salarie.html', show: 'admin bureau' },
-        { label: 'Suivi salarié', href: 'suivi-salarie.html', show: 'staff' },
-        { label: 'Agenda salarié', href: 'missions-agenda.html', show: 'staff' },
-        { label: 'Import agenda', href: 'import-agenda-salarie.html', show: 'staff' }
+        { label: 'Espace salarié', href: 'espace-salarie.html', show: 'staff' }
       ])
     },
 
