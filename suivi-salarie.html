@@ -197,6 +197,15 @@
   bascule d'affichage donne le même onglet sans extraire ~600 lignes de code
   (compteur, export, absences, règles) — zéro risque de régression.
   Titres : « Saisie des missions & séances » -> « Séances » / « Heures & congés ».
+  L4 (même jour, FAIT FOI + maquette validée « Séances ») : champ de recherche
+  transverse (mission, bénéficiaire, type, libellé de séance ; sans accents ni casse ;
+  vue « Recherche » en liste) ; SÉLECTION MULTIPLE : case par séance actionnable
+  (admin|bureau : prevue|realisee ; salarié : prevue passée), « Tout cocher » sur le
+  groupe À traiter, barre d'actions flottante (Valider / Annuler admin ; Déclarer
+  faites salarié), confirmation, RPC unitaires existantes en série, arrêt à la
+  1re erreur. Décision déléguée tracée : la « fiche mission » de la maquette reste
+  le bloc mission dépliable (déjà résumé et groupé en L1) — pas de panneau latéral
+  (largeur 980 px).
   L3 (même jour) : lien profond ?type=<code> -> ouvre la vue du type au chargement
   (utilisé par l'onglet « À traiter » pour « Clore » / « Envoyer » les fins de cycle).
 -->
@@ -297,6 +306,28 @@
   body.es-vue-seances #ssCompteur, body.es-vue-seances #ssAbsences { display: none !important; }
   body.es-vue-heures #ssGridView, body.es-vue-heures #ssTypeView { display: none !important; }
   body.es-vue-heures #ssCompteur { border-top: 0; padding-top: 0; margin-top: 8px; }
+
+  /* ----- ESPACE-SALARIE L4 : recherche + sélection multiple ----- */
+  .ss-search { display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid var(--line, #cabe9f);
+               border-radius: 10px; padding: 0 14px; margin: 0 0 18px; }
+  .ss-search:focus-within { border-color: var(--vert-prairie, #2d7a3e); box-shadow: 0 0 0 3px rgba(45,122,62,.12); }
+  .ss-search svg { width: 18px; height: 18px; color: var(--ink-mute, #6b7a74); flex: 0 0 auto; }
+  .ss-search input { flex: 1; border: 0; outline: 0; background: transparent; font: inherit; font-size: 15px; padding: 12px 0; min-width: 0; }
+  body.es-vue-heures .ss-search { display: none !important; }
+  .ss-check { width: 20px; height: 20px; flex: 0 0 auto; margin: 0 4px 0 0; accent-color: var(--vert-prairie, #2d7a3e); cursor: pointer; }
+  .ss-row.sel { background: #f1f8f3; }
+  .ss-row > .ss-check + .ss-row-main { flex: 1 1 auto; min-width: 0; }
+  .ss-grp-all { float: right; border: 0; background: transparent; color: var(--vert-prairie, #2d7a3e); font: inherit;
+                font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; padding: 0; }
+  .ss-selbar { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 50; display: flex; flex-wrap: wrap;
+               align-items: center; gap: 10px; max-width: calc(100vw - 24px); padding: 10px 14px; border-radius: 12px;
+               background: var(--vert-bouteille, #0c3d24); color: #fff; box-shadow: 0 6px 24px rgba(0,0,0,.25); }
+  .ss-selbar[hidden] { display: none; }
+  .ss-selbar-n { font-weight: 700; font-size: 14px; }
+  .ss-selbar-acts { display: flex; gap: 8px; flex-wrap: wrap; }
+  .ss-selbar .ss-btn-ghost { color: #fff; border-color: rgba(255,255,255,.5); }
+  .ss-selbar .ss-btn.danger { background: #a8321f; }
+  .ss-wrap { padding-bottom: 96px; }
 
   /* ----- ESPACE-SALARIE L1 : tri par actualité ----- */
   .ss-tile.urgent { border-color: var(--gold, #d4a93a); box-shadow: inset 4px 0 0 var(--gold, #d4a93a); }
@@ -502,6 +533,12 @@
 
   <div id="ssMsg" class="ss-msg"></div>
 
+  <!-- ESPACE-SALARIE L4 : recherche transverse (toutes missions, tous types). -->
+  <div class="ss-search" id="ssSearchBar">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+    <input type="search" id="ssSearch" placeholder="Rechercher une mission, une école, une séance…" autocomplete="off" aria-label="Rechercher une mission">
+  </div>
+
   <!-- ============ GRILLE DE VIGNETTES ============ -->
   <section id="ssGridView">
     <div class="ss-grid" id="ssGrid"></div>
@@ -619,6 +656,13 @@
     </table>
   </section>
 
+</div>
+
+<!-- ============ ESPACE-SALARIE L4 : barre d'actions de la sélection multiple ============ -->
+<div class="ss-selbar" id="ssSelBar" hidden>
+  <span class="ss-selbar-n" id="ssSelN">0 séance sélectionnée</span>
+  <span class="ss-selbar-acts" id="ssSelActs"></span>
+  <button type="button" class="ss-btn ss-btn-sm ss-btn-ghost" id="ssSelClear">Tout désélectionner</button>
 </div>
 
 <!-- ============ MODALE BILAN DE CYCLE (CLORE-CYCLE, sql_259) ============ -->
@@ -1223,6 +1267,10 @@
   const venirDeplies = new Set();       // mission.id dont toutes les séances à venir sont affichées
   const historiqueOuverts = new Set();  // mission.id dont le groupe « Validées et annulées » est ouvert
   const VENIR_VISIBLES = 5;
+  // ESPACE-SALARIE L4 : recherche transverse + sélection multiple de séances.
+  const TYPE_RECHERCHE = '__recherche';
+  let rechercheTexte = '';
+  const selection = new Map();          // séance.id -> occurrence (avec _mission)
 
   // ============================================================
   // Helper RPC (calque gestion-salarie.html : appel par nom)
@@ -1366,6 +1414,9 @@
   // ============================================================
   function openType(typeCode) {
     currentType = typeCode;
+    $('ssSeg').style.display = '';
+    if ($('ssSearch').value) { $('ssSearch').value = ''; rechercheTexte = ''; }
+    viderSelection();
     const t = TYPE_BY_CODE[typeCode];
     $('ssTypeTitle').textContent = t ? t.lib : typeCode;
     $('ssGridView').hidden = true;
@@ -1379,6 +1430,10 @@
     currentType = null;
     $('ssTypeView').classList.remove('active');
     $('ssGridView').hidden = false;
+    // ESPACE-SALARIE L4 : sortie de vue = recherche vidée, sélection abandonnée.
+    $('ssSeg').style.display = '';
+    if ($('ssSearch').value) { $('ssSearch').value = ''; rechercheTexte = ''; }
+    viderSelection();
   }
   function setView(mode) {
     currentView = mode;
@@ -1399,7 +1454,38 @@
 
   // Les missions du type courant (objets de plein droit, cf. SALARIE-VUE-MISSIONS-SEANCES).
   function missionsDuType(typeCode) {
+    if (typeCode === TYPE_RECHERCHE) return missions.filter(correspondRecherche);
     return missions.filter(function (m) { return m.type_mission === typeCode; });
+  }
+  // ESPACE-SALARIE L4 : recherche insensible à la casse et aux accents, sur le
+  // libellé de la mission, son bénéficiaire, son type et les libellés de ses séances.
+  function normTxt(v) {
+    return String(v || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+  function correspondRecherche(m) {
+    const q = normTxt(rechercheTexte).trim();
+    if (!q) return false;
+    const ent = m.entite_id ? entites.find(function (e) { return e.id === m.entite_id; }) : null;
+    const t = TYPE_BY_CODE[m.type_mission];
+    const foin = [m.libelle, ent && (ent.libelle_court || ent.libelle), t && t.lib]
+      .concat((occByMission[m.id] || []).map(function (o) { return o.libelle; }))
+      .map(normTxt).join(' | ');
+    return q.split(/\s+/).every(function (mot) { return foin.indexOf(mot) !== -1; });
+  }
+  function ouvrirRecherche() {
+    currentType = TYPE_RECHERCHE;
+    $('ssTypeTitle').textContent = 'Recherche : « ' + rechercheTexte.trim() + ' »';
+    $('ssGridView').hidden = true;
+    $('ssTypeView').classList.add('active');
+    $('ssNewMission').hidden = true;
+    $('ssSeg').style.display = 'none';   // l'agenda reste par type
+    currentView = 'liste';
+    setView('liste');
+  }
+  function surRecherche() {
+    rechercheTexte = $('ssSearch').value || '';
+    if (rechercheTexte.trim().length >= 2) ouvrirRecherche();
+    else if (currentType === TYPE_RECHERCHE) closeType();
   }
   // Les séances d'une mission, filtrées par l'état courant et triées par date.
   function occurrencesDeMission(m) {
@@ -1463,7 +1549,8 @@
     const wrap = $('ssList');
     const mis = missionsDuType(currentType);
     if (!mis.length) {
-      wrap.innerHTML = '<div class="ss-empty">Aucune mission de ce type.</div>';
+      wrap.innerHTML = '<div class="ss-empty">' + (currentType === TYPE_RECHERCHE
+        ? 'Aucune mission ne correspond à cette recherche.' : 'Aucune mission de ce type.') + '</div>';
       return;
     }
     wrap.innerHTML = '';
@@ -1474,7 +1561,7 @@
     if (!actives.length) {
       const e = document.createElement('div');
       e.className = 'ss-empty';
-      e.textContent = 'Aucune mission en cours pour ce type.';
+      e.textContent = currentType === TYPE_RECHERCHE ? 'Aucune mission en cours ne correspond.' : 'Aucune mission en cours pour ce type.';
       wrap.appendChild(e);
     }
     if (terminees.length) {
@@ -1609,7 +1696,23 @@
         return p;
       };
       if (gTraiter.length) {
-        body.appendChild(lbl('À traiter · les plus récentes d’abord (' + gTraiter.length + ')', 'traiter'));
+        const lt = lbl('À traiter · les plus récentes d’abord (' + gTraiter.length + ')', 'traiter');
+        // ESPACE-SALARIE L4 : cocher d'un geste toutes les séances à traiter du groupe.
+        const cochables = gTraiter.filter(selectionnable);
+        if (cochables.length > 1) {
+          const tous = cochables.every(function (o) { return selection.has(o.id); });
+          const ba = document.createElement('button');
+          ba.type = 'button';
+          ba.className = 'ss-grp-all';
+          ba.textContent = tous ? 'Tout décocher' : 'Tout cocher';
+          ba.addEventListener('click', function () {
+            cochables.forEach(function (o) { if (tous) selection.delete(o.id); else selection.set(o.id, o); });
+            majSelection();
+            block.replaceWith(buildMissionBlock(m, r));
+          });
+          lt.appendChild(ba);
+        }
+        body.appendChild(lt);
         gTraiter.forEach(function (o) { body.appendChild(buildRow(o)); });
       }
       if (gVenir.length) {
@@ -1668,7 +1771,7 @@
 
   function buildRow(o) {
     const row = document.createElement('div');
-    row.className = 'ss-row' + (o.etat === 'annulee' ? ' off' : '');
+    row.className = 'ss-row' + (o.etat === 'annulee' ? ' off' : '') + (selection.has(o.id) ? ' sel' : '');
     const meta = [];
     const lieu = lieuLabel(o);
     if (lieu) meta.push(lieu);
@@ -1698,6 +1801,21 @@
 
     buildActions(o).forEach(function (btn) { act.appendChild(btn); });
 
+    // ESPACE-SALARIE L4 : case de sélection multiple (séances sur lesquelles une
+    // action groupée a un sens pour CE compte, cf. selectionnable()).
+    if (selectionnable(o)) {
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.className = 'ss-check';
+      cb.checked = selection.has(o.id);
+      cb.setAttribute('aria-label', 'Sélectionner la séance du ' + fmtWhen(o));
+      cb.addEventListener('change', function () {
+        if (cb.checked) selection.set(o.id, o); else selection.delete(o.id);
+        row.classList.toggle('sel', cb.checked);
+        majSelection();
+      });
+      row.appendChild(cb);
+    }
     row.appendChild(main);
     row.appendChild(act);
     return row;
@@ -1745,6 +1863,75 @@
     }
     return out;
   }
+  // ============================================================
+  // ESPACE-SALARIE L4 : SÉLECTION MULTIPLE ET ACTIONS GROUPÉES
+  // ============================================================
+  // Sélectionnables : admin|bureau -> prevue|realisee (valider si passée, annuler) ;
+  // salarié -> prevue passée ou du jour (déclarer). Mêmes RPC que les gestes
+  // unitaires, appelées séance par séance ; arrêt à la première erreur.
+  function selectionnable(o) {
+    if (o.etat !== 'prevue' && o.etat !== 'realisee') return false;
+    if (peutEcrire) return true;
+    return o.etat === 'prevue' && jourSeance(o) <= isoDate(new Date());
+  }
+  function viderSelection() { selection.clear(); majSelection(); }
+  function majSelection() {
+    const n = selection.size;
+    $('ssSelBar').hidden = (n === 0);
+    $('ssSelN').textContent = n + (n > 1 ? ' séances sélectionnées' : ' séance sélectionnée');
+    const acts = $('ssSelActs');
+    acts.innerHTML = '';
+    if (!n) return;
+    const auj = isoDate(new Date());
+    const lot = Array.from(selection.values());
+    const passees = lot.filter(function (o) { return jourSeance(o) <= auj; });
+    if (peutEcrire) {
+      if (passees.length) {
+        acts.appendChild(mkBtn('✅ Valider (' + passees.length + ')', 'ss-btn ss-btn-sm', function () { actionGroupee('valider', passees); }));
+      }
+      acts.appendChild(mkBtn('Annuler (' + lot.length + ')', 'ss-btn ss-btn-sm danger', function () { actionGroupee('annuler', lot); }));
+    } else if (passees.length) {
+      acts.appendChild(mkBtn('✅ Déclarer faites (' + passees.length + ')', 'ss-btn ss-btn-sm', function () { actionGroupee('declarer', passees); }));
+    }
+  }
+  async function actionGroupee(quoi, lot) {
+    const libs = { valider: 'valider', annuler: 'ANNULER', declarer: 'déclarer comme faites' };
+    if (!window.confirm('Confirmer : ' + libs[quoi] + ' ' + lot.length + (lot.length > 1 ? ' séances' : ' séance') + ' ?')) return;
+    Array.prototype.forEach.call($('ssSelBar').querySelectorAll('button'), function (b) { b.disabled = true; });
+    let ok = 0, erreur = null;
+    for (let i = 0; i < lot.length; i++) {
+      const o = lot[i];
+      try {
+        if (quoi === 'annuler') {
+          await rpc('upsert_mission_seance', {
+            p_id: o.id,
+            p_mission_id: o.mission_id || (o._mission && o._mission.id),
+            p_date_seance: o.date_seance,
+            p_heure_debut: o.heure_debut != null ? o.heure_debut : null,
+            p_duree_min: o.duree_min != null ? o.duree_min : null,
+            p_lieu_id: o.lieu_id != null ? o.lieu_id : null,
+            p_lieu_libre: o.lieu_libre != null ? o.lieu_libre : null,
+            p_refacturable: o.refacturable != null ? o.refacturable : null,
+            p_etat: 'annulee',
+            p_heures_reelles: o.heures_reelles != null ? o.heures_reelles : null,
+            p_notes: o.notes != null ? o.notes : null,
+            p_libelle: o.libelle != null ? o.libelle : null
+          });
+        } else {
+          if (o.etat === 'prevue') await rpc('declarer_occurrence', { p_id: o.id, p_heures_reelles: null });
+          if (quoi === 'valider') await rpc('valider_occurrence', { p_id: o.id });
+        }
+        ok++;
+      } catch (e) { erreur = e; break; }
+    }
+    const verbes = { valider: ['validée', 'validées'], annuler: ['annulée', 'annulées'], declarer: ['déclarée', 'déclarées'] };
+    const txt = ok + (ok > 1 ? ' séances ' + verbes[quoi][1] : ' séance ' + verbes[quoi][0]);
+    viderSelection();
+    try { await refreshAll(); if (quoi === 'valider') await loadCompteur(); } catch (e) { /* message ci-dessous */ }
+    if (erreur) flash(txt + ', puis arrêt : ' + errMsg(erreur), 'err');
+    else flash(txt + '.', 'ok');
+  }
+
   function mkBtn(label, cls, fn) {
     const b = document.createElement('button');
     b.type = 'button'; b.className = cls; b.textContent = label;
@@ -3618,6 +3805,16 @@
 
   function wireEvents() {
     $('ssBack').addEventListener('click', closeType);
+    // ESPACE-SALARIE L4 : recherche (anti-rebond 150 ms) + barre de sélection.
+    let rechTimer = null;
+    $('ssSearch').addEventListener('input', function () {
+      clearTimeout(rechTimer);
+      rechTimer = setTimeout(surRecherche, 150);
+    });
+    $('ssSelClear').addEventListener('click', function () {
+      viderSelection();
+      if (currentType) { if (currentView === 'liste') renderListe(); else renderAgenda(); }
+    });
     Array.prototype.forEach.call($('ssSeg').querySelectorAll('button'), function (btn) {
       btn.addEventListener('click', function () { setView(btn.getAttribute('data-mode')); });
     });
