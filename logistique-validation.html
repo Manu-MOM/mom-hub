@@ -26,6 +26,60 @@
        ========================================================== */
     body.auth-pending { visibility: hidden; }
 
+    /* ==========================================================
+       VALIDATION-LOGISTIQUE-ACTUALITE (17/10/2026, FAIT FOI gelé par
+       Manu « ici, sans maquette, je gèle » ; même méthode que le
+       chantier ESPACE-SALARIE pt 284). Front pur, ZÉRO SQL ; RPC,
+       gardes, conflits, lots et séries INCHANGÉS.
+       LOT 1 · l'actualité d'abord :
+         - File : les 3 sources (ponctuelles, récurrentes, bus) en UNE
+           liste chronologique (date d'effet : date / date_debut / date),
+           échéance affichée (« aujourd'hui », « dans 3 jours »), mise en
+           évidence ≤ 7 jours, « date dépassée » signalée.
+         - Ponctuelles validées : à venir d'abord (plus proches en haut),
+           regroupées par mois ; passées repliées (« Passées (n) »,
+           récentes d'abord).
+         - Règles récurrentes : en cours d'abord (fin la plus proche en
+           haut) ; terminées / suspendues / refusées repliées.
+       LOT 2 · ergonomie :
+         - Recherche UNIQUE en tête (file + règles + ponctuelles ; ouvre
+           les rubriques et les groupes repliés quand un terme est saisi),
+           remplace les deux champs par rubrique (MOTEUR-RECHERCHE-
+           VALIDATION : même normalisation, même filtrage client).
+         - Rubriques renommées : « À valider » / « Règles récurrentes » /
+           « Réservations ponctuelles validées ».
+         - Téléphone (≤ 1020 px) : file d'abord, agenda repliable sous
+           elle (replié par défaut, monté normalement au chargement).
+       ========================================================== */
+    .lgv-searchbar { display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid var(--line);
+      border-radius: 10px; padding: 0 12px; margin: 0 0 18px; max-width: 640px; }
+    .lgv-searchbar:focus-within { border-color: var(--vert-prairie); }
+    .lgv-searchbar svg { width: 16px; height: 16px; color: var(--ink-mute); flex: 0 0 auto; }
+    .lgv-searchbar input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent;
+      font-family: 'JetBrains Mono', monospace; font-size: 13px; letter-spacing: 0.03em; padding: 11px 0; color: var(--ink); }
+    .lgv-ech { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.04em;
+      border-radius: 6px; padding: 1px 7px; white-space: nowrap; background: #eef1f5; color: #2c3e57; }
+    .lgv-ech.is-proche { background: #fbeed6; color: #8a5a12; }
+    .lgv-ech.is-depassee { background: #f7e1dd; color: #a8321f; }
+    .lgv-card.is-proche { border-left: 3px solid #d98c1f; }
+    .lgv-card.is-depassee { border-left: 3px solid #a8321f; }
+    .lgv-mois { font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 600; letter-spacing: 0.06em;
+      text-transform: uppercase; color: var(--ink-soft); margin: 14px 2px 8px; }
+    .lgv-mois:first-child { margin-top: 0; }
+    .lgv-mois.is-filtered { display: none; }
+    .lgv-replie { margin-top: 12px; }
+    .lgv-replie > summary { cursor: pointer; list-style: none; font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      letter-spacing: 0.06em; color: var(--ink-soft); padding: 8px 10px; border: 1px dashed var(--line); border-radius: 8px;
+      background: #faf9f5; margin-bottom: 10px; }
+    .lgv-replie > summary::-webkit-details-marker { display: none; }
+    .lgv-agenda-toggle { display: none; width: 100%; margin: 6px 0 12px; padding: 11px 14px; border: 1px dashed var(--line);
+      border-radius: 10px; background: #faf9f5; font-family: 'Oswald', sans-serif; font-size: 14px; color: var(--ink);
+      text-align: left; cursor: pointer; }
+    @media (max-width: 1020px) {
+      .lgv-agenda-toggle { display: block; }
+      .lgv-col-agenda.is-replie #agRoot { display: none; }
+    }
+
     .lgv-layout { max-width: 1500px; margin: 0 auto; padding: 28px 22px 60px; }
 
     .lgv-back {
@@ -368,32 +422,32 @@
       <p class="lgv-subtitle">Réservations · récurrences · demandes de bus</p>
     </div>
 
+    <!-- VALIDATION-LOGISTIQUE-ACTUALITE lot 2 : recherche unique (file + règles + ponctuelles). -->
+    <div class="lgv-searchbar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input type="search" id="lgv-search" placeholder="Rechercher partout (ressource, motif, catégorie, destination…)"
+             autocomplete="off" aria-label="Rechercher dans les demandes et réservations">
+    </div>
+
     <div class="lgv-cols">
       <!-- FILE TRI-SOURCE (gauche) -->
       <div class="lgv-col-file">
         <section class="lgv-section">
           <h3 class="lgv-section__title">
-            Demandes en attente <span id="lgv-badge" class="lgv-badge"></span>
+            À valider <span id="lgv-badge" class="lgv-badge"></span>
           </h3>
           <div id="lgv-file"><div class="lgv-empty">Chargement…</div></div>
+          <div id="lgv-search-file-vide" class="lgv-search__vide">Aucune demande ne correspond à cette recherche.</div>
         </section>
 
         <details class="lgv-section">
-          <summary class="lgv-section__title">Réservations récurrentes</summary>
-          <div class="lgv-search">
-            <input type="text" id="lgv-search-regles" class="lgv-search__input"
-                   placeholder="Rechercher (ressource, motif…)" autocomplete="off">
-          </div>
+          <summary class="lgv-section__title">Règles récurrentes</summary>
           <div id="lgv-regles"><div class="lgv-empty">—</div></div>
           <div id="lgv-search-regles-vide" class="lgv-search__vide">Aucun résultat pour cette recherche.</div>
         </details>
 
         <details class="lgv-section">
-          <summary class="lgv-section__title">Réservations ponctuelles</summary>
-          <div class="lgv-search">
-            <input type="text" id="lgv-search-ponct" class="lgv-search__input"
-                   placeholder="Rechercher (ressource, motif…)" autocomplete="off">
-          </div>
+          <summary class="lgv-section__title">Réservations ponctuelles validées</summary>
           <div id="lgv-ponct"><div class="lgv-empty">—</div></div>
           <div id="lgv-search-ponct-vide" class="lgv-search__vide">Aucun résultat pour cette recherche.</div>
         </details>
@@ -403,6 +457,7 @@
            les occurrences des règles pending y sont projetées AVANT
            approbation (arbitrage FAIT FOI §2). -->
       <div class="lgv-col-agenda">
+        <button type="button" class="lgv-agenda-toggle" id="lgv-agenda-toggle" aria-expanded="true">▾ Agenda d'arbitrage</button>
         <section id="agRoot"></section>
       </div>
     </div>
@@ -1179,6 +1234,8 @@
         var card = document.createElement('div');
         card.className = 'lgv-card' + (lotBadgeHtml ? ' is-lot' : '') +
           (serie ? ' is-serie' : '');
+        // VALIDATION-LOGISTIQUE-ACTUALITE : la file entre dans la recherche unique.
+        card.setAttribute('data-search', _normSearch(tag + ' ' + titre + ' ' + meta + ' ' + (motif || '')));
         card.innerHTML =
           '<div class="lgv-card__top">' +
             '<span class="lgv-tag' + (tagClass ? ' ' + tagClass : '') + '">' + escapeHtml(tag) + '</span>' +
@@ -1360,6 +1417,16 @@
         var seriesMap = await _resoudreSeries(ponct);
         _selection = {}; // repart propre à chaque refresh de la file
         if (ponct.length > 0) { host.appendChild(_barreSelectionEl()); }
+        // VALIDATION-LOGISTIQUE-ACTUALITE (lot 1) : les cartes des 3 sources sont
+        // construites PUIS triées ensemble par date d'effet (la plus proche en haut),
+        // avec leur échéance. Le contenu et les boutons de chaque carte sont inchangés.
+        var _cartes = [];
+        var _hostReel = host;
+        host = { appendChild: function (c) { _cartes.push(c); } };
+        var _dateEffet = {};
+        ponct.forEach(function (r) { _dateEffet[r.id] = r.date; });
+        recur.forEach(function (r) { _dateEffet[r.id] = r.date_debut || (r.created_at ? String(r.created_at).slice(0, 10) : ''); });
+        bus.forEach(function (d) { _dateEffet[d.id] = d.date; });
         ponct.forEach(function (r) {
           // MULTI-JOURS (maillon 6) : mention de la plage si date_fin présente.
           var quand = formatDateLong(r.date)
@@ -1390,6 +1457,49 @@
             formatDateLong(d.date) + ' · ' + (d.total_bus || 0) + ' pax · ' + catsLbl(d),
             d.notes, d.id));
         });
+        // Tri chronologique stable des 3 sources + pose de l'échéance.
+        host = _hostReel;
+        var _ids = ponct.map(function (r) { return r.id; })
+          .concat(recur.map(function (r) { return r.id; }), bus.map(function (d) { return d.id; }));
+        var _ordre = _cartes.map(function (c, i) { return { c: c, d: _dateEffet[_ids[i]] || '9999-12-31', i: i }; });
+        _ordre.sort(function (a, b) { return a.d < b.d ? -1 : (a.d > b.d ? 1 : a.i - b.i); });
+        _ordre.forEach(function (o) { _poserEcheance(o.c, o.d === '9999-12-31' ? null : o.d); host.appendChild(o.c); });
+        _majBarreSelection();
+        _filtrerTout();
+      }
+
+      // ------------------------------------------------------------------
+      // VALIDATION-LOGISTIQUE-ACTUALITE — échéance d'une demande (jours
+      // calendaires, heure locale) : pastille + liseré (≤ 7 j ; dépassée).
+      // ------------------------------------------------------------------
+      function _joursAvant(iso) {
+        var p = String(iso).slice(0, 10).split('-');
+        var d = new Date(+p[0], +p[1] - 1, +p[2]);
+        var t = new Date(); t.setHours(0, 0, 0, 0);
+        return Math.round((d - t) / 86400000);
+      }
+      function _poserEcheance(card, iso) {
+        if (!iso) return;
+        var n = _joursAvant(iso);
+        var txt = n < 0 ? 'date dépassée' : (n === 0 ? 'aujourd\'hui' : (n === 1 ? 'demain' : 'dans ' + n + ' jours'));
+        var cls = n < 0 ? 'is-depassee' : (n <= 7 ? 'is-proche' : '');
+        var sp = document.createElement('span');
+        sp.className = 'lgv-ech' + (cls ? ' ' + cls : '');
+        sp.textContent = txt;
+        var top = card.querySelector('.lgv-card__top');
+        if (top) top.insertBefore(sp, top.children[1] || null);
+        if (cls) card.classList.add(cls);
+      }
+      var MOIS_TITRE = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+      function _titreMois(iso) { var p = String(iso).split('-'); return MOIS_TITRE[+p[1] - 1] + ' ' + p[0]; }
+      function _groupeReplie(libelle) {
+        var d = document.createElement('details');
+        d.className = 'lgv-replie';
+        var sm = document.createElement('summary');
+        sm.textContent = '▸ ' + libelle;
+        d.appendChild(sm);
+        d.addEventListener('toggle', function () { sm.textContent = (d.open ? '▾ ' : '▸ ') + libelle; });
+        return d;
       }
 
       // ------------------------------------------------------------------
@@ -1424,6 +1534,43 @@
           vide.classList.toggle('is-shown', terme !== '' && cards.length > 0 && visibles === 0);
         }
       }
+      // VALIDATION-LOGISTIQUE-ACTUALITE (lot 2) : recherche UNIQUE en tête de page.
+      // Même normalisation et même filtrage que _appliquerFiltre, sur les trois
+      // zones ; un terme saisi ouvre les rubriques et les groupes repliés.
+      function _filtrerTout() {
+        var input = el('lgv-search');
+        var terme = _normSearch(input ? input.value : '');
+        [['lgv-file', 'lgv-search-file-vide'], ['lgv-regles', 'lgv-search-regles-vide'], ['lgv-ponct', 'lgv-search-ponct-vide']]
+          .forEach(function (z) {
+            var host = el(z[0]);
+            if (!host) return;
+            var cards = host.querySelectorAll('.lgv-card');
+            var visibles = 0;
+            for (var i = 0; i < cards.length; i++) {
+              var hay = cards[i].getAttribute('data-search') || '';
+              var match = (terme === '' || hay.indexOf(terme) !== -1);
+              cards[i].classList.toggle('is-filtered', !match);
+              if (match) visibles++;
+            }
+            // En-têtes de mois sans carte visible : masqués pendant la recherche.
+            host.querySelectorAll('.lgv-mois').forEach(function (h) {
+              var n = h.nextElementSibling, vu = false;
+              while (n && !n.classList.contains('lgv-mois') && n.tagName !== 'DETAILS') {
+                if (n.classList.contains('lgv-card') && !n.classList.contains('is-filtered')) { vu = true; break; }
+                n = n.nextElementSibling;
+              }
+              h.classList.toggle('is-filtered', terme !== '' && !vu);
+            });
+            if (terme !== '') {
+              host.querySelectorAll('details.lgv-replie').forEach(function (d) { d.open = true; });
+              var sec = host.closest('details.lgv-section');
+              if (sec && visibles > 0) sec.open = true;
+            }
+            var vide = el(z[1]);
+            if (vide) vide.classList.toggle('is-shown', terme !== '' && cards.length > 0 && visibles === 0);
+          });
+      }
+
       function _brancherRecherche(inputId, hostId, videId) {
         var input = el(inputId);
         if (!input) return;
@@ -1444,7 +1591,18 @@
           host.innerHTML = '<div class="lgv-empty">Aucune règle récurrente.</div>';
           return;
         }
-        all.forEach(function (r) {
+        // VALIDATION-LOGISTIQUE-ACTUALITE (lot 1) : règles en cours d'abord (fin la
+        // plus proche en haut) ; terminées, suspendues ou refusées repliées.
+        var _aujR = isoOf(new Date());
+        var _enCours = function (r) { return r.active && r.statut !== 'rejected' && (!r.date_fin || r.date_fin >= _aujR); };
+        var _cmpFin = function (a, b) { return String(a.date_fin || '9999').localeCompare(String(b.date_fin || '9999')); };
+        var _actives = all.filter(_enCours).sort(_cmpFin);
+        var _autres = all.filter(function (r) { return !_enCours(r); })
+          .sort(function (a, b) { return String(b.date_fin || '').localeCompare(String(a.date_fin || '')); });
+        var _hostR = host;
+        var _boxAutres = _autres.length ? _groupeReplie('Terminées, suspendues ou refusées (' + _autres.length + ')') : null;
+        _actives.concat(_autres).forEach(function (r) {
+          host = (_boxAutres && !_enCours(r)) ? _boxAutres : _hostR;
           var card = document.createElement('div');
           card.className = 'lgv-card' + (r.active ? '' : ' is-suspended');
           card.setAttribute('data-search', _normSearch(ressLbl(r.ressource_id) + ' ' + (r.motif || '')));
@@ -1482,7 +1640,13 @@
           card.appendChild(actions);
           host.appendChild(card);
         });
-        _appliquerFiltre('lgv-search-regles', 'lgv-regles', 'lgv-search-regles-vide');
+        host = _hostR;
+        if (!_actives.length) {
+          var vR = document.createElement('div'); vR.className = 'lgv-empty'; vR.textContent = 'Aucune règle en cours.';
+          host.appendChild(vR);
+        }
+        if (_boxAutres) host.appendChild(_boxAutres);
+        _filtrerTout();
       }
 
       // ------------------------------------------------------------------
@@ -1504,7 +1668,31 @@
           host.innerHTML = '<div class="lgv-empty">Aucune réservation ponctuelle validée.</div>';
           return;
         }
-        pures.forEach(function (r) {
+        // VALIDATION-LOGISTIQUE-ACTUALITE (lot 1) : à venir d'abord (plus proches en
+        // haut) regroupées par mois ; passées repliées, les plus récentes d'abord.
+        var _aujP = isoOf(new Date());
+        var _finDe = function (r) { return r.date_fin && r.date_fin > r.date ? r.date_fin : r.date; };
+        var _venir = pures.filter(function (r) { return _finDe(r) >= _aujP; })
+          .sort(function (a, b) { return (a.date + (a.heure_debut || '')).localeCompare(b.date + (b.heure_debut || '')); });
+        var _passees = pures.filter(function (r) { return _finDe(r) < _aujP; })
+          .sort(function (a, b) { return (b.date + (b.heure_debut || '')).localeCompare(a.date + (a.heure_debut || '')); });
+        var _hostP = host;
+        var _boxP = _passees.length ? _groupeReplie('Passées (' + _passees.length + ')') : null;
+        var _moisCourant = '';
+        if (!_venir.length) {
+          var vP = document.createElement('div'); vP.className = 'lgv-empty'; vP.textContent = 'Aucune réservation à venir.';
+          host.appendChild(vP);
+        }
+        _venir.concat(_passees).forEach(function (r) {
+          var _estPassee = _finDe(r) < _aujP;
+          host = _estPassee ? _boxP : _hostP;
+          if (!_estPassee && r.date.slice(0, 7) !== _moisCourant) {
+            _moisCourant = r.date.slice(0, 7);
+            var hm = document.createElement('div');
+            hm.className = 'lgv-mois';
+            hm.textContent = _titreMois(_moisCourant);
+            host.appendChild(hm);
+          }
           var card = document.createElement('div');
           card.className = 'lgv-card';
           card.setAttribute('data-search', _normSearch(ressLbl(r.ressource_id) + ' ' + (r.motif || '')));
@@ -1518,7 +1706,9 @@
             (r.motif ? '<div class="lgv-card__motif">' + escapeHtml(r.motif) + '</div>' : '');
           host.appendChild(card);
         });
-        _appliquerFiltre('lgv-search-ponct', 'lgv-ponct', 'lgv-search-ponct-vide');
+        host = _hostP;
+        if (_boxP) host.appendChild(_boxP);
+        _filtrerTout();
       }
 
       // ------------------------------------------------------------------
@@ -1910,10 +2100,33 @@
       // MOTEUR-RECHERCHE-VALIDATION : branchement unique des champs de
       // recherche (les listeners persistent ; chaque refresh ré-applique
       // le filtre courant via _appliquerFiltre en fin de rendu).
-      _brancherRecherche('lgv-search-regles', 'lgv-regles', 'lgv-search-regles-vide');
-      _brancherRecherche('lgv-search-ponct', 'lgv-ponct', 'lgv-search-ponct-vide');
+      // VALIDATION-LOGISTIQUE-ACTUALITE (lot 2) : un seul champ pour toute la page.
+      (function () {
+        var input = el('lgv-search');
+        if (input) input.addEventListener('input', _filtrerTout);
+      })();
 
       await agenda.init();
+
+      // VALIDATION-LOGISTIQUE-ACTUALITE (lot 2) : sur téléphone, l'agenda (monté
+      // normalement ci-dessus) est replié sous la file ; un bouton le déplie.
+      (function () {
+        var col = document.querySelector('.lgv-col-agenda');
+        var tg = el('lgv-agenda-toggle');
+        if (!col || !tg) return;
+        function maj() {
+          var replie = col.classList.contains('is-replie');
+          tg.textContent = (replie ? '▸ ' : '▾ ') + 'Agenda d\'arbitrage';
+          tg.setAttribute('aria-expanded', replie ? 'false' : 'true');
+        }
+        if (window.matchMedia && window.matchMedia('(max-width: 1020px)').matches) col.classList.add('is-replie');
+        maj();
+        tg.addEventListener('click', function () {
+          col.classList.toggle('is-replie');
+          maj();
+          if (!col.classList.contains('is-replie')) window.dispatchEvent(new Event('resize'));
+        });
+      })();
 
       console.log('%c🏉 Validation logistique chargée', 'color:#2D7D46;font-weight:bold;',
         { ressources: Object.keys(ressById).length });
