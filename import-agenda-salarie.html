@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Import agenda · MOM Hub</title>
+<title>Espace salarié — Importer l’agenda · MOM Hub</title>
 <link rel="icon" type="image/png" href="assets/logo-m2m.png">
 <!--
   MOM Hub · Import agenda Google → séances — surface EXÉCUTANT (Lohann), module B-light.
@@ -35,6 +35,10 @@
 
   PÉRIMÈTRE v1 : créations seules. Modif/suppression/récurrence Google = v2 (FAIT FOI §8).
   RGPD : ne projeter que date/heure/durée/libellé/lieu/UID. Pas d'invités, pas d'emails.
+  MAJ : ESPACE-SALARIE · LOT L2 (17/10/2026, FAIT FOI gelé par Manu le 17/10/2026,
+  S1 option B / S3) : la page devient un ONGLET de l'« Espace salarié » — barre
+  d'onglets commune js/espace-salarie.js posée sous la topbar ; profondeur de l'onglet « Agenda », seul le titre de fenêtre est renommé.
+  Aucune logique ni RPC modifiée.
 -->
 <link rel="stylesheet" href="css/hub.css">
 <style>
@@ -147,6 +151,10 @@
   </header>
 
   <script src="js/hub-nav.js"></script>
+
+  <!-- ESPACE-SALARIE L2 : barre d'onglets commune (js/espace-salarie.js). -->
+  <nav class="es-bar" data-espace-salarie></nav>
+  <script src="js/espace-salarie.js"></script>
 
 <div class="ia-wrap">
   <div class="ia-hd">
