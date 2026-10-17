@@ -124,6 +124,17 @@
     - Filtre « À clôturer » : cycles scolaires terminés (≥ 1 validée, plus rien
       d'ouvert) et non encore clos. L'ancien filtre (terminee ET bilan vide) était
       vide par construction (clore_cycle exige le bilan).
+    - L5 (17/10/2026, maquette « Écoles & facturation » validée) : « Parcours des
+      écoles » en 6 colonnes en tête de l'onglet (Planifié · En cours · Terminé à
+      clore · Questionnaire à envoyer · À facturer · Bouclé), cartes regroupées par
+      école, bouton de l'étape suivante (clore / questionnaire -> onglet Séances
+      ?type=intervention_scolaire ; facture -> ouvrirFacture existante). Rendu
+      accroché à renderEmission (mêmes déclencheurs). Le bloc « Facturer les
+      écoles » est masqué (remplacé par la colonne « À facturer »). La liste
+      détaillée de toutes les missions est repliée (details) par défaut. seancesAgg
+      gagne dPremiere/dDerniere. « Factures émises », export, bandeaux INCHANGÉS.
+      Décision déléguée tracée : une classe facturée avant clôture reste dans la
+      colonne de sa clôture (ordre du dispositif).
     - Correctif constaté en test : la vue « Par bénéficiaire » était toujours vide
       (Array.prototype.slice.call sur un itérateur Map.keys()) -> Array.from.
   MAJ : ESPACE-SALARIE · LOT L2 (17/10/2026, même FAIT FOI, S1 option B) : la page
@@ -320,6 +331,34 @@
   body.es-vue-heures #peRefacExport, body.es-vue-heures #peBandTraiter, body.es-vue-heures #peFilters,
   body.es-vue-heures #peListe, body.es-vue-heures #peListeVide, body.es-vue-heures #gcEcoProj,
   body.es-vue-heures #peNewMission, body.es-vue-heures .pe-foot { display: none !important; }
+  body.es-vue-heures #peParcours, body.es-vue-heures #peListeWrap { display: none !important; }
+  /* ESPACE-SALARIE L5 : le bloc « Facturer les écoles » est remplacé par la colonne
+     « À facturer » du parcours (même bouton, même modale ouvrirFacture). */
+  #peRefacEmission { display: none !important; }
+  .pk { background: #fff; border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 14px; padding: 14px; margin: 0 0 20px; }
+  .pk-hd { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px; margin: 0 4px 12px; }
+  .pk-hd h2 { margin: 0; font-size: 16px; color: var(--ink, #0c3d24); }
+  .pk-hint { font-size: 12px; color: var(--ink-mute, #6b7a74); }
+  .pk-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .pk-cols { display: grid; grid-template-columns: repeat(6, minmax(170px, 1fr)); gap: 10px; min-width: 1060px; }
+  .pk-col { background: var(--paper, #f8f5ec); border-radius: 12px; padding: 8px; display: flex; flex-direction: column; gap: 8px; min-height: 220px; }
+  .pk-col-hd { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; padding: 2px 4px 6px; border-bottom: 3px solid #9aa8b6; }
+  .pk-col-hd strong { font-size: 13px; color: var(--ink, #0c3d24); }
+  .pk-col-hd span { font-size: 12px; font-weight: 700; color: var(--ink-mute, #6b7a74); white-space: nowrap; }
+  .pk-vide { font-size: 12px; color: var(--ink-mute, #6b7a74); padding: 6px 4px; }
+  .pk-card { background: #fff; border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 10px; padding: 9px 10px;
+             display: flex; flex-direction: column; gap: 4px; }
+  .pk-card strong { font-size: 14px; color: var(--ink, #0c3d24); }
+  .pk-card-d { font-size: 12px; color: var(--ink-mute, #6b7a74); }
+  .pk-note { align-self: flex-start; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 5px;
+             background: var(--feedback-warning-bg, #fbf1dd); color: #8a5a0b; }
+  .pk-act { margin-top: 2px; display: block; text-align: center; border: 0; border-radius: 8px; padding: 7px 8px; min-height: 34px;
+            background: var(--vert-prairie, #2d7a3e); color: #fff; font: inherit; font-size: 12.5px; font-weight: 700;
+            cursor: pointer; text-decoration: none; }
+  .pk-act:hover { filter: brightness(1.08); }
+  .pe-liste-wrap { margin: 0 0 20px; }
+  .pe-liste-wrap > summary { cursor: pointer; padding: 12px 16px; border: 1px dashed var(--line, #cabe9f); border-radius: 12px;
+                             background: var(--paper, #f8f5ec); font-weight: 700; color: var(--ink, #0c3d24); margin: 0 0 14px; }
   /* ESPACE-SALARIE L1 : actualité des missions */
   .pe-actu { display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 6px;
              background: var(--feedback-warning-bg, #fbf1dd); color: #8a5a0b; }
@@ -471,6 +510,18 @@
 
   <div id="gsMsg" class="gs-msg"></div>
 
+  <!-- ===== ESPACE-SALARIE L5 : PARCOURS DES ÉCOLES (colonnes) =====
+       Chaque classe (mission intervention_scolaire) est rangée dans la colonne de
+       sa PROCHAINE étape, regroupée par école ; le bouton de la carte lance cette
+       étape (clore / questionnaire dans l'onglet Séances, facture ici). -->
+  <section class="pk" id="peParcours" aria-label="Parcours des écoles">
+    <div class="pk-hd">
+      <h2>Parcours des écoles</h2>
+      <span class="pk-hint">Chaque école est dans la colonne de sa prochaine étape</span>
+    </div>
+    <div class="pk-scroll"><div class="pk-cols" id="pkCols"></div></div>
+  </section>
+
   <!-- ===== 3 bandeaux d'agregation ===== -->
   <div class="pe-bandeaux">
 
@@ -529,6 +580,10 @@
 
   </div>
 
+  <!-- ESPACE-SALARIE L5 : la liste détaillée (toutes missions, tous types) est
+       repliée par défaut dans l'onglet Écoles ; contenu et code inchangés. -->
+  <details class="pe-liste-wrap" id="peListeWrap">
+  <summary>Toutes les missions du salarié (liste détaillée, filtres)</summary>
   <!-- ===== Filtres (cable etape 3) ===== -->
   <div class="pe-filters" id="peFilters">
     <button type="button" class="pe-chip on" data-filter="toutes">Toutes</button>
@@ -541,6 +596,7 @@
   <!-- ===== Liste centree-mission (cable etape 3) ===== -->
   <div id="peListe"></div>
   <div class="gs-empty" id="peListeVide" style="display:none">Aucune mission pour ce filtre.</div>
+  </details>
 
   <!-- ===== Compteur d'heures (FAIT FOI 29/06, option beta) =====
        Bloc de consultation des heures depuis le tableau de bord admin.
@@ -752,7 +808,7 @@
   // par chargerPrevisionnel (gcPrevSeances), chargé quel que soit l'onglet.
   (function deplacerProjection() {
     const h3 = document.getElementById('gcEcoH3');
-    const ancre = document.getElementById('peListeVide');
+    const ancre = document.getElementById('peListeWrap') || document.getElementById('peListeVide');
     if (!h3 || !ancre) return;
     const sec = document.createElement('section');
     sec.className = 'gc-compteur';
@@ -902,6 +958,7 @@
       const moisValides = new Set();
       // ESPACE-SALARIE L1 (D6) : actualité de la mission.
       let nbATraiter = 0, nbAVenir = 0, derniereATraiter = '', derniere = '', prochaine = '';
+      let dPremiere = '', dDerniere = '';
       seances.forEach(s => {
         if (s.etat === 'annulee') return;               // exclut les seances annulees
         const d = String(s.date_seance || '').slice(0, 10);
@@ -910,6 +967,8 @@
           else { nbAVenir++; if (!prochaine || d < prochaine) prochaine = d; }
         }
         if (d && d <= auj && d > derniere) derniere = d;
+        if (d && (!dPremiere || d < dPremiere)) dPremiere = d;      // L5 : bornes du cycle
+        if (d && d > dDerniere) dDerniere = d;
         nb++;
         if (s.duree_min != null) hPrev += Number(s.duree_min) / 60;
         if (s.heures_reelles != null) { hReel += Number(s.heures_reelles); aDuReel = true; }
@@ -919,7 +978,8 @@
       seancesAgg.set(mid, { nbSeances: nb, hPrevues: hPrev, hReelles: hReel,
                             nbOuvertes: nbOuvertes, nbValidees: nbValidees, moisValides: moisValides,
                             nbATraiter: nbATraiter, nbAVenir: nbAVenir, derniereATraiter: derniereATraiter,
-                            derniere: derniere, prochaine: prochaine });
+                            derniere: derniere, prochaine: prochaine,
+                            dPremiere: dPremiere, dDerniere: dDerniere });
     }
   }
 
@@ -1074,7 +1134,127 @@
   }
   function aMontant(m) { return m.montant != null && Number(m.montant) > 0; }
 
+  // ============================================================
+  // ESPACE-SALARIE L5 : PARCOURS DES ÉCOLES
+  // ============================================================
+  // Étape d'une classe = sa PROCHAINE étape, dans l'ordre du dispositif :
+  //   plan    : aucune séance encore faite (rien de passé ni de validé)
+  //   cours   : des séances faites / à traiter, le cycle n'est pas fini
+  //   clore   : cycle terminé (≥ 1 validée, plus rien d'ouvert) et non clos  (onglet Séances)
+  //   quest   : clos, questionnaire pas encore envoyé                        (onglet Séances)
+  //   fact    : clos, questionnaire envoyé, facturable et pas encore facturé (ici, modale facture)
+  //   fini    : tout est fait (ou non facturable)
+  // Missions annulées exclues. Une classe facturée avant d'être close reste en
+  // « clore » / « quest » : le parcours suit l'ordre du dispositif.
+  const PK_COLS = [
+    { k: 'plan',  lib: 'Planifié',                  coul: '#9aa8b6', vide: 'Aucun cycle planifié' },
+    { k: 'cours', lib: 'En cours',                  coul: '#3b78b5', vide: 'Aucun cycle en cours' },
+    { k: 'clore', lib: 'Terminé · à clore',         coul: '#d4a93a', vide: 'Rien à clore' },
+    { k: 'quest', lib: 'Questionnaire à envoyer',   coul: '#d48a3a', vide: 'Rien à envoyer' },
+    { k: 'fact',  lib: 'À facturer',                coul: '#a8321f', vide: 'Rien à facturer' },
+    { k: 'fini',  lib: 'Bouclé ✓',                  coul: '#2d7a3e', vide: 'Pas encore' }
+  ];
+  function etapeEcole(m) {
+    const a = seancesAgg.get(m.id) || {};
+    if (m.etat === 'terminee') {
+      if (!m.questionnaire_fait) return 'quest';
+      if (m.statut === 'facturable' && !m.facture_id) return 'fact';
+      return 'fini';
+    }
+    if (cycleTermine(m)) return 'clore';
+    if ((a.nbValidees || 0) > 0 || (a.nbATraiter || 0) > 0) return 'cours';
+    return 'plan';
+  }
+  function moisCourt(iso) {
+    if (!iso) return '';
+    const M = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+    const p = iso.split('-');
+    return parseInt(p[2], 10) + ' ' + M[parseInt(p[1], 10) - 1];
+  }
+  function renderParcours() {
+    const cont = $('pkCols');
+    if (!cont) return;
+    cont.innerHTML = '';
+    const classes = missions.filter(m => m.type_mission === 'intervention_scolaire' && m.etat !== 'annulee');
+    PK_COLS.forEach(col => {
+      const dans = classes.filter(m => etapeEcole(m) === col.k);
+      const parEcole = new Map();
+      dans.forEach(m => {
+        const cle = m.entite_id || '__sans';
+        if (!parEcole.has(cle)) parEcole.set(cle, []);
+        parEcole.get(cle).push(m);
+      });
+      const c = document.createElement('div');
+      c.className = 'pk-col';
+      const hd = document.createElement('div');
+      hd.className = 'pk-col-hd';
+      hd.style.borderBottomColor = col.coul;
+      const t = document.createElement('strong'); t.textContent = col.lib;
+      const n = document.createElement('span'); n.textContent = dans.length + ' cl.';
+      hd.appendChild(t); hd.appendChild(n);
+      c.appendChild(hd);
+      if (!dans.length) {
+        const v = document.createElement('div'); v.className = 'pk-vide'; v.textContent = col.vide;
+        c.appendChild(v);
+      }
+      // Écoles : la plus « avancée » dans le temps d'abord (dernière séance la plus récente).
+      const cles = Array.from(parEcole.keys()).sort((x, y) => {
+        const dx = parEcole.get(x).reduce((d, m) => { const a = seancesAgg.get(m.id) || {}; return (a.dDerniere || '') > d ? a.dDerniere : d; }, '');
+        const dy = parEcole.get(y).reduce((d, m) => { const a = seancesAgg.get(m.id) || {}; return (a.dDerniere || '') > d ? a.dDerniere : d; }, '');
+        if (col.k === 'plan') return dx.localeCompare(dy);
+        return dy.localeCompare(dx) || String(benefLabel(x) || '').localeCompare(String(benefLabel(y) || ''), 'fr');
+      });
+      cles.forEach(cle => {
+        const lot = parEcole.get(cle).slice().sort((a, b) => String(a.libelle || '').localeCompare(String(b.libelle || ''), 'fr'));
+        const card = document.createElement('div');
+        card.className = 'pk-card';
+        const nom = document.createElement('strong');
+        nom.textContent = (cle === '__sans' ? 'Sans école' : (benefLabel(cle) || '—'));
+        card.appendChild(nom);
+        let dMin = '', dMax = '';
+        lot.forEach(m => { const a = seancesAgg.get(m.id) || {};
+          if (a.dPremiere && (!dMin || a.dPremiere < dMin)) dMin = a.dPremiere;
+          if (a.dDerniere && a.dDerniere > dMax) dMax = a.dDerniere; });
+        const d = document.createElement('span');
+        d.className = 'pk-card-d';
+        const periode = !dMin ? 'aucune séance' : (col.k === 'plan' ? 'début le ' + moisCourt(dMin)
+          : (dMin === dMax ? 'le ' + moisCourt(dMin) : moisCourt(dMin) + ' → ' + moisCourt(dMax)));
+        d.textContent = lot.length + (lot.length > 1 ? ' classes' : ' classe') + ' · ' + periode;
+        d.title = lot.map(m => m.libelle || '').join('\n');
+        card.appendChild(d);
+        if (col.k === 'cours') {
+          const nbT = lot.reduce((s2, m) => s2 + ((seancesAgg.get(m.id) || {}).nbATraiter || 0), 0);
+          if (nbT) { const no = document.createElement('span'); no.className = 'pk-note'; no.textContent = nbT + (nbT > 1 ? ' séances à valider' : ' séance à valider'); card.appendChild(no); }
+        }
+        if (col.k === 'fact') {
+          const total = lot.filter(aMontant).reduce((s2, m) => s2 + Number(m.montant), 0);
+          const sansMt = lot.length - lot.filter(aMontant).length;
+          const no = document.createElement('span'); no.className = 'pk-note';
+          no.textContent = fmtEur(total) + ' €' + (sansMt ? ' · ' + sansMt + ' sans montant' : '');
+          card.appendChild(no);
+        }
+        if (col.k === 'clore' || col.k === 'quest') {
+          const a = document.createElement('a');
+          a.className = 'pk-act';
+          a.href = 'suivi-salarie.html?type=intervention_scolaire';
+          a.textContent = col.k === 'clore' ? '🏁 Clore (bilan) →' : '✉️ Envoyer le questionnaire →';
+          card.appendChild(a);
+        } else if (col.k === 'fact' && cle !== '__sans') {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'pk-act';
+          b.textContent = '🧾 Préparer la facture';
+          b.addEventListener('click', () => { ouvrirFacture(cle); });
+          card.appendChild(b);
+        }
+        c.appendChild(card);
+      });
+      cont.appendChild(c);
+    });
+  }
+
   function renderEmission() {
+    renderParcours();   // ESPACE-SALARIE L5 : rafraîchi aux mêmes moments que l'ex-bloc d'émission
     const box = $('peRefacEmission');
     const liste = $('peEmissionListe');
     liste.innerHTML = '';
