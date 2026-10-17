@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Agenda salarié — Planning des séances · MOM Hub</title>
+<title>Espace salarié — Agenda · MOM Hub</title>
 <link rel="icon" type="image/png" href="assets/logo-m2m.png">
 <!--
   MOM Hub · Agenda salarié — surface DÉDIÉE (MISSIONS-AGENDA).
@@ -30,6 +30,10 @@
   déjà exposée. ZÉRO SQL pour cette page.
   Helpers SupabaseHub : client, getSession, getMyRoles, getSaisonActive,
   quiSuisJe, signOut.
+  MAJ : ESPACE-SALARIE · LOT L2 (17/10/2026, FAIT FOI gelé par Manu le 17/10/2026,
+  S1 option B / S3) : la page devient un ONGLET de l'« Espace salarié » — barre
+  d'onglets commune js/espace-salarie.js posée sous la topbar ; titre « Agenda », lien « Importer l'agenda Google (.ics) » sous le titre.
+  Aucune logique ni RPC modifiée.
 -->
 <link rel="stylesheet" href="css/hub.css">
 <!-- CSS structurel du patron agenda (INTERDIT, consommé). La palette .t-* de la
@@ -118,9 +122,14 @@
 
   <script src="js/hub-nav.js"></script>
 
+  <!-- ESPACE-SALARIE L2 : barre d'onglets commune (js/espace-salarie.js). -->
+  <nav class="es-bar" data-espace-salarie></nav>
+  <script src="js/espace-salarie.js"></script>
+
   <div class="ma-wrap">
-    <h1>Agenda salarié</h1>
-    <p class="ma-sub">Planning des séances du salarié — toutes catégories de mission. Consultation seule ; l'édition d'une séance se fait depuis « Suivi salarié ».</p>
+    <h1>Agenda</h1>
+    <p class="ma-sub">Planning des séances, toutes catégories de mission. Consultation seule ; une séance se modifie depuis l'onglet « Séances ».
+      · <a href="import-agenda-salarie.html">Importer l'agenda Google (.ics)</a></p>
 
     <div class="ma-msg" id="maMsg"></div>
 
