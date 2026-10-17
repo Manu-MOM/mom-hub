@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Activité du salarié — Planning hebdomadaire et suivi des séances · MOM Hub</title>
+<title>Espace salarié — Séances · MOM Hub</title>
 <link rel="icon" type="image/png" href="assets/logo-m2m.png">
 <!--
   MOM Hub · Suivi du salarié — écran à VIGNETTES (MISSION-TO-COUNTER-FRONT, pt 115).
@@ -164,6 +164,41 @@
       N'EST PAS propagé.
     - chargerOccurrences() = point de bascule unique vers une future RPC élargie (voie β) si
       la mesure terrain le justifie. Aujourd'hui : boucle list_mission_seances par mission (voie α).
+
+  MAJ : ESPACE-SALARIE · LOT L1 « tri et actualité d'abord » (17/10/2026, front pur,
+  zéro SQL — FAIT FOI gelé par Manu le 17/10/2026, décisions D1 à D5) :
+    - « À traiter » = séance prevue|realisee dont la date est passée ou aujourd'hui
+      (même règle que seancesAValiderDeMission). « À venir » = prevue|realisee future.
+    - D1 : vignettes -> « n à traiter · m à venir » (remplace « n à faire », qui
+      comptait toutes les prévues, futures comprises) ; vignette avec du travail en
+      attente mise en évidence (.ss-tile.urgent). Ordre des 10 types INCHANGÉ.
+    - D2 : missions d'un type triées par actualité : (0) à traiter, la plus récente
+      d'abord ; (1) cycle scolaire à clore ou questionnaire à envoyer ; (2) en cours
+      / à venir, prochaine séance d'abord ; missions terminées (close, annulée, ou
+      plus rien à traiter ni à venir) regroupées dans « Missions terminées (n) »,
+      replié par défaut (mémoire de session termineesOuvertes).
+    - D3 : séances d'une mission en 3 groupes : À traiter (récentes d'abord) ; À venir
+      (proches d'abord, 5 affichées + « Voir les n suivantes », Set venirDeplies) ;
+      Validées et annulées repliées (récentes d'abord, Set historiqueOuverts).
+    - D4 : filtre d'état « Toutes » par défaut (remplace 'prevue', décision pt 115
+      ci-dessus caduque : les groupes font désormais l'anti-noyade).
+    - D5 : en-tête de mission « n à traiter · m à venir · dernière le JJ mois ».
+    - Décision mineure tracée : « Marquer réalisée » masqué sur une séance future
+      (le serveur la refuse déjà, garde de date sql_243 ; le bouton menait à une erreur).
+    Autres actions, gardes de rôle, repli par mission (missionsPliees) et
+    restauration du scroll INCHANGÉS.
+  MAJ : ESPACE-SALARIE · LOT L2 (17/10/2026, même FAIT FOI, S1 option B) : la page
+  porte DEUX onglets de l'« Espace salarié » (barre js/espace-salarie.js sous la
+  topbar). Sans paramètre -> « Séances » (vignettes + missions ; compteur et congés
+  masqués) ; ?vue=heures -> « Heures & congés » (compteur + repos/congés ; vignettes
+  masquées) + lien employeur (admin|bureau) vers gestion-salarie.html?vue=heures.
+  Bascule par classe body.es-vue-* + CSS : chargements, gardes, RPC INCHANGÉS.
+  Décision déléguée tracée : S1 prévoyait une page « Heures & congés » neuve ; la
+  bascule d'affichage donne le même onglet sans extraire ~600 lignes de code
+  (compteur, export, absences, règles) — zéro risque de régression.
+  Titres : « Saisie des missions & séances » -> « Séances » / « Heures & congés ».
+  L3 (même jour) : lien profond ?type=<code> -> ouvre la vue du type au chargement
+  (utilisé par l'onglet « À traiter » pour « Clore » / « Envoyer » les fins de cycle).
 -->
 <link rel="stylesheet" href="css/hub.css">
 <style>
@@ -257,6 +292,29 @@
   .ss-mission-count { font-size: 12px; color: var(--ink-mute, #6b7a74); white-space: nowrap; }
   .ss-mission-head-right { display: flex; align-items: center; gap: 12px; }
   .ss-mission-empty { padding: 16px; text-align: center; color: var(--ink-mute, #6b7a74); font-size: 13px; }
+
+  /* ----- ESPACE-SALARIE L2 : une page, deux onglets (?vue=heures) ----- */
+  body.es-vue-seances #ssCompteur, body.es-vue-seances #ssAbsences { display: none !important; }
+  body.es-vue-heures #ssGridView, body.es-vue-heures #ssTypeView { display: none !important; }
+  body.es-vue-heures #ssCompteur { border-top: 0; padding-top: 0; margin-top: 8px; }
+
+  /* ----- ESPACE-SALARIE L1 : tri par actualité ----- */
+  .ss-tile.urgent { border-color: var(--gold, #d4a93a); box-shadow: inset 4px 0 0 var(--gold, #d4a93a); }
+  .ss-tile .ss-tile-count.traiter { color: #8a5a0b; font-weight: 700; }
+  .ss-mission-count.traiter { color: #8a5a0b; font-weight: 700; }
+  .ss-grp-lbl { margin: 0; padding: 8px 16px; font-size: 11px; font-weight: 700; letter-spacing: .06em;
+                text-transform: uppercase; color: var(--ink-mute, #6b7a74); background: #fdfcf8;
+                border-bottom: 1px solid var(--paper-warm, #e3e0d8); }
+  .ss-grp-lbl.traiter { color: #8a5a0b; background: var(--feedback-warning-bg, #fbf1dd); }
+  .ss-grp-more { display: block; width: 100%; padding: 10px 16px; border: 0; border-top: 1px solid var(--paper-warm, #e3e0d8);
+                 background: #fff; color: var(--vert-prairie, #2d7a3e); font: inherit; font-size: 13px; font-weight: 600;
+                 text-align: left; cursor: pointer; }
+  .ss-grp-more:hover { background: var(--paper, #f8f5ec); }
+  .ss-terminees { margin-top: 18px; }
+  .ss-terminees-toggle { display: flex; align-items: center; gap: 8px; width: 100%; padding: 12px 16px;
+                         border: 1px dashed var(--line, #cabe9f); border-radius: 10px; background: var(--paper, #f8f5ec);
+                         color: var(--ink, #0c3d24); font: inherit; font-size: 14px; font-weight: 700; text-align: left; cursor: pointer; }
+  .ss-terminees-body { margin-top: 14px; }
 
   /* ----- Agenda semaine ----- */
   .ss-agenda { background: #fff; border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 12px; padding: 14px; }
@@ -428,10 +486,19 @@
 
   <script src="js/hub-nav.js"></script>
 
+  <!-- ESPACE-SALARIE L2 : barre d'onglets commune (js/espace-salarie.js). -->
+  <nav class="es-bar" data-espace-salarie></nav>
+  <script src="js/espace-salarie.js"></script>
+
 
 <div class="ss-wrap">
-  <h1>Saisie des missions &amp; séances</h1>
-  <p class="ss-sub" id="ssSub">Planning hebdomadaire et suivi des séances</p>
+  <h1 id="ssTitre">Séances</h1>
+  <p class="ss-sub" id="ssSub">Missions et séances, les plus récentes d’abord</p>
+  <!-- ESPACE-SALARIE L2 : dans l'onglet « Heures & congés », lien employeur
+       (admin|bureau) vers le compteur détaillé de gestion-salarie.html. -->
+  <p class="ss-sub" id="ssLienEmployeur" hidden>
+    <a href="gestion-salarie.html?vue=heures" style="color:var(--vert-prairie,#2d7a3e);font-weight:600;">Compteur détaillé, prévisionnel et relevé (vue employeur) →</a>
+  </p>
 
   <div id="ssMsg" class="ss-msg"></div>
 
@@ -469,7 +536,7 @@
           <option value="realisee">Réalisée</option>
           <option value="validee">Validée</option>
           <option value="annulee">Annulée</option>
-          <option value="__all">Toutes</option>
+          <option value="__all" selected>Toutes</option>
         </select>
       </div>
       <span class="sp"></span>
@@ -1071,6 +1138,18 @@
   // Suivi du salarié — écran à vignettes (pt 115)
   // ============================================================
   const client = SupabaseHub.client;
+
+  // ESPACE-SALARIE L2 : la page porte deux onglets de l'Espace salarié.
+  // ?vue=heures -> « Heures & congés » (compteur + repos/congés) ; sinon « Séances ».
+  // Bascule purement d'affichage (classe sur body + CSS) : les chargements,
+  // gardes et RPC sont inchangés.
+  const VUE = (new URLSearchParams(window.location.search).get('vue') === 'heures') ? 'heures' : 'seances';
+  document.body.classList.add('es-vue-' + VUE);
+  if (VUE === 'heures') {
+    document.title = 'Espace salarié — Heures & congés · MOM Hub';
+    document.getElementById('ssTitre').textContent = 'Heures & congés';
+    document.getElementById('ssSub').textContent = 'Compteur d’heures annualisées, repos et congés';
+  }
   function $(id) { return document.getElementById(id); }
 
   // ---- Référentiel des 10 types (ordre + libellés = kit §1) ----
@@ -1139,6 +1218,11 @@
   // liste/agenda et aux changements de type. Portée = session de page (voulu,
   // FAIT FOI 02/07/2026) : un rechargement repart tout déplié.
   const missionsPliees = new Set();
+  // ESPACE-SALARIE L1 (D2/D3) : mémoires de session des groupes repliables.
+  let termineesOuvertes = false;        // bloc « Missions terminées » (replié par défaut)
+  const venirDeplies = new Set();       // mission.id dont toutes les séances à venir sont affichées
+  const historiqueOuverts = new Set();  // mission.id dont le groupe « Validées et annulées » est ouvert
+  const VENIR_VISIBLES = 5;
 
   // ============================================================
   // Helper RPC (calque gestion-salarie.html : appel par nom)
@@ -1223,12 +1307,23 @@
     out.sort(function (a, b) { return String(a.date_seance).localeCompare(String(b.date_seance)); });
     return out;
   }
-  // Compte des occurrences 'prevue' par type (badge vignette).
-  function comptePrevuesParType() {
+  // ESPACE-SALARIE L1 : classement d'une séance par rapport à aujourd'hui.
+  // « À traiter » = prevue|realisee passée ou du jour (même règle que
+  // seancesAValiderDeMission) ; « À venir » = prevue|realisee future.
+  function jourSeance(o) { return String(o.date_seance).slice(0, 10); }
+  function estATraiter(o, auj) { return (o.etat === 'prevue' || o.etat === 'realisee') && jourSeance(o) <= auj; }
+  function estAVenir(o, auj) { return (o.etat === 'prevue' || o.etat === 'realisee') && jourSeance(o) > auj; }
+
+  // Compte « à traiter » / « à venir » par type (vignettes, D1).
+  function comptesParType() {
+    const auj = isoDate(new Date());
     const c = {};
     missions.forEach(function (m) {
+      const k = m.type_mission;
+      if (!c[k]) c[k] = { traiter: 0, venir: 0 };
       (occByMission[m.id] || []).forEach(function (o) {
-        if (o.etat === 'prevue') c[m.type_mission] = (c[m.type_mission] || 0) + 1;
+        if (estATraiter(o, auj)) c[k].traiter++;
+        else if (estAVenir(o, auj)) c[k].venir++;
       });
     });
     return c;
@@ -1238,22 +1333,26 @@
   // GRILLE DE VIGNETTES
   // ============================================================
   function renderGrid() {
-    const counts = comptePrevuesParType();
+    const counts = comptesParType();
+    const vide = { traiter: 0, venir: 0 };
     const grid = $('ssGrid');
     grid.innerHTML = '';
     TYPES.forEach(function (t) {
-      grid.appendChild(buildTile(t, counts[t.code] || 0));
+      grid.appendChild(buildTile(t, counts[t.code] || vide));
     });
     const dr = $('ssDiversRow');
     dr.innerHTML = '';
-    dr.appendChild(buildTile(TYPE_DIVERS, counts[TYPE_DIVERS.code] || 0, true));
+    dr.appendChild(buildTile(TYPE_DIVERS, counts[TYPE_DIVERS.code] || vide, true));
   }
   function buildTile(t, n, isDivers) {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'ss-tile' + (isDivers ? ' divers' : '');
-    const countCls = n > 0 ? 'ss-tile-count has' : 'ss-tile-count';
-    const countTxt = n > 0 ? (n + ' à faire') : '—';
+    b.className = 'ss-tile' + (isDivers ? ' divers' : '') + (n.traiter > 0 ? ' urgent' : '');
+    const parts = [];
+    if (n.traiter > 0) parts.push('<b>' + n.traiter + ' à traiter</b>');
+    if (n.venir > 0) parts.push(n.venir + ' à venir');
+    const countCls = n.traiter > 0 ? 'ss-tile-count traiter' : (n.venir > 0 ? 'ss-tile-count has' : 'ss-tile-count');
+    const countTxt = parts.length ? parts.join(' · ') : '—';
     b.innerHTML =
       '<span class="ss-tile-ic">' + (ICONS[t.ic] || '') + '</span>' +
       '<span class="ss-tile-lib">' + t.lib + '</span>' +
@@ -1315,6 +1414,51 @@
   // Toutes les missions du type restent visibles ; le filtre d'état s'applique
   // AUX SÉANCES de chaque mission (D1) ; une mission sans séance pour le filtre
   // affiche un sous-message dédié. Tout déplié en v1 (D3).
+  // ESPACE-SALARIE L1 (D2) : résumé d'actualité d'une mission, calculé sur TOUTES
+  // ses séances (indépendant du filtre d'état affiché).
+  function resumeMission(m) {
+    const auj = isoDate(new Date());
+    const occ = occByMission[m.id] || [];
+    let traiter = 0, venir = 0, derniereTraiter = '', derniere = '', prochaine = '';
+    occ.forEach(function (o) {
+      const d = jourSeance(o);
+      if (estATraiter(o, auj)) { traiter++; if (d > derniereTraiter) derniereTraiter = d; }
+      else if (estAVenir(o, auj)) { venir++; if (!prochaine || d < prochaine) prochaine = d; }
+      if (o.etat !== 'annulee' && d <= auj && d > derniere) derniere = d;
+    });
+    const scolaire = m.type_mission === 'intervention_scolaire';
+    let rang;
+    if (traiter > 0) rang = 0;
+    else if (scolaire && m.etat === 'terminee' && !m.questionnaire_fait) rang = 1;
+    else if (scolaire && m.etat !== 'terminee' && m.etat !== 'annulee' && cycleScolaireTermine(m)) rang = 1;
+    else if (m.etat === 'terminee' || m.etat === 'annulee') rang = 3;
+    else if (venir > 0 || !occ.length) rang = 2;
+    else rang = 3;
+    return { traiter: traiter, venir: venir, derniereTraiter: derniereTraiter,
+             derniere: derniere, prochaine: prochaine, rang: rang };
+  }
+  // Ordre D2 : rang croissant ; dans le rang, l'actualité la plus brûlante d'abord.
+  function trierParActualite(mis) {
+    const res = {};
+    mis.forEach(function (m) { res[m.id] = resumeMission(m); });
+    return mis.slice().sort(function (a, b) {
+      const ra = res[a.id], rb = res[b.id];
+      if (ra.rang !== rb.rang) return ra.rang - rb.rang;
+      if (ra.rang === 0) return rb.derniereTraiter.localeCompare(ra.derniereTraiter);
+      if (ra.rang === 2) {
+        if (ra.prochaine && rb.prochaine) return ra.prochaine.localeCompare(rb.prochaine);
+        if (ra.prochaine !== rb.prochaine) return ra.prochaine ? -1 : 1;
+      }
+      const c = rb.derniere.localeCompare(ra.derniere);
+      return c || String(a.libelle || '').localeCompare(String(b.libelle || ''), 'fr');
+    }).map(function (m) { return { m: m, r: res[m.id] }; });
+  }
+  const MOIS_COURTS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+  function jourMoisCourt(iso) {
+    const p = String(iso).slice(0, 10).split('-');
+    return parseInt(p[2], 10) + ' ' + MOIS_COURTS[parseInt(p[1], 10) - 1];
+  }
+
   function renderListe() {
     const wrap = $('ssList');
     const mis = missionsDuType(currentType);
@@ -1323,13 +1467,43 @@
       return;
     }
     wrap.innerHTML = '';
-    mis.forEach(function (m) {
-      wrap.appendChild(buildMissionBlock(m));
-    });
+    const tries = trierParActualite(mis);
+    const actives = tries.filter(function (x) { return x.r.rang < 3; });
+    const terminees = tries.filter(function (x) { return x.r.rang === 3; });
+    actives.forEach(function (x) { wrap.appendChild(buildMissionBlock(x.m, x.r)); });
+    if (!actives.length) {
+      const e = document.createElement('div');
+      e.className = 'ss-empty';
+      e.textContent = 'Aucune mission en cours pour ce type.';
+      wrap.appendChild(e);
+    }
+    if (terminees.length) {
+      const box = document.createElement('div');
+      box.className = 'ss-terminees';
+      const tg = document.createElement('button');
+      tg.type = 'button';
+      tg.className = 'ss-terminees-toggle';
+      tg.setAttribute('aria-expanded', termineesOuvertes ? 'true' : 'false');
+      tg.textContent = (termineesOuvertes ? '▾ ' : '▸ ') + 'Missions terminées (' + terminees.length + ')';
+      const body = document.createElement('div');
+      body.className = 'ss-terminees-body';
+      body.hidden = !termineesOuvertes;
+      terminees.forEach(function (x) { body.appendChild(buildMissionBlock(x.m, x.r)); });
+      tg.addEventListener('click', function () {
+        termineesOuvertes = !termineesOuvertes;
+        body.hidden = !termineesOuvertes;
+        tg.setAttribute('aria-expanded', termineesOuvertes ? 'true' : 'false');
+        tg.textContent = (termineesOuvertes ? '▾ ' : '▸ ') + 'Missions terminées (' + terminees.length + ')';
+      });
+      box.appendChild(tg);
+      box.appendChild(body);
+      wrap.appendChild(box);
+    }
   }
 
   // Un bloc = en-tête mission + ses séances filtrées (ou sous-message si aucune).
-  function buildMissionBlock(m) {
+  function buildMissionBlock(m, r) {
+    if (!r) r = resumeMission(m);
     const occ = occurrencesDeMission(m);
     const block = document.createElement('div');
     block.className = 'ss-mission';
@@ -1354,10 +1528,14 @@
     title.appendChild(chevron);
     title.appendChild(titleText);
     const count = document.createElement('span');
-    count.className = 'ss-mission-count';
-    count.textContent = occ.length > 0
-      ? (occ.length + (occ.length > 1 ? ' séances' : ' séance'))
-      : '—';
+    // ESPACE-SALARIE L1 (D5) : résumé d'actualité au lieu du simple total.
+    count.className = 'ss-mission-count' + (r.traiter > 0 ? ' traiter' : '');
+    const resume = [];
+    if (r.traiter > 0) resume.push(r.traiter + ' à traiter');
+    if (r.venir > 0) resume.push(r.venir + ' à venir');
+    if (r.derniere) resume.push('dernière le ' + jourMoisCourt(r.derniere));
+    else if (r.prochaine) resume.push('début le ' + jourMoisCourt(r.prochaine));
+    count.textContent = resume.length ? resume.join(' · ') : '—';
     head.appendChild(title);
     // Groupe de droite : compte + bouton éditer (préserve le space-between du head).
     const headRight = document.createElement('div');
@@ -1419,7 +1597,61 @@
       empty.textContent = 'Aucune séance pour ce filtre.';
       body.appendChild(empty);
     } else {
-      occ.forEach(function (o) { body.appendChild(buildRow(o)); });
+      // ESPACE-SALARIE L1 (D3) : trois groupes. occ est trié par date croissante.
+      const auj = isoDate(new Date());
+      const gTraiter = occ.filter(function (o) { return estATraiter(o, auj); }).reverse();
+      const gVenir = occ.filter(function (o) { return estAVenir(o, auj); });
+      const gHisto = occ.filter(function (o) { return o.etat === 'validee' || o.etat === 'annulee'; }).reverse();
+      const lbl = function (txt, cls) {
+        const p = document.createElement('p');
+        p.className = 'ss-grp-lbl' + (cls ? ' ' + cls : '');
+        p.textContent = txt;
+        return p;
+      };
+      if (gTraiter.length) {
+        body.appendChild(lbl('À traiter · les plus récentes d’abord (' + gTraiter.length + ')', 'traiter'));
+        gTraiter.forEach(function (o) { body.appendChild(buildRow(o)); });
+      }
+      if (gVenir.length) {
+        body.appendChild(lbl('À venir (' + gVenir.length + ')'));
+        const tout = venirDeplies.has(m.id);
+        const vis = tout ? gVenir : gVenir.slice(0, VENIR_VISIBLES);
+        vis.forEach(function (o) { body.appendChild(buildRow(o)); });
+        if (gVenir.length > VENIR_VISIBLES) {
+          const reste = gVenir.length - VENIR_VISIBLES;
+          const more = document.createElement('button');
+          more.type = 'button';
+          more.className = 'ss-grp-more';
+          more.textContent = tout ? '▴ Masquer les séances suivantes'
+            : '▾ Voir les ' + reste + (reste > 1 ? ' séances suivantes' : ' séance suivante');
+          more.addEventListener('click', function () {
+            if (venirDeplies.has(m.id)) venirDeplies.delete(m.id); else venirDeplies.add(m.id);
+            block.replaceWith(buildMissionBlock(m, r));
+          });
+          body.appendChild(more);
+        }
+      }
+      if (gHisto.length) {
+        // Filtre explicite sur validee|annulee : le groupe est forcément ouvert.
+        const fEtat = $('ssFilter').value;
+        const ouvert = historiqueOuverts.has(m.id) || fEtat === 'validee' || fEtat === 'annulee';
+        const nbV = gHisto.filter(function (o) { return o.etat === 'validee'; }).length;
+        const nbA = gHisto.length - nbV;
+        const libH = [];
+        if (nbV) libH.push(nbV + (nbV > 1 ? ' validées' : ' validée'));
+        if (nbA) libH.push(nbA + (nbA > 1 ? ' annulées' : ' annulée'));
+        const tg = document.createElement('button');
+        tg.type = 'button';
+        tg.className = 'ss-grp-more';
+        tg.setAttribute('aria-expanded', ouvert ? 'true' : 'false');
+        tg.textContent = (ouvert ? '▾ ' : '▸ ') + 'Historique : ' + libH.join(' · ');
+        tg.addEventListener('click', function () {
+          if (historiqueOuverts.has(m.id)) historiqueOuverts.delete(m.id); else historiqueOuverts.add(m.id);
+          block.replaceWith(buildMissionBlock(m, r));
+        });
+        body.appendChild(tg);
+        if (ouvert) gHisto.forEach(function (o) { body.appendChild(buildRow(o)); });
+      }
     }
     block.appendChild(body);
 
@@ -1475,7 +1707,9 @@
   function buildActions(o) {
     const out = [];
     // Déclarer : prevue|realisee, par Lohann OU admin (garde voie 3 RGPD côté SQL).
-    if (o.etat === 'prevue' || o.etat === 'realisee') {
+    // ESPACE-SALARIE L1 : masqué sur une séance future (le serveur la refuse,
+    // garde de date sql_243 ; même règle que l'agenda salarié).
+    if ((o.etat === 'prevue' || o.etat === 'realisee') && jourSeance(o) <= isoDate(new Date())) {
       out.push(mkBtn('Marquer réalisée', 'ss-btn ss-btn-sm', function () { openDecl(o); }));
     }
     if (peutEcrire) {
@@ -3526,6 +3760,7 @@
   // « tout visible, tout verrouillé ») ; seule l'écriture est gardée.
   $('ssAbsences').hidden = false;
   if (peutEcrire) { $('ssAbsNew').hidden = false; $('ssRegNew').hidden = false; }
+  if (peutEcrire && VUE === 'heures') { $('ssLienEmployeur').hidden = false; }
 
   if ($('season-pill') && saisonActive && saisonActive.libelle) {
     $('season-pill').textContent = String(saisonActive.libelle).toUpperCase();
@@ -3538,6 +3773,10 @@
     await chargerMissions();
     await chargerOccurrences();
     renderGrid();
+    // ESPACE-SALARIE L3 : lien profond ?type=<code> (depuis l'onglet « À traiter »)
+    // -> ouvre directement la vue de ce type dans l'onglet Séances.
+    const typeDemande = new URLSearchParams(window.location.search).get('type');
+    if (VUE === 'seances' && typeDemande && TYPE_BY_CODE[typeDemande]) openType(typeDemande);
     await loadCompteur();
     // ABSENCES-SALARIE (pt 229) : APRÈS loadCompteur, qui résout et mémorise
     // le contrat (exportContrat) dont absCharger a besoin.
