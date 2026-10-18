@@ -62,6 +62,17 @@
       list_prospection_contacts_internes(p_entite_id),
       supprimer_prospection_contact_interne(p_id) [suppression autorisée,
       FAIT FOI §2]. Contact principal (direction) inchangé (FAIT FOI §3).
+
+  MAJ : PROSPECTION-SCOLAIRE · LOT L5 (18/10/2026, FAIT FOI v1.1 gelé, D2,
+  maquette « ça me va » artboard 4) : bloc « Épingler pour Lohann » dans la
+  fiche école (édition uniquement) -> epingler_ecole(p_entite_id, p_epingle,
+  p_note) (sql_ps1/ps1f, garde admin|bureau). Action IMMÉDIATE, indépendante du
+  bouton « Enregistrer » ; la ligne renvoyée met à jour l'école en mémoire.
+  upsert_entite ignore les colonnes d'épingle : un enregistrement de la fiche
+  ne les touche pas. L'épingle tombe seule quand le salarié note un appel (C5).
+  Liste : badge « Épinglée ». Les appels notés par le salarié
+  (noter_appel_prospection) apparaissent dans « Historique des derniers
+  échanges » (même table prospection_contacts) — aucun changement nécessaire.
 -->
 <link rel="stylesheet" href="css/hub.css">
 <style>
@@ -136,6 +147,11 @@
   .ds-state.none        { background: #f0ede6; color: #8a948f; }
 
   /* Avancement dérivé (post-client) */
+  /* PROSPECTION-SCOLAIRE L5 : épingle bureau. */
+  .ds-pin { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600;
+            background: #fbe4dc; color: #8a2f12; }
+  .ds-journal.ds-epingle { border-top: 2px solid var(--clay, #b8451f); }
+  .ds-epingle-acts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
   .ds-derive { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600;
                background: #eef6f1; color: var(--vert-prairie, #1b6b4c); border: 1px dashed #b9d8c6; }
 
@@ -363,6 +379,20 @@
     </div>
 
     <p class="gs-modal-note" id="dsEcoleUai" style="display:none"></p>
+
+    <!-- PROSPECTION-SCOLAIRE L5 : épingle pour le salarié (visible en édition uniquement) -->
+    <div class="ds-journal ds-epingle" id="dsEpingleWrap" style="display:none">
+      <h3>Épingler pour Lohann</h3>
+      <p class="gs-modal-note" id="dsEpingleEtat"></p>
+      <div class="gs-field">
+        <label for="dsEpingleNote">Pourquoi (Lohann le verra sur la ligne)</label>
+        <input type="text" id="dsEpingleNote" maxlength="200" placeholder="Ex. nouvelle directrice, à appeler cette semaine">
+      </div>
+      <div class="ds-epingle-acts">
+        <button class="gs-btn gs-btn-sm" id="dsEpingleBtn" type="button">Épingler</button>
+        <button class="gs-link edit" id="dsDesepingleBtn" type="button" style="display:none">Retirer l'épingle</button>
+      </div>
+    </div>
 
     <!-- Interventions dérivées des missions (visible en édition uniquement) -->
     <div class="ds-journal" id="dsInterventionsWrap" style="display:none">
@@ -744,6 +774,7 @@
         +     '</div>'
         +     '<div class="ds-ec-acts">'
         +       stateBadge(e.statut_prospection) + derive
+        +       (e.epingle_le ? ' <span class="ds-pin">Épinglée</span>' : '')
         +       mailBtn
         +       '<button type="button" class="ds-icbtn" data-edit="' + e.id + '" title="Ouvrir la fiche">'
         +         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>'
@@ -822,6 +853,8 @@
       $('dsEcoleUai').textContent = '';
       $('dsEcoleUai').style.display = 'none';
     }
+    // PROSPECTION-SCOLAIRE L5 : épingle (édition uniquement).
+    renderEpingle(e);
     // Journal : visible seulement en édition (une école doit exister).
     if (e) { $('dsJournalWrap').style.display = 'block'; chargerJournal(e.id); }
     else   { $('dsJournalWrap').style.display = 'none'; $('dsJournalListe').innerHTML = ''; }
@@ -840,6 +873,48 @@
     }
     $('dsEcoleOverlay').classList.add('open');
   }
+  // ---------- PROSPECTION-SCOLAIRE L5 : épingle bureau ----------
+  function renderEpingle(e) {
+    if (!e) { $('dsEpingleWrap').style.display = 'none'; return; }
+    $('dsEpingleWrap').style.display = 'block';
+    const pin = !!e.epingle_le;
+    let etat = 'Non épinglée. Épinglée, elle passe en tête de l\'onglet Démarchage de Lohann, avec votre motif.';
+    if (pin) {
+      const d = new Date(e.epingle_le);
+      etat = 'Épinglée le ' + d.toLocaleDateString('fr-FR') + '. L\'épingle tombe dès que Lohann note un appel.';
+    }
+    $('dsEpingleEtat').textContent = etat;
+    $('dsEpingleNote').value = e.epingle_note || '';
+    $('dsEpingleBtn').textContent = pin ? 'Mettre à jour le motif' : 'Épingler';
+    $('dsDesepingleBtn').style.display = pin ? '' : 'none';
+  }
+  async function epingler(oui) {
+    if (!ficheId) return;
+    const e = ecoleById.get(ficheId);
+    if (!e) return;
+    const b1 = $('dsEpingleBtn'), b2 = $('dsDesepingleBtn');
+    b1.disabled = true; b2.disabled = true;
+    try {
+      const row = await rpc('epingler_ecole', {
+        p_entite_id: ficheId,
+        p_epingle: oui,
+        p_note: oui ? ($('dsEpingleNote').value.trim() || null) : null
+      });
+      if (row) {
+        e.epingle_le = row.epingle_le;
+        e.epingle_note = row.epingle_note;
+        e.epingle_par = row.epingle_par;
+      }
+      renderEpingle(e);
+      renderListe();
+      flash(oui ? 'École épinglée pour Lohann.' : 'Épingle retirée.', 'ok');
+    } catch (err) {
+      flash('Épingle impossible : ' + errMsg(err), 'err');
+    } finally {
+      b1.disabled = false; b2.disabled = false;
+    }
+  }
+
   function closeEcole() { $('dsEcoleOverlay').classList.remove('open'); ficheId = null; }
 
   async function saveEcole() {
@@ -1171,6 +1246,8 @@
   $('dsEcoleClose').addEventListener('click', closeEcole);
   $('dsEcoleCancel').addEventListener('click', closeEcole);
   $('dsEcoleSave').addEventListener('click', saveEcole);
+  $('dsEpingleBtn').addEventListener('click', function () { epingler(true); });
+  $('dsDesepingleBtn').addEventListener('click', function () { epingler(false); });
   $('dsAddContact').addEventListener('click', openContact);
   $('dsAddInterne').addEventListener('click', openInterne);
   $('dsInterneClose').addEventListener('click', closeInterne);
