@@ -7,6 +7,8 @@
  * salarié ». Aucune page n'est fusionnée : chaque page garde sa garde d'accès,
  * ses RPC et son code ; ce module ne fait QUE dessiner la barre d'onglets.
  *
+ *   Démarchage           -> demarchage-scolaire.html        (staff ; PROSPECTION-SCOLAIRE L3,
+ *                                                            v1.1 du 18/10/2026, FAIT FOI v1.1 gelé)
  *   Séances              -> suivi-salarie.html              (staff)
  *   Agenda               -> missions-agenda.html            (staff ; import-agenda-salarie.html
  *                                                            est une profondeur de cet onglet)
@@ -28,10 +30,11 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.0';
+  var VERSION = '1.1';
 
   var ONGLETS = [
     { cle: 'traiter', label: 'À traiter',            href: 'espace-salarie.html' },
+    { cle: 'demarchage', label: 'Démarchage',        href: 'demarchage-scolaire.html' },
     { cle: 'seances', label: 'Séances',              href: 'suivi-salarie.html' },
     { cle: 'agenda',  label: 'Agenda',               href: 'missions-agenda.html' },
     { cle: 'heures',  label: 'Heures & congés',      href: 'suivi-salarie.html?vue=heures' },
@@ -61,6 +64,7 @@
     var f = u.pathname.split('/').pop() || '';
     var vue = u.searchParams.get('vue');
     if (f === 'espace-salarie.html') { return 'traiter'; }
+    if (f === 'demarchage-scolaire.html') { return 'demarchage'; }
     if (f === 'suivi-salarie.html') { return vue === 'heures' ? 'heures' : 'seances'; }
     if (f === 'missions-agenda.html' || f === 'import-agenda-salarie.html') { return 'agenda'; }
     if (f === 'gestion-salarie.html') { return vue === 'heures' ? 'heures' : 'ecoles'; }
