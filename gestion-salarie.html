@@ -144,6 +144,14 @@
   démarchage écoles » est déplacée (DOM, mêmes id) dans sa propre section de
   l'onglet Écoles. Titre « Suivi et Facturation » -> « Écoles & facturation ».
   Chargements, gardes, RPC INCHANGÉS.
+  MAJ : PROSPECTION-SCOLAIRE · LOT L2 (18/10/2026, FAIT FOI v1.1 gelé, D4 = A) :
+  la CAPACITÉ de la « Projection démarchage écoles » (créneaux hebdo + 6 dates
+  de méga-cycles) vit désormais EN BASE (table parametres_scolaire, saison
+  active) : lue par get_parametres_scolaire(), écrite par
+  set_parametres_scolaire(p_creneaux, p_bornes) (sql_ps1, ps1c/ps1d). La base
+  prime sur le localStorage ; reprise UNIQUE de la valeur locale si la base est
+  vide. Tarif et taux de remplissage restent locaux (hypothèses de pilotage).
+  Même chiffre que l'objectif affiché au salarié (objectif_demarchage_scolaire).
 -->
 <link rel="stylesheet" href="css/hub.css">
 
@@ -671,7 +679,9 @@
          créneaux hebdo × 1 cycle par méga-cycle ; posé compté dans
          gcPrevSeances (type intervention_scolaire, fenêtres de dates) ;
          curseur taux de remplissage ; synthèses heures + tarification.
-         Estimation de pilotage : rien en base, rien dans les exports. -->
+         Estimation de pilotage, rien dans les exports. PROSPECTION-SCOLAIRE L2 :
+         créneaux + dates EN BASE (parametres_scolaire), partagés avec l'objectif
+         du salarié ; tarif + taux restent locaux. -->
     <h3 class="gc-prev-h3" id="gcEcoH3">Projection démarchage écoles</h3>
     <div class="gc-eco-cfg">
       <label>Créneaux hebdo
@@ -681,6 +691,7 @@
         <input type="number" id="gcEcoTarif" min="0" step="10" value="120">
       </label><span>€</span>
       <span class="gc-eco-hint">1 cycle = 1 classe · 5 séances de 1 h · 1 créneau/sem</span>
+      <span class="gc-eco-hint" id="gcEcoSync"></span>
       <button type="button" class="gc-export-btn gc-eco-btn" id="gcEcoDatesBtn">Dates des périodes</button>
     </div>
     <div class="gc-eco-dates" id="gcEcoDates" hidden>
@@ -2691,7 +2702,10 @@
   // même définition que la carte « Projection » — jamais deux vérités).
   // Euros = cycles × tarif saisi : estimation de pilotage, mention permanente
   // à l'écran, la facturation réelle reste portée par le bilan effectif.
-  // Rien en base, rien dans les exports ; config en localStorage gcProjEcoles.
+  // Rien dans les exports ; config en localStorage gcProjEcoles, SAUF créneaux
+  // et bornes qui vivent en base depuis PROSPECTION-SCOLAIRE L2 (18/10/2026,
+  // D4 = A) : parametres_scolaire (saison active), lus/écrits par RPC. La base
+  // prime ; le localStorage n'en garde qu'une copie de secours.
   const GC_ECO_TYPE = 'intervention_scolaire'; // clé canonique (CHECK sql_114, GC_TYPE_LBL)
   const GC_ECO_SEANCES_CYCLE = 5;              // 5 séances par cycle
   const GC_ECO_H_CYCLE = 5;                    // 5 h par cycle (5 × 1 h)
@@ -2708,25 +2722,109 @@
 
   function gcEcoFmtEur(n) { return Math.round(Number(n)).toLocaleString('fr-FR') + ' €'; }
 
+  // PROSPECTION-SCOLAIRE L2 : capacité en base. gcEcoBase = ligne de
+  // parametres_scolaire de la saison active (null tant que non lue ou absente).
+  let gcEcoBase = null;
+  let gcEcoBaseLue = false;   // true dès que get_parametres_scolaire a répondu
+  let gcEcoSyncTimer = null;
+
+  function gcEcoSyncMsg(txt) { const el = $('gcEcoSync'); if (el) { el.textContent = txt || ''; } }
+
+  function gcEcoBornesCroissantes(b) {
+    for (let i = 0; i < 5; i++) { if (!(b[i] < b[i + 1])) { return false; } }
+    return true;
+  }
+
+  // Normalise une date renvoyée par PostgREST ('2026-09-01') en chaîne ISO jour.
+  function gcEcoIsoJour(d) { return String(d).slice(0, 10); }
+
   // Lecture de la config mémorisée (fail-soft : toute anomalie -> défauts).
   function gcEcoLireCfg() {
     const def = { creneaux: 0, tarif: 120, bornes: GC_ECO_BORNES_DEFAUT.slice(), taux: 100 };
     try {
       const raw = localStorage.getItem(GC_ECO_LS_KEY);
-      if (!raw) { return def; }
+      if (!raw) { return gcEcoAppliquerBase(def); }
       const c = JSON.parse(raw);
       const okDate = function (s) { return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s); };
-      return {
+      return gcEcoAppliquerBase({
         creneaux: (Number.isFinite(Number(c.creneaux)) && Number(c.creneaux) >= 0) ? Math.floor(Number(c.creneaux)) : def.creneaux,
         tarif: (Number.isFinite(Number(c.tarif)) && Number(c.tarif) >= 0) ? Number(c.tarif) : def.tarif,
         bornes: (Array.isArray(c.bornes) && c.bornes.length === 6 && c.bornes.every(okDate)) ? c.bornes.slice() : def.bornes,
         taux: (Number.isFinite(Number(c.taux)) && Number(c.taux) >= 0 && Number(c.taux) <= 100) ? Number(c.taux) : def.taux
-      };
-    } catch (e) { return def; }
+      });
+    } catch (e) { return gcEcoAppliquerBase(def); }
+  }
+
+  // PROSPECTION-SCOLAIRE L2 : créneaux + bornes de la base écrasent la copie locale.
+  function gcEcoAppliquerBase(cfg) {
+    if (gcEcoBase) {
+      cfg.creneaux = Number(gcEcoBase.creneaux);
+      cfg.bornes = (gcEcoBase.bornes || []).map(gcEcoIsoJour);
+    }
+    return cfg;
   }
 
   function gcEcoEcrireCfg(cfg) {
     try { localStorage.setItem(GC_ECO_LS_KEY, JSON.stringify(cfg)); } catch (e) { /* quota/privé : sans conséquence */ }
+    gcEcoPlanifierBase(cfg);
+  }
+
+  // PROSPECTION-SCOLAIRE L2 : envoi différé (800 ms) de créneaux + bornes à la
+  // base, seulement s'ils diffèrent de la ligne connue et si les dates sont
+  // strictement croissantes (CHECK de parametres_scolaire). Échec -> message,
+  // jamais bloquant pour la projection locale.
+  function gcEcoPlanifierBase(cfg) {
+    if (!gcEcoBaseLue) { return; }
+    const memes = gcEcoBase
+      && Number(gcEcoBase.creneaux) === cfg.creneaux
+      && (gcEcoBase.bornes || []).map(gcEcoIsoJour).join(',') === cfg.bornes.join(',');
+    if (memes) { return; }
+    if (!gcEcoBornesCroissantes(cfg.bornes)) {
+      gcEcoSyncMsg('Dates non croissantes : capacité non partagée.');
+      return;
+    }
+    if (gcEcoSyncTimer) { clearTimeout(gcEcoSyncTimer); }
+    gcEcoSyncMsg('Enregistrement…');
+    const envoi = { creneaux: cfg.creneaux, bornes: cfg.bornes.slice() };
+    gcEcoSyncTimer = setTimeout(function () { gcEcoEnvoyerBase(envoi); }, 800);
+  }
+
+  async function gcEcoEnvoyerBase(envoi) {
+    try {
+      const row = await rpc('set_parametres_scolaire', { p_creneaux: envoi.creneaux, p_bornes: envoi.bornes });
+      gcEcoBase = row || gcEcoBase;
+      gcEcoSyncMsg('Capacité partagée avec l\'Espace salarié');
+    } catch (e) {
+      gcEcoSyncMsg('Capacité non enregistrée : ' + errMsg(e));
+    }
+  }
+
+  // PROSPECTION-SCOLAIRE L2 : lecture de la capacité en base, puis reprise
+  // UNIQUE de la copie locale si la base est vide et que des créneaux y sont
+  // saisis (> 0). Repose les champs et relance le rendu.
+  async function gcEcoChargerBase() {
+    try {
+      const rows = (await rpc('get_parametres_scolaire')) || [];
+      gcEcoBase = rows.length ? rows[0] : null;
+      gcEcoBaseLue = true;
+    } catch (e) {
+      gcEcoSyncMsg('Capacité en base illisible : ' + errMsg(e));
+      return;
+    }
+    if (gcEcoBase) {
+      const cfg = gcEcoLireCfg();
+      const inC = $('gcEcoCreneaux'); if (inC) { inC.value = String(cfg.creneaux); }
+      GC_ECO_IDS_BORNES.forEach(function (id, i) { const el = $(id); if (el) { el.value = cfg.bornes[i]; } });
+      gcEcoSyncMsg('Capacité partagée avec l\'Espace salarié');
+      gcEcolesRender();
+      return;
+    }
+    const local = gcEcoCfgDepuisUI();
+    if (local.creneaux > 0 && gcEcoBornesCroissantes(local.bornes)) {
+      await gcEcoEnvoyerBase({ creneaux: local.creneaux, bornes: local.bornes.slice() });
+    } else {
+      gcEcoSyncMsg('Saisissez les créneaux : ils seront partagés avec l\'Espace salarié.');
+    }
   }
 
   // Config courante lue de l'UI (source d'affichage), repli défauts si champ vide.
@@ -2761,6 +2859,7 @@
     });
     const btn = $('gcEcoDatesBtn'); const pan = $('gcEcoDates');
     if (btn && pan) { btn.addEventListener('click', function () { pan.hidden = !pan.hidden; }); }
+    gcEcoChargerBase();  // PROSPECTION-SCOLAIRE L2 : asynchrone, non bloquant
   }
 
   function gcEcoCarte(lbl, val, sub) {
