@@ -36,6 +36,15 @@
     dont qui_suis_je() porte des missions ; sinon retour au portail).
   Pas de badge dans la barre d'onglets : doctrine nav « zéro contenu vivant »
     (hub-nav N6) — le compte vit dans la page.
+
+  MAJ : PROSPECTION-SCOLAIRE · LOT L4 (18/10/2026, FAIT FOI v1.1 gelé, maquette
+  « ça me va » artboard 3) : carte « Démarchage écoles » sous « Aujourd'hui » :
+  relances dues (même règle que l'onglet Démarchage : statut ni client ni en
+  sommeil, relance du dernier échange <= aujourd'hui), épinglées par le bureau,
+  écoles à reconduire. Lecture list_prospection_pour_salarie v2 (ps1g), chargée
+  à part et FAIL-SOFT (erreur -> carte masquée, le reste de la page inchangé).
+  Carte masquée quand les trois compteurs sont à zéro. Liens vers l'onglet
+  « Démarchage » (demarchage-scolaire.html). Aucune écriture.
 -->
 <link rel="stylesheet" href="css/hub.css">
 <style>
@@ -64,6 +73,8 @@
                 color: var(--ink-mute, #6b7a74); }
   .at-card.today { border: 2px solid var(--vert-prairie, #2d7a3e); }
   .at-card.today h2 { color: var(--vert-prairie, #2d7a3e); }
+  .at-card.demarch { border: 2px solid var(--gold, #d4a93a); }
+  .at-card.demarch h2 { color: #7a4d0c; }
   .at-today-item + .at-today-item { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--paper-warm, #e3e0d8); }
   .at-today-lib { margin: 0; font-size: 17px; font-weight: 700; color: var(--ink, #0c3d24); }
   .at-today-meta { margin: 2px 0 10px; font-size: 13px; color: var(--ink-mute, #6b7a74); }
@@ -170,6 +181,7 @@
     </section>
     <aside class="at-side">
       <div class="at-card today" id="atToday"><h2>Aujourd’hui</h2><p class="at-empty">Chargement…</p></div>
+      <div class="at-card demarch" id="atDemarch" hidden></div>
       <div class="at-card" id="atCycles" hidden></div>
       <div class="at-card" id="atFactu" hidden></div>
     </aside>
@@ -203,6 +215,7 @@
   let missions = [];
   let occByMission = {};
   let factures = [];
+  let prospection = null;        // PROSPECTION-SCOLAIRE L4 : lignes v2, null = non lues / illisibles
   let periode = null;
   let anciennesOuvertes = false;
   const enCours = new Set();     // ids de séances en cours d'écriture (anti double clic)
@@ -372,6 +385,7 @@
     renderJours(passees.filter(function (o) { return jourDe(o) < auj && (peutEcrire || actionnable(o)); }));
     renderCycles();
     renderFactu();
+    renderDemarch();
   }
 
   function renderKpis(nTraiter, nAttente, nVenir, nCycle) {
@@ -537,6 +551,40 @@
       .forEach(function (m) { ligne(m.libelle || '(sans libellé)', 'questionnaire', lien, 'Envoyer →'); });
   }
 
+  // PROSPECTION-SCOLAIRE L4 : lecture à part, sans jamais bloquer la page.
+  async function chargerProspection() {
+    try { prospection = (await rpc('list_prospection_pour_salarie')) || []; }
+    catch (e) { prospection = null; }
+  }
+
+  function renderDemarch() {
+    const box = $('atDemarch');
+    box.innerHTML = '';
+    if (!prospection) { box.hidden = true; return; }
+    const auj = aujISO();
+    const relances = prospection.filter(function (e) {
+      return e.statut_prospection !== 'client' && e.statut_prospection !== 'inactif'
+        && e.derniere_relance && String(e.derniere_relance).slice(0, 10) <= auj;
+    }).length;
+    const epinglees = prospection.filter(function (e) { return e.epingle_le && e.statut_prospection !== 'inactif'; }).length;
+    const recond = prospection.filter(function (e) { return e.a_reconduire && !e.epingle_le; }).length;
+    if (!relances && !epinglees && !recond) { box.hidden = true; return; }
+    box.hidden = false;
+    box.appendChild(el('h2', null, 'Démarchage écoles'));
+    const ligne = function (n, un, plusieurs) {
+      if (!n) return;
+      const li = el('div', 'at-li');
+      li.appendChild(el('span', null, n + ' ' + (n > 1 ? plusieurs : un)));
+      const a = el('a', null, 'Ouvrir →');
+      a.href = 'demarchage-scolaire.html';
+      li.appendChild(a);
+      box.appendChild(li);
+    };
+    ligne(relances, 'relance due', 'relances dues');
+    ligne(epinglees, 'école épinglée par le bureau', 'écoles épinglées par le bureau');
+    ligne(recond, 'école à reconduire', 'écoles à reconduire');
+  }
+
   function renderFactu() {
     const box = $('atFactu');
     box.innerHTML = '';
@@ -582,7 +630,7 @@
   if (so) so.addEventListener('click', async function () { try { await SupabaseHub.signOut(); } catch (e) {} window.location.replace('login.html'); });
 
   try {
-    await Promise.all([charger(), chargerAnnualisation()]);
+    await Promise.all([charger(), chargerAnnualisation(), chargerProspection()]);
     render();
   } catch (e) {
     $('atJours').innerHTML = '';
