@@ -39,6 +39,25 @@
   Toutes — clientes et en sommeil ne sortent que sous « Toutes ») ;
   zone (Toutes / Molsheim / Proche secteur / Obernai nord / Obernai sud).
   Recherche accent-insensible sur libellé, commune, zone.
+
+  MAJ : PROSPECTION-SCOLAIRE · LOT L3 (18/10/2026, FAIT FOI v1.1 gelé, maquette
+  « ça me va ») : la page devient l'onglet « Démarchage » de l'Espace salarié
+  (barre js/espace-salarie.js v1.1 ; URL et thème hub-nav « ecoles » inchangés,
+  T5 : aucune modification de hub-nav.js).
+    - En tête : OBJECTIF tiré de la capacité en base
+      (objectif_demarchage_scolaire, ps1d) : « Il reste N classes à trouver
+      pour <prochaine période non commencée> » (T1) + ligne de la suivante.
+    - Sections « Épinglées par le bureau » (D2, motif affiché) et « À
+      reconduire » (D3/C6, colonnes v2 de list_prospection_pour_salarie, ps1g),
+      puis la liste complète (filtres et tri inchangés ; les écoles déjà
+      montrées dans une section n'y sont répétées que sous « Toutes »).
+    - « Noter l'appel » REMPLACE « C'est fait » (C7) : feuille à 3 issues
+      (pas joignable J+2 · intéressée J+7 · non merci 1er septembre suivant ;
+      week-end -> lundi, T2), date modifiable, mot facultatif ->
+      noter_appel_prospection (ps1e) : journal + statut + épingle retirée.
+      marquer_contactee n'est plus appelée (reste en base).
+    - Reconduction : lien vers l'onglet Séances (clôture du cycle et
+      questionnaire de satisfaction, flux CLORE-CYCLE existant).
 -->
 <link rel="stylesheet" href="css/hub.css">
 <style>
@@ -95,6 +114,70 @@
   .dg-lien { color: var(--bleu-base, #1f4a82); text-decoration: underline; cursor: pointer;
              background: transparent; border: 0; font: inherit; font-size: 13px; padding: 0; }
 
+  /* PROSPECTION-SCOLAIRE L3 : objectif, sections, feuille « Noter l'appel ». */
+  .dg-obj { background: var(--vert-bouteille, #0c3d24); color: var(--paper, #f8f5ec); border-radius: 14px;
+            padding: 16px; margin: 0 0 18px; }
+  .dg-obj-k { margin: 0 0 6px; font-size: 11px; font-weight: 700; letter-spacing: .08em;
+              text-transform: uppercase; color: var(--gold, #d4a93a); }
+  .dg-obj-v { margin: 0 0 8px; font-size: 20px; font-weight: 700; line-height: 1.25; }
+  .dg-obj-bar { height: 8px; background: rgba(248,245,236,.2); border-radius: 99px; overflow: hidden; margin: 0 0 8px; }
+  .dg-obj-bar span { display: block; height: 8px; background: var(--gold, #d4a93a); }
+  .dg-obj-s { margin: 0; font-size: 12px; color: var(--paper-deep, #e2d9bf); }
+  .dg-obj.vide { background: #fff; color: var(--ink, #0c3d24); border: 1px dashed var(--line, #cabe9f); }
+  .dg-obj.vide .dg-obj-s { color: var(--ink-mute, #6b7a74); }
+
+  .dg-sec { margin: 0 0 18px; }
+  .dg-sec-h { margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: .05em;
+              text-transform: uppercase; color: var(--ink, #0c3d24); }
+  .dg-sec-box { background: #fff; border: 1px solid var(--paper-warm, #e3e0d8); border-radius: 12px; padding: 0 12px; }
+  .dg-sec-box .dg-row:last-child { border-bottom: 0; }
+  .dg-sec.epingle .dg-sec-box { border-color: var(--clay, #b8451f); }
+  .dg-motif { margin: 6px 0 0; padding: 6px 10px; background: var(--paper, #f8f5ec); border-radius: 8px;
+              font-size: 12px; color: var(--ink, #0c3d24); }
+  .dg-sec-note { margin: 6px 0 0; font-size: 12px; color: var(--ink-mute, #6b7a74); }
+  .dg-badge.epingle  { background: #fbe4dc; color: #8a2f12; }
+  .dg-badge.reconduire { background: #fdf1dc; color: #7a4d0c; }
+
+  .dg-noter { border: 1.5px solid var(--vert-bouteille, #0c3d24); background: #fff; border-radius: 8px;
+              padding: 6px 10px; min-height: 34px; font: inherit; font-size: 12px; font-weight: 700;
+              color: var(--vert-bouteille, #0c3d24); cursor: pointer; white-space: nowrap; }
+
+  @media (max-width: 560px) {
+    .dg-row-top { flex-wrap: wrap; row-gap: 8px; }
+    .dg-row-main { flex: 1 1 100%; }
+    .dg-acts { flex-wrap: wrap; width: 100%; }
+    .dg-acts .dg-badge { margin-right: auto; }
+    .dg-noter { min-height: 40px; }
+    .dg-icbtn { padding: 9px 11px; }
+  }
+
+  .dg-ov { position: fixed; inset: 0; background: rgba(12,61,36,.45); display: none;
+           align-items: flex-end; justify-content: center; z-index: 50; }
+  .dg-ov.on { display: flex; }
+  .dg-sheet { background: #fff; width: 100%; max-width: 520px; border-radius: 20px 20px 0 0;
+              padding: 18px 16px 22px; box-sizing: border-box; max-height: 92vh; overflow-y: auto; }
+  .dg-sheet-k { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: .06em;
+                text-transform: uppercase; color: var(--ink-mute, #6b7a74); }
+  .dg-sheet h2 { margin: 4px 0 14px; font-size: 18px; color: var(--ink, #0c3d24); }
+  .dg-sheet .q { margin: 0 0 8px; font-size: 14px; font-weight: 700; }
+  .dg-issues { display: flex; flex-direction: column; gap: 8px; margin: 0 0 14px; }
+  .dg-issue { min-height: 52px; border-radius: 12px; border: 1.5px solid var(--line, #cabe9f); background: #fff;
+              font: inherit; font-size: 15px; font-weight: 700; color: var(--ink, #0c3d24); text-align: left;
+              padding: 0 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+  .dg-issue small { font-size: 12px; font-weight: 500; color: var(--ink-mute, #6b7a74); }
+  .dg-issue[aria-pressed="true"] { border: 2px solid var(--vert-prairie, #2d7a3e); background: #e7f3ec; }
+  .dg-champ { display: flex; flex-direction: column; gap: 6px; margin: 0 0 12px; }
+  .dg-champ label { font-size: 13px; font-weight: 700; }
+  .dg-champ input { min-height: 44px; border-radius: 10px; border: 1px solid var(--line, #cabe9f);
+                    padding: 0 12px; font: inherit; font-size: 15px; box-sizing: border-box; }
+  .dg-sheet-acts { display: flex; gap: 8px; }
+  .dg-sheet-acts button { flex: 1; min-height: 50px; border-radius: 12px; font: inherit; font-size: 15px;
+                          font-weight: 700; cursor: pointer; }
+  .dg-ok { border: 0; background: var(--vert-bouteille, #0c3d24); color: var(--paper, #f8f5ec); }
+  .dg-ok:disabled { opacity: .45; cursor: default; }
+  .dg-annul { border: 1px solid var(--line, #cabe9f); background: #fff; color: var(--ink, #0c3d24); }
+  .dg-sheet-n { margin: 10px 0 0; font-size: 12px; color: var(--ink-mute, #6b7a74); text-align: center; }
+
   .dg-empty { text-align: center; padding: 40px 16px; color: var(--ink-mute, #6b7a74); }
   .dg-loading { text-align: center; padding: 40px 16px; color: var(--ink-mute, #6b7a74); }
 </style>
@@ -132,13 +215,20 @@
   <!-- Navigation thématique Écoles : contenu servi par js/hub-nav.js (thème « ecoles »). -->
   <script src="js/hub-nav.js"></script>
 
+  <!-- PROSPECTION-SCOLAIRE L3 : onglet « Démarchage » de l'Espace salarié. -->
+  <nav class="es-bar" data-espace-salarie></nav>
+  <script src="js/espace-salarie.js"></script>
+
 <div class="dg-wrap">
   <div class="dg-hd">
     <h1>Écoles à démarcher</h1>
-    <p>La liste complète — appelez, écrivez, notez : chaque action à un tap.</p>
+    <p>Appelez, puis notez l'appel : la relance revient toute seule.</p>
   </div>
 
   <div id="gsMsg" class="gs-msg"></div>
+
+  <div id="dgObjectif"></div>
+  <div id="dgSections"></div>
 
   <input type="search" class="dg-search" id="dgSearch"
          placeholder="Rechercher (nom, commune, zone…)" autocomplete="off">
@@ -150,6 +240,33 @@
 
   <div id="dgListe">
     <div class="dg-loading">Chargement des écoles…</div>
+  </div>
+</div>
+
+<!-- PROSPECTION-SCOLAIRE L3 : feuille « Noter l'appel » (C1-C5). -->
+<div class="dg-ov" id="dgOv">
+  <div class="dg-sheet" role="dialog" aria-modal="true" aria-labelledby="dgSheetNom">
+    <p class="dg-sheet-k">Noter l'appel</p>
+    <h2 id="dgSheetNom"></h2>
+    <p class="q">Comment ça s'est passé ?</p>
+    <div class="dg-issues" id="dgIssues">
+      <button type="button" class="dg-issue" data-issue="pas_joignable" aria-pressed="false">Pas joignable<small>relance dans 2 jours</small></button>
+      <button type="button" class="dg-issue" data-issue="interesse" aria-pressed="false">Intéressée<small>relance dans 7 jours</small></button>
+      <button type="button" class="dg-issue" data-issue="non_merci" aria-pressed="false">Non merci<small>relance à la rentrée</small></button>
+    </div>
+    <div class="dg-champ">
+      <label for="dgRelance">Rappeler le</label>
+      <input type="date" id="dgRelance">
+    </div>
+    <div class="dg-champ">
+      <label for="dgNote">Un mot (facultatif)</label>
+      <input type="text" id="dgNote" maxlength="300" placeholder="Ex. directrice à rappeler après 16h" autocomplete="off">
+    </div>
+    <div class="dg-sheet-acts">
+      <button type="button" class="dg-annul" id="dgAnnul">Annuler</button>
+      <button type="button" class="dg-ok" id="dgOk" disabled>Enregistrer</button>
+    </div>
+    <p class="dg-sheet-n">Écrit au journal de l'école, met à jour son statut ; la relance remonte le jour venu.</p>
   </div>
 </div>
 
@@ -265,6 +382,9 @@
   let zoneCourante = null;
   let recherche = '';
   let ligneOuverte = null;               // entite_id de la ligne dépliée.
+  let objectif = [];                     // L3 : lignes de objectif_demarchage_scolaire (5 périodes) ou [].
+  let noterId = null;                    // L3 : école de la feuille « Noter l'appel ».
+  let noterIssue = null;                 // L3 : issue choisie.
   const internesCache = new Map();       // entite_id -> rows (lazy, par session).
 
   function passeFiltre(e, today) {
@@ -275,10 +395,94 @@
     }
     const rang = prioRang(e, today);
     if (filtreStatut === 'toutes') return true;
+    // L3 : déjà montrée dans « Épinglées » ou « À reconduire » -> pas répétée ici.
+    if (enSection(e)) return false;
     if (filtreStatut === 'relance') return rang === 0;
     if (filtreStatut === 'interesse') return rang === 1;
     // « À traiter » = tout ce qui appelle un geste : relance, conversion, premier contact.
     return rang <= 2;
+  }
+
+  // ---------- PROSPECTION-SCOLAIRE L3 : dates, objectif, sections ----------
+  function isoJour(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  // T2 : samedi/dimanche -> lundi suivant.
+  function horsWeekend(d) {
+    const j = d.getDay();
+    if (j === 6) d.setDate(d.getDate() + 2);
+    if (j === 0) d.setDate(d.getDate() + 1);
+    return d;
+  }
+  // C1/C2/C3 : relance proposée selon l'issue.
+  function relanceProposee(issue) {
+    const d = new Date(); d.setHours(12, 0, 0, 0);
+    if (issue === 'pas_joignable') { d.setDate(d.getDate() + 2); }
+    else if (issue === 'interesse') { d.setDate(d.getDate() + 7); }
+    else {
+      const sept = new Date(d.getFullYear(), 8, 1, 12);
+      return isoJour(horsWeekend(sept > d ? sept : new Date(d.getFullYear() + 1, 8, 1, 12)));
+    }
+    return isoJour(horsWeekend(d));
+  }
+  function fmtJour(iso) {
+    const p = String(iso || '').slice(0, 10).split('-');
+    return p.length === 3 ? p[2] + '/' + p[1] : '';
+  }
+  function enSection(e) {
+    return !!e.epingle_le || !!e.a_reconduire;
+  }
+
+  const PERIODE_LBL = ['Rentrée → Toussaint', 'Toussaint → Noël', 'Noël → hiver', 'Hiver → printemps', 'Printemps → été'];
+
+  // T1 : prochaine période qui n'a pas commencé, puis la suivante.
+  function renderObjectif() {
+    const box = $('dgObjectif');
+    if (!objectif.length) {
+      box.innerHTML = '<div class="dg-obj vide"><p class="dg-obj-k" style="color:var(--ink-mute,#6b7a74)">Objectif</p>'
+        + '<p class="dg-obj-s">Le nombre de créneaux n\'est pas encore renseigné par le bureau.</p></div>';
+      return;
+    }
+    const today = todayStr();
+    const avenir = objectif.filter(o => String(o.debut).slice(0, 10) > today);
+    if (!avenir.length) { box.innerHTML = ''; return; }
+    const p = avenir[0];
+    const lbl = 'P' + p.periode + ' · ' + (PERIODE_LBL[p.periode - 1] || '');
+    const pct = p.capacite > 0 ? Math.min(100, Math.round(100 * p.pose / p.capacite)) : 0;
+    const titre = p.restant > 0
+      ? 'Il reste ' + p.restant + (p.restant > 1 ? ' classes' : ' classe') + ' à trouver pour ' + lbl
+      : 'Créneaux pleins pour ' + lbl;
+    const suite = avenir[1]
+      ? 'Ensuite, P' + avenir[1].periode + ' · ' + (PERIODE_LBL[avenir[1].periode - 1] || '') + ' : '
+        + avenir[1].restant + ' à trouver.'
+      : '';
+    box.innerHTML = '<div class="dg-obj">'
+      + '<p class="dg-obj-k">Objectif · à partir du ' + escapeHtml(fmtJour(p.debut)) + '</p>'
+      + '<p class="dg-obj-v">' + escapeHtml(titre) + '</p>'
+      + '<div class="dg-obj-bar"><span style="width:' + pct + '%"></span></div>'
+      + '<p class="dg-obj-s">' + p.pose + ' posée' + (p.pose > 1 ? 's' : '') + ' sur ' + p.capacite + ' créneaux'
+      + (suite ? ' · ' + escapeHtml(suite) : '') + '</p>'
+      + '</div>';
+  }
+
+  function renderSections(today) {
+    const epinglees = ecoles.filter(e => e.epingle_le && e.statut_prospection !== 'inactif')
+      .sort((a, b) => String(a.epingle_le).localeCompare(String(b.epingle_le)));
+    const recond = ecoles.filter(e => e.a_reconduire && !e.epingle_le)
+      .sort((a, b) => String(a.derniere_seance).localeCompare(String(b.derniere_seance)));
+    let h = '';
+    if (epinglees.length) {
+      h += '<section class="dg-sec epingle"><h2 class="dg-sec-h">Épinglées par le bureau</h2><div class="dg-sec-box">'
+        + epinglees.map(e => ligne(e, today, 'epingle')).join('') + '</div></section>';
+    }
+    if (recond.length) {
+      h += '<section class="dg-sec"><h2 class="dg-sec-h">À reconduire · cycle terminé</h2><div class="dg-sec-box">'
+        + recond.map(e => ligne(e, today, 'reconduire')).join('') + '</div>'
+        + '<p class="dg-sec-note">Proposez la période suivante. Le questionnaire de satisfaction part depuis '
+        + '<a class="dg-lien" href="suivi-salarie.html?type=intervention_scolaire">l\'onglet Séances</a> (clôture du cycle).</p>'
+        + '</section>';
+    }
+    $('dgSections').innerHTML = h;
   }
 
   // ---------- Rendu ----------
@@ -294,6 +498,7 @@
   function rendre() {
     renderChips();
     const today = todayStr();
+    renderSections(today);
     const visibles = ecoles.filter(e => passeFiltre(e, today));
     visibles.sort((a, b) => {
       const pa = prioRang(a, today), pb = prioRang(b, today);
@@ -314,38 +519,48 @@
       return;
     }
 
-    box.innerHTML = visibles.map(e => {
-      const today2 = today;
-      const [cls, lbl] = PRIO_BADGE[prioRang(e, today2)];
-      const meta = [e.commune, e.telephone, e.contact_nom].filter(Boolean).join(' · ');
-      const tel = e.telephone ? String(e.telephone).split('/')[0].replace(/[^+0-9]/g, '') : '';
-      const peutMail = e.type_entite === 'ecole_elementaire' && e.contact_email;
-      return ''
-        + '<div class="dg-row" data-id="' + e.entite_id + '">'
-        +   '<div class="dg-row-top">'
-        +     '<div class="dg-row-main" data-open="' + e.entite_id + '">'
-        +       '<p class="dg-nom">' + escapeHtml(e.libelle) + '</p>'
-        +       (meta ? '<p class="dg-meta">' + escapeHtml(meta) + '</p>' : '')
-        +     '</div>'
-        +     '<div class="dg-acts">'
-        +       '<span class="dg-badge ' + cls + '"><span class="dot"></span>' + escapeHtml(lbl) + '</span>'
-        +       (tel
-              ? '<a class="dg-icbtn" href="tel:' + tel + '" title="Appeler" aria-label="Appeler">'
-                + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg></a>'
-              : '')
-        +       (peutMail
-              ? '<button type="button" class="dg-icbtn" data-mail="' + e.entite_id + '" title="Préparer le mail-type" aria-label="Préparer le mail-type">'
-                + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></button>'
-              : '')
-        +       '<button type="button" class="dg-icbtn" data-fait="' + e.entite_id + '" title="C\'est fait" aria-label="C\'est fait">'
-        +         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg></button>'
-        +     '</div>'
-        +   '</div>'
-        +   (ligneOuverte === e.entite_id ? renderDetail(e) : '')
-        + '</div>';
-    }).join('');
+    box.innerHTML = visibles.map(e => ligne(e, today, null)).join('');
 
     if (ligneOuverte) chargerInternes(ligneOuverte);
+  }
+
+  // L3 : une ligne d'école (liste ou section). mode = null | 'epingle' | 'reconduire'.
+  function ligne(e, today, mode) {
+    let cls, lbl;
+    if (mode === 'epingle') { cls = 'epingle'; lbl = 'Épinglée'; }
+    else if (mode === 'reconduire') { cls = 'reconduire'; lbl = 'À reconduire'; }
+    else { [cls, lbl] = PRIO_BADGE[prioRang(e, today)]; }
+    if (cls === 'premier' && e.nb_contacts > 0) { lbl = 'Déjà appelée'; }
+    const suiteMeta = mode === 'reconduire' && e.derniere_seance
+      ? 'dernière séance le ' + fmtJour(e.derniere_seance)
+      : (e.derniere_relance && e.derniere_relance > today ? 'relance le ' + fmtJour(e.derniere_relance) : '');
+    const meta = [e.commune, e.telephone, e.contact_nom, suiteMeta].filter(Boolean).join(' · ');
+    const tel = e.telephone ? String(e.telephone).split('/')[0].replace(/[^+0-9]/g, '') : '';
+    const peutMail = e.type_entite === 'ecole_elementaire' && e.contact_email;
+    const libNoter = mode === 'reconduire' ? 'Proposer la suite' : 'Noter l\'appel';
+    return ''
+      + '<div class="dg-row" data-id="' + e.entite_id + '">'
+      +   '<div class="dg-row-top">'
+      +     '<div class="dg-row-main" data-open="' + e.entite_id + '">'
+      +       '<p class="dg-nom">' + escapeHtml(e.libelle) + '</p>'
+      +       (meta ? '<p class="dg-meta">' + escapeHtml(meta) + '</p>' : '')
+      +     '</div>'
+      +     '<div class="dg-acts">'
+      +       '<span class="dg-badge ' + cls + '"><span class="dot"></span>' + escapeHtml(lbl) + '</span>'
+      +       (tel
+            ? '<a class="dg-icbtn" href="tel:' + tel + '" title="Appeler" aria-label="Appeler">'
+              + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg></a>'
+            : '')
+      +       (peutMail
+            ? '<button type="button" class="dg-icbtn" data-mail="' + e.entite_id + '" title="Préparer le mail-type" aria-label="Préparer le mail-type">'
+              + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></button>'
+            : '')
+      +       '<button type="button" class="dg-noter" data-noter="' + e.entite_id + '">' + escapeHtml(libNoter) + '</button>'
+      +     '</div>'
+      +   '</div>'
+      +   (mode === 'epingle' && e.epingle_note ? '<p class="dg-motif">« ' + escapeHtml(e.epingle_note) + ' »</p>' : '')
+      +   (ligneOuverte === e.entite_id ? renderDetail(e) : '')
+      + '</div>';
   }
 
   function renderDetail(e) {
@@ -392,16 +607,49 @@
   }
 
   // ---------- Actions ----------
-  async function marquerFait(entiteId, btn) {
-    if (btn) btn.disabled = true;
+  // L3 (C7) : « Noter l'appel » remplace « C'est fait ».
+  function ouvrirNoter(entiteId) {
+    const e = ecoles.find(x => x.entite_id === entiteId);
+    if (!e) return;
+    noterId = entiteId; noterIssue = null;
+    $('dgSheetNom').textContent = e.libelle || '';
+    $('dgRelance').value = '';
+    $('dgNote').value = '';
+    $('dgOk').disabled = true;
+    document.querySelectorAll('#dgIssues .dg-issue').forEach(b => b.setAttribute('aria-pressed', 'false'));
+    $('dgOv').classList.add('on');
+    const prem = document.querySelector('#dgIssues .dg-issue');
+    if (prem) prem.focus();
+  }
+  function fermerNoter() {
+    $('dgOv').classList.remove('on');
+    noterId = null; noterIssue = null;
+  }
+  function choisirIssue(issue) {
+    noterIssue = issue;
+    document.querySelectorAll('#dgIssues .dg-issue').forEach(b =>
+      b.setAttribute('aria-pressed', b.dataset.issue === issue ? 'true' : 'false'));
+    $('dgRelance').value = relanceProposee(issue);
+    $('dgOk').disabled = false;
+  }
+  async function enregistrerNoter() {
+    if (!noterId || !noterIssue) return;
+    const btn = $('dgOk');
+    btn.disabled = true;
     try {
-      await rpc('marquer_contactee', { p_entite_id: entiteId });
-      flash('Noté.', 'ok');
+      await rpc('noter_appel_prospection', {
+        p_entite_id: noterId,
+        p_issue: noterIssue,
+        p_date_relance: $('dgRelance').value || null,
+        p_note: $('dgNote').value.trim() || null
+      });
+      fermerNoter();
+      flash('Appel noté.', 'ok');
       ecoles = (await rpc('list_prospection_pour_salarie')) || [];
       rendre();
     } catch (err) {
-      if (btn) btn.disabled = false;
-      flash('Action impossible : ' + errMsg(err), 'err');
+      btn.disabled = false;
+      flash('Enregistrement impossible : ' + errMsg(err), 'err');
     }
   }
 
@@ -451,8 +699,8 @@
       if (e) ouvrirMailType(e);
       return;
     }
-    const fait = ev.target.closest('[data-fait]');
-    if (fait) { marquerFait(fait.dataset.fait, fait); return; }
+    const noter = ev.target.closest('[data-noter]');
+    if (noter) { ouvrirNoter(noter.dataset.noter); return; }
     const open = ev.target.closest('[data-open]');
     if (open) {
       ligneOuverte = (ligneOuverte === open.dataset.open) ? null : open.dataset.open;
@@ -460,11 +708,43 @@
     }
   });
 
+  // L3 : les sections réutilisent le même délégué que la liste.
+  $('dgSections').addEventListener('click', function (ev) {
+    const mail = ev.target.closest('[data-mail]');
+    if (mail) {
+      const e = ecoles.find(x => x.entite_id === mail.dataset.mail);
+      if (e) ouvrirMailType(e);
+      return;
+    }
+    const noter = ev.target.closest('[data-noter]');
+    if (noter) { ouvrirNoter(noter.dataset.noter); return; }
+    const open = ev.target.closest('[data-open]');
+    if (open) {
+      ligneOuverte = (ligneOuverte === open.dataset.open) ? null : open.dataset.open;
+      rendre();
+    }
+  });
+  $('dgIssues').addEventListener('click', function (ev) {
+    const b = ev.target.closest('.dg-issue');
+    if (b) choisirIssue(b.dataset.issue);
+  });
+  $('dgAnnul').addEventListener('click', fermerNoter);
+  $('dgOk').addEventListener('click', enregistrerNoter);
+  $('dgOv').addEventListener('click', function (ev) { if (ev.target === $('dgOv')) fermerNoter(); });
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Escape' && $('dgOv').classList.contains('on')) fermerNoter();
+  });
+
   // ---------- Boot ----------
+  // L3 : objectif chargé à part, sans bloquer la liste (fail-soft).
+  rpc('objectif_demarchage_scolaire')
+    .then(rows => { objectif = rows || []; renderObjectif(); })
+    .catch(() => { objectif = []; $('dgObjectif').innerHTML = ''; });
   try {
     ecoles = (await rpc('list_prospection_pour_salarie')) || [];
     rendre();
   } catch (err) {
+    $('dgObjectif').innerHTML = '';
     $('dgListe').innerHTML = '<div class="dg-empty"><h2 style="font-size:16px;margin:0 0 6px;">Chargement impossible</h2><p style="margin:0;">'
       + escapeHtml(errMsg(err)) + '</p></div>';
   }
