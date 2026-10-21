@@ -127,6 +127,13 @@
     data/mail-types.json › satisfaction._config.cc. Réponses : envoi depuis la boîte
     de l'EDR (décision Manu, « Répondre à » non fiable en mailto). Logo : signature
     de la messagerie (le mailto ne transporte que du texte).
+  MAJ : QUESTIONNAIRE-EXPEDITEUR-EDR (21/10/2026, front + data, retour terrain Lohann,
+    option A retenue par Manu) : un mailto ne peut pas imposer l'expéditeur. Si
+    data/mail-types.json › satisfaction._config.expediteur est renseigné, le
+    questionnaire s'ouvre dans Gmail (nouvel onglet, authuser = cette adresse,
+    to/cc/objet/corps pré-remplis) ; vide -> mailto inchangé. Fenêtre bloquée ->
+    message, rien n'est marqué. Confirmation « envoyé ? » posée au retour sur
+    l'onglet du Hub (focus) au lieu du délai fixe. Prospection inchangée.
 
   ARCHITECTURE (calque gestion-salarie.html, vérifié à la source 26/06) :
     - charge supabase.min.js (CDN jsDelivr) puis js/supabase-client.js (SupabaseHub).
@@ -2265,6 +2272,7 @@
       return x.entite_id === m.entite_id && x.type_mission === 'intervention_scolaire'
         && x.etat === 'terminee' && !x.questionnaire_fait;
     });
+    let expQ = '';
     try {
       if (mailTypesQ === null) {
         const r = await fetch('data/mail-types.json?nocache=' + Date.now());
@@ -2289,16 +2297,34 @@
           .replace(/\{lien_essai\}/g, lienQ)
           .replace(/\{contact_club\}/g, ccQ);
       };
-      window.location.href = 'mailto:' + encodeURIComponent(e.contact_email.trim())
-        + '?subject=' + encodeURIComponent(inject(tpl.objet))
-        + (ccQ ? '&cc=' + encodeURIComponent(ccQ) : '')
-        + '&body=' + encodeURIComponent(inject(tpl.corps));
+      // QUESTIONNAIRE-EXPEDITEUR-EDR : si satisfaction._config.expediteur est renseigné,
+      // le mail s'ouvre dans Gmail (nouvel onglet) sur CE compte (authuser) au lieu
+      // du client mail par défaut ; vide -> mailto inchangé.
+      expQ = String(cfgQ.expediteur || '').trim();
+      if (expQ) {
+        const urlGmail = 'https://mail.google.com/mail/?authuser=' + encodeURIComponent(expQ)
+          + '&view=cm&fs=1'
+          + '&to=' + encodeURIComponent(e.contact_email.trim())
+          + (ccQ ? '&cc=' + encodeURIComponent(ccQ) : '')
+          + '&su=' + encodeURIComponent(inject(tpl.objet))
+          + '&body=' + encodeURIComponent(inject(tpl.corps));
+        const w = window.open(urlGmail, '_blank');
+        if (!w) {
+          flash('Le navigateur a bloqué l’ouverture de Gmail : autorisez les fenêtres pour le Hub, puis recliquez sur « Questionnaire ».', 'err');
+          return;
+        }
+        try { w.opener = null; } catch (eOp) { /* sans incidence */ }
+      } else {
+        window.location.href = 'mailto:' + encodeURIComponent(e.contact_email.trim())
+          + '?subject=' + encodeURIComponent(inject(tpl.objet))
+          + (ccQ ? '&cc=' + encodeURIComponent(ccQ) : '')
+          + '&body=' + encodeURIComponent(inject(tpl.corps));
+      }
     } catch (err) {
       flash('Préparation du mail impossible : ' + errMsg(err), 'err');
       return;
     }
-    // Laisse le client mail s'ouvrir, puis demande confirmation de l'envoi.
-    setTimeout(async function () {
+    const demanderConfirmation = async function () {
       if (!window.confirm('Le questionnaire a-t-il bien été envoyé à ' + (e.libelle || 'l’école') + ' ?\n\n'
           + lot.length + ' classe' + (lot.length > 1 ? 's' : '') + ' seront marquées « questionnaire envoyé ».')) return;
       try {
@@ -2308,7 +2334,14 @@
       } catch (err2) {
         flash('Enregistrement impossible : ' + errMsg(err2), 'err');
       }
-    }, 1200);
+    };
+    if (expQ) {
+      // Gmail s'ouvre dans un autre onglet : on pose la question au RETOUR sur le Hub.
+      window.addEventListener('focus', function () { setTimeout(demanderConfirmation, 300); }, { once: true });
+    } else {
+      // Laisse le client mail s'ouvrir, puis demande confirmation de l'envoi.
+      setTimeout(demanderConfirmation, 1200);
+    }
   }
 
   // ---- VALIDATION-SEANCES-PAR-MISSION (sql_256) ----
