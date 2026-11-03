@@ -1,7 +1,12 @@
 /* =====================================================================
  * parcours-performance.js — Page Parcours Performance (MOM Hub)
  * ---------------------------------------------------------------------
- * Version : v1.0 — 3 novembre 2026 — lot L2 (saisie manuelle)
+ * Version : v1.1 — 3 novembre 2026 — amendement D7bis (lieu du match)
+ *   v1.1 : lieu domicile | exterieur | neutre (sql_262). Affichage façon
+ *          FFR : équipe qui reçoit d'abord, score dans le même ordre ;
+ *          neutre ou non renseigné : notre équipe d'abord. Le résultat
+ *          (V/N/D) reste lu de notre point de vue.
+ *   v1.0 : lot L2 (saisie manuelle).
  *
  * OBJET
  *   Page dédiée (parcours-performance.html), ouverte depuis le pilotage
@@ -34,6 +39,7 @@
 
   var STATUT_SAISON = { integre: 'Intégré', renfort: 'Renfort', double_licence: 'Double licence' };
   var STATUT_JOUEUR = { titulaire: 'Titulaire', entre: 'Entré', non_entre: 'Non entré' };
+  var LIEUX = { domicile: 'Domicile', exterieur: 'Extérieur', neutre: 'Terrain neutre' };
   var COMPETITIONS_DEFAUT = ['Elite Alamercery', 'Gaudermen'];
   var EQUIPES_DEFAUT = ['ABCD XV', 'Oyonnax'];
 
@@ -118,6 +124,7 @@
           phase: r.phase,
           equipe_accueil: r.equipe_accueil,
           adversaire: r.adversaire,
+          lieu: r.lieu,
           score_pour: r.score_pour,
           score_contre: r.score_contre,
           lignes: []
@@ -125,7 +132,7 @@
       }
       var g = map.get(k);
       // Champs de match : on garde la première valeur non vide rencontrée.
-      ['competition', 'phase', 'equipe_accueil', 'adversaire'].forEach(function (c) {
+      ['competition', 'phase', 'equipe_accueil', 'adversaire', 'lieu'].forEach(function (c) {
         if (!g[c] && r[c]) g[c] = r[c];
       });
       if (g.score_pour == null && r.score_pour != null) g.score_pour = r.score_pour;
@@ -271,15 +278,23 @@
 
     visibles.forEach(function (g) {
       var res = resultat(g);
+      // D7bis : à l'extérieur, l'équipe qui reçoit (l'adversaire) d'abord,
+      // score dans le même ordre ; sinon notre équipe d'abord.
+      var exterieur = g.lieu === 'exterieur';
+      var nous = esc(g.equipe_accueil || 'Équipe Performance');
+      var eux = esc(g.adversaire || '—');
+      var aGauche = exterieur ? eux : nous;
+      var aDroite = exterieur ? nous : eux;
       var score = (g.score_pour != null && g.score_contre != null)
-        ? '<span class="pp-score pp-score-' + res + '">' + g.score_pour + ' – ' + g.score_contre + '</span>'
+        ? '<span class="pp-score pp-score-' + res + '" title="' + (res === 'V' ? 'Victoire' : res === 'D' ? 'Défaite' : 'Nul') + '">' +
+          (exterieur ? g.score_contre + ' – ' + g.score_pour : g.score_pour + ' – ' + g.score_contre) + '</span>'
         : '<span class="pp-score">score non saisi</span>';
-      var ctx = [g.competition, g.phase].filter(Boolean).join(' · ');
+      var ctx = [g.competition, g.phase, LIEUX[g.lieu]].filter(Boolean).join(' · ');
       h += '<article class="pp-match">' +
         '<div class="pp-match-head"><div>' +
           '<div class="pp-match-date">' + fmtDate(g.date_match) + (ctx ? ' · ' + esc(ctx) : '') + '</div>' +
-          '<div class="pp-match-titre">' + esc(g.equipe_accueil || 'Équipe Performance') +
-            ' <span class="pp-vs">vs</span> ' + esc(g.adversaire || '—') + ' ' + score + '</div>' +
+          '<div class="pp-match-titre">' + aGauche +
+            ' <span class="pp-vs">vs</span> ' + aDroite + ' ' + score + '</div>' +
         '</div><button type="button" class="pp-btn" data-action="modifier" data-cle="' + esc(g.cle) + '">Modifier</button></div>' +
         '<ul class="pp-match-joueurs">';
       g.lignes.forEach(function (l) {
@@ -381,10 +396,14 @@
       '<div class="pp-grid2">' +
         '<label>Date du match *<input type="date" name="date_match" required value="' + esc(g ? String(g.date_match).slice(0, 10) : '') + '"></label>' +
         '<label>Adversaire *<input type="text" name="adversaire" required maxlength="80" value="' + esc(g ? g.adversaire || '' : '') + '" placeholder="ex. Rouen"></label>' +
+        '<label>Lieu<select name="lieu"><option value="">Non renseigné</option>' +
+          Object.keys(LIEUX).map(function (k) {
+            return '<option value="' + k + '"' + (g && g.lieu === k ? ' selected' : '') + '>' + LIEUX[k] + '</option>';
+          }).join('') + '</select></label>' +
         '<label>Équipe d\'accueil<input type="text" name="equipe_accueil" list="pp-dl-equipe" maxlength="80" value="' + esc(g ? g.equipe_accueil || '' : equipeDefaut) + '"></label>' +
         '<label>Compétition<input type="text" name="competition" list="pp-dl-competition" maxlength="80" value="' + esc(g ? g.competition || '' : '') + '"></label>' +
         '<label>Phase<input type="text" name="phase" list="pp-dl-phase" maxlength="80" value="' + esc(g ? g.phase || '' : '') + '"></label>' +
-        '<div class="pp-score-saisie"><label>Score équipe<input type="number" name="score_pour" min="0" max="250" value="' + esc(g && g.score_pour != null ? g.score_pour : '') + '"></label>' +
+        '<div class="pp-score-saisie"><label>Score de notre équipe<input type="number" name="score_pour" min="0" max="250" value="' + esc(g && g.score_pour != null ? g.score_pour : '') + '"></label>' +
         '<label>Score adverse<input type="number" name="score_contre" min="0" max="250" value="' + esc(g && g.score_contre != null ? g.score_contre : '') + '"></label></div>' +
       '</div>' +
       optionsDatalist('pp-dl-equipe', valeursDistinctes('equipe_accueil', EQUIPES_DEFAUT)) +
@@ -450,6 +469,7 @@
     var match = {
       date_match: v('date_match'),
       adversaire: v('adversaire'),
+      lieu: v('lieu') || null,
       equipe_accueil: v('equipe_accueil'),
       competition: v('competition'),
       phase: v('phase'),
@@ -543,6 +563,7 @@
           phase: m.phase,
           equipe_accueil: m.equipe_accueil,
           adversaire: m.adversaire,
+          lieu: m.lieu,
           score_pour: m.score_pour,
           score_contre: m.score_contre,
           statut_joueur: l.statut_joueur,
