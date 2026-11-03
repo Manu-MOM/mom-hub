@@ -18,6 +18,10 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 1.94 — 3 novembre 2026
+ *   v1.94 : PARCOURS-PERFORMANCE amendement D7bis (sql_262). saveParcoursMatch
+ *          transmet p_lieu (domicile | exterieur | neutre | null) ;
+ *          listParcoursMatchs renvoie lieu (côté base). Additif.
  * Version : 1.93 — 3 novembre 2026
  *   v1.93 : PARCOURS-PERFORMANCE lot L1 (FAIT FOI gelé 03/11/2026, sql_261).
  *          6 wrappers ADDITIFS : listParcoursSaison(cat, saison?),
@@ -5355,7 +5359,8 @@
      * Crée ou met à jour une participation. id absent = création ; un même
      * joueur, même date et même adversaire met à jour la ligne existante
      * (réimport sans doublon, D8). statut_joueur ∈ titulaire | entre |
-     * non_entre ; source ∈ ffr | manuel.
+     * non_entre ; source ∈ ffr | manuel ; lieu ∈ domicile | exterieur |
+     * neutre | null (D7bis, sql_262).
      * @returns {Promise<{ok: boolean, data?: Object, error?: string}>}
      */
     async saveParcoursMatch(m) {
@@ -5384,7 +5389,8 @@
         p_penalites: n(m.penalites) || 0,
         p_drops: n(m.drops) || 0,
         p_source: m.source || 'manuel',
-        p_notes: m.notes || null
+        p_notes: m.notes || null,
+        p_lieu: ['domicile', 'exterieur', 'neutre'].indexOf(m.lieu) !== -1 ? m.lieu : null
       });
       if (error) {
         console.error('MOM Hub: saveParcoursMatch()', error);
