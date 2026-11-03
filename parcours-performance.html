@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="assets/logo-m2m.png">
+  <title>Parcours Performance · MOM Hub</title>
+  <link rel="stylesheet" href="css/hub.css">
+  <!-- PARCOURS-PERFORMANCE L2 (FAIT FOI v1 gelé 03/11/2026, D9) : page
+       dédiée ouverte depuis le pilotage de saison, SANS entrée de nav
+       (hub-nav.js INTERDIT non touché). Logique : js/parcours-performance.js. -->
+  <style>
+    :root {
+      --vert: #2D7D46; --vert-fonce: #1f5a32; --gris: #5b6470;
+      --gris-clair: #eef1f4; --bord: #d8dee5; --attente: #8a93a0;
+      --carte: #ffffff; --perf: #1f3a68; --perf-clair: #e6ecf6;
+      --rouge: #a3271b;
+    }
+    * { box-sizing: border-box; }
+    body { color: #1c232b; }
+    body.auth-pending { visibility: hidden; }
+    .pp-wrap { max-width: 960px; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+    .pp-head { border-bottom: 3px solid var(--perf); padding-bottom: .75rem; margin-bottom: 1.25rem; }
+    .pp-head h1 { margin: 0; font-size: 1.8rem; color: var(--perf); }
+    .pp-sub { margin: .25rem 0 .5rem; color: var(--gris); font-size: .95rem; }
+    .pp-retour { color: var(--vert-fonce); font-size: .9rem; font-weight: 600; text-decoration: none; }
+    .pp-retour:hover { text-decoration: underline; }
+    .pp-selecteur {
+      margin-bottom: 1.25rem; padding: .75rem 1rem; background: var(--carte);
+      border: 1px solid var(--bord); border-radius: 10px;
+      display: flex; align-items: center; gap: .6rem; flex-wrap: wrap;
+    }
+    .pp-selecteur label { color: var(--gris); font-size: .9rem; font-weight: 600; }
+    .pp-selecteur select { font-size: .95rem; padding: .35rem .6rem; border: 1px solid var(--bord); border-radius: 6px; background: #fff; min-width: 140px; }
+    .pp-bloc { background: var(--carte); border: 1px solid var(--bord); border-radius: 10px; padding: 1rem 1.1rem; margin-bottom: 1.25rem; }
+    .pp-bloc h2 { margin: 0 0 .75rem; font-size: 1.1rem; color: var(--perf); }
+    .pp-bloc-head { display: flex; justify-content: space-between; align-items: center; gap: .75rem; flex-wrap: wrap; margin-bottom: .75rem; }
+    .pp-bloc-head h2 { margin: 0; }
+    .pp-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+    .pp-load, .pp-note { color: var(--gris); font-size: .85rem; }
+    .pp-note { margin: .6rem 0 0; }
+    .pp-attente { color: var(--attente); font-style: italic; margin: .25rem 0 0; }
+    .pp-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: .6rem; }
+    .pp-kpi { background: var(--perf-clair); border-radius: 8px; padding: .6rem .7rem; text-align: center; }
+    .pp-kpi__v { display: block; font-size: 1.35rem; font-weight: 700; color: var(--perf); }
+    .pp-kpi__l { display: block; font-size: .72rem; color: var(--gris); text-transform: uppercase; letter-spacing: .03em; margin-top: .15rem; }
+    .pp-scroll { overflow-x: auto; }
+    .pp-table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+    .pp-table th, .pp-table td { text-align: left; padding: .5rem .55rem; border-bottom: 1px solid var(--bord); vertical-align: middle; }
+    .pp-table th { color: var(--gris); font-weight: 600; font-size: .78rem; text-transform: uppercase; letter-spacing: .02em; }
+    .pp-table th.pp-num, .pp-table td.pp-num { text-align: right; }
+    .pp-ligne { cursor: pointer; }
+    .pp-ligne:hover, .pp-ligne:focus { background: var(--gris-clair); outline: none; }
+    .pp-ligne-active { background: var(--perf-clair) !important; }
+    .pp-club { color: var(--gris); font-size: .8rem; }
+    .pp-badge { display: inline-block; background: var(--perf); color: #fff; border-radius: 4px; padding: .05rem .45rem; font-size: .75rem; font-weight: 700; letter-spacing: .02em; }
+    .pp-btn { font: inherit; font-size: .88rem; padding: .4rem .8rem; border: 1px solid var(--bord); border-radius: 8px; background: #fff; color: var(--perf); font-weight: 600; cursor: pointer; }
+    .pp-btn:hover:not([disabled]) { background: var(--gris-clair); }
+    .pp-btn[disabled] { opacity: .5; cursor: not-allowed; }
+    .pp-btn-primaire { background: var(--perf); color: #fff; border-color: var(--perf); }
+    .pp-btn-primaire:hover:not([disabled]) { background: #172c50; }
+    .pp-btn-danger { color: var(--rouge); border-color: #e3b8b3; }
+    /* Matchs */
+    .pp-match { border: 1px solid var(--bord); border-radius: 8px; padding: .7rem .85rem; margin-top: .7rem; }
+    .pp-match-head { display: flex; justify-content: space-between; align-items: flex-start; gap: .75rem; }
+    .pp-match-date { color: var(--gris); font-size: .82rem; }
+    .pp-match-titre { font-weight: 700; color: #1c232b; margin-top: .1rem; }
+    .pp-vs { color: var(--gris); font-weight: 400; font-size: .85rem; }
+    .pp-score { display: inline-block; margin-left: .35rem; padding: 0 .4rem; border-radius: 4px; background: var(--gris-clair); font-size: .85rem; font-weight: 700; color: var(--gris); }
+    .pp-score-V { background: #dff0e4; color: var(--vert-fonce); }
+    .pp-score-D { background: #f6e1de; color: var(--rouge); }
+    .pp-match-joueurs { list-style: none; margin: .55rem 0 0; padding: 0; }
+    .pp-match-joueurs li { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; padding: .25rem 0; border-top: 1px dashed var(--bord); font-size: .9rem; }
+    .pp-match-joueurs li.pp-dim { opacity: .45; }
+    .pp-num-maillot { display: inline-block; min-width: 1.7rem; text-align: center; font-weight: 700; color: var(--perf); background: var(--perf-clair); border-radius: 4px; font-size: .8rem; }
+    .pp-j-nom { font-weight: 600; }
+    .pp-cap { display: inline-block; background: #c99a2e; color: #fff; border-radius: 50%; width: 1.15rem; height: 1.15rem; line-height: 1.15rem; text-align: center; font-size: .68rem; font-weight: 700; }
+    .pp-j-statut { font-size: .78rem; color: var(--gris); }
+    .pp-st-titulaire { color: var(--vert-fonce); font-weight: 600; }
+    .pp-st-non_entre { color: var(--attente); font-style: italic; }
+    .pp-j-marque { font-size: .82rem; color: #1c232b; }
+    .pp-src { font-size: .65rem; font-weight: 700; color: var(--gris); border: 1px solid var(--bord); border-radius: 3px; padding: 0 .25rem; }
+    /* Modale */
+    .pp-overlay { position: fixed; inset: 0; background: rgba(20, 28, 40, .55); z-index: 300; display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; padding: 2rem 1rem; }
+    .pp-overlay[hidden] { display: none; }
+    .pp-modal { background: #fff; border-radius: 12px; width: 100%; max-width: 760px; box-shadow: 0 12px 40px rgba(0,0,0,.25); }
+    .pp-modal-head { display: flex; justify-content: space-between; align-items: center; padding: .9rem 1.1rem; border-bottom: 1px solid var(--bord); }
+    .pp-modal-head h2 { margin: 0; font-size: 1.15rem; color: var(--perf); }
+    .pp-fermer { background: none; border: 0; font-size: 1.5rem; line-height: 1; color: var(--gris); cursor: pointer; }
+    .pp-modal-body { padding: 1rem 1.1rem; }
+    .pp-modal-foot { display: flex; justify-content: space-between; gap: .5rem; padding: .8rem 1.1rem; border-top: 1px solid var(--bord); flex-wrap: wrap; }
+    .pp-modal-foot .pp-droite { display: flex; gap: .5rem; margin-left: auto; }
+    .pp-grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: .7rem; }
+    .pp-modal label { display: flex; flex-direction: column; gap: .2rem; font-size: .82rem; font-weight: 600; color: var(--gris); }
+    .pp-modal input[type="text"], .pp-modal input[type="date"], .pp-modal input[type="number"], .pp-modal select, .pp-modal textarea {
+      font: inherit; font-size: .92rem; padding: .35rem .5rem; border: 1px solid var(--bord); border-radius: 6px; color: #1c232b; background: #fff; font-weight: 400;
+    }
+    .pp-score-saisie { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+    .pp-h3 { margin: 1.1rem 0 0; font-size: .95rem; color: var(--perf); }
+    .pp-grille td { padding: .3rem .35rem; }
+    .pp-grille input[type="number"] { width: 3.4rem; text-align: right; }
+    .pp-notes { margin-top: .8rem; }
+    .pp-erreur { color: var(--rouge); font-weight: 600; font-size: .88rem; margin: .7rem 0 0; min-height: 1.2em; }
+    footer { max-width: 960px; margin: 2rem auto 0; color: var(--attente); font-size: .8rem; text-align: center; }
+    @media (max-width: 560px) {
+      .pp-head h1 { font-size: 1.4rem; }
+      .pp-match-head { flex-direction: column; }
+    }
+  </style>
+</head>
+<body class="auth-pending">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo"><img src="assets/logo-m2m.png" alt="MOM Rugby"></div>
+      <div class="brand-text">
+        <h1>MOM Hub</h1>
+        <p>Mutzig Ovalie Molsheim</p>
+      </div>
+    </div>
+
+    <div class="season-pill" id="season-pill">SAISON …</div>
+
+    <!-- Navigation thématique « Mon équipe » injectée par js/hub-nav.js
+         (aucune entrée propre à cette page : D9). -->
+    <nav class="main-nav hub-nav" data-hub-nav="equipe"></nav>
+
+    <div class="user-profile">
+      <div class="avatar">MOM</div>
+      <div class="user-info">
+        <div class="user-name">Éducateur MOM</div>
+        <div class="user-role">Espace éducateurs</div>
+      </div>
+      <a href="./" class="user-action" title="Retour au portail" aria-label="Retour au portail">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/></svg>
+      </a>
+      <button type="button" class="user-action" id="btn-signout" title="Se déconnecter" aria-label="Se déconnecter">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <script src="js/hub-nav.js"></script>
+
+  <div class="pp-wrap">
+    <main id="pp-page"><p class="pp-load">Initialisation…</p></main>
+  </div>
+  <footer>MOM Hub · Parcours Performance — Mutzig Ovalie Molsheim</footer>
+
+  <!-- Modale de saisie d'un match (plusieurs joueurs). -->
+  <div class="pp-overlay" id="pp-overlay" hidden>
+    <div class="pp-modal" role="dialog" aria-modal="true" aria-labelledby="pp-modal-titre">
+      <div class="pp-modal-head">
+        <h2 id="pp-modal-titre">Saisir un match</h2>
+        <button type="button" class="pp-fermer" data-action="fermer" aria-label="Fermer">×</button>
+      </div>
+      <div class="pp-modal-body">
+        <form id="pp-form" onsubmit="return false;"></form>
+      </div>
+      <div class="pp-modal-foot">
+        <button type="button" class="pp-btn pp-btn-danger" id="pp-supprimer" hidden>Supprimer le match</button>
+        <div class="pp-droite">
+          <button type="button" class="pp-btn" data-action="fermer">Annuler</button>
+          <button type="button" class="pp-btn pp-btn-primaire" id="pp-enregistrer">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/season-pill.js"></script>
+  <script src="js/parcours-performance.js"></script>
+  <script>
+    /* Boot topbar (patron pilotage-categorie.html) : anonyme → login.html ;
+       droits de lecture/écriture portés par les RPC sql_261. */
+    (async function () {
+      'use strict';
+      if (window.SupabaseHub && SupabaseHub.getSession) {
+        var _session = await SupabaseHub.getSession();
+        if (!_session) { window.location.replace('login.html'); return; }
+      }
+      try {
+        if (window.SupabaseHub && SupabaseHub.getMyRoles) {
+          var roles = await SupabaseHub.getMyRoles();
+          document.body.classList.add('auth-resolved');
+          if (Array.isArray(roles) && roles.indexOf('admin') !== -1) {
+            document.body.classList.add('auth-admin');
+          }
+        } else {
+          document.body.classList.add('auth-resolved');
+        }
+      } catch (_) { document.body.classList.add('auth-resolved'); }
+      document.body.classList.remove('auth-pending');
+
+      var _so = document.getElementById('btn-signout');
+      if (_so && window.SupabaseHub && SupabaseHub.signOut) {
+        _so.addEventListener('click', async function () {
+          _so.disabled = true;
+          await SupabaseHub.signOut();
+        });
+      }
+      if (window.ParcoursPerformance) {
+        ParcoursPerformance.demarrer();
+      } else {
+        document.getElementById('pp-page').innerHTML =
+          '<section class="pp-bloc"><h2>Erreur</h2><p>Module Parcours Performance indisponible.</p></section>';
+      }
+    })();
+  </script>
+</body>
+</html>
