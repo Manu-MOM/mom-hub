@@ -4,7 +4,12 @@
  *
  * Module IIFE — initialise l'UI de la page joueurs.html.
  *
- * Version : v1.12 — 3 novembre 2026
+ * Version : v1.13 — 3 novembre 2026
+ *   v1.13 : PARCOURS-PERFORMANCE amendement v1.2 (D12). joueurs.html?fiche=<id>
+ *          rouvre la fiche du joueur (sa catégorie devient la catégorie
+ *          active si elle est dans le périmètre). Les liens « Voir tous
+ *          ses matchs » et « Stats de saison » portent &depuis=fiche pour
+ *          que la page ouverte propose le retour à la fiche.
  *   v1.12 : PARCOURS-PERFORMANCE lot L4 (mise en valeur). Section de la
  *          fiche : totaux de la saison (feuilles, titularisations, points)
  *          et 3 derniers matchs, chargés à l'ouverture de la fiche
@@ -496,7 +501,7 @@ window.JoueursBrowser = (function () {
       + '<ul class="joueur-fiche-perf-meta" style="margin:4px 0 0;padding-left:18px;">' + derniers + '</ul>'
       + '<div class="joueur-fiche-perf-meta"><a style="color:#1f3a68;font-weight:600" href="parcours-performance.html?categorie='
       + encodeURIComponent(catId) + '&joueur=' + encodeURIComponent(personneId)
-      + '">Voir tous ses matchs →</a></div>';
+      + '&depuis=fiche">Voir tous ses matchs →</a></div>';
   }
 
   function renderParcoursBadge(j) {
@@ -1548,7 +1553,8 @@ window.JoueursBrowser = (function () {
     document.querySelectorAll('.joueur-btn-stats[data-stats="saison"]').forEach(btn => {
       btn.addEventListener('click', function () {
         if (!currentEditPersonneId) return;
-        window.location.href = 'fiche-joueur-stats.html?joueur_id=' + encodeURIComponent(currentEditPersonneId);
+        window.location.href = 'fiche-joueur-stats.html?joueur_id=' + encodeURIComponent(currentEditPersonneId)
+          + '&depuis=fiche'; // v1.13 (D12) : retour à la fiche proposé
       });
     });
     document.querySelectorAll('.joueur-btn-edit[data-edit]').forEach(btn => {
@@ -2599,6 +2605,20 @@ window.JoueursBrowser = (function () {
       return;
     }
 
+    // 1quater. v1.13 (D12) — joueurs.html?fiche=<id> : la catégorie du joueur
+    // devient la catégorie active (prise en compte par le socle seulement si
+    // elle est dans le périmètre), la fiche est ouverte après le rendu.
+    let ficheAOuvrir = null;
+    try { ficheAOuvrir = new URLSearchParams(window.location.search).get('fiche'); } catch (e) { /* ignoré */ }
+    if (ficheAOuvrir && typeof SupabaseHub !== 'undefined'
+        && typeof SupabaseHub.getJoueurDetail === 'function'
+        && typeof SupabaseHub.memoriserCategorieActive === 'function') {
+      try {
+        const dFiche = await SupabaseHub.getJoueurDetail(ficheAOuvrir);
+        if (dFiche && dFiche.categorie_id) SupabaseHub.memoriserCategorieActive(dFiche.categorie_id);
+      } catch (e) { console.warn('Joueurs: ?fiche= — catégorie du joueur non résolue.', e); }
+    }
+
     // 1bis. Périmètre de catégorie active + sélecteur (multi-cat).
     // Résolu AVANT le chargement pour que _chargerJoueursCategorieActive
     // lise la bonne catégorie. Le sélecteur n'apparaît que si > 1
@@ -2683,6 +2703,17 @@ window.JoueursBrowser = (function () {
     render();
 
     console.log('Joueurs: init() OK —', ALL_JOUEURS.length, 'joueurs chargés');
+
+    // 6. v1.13 (D12) — ouverture de la fiche demandée par ?fiche=, puis
+    // nettoyage de l'adresse (un rechargement ne la rouvre pas).
+    if (ficheAOuvrir) {
+      await openFiche(ficheAOuvrir);
+      try {
+        const u = new URL(window.location.href);
+        u.searchParams.delete('fiche');
+        window.history.replaceState(null, '', u.pathname + u.search + u.hash);
+      } catch (e) { /* adresse conservée */ }
+    }
   }
 
   // ============================================================
