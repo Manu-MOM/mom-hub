@@ -46,11 +46,57 @@
       background: var(--gris-clair); border-radius: 4px; padding: 0 .35rem;
     }
     footer { max-width: 680px; margin: 2rem auto 0; color: var(--attente); font-size: .8rem; text-align: center; }
+    /* PARCOURS-PERFORMANCE amendement v1.2 (FAIT FOI gelé 03/11/2026).
+       D11 — barre d'actions (retour + impression / PDF). */
+    .ss-barre { display: flex; justify-content: space-between; align-items: center; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .ss-barre .ss-retour { margin-bottom: 0; }
+    .ss-imprimer {
+      display: inline-flex; align-items: center; gap: .35rem; padding: .4rem .8rem;
+      border: 1px solid var(--vert); border-radius: 8px; background: var(--vert); color: #fff;
+      font: inherit; font-weight: 600; font-size: .95rem; cursor: pointer;
+    }
+    .ss-imprimer:hover { background: var(--vert-fonce); }
+    .ss-print-tete { display: none; }
+    /* D10 — bloc Parcours Performance, séparé des stats du collectif (D3). */
+    .ss-pp { border-top: 4px solid #1f3a68; }
+    .ss-pp h2 { color: #1f3a68; }
+    .ss-pp-meta { margin: 0 0 .6rem; color: var(--gris); font-size: .92rem; }
+    .ss-pp-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: .45rem; margin-bottom: .7rem; }
+    .ss-pp-kpi { background: #e6ecf6; border-radius: 8px; padding: .45rem .5rem; text-align: center; }
+    .ss-pp-kpi b { display: block; font-size: 1.15rem; color: #1f3a68; }
+    .ss-pp-kpi span { display: block; font-size: .7rem; color: var(--gris); text-transform: uppercase; letter-spacing: .03em; }
+    .ss-pp-scroll { overflow-x: auto; }
+    .ss-pp-res { display: inline-block; min-width: 1.2rem; text-align: center; border-radius: 3px; font-size: .72rem; font-weight: 700; padding: 0 .2rem; margin-left: .2rem; }
+    .ss-pp-res-V { background: #dff0e4; color: var(--vert-fonce); }
+    .ss-pp-res-D { background: #f6e1de; color: #a3271b; }
+    .ss-pp-res-N { background: var(--gris-clair); color: var(--gris); }
+    .ss-pp-note { color: var(--gris); font-size: .8rem; margin: .6rem 0 0; }
+    /* D11 — impression / « Enregistrer au format PDF » du navigateur. */
+    @page { size: A4 portrait; margin: 12mm; }
+    @media print {
+      body { background: #fff; padding: 0; font-size: 11pt; }
+      .ss-wrap { max-width: none; }
+      .ss-barre, .ss-load { display: none !important; }
+      .ss-print-tete {
+        display: flex; justify-content: space-between; border-bottom: 1px solid var(--bord);
+        padding-bottom: .3rem; margin-bottom: .8rem; font-size: 9pt; color: var(--gris);
+      }
+      .ss-bloc { break-inside: avoid; page-break-inside: avoid; box-shadow: none; }
+      .ss-table thead { display: table-header-group; }
+      .ss-table tr { break-inside: avoid; page-break-inside: avoid; }
+      .ss-pp-scroll { overflow: visible; }
+      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      footer { max-width: none; }
+    }
   </style>
 </head>
 <body>
   <div class="ss-wrap">
-    <a href="joueurs.html" class="ss-retour" id="ss-retour">← Retour</a>
+    <div class="ss-barre">
+      <a href="joueurs.html" class="ss-retour" id="ss-retour">← Retour</a>
+      <button type="button" class="ss-imprimer" id="ss-imprimer" title="Imprimer la fiche ou l'enregistrer en PDF">🖨 Imprimer / PDF</button>
+    </div>
+    <div class="ss-print-tete"><span>Mutzig Ovalie Molsheim · Fiche de statistiques</span><span id="ss-print-date"></span></div>
     <main id="ss-fiche"><p class="ss-load">Initialisation…</p></main>
   </div>
   <footer>MOM Hub · restitution famille — Mutzig Ovalie Molsheim</footer>
@@ -66,7 +112,19 @@
       // R1-A — retour : page précédente du Hub si on en vient, sinon la
       // liste des joueurs (lien par défaut).
       var retour = document.getElementById('ss-retour');
-      if (retour) retour.addEventListener('click', function (ev) {
+      // Amendement v1.2 (D12) : ouvert depuis la fiche joueur (&depuis=fiche),
+      // le retour rouvre cette fiche au lieu de revenir à la liste.
+      var depuisFiche = params.get('depuis') === 'fiche' && !!joueurId;
+      if (retour && depuisFiche) {
+        retour.href = 'joueurs.html?fiche=' + encodeURIComponent(joueurId);
+        retour.textContent = '← Retour à la fiche joueur';
+      }
+      // D11 : impression (le navigateur propose aussi « Enregistrer au format PDF »).
+      var dImp = document.getElementById('ss-print-date');
+      if (dImp) dImp.textContent = 'Édité le ' + new Date().toLocaleDateString('fr-FR');
+      var bImp = document.getElementById('ss-imprimer');
+      if (bImp) bImp.addEventListener('click', function () { window.print(); });
+      if (retour && !depuisFiche) retour.addEventListener('click', function (ev) {
         var memeSite = false;
         try { memeSite = !!document.referrer && new URL(document.referrer).origin === window.location.origin; } catch (e) {}
         if (memeSite && window.history.length > 1) { ev.preventDefault(); window.history.back(); }
@@ -75,8 +133,96 @@
         mount.innerHTML = '<section class="ss-bloc"><h2>Erreur</h2><p>Module stats-saison indisponible.</p></section>';
         return;
       }
-      StatsSaison.renderFicheJoueur(joueurId, mount);
+      Promise.resolve(StatsSaison.renderFicheJoueur(joueurId, mount))
+        .catch(function () { /* la fiche affiche déjà son propre message */ })
+        .then(function () { return ajouterBlocParcours(joueurId, mount, retour, depuisFiche); })
+        .catch(function (e) { if (window.console) console.warn('fiche-joueur-stats : bloc Parcours Performance', e); });
     })();
+
+    /* =================================================================
+     * Amendement v1.2 (D10) — bloc « Parcours Performance » ajouté APRÈS
+     * les stats du collectif, sans aucun calcul commun (D3). Lectures par
+     * les RPC sql_261/sql_262 (droits de lecture de la catégorie) ; joueur
+     * non inscrit, droit refusé ou erreur → aucun bloc (silence honnête).
+     * ================================================================= */
+    function ajouterBlocParcours(joueurId, mount, retour, depuisFiche) {
+      var hub = window.SupabaseHub;
+      if (!joueurId || !mount || !hub || typeof hub.getJoueurDetail !== 'function'
+          || typeof hub.listParcoursSaison !== 'function' || typeof hub.listParcoursMatchs !== 'function') {
+        return Promise.resolve();
+      }
+      function esc(s) {
+        return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+      }
+      return Promise.resolve(hub.getJoueurDetail(joueurId)).then(function (d) {
+        if (!d) return null;
+        if (retour && depuisFiche) {
+          retour.textContent = '← Retour à la fiche de ' + (d.prenom ? d.prenom + ' ' : '') + String(d.nom || '').toUpperCase();
+        }
+        if (!d.categorie_id) return null;
+        return Promise.resolve(hub.listParcoursSaison(d.categorie_id)).then(function (saison) {
+          var st = Array.isArray(saison) && saison.find(function (x) { return x.personne_id === joueurId; });
+          if (!st) return null;
+          return Promise.resolve(hub.listParcoursMatchs(d.categorie_id, null, joueurId)).then(function (matchs) {
+            return { st: st, matchs: Array.isArray(matchs) ? matchs : [] };
+          });
+        });
+      }).then(function (pp) {
+        if (!pp) return;
+        var LIB = { integre: 'Intégré', renfort: 'Renfort', double_licence: 'Double licence' };
+        var STJ = { titulaire: 'Titulaire', entre: 'Entré', non_entre: 'Non entré' };
+        var m = pp.matchs;
+        var titu = 0, entres = 0, essais = 0, pts = 0;
+        m.forEach(function (x) {
+          if (x.statut_joueur === 'titulaire') titu += 1;
+          if (x.statut_joueur === 'entre') entres += 1;
+          essais += Number(x.essais) || 0;
+          pts += Number(x.points) || 0;
+        });
+        function kpi(v, l) { return '<div class="ss-pp-kpi"><b>' + v + '</b><span>' + l + '</span></div>'; }
+        function real(x) {
+          var p = [];
+          function a(n, s1, s2) { n = Number(n) || 0; if (n) p.push(n + ' ' + (n > 1 ? s2 : s1)); }
+          a(x.essais, 'essai', 'essais'); a(x.transformations, 'transfo', 'transfos');
+          a(x.penalites, 'pénalité', 'pénalités'); a(x.drops, 'drop', 'drops');
+          return p.join(', ') || '—';
+        }
+        var lignes = m.map(function (x) {
+          var dt = String(x.date_match || '').slice(0, 10).split('-');
+          var nous = x.equipe_accueil || 'Équipe Performance', eux = x.adversaire || '—';
+          var ext = x.lieu === 'exterieur';
+          var score = '—', res = '';
+          if (x.score_pour != null && x.score_contre != null) {
+            res = x.score_pour > x.score_contre ? 'V' : (x.score_pour < x.score_contre ? 'D' : 'N');
+            score = ext ? x.score_contre + '–' + x.score_pour : x.score_pour + '–' + x.score_contre;
+          }
+          var ctx = [x.competition, x.phase].filter(Boolean).join(' · ');
+          return '<tr><td>' + (dt.length === 3 ? dt[2] + '/' + dt[1] + '/' + dt[0] : '') + '</td>' +
+            '<td>' + esc(ext ? eux + ' – ' + nous : nous + ' – ' + eux) +
+              (ctx ? '<br><span class="ss-pp-meta" style="font-size:.78rem">' + esc(ctx) + '</span>' : '') + '</td>' +
+            '<td>' + esc(score) + (res ? '<span class="ss-pp-res ss-pp-res-' + res + '">' + res + '</span>' : '') + '</td>' +
+            '<td>' + esc(STJ[x.statut_joueur] || x.statut_joueur) +
+              (x.numero != null ? ' · n°' + esc(x.numero) : '') + (x.capitaine ? ' · C' : '') + '</td>' +
+            '<td>' + esc(real(x)) + '</td><td class="ss-num">' + (Number(x.points) || 0) + '</td></tr>';
+        }).join('');
+        var st = pp.st;
+        var meta = [LIB[st.statut] || st.statut, st.structure, st.equipe_accueil].filter(Boolean).join(' · ');
+        var sec = document.createElement('section');
+        sec.className = 'ss-bloc ss-pp';
+        sec.innerHTML = '<h2>⭐ Parcours Performance</h2>' +
+          '<p class="ss-pp-meta">' + esc(meta) + '</p>' +
+          (m.length
+            ? '<div class="ss-pp-kpis">' + kpi(m.length, m.length > 1 ? 'Feuilles de match' : 'Feuille de match') +
+                kpi(titu, 'Titularisations') + kpi(entres, 'Entrées') + kpi(essais, 'Essais') + kpi(pts, 'Points') + '</div>' +
+              '<div class="ss-pp-scroll"><table class="ss-table"><thead><tr><th>Date</th><th>Rencontre</th>' +
+              '<th>Score</th><th>Rôle</th><th>Réalisations</th><th class="ss-num">Pts</th></tr></thead>' +
+              '<tbody>' + lignes + '</tbody></table></div>'
+            : '<p class="ss-attente">Aucun match saisi cette saison.</p>') +
+          '<p class="ss-pp-note">Matchs joués en équipe Performance : ils ne sont jamais comptés dans les statistiques ci-dessus.</p>';
+        mount.appendChild(sec);
+      });
+    }
   </script>
 </body>
 </html>
