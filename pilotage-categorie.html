@@ -67,6 +67,17 @@
       font-size: .95rem; padding: .35rem .6rem; border: 1px solid var(--bord);
       border-radius: 6px; background: #fff; color: #1c232b; min-width: 160px;
     }
+    /* PARCOURS-PERFORMANCE L2 (D9) : lien vers la page dédiée, affiché
+       seulement si la catégorie pilotée compte au moins un joueur engagé. */
+    .ss-pp-lien {
+      display: flex; align-items: center; justify-content: space-between; gap: .75rem;
+      margin-bottom: 1.25rem; padding: .7rem 1rem; border-radius: 10px;
+      background: #e6ecf6; border: 1px solid #c3d0e6; color: #1f3a68;
+      text-decoration: none; font-weight: 600;
+    }
+    .ss-pp-lien:hover { background: #d9e2f1; }
+    .ss-pp-lien[hidden] { display: none; }
+    .ss-pp-lien__fleche { white-space: nowrap; }
     footer { max-width: 920px; margin: 2rem auto 0; color: var(--attente); font-size: .8rem; text-align: center; }
     /* E3 (pt 160) : CSS .hub-back-row / .hub-back-btn retiré — le bouton corps
        « Retour au portail » qu'il stylait a été supprimé (redondant avec le
@@ -122,6 +133,10 @@
        — redondant avec le tronc « Accueil » de la barre thématique. -->
 
   <div class="ss-wrap">
+    <a class="ss-pp-lien" id="ss-pp-lien" href="parcours-performance.html" hidden>
+      <span id="ss-pp-lien-texte">⭐ Parcours Performance</span>
+      <span class="ss-pp-lien__fleche">Voir leurs matchs →</span>
+    </a>
     <main id="ss-pilotage"><p class="ss-load">Initialisation…</p></main>
   </div>
   <footer>MOM Hub · pilotage de saison — Mutzig Ovalie Molsheim</footer>
@@ -211,6 +226,24 @@
           '<p>Ces informations sont réservées aux encadrants d\'une catégorie.</p></section>';
       }
 
+      // PARCOURS-PERFORMANCE L2 (D9) : lien vers la page dédiée pour la
+      // catégorie pilotée, visible seulement si ≥ 1 joueur engagé. Lecture
+      // gardée par la RPC list_parcours_saison ; échec = lien masqué.
+      function majLienPP(catId) {
+        var lien = document.getElementById('ss-pp-lien');
+        if (!lien) return;
+        lien.hidden = true;
+        if (!catId || typeof SupabaseHub.listParcoursSaison !== 'function') return;
+        Promise.resolve(SupabaseHub.listParcoursSaison(catId)).then(function (rows) {
+          if (!Array.isArray(rows) || rows.length === 0) return;
+          lien.href = 'parcours-performance.html?categorie=' + encodeURIComponent(catId);
+          var t = document.getElementById('ss-pp-lien-texte');
+          if (t) t.textContent = '⭐ Parcours Performance — ' + rows.length +
+            (rows.length > 1 ? ' joueurs engagés' : ' joueur engagé') + ' en équipe Performance';
+          lien.hidden = false;
+        }).catch(function () { /* lien masqué */ });
+      }
+
       // Rendu transverse : barre de sélection + zone de pilotage rafraîchie au choix.
       function rendreAvecSelecteur(categories, catParDefaut) {
         var options = categories.map(function (c) {
@@ -233,6 +266,7 @@
         function peindre(catId) {
           zone.innerHTML = '<p class="ss-load">Chargement du pilotage de saison…</p>';
           StatsSaison.renderPilotageCategorie(catId, zone);
+          majLienPP(catId);
         }
         sel.addEventListener('change', function () {
           // Mémorise le choix → cohérence inter-écrans (clé partagée
@@ -249,6 +283,7 @@
       // Cas override : court-circuit direct.
       if (override) {
         StatsSaison.renderPilotageCategorie(override, mount);
+        majLienPP(override);
         return;
       }
 
@@ -283,6 +318,7 @@
           // pilotage direct, aucun sélecteur (UX inchangée).
           if (!perimetre.transverse && cats.length === 1) {
             StatsSaison.renderPilotageCategorie(cats[0].id, mount);
+            majLienPP(cats[0].id);
             return;
           }
 
