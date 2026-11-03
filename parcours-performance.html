@@ -100,6 +100,16 @@
     .pp-grille td { padding: .3rem .35rem; }
     .pp-grille input[type="number"] { width: 3.4rem; text-align: right; }
     .pp-notes { margin-top: .8rem; }
+    /* L3 — import FFR */
+    .pp-bandeau { background: var(--perf-clair); border: 1px solid #c3d0e6; border-radius: 8px; padding: .6rem .8rem; margin-bottom: .9rem; font-size: .88rem; color: var(--perf); }
+    .pp-imp-champs { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: .7rem; }
+    .pp-imp-champs textarea { min-height: 9rem; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .78rem; }
+    .pp-imp-aide { margin: 0 0 .8rem; color: var(--gris); font-size: .85rem; }
+    .pp-imp-aide ol { margin: .3rem 0 0; padding-left: 1.2rem; }
+    .pp-imp-ok { color: var(--vert-fonce); font-weight: 600; margin: .9rem 0 .2rem; }
+    .pp-imp-ko { color: var(--rouge); font-weight: 700; margin: .9rem 0 .2rem; }
+    .pp-imp-erreurs { color: var(--rouge); margin: .2rem 0 0; padding-left: 1.2rem; font-size: .88rem; }
+    .pp-imp-alertes { color: #8a5a00; margin: .5rem 0 0; padding-left: 1.2rem; font-size: .85rem; }
     .pp-erreur { color: var(--rouge); font-weight: 600; font-size: .88rem; margin: .7rem 0 0; min-height: 1.2em; }
     footer { max-width: 960px; margin: 2rem auto 0; color: var(--attente); font-size: .8rem; text-align: center; }
     @media (max-width: 560px) {
@@ -167,9 +177,40 @@
     </div>
   </div>
 
+  <!-- L3 : import d'une feuille de match FFR (collage Résumé + Compositions). -->
+  <div class="pp-overlay" id="pp-import-overlay" hidden>
+    <div class="pp-modal" role="dialog" aria-modal="true" aria-labelledby="pp-import-titre">
+      <div class="pp-modal-head">
+        <h2 id="pp-import-titre">Importer une feuille FFR</h2>
+        <button type="button" class="pp-fermer" data-action="fermer-import" aria-label="Fermer">×</button>
+      </div>
+      <div class="pp-modal-body">
+        <div class="pp-imp-aide">Sur Mon Club House, ouvre la page du match :
+          <ol>
+            <li>onglet <strong>Résumé</strong> : tout sélectionner (Ctrl+A), copier, coller dans le 1<sup>er</sup> champ ;</li>
+            <li>onglet <strong>Compositions</strong> : déplier « Afficher les remplacements », tout sélectionner, copier, coller dans le 2<sup>e</sup> champ.</li>
+          </ol>
+        </div>
+        <div class="pp-imp-champs">
+          <label>Résumé<textarea id="pp-imp-resume" spellcheck="false"></textarea></label>
+          <label>Compositions<textarea id="pp-imp-compos" spellcheck="false"></textarea></label>
+        </div>
+        <div id="pp-imp-resultat" aria-live="polite"></div>
+      </div>
+      <div class="pp-modal-foot">
+        <button type="button" class="pp-btn" id="pp-imp-analyser">Analyser</button>
+        <div class="pp-droite">
+          <button type="button" class="pp-btn" data-action="fermer-import">Annuler</button>
+          <button type="button" class="pp-btn pp-btn-primaire" id="pp-imp-continuer" disabled>Vérifier et enregistrer →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="js/supabase-client.js"></script>
   <script src="js/season-pill.js"></script>
+  <script src="js/parcours-ffr.js"></script>
   <script src="js/parcours-performance.js"></script>
   <script>
     /* Boot topbar (patron pilotage-categorie.html) : anonyme → login.html ;
