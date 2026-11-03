@@ -1,6 +1,9 @@
 /* =====================================================================
  * parcours-performance.js — Page Parcours Performance (MOM Hub)
  * ---------------------------------------------------------------------
+ * Version : v1.3 — 3 novembre 2026 — lot L4 (mise en valeur)
+ *   v1.3 : paramètre ?joueur=<personne_id> : ouvre directement
+ *          l'historique du joueur (lien depuis sa fiche).
  * Version : v1.2 — 3 novembre 2026 — lot L3 (import des feuilles FFR)
  *   v1.2 : bouton « Importer une feuille FFR » : collage des onglets
  *          Résumé + Compositions, lecture et contrôle bloquant du score
@@ -842,7 +845,11 @@
       return;
     }
     cablerModale();
-    var override = new URLSearchParams(window.location.search).get('categorie');
+    var params = new URLSearchParams(window.location.search);
+    var override = params.get('categorie');
+    // v1.3 (L4) : historique d'un joueur ouvert depuis sa fiche ; ignoré
+    // au chargement s'il n'est ni engagé ni présent dans les matchs.
+    if (params.get('joueur')) ETAT.filtreJoueur = params.get('joueur');
 
     Promise.resolve(hub.getSaisonActive()).catch(function () { return null; }).then(function (saison) {
       ETAT.saison = saison;
