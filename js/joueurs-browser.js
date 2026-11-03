@@ -4,7 +4,13 @@
  *
  * Module IIFE — initialise l'UI de la page joueurs.html.
  *
- * Version : v1.11 — 3 novembre 2026
+ * Version : v1.12 — 3 novembre 2026
+ *   v1.12 : PARCOURS-PERFORMANCE lot L4 (mise en valeur). Section de la
+ *          fiche : totaux de la saison (feuilles, titularisations, points)
+ *          et 3 derniers matchs, chargés à l'ouverture de la fiche
+ *          (list_parcours_matchs, non bloquant) ; lien vers l'historique
+ *          complet (parcours-performance.html?joueur=). Jamais mêlé aux
+ *          stats du collectif (D3).
  *   v1.11 : PARCOURS-PERFORMANCE lot L1 (FAIT FOI gelé 03/11/2026, sql_261,
  *          supabase-client v1.93). Statut de saison chargé une fois par
  *          catégorie active (list_parcours_saison, non bloquant) :
@@ -439,6 +445,58 @@ window.JoueursBrowser = (function () {
     } catch (err) {
       console.warn('Joueurs: _chargerParcours()', err);
     }
+  }
+
+  // v1.12 (L4) — Fiche : totaux de saison + 3 derniers matchs du Parcours
+  // Performance. Lecture seule (list_parcours_matchs) ; échec = le texte
+  // initial (« N match(s) saisi(s) ») reste en place.
+  const PP_STATUT_JOUEUR = { titulaire: 'Titulaire', entre: 'Entré', non_entre: 'Non entré' };
+
+  async function _chargerMatchsParcoursFiche(personneId) {
+    const catId = CTX_PERIMETRE && CTX_PERIMETRE.active;
+    if (!PARCOURS_BY_PERSONNE.get(personneId) || !catId
+        || typeof SupabaseHub === 'undefined'
+        || typeof SupabaseHub.listParcoursMatchs !== 'function') {
+      return;
+    }
+    let rows = null;
+    try { rows = await SupabaseHub.listParcoursMatchs(catId, null, personneId); }
+    catch (err) { console.warn('Joueurs: _chargerMatchsParcoursFiche()', err); }
+    const el = document.getElementById('joueur-fiche-pp-matchs');
+    if (!el || !Array.isArray(rows) || currentEditPersonneId !== personneId) return;
+    if (rows.length === 0) {
+      el.innerHTML = '<div class="joueur-fiche-perf-meta">Aucun match saisi cette saison.</div>';
+      return;
+    }
+    const titu = rows.filter(m => m.statut_joueur === 'titulaire').length;
+    const pts = rows.reduce((t, m) => t + (Number(m.points) || 0), 0);
+    const essais = rows.reduce((t, m) => t + (Number(m.essais) || 0), 0);
+    const totaux = rows.length + ' feuille' + (rows.length > 1 ? 's' : '') + ' de match · '
+      + titu + ' titularisation' + (titu > 1 ? 's' : '') + ' · '
+      + essais + ' essai' + (essais > 1 ? 's' : '') + ' · ' + pts + ' pt' + (pts > 1 ? 's' : '');
+    const derniers = rows.slice(0, 3).map(function (m) {
+      const d = String(m.date_match || '').slice(0, 10).split('-');
+      const date = d.length === 3 ? d[2] + '/' + d[1] : '';
+      const nous = m.equipe_accueil || 'Équipe Performance';
+      const eux = m.adversaire || '—';
+      const ext = m.lieu === 'exterieur';
+      let score = '';
+      if (m.score_pour != null && m.score_contre != null) {
+        const res = m.score_pour > m.score_contre ? 'V' : (m.score_pour < m.score_contre ? 'D' : 'N');
+        score = ' ' + (ext ? m.score_contre + '–' + m.score_pour : m.score_pour + '–' + m.score_contre) + ' (' + res + ')';
+      }
+      const role = [PP_STATUT_JOUEUR[m.statut_joueur] || m.statut_joueur]
+        .concat(m.numero != null ? ['n°' + m.numero] : [])
+        .concat(m.capitaine ? ['capitaine'] : [])
+        .concat(Number(m.points) ? [m.points + ' pts'] : []);
+      return '<li>' + esc(date) + ' · ' + esc(ext ? eux + ' – ' + nous : nous + ' – ' + eux) + esc(score)
+        + ' <span style="color:var(--ink-mute)">· ' + esc(role.join(' · ')) + '</span></li>';
+    }).join('');
+    el.innerHTML = '<div class="joueur-fiche-perf-meta"><strong>' + esc(totaux) + '</strong></div>'
+      + '<ul class="joueur-fiche-perf-meta" style="margin:4px 0 0;padding-left:18px;">' + derniers + '</ul>'
+      + '<div class="joueur-fiche-perf-meta"><a style="color:#1f3a68;font-weight:600" href="parcours-performance.html?categorie='
+      + encodeURIComponent(catId) + '&joueur=' + encodeURIComponent(personneId)
+      + '">Voir tous ses matchs →</a></div>';
   }
 
   function renderParcoursBadge(j) {
@@ -1020,6 +1078,7 @@ window.JoueursBrowser = (function () {
       _chargerPhotoFiche(detail.id); // asynchrone, non bloquant ; repli initiales
       _chargerHistoFiche('bl', detail.id); // pt 274 : asynchrone, non bloquant
       _chargerHistoFiche('in', detail.id); // pt 274 : asynchrone, non bloquant
+      _chargerMatchsParcoursFiche(detail.id); // v1.12 (L4) : asynchrone, non bloquant
 
     } catch (err) {
       console.error('Joueurs: openFiche()', err);
@@ -1068,9 +1127,10 @@ window.JoueursBrowser = (function () {
       if (p.structure) lignes.push(esc(p.structure));
       if (p.equipe_accueil) lignes.push(esc(p.equipe_accueil));
       contenu = '<div class="joueur-fiche-perf-ligne">' + lignes.join(' · ') + '</div>'
-        + '<div class="joueur-fiche-perf-meta">' + (Number(p.nb_matchs) || 0)
-        + ' match(s) saisi(s) cette saison</div>'
-        + (p.notes ? '<div class="joueur-fiche-perf-meta">' + esc(p.notes) + '</div>' : '');
+        + (p.notes ? '<div class="joueur-fiche-perf-meta">' + esc(p.notes) + '</div>' : '')
+        // v1.12 (L4) : totaux et derniers matchs remplis par _chargerMatchsParcoursFiche.
+        + '<div id="joueur-fiche-pp-matchs"><div class="joueur-fiche-perf-meta">'
+        + (Number(p.nb_matchs) || 0) + ' match(s) saisi(s) cette saison</div></div>';
     } else {
       contenu = '<div class="joueur-fiche-perf-meta">Pas inscrit au Parcours Performance cette saison.</div>';
     }
