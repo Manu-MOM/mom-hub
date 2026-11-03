@@ -530,6 +530,12 @@
   .joueur-badge-cat     { background: var(--paper-deep); color: var(--ink); }
   .joueur-badge-f15     { background: #c93a8a; color: var(--paper); border-color: #c93a8a; }
   .joueur-badge-coach   { background: #cf6a1a; color: var(--paper); border-color: #cf6a1a; }
+  /* v1.11 PARCOURS-PERFORMANCE (sql_261) — badge vignette + section fiche */
+  .joueur-badge-perf    { background: #1f3a68; color: var(--paper); border-color: #1f3a68; }
+  .joueur-fiche-perf-ligne { font-size: 14px; line-height: 1.5; }
+  .joueur-fiche-perf-meta  { font-size: 12px; color: var(--ink-mute); margin-top: 4px; line-height: 1.5; }
+  /* La modale J7 s'ouvre depuis la fiche (z-index 200/201) : elle doit passer au-dessus. */
+  #joueur-overlay-pp { z-index: 300; }
   .joueur-badge-staff   { background: #8b3a3a; color: var(--paper); border-color: #8b3a3a; }
 
   .joueur-badge-etat {
@@ -1618,6 +1624,55 @@
     <div class="joueur-modal-actions">
       <button type="button" class="joueur-btn" data-action="close-notes">Annuler</button>
       <button type="button" class="joueur-btn joueur-btn-primary" id="joueur-notes-submit">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- J7 — Modale Parcours Performance (v1.11, FAIT FOI PARCOURS-PERFORMANCE, sql_261) -->
+<div class="joueur-overlay" id="joueur-overlay-pp" role="dialog" aria-modal="true" aria-labelledby="joueur-pp-title">
+  <div class="joueur-modal">
+    <div class="joueur-modal-title" id="joueur-pp-title">Parcours Performance</div>
+    <div class="joueur-modal-body" id="joueur-pp-body">
+      <div id="joueur-pp-msg"></div>
+      <div class="joueur-modal-info" id="joueur-pp-info">
+        <em>Chargement…</em>
+      </div>
+      <form class="joueur-modal-form" id="joueur-pp-form" onsubmit="return false;">
+        <div class="joueur-form-group">
+          <label class="joueur-form-label" for="joueur-pp-statut">Statut cette saison</label>
+          <select class="joueur-form-select" id="joueur-pp-statut">
+            <option value="">— Pas au Parcours Performance —</option>
+            <option value="integre">Intégré (joue principalement en équipe Performance)</option>
+            <option value="renfort">Renfort (appelé ponctuellement)</option>
+            <option value="double_licence">Double licence</option>
+          </select>
+          <div class="joueur-form-hint">Choisir « Pas au Parcours Performance » retire le joueur pour la saison.</div>
+        </div>
+        <div class="joueur-form-group">
+          <label class="joueur-form-label" for="joueur-pp-structure">Structure de formation</label>
+          <input class="joueur-form-input" id="joueur-pp-structure" type="text" list="joueur-pp-structures" maxlength="80" placeholder="Pôle Espoir Dijon, CREF BFC…">
+          <datalist id="joueur-pp-structures">
+            <option value="Pôle Espoir Dijon"></option>
+            <option value="CREF BFC"></option>
+          </datalist>
+        </div>
+        <div class="joueur-form-group">
+          <label class="joueur-form-label" for="joueur-pp-equipe">Équipe d'accueil</label>
+          <input class="joueur-form-input" id="joueur-pp-equipe" type="text" list="joueur-pp-equipes" maxlength="80" placeholder="ABCD XV, Oyonnax…">
+          <datalist id="joueur-pp-equipes">
+            <option value="ABCD XV"></option>
+            <option value="Oyonnax"></option>
+          </datalist>
+        </div>
+        <div class="joueur-form-group">
+          <label class="joueur-form-label" for="joueur-pp-notes">Notes</label>
+          <textarea class="joueur-form-textarea" id="joueur-pp-notes" maxlength="1000" placeholder="Précisions utiles (facultatif)"></textarea>
+        </div>
+      </form>
+    </div>
+    <div class="joueur-modal-actions">
+      <button type="button" class="joueur-btn" data-action="close-pp">Annuler</button>
+      <button type="button" class="joueur-btn joueur-btn-primary" id="joueur-pp-submit">Enregistrer</button>
     </div>
   </div>
 </div>
