@@ -1,7 +1,11 @@
 /* =====================================================================
  * parcours-ffr.js — Lecture des feuilles de match FFR (Mon Club House)
  * ---------------------------------------------------------------------
- * Version : v1.1 — 3 novembre 2026 — PARCOURS-PERFORMANCE lot L3 (D2, D8)
+ * Version : v1.2 — 3 novembre 2026 — PARCOURS-PERFORMANCE lot L3 (D2, D8)
+ *   v1.2 : bouton « Ajouter aux / Retirer des favoris » de Mon Club House
+ *          (affiché près de l'équipe favorite du compte) ignoré ; la phase
+ *          n'agrège plus une ligne égale au nom d'une des deux équipes.
+ *          Constat : imports du 03/11 à domicile, phase polluée.
  *   v1.1 : collage « texte brut » de la page entière (Ctrl+A, recette
  *          terrain du 03/11) : la page y arrive éclatée (date / heure,
  *          score « 19 » « - » « 29 », « 12 » « Mi-temps » « 16 », nom puis
@@ -62,7 +66,7 @@
   }
 
   // Libellés d'images de la page FFR, sans valeur pour la lecture.
-  var IMAGE_RE = /( logo$|^logo |^go back icon$|^google store logo$|^ios store logo$)/i;
+  var IMAGE_RE = /( logo$|^logo |^go back icon$|^google store logo$|^ios store logo$|^(ajouter aux|retirer des) favoris\b)/i;
 
   // v1.1 — Collage texte brut : recolle les éléments que le navigateur
   // sépare sur plusieurs lignes, pour retrouver la forme d'une ligne.
@@ -154,7 +158,9 @@
     }
     if (iScore < 0 || iScore - iDate < 2) return null;
     var domicile = L[iScore - 1].t;
-    var milieu = L.slice(iDate + 1, iScore - 1).map(function (l) { return l.t; });
+    var nDom = sansAccents(domicile).toLowerCase();
+    var milieu = L.slice(iDate + 1, iScore - 1).map(function (l) { return l.t; })
+      .filter(function (t) { return sansAccents(t).toLowerCase() !== nDom; });
     var k = iScore + 1;
     while (k < L.length && STATUTS_MATCH.test(L[k].t)) k++;
     if (k >= L.length) return null;
