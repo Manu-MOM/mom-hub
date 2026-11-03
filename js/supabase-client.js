@@ -18,6 +18,14 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 1.93 — 3 novembre 2026
+ *   v1.93 : PARCOURS-PERFORMANCE lot L1 (FAIT FOI gelé 03/11/2026, sql_261).
+ *          6 wrappers ADDITIFS : listParcoursSaison(cat, saison?),
+ *          saveParcoursSaison({personne_id, statut, structure?,
+ *          equipe_accueil?, notes?}), deleteParcoursSaison(id),
+ *          listParcoursMatchs(cat, saison?, personne?), saveParcoursMatch(m),
+ *          deleteParcoursMatch(id). Gardes portées par les RPC SECURITY
+ *          DEFINER (admin | bureau | puis_je_lire/ecrire_categorie).
  * Version : 1.92 — 12 octobre 2026
  *   v1.92 : SUIVI-THEO lot L3 (D2-A). 2 wrappers ADDITIFS → RPC C18-b :
  *          definirJoueursAssocies(evt, ligneId, joueurs[]) et
@@ -5249,6 +5257,150 @@
       if (error) {
         console.error('MOM Hub: deleteIndisponibilite()', error);
         return { ok: false, error: error.message || 'Erreur delete_indisponibilite' };
+      }
+      return { ok: true };
+    },
+
+    // ------------------------------------------------------------------
+    // PARCOURS-PERFORMANCE (sql_261, FAIT FOI gelé 03/11/2026)
+    // Joueurs du collectif qui jouent en équipe de niveau supérieur
+    // (ABCD XV, Oyonnax…). Données isolées : jamais agrégées aux stats du
+    // collectif (D3). Lecture : admin | bureau | puis_je_lire_categorie ;
+    // écriture : admin | bureau | puis_je_ecrire_categorie (RPC = vérité).
+    // ------------------------------------------------------------------
+
+    /**
+     * Statuts de saison d'une catégorie (saison active par défaut).
+     * @returns {Promise<Array<Object>|null>} lignes { id, personne_id, nom,
+     *   prenom, club, saison_id, categorie_id, statut, structure,
+     *   equipe_accueil, notes, nb_matchs, updated_at } ; [] si aucune ;
+     *   null si erreur (droit inclus).
+     */
+    async listParcoursSaison(categorieId, saisonId) {
+      if (!categorieId) {
+        console.error('MOM Hub: listParcoursSaison() requiert une catégorie');
+        return null;
+      }
+      const { data, error } = await client.rpc('list_parcours_saison', {
+        p_categorie_id: categorieId,
+        p_saison_id: saisonId || null
+      });
+      if (error) {
+        console.error('MOM Hub: listParcoursSaison()', error);
+        return null;
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * Crée ou met à jour le statut de saison d'un joueur (unicité joueur ×
+     * saison côté base). statut ∈ integre | renfort | double_licence.
+     * @returns {Promise<{ok: boolean, data?: Object, error?: string}>}
+     */
+    async saveParcoursSaison(p) {
+      if (!p || !p.personne_id) return { ok: false, error: 'personne_id requis' };
+      if (['integre', 'renfort', 'double_licence'].indexOf(p.statut) === -1) {
+        return { ok: false, error: 'Statut invalide' };
+      }
+      const { data, error } = await client.rpc('upsert_parcours_saison', {
+        p_personne_id: p.personne_id,
+        p_statut: p.statut,
+        p_structure: p.structure || null,
+        p_equipe_accueil: p.equipe_accueil || null,
+        p_notes: p.notes || null,
+        p_saison_id: p.saison_id || null
+      });
+      if (error) {
+        console.error('MOM Hub: saveParcoursSaison()', error);
+        return { ok: false, error: error.message || 'Erreur upsert_parcours_saison' };
+      }
+      const row = Array.isArray(data) && data.length > 0 ? data[0] : null;
+      return { ok: true, data: row };
+    },
+
+    /** Supprime un statut de saison (retrait du Parcours Performance). */
+    async deleteParcoursSaison(id) {
+      if (!id) return { ok: false, error: 'id requis' };
+      const { error } = await client.rpc('delete_parcours_saison', { p_id: id });
+      if (error) {
+        console.error('MOM Hub: deleteParcoursSaison()', error);
+        return { ok: false, error: error.message || 'Erreur delete_parcours_saison' };
+      }
+      return { ok: true };
+    },
+
+    /**
+     * Participations aux matchs d'une catégorie (saison active par défaut),
+     * filtrables par joueur. Chaque ligne porte `points` calculés en base.
+     * @returns {Promise<Array<Object>|null>} [] si aucune, null si erreur.
+     */
+    async listParcoursMatchs(categorieId, saisonId, personneId) {
+      if (!categorieId) {
+        console.error('MOM Hub: listParcoursMatchs() requiert une catégorie');
+        return null;
+      }
+      const { data, error } = await client.rpc('list_parcours_matchs', {
+        p_categorie_id: categorieId,
+        p_saison_id: saisonId || null,
+        p_personne_id: personneId || null
+      });
+      if (error) {
+        console.error('MOM Hub: listParcoursMatchs()', error);
+        return null;
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * Crée ou met à jour une participation. id absent = création ; un même
+     * joueur, même date et même adversaire met à jour la ligne existante
+     * (réimport sans doublon, D8). statut_joueur ∈ titulaire | entre |
+     * non_entre ; source ∈ ffr | manuel.
+     * @returns {Promise<{ok: boolean, data?: Object, error?: string}>}
+     */
+    async saveParcoursMatch(m) {
+      if (!m || (!m.id && !m.personne_id)) return { ok: false, error: 'personne_id requis' };
+      if (!m.date_match) return { ok: false, error: 'Date du match obligatoire' };
+      const n = function (v) {
+        if (v === null || v === undefined || v === '') return null;
+        const x = parseInt(v, 10);
+        return isNaN(x) ? null : x;
+      };
+      const { data, error } = await client.rpc('upsert_parcours_match', {
+        p_id: m.id || null,
+        p_personne_id: m.personne_id || null,
+        p_date_match: m.date_match,
+        p_competition: m.competition || null,
+        p_phase: m.phase || null,
+        p_equipe_accueil: m.equipe_accueil || null,
+        p_adversaire: m.adversaire || null,
+        p_score_pour: n(m.score_pour),
+        p_score_contre: n(m.score_contre),
+        p_statut_joueur: m.statut_joueur || 'titulaire',
+        p_numero: n(m.numero),
+        p_capitaine: m.capitaine === true,
+        p_essais: n(m.essais) || 0,
+        p_transformations: n(m.transformations) || 0,
+        p_penalites: n(m.penalites) || 0,
+        p_drops: n(m.drops) || 0,
+        p_source: m.source || 'manuel',
+        p_notes: m.notes || null
+      });
+      if (error) {
+        console.error('MOM Hub: saveParcoursMatch()', error);
+        return { ok: false, error: error.message || 'Erreur upsert_parcours_match' };
+      }
+      const row = Array.isArray(data) && data.length > 0 ? data[0] : null;
+      return { ok: true, data: row };
+    },
+
+    /** Supprime une participation (erreur de saisie). */
+    async deleteParcoursMatch(id) {
+      if (!id) return { ok: false, error: 'id requis' };
+      const { error } = await client.rpc('delete_parcours_match', { p_id: id });
+      if (error) {
+        console.error('MOM Hub: deleteParcoursMatch()', error);
+        return { ok: false, error: error.message || 'Erreur delete_parcours_match' };
       }
       return { ok: true };
     },
