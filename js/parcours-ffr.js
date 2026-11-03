@@ -1,7 +1,15 @@
 /* =====================================================================
  * parcours-ffr.js — Lecture des feuilles de match FFR (Mon Club House)
  * ---------------------------------------------------------------------
- * Version : v1.0 — 3 novembre 2026 — PARCOURS-PERFORMANCE lot L3 (D2, D8)
+ * Version : v1.1 — 3 novembre 2026 — PARCOURS-PERFORMANCE lot L3 (D2, D8)
+ *   v1.1 : collage « texte brut » de la page entière (Ctrl+A, recette
+ *          terrain du 03/11) : la page y arrive éclatée (date / heure,
+ *          score « 19 » « - » « 29 », « 12 » « Mi-temps » « 16 », nom puis
+ *          « (Essai) » sur la ligne suivante) et porte des libellés
+ *          d'images (« … logo », « logo équipe … », « go back icon »).
+ *          Étape de recollage ajoutée dans lignes() ; menus et pied de
+ *          page déjà ignorés (lecture à partir de l'en-tête du match).
+ *   v1.0 : première version.
  *
  * OBJET
  *   Fonctions PURES (aucun accès réseau, aucun DOM) qui lisent le texte
@@ -40,7 +48,7 @@
   // Lignes : retire les liens Markdown, garde l'identifiant FFR éventuel
   // ------------------------------------------------------------------
   function lignes(texte) {
-    return String(texte || '').replace(/\r/g, '').split('\n').map(function (brut) {
+    var out = String(texte || '').replace(/\r/g, '').split('\n').map(function (brut) {
       var id = null;
       var m = /\/joueurs\/(\d+)/.exec(brut);
       if (m) id = m[1];
@@ -49,7 +57,35 @@
         .replace(/ /g, ' ')
         .trim();
       return { t: t, id: id };
-    }).filter(function (l) { return l.t !== ''; });
+    }).filter(function (l) { return l.t !== '' && !IMAGE_RE.test(l.t); });
+    return recoller(out);
+  }
+
+  // Libellés d'images de la page FFR, sans valeur pour la lecture.
+  var IMAGE_RE = /( logo$|^logo |^go back icon$|^google store logo$|^ios store logo$)/i;
+
+  // v1.1 — Collage texte brut : recolle les éléments que le navigateur
+  // sépare sur plusieurs lignes, pour retrouver la forme d'une ligne.
+  function recoller(L) {
+    var res = [];
+    var num = function (x) { return x && /^\d{1,3}$/.test(x.t); };
+    for (var i = 0; i < L.length; i++) {
+      var a = L[i], b = L[i + 1], c = L[i + 2];
+      // « 31/10/2026 » + « 14h30 »
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(a.t) && b && /^\d{1,2}h\d{2}$/.test(b.t)) {
+        res.push({ t: a.t + b.t, id: null }); i += 1; continue;
+      }
+      // « 19 » + « - » + « 29 » ; « 12 » + « Mi-temps » + « 16 » ; idem « Fin de match »
+      if (num(a) && b && c && num(c) && /^(-|–|mi-temps|fin de match)$/i.test(b.t)) {
+        res.push({ t: a.t + (b.t === '–' ? '-' : b.t) + c.t, id: null }); i += 2; continue;
+      }
+      // « E. GUIOT » + « (Essai) » (ou « (E. GUIOT) » pour un changement)
+      if (b && /^\(.+\)$/.test(b.t) && !/^\(/.test(a.t) && !/^\d{1,3}'?$/.test(a.t)) {
+        res.push({ t: a.t + b.t, id: a.id || b.id }); i += 1; continue;
+      }
+      res.push(a);
+    }
+    return res;
   }
 
   function typeCanonique(s) {
