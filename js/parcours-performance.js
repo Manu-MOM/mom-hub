@@ -1,6 +1,9 @@
 /* =====================================================================
  * parcours-performance.js — Page Parcours Performance (MOM Hub)
  * ---------------------------------------------------------------------
+ * Version : v1.4 — 3 novembre 2026 — amendement v1.2 (D12)
+ *   v1.4 : ouvert depuis la fiche joueur (&depuis=fiche&joueur=<id>), le
+ *          lien de retour ramène à la fiche (joueurs.html?fiche=<id>).
  * Version : v1.3 — 3 novembre 2026 — lot L4 (mise en valeur)
  *   v1.3 : paramètre ?joueur=<personne_id> : ouvre directement
  *          l'historique du joueur (lien depuis sa fiche).
@@ -186,6 +189,12 @@
       }
       ETAT.engages = r[0];
       ETAT.matchs = r[1];
+      // v1.4 (D12) : nom du joueur dans le lien de retour à sa fiche.
+      if (ETAT.retourFiche) {
+        var refRetour = r[0].concat(r[1]).find(function (x) { return x.personne_id === ETAT.retourFiche; });
+        var aRetour = document.getElementById('pp-retour');
+        if (refRetour && aRetour) aRetour.textContent = '← Retour à la fiche de ' + nomJoueur(refRetour);
+      }
       if (ETAT.filtreJoueur && !ETAT.engages.some(function (e) { return e.personne_id === ETAT.filtreJoueur; })
           && !ETAT.matchs.some(function (m) { return m.personne_id === ETAT.filtreJoueur; })) {
         ETAT.filtreJoueur = null;
@@ -815,7 +824,10 @@
       '<div class="pp-head"><h1>⭐ Parcours Performance <span id="pp-cat-lib"></span></h1>' +
       '<p class="pp-sub">Nos joueurs en équipe Performance' +
       (ETAT.saison && ETAT.saison.libelle ? ' · saison ' + esc(ETAT.saison.libelle) : '') + '</p>' +
-      '<a class="pp-retour" href="pilotage-categorie.html">← Retour au pilotage de saison</a></div>' +
+      (ETAT.retourFiche
+        ? '<a class="pp-retour" id="pp-retour" href="joueurs.html?fiche=' + encodeURIComponent(ETAT.retourFiche) +
+          '">← Retour à la fiche joueur</a></div>'
+        : '<a class="pp-retour" href="pilotage-categorie.html">← Retour au pilotage de saison</a></div>') +
       sel + '<div id="pp-zone"></div>';
     majLibelle(categories);
     var s = document.getElementById('pp-cat-select');
@@ -850,6 +862,8 @@
     // v1.3 (L4) : historique d'un joueur ouvert depuis sa fiche ; ignoré
     // au chargement s'il n'est ni engagé ni présent dans les matchs.
     if (params.get('joueur')) ETAT.filtreJoueur = params.get('joueur');
+    // v1.4 (D12) : retour à la fiche du joueur quand on vient de sa fiche.
+    if (params.get('depuis') === 'fiche' && params.get('joueur')) ETAT.retourFiche = params.get('joueur');
 
     Promise.resolve(hub.getSaisonActive()).catch(function () { return null; }).then(function (saison) {
       ETAT.saison = saison;
