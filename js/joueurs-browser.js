@@ -4,7 +4,14 @@
  *
  * Module IIFE — initialise l'UI de la page joueurs.html.
  *
- * Version : v1.10 — 7 octobre 2026
+ * Version : v1.11 — 3 novembre 2026
+ *   v1.11 : PARCOURS-PERFORMANCE lot L1 (FAIT FOI gelé 03/11/2026, sql_261,
+ *          supabase-client v1.93). Statut de saison chargé une fois par
+ *          catégorie active (list_parcours_saison, non bloquant) :
+ *          badge « Perf · <statut> » sur la vignette, section « Parcours
+ *          Performance » dans la fiche + modale J7 (statut, structure,
+ *          équipe d'accueil, notes). La RPC reste la vérité des droits.
+ *          Aucune RPC d'effectif modifiée, aucune stat du collectif touchée.
  *   v1.10 : BADGE-FILLES-EDR (07/10/2026, enchaîné sur IMPORT-CATEGORIE).
  *          Vignette : badge rose « F-6 / F-8 / F-10 / F-12 » (classe
  *          joueur-badge-f15, comme F-15) pour une joueuse (sexe F) en
@@ -329,6 +336,10 @@ window.JoueursBrowser = (function () {
   /** Index par personne_id pour accès rapide depuis cartes / fiche */
   let JOUEURS_BY_ID = new Map();
 
+  /** v1.11 PARCOURS-PERFORMANCE : statut de saison par personne_id
+   *  (catégorie active, saison active). Vide si erreur ou aucun droit. */
+  let PARCOURS_BY_PERSONNE = new Map();
+
   /** Référentiels chargés depuis data/*.json */
   let POSTES_BY_ID = new Map();
   let POSTES_GROUPES_BY_ID = new Map();
@@ -396,6 +407,48 @@ window.JoueursBrowser = (function () {
   function buildIndexes() {
     JOUEURS_BY_ID.clear();
     ALL_JOUEURS.forEach(j => JOUEURS_BY_ID.set(j.id, j));
+  }
+
+  // ============================================================
+  // v1.11 PARCOURS-PERFORMANCE (FAIT FOI gelé 03/11/2026)
+  // ============================================================
+
+  const PARCOURS_STATUT_LABELS = {
+    integre: 'Intégré',
+    renfort: 'Renfort',
+    double_licence: 'Double licence'
+  };
+
+  /**
+   * Charge les statuts Parcours Performance de la catégorie active.
+   * Non bloquant : toute erreur (droit, réseau, socle absent) laisse la
+   * map vide et l'effectif s'affiche normalement (dégradation honnête).
+   */
+  async function _chargerParcours() {
+    PARCOURS_BY_PERSONNE = new Map();
+    const catId = CTX_PERIMETRE && CTX_PERIMETRE.active;
+    if (!catId || typeof SupabaseHub === 'undefined'
+        || typeof SupabaseHub.listParcoursSaison !== 'function') {
+      return;
+    }
+    try {
+      const rows = await SupabaseHub.listParcoursSaison(catId);
+      if (Array.isArray(rows)) {
+        rows.forEach(r => { if (r && r.personne_id) PARCOURS_BY_PERSONNE.set(r.personne_id, r); });
+      }
+    } catch (err) {
+      console.warn('Joueurs: _chargerParcours()', err);
+    }
+  }
+
+  function renderParcoursBadge(j) {
+    const p = j && PARCOURS_BY_PERSONNE.get(j.id);
+    if (!p) return '';
+    const lib = PARCOURS_STATUT_LABELS[p.statut] || p.statut;
+    const titre = 'Parcours Performance'
+      + (p.structure ? ' · ' + p.structure : '')
+      + (p.equipe_accueil ? ' · ' + p.equipe_accueil : '');
+    return `<span class="joueur-badge joueur-badge-perf" title="${esc(titre)}">Perf · ${esc(lib)}</span>`;
   }
 
   // ============================================================
@@ -735,6 +788,7 @@ window.JoueursBrowser = (function () {
                 ${badgeFilleEdr(j) ? `<span class="joueur-badge joueur-badge-f15">${badgeFilleEdr(j)}</span>` : ''}
                 ${j.profil === 'coach' ? `<span class="joueur-badge joueur-badge-coach">${j.fonction_staff ? esc(j.fonction_staff) : 'Coach'}</span>` : ''}
                 ${j.profil === 'staff' ? `<span class="joueur-badge joueur-badge-staff">Staff</span>` : ''}
+                ${renderParcoursBadge(j)}
               </div>
             </div>
             ${renderEtatBadge(j.etat_calcule)}
@@ -990,6 +1044,7 @@ window.JoueursBrowser = (function () {
       + renderFicheIdentite(d)
       + renderFicheActions(d)
       + renderFicheProfilSportif(d)
+      + renderFicheParcours(d)
       + renderFicheEtatMetier(d)
       + wrapCollapsible(renderFicheFFR(d))
       + wrapCollapsible(renderFicheCoordonnees(d))
@@ -997,6 +1052,37 @@ window.JoueursBrowser = (function () {
       + wrapCollapsible(renderFicheRGPD(d))
       + wrapCollapsible(renderFicheMetadonnees(d))
       + renderFicheFooterAnnuaire();
+  }
+
+  /**
+   * v1.11 PARCOURS-PERFORMANCE : section de la fiche. Lecture depuis la
+   * map chargée pour la catégorie active ; bouton d'édition toujours
+   * présent (la RPC refuse et la modale affiche le refus si pas de droit).
+   */
+  function renderFicheParcours(d) {
+    const p = d && PARCOURS_BY_PERSONNE.get(d.id);
+    let contenu;
+    if (p) {
+      const lignes = [];
+      lignes.push('<strong>' + esc(PARCOURS_STATUT_LABELS[p.statut] || p.statut) + '</strong>');
+      if (p.structure) lignes.push(esc(p.structure));
+      if (p.equipe_accueil) lignes.push(esc(p.equipe_accueil));
+      contenu = '<div class="joueur-fiche-perf-ligne">' + lignes.join(' · ') + '</div>'
+        + '<div class="joueur-fiche-perf-meta">' + (Number(p.nb_matchs) || 0)
+        + ' match(s) saisi(s) cette saison</div>'
+        + (p.notes ? '<div class="joueur-fiche-perf-meta">' + esc(p.notes) + '</div>' : '');
+    } else {
+      contenu = '<div class="joueur-fiche-perf-meta">Pas inscrit au Parcours Performance cette saison.</div>';
+    }
+    return `
+      <div class="joueur-fiche-section joueur-fiche-perf">
+        <div class="joueur-fiche-section-title">⭐ Parcours Performance</div>
+        ${contenu}
+        <div class="joueur-fiche-actions-row" style="margin-top:8px;">
+          <button type="button" class="joueur-btn joueur-btn-edit" data-edit="parcours">Modifier le Parcours Performance</button>
+        </div>
+      </div>
+    `;
   }
 
   /**
@@ -1412,6 +1498,7 @@ window.JoueursBrowser = (function () {
         if (which === 'profil') openModalProfil(currentEditDetail);
         else if (which === 'etat') openModalEtat(currentEditDetail);
         else if (which === 'notes') openModalNotes(currentEditDetail);
+        else if (which === 'parcours') openModalParcours(currentEditDetail);
       });
     });
     // pt 211 — Archiver / Réactiver (cycle de vie licence). Libellé selon l'état
@@ -1603,6 +1690,7 @@ window.JoueursBrowser = (function () {
     if (joueurs) {
       ALL_JOUEURS = joueurs;
       buildIndexes();
+      await _chargerParcours(); // v1.11 — non bloquant
       renderKpis();
       renderSidebarAlerts();
       render();
@@ -2191,6 +2279,90 @@ window.JoueursBrowser = (function () {
   }
 
   // ----------------------------------------------------------------
+  // J7 — Modale Parcours Performance (v1.11, sql_261)
+  // ----------------------------------------------------------------
+
+  function openModalParcours(d) {
+    const overlay = document.getElementById('joueur-overlay-pp');
+    if (!overlay) return;
+    clearModalMessage('joueur-pp-msg');
+
+    const p = PARCOURS_BY_PERSONNE.get(d.id) || null;
+    const infoEl = document.getElementById('joueur-pp-info');
+    if (infoEl) {
+      infoEl.innerHTML = '<span class="joueur-modal-info-strong">'
+        + esc(d.prenom) + ' ' + esc(d.nom) + '</span>'
+        + ' · Saison en cours. Les matchs joués au Parcours ne comptent pas dans les stats du collectif.';
+    }
+    const setVal = function (id, v) { const el = document.getElementById(id); if (el) el.value = v || ''; };
+    setVal('joueur-pp-statut', p ? p.statut : '');
+    setVal('joueur-pp-structure', p ? p.structure : '');
+    setVal('joueur-pp-equipe', p ? p.equipe_accueil : '');
+    setVal('joueur-pp-notes', p ? p.notes : '');
+
+    const submitBtn = document.getElementById('joueur-pp-submit');
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.onclick = submitModalParcours;
+    }
+    overlay.classList.add('show');
+  }
+
+  async function submitModalParcours() {
+    if (!currentEditPersonneId) return;
+    clearModalMessage('joueur-pp-msg');
+    const submitBtn = document.getElementById('joueur-pp-submit');
+    if (submitBtn) submitBtn.disabled = true;
+
+    const val = function (id) { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+    const statut = val('joueur-pp-statut');
+    const existant = PARCOURS_BY_PERSONNE.get(currentEditPersonneId) || null;
+
+    try {
+      let res;
+      if (!statut) {
+        if (!existant) {
+          showModalMessage('joueur-pp-msg', 'joueur-pp-body', 'error',
+            'Choisissez un statut (ou Annuler).');
+          if (submitBtn) submitBtn.disabled = false;
+          return;
+        }
+        if (!window.confirm('Retirer ce joueur du Parcours Performance pour la saison ?')) {
+          if (submitBtn) submitBtn.disabled = false;
+          return;
+        }
+        res = await SupabaseHub.deleteParcoursSaison(existant.id);
+      } else {
+        res = await SupabaseHub.saveParcoursSaison({
+          personne_id: currentEditPersonneId,
+          statut: statut,
+          structure: val('joueur-pp-structure'),
+          equipe_accueil: val('joueur-pp-equipe'),
+          notes: val('joueur-pp-notes')
+        });
+      }
+      if (!res || !res.ok) {
+        showModalMessage('joueur-pp-msg', 'joueur-pp-body', 'error',
+          'Échec : ' + ((res && res.error) || 'erreur inconnue'));
+        if (submitBtn) submitBtn.disabled = false;
+        return;
+      }
+      showModalMessage('joueur-pp-msg', 'joueur-pp-body', 'success',
+        statut ? '✅ Parcours Performance enregistré' : '✅ Joueur retiré du Parcours Performance');
+      setTimeout(async () => {
+        document.getElementById('joueur-overlay-pp').classList.remove('show');
+        await reloadJoueurs();
+        await reopenFicheCurrent();
+      }, 700);
+    } catch (err) {
+      console.error('Joueurs: submitModalParcours()', err);
+      showModalMessage('joueur-pp-msg', 'joueur-pp-body', 'error',
+        'Erreur inattendue : ' + (err.message || err));
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  }
+
+  // ----------------------------------------------------------------
   // J5 — Modale Notes coach
   // ----------------------------------------------------------------
 
@@ -2441,6 +2613,9 @@ window.JoueursBrowser = (function () {
 
     // 4. Attendre fin chargement référentiels (idéalement déjà fini)
     await refPromise;
+
+    // 4bis. v1.11 PARCOURS-PERFORMANCE — statuts de saison (non bloquant)
+    await _chargerParcours();
 
     // 5. Render
     renderKpis();
