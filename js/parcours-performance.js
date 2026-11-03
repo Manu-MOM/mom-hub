@@ -1,6 +1,12 @@
 /* =====================================================================
  * parcours-performance.js — Page Parcours Performance (MOM Hub)
  * ---------------------------------------------------------------------
+ * Version : v1.2 — 3 novembre 2026 — lot L3 (import des feuilles FFR)
+ *   v1.2 : bouton « Importer une feuille FFR » : collage des onglets
+ *          Résumé + Compositions, lecture et contrôle bloquant du score
+ *          par js/parcours-ffr.js, puis vérification dans la grille de
+ *          saisie (source = ffr). Un match déjà saisi à la même date est
+ *          mis à jour (lignes existantes réutilisées, pas de doublon, D8).
  * Version : v1.1 — 3 novembre 2026 — amendement D7bis (lieu du match)
  *   v1.1 : lieu domicile | exterieur | neutre (sql_262). Affichage façon
  *          FFR : équipe qui reçoit d'abord, score dans le même ordre ;
@@ -268,6 +274,9 @@
     }
     var h = '<section class="pp-bloc"><div class="pp-bloc-head"><h2>' + esc(titre) + '</h2><div class="pp-actions">';
     if (filtre) h += '<button type="button" class="pp-btn" data-action="tout">Tous les matchs</button>';
+    h += '<button type="button" class="pp-btn" data-action="importer"' +
+      (ETAT.engages.length === 0 || !window.ParcoursFFR ? ' disabled title="Inscris d\'abord un joueur"' : '') +
+      '>Importer une feuille FFR</button>';
     h += '<button type="button" class="pp-btn pp-btn-primaire" data-action="nouveau"' +
       (ETAT.engages.length === 0 ? ' disabled title="Inscris d\'abord un joueur"' : '') +
       '>+ Saisir un match</button></div></div>';
@@ -333,6 +342,8 @@
     if (bTout) bTout.addEventListener('click', function () { ETAT.filtreJoueur = null; rendre(); });
     var bNouveau = zone.querySelector('[data-action="nouveau"]');
     if (bNouveau) bNouveau.addEventListener('click', function () { ouvrirModale(null); });
+    var bImporter = zone.querySelector('[data-action="importer"]');
+    if (bImporter) bImporter.addEventListener('click', ouvrirImport);
     zone.querySelectorAll('[data-action="modifier"]').forEach(function (b) {
       b.addEventListener('click', function () {
         var cle = b.getAttribute('data-cle');
@@ -366,7 +377,7 @@
       return { personne_id: e.personne_id, nom: e.nom, prenom: e.prenom, equipe_accueil: e.equipe_accueil };
     });
     if (g) {
-      g.lignes.forEach(function (l) {
+      g.lignes.concat(g.retraits || []).forEach(function (l) {
         if (!liste.some(function (x) { return x.personne_id === l.personne_id; })) {
           liste.push({ personne_id: l.personne_id, nom: l.nom, prenom: l.prenom, equipe_accueil: null });
         }
@@ -376,11 +387,17 @@
     return liste;
   }
 
-  function ouvrirModale(g) {
+  // opts (import FFR) : { source: 'ffr', titre, bandeau (HTML déjà échappé) }.
+  // g.retraits : participations existantes absentes de la feuille, affichées
+  // décochées (leur suppression est confirmée à l'enregistrement).
+  function ouvrirModale(g, opts) {
+    opts = opts || {};
     ETAT.edition = g || { lignes: [] };
+    ETAT.edition.source = opts.source || 'manuel';
     var ov = document.getElementById('pp-overlay');
-    var parId = {};
+    var parId = {}, retraitParId = {};
     ETAT.edition.lignes.forEach(function (l) { parId[l.personne_id] = l; });
+    (ETAT.edition.retraits || []).forEach(function (l) { retraitParId[l.personne_id] = l; });
     var joueurs = joueursGrille(g);
 
     // Équipe d'accueil par défaut en création : commune à tous les engagés.
@@ -390,9 +407,10 @@
       if (eqs.length && eqs.every(function (x) { return x && x === eqs[0]; })) equipeDefaut = eqs[0];
     }
 
-    document.getElementById('pp-modal-titre').textContent = g ? 'Modifier le match' : 'Saisir un match';
+    document.getElementById('pp-modal-titre').textContent =
+      opts.titre || (g ? 'Modifier le match' : 'Saisir un match');
     var f = document.getElementById('pp-form');
-    f.innerHTML =
+    f.innerHTML = (opts.bandeau ? '<div class="pp-bandeau">' + opts.bandeau + '</div>' : '') +
       '<div class="pp-grid2">' +
         '<label>Date du match *<input type="date" name="date_match" required value="' + esc(g ? String(g.date_match).slice(0, 10) : '') + '"></label>' +
         '<label>Adversaire *<input type="text" name="adversaire" required maxlength="80" value="' + esc(g ? g.adversaire || '' : '') + '" placeholder="ex. Rouen"></label>' +
@@ -423,7 +441,8 @@
           return '<td class="pp-num"><input type="number" min="0" max="' + max + '" data-champ="' + champ +
             '" value="' + esc(val) + '"></td>';
         }
-        return '<tr data-pid="' + pid + '"' + (l ? ' data-id="' + esc(l.id) + '"' : '') + '>' +
+        var idLigne = l ? l.id : (retraitParId[j.personne_id] ? retraitParId[j.personne_id].id : null);
+        return '<tr data-pid="' + pid + '"' + (idLigne ? ' data-id="' + esc(idLigne) + '"' : '') + '>' +
           '<td><input type="checkbox" data-champ="present"' + (l ? ' checked' : '') + ' aria-label="Présent"></td>' +
           '<td>' + esc(nomJoueur(j)) + '</td>' +
           '<td><select data-champ="statut_joueur">' +
@@ -449,7 +468,7 @@
       });
     });
 
-    document.getElementById('pp-supprimer').hidden = !g;
+    document.getElementById('pp-supprimer').hidden = !(g && g.cle) || ETAT.edition.source === 'ffr';
     ov.hidden = false;
     var premier = f.querySelector('input[name="date_match"]');
     if (premier) premier.focus();
@@ -573,7 +592,7 @@
           transformations: l.transformations,
           penalites: l.penalites,
           drops: l.drops,
-          source: 'manuel',
+          source: ETAT.edition.source || 'manuel',
           notes: m.notes
         }).then(function (r) { return { nom: l.nom, r: r }; });
       };
@@ -632,8 +651,149 @@
     document.getElementById('pp-enregistrer').addEventListener('click', enregistrer);
     document.getElementById('pp-supprimer').addEventListener('click', supprimerMatch);
     document.addEventListener('keydown', function (ev) {
-      if (ev.key === 'Escape' && !ov.hidden) fermerModale();
+      if (ev.key !== 'Escape') return;
+      var imp = document.getElementById('pp-import-overlay');
+      if (!ov.hidden) fermerModale();
+      else if (imp && !imp.hidden) fermerImport();
     });
+    var imp = document.getElementById('pp-import-overlay');
+    if (imp) {
+      imp.addEventListener('click', function (ev) { if (ev.target === imp) fermerImport(); });
+      imp.querySelectorAll('[data-action="fermer-import"]').forEach(function (b) {
+        b.addEventListener('click', fermerImport);
+      });
+      document.getElementById('pp-imp-analyser').addEventListener('click', analyserImport);
+      document.getElementById('pp-imp-continuer').addEventListener('click', continuerImport);
+      ['pp-imp-resume', 'pp-imp-compos'].forEach(function (id) {
+        document.getElementById(id).addEventListener('input', function () {
+          IMPORT.analyse = null;
+          document.getElementById('pp-imp-continuer').disabled = true;
+        });
+      });
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Import d'une feuille FFR (L3) : collage → analyse → grille de saisie
+  // ------------------------------------------------------------------
+  var IMPORT = { analyse: null, rapprochement: null };
+
+  function ouvrirImport() {
+    if (!window.ParcoursFFR) return;
+    IMPORT.analyse = null; IMPORT.rapprochement = null;
+    document.getElementById('pp-imp-resume').value = '';
+    document.getElementById('pp-imp-compos').value = '';
+    document.getElementById('pp-imp-resultat').innerHTML = '';
+    document.getElementById('pp-imp-continuer').disabled = true;
+    document.getElementById('pp-import-overlay').hidden = false;
+    document.getElementById('pp-imp-resume').focus();
+  }
+
+  function fermerImport() {
+    document.getElementById('pp-import-overlay').hidden = true;
+  }
+
+  function liste(items, classe) {
+    return '<ul class="' + classe + '">' + items.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>';
+  }
+
+  function analyserImport() {
+    var zone = document.getElementById('pp-imp-resultat');
+    var bouton = document.getElementById('pp-imp-continuer');
+    bouton.disabled = true;
+    var a = window.ParcoursFFR.analyser(
+      document.getElementById('pp-imp-resume').value,
+      document.getElementById('pp-imp-compos').value);
+    if (!a.ok) {
+      zone.innerHTML = '<p class="pp-imp-ko">Import impossible :</p>' + liste(a.erreurs, 'pp-imp-erreurs');
+      return;
+    }
+    var rap = window.ParcoursFFR.rapprocher(a, ETAT.engages);
+    if (!rap.ok) {
+      zone.innerHTML = '<p class="pp-imp-ko">Import impossible :</p>' + liste(rap.erreurs, 'pp-imp-erreurs') +
+        (rap.alertes.length ? liste(rap.alertes, 'pp-imp-alertes') : '');
+      return;
+    }
+    IMPORT.analyse = a; IMPORT.rapprochement = rap;
+    var m = a.match;
+    var mi = m.miTemps ? ' · mi-temps ' + m.miTemps.dom + ' – ' + m.miTemps.ext + ' ✓' : '';
+    zone.innerHTML =
+      '<p class="pp-imp-ok">✓ ' + esc(m.domicile) + ' <strong>' + m.score.dom + ' – ' + m.score.ext + '</strong> ' +
+        esc(m.exterieur) + ' — score recalculé depuis la chronologie ✓' + mi + '</p>' +
+      '<p class="pp-note">' + fmtDate(m.date) + (m.competition ? ' · ' + esc(m.competition) : '') +
+        (m.phase ? ' · ' + esc(m.phase) : '') + ' · ' + esc(LIEUX[rap.lieu]) + '</p>' +
+      '<div class="pp-scroll"><table class="pp-table"><thead><tr><th class="pp-num">N°</th><th>Joueur</th>' +
+        '<th>Sur la feuille</th><th>Statut</th><th>Réalisations</th></tr></thead><tbody>' +
+      rap.lignes.map(function (l) {
+        return '<tr><td class="pp-num">' + esc(l.numero) + '</td><td><strong>' + esc(nomJoueur(l)) + '</strong>' +
+          (l.capitaine ? ' <span class="pp-cap" title="Capitaine">C</span>' : '') + '</td>' +
+          '<td>' + esc(l.nomFFR) + '</td><td>' + esc(STATUT_JOUEUR[l.statut_joueur]) + '</td>' +
+          '<td>' + esc(detailMarque(l) || '—') + (pointsDe(l) ? ' · ' + pointsDe(l) + ' pts' : '') + '</td></tr>';
+      }).join('') + '</tbody></table></div>' +
+      (rap.alertes.length || a.alertes.length ? liste(a.alertes.concat(rap.alertes), 'pp-imp-alertes') : '');
+    bouton.disabled = false;
+  }
+
+  // Match déjà saisi à la même date (quel que soit le libellé de l'adversaire).
+  function matchExistant(date, adversaireFFR) {
+    var memeDate = grouperMatchs(ETAT.matchs).filter(function (g) {
+      return String(g.date_match).slice(0, 10) === date;
+    });
+    if (memeDate.length <= 1) return memeDate[0] || null;
+    var cible = cleMatch(date, adversaireFFR).split('|')[1];
+    return memeDate.find(function (g) {
+      var adv = g.cle.split('|')[1];
+      return adv && (cible.indexOf(adv) === 0 || adv.indexOf(cible) === 0);
+    }) || null;
+  }
+
+  function continuerImport() {
+    var a = IMPORT.analyse, rap = IMPORT.rapprochement;
+    if (!a || !rap) return;
+    var m = a.match;
+    var ex = matchExistant(m.date, rap.adversaire);
+    var parPersonne = {};
+    if (ex) ex.lignes.forEach(function (l) { parPersonne[l.personne_id] = l; });
+    var importes = {};
+    var lignesG = rap.lignes.map(function (l) {
+      importes[l.personne_id] = true;
+      var old = parPersonne[l.personne_id];
+      return {
+        id: old ? old.id : null, personne_id: l.personne_id, nom: l.nom, prenom: l.prenom,
+        statut_joueur: l.statut_joueur, numero: l.numero, capitaine: l.capitaine,
+        essais: l.essais, transformations: l.transformations, penalites: l.penalites, drops: l.drops,
+        notes: old ? old.notes : null
+      };
+    });
+    // Équipe d'accueil : libellé du match existant, sinon celui commun aux
+    // joueurs reconnus (statut de saison), sinon le nom FFR.
+    var equipe = ex && ex.equipe_accueil;
+    if (!equipe) {
+      var eqs = rap.lignes.map(function (l) {
+        var e = ETAT.engages.find(function (x) { return x.personne_id === l.personne_id; });
+        return e && e.equipe_accueil;
+      });
+      equipe = (eqs.length && eqs.every(function (x) { return x && x === eqs[0]; })) ? eqs[0] : rap.equipeFFR;
+    }
+    var g = {
+      cle: ex ? ex.cle : undefined,
+      date_match: m.date,
+      competition: m.competition, phase: m.phase,
+      equipe_accueil: equipe,
+      adversaire: ex ? ex.adversaire : rap.adversaire,
+      lieu: rap.lieu,
+      score_pour: rap.scorePour, score_contre: rap.scoreContre,
+      lignes: lignesG,
+      retraits: ex ? ex.lignes.filter(function (l) { return !importes[l.personne_id]; }) : []
+    };
+    var bandeau = '<strong>Feuille FFR</strong> : ' + esc(m.domicile) + ' ' + m.score.dom + ' – ' + m.score.ext + ' ' +
+      esc(m.exterieur) + ' · score contrôlé ✓' + (m.miTemps ? ' · mi-temps ✓' : '') + '. ' +
+      rap.lignes.length + ' joueur(s) du Parcours reconnu(s).' +
+      (ex ? ' <br>Ce match est déjà saisi (' + fmtDate(ex.date_match) + ' contre ' + esc(ex.adversaire || '—') +
+        ') : il sera <strong>mis à jour</strong>, sans doublon.' : '') +
+      ' Vérifie puis enregistre.';
+    fermerImport();
+    ouvrirModale(g, { source: 'ffr', titre: 'Vérifier l\'import FFR', bandeau: bandeau });
   }
 
   // ------------------------------------------------------------------
