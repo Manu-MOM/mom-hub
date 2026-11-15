@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<link rel="icon" type="image/png" href="assets/logo-m2m.png">
+<title>Mon espace · MOM</title>
+<!-- =====================================================================
+     MOM Hub · Espace joueur & famille — EVAL-JOUEUR lot L4
+     =====================================================================
+     FAIT FOI Conception-EVAL-JOUEUR-v1 (gelé par Manu le 15/11/2026).
+     Page PUBLIQUE ouverte par le lien personnel du joueur (D1) :
+       espace-joueur.html?t=<jeton 64 hex>
+     - Lecture des évaluations PUBLIÉES seulement (D2) via
+       get_espace_joueur (sql_263, anon) ; payload réduit (D15).
+     - Seule écriture : la réponse courte du joueur (D3, D14) via
+       repondre_eval (≤ 280 caractères ; vide = effacement).
+     - Aucun compte, aucune session : client anon minimal, aucun
+       stockage navigateur (patron spectateur.html). noindex + pas de
+       referrer (le jeton ne fuit pas vers VEO ou WhatsApp).
+     - Aucun classement ni comparaison entre joueurs (D7-f).
+     Mobile d'abord. Feuille de style propre (hub.css non chargé : page
+     hors Hub, sans topbar ni nav). Logique : js/espace-joueur.js.
+     ===================================================================== -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap">
+<style>
+  :root {
+    --vert: #0c3d24; --paper: #f8f5ec; --gold: #d4a93a; --clay: #b8451f; --bleu: #3066BE;
+    --ink: #0c3d24; --mute: #5f6e63; --bord: #cabe9f; --doux: #efe9d6;
+    --feu-v: #2d7a3e; --feu-o: #b86e0a; --feu-r: #c73e3e;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); font-family: 'Manrope', system-ui, sans-serif; }
+  .ej-page { max-width: 560px; margin: 0 auto; min-height: 100vh; }
+  .ej-tete { background: var(--vert); color: var(--paper); padding: 28px 20px 22px; }
+  .ej-sur { font-size: 12px; font-weight: 700; letter-spacing: 2px; color: var(--gold); text-transform: uppercase; }
+  .ej-tete h1 { margin: 6px 0 4px; font-family: 'Oswald', sans-serif; font-size: 34px; font-weight: 600; line-height: 1.1; }
+  .ej-tete p { margin: 0; font-size: 14px; color: #e2d9bf; }
+  main { padding: 18px 14px 28px; display: flex; flex-direction: column; gap: 18px; }
+  .ej-carte { background: #fff; border: 1px solid var(--bord); border-radius: 16px; overflow: hidden; }
+  .ej-carte-une { border: 2px solid var(--gold); }
+  .ej-carte-tete { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; background: var(--vert); color: var(--paper); }
+  .ej-carte-tete h2, .ej-titre { margin: 0; font-family: 'Oswald', sans-serif; font-size: 17px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; }
+  .ej-corps { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+  .ej-nouveau { background: var(--gold); color: var(--vert); border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 800; }
+  .ej-feu-ligne { display: flex; gap: 12px; align-items: center; }
+  .ej-feu { width: 52px; height: 52px; border-radius: 50%; color: #fff; display: inline-flex; align-items: center; justify-content: center;
+    font-family: 'Oswald', sans-serif; font-size: 22px; font-weight: 700; flex: none; }
+  .ej-feu-V { background: var(--feu-v); } .ej-feu-O { background: var(--feu-o); } .ej-feu-R { background: var(--feu-r); }
+  .ej-feu-libelle { font-size: 16px; font-weight: 700; }
+  .ej-meta { font-size: 13px; color: var(--mute); }
+  .ej-niveau { font-weight: 800; color: var(--vert); }
+  .ej-encart { border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
+  .ej-encart p { margin: 0; font-size: 15px; white-space: pre-line; }
+  .ej-encart-titre { font-size: 12px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
+  .ej-pf { background: #e7f3ec; } .ej-pf .ej-encart-titre { color: #1f5a32; }
+  .ej-axe { background: #fbeee7; } .ej-axe .ej-encart-titre { color: #9a3a19; }
+  .ej-mot { background: var(--doux); } .ej-mot .ej-encart-titre { color: var(--vert); }
+  .ej-veo { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; border-radius: 12px; background: var(--bleu);
+    color: #fff; text-decoration: none; font-weight: 700; font-size: 15px; }
+  .ej-reponse { border-top: 1px solid var(--doux); padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .ej-reponse label { font-size: 13px; font-weight: 700; }
+  .ej-reponse textarea { font: inherit; font-size: 15px; padding: 10px 12px; border: 1px solid var(--bord); border-radius: 10px; resize: vertical; color: var(--ink); width: 100%; }
+  .ej-compteur { font-size: 12px; color: var(--mute); text-align: right; }
+  .ej-btn { font: inherit; font-weight: 700; font-size: 15px; min-height: 48px; border: 0; border-radius: 12px; background: var(--vert); color: var(--paper); cursor: pointer; }
+  .ej-btn[disabled] { opacity: .55; cursor: default; }
+  .ej-msg-ok { font-size: 13px; color: #1f5a32; } .ej-msg-err { font-size: 13px; color: #a52f2f; }
+  .ej-objectif { display: flex; gap: 10px; align-items: flex-start; font-size: 15px; }
+  .ej-objectif-n { font-family: 'Oswald', sans-serif; background: var(--vert); color: var(--gold); border-radius: 8px; padding: 2px 8px; font-weight: 600; flex: none; }
+  .ej-grille { display: grid; grid-template-columns: minmax(0, 1fr) repeat(4, 40px); gap: 8px 6px; align-items: center; }
+  .ej-grille-tete { text-align: center; font-size: 12px; font-weight: 700; color: var(--mute); }
+  .ej-grille-nom { font-size: 14px; font-weight: 600; }
+  .ej-pastille { justify-self: center; width: 30px; height: 30px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: #fff; }
+  .ej-pastille-vide { background: #fff; color: #8a958d; border: 1px dashed var(--bord); }
+  .ej-liste { list-style: none; margin: 0; padding: 0; }
+  .ej-liste > li { border-top: 1px solid var(--doux); }
+  .ej-liste > li:first-child { border-top: 0; }
+  .ej-ligne { display: flex; gap: 12px; align-items: center; width: 100%; min-height: 56px; padding: 12px 16px; border: 0; background: #fff;
+    font: inherit; text-align: left; color: var(--ink); cursor: pointer; }
+  .ej-ligne:hover { background: #faf7ee; }
+  .ej-ligne-texte { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .ej-ligne-texte strong { font-size: 14px; }
+  .ej-tag { font-size: 11px; font-weight: 800; border-radius: 999px; padding: 3px 8px; white-space: nowrap; }
+  .ej-tag-nat { background: var(--vert); color: var(--paper); } .ej-tag-autre { background: #e2d9bf; color: var(--vert); }
+  .ej-detail { padding: 0 16px 16px; display: flex; flex-direction: column; gap: 12px; }
+  .ej-critere { display: flex; gap: 10px; align-items: flex-start; }
+  .ej-critere .ej-pastille { flex: none; }
+  .ej-critere-texte { font-size: 14px; } .ej-critere-texte strong { display: block; }
+  .ej-vide { padding: 16px; font-size: 14px; color: var(--mute); margin: 0; }
+  .ej-pied { margin: 0; font-size: 12px; color: var(--mute); text-align: center; padding: 0 12px; }
+  .ej-erreur { margin: 40px 16px; padding: 20px; background: #fff; border: 1px solid var(--bord); border-radius: 16px; text-align: center; }
+  .ej-erreur h2 { font-family: 'Oswald', sans-serif; margin: 0 0 8px; }
+  .ej-charge { padding: 40px 16px; text-align: center; color: var(--mute); }
+</style>
+</head>
+<body>
+  <div class="ej-page" id="ej-page">
+    <p class="ej-charge">Chargement de ton espace…</p>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/espace-joueur.js"></script>
+</body>
+</html>
