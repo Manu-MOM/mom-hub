@@ -18,6 +18,17 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 1.95 — 15 novembre 2026
+ *   v1.95 : EVAL-JOUEUR lot L2 (FAIT FOI gelé 15/11/2026, sql_263).
+ *          10 wrappers ADDITIFS (staff, authentifié), retour homogène
+ *          { ok, data | error } : listEvalsJoueur(personne, saison?),
+ *          saveEvalBilan(b), statutEvalBilan(id, action),
+ *          listMatchsEval(cat, saison?), listEvalsMatch(evenement),
+ *          saveEvalMatch(m), statutEvalMatch(id, action),
+ *          publierBrouillonsMatch(evenement), getLienEspaceJoueur(personne),
+ *          genererLienEspaceJoueur(personne). action ∈ publier | depublier |
+ *          supprimer. La RPC reste la vérité des droits. L'espace joueur
+ *          (anon, jeton) n'utilise PAS ce client (lot L4, patron spectateur).
  * Version : 1.94 — 3 novembre 2026
  *   v1.94 : PARCOURS-PERFORMANCE amendement D7bis (sql_262). saveParcoursMatch
  *          transmet p_lieu (domicile | exterieur | neutre | null) ;
@@ -1462,6 +1473,17 @@
 
   // Cache mémoire des rôles (Phase 2.5.4)
   let _rolesCache = null;
+
+  // EVAL-JOUEUR (v1.95) — appel commun des RPC JSON de sql_263 :
+  // { ok: true, data } ou { ok: false, error }. Interne (non exposé).
+  async function _evalRpc(nom, params, etiquette) {
+    const { data, error } = await client.rpc(nom, params);
+    if (error) {
+      console.error('MOM Hub: ' + etiquette + '()', error);
+      return { ok: false, error: error.message || ('Erreur ' + nom) };
+    }
+    return { ok: true, data: data };
+  }
 
   // ============================================================
   // API PUBLIQUE
@@ -5409,6 +5431,129 @@
         return { ok: false, error: error.message || 'Erreur delete_parcours_match' };
       }
       return { ok: true };
+    },
+
+    // ------------------------------------------------------------------
+    // EVAL-JOUEUR (v1.95, sql_263) — évaluation des joueurs, côté staff.
+    // Toutes les RPC renvoient du JSON ; retour homogène { ok, data|error }.
+    // ------------------------------------------------------------------
+
+    /**
+     * Dossier d'évaluation d'un joueur (saison active par défaut) :
+     * { joueur, saison, peut_ecrire, lien, bilans[], matchs[] }.
+     */
+    async listEvalsJoueur(personneId, saisonId) {
+      if (!personneId) return { ok: false, error: 'personne_id requis' };
+      return _evalRpc('lister_evals_joueur', {
+        p_personne_id: personneId,
+        p_saison_id: saisonId || null
+      }, 'listEvalsJoueur');
+    },
+
+    /**
+     * Crée ou met à jour le bilan d'une période (unicité joueur × saison ×
+     * période côté base). b = { personne_id, periode, objectif_1?, objectif_2?,
+     * feux: {tech_indiv, physique, tech_poste, comprehension, etat_esprit},
+     * obs: {…mêmes clés}, saison_id? }. Feu ∈ V | O | R | null.
+     */
+    async saveEvalBilan(b) {
+      if (!b || !b.personne_id) return { ok: false, error: 'personne_id requis' };
+      if (['pre_saison', 'p1', 'p2', 'p3'].indexOf(b.periode) === -1) {
+        return { ok: false, error: 'Période invalide' };
+      }
+      const f = b.feux || {};
+      const o = b.obs || {};
+      const v = function (x) { return (x === undefined || x === '') ? null : x; };
+      return _evalRpc('enregistrer_eval_bilan', {
+        p_personne_id: b.personne_id,
+        p_periode: b.periode,
+        p_objectif_1: v(b.objectif_1),
+        p_objectif_2: v(b.objectif_2),
+        p_feu_tech_indiv: v(f.tech_indiv),
+        p_feu_physique: v(f.physique),
+        p_feu_tech_poste: v(f.tech_poste),
+        p_feu_comprehension: v(f.comprehension),
+        p_feu_etat_esprit: v(f.etat_esprit),
+        p_obs_tech_indiv: v(o.tech_indiv),
+        p_obs_physique: v(o.physique),
+        p_obs_tech_poste: v(o.tech_poste),
+        p_obs_comprehension: v(o.comprehension),
+        p_obs_etat_esprit: v(o.etat_esprit),
+        p_saison_id: b.saison_id || null
+      }, 'saveEvalBilan');
+    },
+
+    /** Publier | dépublier | supprimer (brouillon seulement) un bilan. */
+    async statutEvalBilan(id, action) {
+      if (!id) return { ok: false, error: 'id requis' };
+      if (['publier', 'depublier', 'supprimer'].indexOf(action) === -1) {
+        return { ok: false, error: 'Action invalide' };
+      }
+      return _evalRpc('statut_eval_bilan', { p_id: id, p_action: action }, 'statutEvalBilan');
+    },
+
+    /** Matchs d'une catégorie (saison active par défaut) + avancement des évals. */
+    async listMatchsEval(categorieId, saisonId) {
+      if (!categorieId) return { ok: false, error: 'catégorie requise' };
+      return _evalRpc('lister_matchs_eval', {
+        p_categorie_id: categorieId,
+        p_saison_id: saisonId || null
+      }, 'listMatchsEval');
+    },
+
+    /** Feuille d'un match (D9) avec l'éval de chaque joueur. */
+    async listEvalsMatch(evenementId) {
+      if (!evenementId) return { ok: false, error: 'évènement requis' };
+      return _evalRpc('lister_evals_match', { p_evenement_id: evenementId }, 'listEvalsMatch');
+    },
+
+    /**
+     * Crée ou met à jour l'éval match d'un joueur. m = { personne_id,
+     * evenement_id, feu?, point_fort?, axe_travail?, mot_coach?, veo_url?,
+     * veo_minute? }. Le lien VEO doit commencer par https:// (contrôle base).
+     */
+    async saveEvalMatch(m) {
+      if (!m || !m.personne_id || !m.evenement_id) {
+        return { ok: false, error: 'personne_id et evenement_id requis' };
+      }
+      const v = function (x) { return (x === undefined || x === '') ? null : x; };
+      return _evalRpc('enregistrer_eval_match', {
+        p_personne_id: m.personne_id,
+        p_evenement_id: m.evenement_id,
+        p_feu: v(m.feu),
+        p_point_fort: v(m.point_fort),
+        p_axe_travail: v(m.axe_travail),
+        p_mot_coach: v(m.mot_coach),
+        p_veo_url: v(m.veo_url),
+        p_veo_minute: v(m.veo_minute)
+      }, 'saveEvalMatch');
+    },
+
+    /** Publier | dépublier | supprimer (brouillon seulement) une éval match. */
+    async statutEvalMatch(id, action) {
+      if (!id) return { ok: false, error: 'id requis' };
+      if (['publier', 'depublier', 'supprimer'].indexOf(action) === -1) {
+        return { ok: false, error: 'Action invalide' };
+      }
+      return _evalRpc('statut_eval_match', { p_id: id, p_action: action }, 'statutEvalMatch');
+    },
+
+    /** Publie les brouillons complets d'un match : { publiees, brouillons_restants }. */
+    async publierBrouillonsMatch(evenementId) {
+      if (!evenementId) return { ok: false, error: 'évènement requis' };
+      return _evalRpc('publier_brouillons_match', { p_evenement_id: evenementId }, 'publierBrouillonsMatch');
+    },
+
+    /** Lien personnel actif d'un joueur : { token, date_creation, derniere_consultation } ou null. */
+    async getLienEspaceJoueur(personneId) {
+      if (!personneId) return { ok: false, error: 'personne_id requis' };
+      return _evalRpc('get_lien_espace_joueur', { p_personne_id: personneId }, 'getLienEspaceJoueur');
+    },
+
+    /** Crée ou régénère le lien personnel (l'ancien est révoqué). */
+    async genererLienEspaceJoueur(personneId) {
+      if (!personneId) return { ok: false, error: 'personne_id requis' };
+      return _evalRpc('generer_lien_espace_joueur', { p_personne_id: personneId }, 'genererLienEspaceJoueur');
     },
 
     /**
