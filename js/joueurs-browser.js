@@ -4,6 +4,11 @@
  *
  * Module IIFE — initialise l'UI de la page joueurs.html.
  *
+ * Version : v1.14 — 15 novembre 2026
+ *   v1.14 : EVAL-JOUEUR lot L2 (FAIT FOI gelé 15/11/2026, D12). Section
+ *          « Suivi » de la fiche : bouton « Évaluation » à côté de « Stats de
+ *          saison » → evaluation-joueur.html?joueur=<id>&depuis=fiche (retour
+ *          à la fiche). Aucun autre changement.
  * Version : v1.13 — 3 novembre 2026
  *   v1.13 : PARCOURS-PERFORMANCE amendement v1.2 (D12). joueurs.html?fiche=<id>
  *          rouvre la fiche du joueur (sa catégorie devient la catégorie
@@ -1520,6 +1525,7 @@ window.JoueursBrowser = (function () {
         <div class="joueur-fiche-section-title">📊 Suivi</div>
         <div class="joueur-fiche-actions-row">
           <button type="button" class="joueur-btn joueur-btn-stats" data-stats="saison">Stats de saison</button>
+          <button type="button" class="joueur-btn joueur-btn-stats" data-stats="eval">Évaluation</button>
         </div>
         <div class="joueur-fiche-section-title" style="margin-top:14px;">✏️ Édition métier</div>
         <div class="joueur-fiche-actions-row">
@@ -1555,6 +1561,14 @@ window.JoueursBrowser = (function () {
         if (!currentEditPersonneId) return;
         window.location.href = 'fiche-joueur-stats.html?joueur_id=' + encodeURIComponent(currentEditPersonneId)
           + '&depuis=fiche'; // v1.13 (D12) : retour à la fiche proposé
+      });
+    });
+    // v1.14 — EVAL-JOUEUR (D12) : bilans de période + évals match du joueur.
+    document.querySelectorAll('.joueur-btn-stats[data-stats="eval"]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        if (!currentEditPersonneId) return;
+        window.location.href = 'evaluation-joueur.html?joueur=' + encodeURIComponent(currentEditPersonneId)
+          + '&depuis=fiche';
       });
     });
     document.querySelectorAll('.joueur-btn-edit[data-edit]').forEach(btn => {
