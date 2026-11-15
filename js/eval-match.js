@@ -1,6 +1,12 @@
 /* =====================================================================
  * eval-match.js — Saisie des évals match (MOM Hub)
  * ---------------------------------------------------------------------
+ * Version : v1.1 — 15 novembre 2026 — EVAL-JOUEUR lot L5
+ *   v1.1 : (D8) bloc « Repères du suivi » sous la saisie, en lecture seule,
+ *          pour aider à rédiger : repères complets du joueur sur le match
+ *          (reperes_match_joueur, sql_264 ; supabase-client v1.96). Chargé
+ *          à la sélection du joueur, mis en cache ; masqué si le client est
+ *          trop ancien ; « match non suivi » si aucune donnée.
  * Version : v1.0 — 15 novembre 2026 — EVAL-JOUEUR lot L3
  *   FAIT FOI Conception-EVAL-JOUEUR-v1 (gelé par Manu le 15/11/2026),
  *   socle SQL sql_263, supabase-client v1.95.
@@ -36,7 +42,8 @@
     feuille: null,       // réponse de lister_evals_match
     joueurs: [],         // [{personne_id, nom, prenom, numero, club, eval}]
     choisi: null,        // personne_id sélectionné
-    modifie: false
+    modifie: false,
+    reperes: {}          // v1.1 : personne_id -> repères (ou null si non suivi)
   };
 
   // ------------------------------------------------------------------
@@ -189,6 +196,62 @@
 
     $('ev-page').innerHTML = tete + '<div id="em-msg" aria-live="polite"></div>'
       + '<div class="em-grille">' + feuille + '<section class="em-saisie" id="em-saisie">' + rendreSaisie() + '</section></div>';
+    afficherReperes();
+  }
+
+  // ------------------------------------------------------------------
+  // v1.1 (L5, D8) — repères du suivi (lecture seule, aide à la rédaction)
+  // ------------------------------------------------------------------
+  function texteReperes(r) {
+    if (!r) return null;
+    var c = r.cartons || {};
+    var buteur = [];
+    if (r.transformations || r.transformations_ratees) buteur.push('transfo ' + r.transformations + '/' + (r.transformations + (r.transformations_ratees || 0)));
+    if (r.penalites || r.penalites_ratees) buteur.push('pénalités ' + r.penalites + '/' + (r.penalites + (r.penalites_ratees || 0)));
+    if (r.drops) buteur.push('drops ' + r.drops);
+    var positifs = [
+      r.points ? r.points + ' pt' + (r.points > 1 ? 's' : '') : null,
+      r.essais ? r.essais + ' essai' + (r.essais > 1 ? 's' : '') : null,
+      buteur.length ? buteur.join(', ') : null,
+      r.pied_tentes ? 'jeu au pied ' + r.pied_reussis + ' réussi' + (r.pied_reussis > 1 ? 's' : '') + ' / ' + r.pied_tentes : null
+    ].filter(Boolean);
+    var actions = (r.actions || []).map(function (a) { return a.libelle + (a.nombre > 1 ? ' ×' + a.nombre : ''); });
+    var cartons = ['blanc', 'jaune', 'rouge'].filter(function (k) { return c[k]; })
+      .map(function (k) { return c[k] + ' ' + k; });
+    var vigilance = [
+      r.fautes ? r.fautes + ' faute' + (r.fautes > 1 ? 's' : '') : null,
+      r.en_avant ? r.en_avant + ' en-avant' : null,
+      r.passe_avant ? r.passe_avant + ' passe' + (r.passe_avant > 1 ? 's' : '') + ' en avant' : null,
+      cartons.length ? 'carton' + (cartons.length > 1 ? 's' : '') + ' : ' + cartons.join(', ') : null
+    ].filter(Boolean);
+    return { positifs: positifs, actions: actions, vigilance: vigilance };
+  }
+
+  function rendreReperes(r) {
+    var z = $('em-reperes');
+    if (!z) return;
+    var t = texteReperes(r);
+    var corps;
+    if (!t) {
+      corps = '<p style="margin:.25rem 0 0">Match non suivi : pas de repères.</p>';
+    } else {
+      corps = '<p style="margin:.25rem 0 0"><strong>Positif :</strong> ' + esc(t.positifs.length ? t.positifs.join(' · ') : 'rien de noté au suivi') + '</p>'
+        + (t.actions.length ? '<p style="margin:.25rem 0 0"><strong>Actions marquantes :</strong> ' + esc(t.actions.join(' · ')) + '</p>' : '')
+        + (t.vigilance.length ? '<p style="margin:.25rem 0 0"><strong>À surveiller :</strong> ' + esc(t.vigilance.join(' · ')) + '</p>' : '');
+    }
+    z.innerHTML = '<div class="ev-bloc" style="margin:0;border-style:dashed"><div class="ev-bloc-corps" style="font-size:.88rem">'
+      + '<span class="ev-lien-titre">Repères du suivi · visibles du staff seulement</span>' + corps
+      + '<p class="ev-note" style="margin:.35rem 0 0">Le joueur ne verra que les repères positifs.</p></div></div>';
+  }
+
+  async function afficherReperes() {
+    var pid = etat.choisi;
+    if (!pid || !window.SupabaseHub || typeof SupabaseHub.reperesMatchJoueur !== 'function') return;
+    if (Object.prototype.hasOwnProperty.call(etat.reperes, pid)) { rendreReperes(etat.reperes[pid]); return; }
+    var r = await SupabaseHub.reperesMatchJoueur(etat.evenementId, pid);
+    if (!r.ok) return; // repères facultatifs : en cas d'erreur, rien n'est affiché
+    etat.reperes[pid] = r.data || null;
+    if (etat.choisi === pid) rendreReperes(etat.reperes[pid]);
   }
 
   function rendreSaisie() {
@@ -238,6 +301,7 @@
       + '<input type="url" id="em-veo-url" inputmode="url" placeholder="https://…" value="' + esc(e.veo_url || '') + '"></label>'
       + '<label class="ev-champ">À la minute<input type="text" id="em-veo-minute" maxlength="10" placeholder="24:10" value="' + esc(e.veo_minute || '') + '"></label>'
       + '</div>' + reponse
+      + '<div id="em-reperes" aria-live="polite"></div>'
       + '</div>'
       + '<div class="ev-pied"><span class="ev-pied-info" id="em-info">' + esc(info) + '</span>'
       + '<div class="ev-actions">' + actions + '</div></div></div>';
