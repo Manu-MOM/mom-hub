@@ -1,6 +1,10 @@
 /* =====================================================================
  * evaluation-joueur.js — Page Évaluation d'un joueur (MOM Hub)
  * ---------------------------------------------------------------------
+ * Version : v1.2 — 15 novembre 2026 — EVAL-JOUEUR lot L4
+ *   v1.2 : espace joueur en ligne (espace-joueur.html, L4) : retrait de
+ *          l'avertissement « n'envoie pas encore le lien ». Aucun autre
+ *          changement.
  * Version : v1.1 — 15 novembre 2026 — EVAL-JOUEUR lot L3
  *   v1.1 : section « Évals match » reliée à eval-match.html (L3) : lien
  *          « Évaluer un match » (matchs de la catégorie du joueur) et
@@ -26,9 +30,8 @@
  *   La RPC reste la vérité (sql_263). Le drapeau peut_ecrire renvoyé par
  *   lister_evals_joueur ne sert qu'à masquer les commandes d'écriture.
  *
- * NOTE L2
- *   L'espace joueur (espace-joueur.html, lot L4) n'existe pas encore : le
- *   lien généré n'est utile qu'une fois L4 en ligne (message affiché).
+ * NOTE
+ *   Le lien ouvre espace-joueur.html?t=<jeton> (lot L4).
  * ===================================================================== */
 (function () {
   'use strict';
@@ -143,8 +146,7 @@
       + '<div class="ev-lien"><div>'
       + '<div class="ev-lien-titre">Lien joueur &amp; famille</div>'
       + '<div class="ev-lien-etat">' + esc(etatTxt) + '</div>'
-      + '<div class="ev-note">Le joueur et sa famille ne voient que les évaluations publiées. '
-      + 'L’espace joueur sera en ligne au lot L4 : n’envoie pas encore le lien.</div>'
+      + '<div class="ev-note">Le joueur et sa famille ne voient que les évaluations publiées.</div>'
       + '</div><div class="ev-actions">' + boutons + '</div></div>'
       + '<div id="ev-lien-msg" aria-live="polite"></div>'
       + '</div></section>';
