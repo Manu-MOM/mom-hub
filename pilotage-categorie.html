@@ -137,6 +137,14 @@
       <span id="ss-pp-lien-texte">⭐ Parcours Performance</span>
       <span class="ss-pp-lien__fleche">Voir leurs matchs →</span>
     </a>
+    <!-- EVAL-JOUEUR L3 (FAIT FOI gelé 15/11/2026, D12) : lien vers la saisie
+         des évals match de la catégorie pilotée (eval-match.html). Même
+         style que le lien Parcours Performance ; lecture gardée par la RPC
+         lister_matchs_eval (sql_263). -->
+    <a class="ss-pp-lien" id="ss-eval-lien" href="eval-match.html" hidden>
+      <span>📝 Évals match — retours aux joueurs après chaque match</span>
+      <span class="ss-pp-lien__fleche">Évaluer un match →</span>
+    </a>
     <main id="ss-pilotage"><p class="ss-load">Initialisation…</p></main>
   </div>
   <footer>MOM Hub · pilotage de saison — Mutzig Ovalie Molsheim</footer>
@@ -230,6 +238,7 @@
       // catégorie pilotée, visible seulement si ≥ 1 joueur engagé. Lecture
       // gardée par la RPC list_parcours_saison ; échec = lien masqué.
       function majLienPP(catId) {
+        majLienEval(catId); // EVAL-JOUEUR L3 : même point d'accroche, aucun appelant modifié
         var lien = document.getElementById('ss-pp-lien');
         if (!lien) return;
         lien.hidden = true;
@@ -242,6 +251,16 @@
             (rows.length > 1 ? ' joueurs engagés' : ' joueur engagé') + ' en équipe Performance';
           lien.hidden = false;
         }).catch(function () { /* lien masqué */ });
+      }
+
+      // EVAL-JOUEUR L3 (D12) : lien vers les évals match de la catégorie
+      // pilotée, affiché dès qu'une catégorie est résolue (droits portés par
+      // la RPC lister_matchs_eval côté page cible).
+      function majLienEval(catId) {
+        var lien = document.getElementById('ss-eval-lien');
+        if (!lien) return;
+        lien.hidden = !catId;
+        if (catId) lien.href = 'eval-match.html?categorie=' + encodeURIComponent(catId);
       }
 
       // Rendu transverse : barre de sélection + zone de pilotage rafraîchie au choix.
