@@ -1,6 +1,11 @@
 /* =====================================================================
  * evaluation-joueur.js — Page Évaluation d'un joueur (MOM Hub)
  * ---------------------------------------------------------------------
+ * Version : v1.1 — 15 novembre 2026 — EVAL-JOUEUR lot L3
+ *   v1.1 : section « Évals match » reliée à eval-match.html (L3) : lien
+ *          « Évaluer un match » (matchs de la catégorie du joueur) et
+ *          chaque éval listée ouvre son match avec le joueur présélectionné
+ *          (retour ici via depuis=joueur). Aucun autre changement.
  * Version : v1.0 — 15 novembre 2026 — EVAL-JOUEUR lot L2
  *   FAIT FOI Conception-EVAL-JOUEUR-v1 (gelé par Manu le 15/11/2026),
  *   socle SQL sql_263, supabase-client v1.95.
@@ -15,7 +20,7 @@
  *        observation, 1 à 2 objectifs (D7-c) ; brouillon → publié (D2),
  *        dépublier (D13), supprimer un brouillon ; réponse du joueur
  *        affichée (D3) ;
- *     3. évals match du joueur (lecture ; saisie au lot L3).
+ *     3. évals match du joueur (lecture ; saisie dans eval-match.html, L3).
  *
  * DROITS
  *   La RPC reste la vérité (sql_263). Le drapeau peut_ecrire renvoyé par
@@ -235,9 +240,11 @@
 
   function rendreMatchs() {
     var ms = etat.dossier.matchs || [];
+    var j = etat.dossier.joueur || {};
+    var suffixe = '&depuis=joueur&joueur=' + encodeURIComponent(etat.joueurId);
     var corps;
     if (ms.length === 0) {
-      corps = '<p class="ev-note">Aucune éval match pour ce joueur cette saison. La saisie match par match arrive au lot L3.</p>';
+      corps = '<p class="ev-note">Aucune éval match pour ce joueur cette saison.</p>';
     } else {
       corps = '<ul class="ev-matchs">' + ms.map(function (m) {
         var x = m.match || {};
@@ -249,7 +256,8 @@
           ? '<span class="ev-badge ev-badge-publie">Publiée</span>'
           : '<span class="ev-badge ev-badge-brouillon">Brouillon</span>';
         return '<li>' + pastille
-          + '<div class="ev-match-texte"><strong>' + esc(titre) + '</strong>'
+          + '<div class="ev-match-texte"><a style="color:inherit" href="eval-match.html?evenement='
+          + encodeURIComponent(m.evenement_id) + suffixe + '"><strong>' + esc(titre) + '</strong></a>'
           + '<div class="ev-match-meta">' + esc(dateCourte(x.date))
           + (m.point_fort ? ' · Point fort : ' + esc(m.point_fort) : '') + '</div>'
           + (m.reponse_joueur ? '<div class="ev-match-meta">Réponse du joueur : ' + esc(m.reponse_joueur) + '</div>' : '')
@@ -258,8 +266,13 @@
           + statut + '</li>';
       }).join('') + '</ul>';
     }
+    var lienEvaluer = j.categorie_id
+      ? '<a class="ev-btn" style="display:inline-flex;align-items:center;text-decoration:none" href="eval-match.html?categorie='
+        + encodeURIComponent(j.categorie_id) + suffixe + '">Évaluer un match →</a>'
+      : '';
     return '<section class="ev-bloc"><div class="ev-bloc-corps">'
-      + '<h2 class="ev-titre-section">Évals match</h2>' + corps + '</div></section>';
+      + '<div class="ev-lien" style="margin-bottom:.4rem"><h2 class="ev-titre-section" style="margin:0">Évals match</h2>'
+      + '<div class="ev-actions">' + lienEvaluer + '</div></div>' + corps + '</div></section>';
   }
 
   // ------------------------------------------------------------------
