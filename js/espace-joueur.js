@@ -1,6 +1,13 @@
 /* =====================================================================
  * espace-joueur.js — Espace joueur & famille (MOM Hub)
  * ---------------------------------------------------------------------
+ * Version : v1.1 — 15 novembre 2026 — EVAL-JOUEUR lot L5
+ *   v1.1 : (D8) « Tes repères du match » sous chaque éval match publiée,
+ *          si le match a été suivi : repères POSITIFS seulement (points,
+ *          essais, buteur, coups de pied réussis sans total, actions
+ *          marquantes), calculés et filtrés en base (sql_264, clé
+ *          'reperes' de get_espace_joueur). Rien n'est affiché si la clé
+ *          est absente ou nulle.
  * Version : v1.0 — 15 novembre 2026 — EVAL-JOUEUR lot L4
  *   FAIT FOI Conception-EVAL-JOUEUR-v1 (gelé par Manu le 15/11/2026),
  *   socle SQL sql_263.
@@ -118,6 +125,25 @@
       + '<div data-msg aria-live="polite"></div></div>';
   }
 
+  // v1.1 (L5, D8) — repères positifs du match (déjà filtrés côté base).
+  function pluriel(n, un, plusieurs) { return n + ' ' + (n > 1 ? plusieurs : un); }
+  function blocReperes(r) {
+    if (!r) return '';
+    var items = [];
+    if (r.points) items.push(pluriel(r.points, 'point', 'points'));
+    if (r.essais) items.push(pluriel(r.essais, 'essai', 'essais'));
+    if (r.transformations) items.push(pluriel(r.transformations, 'transformation réussie', 'transformations réussies'));
+    if (r.penalites) items.push(pluriel(r.penalites, 'pénalité réussie', 'pénalités réussies'));
+    if (r.drops) items.push(pluriel(r.drops, 'drop', 'drops'));
+    if (r.pied_reussis) items.push(pluriel(r.pied_reussis, 'coup de pied réussi', 'coups de pied réussis'));
+    (Array.isArray(r.actions) ? r.actions : []).forEach(function (a) {
+      if (a && a.libelle) items.push(a.libelle + (a.nombre > 1 ? ' ×' + a.nombre : ''));
+    });
+    if (!items.length) return '';
+    return '<div class="ej-encart ej-mot"><span class="ej-encart-titre">Tes repères du match</span>'
+      + '<p>' + items.map(esc).join(' · ') + '</p></div>';
+  }
+
   function contenuMatch(m) {
     var x = m.match || {};
     var h = '<div class="ej-feu-ligne">'
@@ -130,6 +156,7 @@
     if (m.axe_travail) {
       h += '<div class="ej-encart ej-axe"><span class="ej-encart-titre">Ton axe de travail</span><p>' + esc(m.axe_travail) + '</p></div>';
     }
+    h += blocReperes(m.reperes);
     if (m.mot_coach) {
       h += '<div class="ej-encart ej-mot"><span class="ej-encart-titre">Le mot du coach'
         + (m.publie_par_prenom ? ' · ' + esc(m.publie_par_prenom) : '') + '</span><p>' + esc(m.mot_coach) + '</p></div>';
