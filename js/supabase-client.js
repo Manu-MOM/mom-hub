@@ -18,6 +18,11 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 1.96 — 15 novembre 2026
+ *   v1.96 : EVAL-JOUEUR lot L5 (D8, sql_264). 1 wrapper ADDITIF :
+ *          reperesMatchJoueur(evenement, personne) → repères complets d'un
+ *          joueur sur un match (suivi), null si le match n'a pas été suivi.
+ *          Retour { ok, data | error }.
  * Version : 1.95 — 15 novembre 2026
  *   v1.95 : EVAL-JOUEUR lot L2 (FAIT FOI gelé 15/11/2026, sql_263).
  *          10 wrappers ADDITIFS (staff, authentifié), retour homogène
@@ -5554,6 +5559,20 @@
     async genererLienEspaceJoueur(personneId) {
       if (!personneId) return { ok: false, error: 'personne_id requis' };
       return _evalRpc('generer_lien_espace_joueur', { p_personne_id: personneId }, 'genererLienEspaceJoueur');
+    },
+
+    /**
+     * v1.96 (L5, D8) — repères de stats d'un joueur sur un match, calculés
+     * en base depuis le suivi (sql_264) : points, essais, buteur, jeu au
+     * pied, actions marquantes, fautes, en-avant, cartons. data = null si
+     * le match n'a pas été suivi.
+     */
+    async reperesMatchJoueur(evenementId, personneId) {
+      if (!evenementId || !personneId) return { ok: false, error: 'évènement et joueur requis' };
+      return _evalRpc('reperes_match_joueur', {
+        p_evenement_id: evenementId,
+        p_personne_id: personneId
+      }, 'reperesMatchJoueur');
     },
 
     /**
