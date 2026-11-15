@@ -26,6 +26,13 @@
     - Fonctions: SupabaseHub.getPolesAvecCategories ; client.rpc list_fonctions_staff
                  / definir_ / cloturer_ / supprimer_fonction_staff ; list_staff_disponibles.
   Datalist fonctions alimentée par data/fonctions-staff.json (référentiel suggéré).
+
+  15/11/2026 — FONCTION-STAFF-CHANGER (option A retenue par Manu, « je suis tes
+  recos ») : bouton « Changer » sur une fonction en cours = clôture à la date
+  d'effet + nouvelle fonction à la même date (historique daté conservé ; aucune
+  RPC nouvelle : definir_ puis cloturer_fonction_staff). Avertissement quand le
+  libellé ne donne aucun droit d'écriture (lecture de capabilities_fonction,
+  policy SELECT authenticated existante ; normalisation identique à _b5_norm).
 -->
 <link rel="stylesheet" href="css/hub.css">
 <style>
@@ -109,6 +116,14 @@
   .st-badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 12px; font-weight: 600; }
   .st-badge.active { background: #e8f1ec; color: var(--vert-mom, #1b6b4c); }
   .st-badge.ended { background: #f0ede6; color: var(--ink-mute, #6b7a6f); }
+  /* FONCTION-STAFF-CHANGER (15/11/2026) */
+  .st-badge.warn { background: #fdf1e2; color: #8a5208; margin-left: 6px; }
+  .st-warn { font-size: 12px; color: #8a5208; margin-top: 4px; }
+  .st-warn[hidden] { display: none; }
+  .st-change td { background: #faf7ee; }
+  .st-change-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+  .st-change-form label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+  .st-change-form input { font: inherit; padding: 7px 9px; border: 1px solid #d8dee5; border-radius: 6px; }
 
 </style>
 </head>
@@ -179,6 +194,7 @@
             <label for="fnFonction">Fonction</label>
             <input id="fnFonction" list="fnFonctionsList" placeholder="ex. Référent de catégorie" autocomplete="off">
             <datalist id="fnFonctionsList"></datalist>
+            <div class="st-warn" id="fnFonctionWarn" hidden></div>
           </div>
           <div>
             <label for="fnDebut">Début</label>
