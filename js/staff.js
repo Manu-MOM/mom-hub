@@ -19,6 +19,18 @@
  *     - pioche : listStaffDisponibles() (club-wide), excluant les actifs.
  *
  * Garde d'auth admin = motif fonctions-staff/u-admin (getSession + getMyRoles).
+ *
+ * 15/11/2026 — FONCTION-STAFF-CHANGER (option A, validée par Manu) :
+ *   - bouton « Changer » sur une fonction EN COURS : formulaire en ligne
+ *     (nouvelle fonction + date d'effet). Enchaîne definir_fonction_staff
+ *     (nouvelle ligne, début = date d'effet) PUIS cloturer_fonction_staff
+ *     (ancienne ligne, fin = date d'effet). Ordre choisi pour qu'un échec
+ *     partiel laisse au pire deux lignes actives (visible, réparable), jamais
+ *     une personne sans fonction. Aucune RPC nouvelle.
+ *   - avertissement « aucun droit d'écriture » quand le libellé normalisé
+ *     (même normalisation que _b5_norm SQL) n'a aucune capability autorisée
+ *     dans capabilities_fonction (SELECT authenticated, policy existante).
+ *     Lecture impossible → aucun avertissement (dégradation silencieuse).
  * Aucun client recréé : tout via SupabaseHub.client.
  */
 (async function () {
@@ -85,7 +97,39 @@
   // ==========================================================
   // ONGLET FONCTIONS (ex-fonctions-staff)
   // ==========================================================
-  const FN = { staffNames: new Map(), currentCat: '', poles: [], loaded: false };
+  const FN = { staffNames: new Map(), currentCat: '', poles: [], loaded: false,
+               droits: null };   // FONCTION-STAFF-CHANGER : Set des fonctions normalisées dotées de droits
+
+  // Normalisation identique à public._b5_norm (translate des accents + lower + btrim).
+  const B5_DE = 'àâäáãÀÂÄÁÃéèêëÉÈÊËíìîïÍÌÎÏóòôöõÓÒÔÖÕúùûüÚÙÛÜçÇñÑ';
+  const B5_EN = 'aaaaaAAAAAeeeeEEEEiiiiIIIIoooooOOOOOuuuuUUUUcCnN';
+  function b5Norm(txt) {
+    let out = '';
+    for (const ch of String(txt == null ? '' : txt)) {
+      const i = B5_DE.indexOf(ch);
+      out += (i >= 0 ? B5_EN[i] : ch);
+    }
+    return out.toLowerCase().trim();
+  }
+  async function fnLoadDroits() {
+    try {
+      const { data, error } = await client.from('capabilities_fonction')
+        .select('fonction_normalisee').eq('autorise', true);
+      if (error) return;
+      FN.droits = new Set((data || []).map(function (r) { return r.fonction_normalisee; }));
+    } catch (_) { /* pas d'avertissement si la lecture échoue */ }
+  }
+  function sansDroits(fonction) {
+    return !!(FN.droits && String(fonction || '').trim() && !FN.droits.has(b5Norm(fonction)));
+  }
+  const TXT_SANS_DROITS = '⚠️ Cette fonction ne donne aucun droit d\'écriture dans la catégorie '
+    + '(droits prévus pour : Référent de catégorie, Entraîneur principal, Entraîneur adjoint, Manager).';
+  function majAvertissement(input, zone) {
+    if (!input || !zone) return;
+    const ko = sansDroits(input.value);
+    zone.hidden = !ko;
+    zone.textContent = ko ? TXT_SANS_DROITS : '';
+  }
 
   async function fnLoadGrid() {
     const host = $('fnGrid');
@@ -191,7 +235,10 @@
       const nomLigne = [r.prenom, r.nom].filter(Boolean).join(' ').trim() || fnNameFor(r.personne_id);
       tr.innerHTML =
         '<td>' + escapeHtml(nomLigne) + '</td>' +
-        '<td>' + escapeHtml(r.fonction) + '</td>' +
+        '<td>' + escapeHtml(r.fonction) +
+          (!ended && sansDroits(r.fonction)
+            ? '<span class="st-badge warn" title="' + escapeHtml(TXT_SANS_DROITS) + '">aucun droit</span>' : '') +
+        '</td>' +
         '<td>' + (r.date_debut || '') + '</td>' +
         '<td>' + (ended
           ? '<span class="st-badge ended">clos ' + r.date_fin + '</span>'
@@ -199,6 +246,10 @@
         '<td style="text-align:right"></td>';
       const actions = tr.lastElementChild;
       if (!ended) {
+        const ch = document.createElement('button');
+        ch.className = 'st-link'; ch.textContent = 'Changer';
+        ch.onclick = function () { fnOuvrirChangement(r, tr, nomLigne); };
+        actions.appendChild(ch);
         const b = document.createElement('button');
         b.className = 'st-link'; b.textContent = 'Clôturer';
         b.onclick = function () { fnClose(r.id); };
@@ -230,6 +281,67 @@
     } catch (e) { flash(errMsg(e), 'err'); }
     finally { $('fnAddBtn').disabled = false; }
   }
+  // FONCTION-STAFF-CHANGER — formulaire en ligne sous la ligne concernée.
+  function fnOuvrirChangement(r, tr, nomLigne) {
+    const deja = $('fnRows').querySelector('.st-change');
+    if (deja) deja.remove();
+    const ligne = document.createElement('tr');
+    ligne.className = 'st-change';
+    ligne.innerHTML =
+      '<td colspan="5">' +
+        '<div class="st-change-form">' +
+          '<div><strong>' + escapeHtml(nomLigne) + '</strong><br><span class="st-hint">actuellement : ' +
+            escapeHtml(r.fonction) + ' (depuis le ' + escapeHtml(formatDate(r.date_debut)) + ')</span></div>' +
+          '<div><label for="fnChFonction">Nouvelle fonction</label>' +
+            '<input id="fnChFonction" list="fnFonctionsList" autocomplete="off" value="' + escapeHtml(r.fonction) + '"></div>' +
+          '<div><label for="fnChDate">À partir du</label>' +
+            '<input id="fnChDate" type="date" value="' + today() + '" min="' + escapeHtml(r.date_debut || '') + '"></div>' +
+          '<div><button type="button" class="st-btn" id="fnChOk">Valider</button> ' +
+            '<button type="button" class="st-link" id="fnChAnnuler">Annuler</button></div>' +
+        '</div>' +
+        '<div class="st-warn" id="fnChWarn" hidden></div>' +
+      '</td>';
+    tr.parentNode.insertBefore(ligne, tr.nextSibling);
+    const inp = $('fnChFonction');
+    inp.addEventListener('input', function () { majAvertissement(inp, $('fnChWarn')); });
+    majAvertissement(inp, $('fnChWarn'));
+    $('fnChAnnuler').onclick = function () { ligne.remove(); };
+    $('fnChOk').onclick = function () { fnValiderChangement(r, ligne); };
+    inp.focus(); inp.select();
+  }
+
+  async function fnValiderChangement(r, ligne) {
+    const nouvelle = $('fnChFonction').value.trim();
+    const effet = $('fnChDate').value || today();
+    if (!nouvelle) return flash('Saisis la nouvelle fonction.', 'err');
+    if (b5Norm(nouvelle) === b5Norm(r.fonction)) return flash('La fonction est inchangée.', 'err');
+    if (r.date_debut && effet < r.date_debut) {
+      return flash('La date d\'effet ne peut pas précéder le début de la fonction actuelle (' + formatDate(r.date_debut) + ').', 'err');
+    }
+    const ok = $('fnChOk'); ok.disabled = true;
+    try {
+      // 1) nouvelle fonction d'abord (un échec ici ne touche à rien)…
+      await rpc('definir_fonction_staff', {
+        p_personne_id: r.personne_id, p_categorie_id: FN.currentCat,
+        p_fonction: nouvelle, p_date_debut: effet
+      });
+      // 2) … puis clôture de l'ancienne à la même date.
+      try {
+        await rpc('cloturer_fonction_staff', { p_id: r.id, p_date_fin: effet });
+      } catch (e2) {
+        flash('Nouvelle fonction ajoutée, mais l\'ancienne n\'a pas pu être clôturée : ' + errMsg(e2)
+          + ' — clôture-la à la main.', 'err');
+        await fnRenderList();
+        return;
+      }
+      flash('Fonction changée : ' + nouvelle + ' à partir du ' + formatDate(effet) + '.', 'ok');
+      await fnRenderList();
+    } catch (e) {
+      flash(errMsg(e), 'err');
+      ok.disabled = false;
+    }
+  }
+
   async function fnClose(id) {
     try { await rpc('cloturer_fonction_staff', { p_id: id }); flash('Fonction clôturée.', 'ok'); await fnRenderList(); }
     catch (e) { flash(errMsg(e), 'err'); }
@@ -398,7 +510,7 @@
     $('panel-vivier').style.display = onFn ? 'none' : 'block';
     if (onFn && !FN.loaded) {
       FN.loaded = true;
-      Promise.all([fnLoadGrid(), fnLoadStaffPioche(), fnLoadFonctionsRef()])
+      Promise.all([fnLoadGrid(), fnLoadStaffPioche(), fnLoadFonctionsRef(), fnLoadDroits()])
         .catch(function (e) { flash('Chargement fonctions impossible : ' + errMsg(e), 'err'); });
     }
     if (!onFn && !VI.loaded) {
@@ -414,6 +526,7 @@
   // Listeners Fonctions
   $('fnAddBtn').addEventListener('click', fnAdd);
   $('fnHistChk').addEventListener('change', fnRenderList);
+  $('fnFonction').addEventListener('input', function () { majAvertissement($('fnFonction'), $('fnFonctionWarn')); });
 
   // Listeners Vivier (la sélection d'entente se fait par clic sur une vignette,
   // câblé dans viLoadGrid)
