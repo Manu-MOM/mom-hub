@@ -29,6 +29,8 @@
      frise « Comment je me vois ». 3e RPC anon : envoyer_auto_eval.
      Styles .ej-ae*, .ej-choix*, .ej-oui-non, .ej-cadenas*, .ej-compare*,
      .ej-gene, .ej-frise*, .ej-merci, .ej-btn-clair. Logique : js/espace-joueur.js v1.2.
+     D28 (16/11/2026) : moments VEO (.ej-veo-bloc, .ej-moments, .ej-moment-min),
+     js/espace-joueur.js v1.3.
      ===================================================================== -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap">
@@ -131,6 +133,10 @@
   .ej-frise { overflow-x: auto; display: flex; flex-direction: column; gap: 8px; }
   .ej-frise-ligne { display: grid; gap: 6px; align-items: center; min-width: max-content; }
   .ej-frise-ligne .ej-grille-nom { min-width: 130px; }
+  .ej-veo-bloc { background: #eaf1fa; } .ej-veo-bloc .ej-encart-titre { color: var(--bleu); }
+  .ej-moments { list-style: none; margin: 4px 0 8px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .ej-moments li { display: flex; gap: 10px; align-items: baseline; font-size: 15px; }
+  .ej-moment-min { font-family: 'Oswald', sans-serif; font-weight: 600; background: var(--bleu); color: #fff; border-radius: 6px; padding: 1px 8px; flex: none; }
   .ej-merci { background: #e7f3ec; color: #1f5a32; border-radius: 12px; padding: 12px 14px; font-weight: 700; font-size: 15px; }
 </style>
 </head>
