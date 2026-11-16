@@ -1,6 +1,19 @@
 /* =====================================================================
  * eval-match.js — Saisie des évals match (MOM Hub)
  * ---------------------------------------------------------------------
+ * Version : v1.2 — 16 novembre 2026 — EVAL-JOUEUR Avenant A, lot A2
+ *   FAIT FOI §9 (D16–D27), sql_265 + sql_266, supabase-client v1.97.
+ *   v1.2 : (D17) 5 critères V/O/R FACULTATIFS dans la saisie (re-clic =
+ *          effacer), publication inchangée (feu + point fort).
+ *          (D23) avis du joueur affiché à côté de chaque critère quand il
+ *          a envoyé son auto-évaluation, + son mot ; sinon « pas encore ».
+ *          (D19) rappel : l'éval publiée ne s'ouvre au joueur qu'après son
+ *          auto-évaluation (évals antérieures à l'avenant : libres, D22).
+ *          (D24–D26) signalement blessure / gêne / fatigue : badge ⚠ sur
+ *          la feuille, compteur en tête, encart rouge avec le texte du
+ *          joueur, blessures en cours (lecture), bouton « Créer une
+ *          blessure » (saisie existante saveBlessure, préremplie). Jamais
+ *          de blessure créée automatiquement.
  * Version : v1.1 — 15 novembre 2026 — EVAL-JOUEUR lot L5
  *   v1.1 : (D8) bloc « Repères du suivi » sous la saisie, en lecture seule,
  *          pour aider à rédiger : repères complets du joueur sur le match
@@ -29,6 +42,20 @@
 (function () {
   'use strict';
 
+  // Avenant A (D16/D17) : les 5 critères des bilans (mêmes libellés, D6).
+  var CRITERES = [
+    { cle: 'tech_indiv', nom: 'Niveau technique individuel' },
+    { cle: 'physique', nom: 'Niveau physique' },
+    { cle: 'tech_poste', nom: 'Niveau technique au poste' },
+    { cle: 'comprehension', nom: 'Compréhension du jeu' },
+    { cle: 'etat_esprit', nom: "État d'esprit" }
+  ];
+  var FEUX_CRITERE = [
+    { v: 'V', titre: 'Vert — acquis' },
+    { v: 'O', titre: 'Orange — en progrès' },
+    { v: 'R', titre: 'Rouge — à travailler' }
+  ];
+
   var FEUX_MATCH = [
     { v: 'V', libelle: 'V · Gros match' },
     { v: 'O', libelle: 'O · Dans le match' },
@@ -43,7 +70,9 @@
     joueurs: [],         // [{personne_id, nom, prenom, numero, club, eval}]
     choisi: null,        // personne_id sélectionné
     modifie: false,
-    reperes: {}          // v1.1 : personne_id -> repères (ou null si non suivi)
+    reperes: {},         // v1.1 : personne_id -> repères (ou null si non suivi)
+    blessures: {},       // v1.2 : personne_id -> blessures en cours (D26), ou null si refus
+    formBlessure: false  // v1.2 : formulaire « Créer une blessure » ouvert
   };
 
   // ------------------------------------------------------------------
@@ -75,6 +104,10 @@
     if (!j.eval) return { cls: 'em-etat-afaire', txt: 'À faire' };
     if (j.eval.statut === 'publie') return { cls: 'em-etat-publiee', txt: 'Publiée' };
     return { cls: 'em-etat-brouillon', txt: 'Brouillon' };
+  }
+  // v1.2 (D24) : le joueur a-t-il signalé une blessure / gêne / fatigue ?
+  function aSignale(j) {
+    return !!(j && j.auto_eval && j.auto_eval.gene && j.auto_eval.gene.signalee);
   }
   function joueurChoisi() {
     for (var i = 0; i < etat.joueurs.length; i++) {
@@ -151,9 +184,12 @@
   function rendreMatch() {
     var m = etat.feuille.match || {};
     var nb = { afaire: 0, brouillon: 0, publiee: 0 };
+    var nbSignal = 0, nbAuto = 0;
     etat.joueurs.forEach(function (j) {
       var e = etatJoueur(j);
       if (e.cls === 'em-etat-afaire') nb.afaire++; else if (e.cls === 'em-etat-brouillon') nb.brouillon++; else nb.publiee++;
+      if (j.auto_eval) nbAuto++;
+      if (aSignale(j)) nbSignal++;
     });
     var score = (m.score_mom != null && m.score_adverse != null) ? ' · ' + m.score_mom + ' – ' + m.score_adverse : '';
     var sous = [m.niveau, dateCourte(m.date)].filter(Boolean).join(' · ') + score;
@@ -162,7 +198,8 @@
       + '<div class="ev-head"><div><h1>' + esc(titreMatch(m)) + '</h1>'
       + '<p class="ev-sub">' + esc(sous) + '</p></div>'
       + '<div class="ev-actions"><span class="ev-note">' + nb.publiee + ' publiée(s) · ' + nb.brouillon + ' brouillon(s) · '
-      + nb.afaire + ' à faire</span>'
+      + nb.afaire + ' à faire · ' + nbAuto + ' auto-éval' + (nbAuto > 1 ? 's' : '') + '</span>'
+      + (nbSignal ? '<span class="em-badge-gene">⚠ ' + nbSignal + ' signalement' + (nbSignal > 1 ? 's' : '') + '</span>' : '')
       + '<button type="button" class="ev-btn" id="em-publier-tous"' + (nb.brouillon ? '' : ' disabled') + '>Publier tous les brouillons</button>'
       + '</div></div>';
 
@@ -173,6 +210,7 @@
         + '<span class="em-num">' + esc(j.numero != null ? j.numero : '') + '</span>'
         + '<span class="em-nom">' + esc((j.nom || '') + ' ' + (j.prenom || ''))
         + (j.club ? '<span class="em-club">' + esc(j.club) + '</span>' : '') + '</span>'
+        + (aSignale(j) ? '<span class="em-badge-gene" title="Blessure, gêne ou fatigue signalée par le joueur">⚠</span>' : '')
         + '<span class="em-etat ' + e.cls + '">' + e.txt + '</span></button>';
     }).join('');
     if (etat.joueurs.length === 0) {
@@ -197,6 +235,115 @@
     $('ev-page').innerHTML = tete + '<div id="em-msg" aria-live="polite"></div>'
       + '<div class="em-grille">' + feuille + '<section class="em-saisie" id="em-saisie">' + rendreSaisie() + '</section></div>';
     afficherReperes();
+    afficherBlessures();
+  }
+
+  // ------------------------------------------------------------------
+  // v1.2 (Avenant A) — critères du coach + avis du joueur (D17, D23)
+  // ------------------------------------------------------------------
+  function rendreCriteres(e, auto, requise) {
+    var crit = e.criteres || {};
+    var feuxJoueur = auto && auto.feux ? auto.feux : null;
+    var lignes = CRITERES.map(function (c) {
+      var boutons = FEUX_CRITERE.map(function (f) {
+        return '<button type="button" class="ev-feu ev-feu-' + f.v + '" title="' + esc(f.titre) + '"'
+          + ' aria-pressed="' + (crit[c.cle] === f.v ? 'true' : 'false') + '"'
+          + ' data-critere="' + c.cle + '" data-feu="' + f.v + '">' + f.v + '</button>';
+      }).join('');
+      var avis = feuxJoueur && feuxJoueur[c.cle]
+        ? '<span class="em-avis">Le joueur : <span class="ev-pastille ev-pastille-' + esc(feuxJoueur[c.cle]) + '">'
+          + esc(feuxJoueur[c.cle]) + '</span></span>'
+        : '';
+      return '<div class="em-critere"><span class="em-critere-nom">' + esc(c.nom) + '</span>'
+        + '<div class="ev-feux" role="group" aria-label="' + esc('Critère — ' + c.nom) + '">' + boutons + '</div>'
+        + avis + '</div>';
+    }).join('');
+    var etatAuto;
+    if (auto) {
+      etatAuto = '<p class="ev-note" style="margin:.4rem 0 0">Auto-évaluation envoyée le ' + esc(dateCourte(auto.envoye_le)) + '.'
+        + (auto.commentaire ? '</p><div class="ev-reponse" style="margin-top:.4rem"><div class="ev-reponse-titre">Le mot du joueur</div><p>'
+          + esc(auto.commentaire) + '</p></div>' : '</p>');
+    } else {
+      etatAuto = '<p class="ev-note" style="margin:.4rem 0 0">Le joueur n’a pas encore envoyé son auto-évaluation.'
+        + (requise ? ' Ton éval publiée ne s’ouvrira pour lui qu’après.' : '') + '</p>';
+    }
+    return '<div><div class="ev-champ" id="em-crit-label">Les 5 critères <span class="em-aide">Facultatif — re-clic pour effacer</span></div>'
+      + '<div class="em-criteres" role="group" aria-labelledby="em-crit-label">' + lignes + '</div>' + etatAuto + '</div>';
+  }
+
+  // ------------------------------------------------------------------
+  // v1.2 (D24–D26) — signalement blessure / gêne / fatigue
+  // ------------------------------------------------------------------
+  function rendreSignalement(j) {
+    if (!aSignale(j)) return '';
+    var g = j.auto_eval.gene;
+    var form = '';
+    if (etat.formBlessure) {
+      var m = (etat.feuille && etat.feuille.match) || {};
+      var d = String(m.date || '').slice(0, 10);
+      form = '<div class="em-blessure-form">'
+        + '<label class="ev-champ">Libellé<input type="text" id="em-bl-libelle" maxlength="120" placeholder="Ex. entorse cheville droite"></label>'
+        + '<label class="ev-champ">Début<input type="date" id="em-bl-debut" value="' + esc(d) + '"></label>'
+        + '<label class="ev-champ">Retour prévu <span class="em-aide">Facultatif</span><input type="date" id="em-bl-fin"></label>'
+        + '<label class="ev-champ em-bl-notes">Notes<textarea id="em-bl-notes" rows="2">'
+        + esc('Signalé par le joueur après le match du ' + dateCourte(m.date) + ' : ' + (g.detail || '')) + '</textarea></label>'
+        + '<div class="ev-actions"><button type="button" class="ev-btn ev-btn-discret" data-blessure="annuler">Annuler</button>'
+        + '<button type="button" class="ev-btn ev-btn-primaire" data-blessure="creer">Enregistrer la blessure</button></div></div>';
+    }
+    return '<div class="em-alerte" role="note">'
+      + '<div class="em-alerte-titre">⚠ Le joueur signale une blessure, une gêne ou une fatigue</div>'
+      + '<p>' + esc(g.detail || '') + '</p>'
+      + '<div id="em-blessures" class="ev-note"></div>'
+      + (etat.formBlessure ? form
+        : '<div class="ev-actions"><button type="button" class="ev-btn" data-blessure="ouvrir">Créer une blessure</button></div>')
+      + '<p class="em-aide" style="margin:.4rem 0 0">Visible du joueur et des encadrants de la catégorie seulement. Rien n’est créé automatiquement.</p>'
+      + '</div>';
+  }
+
+  function rendreBlessures(liste) {
+    var z = $('em-blessures');
+    if (!z) return;
+    if (liste === null) { z.textContent = ''; return; }
+    var actives = (liste || []).filter(function (b) { return b.est_active; });
+    z.textContent = actives.length
+      ? 'Blessure' + (actives.length > 1 ? 's' : '') + ' en cours : ' + actives.map(function (b) {
+        return b.libelle + ' (depuis le ' + dateCourte(b.date_debut) + ')';
+      }).join(' · ')
+      : 'Aucune blessure en cours enregistrée pour ce joueur.';
+  }
+
+  async function afficherBlessures() {
+    var j = joueurChoisi();
+    if (!aSignale(j) || typeof SupabaseHub.listBlessuresJoueur !== 'function') return;
+    var pid = j.personne_id;
+    if (Object.prototype.hasOwnProperty.call(etat.blessures, pid)) { rendreBlessures(etat.blessures[pid]); return; }
+    var l = await SupabaseHub.listBlessuresJoueur(pid); // null si refus ou erreur
+    etat.blessures[pid] = l;
+    if (etat.choisi === pid) rendreBlessures(l);
+  }
+
+  async function creerBlessure(bouton) {
+    var j = joueurChoisi();
+    if (!j) return;
+    var b = {
+      personne_id: j.personne_id,
+      libelle: $('em-bl-libelle').value.trim(),
+      date_debut: $('em-bl-debut').value,
+      date_fin: $('em-bl-fin').value || null,
+      notes: $('em-bl-notes').value.trim()
+    };
+    if (!b.libelle || !b.date_debut) { message('Le libellé et la date de début sont obligatoires.'); return; }
+    bouton.disabled = true;
+    var r = await SupabaseHub.saveBlessure(b);
+    if (!r.ok) {
+      bouton.disabled = false;
+      message(/Droit insuffisant/.test(r.error || '') ? 'Tu n’as pas le droit d’enregistrer une blessure pour ce joueur.' : r.error);
+      return;
+    }
+    etat.formBlessure = false;
+    delete etat.blessures[j.personne_id];
+    rendreMatch();
+    message('Blessure enregistrée.', true);
   }
 
   // ------------------------------------------------------------------
@@ -286,8 +433,9 @@
     return '<div class="ev-bloc">'
       + '<div class="ev-periode-tete"><h2>' + esc((j.numero != null ? 'N° ' + j.numero + ' · ' : '') + (j.nom || '') + ' ' + (j.prenom || '')) + '</h2>' + badge + '</div>'
       + '<div class="ev-bloc-corps" style="display:flex;flex-direction:column;gap:1rem">'
+      + rendreSignalement(j)
       + '<div><div class="ev-champ" id="em-feu-label">Feu du match</div>'
-      + '<div class="em-feux-match" role="group" aria-labelledby="em-feu-label">' + feux + '</div></div>'
+      + '<div class="em-feux-match" id="em-feux-match" role="group" aria-labelledby="em-feu-label">' + feux + '</div></div>'
       + '<div class="em-deux">'
       + '<label class="ev-champ em-pf">Ton point fort du match <span class="em-aide">Obligatoire pour publier — toujours au moins un positif</span>'
       + '<textarea id="em-point-fort" rows="3">' + esc(e.point_fort || '') + '</textarea></label>'
@@ -300,7 +448,9 @@
       + '<label class="ev-champ">Revoir ton action — lien VEO <span class="em-aide">Facultatif, commence par https://</span>'
       + '<input type="url" id="em-veo-url" inputmode="url" placeholder="https://…" value="' + esc(e.veo_url || '') + '"></label>'
       + '<label class="ev-champ">À la minute<input type="text" id="em-veo-minute" maxlength="10" placeholder="24:10" value="' + esc(e.veo_minute || '') + '"></label>'
-      + '</div>' + reponse
+      + '</div>'
+      + rendreCriteres(e, j.auto_eval || null, !j.eval || !!e.auto_eval_requise)
+      + reponse
       + '<div id="em-reperes" aria-live="polite"></div>'
       + '</div>'
       + '<div class="ev-pied"><span class="ev-pied-info" id="em-info">' + esc(info) + '</span>'
@@ -308,7 +458,12 @@
   }
 
   function lireSaisie() {
-    var actif = document.querySelector('#em-saisie .ev-feu[aria-pressed="true"]');
+    var actif = document.querySelector('#em-feux-match .ev-feu[aria-pressed="true"]');
+    var criteres = {};
+    CRITERES.forEach(function (c) {
+      var a = document.querySelector('#em-saisie .ev-feu[data-critere="' + c.cle + '"][aria-pressed="true"]');
+      criteres[c.cle] = a ? a.getAttribute('data-feu') : null;
+    });
     return {
       personne_id: etat.choisi,
       evenement_id: etat.evenementId,
@@ -317,7 +472,8 @@
       axe_travail: $('em-axe').value.trim(),
       mot_coach: $('em-mot').value.trim(),
       veo_url: $('em-veo-url').value.trim(),
-      veo_minute: $('em-veo-minute').value.trim()
+      veo_minute: $('em-veo-minute').value.trim(),
+      criteres: criteres
     };
   }
 
@@ -329,6 +485,7 @@
   function choisir(personneId) {
     etat.choisi = personneId;
     etat.modifie = false;
+    etat.formBlessure = false;
     rendreMatch();
   }
 
@@ -356,7 +513,8 @@
         if (!rp.ok) { message(rp.error); return; }
         majEval(rp.data);
         rendreMatch();
-        message('Éval publiée.', true);
+        message(rp.data && rp.data.auto_eval_requise && !j.auto_eval
+          ? 'Éval publiée. Le joueur la découvrira après son auto-évaluation.' : 'Éval publiée.', true);
       } else if (action === 'depublier') {
         if (etat.modifie) { message('Enregistre d’abord tes modifications.'); return; }
         if (!window.confirm('Dépublier cette éval ? Elle ne sera plus visible du joueur.')) return;
@@ -421,6 +579,13 @@
         choisir(cible);
         return;
       }
+      var bl = b.getAttribute('data-blessure');
+      if (bl) {
+        if (bl === 'ouvrir') { etat.formBlessure = true; garderSaisie(); }
+        else if (bl === 'annuler') { etat.formBlessure = false; garderSaisie(); }
+        else if (bl === 'creer') { creerBlessure(b); }
+        return;
+      }
       if (b.classList.contains('ev-feu')) {
         var actif = b.getAttribute('aria-pressed') === 'true';
         Array.prototype.forEach.call(b.parentNode.querySelectorAll('.ev-feu'), function (x) { x.setAttribute('aria-pressed', 'false'); });
@@ -434,11 +599,31 @@
       if (b.id === 'em-ajout-btn') { ajouterJoueur(); return; }
     });
     page.addEventListener('input', function (ev) {
-      if (ev.target.closest && ev.target.closest('#em-saisie')) marquerModifie();
+      // Le formulaire blessure n'est pas la saisie de l'éval.
+      if (ev.target.closest && ev.target.closest('#em-saisie') && !ev.target.closest('.em-blessure-form')) marquerModifie();
     });
     window.addEventListener('beforeunload', function (ev) {
       if (etat.modifie) { ev.preventDefault(); ev.returnValue = ''; }
     });
+  }
+
+  // v1.2 : ouvre / ferme le formulaire blessure sans perdre la saisie de
+  // l'éval en cours (relue puis réinjectée après le rendu).
+  function garderSaisie() {
+    var s = etat.modifie ? lireSaisie() : null;
+    rendreMatch();
+    if (!s) return;
+    $('em-point-fort').value = s.point_fort; $('em-axe').value = s.axe_travail; $('em-mot').value = s.mot_coach;
+    $('em-veo-url').value = s.veo_url; $('em-veo-minute').value = s.veo_minute;
+    Array.prototype.forEach.call(document.querySelectorAll('#em-feux-match .ev-feu'), function (x) {
+      x.setAttribute('aria-pressed', x.getAttribute('data-feu') === s.feu ? 'true' : 'false');
+    });
+    CRITERES.forEach(function (c) {
+      Array.prototype.forEach.call(document.querySelectorAll('#em-saisie .ev-feu[data-critere="' + c.cle + '"]'), function (x) {
+        x.setAttribute('aria-pressed', x.getAttribute('data-feu') === s.criteres[c.cle] ? 'true' : 'false');
+      });
+    });
+    marquerModifie();
   }
 
   function marquerModifie() {
