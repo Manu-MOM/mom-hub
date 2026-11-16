@@ -1,6 +1,14 @@
 /* =====================================================================
  * eval-match.js — Saisie des évals match (MOM Hub)
  * ---------------------------------------------------------------------
+ * Version : v1.3 — 16 novembre 2026 — EVAL-JOUEUR Avenant A (retour
+ *   recette de Manu : « obtenir le lien depuis l'éval match »)
+ *   v1.3 : bloc « Lien joueur & famille » sous la saisie : Copier le lien,
+ *          Envoyer par WhatsApp (message adapté : si l'éval est publiée et
+ *          verrouillée, invite à donner son avis d'abord), ou Créer le lien
+ *          s'il n'existe pas. Mêmes RPC que la page Évaluation joueur
+ *          (get_lien_espace_joueur / generer_lien_espace_joueur), mêmes
+ *          droits. La régénération reste sur la page Évaluation joueur.
  * Version : v1.2 — 16 novembre 2026 — EVAL-JOUEUR Avenant A, lot A2
  *   FAIT FOI §9 (D16–D27), sql_265 + sql_266, supabase-client v1.97.
  *   v1.2 : (D17) 5 critères V/O/R FACULTATIFS dans la saisie (re-clic =
@@ -62,6 +70,9 @@
     { v: 'R', libelle: 'R · Match difficile' }
   ];
 
+  // v1.3 : page publique de l'espace joueur (jeton dans ?t=), comme evaluation-joueur.js.
+  var PAGE_ESPACE = 'espace-joueur.html';
+
   var etat = {
     params: null,
     evenementId: null,
@@ -72,7 +83,8 @@
     modifie: false,
     reperes: {},         // v1.1 : personne_id -> repères (ou null si non suivi)
     blessures: {},       // v1.2 : personne_id -> blessures en cours (D26), ou null si refus
-    formBlessure: false  // v1.2 : formulaire « Créer une blessure » ouvert
+    formBlessure: false, // v1.2 : formulaire « Créer une blessure » ouvert
+    liens: {}            // v1.3 : personne_id -> jeton | null (pas de lien) ; absent = inconnu
   };
 
   // ------------------------------------------------------------------
@@ -236,6 +248,82 @@
       + '<div class="em-grille">' + feuille + '<section class="em-saisie" id="em-saisie">' + rendreSaisie() + '</section></div>';
     afficherReperes();
     afficherBlessures();
+    afficherLien();
+  }
+
+  // ------------------------------------------------------------------
+  // v1.3 — lien personnel du joueur depuis l'éval match
+  // ------------------------------------------------------------------
+  function urlEspace(jeton) {
+    var base = window.location.href.split('?')[0].split('#')[0];
+    base = base.substring(0, base.lastIndexOf('/') + 1);
+    return base + PAGE_ESPACE + '?t=' + encodeURIComponent(jeton);
+  }
+  function msgLien(texte, ok) {
+    var z = $('em-lien-msg');
+    if (z) z.innerHTML = texte ? '<div class="' + (ok ? 'ev-ok' : 'ev-erreur') + '">' + esc(texte) + '</div>' : '';
+  }
+  function rendreLien(pid) {
+    var z = $('em-lien-actions');
+    if (!z || etat.choisi !== pid) return;
+    var t = etat.liens[pid];
+    if (t === undefined) { z.innerHTML = '<span class="ev-note">Lien indisponible pour toi.</span>'; return; }
+    z.innerHTML = t
+      ? '<button type="button" class="ev-btn" data-lien="copier">Copier le lien</button>'
+        + '<button type="button" class="ev-btn" data-lien="whatsapp">Envoyer par WhatsApp</button>'
+      : '<span class="ev-note">Aucun lien pour ce joueur.</span>'
+        + '<button type="button" class="ev-btn" data-lien="creer">Créer le lien</button>';
+  }
+  async function afficherLien() {
+    var pid = etat.choisi;
+    if (!pid || typeof SupabaseHub.getLienEspaceJoueur !== 'function') { var z = $('em-lien'); if (z) z.hidden = true; return; }
+    if (Object.prototype.hasOwnProperty.call(etat.liens, pid)) { rendreLien(pid); return; }
+    var r = await SupabaseHub.getLienEspaceJoueur(pid);
+    if (r.ok) etat.liens[pid] = (r.data && r.data.token) ? r.data.token : null;
+    rendreLien(pid);
+  }
+  function texteWhatsApp(j, url) {
+    var m = (etat.feuille && etat.feuille.match) || {};
+    var e = j.eval;
+    var adv = m.adversaire ? ' contre ' + m.adversaire : '';
+    if (e && e.statut === 'publie' && e.auto_eval_requise && !j.auto_eval) {
+      return 'Salut ' + (j.prenom || '') + ', ton coach a évalué ton match' + adv
+        + '. Donne d’abord ton avis sur ton match pour découvrir le sien : ' + url;
+    }
+    return 'Salut ' + (j.prenom || '') + ', voici ton espace joueur MOM pour suivre tes évaluations : ' + url
+      + ' (lien personnel, à garder pour toi et ta famille).';
+  }
+  async function agirLien(action, bouton) {
+    var j = joueurChoisi();
+    if (!j) return;
+    msgLien('');
+    if (action === 'creer') {
+      bouton.disabled = true;
+      var r = await SupabaseHub.genererLienEspaceJoueur(j.personne_id);
+      if (!r.ok) { bouton.disabled = false; msgLien(r.error); return; }
+      etat.liens[j.personne_id] = r.data && r.data.token ? r.data.token : null;
+      if (!etat.liens[j.personne_id]) delete etat.liens[j.personne_id]; // relire au prochain affichage
+      await afficherLien();
+      msgLien('Lien créé.', true);
+      return;
+    }
+    var t = etat.liens[j.personne_id];
+    if (!t) return;
+    var url = urlEspace(t);
+    if (action === 'whatsapp') {
+      window.open('https://wa.me/?text=' + encodeURIComponent(texteWhatsApp(j, url)), '_blank', 'noopener');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      msgLien('Lien copié dans le presse-papiers.', true);
+    } catch (_) {
+      var z = $('em-lien-msg');
+      z.innerHTML = '<div class="ev-ok">Copie automatique impossible. Lien à copier :</div>'
+        + '<input type="text" readonly class="ev-obs" id="em-lien-brut" value="' + esc(url) + '">';
+      var champ = $('em-lien-brut');
+      if (champ) { champ.focus(); champ.select(); }
+    }
   }
 
   // ------------------------------------------------------------------
@@ -452,6 +540,10 @@
       + rendreCriteres(e, j.auto_eval || null, !j.eval || !!e.auto_eval_requise)
       + reponse
       + '<div id="em-reperes" aria-live="polite"></div>'
+      + '<div class="em-lien" id="em-lien" style="display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;border-top:1px dashed var(--ev-bord);padding-top:.8rem">'
+      + '<span class="ev-lien-titre">Lien joueur &amp; famille</span>'
+      + '<div class="ev-actions" id="em-lien-actions"><span class="ev-note">Chargement…</span></div>'
+      + '<div id="em-lien-msg" aria-live="polite" style="flex-basis:100%"></div></div>'
       + '</div>'
       + '<div class="ev-pied"><span class="ev-pied-info" id="em-info">' + esc(info) + '</span>'
       + '<div class="ev-actions">' + actions + '</div></div></div>';
@@ -579,6 +671,8 @@
         choisir(cible);
         return;
       }
+      var li = b.getAttribute('data-lien');
+      if (li) { agirLien(li, b); return; }
       var bl = b.getAttribute('data-blessure');
       if (bl) {
         if (bl === 'ouvrir') { etat.formBlessure = true; garderSaisie(); }
