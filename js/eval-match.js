@@ -1,6 +1,11 @@
 /* =====================================================================
  * eval-match.js — Saisie des évals match (MOM Hub)
  * ---------------------------------------------------------------------
+ * Version : v1.4 — 16 novembre 2026 — EVAL-JOUEUR D28 (retour terrain,
+ *   choix de Manu : 1 lien VEO du match + jusqu'à 5 moments)
+ *   v1.4 : « Revoir tes actions » : lien VEO du match + 5 lignes fixes
+ *          (minute 10 car. + libellé facultatif 60 car.) ; lignes vides
+ *          ignorées. Envoi veo_moments (supabase-client v1.98, sql_267).
  * Version : v1.3 — 16 novembre 2026 — EVAL-JOUEUR Avenant A (retour
  *   recette de Manu : « obtenir le lien depuis l'éval match »)
  *   v1.3 : bloc « Lien joueur & famille » sous la saisie : Copier le lien,
@@ -40,7 +45,7 @@
  *                     ajout depuis les joueurs de la catégorie) et saisie
  *                     de l'éval du joueur sélectionné (D7-a/b) : feu,
  *                     point fort (obligatoire pour publier, D7-f), axe de
- *                     travail, mot du coach, lien VEO + minute.
+ *                     travail, mot du coach, lien VEO + moments (v1.4).
  *   Paramètres optionnels : joueur=<id> (joueur présélectionné),
  *   depuis=joueur (retour vers la page Évaluation de ce joueur).
  *
@@ -72,6 +77,7 @@
 
   // v1.3 : page publique de l'espace joueur (jeton dans ?t=), comme evaluation-joueur.js.
   var PAGE_ESPACE = 'espace-joueur.html';
+  var NB_MOMENTS = 5;   // v1.4 (D28)
 
   var etat = {
     params: null,
@@ -327,6 +333,48 @@
   }
 
   // ------------------------------------------------------------------
+  // v1.4 (D28) — lien VEO du match + jusqu'à 5 moments
+  // ------------------------------------------------------------------
+  function rendreVeo(e) {
+    var moments = Array.isArray(e.veo_moments) ? e.veo_moments : [];
+    var lignes = '';
+    for (var i = 0; i < NB_MOMENTS; i++) {
+      var m = moments[i] || {};
+      lignes += '<div class="em-moment" style="display:grid;grid-template-columns:minmax(80px,110px) minmax(0,1fr);gap:.5rem">'
+        + '<input type="text" data-moment-minute="' + i + '" maxlength="10" placeholder="' + (i === 0 ? '24:10' : 'mm:ss') + '"'
+        + ' aria-label="' + esc('Moment ' + (i + 1) + ' — minute') + '" value="' + esc(m.minute || '') + '">'
+        + '<input type="text" data-moment-libelle="' + i + '" maxlength="60" placeholder="' + (i === 0 ? 'Ex. ton plaquage sur le 10' : 'Libellé (facultatif)') + '"'
+        + ' aria-label="' + esc('Moment ' + (i + 1) + ' — libellé') + '" value="' + esc(m.libelle || '') + '">'
+        + '</div>';
+    }
+    return '<div style="display:flex;flex-direction:column;gap:.5rem;background:var(--feedback-info-bg,#eaf1fa);border-radius:10px;padding:.8rem .9rem">'
+      + '<label class="ev-champ">Revoir tes actions — lien VEO du match <span class="em-aide">Facultatif, commence par https://</span>'
+      + '<input type="url" id="em-veo-url" inputmode="url" placeholder="https://app.veo.co/matches/…" value="' + esc(e.veo_url || '') + '"></label>'
+      + '<div class="ev-champ" style="margin:0">Moments à revoir <span class="em-aide">Jusqu’à ' + NB_MOMENTS + ' : minute + ce qu’il doit regarder</span></div>'
+      + lignes + '</div>';
+  }
+  function lireMoments() {
+    var out = [];
+    for (var i = 0; i < NB_MOMENTS; i++) {
+      var mi = document.querySelector('#em-saisie [data-moment-minute="' + i + '"]');
+      var li = document.querySelector('#em-saisie [data-moment-libelle="' + i + '"]');
+      var minute = mi ? mi.value.trim() : '';
+      var libelle = li ? li.value.trim() : '';
+      if (minute || libelle) out.push({ minute: minute, libelle: libelle || null });
+    }
+    return out;
+  }
+  function ecrireMoments(moments) {
+    for (var i = 0; i < NB_MOMENTS; i++) {
+      var m = moments[i] || {};
+      var mi = document.querySelector('#em-saisie [data-moment-minute="' + i + '"]');
+      var li = document.querySelector('#em-saisie [data-moment-libelle="' + i + '"]');
+      if (mi) mi.value = m.minute || '';
+      if (li) li.value = m.libelle || '';
+    }
+  }
+
+  // ------------------------------------------------------------------
   // v1.2 (Avenant A) — critères du coach + avis du joueur (D17, D23)
   // ------------------------------------------------------------------
   function rendreCriteres(e, auto, requise) {
@@ -532,11 +580,7 @@
       + '</div>'
       + '<label class="ev-champ">Le mot du coach <span class="em-aide">Facultatif</span>'
       + '<textarea id="em-mot" rows="2">' + esc(e.mot_coach || '') + '</textarea></label>'
-      + '<div class="em-veo">'
-      + '<label class="ev-champ">Revoir ton action — lien VEO <span class="em-aide">Facultatif, commence par https://</span>'
-      + '<input type="url" id="em-veo-url" inputmode="url" placeholder="https://…" value="' + esc(e.veo_url || '') + '"></label>'
-      + '<label class="ev-champ">À la minute<input type="text" id="em-veo-minute" maxlength="10" placeholder="24:10" value="' + esc(e.veo_minute || '') + '"></label>'
-      + '</div>'
+      + rendreVeo(e)
       + rendreCriteres(e, j.auto_eval || null, !j.eval || !!e.auto_eval_requise)
       + reponse
       + '<div id="em-reperes" aria-live="polite"></div>'
@@ -564,7 +608,7 @@
       axe_travail: $('em-axe').value.trim(),
       mot_coach: $('em-mot').value.trim(),
       veo_url: $('em-veo-url').value.trim(),
-      veo_minute: $('em-veo-minute').value.trim(),
+      veo_moments: lireMoments(),
       criteres: criteres
     };
   }
@@ -708,7 +752,7 @@
     rendreMatch();
     if (!s) return;
     $('em-point-fort').value = s.point_fort; $('em-axe').value = s.axe_travail; $('em-mot').value = s.mot_coach;
-    $('em-veo-url').value = s.veo_url; $('em-veo-minute').value = s.veo_minute;
+    $('em-veo-url').value = s.veo_url; ecrireMoments(s.veo_moments);
     Array.prototype.forEach.call(document.querySelectorAll('#em-feux-match .ev-feu'), function (x) {
       x.setAttribute('aria-pressed', x.getAttribute('data-feu') === s.feu ? 'true' : 'false');
     });
