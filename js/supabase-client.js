@@ -18,6 +18,12 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 1.97 — 16 novembre 2026
+ *   v1.97 : EVAL-JOUEUR Avenant A, lot A2 (D17, sql_265). saveEvalMatch
+ *          transmet les 5 critères facultatifs du coach : m.criteres =
+ *          { tech_indiv, physique, tech_poste, comprehension, etat_esprit },
+ *          feu V | O | R | null (absent = null : la RPC remplace tout).
+ *          Aucun autre changement.
  * Version : 1.96 — 15 novembre 2026
  *   v1.96 : EVAL-JOUEUR lot L5 (D8, sql_264). 1 wrapper ADDITIF :
  *          reperesMatchJoueur(evenement, personne) → repères complets d'un
@@ -5515,13 +5521,18 @@
     /**
      * Crée ou met à jour l'éval match d'un joueur. m = { personne_id,
      * evenement_id, feu?, point_fort?, axe_travail?, mot_coach?, veo_url?,
-     * veo_minute? }. Le lien VEO doit commencer par https:// (contrôle base).
+     * veo_minute?, criteres? }. Le lien VEO doit commencer par https://
+     * (contrôle base). v1.97 (Avenant A, D17) : criteres = { tech_indiv,
+     * physique, tech_poste, comprehension, etat_esprit }, chacun V | O | R |
+     * null, tous facultatifs. Remplacement complet côté base : un critère
+     * absent est effacé.
      */
     async saveEvalMatch(m) {
       if (!m || !m.personne_id || !m.evenement_id) {
         return { ok: false, error: 'personne_id et evenement_id requis' };
       }
       const v = function (x) { return (x === undefined || x === '') ? null : x; };
+      const c = (m.criteres && typeof m.criteres === 'object') ? m.criteres : {};
       return _evalRpc('enregistrer_eval_match', {
         p_personne_id: m.personne_id,
         p_evenement_id: m.evenement_id,
@@ -5530,7 +5541,12 @@
         p_axe_travail: v(m.axe_travail),
         p_mot_coach: v(m.mot_coach),
         p_veo_url: v(m.veo_url),
-        p_veo_minute: v(m.veo_minute)
+        p_veo_minute: v(m.veo_minute),
+        p_feu_tech_indiv: v(c.tech_indiv),
+        p_feu_physique: v(c.physique),
+        p_feu_tech_poste: v(c.tech_poste),
+        p_feu_comprehension: v(c.comprehension),
+        p_feu_etat_esprit: v(c.etat_esprit)
       }, 'saveEvalMatch');
     },
 
