@@ -1,6 +1,20 @@
 /* =====================================================================
  * espace-joueur.js — Espace joueur & famille (MOM Hub)
  * ---------------------------------------------------------------------
+ * Version : v1.4 — 16 novembre 2026 — EVAL-JOUEUR, retour terrain « page
+ *   confuse, le dernier match est tout en bas » (plan validé par Manu).
+ *   Cause : une carte « À toi de jouer » par match passé de la saison
+ *   (jusqu'à 8 en M16) empilées au-dessus du dernier match. Choix de Manu :
+ *   tous les matchs restent ouverts à l'auto-évaluation (pour retrouver les
+ *   évals passées), mais repliés. Nouvel ordre :
+ *     1. TON DERNIER MATCH (le plus récent, éval publiée ou avis attendu),
+ *        avec le formulaire d'avis DEDANS s'il est verrouillé ou sans éval ;
+ *     2. « Encore à donner ton avis » : une ligne repliée par autre match
+ *        (🔒 d'abord : une éval du coach attend) ;
+ *     3. MA SAISON : objectifs, progression, « Comment je me vois » ;
+ *     4. HISTORIQUE replié : bilans de période, matchs précédents.
+ *   Après un envoi hors dernier match : l'éval déverrouillée est dépliée
+ *   et affichée. Aucun changement SQL ni de données reçues.
  * Version : v1.3 — 16 novembre 2026 — EVAL-JOUEUR D28 (retour terrain)
  *   v1.3 : « Revoir tes actions » : bouton vers la vidéo VEO du match +
  *          liste des moments à revoir (minute + libellé), veo_moments
@@ -323,18 +337,63 @@
       + '<div data-msg aria-live="polite"></div></div>';
   }
 
-  function carteAutoEval() {
-    var liste = etat.donnees.a_auto_evaluer || [];
+  // v1.4 — le « dernier match » : le plus récent entre les évals publiées
+  // et les matchs qui attendent l'avis du joueur.
+  function dateDe(x) { return String((x && x.date) || '').slice(0, 10); }
+  function dernierMatch() {
+    var d = etat.donnees;
+    var cands = [];
+    (d.matchs || []).forEach(function (m) { cands.push({ evt: m.evenement_id, date: dateDe(m.match), eval: m }); });
+    (d.a_auto_evaluer || []).forEach(function (x) {
+      if (!cands.some(function (c) { return c.evt === x.evenement_id; })) cands.push({ evt: x.evenement_id, date: dateDe(x), eval: null });
+    });
+    if (!cands.length) return null;
+    cands.sort(function (a, b) { return a.date < b.date ? 1 : (a.date > b.date ? -1 : 0); });
+    var h = cands[0];
+    h.auto = (d.a_auto_evaluer || []).filter(function (x) { return x.evenement_id === h.evt; })[0] || null;
+    return h;
+  }
+
+  function carteHeros(h) {
+    var m = h.eval;
+    if (m && !m.verrouille) return carteDernierMatch(m);
+    var x = h.auto || (m && m.match) || {};
+    var intro = m
+      ? '<p class="ej-avis-intro" style="margin:0;font-size:15px;line-height:1.4">🔒 <strong>Ton coach t’a écrit sur ce match.</strong> Dis-nous d’abord comment tu l’as vu, puis découvre son avis.</p>'
+      : '<p class="ej-avis-intro" style="margin:0;font-size:15px;line-height:1.4">Ton coach n’a pas encore publié son évaluation. En attendant : comment tu as vu ton match ?</p>';
+    return '<section class="ej-carte ej-carte-une" id="carte-auto-' + esc(h.evt) + '">'
+      + '<div class="ej-carte-tete"><h2>Ton dernier match</h2>' + (m && estNouveau(m.publie_le) ? '<span class="ej-nouveau">NOUVEAU</span>' : '') + '</div>'
+      + '<div class="ej-corps"><div><div class="ej-feu-libelle">' + esc(titreMatch(x)) + '</div>'
+      + '<div class="ej-meta">' + (h.date ? esc(dateCourte(h.date)) + ' ' : '') + tagNiveau(x.niveau) + '</div></div>'
+      + intro + (h.auto ? formAuto(h.auto) : '<p class="ej-meta">Ton avis sur ce match n’est plus disponible ici : parles-en à ton coach.</p>')
+      + '</div></section>';
+  }
+
+  function carteAvisAutres(heroEvt) {
+    var liste = (etat.donnees.a_auto_evaluer || []).filter(function (x) { return x.evenement_id !== heroEvt; });
     if (!liste.length) return '';
-    return liste.map(function (x) {
+    liste = liste.slice().sort(function (a, b) {
+      var va = verrouPour(a.evenement_id) ? 1 : 0, vb = verrouPour(b.evenement_id) ? 1 : 0;
+      if (va !== vb) return vb - va;
+      return dateDe(a) < dateDe(b) ? 1 : -1;
+    });
+    var lignes = liste.map(function (x) {
       var verrou = verrouPour(x.evenement_id);
-      return '<section class="ej-carte ej-carte-auto" id="carte-auto-' + esc(x.evenement_id) + '">'
-        + '<div class="ej-carte-tete"><h2>À toi de jouer</h2>' + (verrou ? '<span class="ej-nouveau">🔒 AVIS DU COACH</span>' : '') + '</div>'
-        + '<div class="ej-corps"><div><div class="ej-feu-libelle">Comment tu as vu ton match ?</div>'
-        + '<div class="ej-meta">' + esc(titreMatch(x)) + (x.date ? ' · ' + esc(dateCourte(x.date)) : '') + ' ' + tagNiveau(x.niveau) + '</div>'
-        + (verrou ? '<p class="ej-meta" style="margin:6px 0 0">Ton coach t’a écrit : envoie ton avis pour le découvrir.</p>' : '')
-        + '</div>' + formAuto(x) + '</div></section>';
+      return ligneDepliable('auto-' + x.evenement_id,
+        '<span class="ej-pastille ej-pastille-vide" aria-hidden="true">' + (verrou ? '🔒' : '✎') + '</span>',
+        titreMatch(x), (x.date ? dateCourte(x.date) : '') + (verrou ? ' · ton coach t’a écrit' : ''),
+        tagNiveau(x.niveau), false,
+        '<div class="ej-corps" style="padding:0">' + formAuto(x) + '</div>');
     }).join('');
+    return '<section class="ej-carte"><h2 class="ej-titre" style="padding:16px 16px 2px">Encore à donner ton avis</h2>'
+      + '<p class="ej-meta" style="margin:0 16px 6px">' + esc(pluriel(liste.length, 'match', 'matchs'))
+      + ' · 🔒 = ton coach t’a écrit, donne ton avis pour le lire</p>'
+      + '<ul class="ej-liste">' + lignes + '</ul></section>';
+  }
+
+  function titreSection(t) {
+    return '<h2 class="ej-section" style="font-family:\'Oswald\',sans-serif;font-size:13px;letter-spacing:.08em;text-transform:uppercase;'
+      + 'color:var(--mute);margin:22px 4px 8px">' + esc(t) + '</h2>';
   }
 
   function carteFrise() {
@@ -407,9 +466,10 @@
     return '<section class="ej-carte"><h2 class="ej-titre" style="padding:16px 16px 6px">Mes bilans</h2><ul class="ej-liste">' + lignes + '</ul></section>';
   }
 
-  function carteMatchs(matchs) {
-    if (matchs.length < 2) return '';
-    var lignes = matchs.slice(1).map(function (m) {
+  function carteMatchs(matchs, heroEvt) {
+    var autres = matchs.filter(function (m) { return m.evenement_id !== heroEvt; });
+    if (!autres.length) return '';
+    var lignes = autres.map(function (m) {
       var x = m.match || {};
       return ligneDepliable('match-' + m.id,
         m.verrouille ? '<span class="ej-pastille ej-pastille-vide" aria-label="Verrouillé">🔒</span>'
@@ -417,7 +477,7 @@
         titreMatch(x), metaMatch(x), tagNiveau(x.niveau), estNouveau(m.publie_le),
         '<div class="ej-corps" style="padding:0">' + contenuMatch(m) + '</div>');
     }).join('');
-    return '<section class="ej-carte"><h2 class="ej-titre" style="padding:16px 16px 6px">Mes autres matchs</h2><ul class="ej-liste">' + lignes + '</ul></section>';
+    return '<section class="ej-carte"><h2 class="ej-titre" style="padding:16px 16px 6px">Mes matchs précédents</h2><ul class="ej-liste">' + lignes + '</ul></section>';
   }
 
   // ------------------------------------------------------------------
@@ -430,17 +490,20 @@
     var matchs = Array.isArray(d.matchs) ? d.matchs : [];
     var h = '<header class="ej-tete"><div class="ej-sur">MOM · Mon espace' + (d.saison ? ' · ' + esc(d.saison) : '') + '</div>'
       + '<h1>Salut ' + esc(j.prenom || '') + '</h1><p>' + esc(j.categorie_code || '') + '</p></header><main>';
-    h += carteAutoEval();
-    if (!bilans.length && !matchs.length) {
-      if (!(d.auto_evals || []).length && !(d.a_auto_evaluer || []).length) {
-        h += '<section class="ej-carte"><p class="ej-vide">Pas encore d’évaluation publiée cette saison. '
-          + 'Reviens après le prochain match : ton coach t’écrira ici.</p></section>';
-      }
-      h += carteFrise();
-    } else {
-      if (matchs.length) h += carteDernierMatch(matchs[0]);
-      h += carteObjectifs(bilans) + carteProgression(bilans) + carteFrise() + carteBilans(bilans) + carteMatchs(matchs);
+    // v1.4 : 1 dernier match · 2 avis à donner · 3 ma saison · 4 historique.
+    var heros = dernierMatch();
+    var heroEvt = heros ? heros.evt : null;
+    if (heros) {
+      h += carteHeros(heros);
+    } else if (!bilans.length) {
+      h += '<section class="ej-carte"><p class="ej-vide">Pas encore d’évaluation publiée cette saison. '
+        + 'Reviens après le prochain match : ton coach t’écrira ici.</p></section>';
     }
+    h += carteAvisAutres(heroEvt);
+    var saison = carteObjectifs(bilans) + carteProgression(bilans) + carteFrise();
+    if (saison) h += titreSection('Ma saison') + saison;
+    var histo = carteBilans(bilans) + carteMatchs(matchs, heroEvt);
+    if (histo) h += titreSection('Historique') + histo;
     h += '<p class="ej-pied">Ce lien est personnel : garde-le pour toi et ta famille.</p></main>';
     $('ej-page').innerHTML = h;
   }
@@ -550,8 +613,19 @@
     if (!ok) { msg.innerHTML = '<span class="ej-msg-ok">Ton avis est envoyé. Recharge la page pour voir celui de ton coach.</span>'; return; }
     rendre();
     var mm = (etat.donnees.matchs || []).filter(function (m) { return m.evenement_id === evt; })[0];
+    var lu = mm && !mm.verrouille;
     var bandeau = '<div class="ej-merci" role="status">Merci ! Ton avis est envoyé.'
-      + (mm && !mm.verrouille ? ' Découvre celui de ton coach ci-dessous.' : ' Ton coach le lira.') + '</div>';
+      + (lu ? ' Découvre celui de ton coach ci-dessous.' : ' Ton coach le lira.') + '</div>';
+    // v1.4 : si ce n'est pas le dernier match, déplier son éval dans l'historique.
+    var ligne = lu ? document.querySelector('[data-deplier="match-' + mm.id + '"]') : null;
+    if (ligne) {
+      ligne.setAttribute('aria-expanded', 'true');
+      var det = $('det-match-' + mm.id);
+      if (det) det.hidden = false;
+      ligne.closest('li').insertAdjacentHTML('beforebegin', '<li style="list-style:none;padding:8px 12px">' + bandeau + '</li>');
+      if (ligne.scrollIntoView) ligne.scrollIntoView({ block: 'start' });
+      return;
+    }
     var main = document.querySelector('#ej-page main');
     if (main) main.insertAdjacentHTML('afterbegin', bandeau);
     window.scrollTo(0, 0);
@@ -566,8 +640,16 @@
       if (b.hasAttribute('data-envoyer-auto')) { envoyerAuto(b); return; }
       var aller = b.getAttribute('data-aller-auto');
       if (aller) {
+        // v1.4 : le formulaire est soit dans « Ton dernier match », soit replié dans « Encore à donner ton avis ».
         var carte = $('carte-auto-' + aller);
-        if (carte) carte.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        var l = carte ? null : document.querySelector('[data-deplier="auto-' + aller + '"]');
+        if (l) {
+          l.setAttribute('aria-expanded', 'true');
+          var dd = $('det-auto-' + aller);
+          if (dd) dd.hidden = false;
+          carte = l;
+        }
+        if (carte && carte.scrollIntoView) carte.scrollIntoView({ behavior: 'smooth', block: 'start' });
         return;
       }
       if (b.hasAttribute('data-envoyer')) { envoyer(b.closest('[data-reponse-type]')); return; }
