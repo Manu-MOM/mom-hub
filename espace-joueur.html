@@ -23,6 +23,12 @@
      - Aucun classement ni comparaison entre joueurs (D7-f).
      Mobile d'abord. Feuille de style propre (hub.css non chargé : page
      hors Hub, sans topbar ni nav). Logique : js/espace-joueur.js.
+     Avenant A, lot A3 (16/11/2026, FAIT FOI §9 D16–D27, sql_265/266) :
+     auto-évaluation match (carte « À toi de jouer », question santé),
+     éval du coach verrouillée jusqu'à l'envoi, comparaison neutre,
+     frise « Comment je me vois ». 3e RPC anon : envoyer_auto_eval.
+     Styles .ej-ae*, .ej-choix*, .ej-oui-non, .ej-cadenas*, .ej-compare*,
+     .ej-gene, .ej-frise*, .ej-merci, .ej-btn-clair. Logique : js/espace-joueur.js v1.2.
      ===================================================================== -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap">
@@ -95,6 +101,37 @@
   .ej-erreur { margin: 40px 16px; padding: 20px; background: #fff; border: 1px solid var(--bord); border-radius: 16px; text-align: center; }
   .ej-erreur h2 { font-family: 'Oswald', sans-serif; margin: 0 0 8px; }
   .ej-charge { padding: 40px 16px; text-align: center; color: var(--mute); }
+  /* --- Avenant A (A3) : auto-évaluation --- */
+  .ej-carte-auto { border: 2px solid var(--clay); }
+  .ej-carte-auto .ej-carte-tete { background: var(--clay); }
+  .ej-ae { display: flex; flex-direction: column; gap: 12px; }
+  .ej-ae label { font-size: 13px; font-weight: 700; display: block; margin-bottom: 4px; }
+  .ej-ae textarea { font: inherit; font-size: 15px; padding: 10px 12px; border: 1px solid var(--bord); border-radius: 10px; resize: vertical; color: var(--ink); width: 100%; }
+  .ej-ae-critere { display: flex; flex-direction: column; gap: 6px; }
+  .ej-ae-nom { font-size: 14px; font-weight: 700; }
+  .ej-choix-groupe { display: flex; gap: 8px; }
+  .ej-choix, .ej-oui-non { flex: 1; font: inherit; font-weight: 800; font-size: 16px; min-height: 52px; border-radius: 12px; background: #fff; cursor: pointer;
+    border: 2px solid var(--bord); color: var(--ink); display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1; }
+  .ej-choix small { font-size: 11px; font-weight: 600; }
+  .ej-choix-V { border-color: var(--feu-v); color: #1f5a32; } .ej-choix-O { border-color: var(--feu-o); color: #8a5208; } .ej-choix-R { border-color: var(--feu-r); color: #a52f2f; }
+  .ej-choix-V[aria-pressed="true"] { background: var(--feu-v); color: #fff; }
+  .ej-choix-O[aria-pressed="true"] { background: var(--feu-o); color: #fff; }
+  .ej-choix-R[aria-pressed="true"] { background: var(--feu-r); color: #fff; }
+  .ej-oui-non[aria-pressed="true"] { background: var(--vert); border-color: var(--vert); color: var(--paper); }
+  .ej-ae-gene { display: flex; flex-direction: column; gap: 8px; background: #fbeee7; border-radius: 12px; padding: 12px; }
+  .ej-btn-clair { background: #fff; color: var(--vert); border: 2px solid var(--vert); padding: 0 16px; margin-top: 8px; }
+  .ej-cadenas { display: flex; gap: 12px; align-items: flex-start; background: var(--doux); border-radius: 12px; padding: 14px; }
+  .ej-cadenas p { margin: 6px 0 0; font-size: 14px; }
+  .ej-cadenas-ico { font-size: 26px; line-height: 1; }
+  .ej-compare { background: #eaf1fa; } .ej-compare .ej-encart-titre { color: var(--bleu); }
+  .ej-compare-ligne { display: grid; grid-template-columns: minmax(0, 1fr) 40px 40px minmax(70px, auto); gap: 6px; align-items: center; }
+  .ej-compare-tete span { text-align: center; font-size: 12px; font-weight: 700; color: var(--mute); }
+  .ej-compare-note { font-size: 12px; color: var(--mute); font-style: italic; }
+  .ej-gene { background: #fdecea; } .ej-gene .ej-encart-titre { color: #8a1b14; }
+  .ej-frise { overflow-x: auto; display: flex; flex-direction: column; gap: 8px; }
+  .ej-frise-ligne { display: grid; gap: 6px; align-items: center; min-width: max-content; }
+  .ej-frise-ligne .ej-grille-nom { min-width: 130px; }
+  .ej-merci { background: #e7f3ec; color: #1f5a32; border-radius: 12px; padding: 12px 14px; font-weight: 700; font-size: 15px; }
 </style>
 </head>
 <body>
