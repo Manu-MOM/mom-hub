@@ -6,6 +6,12 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.92 — Import FFR : minute sans apostrophe (16 nov. 2026)
+ *   v3.92 : la FFR publie la minute 0 sans apostrophe (« 0 » au lieu de
+ *           « 0' »). Ces lignes étaient ignorées, avec le fait qui suit
+ *           (ex. : essai transformé à 0 = 7 points manquants, import bloqué
+ *           sur 83/90). Un nombre seul sur sa ligne est désormais lu comme
+ *           une minute (_estMinuteFfr, _parserResumeFfr). Rien d'autre ne change.
  * Version : 3.91 — Suivi : faute à plusieurs joueurs + conquête (12 oct. 2026)
  *   v3.91 : FAIT FOI Conception-SUIVI-THEO-v1, lot L3. (D2-A) Faute de notre
  *           équipe : sélection de 0 à n joueurs (« ✔ Valider ») ; 1 seule
@@ -7459,7 +7465,9 @@
   //   « T. BOUVIER »  + « (M. BACOUEL) »    → « T. BOUVIER(M. BACOUEL) »
   //   « 3 » + « Mi-temps » + « 9 »          → « 3Mi-temps9 » (idem Fin de match)
   var _RE_TYPE_FFR = /^(essai de p[ée]nalit[ée]|essai|transformation|p[ée]nalit[ée]|drop)$/i;
-  function _estMinuteFfr(l) { return /^\d{1,3}\s*['’]$/.test(l); }
+  // v3.92 — minute « 0 » publiée SANS apostrophe par la FFR (match du
+  // 14/11/2026) : un nombre seul sur sa ligne est aussi une minute.
+  function _estMinuteFfr(l) { return /^\d{1,3}\s*['’]?$/.test(l); }
   function _fusionnerLignesFfr(ls) {
     var out = [];
     for (var i = 0; i < ls.length; i++) {
@@ -7499,7 +7507,7 @@
       if (/^d[ée]but de match$/i.test(l)) return;
       if ((m = /^(\d+)\s*mi-temps\s*(\d+)$/i.exec(l))) { res.scoreMT = [+m[1], +m[2]]; periode = 2; minute = null; return; }
       if ((m = /^(\d+)\s*fin de match\s*(\d+)$/i.exec(l))) { res.scoreFin = [+m[1], +m[2]]; minute = null; return; }
-      if ((m = /^(\d{1,3})\s*['’]\s*(.*)$/.exec(l))) {
+      if ((m = /^(\d{1,3})\s*['’]\s*(.*)$/.exec(l)) || (m = /^(\d{1,3})()$/.exec(l))) {
         minute = +m[1];
         l = m[2].trim();
         if (!l) return;
