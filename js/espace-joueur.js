@@ -1,6 +1,24 @@
 /* =====================================================================
  * espace-joueur.js — Espace joueur & famille (MOM Hub)
  * ---------------------------------------------------------------------
+ * Version : v1.2 — 16 novembre 2026 — EVAL-JOUEUR Avenant A, lot A3
+ *   FAIT FOI §9 (D16–D27), sql_265 + sql_266.
+ *   v1.2 : AUTO-ÉVALUATION MATCH.
+ *          - Carte « À toi de jouer » en tête pour chaque match passé où
+ *            le joueur est sur la feuille (a_auto_evaluer, D18) : 5 critères
+ *            V/O/R requis (D16), question santé Oui/Non requise + « Explique-
+ *            nous » requis si Oui, 500 car. (D24), un mot facultatif 280 car.
+ *            (D21). Envoi définitif (D20) via envoyer_auto_eval.
+ *          - Éval du coach verrouillée (verrouille:true, D19) : cadenas et
+ *            renvoi vers le formulaire ; rien du contenu n'est reçu.
+ *          - Après envoi : rechargement des données (déverrouillage), en
+ *            conservant la visite précédente d'origine (les « Nouveau »
+ *            de la visite restent).
+ *          - Comparaison neutre « ton avis / l'avis du coach » critère par
+ *            critère (D23), écarts signalés sans jugement ; le signalement
+ *            santé est rappelé à part, hors comparaison (D25).
+ *          - Carte « Comment je me vois » : frise des auto-évaluations par
+ *            critère (D23), sans le signalement santé (D25).
  * Version : v1.1 — 15 novembre 2026 — EVAL-JOUEUR lot L5
  *   v1.1 : (D8) « Tes repères du match » sous chaque éval match publiée,
  *          si le match a été suivi : repères POSITIFS seulement (points,
@@ -24,8 +42,9 @@
  *   - Client anon minimal propre (patron spectateur.js) : 2 constantes
  *     PUBLIQUES par design dupliquées depuis supabase-client.js ;
  *     persistSession:false, aucun localStorage/sessionStorage.
- *   - N'appelle QUE get_espace_joueur et repondre_eval (sql_263) ; la
- *     garde est le jeton, vérifié côté base.
+ *   - N'appelle QUE get_espace_joueur, repondre_eval (sql_263) et
+ *     envoyer_auto_eval (sql_265/266) ; la garde est le jeton, vérifiée
+ *     côté base.
  *   - Tout texte venant de la base est échappé (esc) ; le lien VEO n'est
  *     rendu cliquable que s'il commence par https:// (contrainte base
  *     eval_match_veo_check + contrôle ici).
@@ -43,6 +62,8 @@
   var SUPABASE_URL = 'https://fvfqffxaiaoygqhjtxwr.supabase.co';
   var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ2ZnFmZnhhaWFveWdxaGp0eHdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MjgyNzQsImV4cCI6MjA5NDAwNDI3NH0.1WgEmHTuI00CuKpWflvu5SqZ4ScoEpQgZ7ijJt5OQ00';
   var MAX_REPONSE = 280;
+  var MAX_GENE = 500;      // D24
+  var FRISE_MAX = 10;      // frise « Comment je me vois » : 10 derniers matchs
 
   var PERIODES = [
     { code: 'pre_saison', court: 'Pré-s.', titre: 'Pré-saison' },
@@ -59,9 +80,13 @@
   ];
   var FEU_BILAN = { V: 'Acquis', O: 'En progrès', R: 'À travailler' };
   var FEU_MATCH = { V: 'Gros match', O: 'Dans le match', R: 'Match difficile' };
+  // Avenant A : lecture d'un critère sur UN match (auto-évaluation et critères du coach).
+  var FEU_CRITERE_MATCH = { V: 'Bien', O: 'Moyen', R: 'Difficile' };
   var COULEUR = { V: '#2d7a3e', O: '#b86e0a', R: '#c73e3e' };
 
-  var etat = { token: null, donnees: null, client: null };
+  var etat = { token: null, donnees: null, client: null,
+    visitePrecedente: undefined, // v1.2 : figée au 1er chargement
+    saisies: {} };               // v1.2 : evenement_id -> { feux, gene, detail, mot }
 
   // ------------------------------------------------------------------
   // Utilitaires
@@ -78,7 +103,7 @@
   }
   function estNouveau(publieLe) {
     if (!publieLe) return false;
-    var prec = etat.donnees.visite_precedente;
+    var prec = etat.visitePrecedente;
     if (!prec) return true; // première visite : tout est nouveau
     return new Date(publieLe).getTime() > new Date(prec).getTime();
   }
@@ -144,7 +169,50 @@
       + '<p>' + items.map(esc).join(' · ') + '</p></div>';
   }
 
+  // v1.2 (D19) : éval du coach verrouillée tant que l'auto-évaluation n'est pas envoyée.
+  function contenuVerrouille(m) {
+    var x = m.match || {};
+    var ouvert = aAutoEvaluer(m.evenement_id);
+    return '<div class="ej-cadenas"><span class="ej-cadenas-ico" aria-hidden="true">🔒</span><div>'
+      + '<strong>Ton coach t’a écrit sur ce match.</strong>'
+      + '<div class="ej-meta">' + esc(titreMatch(x)) + (metaMatch(x) ? ' · ' + esc(metaMatch(x)) : '') + '</div>'
+      + '<p>' + (ouvert ? 'Donne d’abord ton avis sur ton match pour découvrir le sien.'
+        : 'Ton avis sur ce match n’est plus disponible ici : parles-en à ton coach.') + '</p>'
+      + (ouvert ? '<button type="button" class="ej-btn ej-btn-clair" data-aller-auto="' + esc(m.evenement_id) + '">Donner mon avis</button>' : '')
+      + '</div></div>';
+  }
+
+  // v1.2 (D23) : comparaison neutre, critère par critère.
+  function blocComparaison(m) {
+    var a = m.auto_eval;
+    if (!a || !a.feux) return '';
+    var coach = m.criteres || {};
+    var coachNote = CRITERES.some(function (c) { return coach[c.cle]; });
+    var ecarts = 0;
+    var lignes = CRITERES.map(function (c) {
+      var moi = a.feux[c.cle], lui = coach[c.cle];
+      var diff = coachNote && moi && lui && moi !== lui;
+      if (diff) ecarts++;
+      return '<div class="ej-compare-ligne"><span class="ej-grille-nom">' + esc(c.nom) + '</span>'
+        + pastille(moi) + (coachNote ? pastille(lui) : '<span></span>')
+        + '<span class="ej-compare-note">' + (diff ? 'vu différemment' : '') + '</span></div>';
+    }).join('');
+    var tete = '<div class="ej-compare-ligne ej-compare-tete"><span></span><span>Toi</span>'
+      + (coachNote ? '<span>Coach</span>' : '<span></span>') + '<span></span></div>';
+    var conclusion = !coachNote
+      ? 'Ton coach n’a pas noté les critères sur ce match.'
+      : (ecarts ? 'Vous voyez ' + ecarts + ' point' + (ecarts > 1 ? 's' : '') + ' différemment : c’est un bon sujet à aborder avec ton coach.'
+        : 'Vous voyez ton match de la même façon.');
+    var gene = a.gene && a.gene.signalee
+      ? '<div class="ej-encart ej-gene"><span class="ej-encart-titre">Ce que tu as signalé</span><p>' + esc(a.gene.detail || '')
+        + '</p><span class="ej-meta">Ton coach en est informé.</span></div>' : '';
+    return '<div class="ej-encart ej-compare"><span class="ej-encart-titre">Ton avis · l’avis du coach</span>'
+      + tete + lignes + '<p class="ej-meta" style="margin-top:6px">' + esc(conclusion) + '</p>'
+      + (a.commentaire ? '<p class="ej-meta">Ton mot : ' + esc(a.commentaire) + '</p>' : '') + '</div>' + gene;
+  }
+
   function contenuMatch(m) {
+    if (m.verrouille) return contenuVerrouille(m);
     var x = m.match || {};
     var h = '<div class="ej-feu-ligne">'
       + (m.feu ? '<span class="ej-feu ej-feu-' + esc(m.feu) + '">' + esc(m.feu) + '</span>' : '')
@@ -157,6 +225,7 @@
       h += '<div class="ej-encart ej-axe"><span class="ej-encart-titre">Ton axe de travail</span><p>' + esc(m.axe_travail) + '</p></div>';
     }
     h += blocReperes(m.reperes);
+    h += blocComparaison(m);
     if (m.mot_coach) {
       h += '<div class="ej-encart ej-mot"><span class="ej-encart-titre">Le mot du coach'
         + (m.publie_par_prenom ? ' · ' + esc(m.publie_par_prenom) : '') + '</span><p>' + esc(m.mot_coach) + '</p></div>';
@@ -185,6 +254,88 @@
     }).join('');
     if (b.publie_par_prenom) h += '<div class="ej-meta">Bilan de ' + esc(b.publie_par_prenom) + '</div>';
     return h + blocReponse('bilan', b);
+  }
+
+  // ------------------------------------------------------------------
+  // v1.2 — Auto-évaluation (D16–D24)
+  // ------------------------------------------------------------------
+  function aAutoEvaluer(evenementId) {
+    return (etat.donnees.a_auto_evaluer || []).some(function (x) { return x.evenement_id === evenementId; });
+  }
+  function saisieDe(evt) {
+    if (!etat.saisies[evt]) etat.saisies[evt] = { feux: {}, gene: null, detail: '', mot: '' };
+    return etat.saisies[evt];
+  }
+  function saisieComplete(s) {
+    var feux = CRITERES.every(function (c) { return !!s.feux[c.cle]; });
+    if (!feux || s.gene === null) return false;
+    return s.gene === false || s.detail.trim().length > 0;
+  }
+  function verrouPour(evt) {
+    return (etat.donnees.matchs || []).some(function (m) { return m.evenement_id === evt && m.verrouille; });
+  }
+
+  function formAuto(x) {
+    var evt = x.evenement_id;
+    var s = saisieDe(evt);
+    var criteres = CRITERES.map(function (c) {
+      var boutons = ['V', 'O', 'R'].map(function (f) {
+        return '<button type="button" class="ej-choix ej-choix-' + f + '" aria-pressed="' + (s.feux[c.cle] === f ? 'true' : 'false') + '"'
+          + ' data-auto="' + esc(evt) + '" data-critere="' + c.cle + '" data-feu="' + f + '">'
+          + f + '<small>' + esc(FEU_CRITERE_MATCH[f]) + '</small></button>';
+      }).join('');
+      return '<div class="ej-ae-critere"><span class="ej-ae-nom">' + esc(c.nom) + '</span>'
+        + '<div class="ej-choix-groupe" role="group" aria-label="' + esc(c.nom) + '">' + boutons + '</div></div>';
+    }).join('');
+    var ouiNon = ['oui', 'non'].map(function (v) {
+      var actif = (v === 'oui' && s.gene === true) || (v === 'non' && s.gene === false);
+      return '<button type="button" class="ej-oui-non" aria-pressed="' + (actif ? 'true' : 'false') + '" data-auto="' + esc(evt) + '" data-gene="' + v + '">'
+        + (v === 'oui' ? 'Oui' : 'Non') + '</button>';
+    }).join('');
+    var idb = 'ae-' + esc(evt);
+    return '<div class="ej-ae" data-ae="' + esc(evt) + '">'
+      + '<p class="ej-meta" style="margin:0">Pour chaque point : <strong>V</strong> ça a bien marché · <strong>O</strong> moyen · <strong>R</strong> difficile.</p>'
+      + criteres
+      + '<div class="ej-ae-gene"><span class="ej-ae-nom">T’es-tu blessé, ou ressens-tu une gêne ou une fatigue importante ?</span>'
+      + '<div class="ej-choix-groupe" role="group" aria-label="Blessure, gêne ou fatigue">' + ouiNon + '</div>'
+      + '<div data-gene-detail' + (s.gene === true ? '' : ' hidden') + '>'
+      + '<label for="' + idb + '-gene">Explique-nous : où, depuis quand, ce que tu ressens</label>'
+      + '<textarea id="' + idb + '-gene" rows="3" maxlength="' + MAX_GENE + '" data-auto-texte="detail" data-auto="' + esc(evt) + '">' + esc(s.detail) + '</textarea>'
+      + '<div class="ej-compteur"><span data-compteur>' + s.detail.length + '</span> / ' + MAX_GENE + '</div></div></div>'
+      + '<div><label for="' + idb + '-mot">Un mot sur ton match <span class="ej-meta">(facultatif)</span></label>'
+      + '<textarea id="' + idb + '-mot" rows="2" maxlength="' + MAX_REPONSE + '" data-auto-texte="mot" data-auto="' + esc(evt) + '" placeholder="Ce qui t’a plu, ce que tu veux améliorer…">' + esc(s.mot) + '</textarea>'
+      + '<div class="ej-compteur"><span data-compteur>' + s.mot.length + '</span> / ' + MAX_REPONSE + '</div></div>'
+      + '<p class="ej-meta" style="margin:0">Une fois envoyé, ton avis ne peut plus être modifié.</p>'
+      + '<button type="button" class="ej-btn" data-envoyer-auto="' + esc(evt) + '"' + (saisieComplete(s) ? '' : ' disabled') + '>Envoyer mon avis</button>'
+      + '<div data-msg aria-live="polite"></div></div>';
+  }
+
+  function carteAutoEval() {
+    var liste = etat.donnees.a_auto_evaluer || [];
+    if (!liste.length) return '';
+    return liste.map(function (x) {
+      var verrou = verrouPour(x.evenement_id);
+      return '<section class="ej-carte ej-carte-auto" id="carte-auto-' + esc(x.evenement_id) + '">'
+        + '<div class="ej-carte-tete"><h2>À toi de jouer</h2>' + (verrou ? '<span class="ej-nouveau">🔒 AVIS DU COACH</span>' : '') + '</div>'
+        + '<div class="ej-corps"><div><div class="ej-feu-libelle">Comment tu as vu ton match ?</div>'
+        + '<div class="ej-meta">' + esc(titreMatch(x)) + (x.date ? ' · ' + esc(dateCourte(x.date)) : '') + ' ' + tagNiveau(x.niveau) + '</div>'
+        + (verrou ? '<p class="ej-meta" style="margin:6px 0 0">Ton coach t’a écrit : envoie ton avis pour le découvrir.</p>' : '')
+        + '</div>' + formAuto(x) + '</div></section>';
+    }).join('');
+  }
+
+  function carteFrise() {
+    var autos = (etat.donnees.auto_evals || []).slice(0, FRISE_MAX).reverse(); // ancien → récent
+    if (!autos.length) return '';
+    var col = 'grid-template-columns: minmax(0, 1fr) repeat(' + autos.length + ', 30px)';
+    var h = CRITERES.map(function (c) {
+      return '<div class="ej-frise-ligne" style="' + col + '"><span class="ej-grille-nom">' + esc(c.nom) + '</span>'
+        + autos.map(function (a) { return pastille(a.feux ? a.feux[c.cle] : null); }).join('') + '</div>';
+    }).join('');
+    return '<section class="ej-carte"><div class="ej-corps"><h2 class="ej-titre">Comment je me vois</h2>'
+      + '<div class="ej-frise">' + h + '</div>'
+      + '<div class="ej-meta">Ton avis match après match, du plus ancien au plus récent' + (autos.length > 1 ? '' : ' (premier match)') + '.</div>'
+      + '</div></section>';
   }
 
   function carteDernierMatch(m) {
@@ -248,7 +399,8 @@
     var lignes = matchs.slice(1).map(function (m) {
       var x = m.match || {};
       return ligneDepliable('match-' + m.id,
-        m.feu ? '<span class="ej-pastille" style="background:' + COULEUR[m.feu] + '">' + esc(m.feu) + '</span>' : pastille(null),
+        m.verrouille ? '<span class="ej-pastille ej-pastille-vide" aria-label="Verrouillé">🔒</span>'
+          : (m.feu ? '<span class="ej-pastille" style="background:' + COULEUR[m.feu] + '">' + esc(m.feu) + '</span>' : pastille(null)),
         titreMatch(x), metaMatch(x), tagNiveau(x.niveau), estNouveau(m.publie_le),
         '<div class="ej-corps" style="padding:0">' + contenuMatch(m) + '</div>');
     }).join('');
@@ -265,12 +417,16 @@
     var matchs = Array.isArray(d.matchs) ? d.matchs : [];
     var h = '<header class="ej-tete"><div class="ej-sur">MOM · Mon espace' + (d.saison ? ' · ' + esc(d.saison) : '') + '</div>'
       + '<h1>Salut ' + esc(j.prenom || '') + '</h1><p>' + esc(j.categorie_code || '') + '</p></header><main>';
+    h += carteAutoEval();
     if (!bilans.length && !matchs.length) {
-      h += '<section class="ej-carte"><p class="ej-vide">Pas encore d’évaluation publiée cette saison. '
-        + 'Reviens après le prochain match : ton coach t’écrira ici.</p></section>';
+      if (!(d.auto_evals || []).length && !(d.a_auto_evaluer || []).length) {
+        h += '<section class="ej-carte"><p class="ej-vide">Pas encore d’évaluation publiée cette saison. '
+          + 'Reviens après le prochain match : ton coach t’écrira ici.</p></section>';
+      }
+      h += carteFrise();
     } else {
       if (matchs.length) h += carteDernierMatch(matchs[0]);
-      h += carteObjectifs(bilans) + carteProgression(bilans) + carteBilans(bilans) + carteMatchs(matchs);
+      h += carteObjectifs(bilans) + carteProgression(bilans) + carteFrise() + carteBilans(bilans) + carteMatchs(matchs);
     }
     h += '<p class="ej-pied">Ce lien est personnel : garde-le pour toi et ta famille.</p></main>';
     $('ej-page').innerHTML = h;
@@ -320,11 +476,87 @@
     msg.innerHTML = '<span class="ej-msg-ok">' + (texte ? 'Envoyé ! Ton coach verra ta réponse.' : 'Réponse effacée.') + '</span>';
   }
 
+  // v1.2 — auto-évaluation : choix, textes, envoi.
+  function majBoutonAuto(evt) {
+    var bloc = document.querySelector('[data-ae="' + evt + '"]');
+    if (!bloc) return;
+    var btn = bloc.querySelector('[data-envoyer-auto]');
+    if (btn) btn.disabled = !saisieComplete(saisieDe(evt));
+  }
+
+  function choisirAuto(b) {
+    var evt = b.getAttribute('data-auto');
+    var s = saisieDe(evt);
+    var bloc = b.closest('[data-ae]');
+    if (b.hasAttribute('data-critere')) {
+      s.feux[b.getAttribute('data-critere')] = b.getAttribute('data-feu');
+    } else {
+      s.gene = b.getAttribute('data-gene') === 'oui';
+      var det = bloc.querySelector('[data-gene-detail]');
+      if (det) det.hidden = !s.gene;
+      if (s.gene && det) { var ta = det.querySelector('textarea'); if (ta) ta.focus(); }
+    }
+    Array.prototype.forEach.call(b.parentNode.querySelectorAll('button'), function (x) {
+      x.setAttribute('aria-pressed', x === b ? 'true' : 'false');
+    });
+    majBoutonAuto(evt);
+  }
+
+  async function envoyerAuto(b) {
+    var evt = b.getAttribute('data-envoyer-auto');
+    var s = saisieDe(evt);
+    var msg = b.parentNode.querySelector('[data-msg]');
+    if (!saisieComplete(s)) { msg.innerHTML = '<span class="ej-msg-err">Réponds aux 5 points et à la question santé.</span>'; return; }
+    if (s.gene && s.detail.trim().length > MAX_GENE) { msg.innerHTML = '<span class="ej-msg-err">500 caractères maximum.</span>'; return; }
+    if (s.mot.trim().length > MAX_REPONSE) { msg.innerHTML = '<span class="ej-msg-err">280 caractères maximum pour ton mot.</span>'; return; }
+    var cli = getClient();
+    if (!cli) { msg.innerHTML = '<span class="ej-msg-err">Connexion impossible.</span>'; return; }
+    b.disabled = true;
+    msg.innerHTML = '';
+    var res = await cli.rpc('envoyer_auto_eval', {
+      p_token: etat.token,
+      p_evenement_id: evt,
+      p_feu_tech_indiv: s.feux.tech_indiv,
+      p_feu_physique: s.feux.physique,
+      p_feu_tech_poste: s.feux.tech_poste,
+      p_feu_comprehension: s.feux.comprehension,
+      p_feu_etat_esprit: s.feux.etat_esprit,
+      p_gene_signalee: s.gene,
+      p_gene_detail: s.gene ? s.detail.trim() : null,
+      p_commentaire: s.mot.trim() || null
+    });
+    if (res.error && res.error.code !== '23505') {
+      b.disabled = false;
+      msg.innerHTML = '<span class="ej-msg-err">' + esc(/ne peut pas/i.test(res.error.message || '')
+        ? 'Ce match ne peut plus recevoir ton avis.' : 'Envoi impossible, réessaie plus tard.') + '</span>';
+      return;
+    }
+    // Envoyé (ou déjà envoyé) : on recharge pour déverrouiller l'éval du coach.
+    delete etat.saisies[evt];
+    var ok = await charger();
+    if (!ok) { msg.innerHTML = '<span class="ej-msg-ok">Ton avis est envoyé. Recharge la page pour voir celui de ton coach.</span>'; return; }
+    rendre();
+    var mm = (etat.donnees.matchs || []).filter(function (m) { return m.evenement_id === evt; })[0];
+    var bandeau = '<div class="ej-merci" role="status">Merci ! Ton avis est envoyé.'
+      + (mm && !mm.verrouille ? ' Découvre celui de ton coach ci-dessous.' : ' Ton coach le lira.') + '</div>';
+    var main = document.querySelector('#ej-page main');
+    if (main) main.insertAdjacentHTML('afterbegin', bandeau);
+    window.scrollTo(0, 0);
+  }
+
   function brancher() {
     var page = $('ej-page');
     page.addEventListener('click', function (e) {
       var b = e.target.closest('button');
       if (!b || b.disabled) return;
+      if (b.hasAttribute('data-auto')) { choisirAuto(b); return; }
+      if (b.hasAttribute('data-envoyer-auto')) { envoyerAuto(b); return; }
+      var aller = b.getAttribute('data-aller-auto');
+      if (aller) {
+        var carte = $('carte-auto-' + aller);
+        if (carte) carte.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+      }
       if (b.hasAttribute('data-envoyer')) { envoyer(b.closest('[data-reponse-type]')); return; }
       var cle = b.getAttribute('data-deplier');
       if (cle) {
@@ -338,6 +570,12 @@
       if (e.target.tagName !== 'TEXTAREA') return;
       var c = e.target.parentNode.querySelector('[data-compteur]');
       if (c) c.textContent = e.target.value.length;
+      var champ = e.target.getAttribute('data-auto-texte');
+      if (champ) {
+        var evt = e.target.getAttribute('data-auto');
+        saisieDe(evt)[champ] = e.target.value;
+        majBoutonAuto(evt);
+      }
     });
   }
 
@@ -362,8 +600,20 @@
       return;
     }
     etat.donnees = res.data;
+    etat.visitePrecedente = res.data.visite_precedente || null;
     rendre();
     brancher();
+  }
+
+  // v1.2 : rechargement après une auto-évaluation (la visite précédente
+  // d'origine est conservée : les « Nouveau » de la visite restent).
+  async function charger() {
+    var cli = getClient();
+    if (!cli) return false;
+    var res = await cli.rpc('get_espace_joueur', { p_token: etat.token });
+    if (res.error || !res.data) return false;
+    etat.donnees = res.data;
+    return true;
   }
 
   if (document.readyState === 'loading') {
