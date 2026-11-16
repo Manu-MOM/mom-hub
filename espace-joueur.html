@@ -31,6 +31,10 @@
      .ej-gene, .ej-frise*, .ej-merci, .ej-btn-clair. Logique : js/espace-joueur.js v1.2.
      D28 (16/11/2026) : moments VEO (.ej-veo-bloc, .ej-moments, .ej-moment-min),
      js/espace-joueur.js v1.3.
+     Correctif 16/11/2026 (recette Manu « replier match par match ») :
+     [hidden] { display: none !important }. Sans cette règle, .ej-detail
+     (display:flex) annulait l'attribut hidden : toutes les lignes
+     dépliables (avis à donner, bilans, matchs) s'affichaient ouvertes.
      ===================================================================== -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap">
@@ -94,6 +98,7 @@
   .ej-ligne-texte strong { font-size: 14px; }
   .ej-tag { font-size: 11px; font-weight: 800; border-radius: 999px; padding: 3px 8px; white-space: nowrap; }
   .ej-tag-nat { background: var(--vert); color: var(--paper); } .ej-tag-autre { background: #e2d9bf; color: var(--vert); }
+  [hidden] { display: none !important; }
   .ej-detail { padding: 0 16px 16px; display: flex; flex-direction: column; gap: 12px; }
   .ej-critere { display: flex; gap: 10px; align-items: flex-start; }
   .ej-critere .ej-pastille { flex: none; }
