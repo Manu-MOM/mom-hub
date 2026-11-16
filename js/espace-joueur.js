@@ -1,6 +1,10 @@
 /* =====================================================================
  * espace-joueur.js — Espace joueur & famille (MOM Hub)
  * ---------------------------------------------------------------------
+ * Version : v1.3 — 16 novembre 2026 — EVAL-JOUEUR D28 (retour terrain)
+ *   v1.3 : « Revoir tes actions » : bouton vers la vidéo VEO du match +
+ *          liste des moments à revoir (minute + libellé), veo_moments
+ *          (sql_267). Repli : ancienne clé veo_minute si veo_moments absent.
  * Version : v1.2 — 16 novembre 2026 — EVAL-JOUEUR Avenant A, lot A3
  *   FAIT FOI §9 (D16–D27), sql_265 + sql_266.
  *   v1.2 : AUTO-ÉVALUATION MATCH.
@@ -231,9 +235,18 @@
         + (m.publie_par_prenom ? ' · ' + esc(m.publie_par_prenom) : '') + '</span><p>' + esc(m.mot_coach) + '</p></div>';
     }
     if (veoSur(m.veo_url)) {
-      h += '<a class="ej-veo" href="' + esc(m.veo_url) + '" target="_blank" rel="noopener noreferrer">'
+      // v1.3 (D28) : jusqu'à 5 moments ; repli sur l'ancienne minute unique.
+      var moments = Array.isArray(m.veo_moments) ? m.veo_moments.filter(function (x) { return x && x.minute; })
+        : (m.veo_minute ? [{ minute: m.veo_minute, libelle: null }] : []);
+      h += '<div class="ej-encart ej-veo-bloc"><span class="ej-encart-titre">Revoir tes actions</span>'
+        + (moments.length
+          ? '<ul class="ej-moments">' + moments.map(function (x) {
+            return '<li><span class="ej-moment-min">' + esc(x.minute) + '</span>' + (x.libelle ? '<span>' + esc(x.libelle) + '</span>' : '') + '</li>';
+          }).join('') + '</ul>'
+          : '')
+        + '<a class="ej-veo" href="' + esc(m.veo_url) + '" target="_blank" rel="noopener noreferrer">'
         + '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>'
-        + 'Revoir ton action' + (m.veo_minute ? ' (' + esc(m.veo_minute) + ')' : '') + '</a>';
+        + (moments.length ? 'Ouvrir la vidéo du match' : 'Revoir ton match') + '</a></div>';
     }
     return h + blocReponse('match', m);
   }
