@@ -1,6 +1,15 @@
 /* =====================================================================
  * evaluation-joueur.js — Page Évaluation d'un joueur (MOM Hub)
  * ---------------------------------------------------------------------
+ * Version : v1.3 — 16 novembre 2026 — EVAL-JOUEUR Avenant A, lot A2
+ *   FAIT FOI §9 (D16–D27), sql_265 + sql_266.
+ *   v1.3 : section « Comment il se voit » (D23) : frise des auto-
+ *          évaluations match par critère (tendance de la saison, la plus
+ *          ancienne à gauche), le mot du joueur, et ses signalements
+ *          blessure / gêne / fatigue en rouge (D24–D26 ; la blessure se
+ *          crée depuis la page du match ou la fiche joueur). Compteurs
+ *          « auto-évaluations » et « signalements » dans la synthèse.
+ *          Lecture seule ; données de lister_evals_joueur.auto_evals.
  * Version : v1.2 — 15 novembre 2026 — EVAL-JOUEUR lot L4
  *   v1.2 : espace joueur en ligne (espace-joueur.html, L4) : retrait de
  *          l'avertissement « n'envoie pas encore le lien ». Aucun autre
@@ -125,7 +134,8 @@
       + rendreLien()
       + rendreSynthese()
       + PERIODES.map(rendrePeriode).join('')
-      + rendreMatchs();
+      + rendreMatchs()
+      + rendreAutoEvals();
     $('ev-page').innerHTML = html;
     brancher();
   }
@@ -161,12 +171,17 @@
       if (b.reponse_joueur) nbReponses++;
     });
     (etat.dossier.matchs || []).forEach(function (m) { if (m.reponse_joueur) nbReponses++; });
+    var autos = etat.dossier.auto_evals || [];
+    var nbSignal = autos.filter(function (a) { return a.gene && a.gene.signalee; }).length;
     var total = PERIODES.length * CRITERES.length;
     return '<section class="ev-bloc"><div class="ev-bloc-corps ev-lien">'
       + '<div class="ev-kpis">'
       + '<div><div class="ev-kpi-v">' + nbCriteres + ' / ' + total + '</div><div class="ev-kpi-l">critères évalués</div></div>'
       + '<div><div class="ev-kpi-v">' + nbPublies + '</div><div class="ev-kpi-l">bilan' + (nbPublies > 1 ? 's' : '') + ' publié' + (nbPublies > 1 ? 's' : '') + '</div></div>'
       + '<div><div class="ev-kpi-v">' + nbReponses + '</div><div class="ev-kpi-l">réponse' + (nbReponses > 1 ? 's' : '') + ' du joueur</div></div>'
+      + '<div><div class="ev-kpi-v">' + autos.length + '</div><div class="ev-kpi-l">auto-évaluation' + (autos.length > 1 ? 's' : '') + ' match</div></div>'
+      + (nbSignal ? '<div><div class="ev-kpi-v" style="color:#a52f2f">⚠ ' + nbSignal + '</div><div class="ev-kpi-l">signalement'
+        + (nbSignal > 1 ? 's' : '') + ' santé</div></div>' : '')
       + '</div>'
       + '<p class="ev-legende"><strong>V</strong> acquis · <strong>O</strong> en progrès · <strong>R</strong> à travailler. '
       + 'Le joueur ne voit que ce qui est <strong>publié</strong>.</p>'
@@ -275,6 +290,52 @@
     return '<section class="ev-bloc"><div class="ev-bloc-corps">'
       + '<div class="ev-lien" style="margin-bottom:.4rem"><h2 class="ev-titre-section" style="margin:0">Évals match</h2>'
       + '<div class="ev-actions">' + lienEvaluer + '</div></div>' + corps + '</div></section>';
+  }
+
+  // ------------------------------------------------------------------
+  // v1.3 (Avenant A, D23–D26) — auto-évaluations du joueur
+  // ------------------------------------------------------------------
+  function titreAuto(a) {
+    var x = a.match || {};
+    return (x.adversaire ? 'vs ' + x.adversaire : (x.libelle || 'Match')) + (x.date ? ' · ' + dateCourte(x.date) : '');
+  }
+
+  function rendreAutoEvals() {
+    var autos = (etat.dossier.auto_evals || []).slice();
+    var corps;
+    if (autos.length === 0) {
+      corps = '<p class="ev-note">Aucune auto-évaluation match cette saison.</p>';
+    } else {
+      // Frise : du plus ancien au plus récent (la RPC renvoie le plus récent d'abord).
+      var chrono = autos.slice().reverse();
+      var frise = CRITERES.map(function (c) {
+        var points = chrono.map(function (a) {
+          var f = a.feux ? a.feux[c.cle] : null;
+          return f
+            ? '<span class="ev-pastille ev-pastille-' + esc(f) + '" title="' + esc(titreAuto(a)) + '">' + esc(f) + '</span>'
+            : '<span class="ev-pastille ev-pastille-vide">·</span>';
+        }).join('');
+        return '<div class="ev-critere" style="grid-template-columns:minmax(170px,230px) minmax(0,1fr)">'
+          + '<span class="ev-critere-nom">' + esc(c.nom) + '</span>'
+          + '<div style="display:flex;flex-wrap:wrap;gap:.3rem">' + points + '</div></div>';
+      }).join('');
+      var liste = '<ul class="ev-matchs" style="margin-top:.8rem">' + autos.map(function (a) {
+        var g = a.gene || {};
+        return '<li style="display:block">'
+          + '<div class="ev-match-texte"><strong>' + esc(titreAuto(a)) + '</strong>'
+          + '<span class="ev-match-meta"> · envoyée le ' + esc(dateFr(a.envoye_le)) + '</span></div>'
+          + (a.commentaire ? '<div class="ev-match-meta">Son mot : ' + esc(a.commentaire) + '</div>' : '')
+          + (g.signalee ? '<div style="margin-top:.35rem;background:#fdecea;border:1px solid #c73e3e;border-radius:8px;padding:.45rem .65rem;'
+            + 'color:#5c120d;font-size:.88rem"><strong>⚠ Blessure, gêne ou fatigue signalée :</strong> ' + esc(g.detail || '') + '</div>' : '')
+          + '</li>';
+      }).join('') + '</ul>';
+      corps = '<p class="ev-note" style="margin:0 0 .4rem">Comment le joueur s’est vu, match après match (le plus ancien à gauche).</p>'
+        + frise + liste;
+    }
+    return '<section class="ev-bloc"><div class="ev-bloc-corps">'
+      + '<h2 class="ev-titre-section">Comment il se voit · auto-évaluations</h2>' + corps
+      + '<p class="ev-note" style="margin:.6rem 0 0">Les signalements santé ne sont visibles que du joueur et des encadrants de la catégorie.</p>'
+      + '</div></section>';
   }
 
   // ------------------------------------------------------------------
