@@ -18,6 +18,10 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 1.98 — 16 novembre 2026
+ *   v1.98 : EVAL-JOUEUR D28 (sql_267). saveEvalMatch transmet
+ *          m.veo_moments = [{ minute, libelle? }] (5 max) en p_veo_moments ;
+ *          p_veo_minute n'est plus envoyé. Aucun autre changement.
  * Version : 1.97 — 16 novembre 2026
  *   v1.97 : EVAL-JOUEUR Avenant A, lot A2 (D17, sql_265). saveEvalMatch
  *          transmet les 5 critères facultatifs du coach : m.criteres =
@@ -5521,8 +5525,9 @@
     /**
      * Crée ou met à jour l'éval match d'un joueur. m = { personne_id,
      * evenement_id, feu?, point_fort?, axe_travail?, mot_coach?, veo_url?,
-     * veo_minute?, criteres? }. Le lien VEO doit commencer par https://
-     * (contrôle base). v1.97 (Avenant A, D17) : criteres = { tech_indiv,
+     * veo_moments?, criteres? }. Le lien VEO doit commencer par https://
+     * (contrôle base). v1.98 (D28) : veo_moments = [{ minute, libelle? }],
+     * 5 au plus, lien VEO requis s'il y en a (contrôles base). v1.97 (Avenant A, D17) : criteres = { tech_indiv,
      * physique, tech_poste, comprehension, etat_esprit }, chacun V | O | R |
      * null, tous facultatifs. Remplacement complet côté base : un critère
      * absent est effacé.
@@ -5541,12 +5546,12 @@
         p_axe_travail: v(m.axe_travail),
         p_mot_coach: v(m.mot_coach),
         p_veo_url: v(m.veo_url),
-        p_veo_minute: v(m.veo_minute),
         p_feu_tech_indiv: v(c.tech_indiv),
         p_feu_physique: v(c.physique),
         p_feu_tech_poste: v(c.tech_poste),
         p_feu_comprehension: v(c.comprehension),
-        p_feu_etat_esprit: v(c.etat_esprit)
+        p_feu_etat_esprit: v(c.etat_esprit),
+        p_veo_moments: Array.isArray(m.veo_moments) ? m.veo_moments : []
       }, 'saveEvalMatch');
     },
 
