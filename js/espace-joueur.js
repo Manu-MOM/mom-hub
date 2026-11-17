@@ -1,6 +1,14 @@
 /* =====================================================================
  * espace-joueur.js — Espace joueur & famille (MOM Hub)
  * ---------------------------------------------------------------------
+ * Version : v2.1 — 17 novembre 2026 — recette Manu : « je ne trouve pas le
+ *   bouton Installer l'appli ». La page est installable (contrôle Chrome :
+ *   aucune erreur d'installabilité, invite reçue), mais l'invite n'existe
+ *   ni dans le navigateur intégré de WhatsApp, ni sur iPhone, ni dans
+ *   certains navigateurs (Samsung Internet, Firefox). v2.1 : quand il n'y
+ *   a pas d'invite, mode d'emploi toujours affiché (Android : ouvrir dans
+ *   Chrome puis menu ⋮ → Installer / Ajouter à l'écran d'accueil ;
+ *   iPhone : Safari → Partager → Sur l'écran d'accueil).
  * Version : v2.0 — 16 novembre 2026 — EVAL-JOUEUR Avenant B (FAIT FOI §10,
  *   gelé par Manu : code à 4 chiffres, session de 2 h, code oublié =
  *   réinitialiser le code seul). sql_268.
@@ -866,8 +874,16 @@
     var ios = /iphone|ipad|ipod/i.test(window.navigator.userAgent || '');
     var install = '';
     if (!estInstallee()) {
-      if (etat.invite) install = '<button type="button" class="ej-btn ej-btn-clair" data-installer>📲 Installer l’appli</button>';
-      else if (ios) install = '<p class="ej-meta">📲 Pour l’installer : touche « Partager » puis « Sur l’écran d’accueil ».</p>';
+      if (etat.invite) {
+        install = '<button type="button" class="ej-btn ej-btn-clair" data-installer>📲 Installer l’appli</button>';
+      } else if (ios) {
+        install = '<p class="ej-meta">📲 <strong>Installer l’appli sur iPhone</strong> : ouvre ce lien dans <strong>Safari</strong>, '
+          + 'touche « Partager » (carré avec une flèche) puis « Sur l’écran d’accueil ».</p>';
+      } else {
+        install = '<p class="ej-meta">📲 <strong>Installer l’appli</strong> : ouvre ce lien dans <strong>Chrome</strong> '
+          + '(depuis WhatsApp : menu ⋮ → « Ouvrir dans Chrome »), puis menu ⋮ → « Installer l’appli » '
+          + 'ou « Ajouter à l’écran d’accueil ».</p>';
+      }
     }
     return '<div class="ej-appli">' + install
       + '<button type="button" class="ej-lien-discret" data-verrouiller>🔒 Verrouiller mon espace</button></div>';
