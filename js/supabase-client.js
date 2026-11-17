@@ -18,6 +18,11 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 1.99 — 16 novembre 2026
+ *   v1.99 : EVAL-JOUEUR Avenant B (B6, sql_268). + reinitialiserCodeEspace
+ *          (personne) → { code_defini:false } : efface le code perso du
+ *          joueur (le lien ne change pas) et ferme ses sessions. Aucun
+ *          autre changement.
  * Version : 1.98 — 16 novembre 2026
  *   v1.98 : EVAL-JOUEUR D28 (sql_267). saveEvalMatch transmet
  *          m.veo_moments = [{ minute, libelle? }] (5 max) en p_veo_moments ;
@@ -5580,6 +5585,16 @@
     async genererLienEspaceJoueur(personneId) {
       if (!personneId) return { ok: false, error: 'personne_id requis' };
       return _evalRpc('generer_lien_espace_joueur', { p_personne_id: personneId }, 'genererLienEspaceJoueur');
+    },
+
+    /**
+     * v1.99 (Avenant B, B6) : réinitialise le code perso du joueur. Le lien
+     * reste le même ; le joueur choisira un nouveau code à la prochaine
+     * ouverture. Garde base : encadrant de la catégorie | admin | bureau.
+     */
+    async reinitialiserCodeEspace(personneId) {
+      if (!personneId) return { ok: false, error: 'personne_id requis' };
+      return _evalRpc('reinitialiser_code_espace', { p_personne_id: personneId }, 'reinitialiserCodeEspace');
     },
 
     /**
