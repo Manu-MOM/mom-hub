@@ -6,6 +6,12 @@
 <meta name="robots" content="noindex,nofollow">
 <meta name="referrer" content="no-referrer">
 <link rel="icon" type="image/png" href="assets/logo-m2m.png">
+<link rel="manifest" href="manifest-espace-joueur.json">
+<meta name="theme-color" content="#0c3d24">
+<link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Mon espace MOM">
 <title>Mon espace · MOM</title>
 <!-- =====================================================================
      MOM Hub · Espace joueur & famille — EVAL-JOUEUR lot L4
@@ -35,6 +41,11 @@
      [hidden] { display: none !important }. Sans cette règle, .ej-detail
      (display:flex) annulait l'attribut hidden : toutes les lignes
      dépliables (avis à donner, bilans, matchs) s'affichaient ouvertes.
+     Avenant B (16/11/2026, FAIT FOI §10, sql_268) : APPLI INSTALLABLE
+     (manifest-espace-joueur.json, js/pwa.js + sw.js du Hub, inchangés :
+     réseau d'abord, aucune donnée en cache) et CODE PERSO (écrans
+     .ej-acces, .ej-champ*, pied .ej-appli, .ej-lien-discret).
+     Logique : js/espace-joueur.js v2.0.
      ===================================================================== -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap">
@@ -142,6 +153,13 @@
   .ej-moments { list-style: none; margin: 4px 0 8px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
   .ej-moments li { display: flex; gap: 10px; align-items: baseline; font-size: 15px; }
   .ej-moment-min { font-family: 'Oswald', sans-serif; font-weight: 600; background: var(--bleu); color: #fff; border-radius: 6px; padding: 1px 8px; flex: none; }
+  .ej-acces { display: flex; flex-direction: column; gap: 10px; }
+  .ej-acces form { display: flex; flex-direction: column; gap: 10px; }
+  .ej-acces label { font-size: 13px; font-weight: 700; }
+  .ej-champ { font: inherit; font-size: 16px; padding: 12px; border: 1px solid var(--bord); border-radius: 10px; width: 100%; color: var(--ink); }
+  .ej-champ-code { font-family: 'Oswald', sans-serif; font-size: 28px; letter-spacing: .5em; text-align: center; max-width: 220px; }
+  .ej-appli { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 18px 0 4px; text-align: center; }
+  .ej-lien-discret { font: inherit; font-size: 13px; background: none; border: 0; color: var(--mute); text-decoration: underline; cursor: pointer; padding: 6px; }
   .ej-merci { background: #e7f3ec; color: #1f5a32; border-radius: 12px; padding: 12px 14px; font-weight: 700; font-size: 15px; }
 </style>
 </head>
@@ -151,5 +169,6 @@
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="js/espace-joueur.js"></script>
+  <script src="js/pwa.js"></script>
 </body>
 </html>
