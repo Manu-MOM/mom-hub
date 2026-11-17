@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="assets/logo-m2m.png">
+  <title>Grille VEO · MOM Hub</title>
+  <!-- GRILLE-VEO v1 (FAIT FOI Conception-GRILLE-VEO-v1.md, gelé 17/11/2026,
+       « je gèle R2 ») : grille d'analyse VEO à imprimer, A4 paysage.
+       grille-veo.html?evenement=<id>. Staff connecté. Lecture seule.
+       Page autonome (pas de hub.css) pour garder un rendu d'impression
+       identique à la maquette R2. -->
+  <style>
+    @page { size: A4 landscape; margin: 7mm; }
+    body { font-family: Arial, sans-serif; font-size: 8.5pt; margin: 0; color: #111; background: #fff; }
+
+    /* ---------- Écran : barre d'outils + réglages (masqués à l'impression) ---------- */
+    .gv-ecran-only { font-size: 14px; }
+    .gv-barre { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 14px; background: #0c3d24; color: #fff; }
+    .gv-barre a { color: #fff; }
+    .gv-barre button { font: inherit; font-weight: 700; padding: 8px 16px; border: 0; border-radius: 6px; background: #f2c14e; color: #111; cursor: pointer; }
+    .gv-barre .gv-titre { font-weight: 700; flex: 1; }
+    #gv-reglages { display: flex; flex-wrap: wrap; gap: 10px; padding: 10px 14px; background: #f3f6f3; border-bottom: 1px solid #ccd; }
+    #gv-reglages fieldset { border: 1px solid #b9c7b9; border-radius: 6px; padding: 6px 10px; margin: 0; background: #fff; }
+    #gv-reglages legend { font-weight: 700; color: #0c3d24; padding: 0 4px; }
+    .gv-case { display: block; font-size: 13px; line-height: 1.7; white-space: nowrap; }
+    .gv-aide { padding: 6px 14px; color: #555; font-size: 12px; }
+    .gv-erreur { margin: 20px; padding: 14px; border: 1px solid #c44; background: #fdeaea; color: #811; border-radius: 6px; }
+    .gv-load { margin: 20px; color: #555; }
+    #gv-apercu { padding: 12px; background: #e6e6e6; }
+    .gv-feuille { background: #fff; width: 283mm; margin: 0 auto; padding: 7mm; box-shadow: 0 1px 6px rgba(0,0,0,.25); box-sizing: content-box; }
+
+    /* ---------- Grille (reprise de la maquette R2) ---------- */
+    .tete { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #0c3d24; padding-bottom: 1mm; margin-bottom: 1mm; }
+    .tete h1 { font-size: 13pt; margin: 0; color: #0c3d24; }
+    .tete .meta { font-size: 8.5pt; }
+    .tete .champ { display: inline-block; min-width: 45mm; border-bottom: 1px solid #777; margin-left: 2mm; }
+    .legende { font-size: 7.5pt; color: #444; margin-bottom: 1.5mm; }
+    .gv-feuille table { border-collapse: collapse; width: 100%; table-layout: fixed; margin-bottom: 1.5mm; }
+    .gv-feuille th, .gv-feuille td { border: 1px solid #555; padding: 0; text-align: center; }
+    .gv-feuille th { background: #e9efe9; font-weight: 700; font-size: 7pt; height: 4mm; }
+    .gv-feuille th.s { font-size: 8pt; }
+    .gv-feuille th.v { vertical-align: middle; height: 8mm; font-size: 6.3pt; line-height: 1.05; word-break: normal; }
+    .gv-feuille th.v span { display: inline-block; padding: 0.5mm 0.3mm; }
+    .gv-feuille td { height: 5.1mm; }
+    .gv-feuille.gv-serre td { height: 4mm; }
+    .gv-feuille .nom { text-align: left; padding-left: 1.5mm; white-space: nowrap; overflow: hidden; }
+    .gv-feuille caption { text-align: left; font-weight: 700; font-size: 9.5pt; color: #fff; background: #0c3d24; padding: 0.8mm 2mm; }
+    .gv-feuille table.bloc { page-break-inside: avoid; break-inside: avoid; }
+    .gv-feuille .coll { width: auto; margin: 0; }
+    .gv-feuille .coll td, .gv-feuille .coll th { width: 13mm; height: 4.5mm; font-size: 6.5pt; }
+    .gv-feuille .coll caption { font-size: 7.5pt; padding: 0.3mm 1.5mm; }
+
+    [hidden] { display: none !important; }
+
+    @media print {
+      .gv-ecran-only { display: none !important; }
+      #gv-apercu { padding: 0; background: #fff; }
+      .gv-feuille { width: auto; margin: 0; padding: 0; box-shadow: none; }
+      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+  <div class="gv-ecran-only">
+    <div class="gv-barre">
+      <a id="gv-retour" href="evenements.html">← Évènements</a>
+      <span class="gv-titre">Grille VEO à imprimer</span>
+      <button type="button" id="gv-imprimer">🖨️ Imprimer</button>
+    </div>
+    <div id="gv-reglages"></div>
+    <div class="gv-aide">Décoche les observables inutiles pour ce match avant d’imprimer (non mémorisé). Impression : A4 paysage.</div>
+  </div>
+  <div id="gv-ecran"><div id="gv-apercu"><div id="gv-grille"><p class="gv-load gv-ecran-only">Chargement…</p></div></div></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/grille-veo.js"></script>
+  <script>
+    /* Boot (patron eval-match.html) : anonyme → login.html ; droits de
+       lecture portés par lister_evals_match (sql_263) et la RLS. */
+    (async function () {
+      'use strict';
+      if (window.SupabaseHub && SupabaseHub.getSession) {
+        var _session = await SupabaseHub.getSession();
+        if (!_session) { window.location.replace('login.html'); return; }
+      }
+      if (window.GrilleVeo) GrilleVeo.demarrer();
+    })();
+  </script>
+</body>
+</html>
