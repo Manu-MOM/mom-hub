@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="assets/logo-m2m.png">
+  <title>Récap évals match · MOM Hub</title>
+  <!-- RECAP-EVALS-MATCH v1 (FAIT FOI Conception-RECAP-EVALS-MATCH-v1.md,
+       gelé par Manu le 17/11/2026, R9 = a′) : tableau récapitulatif des
+       évaluations d'un match (éval coach + auto-évaluation), écran et
+       impression A4 paysage. recap-evals-match.html?evenement=<id>.
+       Ouverte uniquement depuis la page Évals match (R7). Staff connecté,
+       lecture seule, droits portés par lister_evals_match. Page autonome
+       (pas de hub.css), patron grille-veo.html. Logique :
+       js/recap-evals-match.js. La colonne ⚠ (santé) n'est jamais
+       imprimée (R6). -->
+  <style>
+    @page { size: A4 landscape; margin: 7mm; }
+    body { font-family: Arial, sans-serif; font-size: 8.5pt; margin: 0; color: #111; background: #fff; }
+
+    /* ---------- Écran : barre d'outils (masquée à l'impression) ---------- */
+    .re-ecran { font-size: 14px; }
+    .re-barre { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 10px 14px; background: #0c3d24; color: #fff; }
+    .re-barre a { color: #fff; }
+    .re-barre .re-titre { font-weight: 700; flex: 1; }
+    .re-barre button { font: inherit; font-weight: 700; padding: 8px 16px; border: 0; border-radius: 6px; background: #f2c14e; color: #111; cursor: pointer; }
+    .re-aide { padding: 6px 14px; color: #555; font-size: 12px; }
+    .re-erreur { margin: 20px; padding: 14px; border: 1px solid #c44; background: #fdeaea; color: #811; border-radius: 6px; font-size: 14px; }
+    .re-load { margin: 20px; color: #555; font-size: 14px; }
+    #re-apercu { padding: 12px; background: #e6e6e6; }
+    .re-feuille { background: #fff; width: 283mm; margin: 0 auto; padding: 7mm; box-shadow: 0 1px 6px rgba(0,0,0,.25); box-sizing: content-box; }
+
+    /* ---------- Tableau (maquette v2 validée) ---------- */
+    .tete { display: flex; justify-content: space-between; align-items: flex-end; gap: 4mm; border-bottom: 2px solid #0c3d24; padding-bottom: 1mm; margin-bottom: 1mm; }
+    .tete h1 { font-size: 13pt; margin: 0; color: #0c3d24; }
+    .tete .meta { font-size: 8.5pt; text-align: right; white-space: nowrap; }
+    .legende { font-size: 7.5pt; color: #444; margin-bottom: 1.5mm; }
+    .re-feuille table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+    .re-feuille thead { display: table-header-group; }
+    .re-feuille th, .re-feuille td { border: 1px solid #777; padding: 0.4mm 0.8mm; text-align: center; }
+    .re-feuille thead th { background: #0c3d24; color: #fff; font-size: 7pt; }
+    .re-feuille thead th.tt { background: #1d5a3a; }
+    .re-feuille thead tr.sous th { background: #e9efe9; color: #111; font-weight: 700; font-size: 6.5pt; }
+    .re-feuille td { height: 5.4mm; font-size: 8pt; }
+    .re-feuille td.nom { text-align: left; font-size: 7.2pt; line-height: 1.05; overflow: hidden; }
+    .re-feuille td.j { border-left: 1px dotted #aaa; }
+    .re-feuille .sep { border-left: 2px solid #0c3d24; }
+    .re-feuille td.t { text-align: left; vertical-align: top; font-size: 6.4pt; line-height: 1.1; padding: 0.3mm 0.8mm;
+      white-space: pre-line; overflow-wrap: anywhere; }
+    .re-feuille td.t .rep { display: block; margin-top: 0.2mm; color: #0c3d24; }
+    .p { display: inline-block; min-width: 3.6mm; padding: 0.2mm 0; border-radius: 1mm; font-weight: 700; font-size: 6.8pt; }
+    .p-V { background: #2e9e4f; color: #fff; }
+    .p-O { background: #f0a020; color: #111; }
+    .p-R { background: #d33b2c; color: #fff; }
+    .vide { color: #999; }
+    .ecart { box-shadow: inset 0 0 0 1.6px #111; }
+    .re-feuille td.statut { font-size: 6.5pt; line-height: 1.1; }
+    .st-b { color: #8a5a00; font-weight: 700; }
+    .gene { color: #b11; font-weight: 700; }
+    .synthese { margin-top: 2mm; font-size: 7.5pt; color: #333; display: flex; gap: 6mm; flex-wrap: wrap; }
+    .pied { margin-top: 1mm; font-size: 6.5pt; color: #777; }
+
+    [hidden] { display: none !important; }
+
+    @media print {
+      .re-ecran { display: none !important; }
+      .re-ecran-seul { display: none !important; }   /* R6 : santé jamais imprimée */
+      #re-apercu { padding: 0; background: #fff; }
+      .re-feuille { width: auto; margin: 0; padding: 0; box-shadow: none; }
+      .re-feuille tr { break-inside: avoid; }
+      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+  <div class="re-ecran">
+    <div class="re-barre">
+      <a id="re-retour" href="eval-match.html">← Évals match</a>
+      <span class="re-titre">Récap des évaluations du match</span>
+      <button type="button" id="re-imprimer">🖨️ Imprimer</button>
+    </div>
+    <div class="re-aide">La colonne ⚠ (blessure, gêne ou fatigue signalée) n’apparaît qu’à l’écran, sans le détail (à lire sur la page Évals match) ; elle n’est jamais imprimée. Impression : A4 paysage.</div>
+  </div>
+  <div id="re-ecran"><div id="re-apercu"><div id="re-tableau"><p class="re-load re-ecran">Chargement…</p></div></div></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/recap-evals-match.js"></script>
+  <script>
+    /* Boot (patron grille-veo.html) : anonyme → login.html ; droits de
+       lecture portés par lister_evals_match (sql_263 / sql_265). */
+    (async function () {
+      'use strict';
+      if (window.SupabaseHub && SupabaseHub.getSession) {
+        var _session = await SupabaseHub.getSession();
+        if (!_session) { window.location.replace('login.html'); return; }
+      }
+      if (window.RecapEvalsMatch) RecapEvalsMatch.demarrer();
+    })();
+  </script>
+</body>
+</html>
