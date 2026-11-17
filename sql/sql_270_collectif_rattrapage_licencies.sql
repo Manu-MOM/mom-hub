@@ -19,7 +19,7 @@
 --   joueurs partenaires existants : type_personne 'licencie_externe_
 --   partenaire', categorie_personne 'joueur', catégorie SR-F, club CRIG,
 --   puis inscrites au collectif SR-F. Noms tels que donnés par Manu
---   (sans accent ajouté).
+--   (« Anaïs » avec tréma, confirmé par Manu).
 -- Garde-fous : nombre attendu (81) vérifié avant insertion ; aucune
 --   entente en double par catégorie ; après insertion, 0 licencié restant
 --   hors collectif (fail-loud).
@@ -70,7 +70,7 @@ DECLARE
 BEGIN
   SELECT count(*) INTO v_n FROM public.personnes p
   WHERE (upper(p.nom), lower(p.prenom)) IN (('GENTNER','camille'), ('LIBBRA','victoria'), ('BOUDELE','sara'),
-                                            ('BANNAY','lucie'), ('MAUBOURGUET','anais'));
+                                            ('BANNAY','lucie'), ('MAUBOURGUET','anais'), ('MAUBOURGUET','anaïs'));
   IF v_n <> 0 THEN RAISE EXCEPTION 'GARDE: % fiche(s) CRIG déjà existante(s), rien n''est créé', v_n; END IF;
   SELECT count(*) INTO v_n FROM public.clubs WHERE id = '0152d537-8db4-40ad-9e2a-697c6b4c71f9' AND code = 'CRIG';
   IF v_n <> 1 THEN RAISE EXCEPTION 'GARDE: club CRIG introuvable'; END IF;
@@ -89,7 +89,7 @@ WITH nouvelles AS (
          '0152d537-8db4-40ad-9e2a-697c6b4c71f9', 'France', 'France',
          'claude-sql_270-2026-11-17', 'demande_manu_srf_crig_2026-11-17'
   FROM (VALUES ('GENTNER', 'Camille'), ('LIBBRA', 'Victoria'), ('BOUDELE', 'Sara'),
-               ('BANNAY', 'Lucie'), ('MAUBOURGUET', 'Anais')) AS v (nom, prenom)
+               ('BANNAY', 'Lucie'), ('MAUBOURGUET', 'Anaïs')) AS v (nom, prenom)
   RETURNING id
 )
 INSERT INTO _crig (id) SELECT id FROM nouvelles;
