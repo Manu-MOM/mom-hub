@@ -21,7 +21,16 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
- * Version : 1.64 — EVT-PASSES-TOUTE-SAISON : bouton « Voir toute la saison » (17 novembre 2026)
+ * Version : 1.65 — GRILLE-VEO : lien « Grille VEO à imprimer » (17 novembre 2026)
+ *   v1.65 : FAIT FOI Conception-GRILLE-VEO-v1.md (gelé 17/11/2026, R2,
+ *          G1). Demande de Vivien traitée dans la conversation EVAL-JOUEUR
+ *          (« enchaîne ici », écart tracé au STATE). Nouvelle fonction
+ *          renderGrilleVeoAcces(rencontre) : lien vers
+ *          grille-veo.html?evenement=<id> (nouvel onglet), appelée pour le
+ *          match simple et pour chaque match enfant de tournoi non annulé /
+ *          archivé, quel que soit l'état. Lecture seule, aucun SQL, aucune
+ *          autre logique retouchée.
+ * Version précédente : 1.64 — EVT-PASSES-TOUTE-SAISON : bouton « Voir toute la saison » (17 novembre 2026)
  *   v1.64 : demande de Manu (17/11/2026, traitée dans la conversation
  *          EVAL-JOUEUR, écart de gouvernance tracé au STATE). Les passés
  *          restent par défaut sur les 30 derniers jours (affichage léger).
@@ -3068,6 +3077,20 @@
     return h;
   }
 
+  // v1.65 — GRILLE-VEO (G1) : lien vers la grille d'analyse VEO à
+  // imprimer (grille-veo.html, A4 paysage). Lien simple, nouvel onglet,
+  // indépendant de l'état du suivi. Les droits sont portés par la page
+  // (lister_evals_match côté base).
+  function renderGrilleVeoAcces(rencontre) {
+    if (!rencontre || !rencontre.id) return '';
+    const url = 'grille-veo.html?evenement=' + encodeURIComponent(rencontre.id);
+    let h = '<div style="padding:6px 0;border-top:1px solid var(--paper-warm);margin-top:8px;">';
+    h += '<a class="evt-btn" href="' + escHtml(url) + '" target="_blank" rel="noopener" style="text-decoration:none;display:inline-block;">🖨️ Grille VEO à imprimer</a>';
+    h += '<div style="font-size:11px;color:var(--ink-mute);margin-top:6px;">Aide au visionnage VEO : joueurs de la compo classés Avants · 3/4 · 9-10-15.</div>';
+    h += '</div>';
+    return h;
+  }
+
   // ============================================================
   // SUIVI-COACH-1 Objet C — ACCROCHE (ADDITION PURE)
   // ============================================================
@@ -3331,6 +3354,7 @@
               // CONSERVÉ (dépend du lien coach généré). Cf. dette
               // SUIVI-LIEN-COACH-MIGRATION en en-tête.
               html += renderSpectateurAcces(child);
+              html += renderGrilleVeoAcces(child); // v1.65
             }
             html += '</div>';
           });
@@ -3340,6 +3364,7 @@
       // Match simple
       html += renderSuiviRencontreBloc(evt);
       html += renderModeVideoAcces(evt);
+      html += renderGrilleVeoAcces(evt); // v1.65
       html += renderSpectateurAcces(evt);
       html += renderTempsDeJeuMount(evt);
     }
