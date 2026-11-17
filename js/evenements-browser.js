@@ -21,6 +21,14 @@
  *   - SupabaseHub v1.10+ (RPC événements C9 : sql/29)
  *   - DOM : voir evenements.html (zone #evt-list, KPIs, filtres, sidebar, modales)
  *
+ * Version : 1.64 — EVT-PASSES-TOUTE-SAISON : bouton « Voir toute la saison » (17 novembre 2026)
+ *   v1.64 : demande de Manu (17/11/2026, traitée dans la conversation
+ *          EVAL-JOUEUR, écart de gouvernance tracé au STATE). Les passés
+ *          restent par défaut sur les 30 derniers jours (affichage léger).
+ *          Un bouton en tête de liste bascule sur TOUTE LA SAISON active
+ *          (depuis saisons.date_debut, limite 500) et inversement. Même RPC
+ *          get_evenements_passes (p_jours_passes calculé), aucun SQL.
+ *          Choix non mémorisé : chaque ouverture repart sur 30 jours.
  * Version : 1.63 — EVT-CREATION-HEURE-MINUIT : date_debut composée avec l'heure de début au submit (9 juillet 2026)
  *   v1.63 : CAUSE RACINE DU BUG MINUIT RÉSORBÉE. submitModalCreate (chemin
  *           partagé création + édition) envoyait date_debut =
@@ -1686,6 +1694,10 @@
   const FENETRE_JOURS_AVENIR  = 90;
   const FENETRE_JOURS_PASSES  = 30;
   const PASSES_LIMIT          = 50;
+  // v1.64 — EVT-PASSES-TOUTE-SAISON
+  const PASSES_LIMIT_SAISON   = 500;
+  let PASSES_TOUTE_SAISON     = false;
+  let SAISON_DEBUT_ISO        = null;
 
   const STORAGE_KEY_PREFS = 'mom_hub.evenements.prefs';
 
@@ -2168,8 +2180,44 @@
     }
     const catId = CTX_PERIMETRE && CTX_PERIMETRE.active;
     if (!catId) return [];
-    const liste = await SupabaseHub.getEvenementsPasses(null, FENETRE_JOURS_PASSES, PASSES_LIMIT, catId);
+    // v1.64 : toute la saison → fenêtre = jours écoulés depuis le début de
+    // la saison active (jamais moins de 30). Repli 30 jours si inconnue.
+    let jours = FENETRE_JOURS_PASSES, limite = PASSES_LIMIT;
+    if (PASSES_TOUTE_SAISON) {
+      if (!SAISON_DEBUT_ISO && typeof SupabaseHub.getSaisonActive === 'function') {
+        try {
+          const saison = await SupabaseHub.getSaisonActive();
+          SAISON_DEBUT_ISO = (saison && saison.date_debut) || null;
+        } catch (e) { console.warn('loadEvenementsPasses() getSaisonActive', e); }
+      }
+      const debut = SAISON_DEBUT_ISO ? new Date(SAISON_DEBUT_ISO) : null;
+      if (debut && !isNaN(debut.getTime())) {
+        jours = Math.max(FENETRE_JOURS_PASSES, Math.ceil((Date.now() - debut.getTime()) / 86400000) + 1);
+        limite = PASSES_LIMIT_SAISON;
+      }
+    }
+    const liste = await SupabaseHub.getEvenementsPasses(null, jours, limite, catId);
     return _fusionnerEvenements([liste]);
+  }
+
+  // v1.64 — barre « Voir toute la saison » / « 30 derniers jours ».
+  function _barrePassesSaison() {
+    return '<div class="evt-passes-saison" style="display:flex;justify-content:center;margin:4px 0 12px;">'
+      + '<button type="button" id="evt-btn-passes-saison" class="evt-btn-secondary" '
+      + 'style="font:inherit;font-size:13px;padding:6px 14px;border-radius:999px;border:1px solid var(--line,#d8d2c2);'
+      + 'background:var(--paper,#f8f5ec);color:inherit;cursor:pointer;">'
+      + (PASSES_TOUTE_SAISON ? '↺ Revenir aux 30 derniers jours' : '📅 Voir toute la saison')
+      + '</button></div>';
+  }
+  function _brancherBarrePassesSaison(list) {
+    const b = list && list.querySelector('#evt-btn-passes-saison');
+    if (!b) return;
+    b.addEventListener('click', async function () {
+      b.disabled = true;
+      b.textContent = 'Chargement…';
+      PASSES_TOUTE_SAISON = !PASSES_TOUTE_SAISON;
+      await reloadEvents();
+    });
   }
 
   async function buildIndexes() {
@@ -2532,8 +2580,9 @@
           + '<br><small>Aucune entente n\'est encore créée pour cette catégorie cette saison — '
           + 'les évènements apparaîtront une fois l\'équipe engagée.</small></div>';
       } else {
-        list.innerHTML =
-          '<div class="evt-list-empty">Aucun évènement trouvé.<br><small>Essayez d\'élargir les filtres ou de modifier la recherche.</small></div>';
+        list.innerHTML = (state.showPassed ? _barrePassesSaison() : '')
+          + '<div class="evt-list-empty">Aucun évènement trouvé.<br><small>Essayez d\'élargir les filtres ou de modifier la recherche.</small></div>';
+        _brancherBarrePassesSaison(list);
       }
       bindCardEvents();
       return;
@@ -2562,7 +2611,10 @@
       }
     }
 
+    // v1.64 : barre « toute la saison » en tête, dès que les passés sont affichés.
+    if (state.showPassed) html = _barrePassesSaison() + html;
     list.innerHTML = html;
+    _brancherBarrePassesSaison(list);
     bindCardEvents();
   }
 
@@ -2680,7 +2732,8 @@
       const nbMatchs  = (EVENEMENTS_AVENIR.length + EVENEMENTS_PASSES.length) - nbRacines;
       let txt = nbRacines + ' évènement(s)';
       if (nbMatchs > 0) txt += ' · ' + nbMatchs + ' match(s) de tournoi';
-      txt += ' · ' + FENETRE_JOURS_AVENIR + ' jours à venir, ' + FENETRE_JOURS_PASSES + ' jours passés';
+      txt += ' · ' + FENETRE_JOURS_AVENIR + ' jours à venir, '
+        + (PASSES_TOUTE_SAISON ? 'passés depuis le début de la saison' : FENETRE_JOURS_PASSES + ' jours passés');
       sub.textContent = txt;
     }
   }
