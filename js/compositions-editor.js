@@ -6,6 +6,15 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.93 — Suivi : lien « Grille VEO à imprimer » (17 nov. 2026)
+ *   v3.93 : FAIT FOI Conception-GRILLE-VEO-v1 (gelé 17/11/2026, R2, G1).
+ *           Demande de Vivien traitée dans la conversation EVAL-JOUEUR
+ *           (« enchaîne ici », écart tracé au STATE). Onglet Suivi d'une
+ *           feuille de match : lien vers grille-veo.html?evenement=<id>
+ *           (nouvel onglet), sous l'encart « Liens à partager », dès que
+ *           evenement_id est connu (chaque match d'un tournoi a sa feuille).
+ *           Styles en ligne (aucun CSS ajouté). Rien d'autre ne change
+ *           (chrono, score, saisie intacts).
  * Version : 3.92 — Import FFR : minute sans apostrophe (16 nov. 2026)
  *   v3.92 : la FFR publie la minute 0 sans apostrophe (« 0 » au lieu de
  *           « 0' »). Ces lignes étaient ignorées, avec le fait qui suit
@@ -2975,6 +2984,15 @@
           '</summary>' +
           '<div class="view-suivi__liens-inner" id="suivi-liens-inner"></div>' +
         '</details>' +
+        // v3.93 — GRILLE-VEO (G1) : grille d'analyse VEO à imprimer.
+        (evtId
+          ? '<div class="view-suivi__grille-veo" style="margin:8px 18px 0;">' +
+              '<a href="grille-veo.html?evenement=' + encodeURIComponent(evtId) + '" target="_blank" rel="noopener"' +
+              ' style="display:inline-block;padding:8px 14px;border:1px solid #2a323a;border-radius:10px;background:#1c2228;color:#e8edf2;text-decoration:none;font-weight:600;">' +
+              '🖨️ Grille VEO à imprimer</a>' +
+              '<span style="margin-left:10px;font-size:12px;color:#8a96a3;">aide au visionnage · Avants · 3/4 · 9-10-15</span>' +
+            '</div>'
+          : '') +
         '<div id="suivi-score" class="suivi-score">' + _scoreHTML() + '</div>' +
         '<div id="suivi-chrono-host" class="suivi-chrono"><div class="view-suivi__hint">Chargement du chrono…</div></div>' +
         '<div id="suivi-palette"></div>' +
