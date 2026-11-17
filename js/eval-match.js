@@ -1,6 +1,11 @@
 /* =====================================================================
  * eval-match.js — Saisie des évals match (MOM Hub)
  * ---------------------------------------------------------------------
+ * Version : v1.5 — 17 novembre 2026 — RECAP-EVALS-MATCH v1 (FAIT FOI
+ *   Conception-RECAP-EVALS-MATCH-v1.md, gelé par Manu le 17/11/2026)
+ *   v1.5 : (R7) bouton « 🖨 Récap du match » dans l'en-tête de la feuille
+ *          (rendreMatch, bloc ev-actions) → recap-evals-match.html
+ *          ?evenement=<id>, nouvel onglet. Ajout pur, rien d'autre modifié.
  * Version : v1.4 — 16 novembre 2026 — EVAL-JOUEUR D28 (retour terrain,
  *   choix de Manu : 1 lien VEO du match + jusqu'à 5 moments)
  *   v1.4 : « Revoir tes actions » : lien VEO du match + 5 lignes fixes
@@ -219,6 +224,9 @@
       + nb.afaire + ' à faire · ' + nbAuto + ' auto-éval' + (nbAuto > 1 ? 's' : '') + '</span>'
       + (nbSignal ? '<span class="em-badge-gene">⚠ ' + nbSignal + ' signalement' + (nbSignal > 1 ? 's' : '') + '</span>' : '')
       + '<button type="button" class="ev-btn" id="em-publier-tous"' + (nb.brouillon ? '' : ' disabled') + '>Publier tous les brouillons</button>'
+      // v1.5 (RECAP-EVALS-MATCH R7) : récap du match à l'écran / à imprimer.
+      + '<a class="ev-btn" href="recap-evals-match.html?evenement=' + encodeURIComponent(etat.evenementId) + '"'
+      + ' target="_blank" rel="noopener" style="display:inline-flex;align-items:center;text-decoration:none;">🖨 Récap du match</a>'
       + '</div></div>';
 
     var liste = etat.joueurs.map(function (j) {
