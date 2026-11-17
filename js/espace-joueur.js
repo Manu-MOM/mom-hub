@@ -1,6 +1,25 @@
 /* =====================================================================
  * espace-joueur.js — Espace joueur & famille (MOM Hub)
  * ---------------------------------------------------------------------
+ * Version : v2.0 — 16 novembre 2026 — EVAL-JOUEUR Avenant B (FAIT FOI §10,
+ *   gelé par Manu : code à 4 chiffres, session de 2 h, code oublié =
+ *   réinitialiser le code seul). sql_268.
+ *   v2.0 : APPLI INSTALLABLE + CODE PERSO.
+ *          - B2 : le jeton du LIEN est mémorisé sur l'appareil
+ *            (localStorage) puis retiré de l'adresse ; sans jeton (appli
+ *            iPhone installée) : écran « Colle ton lien perso ».
+ *          - B3/B4 : écran code (créer avec confirmation / saisir). Le code
+ *            ouvre une SESSION de 2 h gardée en sessionStorage ; les RPC de
+ *            données reçoivent le jeton de session (le jeton du lien seul
+ *            ne donne plus rien). Le code n'est jamais stocké.
+ *          - B5 : essais restants / blocage affichés.
+ *          - Session expirée en cours d'usage : retour à l'écran code.
+ *          - Pied de page : « Verrouiller » + « Installer l'appli »
+ *            (Android : invite native ; iPhone : mode d'emploi).
+ *          - Hors connexion : « Pas de connexion » + Réessayer.
+ *          RPC anon : etat_acces_espace, definir_code_espace,
+ *          ouvrir_session_espace (jeton du lien) ; get_espace_joueur,
+ *          repondre_eval, envoyer_auto_eval (jeton de session).
  * Version : v1.4 — 16 novembre 2026 — EVAL-JOUEUR, retour terrain « page
  *   confuse, le dernier match est tout en bas » (plan validé par Manu).
  *   Cause : une carte « À toi de jouer » par match passé de la saison
@@ -59,7 +78,8 @@
  * SÉCURITÉ / RGPD
  *   - Client anon minimal propre (patron spectateur.js) : 2 constantes
  *     PUBLIQUES par design dupliquées depuis supabase-client.js ;
- *     persistSession:false, aucun localStorage/sessionStorage.
+ *     persistSession:false. v2.0 (B2/B4) : localStorage = jeton du lien
+ *     seulement ; sessionStorage = jeton de session (2 h). Jamais le code.
  *   - N'appelle QUE get_espace_joueur, repondre_eval (sql_263) et
  *     envoyer_auto_eval (sql_265/266) ; la garde est le jeton, vérifiée
  *     côté base.
@@ -82,6 +102,8 @@
   var MAX_REPONSE = 280;
   var MAX_GENE = 500;      // D24
   var FRISE_MAX = 10;      // frise « Comment je me vois » : 10 derniers matchs
+  var CLE_LIEN = 'mom-ej-lien';        // v2.0 (B2) : localStorage
+  var CLE_SESSION = 'mom-ej-session';  // v2.0 (B4) : sessionStorage
 
   var PERIODES = [
     { code: 'pre_saison', court: 'Pré-s.', titre: 'Pré-saison' },
@@ -103,6 +125,8 @@
   var COULEUR = { V: '#2d7a3e', O: '#b86e0a', R: '#c73e3e' };
 
   var etat = { token: null, donnees: null, client: null,
+    lien: null,                  // v2.0 : jeton du LIEN (etat.token = jeton de SESSION)
+    branche: false, invite: null, // v2.0 : écouteurs posés une fois ; invite d'installation
     visitePrecedente: undefined, // v1.2 : figée au 1er chargement
     saisies: {} };               // v1.2 : evenement_id -> { feux, gene, detail, mot }
 
@@ -504,6 +528,7 @@
     if (saison) h += titreSection('Ma saison') + saison;
     var histo = carteBilans(bilans) + carteMatchs(matchs, heroEvt);
     if (histo) h += titreSection('Historique') + histo;
+    h += piedAppli();
     h += '<p class="ej-pied">Ce lien est personnel : garde-le pour toi et ta famille.</p></main>';
     $('ej-page').innerHTML = h;
   }
@@ -537,6 +562,7 @@
     msg.innerHTML = '';
     var res = await cli.rpc('repondre_eval', { p_token: etat.token, p_type: type, p_eval_id: id, p_texte: texte });
     bouton.disabled = false;
+    if (res.error && res.error.code === '42501') { expirer(); return; }
     if (res.error) {
       msg.innerHTML = '<span class="ej-msg-err">' + esc(/introuvable/i.test(res.error.message || '')
         ? 'Cette évaluation n’est plus disponible.' : 'Envoi impossible, réessaie plus tard.') + '</span>';
@@ -601,6 +627,7 @@
       p_gene_detail: s.gene ? s.detail.trim() : null,
       p_commentaire: s.mot.trim() || null
     });
+    if (res.error && res.error.code === '42501') { expirer(); return; }
     if (res.error && res.error.code !== '23505') {
       b.disabled = false;
       msg.innerHTML = '<span class="ej-msg-err">' + esc(/ne peut pas/i.test(res.error.message || '')
@@ -632,10 +659,19 @@
   }
 
   function brancher() {
+    if (etat.branche) return;
+    etat.branche = true;
     var page = $('ej-page');
+    page.addEventListener('submit', function (e) { e.preventDefault(); });
     page.addEventListener('click', function (e) {
       var b = e.target.closest('button');
       if (!b || b.disabled) return;
+      // v2.0 : écrans d'accès et pied d'appli.
+      if (b.hasAttribute('data-code-valider')) { validerCode(b); return; }
+      if (b.hasAttribute('data-lien-valider')) { validerLienColle(); return; }
+      if (b.hasAttribute('data-reessayer')) { demarrer(); return; }
+      if (b.hasAttribute('data-verrouiller')) { effacerSession(); ecranCode(); return; }
+      if (b.hasAttribute('data-installer')) { installer(); return; }
       if (b.hasAttribute('data-auto')) { choisirAuto(b); return; }
       if (b.hasAttribute('data-envoyer-auto')) { envoyerAuto(b); return; }
       var aller = b.getAttribute('data-aller-auto');
@@ -677,27 +713,194 @@
   // ------------------------------------------------------------------
   // Démarrage
   // ------------------------------------------------------------------
-  async function demarrer() {
-    var t = new URLSearchParams(window.location.search).get('t');
-    if (!t || !/^[0-9a-f]{64}$/.test(t)) {
-      erreur('Lien incomplet', 'Ce lien ne fonctionne pas. Demande ton lien personnel à ton coach.');
+  // ------------------------------------------------------------------
+  // v2.0 — Accès : lien mémorisé, code perso, session (Avenant B)
+  // ------------------------------------------------------------------
+  function stockage(type) { try { return window[type]; } catch (_) { return null; } }
+  function lireLien() { var st = stockage('localStorage'); try { return st ? st.getItem(CLE_LIEN) : null; } catch (_) { return null; } }
+  function ecrireLien(t) { var st = stockage('localStorage'); try { if (st) st.setItem(CLE_LIEN, t); } catch (_) { /* navigation privée */ } }
+  function effacerLien() { var st = stockage('localStorage'); try { if (st) st.removeItem(CLE_LIEN); } catch (_) { /* rien */ } }
+  function lireSession() {
+    var st = stockage('sessionStorage');
+    try {
+      var o = st ? JSON.parse(st.getItem(CLE_SESSION) || 'null') : null;
+      if (!o || !o.session || !o.expire_le || new Date(o.expire_le).getTime() <= Date.now()) return null;
+      return o;
+    } catch (_) { return null; }
+  }
+  function ecrireSession(o) { var st = stockage('sessionStorage'); try { if (st) st.setItem(CLE_SESSION, JSON.stringify(o)); } catch (_) { /* rien */ } }
+  function effacerSession() { etat.token = null; var st = stockage('sessionStorage'); try { if (st) st.removeItem(CLE_SESSION); } catch (_) { /* rien */ } }
+  function jetonDe(texte) {
+    var m = String(texte || '').match(/[?&]t=([0-9a-f]{64})/) || String(texte || '').trim().match(/^([0-9a-f]{64})$/);
+    return m ? m[1] : null;
+  }
+  function horsLigne(err) {
+    return navigator.onLine === false || (err && /fetch|network|Failed to fetch|NetworkError/i.test(String(err.message || err)));
+  }
+  function ecranHorsLigne() {
+    $('ej-page').innerHTML = '<div class="ej-erreur"><h2>Pas de connexion</h2><p>Vérifie ton réseau puis réessaie.</p>'
+      + '<button type="button" class="ej-btn" data-reessayer>Réessayer</button></div>';
+    brancher();
+  }
+  function enteteAcces() {
+    return '<header class="ej-tete"><div class="ej-sur">MOM · Mon espace</div><h1>Ton espace joueur</h1>'
+      + '<p>Évaluations, avis du coach, progression</p></header>';
+  }
+
+  function ecranLien(msg) {
+    $('ej-page').innerHTML = enteteAcces() + '<main><section class="ej-carte"><div class="ej-corps ej-acces">'
+      + '<h2 class="ej-titre">Colle ton lien perso</h2>'
+      + '<p class="ej-meta">C’est le lien envoyé par ton coach (il contient « espace-joueur.html?t= »). Tu ne le feras qu’une fois.</p>'
+      + (msg ? '<p class="ej-msg-err">' + esc(msg) + '</p>' : '')
+      + '<label for="ej-lien-colle">Ton lien</label>'
+      + '<input type="url" id="ej-lien-colle" class="ej-champ" autocomplete="off" placeholder="https://…/espace-joueur.html?t=…">'
+      + '<button type="button" class="ej-btn" data-lien-valider>Continuer</button>'
+      + '</div></section></main>';
+    brancher();
+  }
+  function validerLienColle() {
+    var t = jetonDe($('ej-lien-colle').value);
+    if (!t) { ecranLien('Ce lien n’est pas reconnu. Copie-le en entier depuis le message de ton coach.'); return; }
+    ecrireLien(t);
+    effacerSession();
+    demarrer();
+  }
+
+  async function ecranCode(msg) {
+    var cli = getClient();
+    if (!cli) { ecranHorsLigne(); return; }
+    var r;
+    try { r = await cli.rpc('etat_acces_espace', { p_token: etat.lien }); } catch (e) { ecranHorsLigne(); return; }
+    if (r.error) {
+      if (horsLigne(r.error)) { ecranHorsLigne(); return; }
+      if (r.error.code === '42501') {
+        effacerLien();
+        ecranLien('Ce lien n’est plus valable. Demande le nouveau lien à ton coach, puis colle-le ici.');
+        return;
+      }
+      erreur('Chargement impossible', 'Réessaie dans quelques instants.');
       return;
     }
-    etat.token = t;
+    var creer = !r.data.code_defini;
+    var bloque = r.data.bloque_jusqua;
+    var champ = function (id, label) {
+      return '<label for="' + id + '">' + label + '</label>'
+        + '<input type="password" id="' + id + '" class="ej-champ ej-champ-code" inputmode="numeric" pattern="[0-9]*"'
+        + ' maxlength="4" autocomplete="off" placeholder="••••">';
+    };
+    $('ej-page').innerHTML = enteteAcces() + '<main><section class="ej-carte"><div class="ej-corps ej-acces">'
+      + '<h2 class="ej-titre">' + (creer ? 'Choisis ton code perso' : 'Entre ton code') + '</h2>'
+      + '<p class="ej-meta">' + (creer
+        ? '4 chiffres, à retenir. Il protège ton espace (tes évaluations, ce que tu signales). Tu peux le donner à tes parents.'
+        : 'Ton code à 4 chiffres. Code oublié ? Demande à ton coach de le réinitialiser.') + '</p>'
+      + (bloque ? '<p class="ej-msg-err">Trop d’essais. Réessaie à ' + esc(new Date(bloque).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })) + '.</p>'
+        : (msg ? '<p class="ej-msg-err">' + esc(msg) + '</p>' : ''))
+      + '<form>' + champ('ej-code', creer ? 'Ton code' : 'Code') + (creer ? champ('ej-code2', 'Confirme ton code') : '')
+      + '<button type="submit" class="ej-btn" data-code-valider data-mode="' + (creer ? 'creer' : 'ouvrir') + '"' + (bloque ? ' disabled' : '') + '>'
+      + (creer ? 'Valider mon code' : 'Ouvrir mon espace') + '</button></form>'
+      + '</div></section></main>';
+    brancher();
+    var c = $('ej-code');
+    if (c && !bloque) c.focus();
+  }
+
+  async function validerCode(b) {
+    var mode = b.getAttribute('data-mode');
+    var code = ($('ej-code').value || '').trim();
+    if (!/^[0-9]{4}$/.test(code)) { ecranCode('Le code doit faire 4 chiffres.'); return; }
+    if (mode === 'creer' && code !== ($('ej-code2').value || '').trim()) { ecranCode('Les deux codes ne sont pas identiques.'); return; }
     var cli = getClient();
-    if (!cli) { erreur('Connexion impossible', 'Vérifie ta connexion internet puis recharge la page.'); return; }
-    var res = await cli.rpc('get_espace_joueur', { p_token: t });
+    if (!cli) { ecranHorsLigne(); return; }
+    b.disabled = true;
+    var r;
+    try {
+      r = await cli.rpc(mode === 'creer' ? 'definir_code_espace' : 'ouvrir_session_espace', { p_token: etat.lien, p_code: code });
+    } catch (e) { ecranHorsLigne(); return; }
+    if (r.error) {
+      if (horsLigne(r.error)) { ecranHorsLigne(); return; }
+      if (r.error.code === '42501') { effacerLien(); ecranLien('Ce lien n’est plus valable. Demande le nouveau lien à ton coach.'); return; }
+      if (r.error.code === '23505') { ecranCode('Un code existe déjà : entre-le.'); return; }
+      ecranCode('Code refusé, réessaie.');
+      return;
+    }
+    var d = r.data || {};
+    if (!d.ok) {
+      if (d.raison === 'pas_de_code') { ecranCode(); return; }
+      if (d.raison === 'bloque') { ecranCode(); return; }
+      ecranCode('Code incorrect. ' + pluriel(d.essais_restants, 'essai restant', 'essais restants') + '.');
+      return;
+    }
+    ecrireSession({ session: d.session, expire_le: d.expire_le });
+    etat.token = d.session;
+    await ouvrirEspace();
+  }
+
+  async function ouvrirEspace() {
+    var cli = getClient();
+    if (!cli) { ecranHorsLigne(); return; }
+    var res;
+    try { res = await cli.rpc('get_espace_joueur', { p_token: etat.token }); } catch (e) { ecranHorsLigne(); return; }
     if (res.error || !res.data) {
-      var invalide = res.error && (res.error.code === '42501' || /invalide|expir/i.test(res.error.message || ''));
-      erreur(invalide ? 'Lien expiré' : 'Chargement impossible',
-        invalide ? 'Ce lien n’est plus valable. Demande le nouveau lien à ton coach.'
-          : 'Réessaie dans quelques instants.');
+      if (res.error && horsLigne(res.error)) { ecranHorsLigne(); return; }
+      if (res.error && res.error.code === '42501') { effacerSession(); ecranCode('Ta session a expiré : entre ton code.'); return; }
+      erreur('Chargement impossible', 'Réessaie dans quelques instants.');
       return;
     }
     etat.donnees = res.data;
-    etat.visitePrecedente = res.data.visite_precedente || null;
+    if (etat.visitePrecedente === undefined) etat.visitePrecedente = res.data.visite_precedente || null;
     rendre();
     brancher();
+  }
+
+  // Session expirée pendant l'usage (réponse, auto-évaluation).
+  function expirer() {
+    effacerSession();
+    ecranCode('Ta session a expiré : entre ton code pour continuer.');
+  }
+
+  // ---- Appli installable (B1) ----
+  function estInstallee() {
+    return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+  }
+  function piedAppli() {
+    var ios = /iphone|ipad|ipod/i.test(window.navigator.userAgent || '');
+    var install = '';
+    if (!estInstallee()) {
+      if (etat.invite) install = '<button type="button" class="ej-btn ej-btn-clair" data-installer>📲 Installer l’appli</button>';
+      else if (ios) install = '<p class="ej-meta">📲 Pour l’installer : touche « Partager » puis « Sur l’écran d’accueil ».</p>';
+    }
+    return '<div class="ej-appli">' + install
+      + '<button type="button" class="ej-lien-discret" data-verrouiller>🔒 Verrouiller mon espace</button></div>';
+  }
+  async function installer() {
+    if (!etat.invite) return;
+    etat.invite.prompt();
+    try { await etat.invite.userChoice; } catch (_) { /* rien */ }
+    etat.invite = null;
+    if (etat.donnees && etat.token) rendre();
+  }
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    etat.invite = e;
+    if (etat.donnees && etat.token && $('ej-page').querySelector('.ej-appli')) rendre();
+  });
+
+  async function demarrer() {
+    // B2 : jeton du lien dans l'adresse → mémorisé puis retiré de l'adresse.
+    var t = jetonDe(window.location.search);
+    if (t) {
+      if (lireLien() !== t) effacerSession();
+      ecrireLien(t);
+      try { window.history.replaceState(null, '', window.location.pathname); } catch (_) { /* rien */ }
+    } else {
+      t = lireLien();
+    }
+    if (!t) { ecranLien(); return; }
+    etat.lien = t;
+    if (navigator.onLine === false) { ecranHorsLigne(); return; }
+    var s = lireSession();
+    if (s) { etat.token = s.session; await ouvrirEspace(); return; }
+    ecranCode();
   }
 
   // v1.2 : rechargement après une auto-évaluation (la visite précédente
