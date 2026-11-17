@@ -1,6 +1,12 @@
 /* =====================================================================
  * evaluation-joueur.js — Page Évaluation d'un joueur (MOM Hub)
  * ---------------------------------------------------------------------
+ * Version : v1.4 — 16 novembre 2026 — EVAL-JOUEUR Avenant B (B6, B7)
+ *   v1.4 : bloc « Lien joueur & famille » : état du code perso (défini /
+ *          pas encore / bloqué jusqu'à …) et bouton « Réinitialiser le
+ *          code » (le lien ne change pas, sql_268). Message WhatsApp :
+ *          mention du code à 4 chiffres choisi à la première ouverture.
+ *          supabase-client v1.99.
  * Version : v1.3 — 16 novembre 2026 — EVAL-JOUEUR Avenant A, lot A2
  *   FAIT FOI §9 (D16–D27), sql_265 + sql_266.
  *   v1.3 : section « Comment il se voit » (D23) : frise des auto-
@@ -147,15 +153,21 @@
       ? 'Lien actif depuis le ' + dateFr(l.date_creation) + ' · '
         + (l.derniere_consultation ? 'dernière consultation le ' + dateFr(l.derniere_consultation, true) : 'jamais consulté')
       : 'Aucun lien créé pour ce joueur.';
+    // v1.4 (B7) : état du code perso.
+    var codeTxt = !l ? ''
+      : (l.code_bloque_jusqua ? 'Code perso : bloqué jusqu’à ' + dateFr(l.code_bloque_jusqua, true) + ' (trop d’essais)'
+        : (l.code_defini ? 'Code perso : défini' : 'Code perso : pas encore choisi (il le choisira à la première ouverture)'));
     var boutons = l
       ? '<button type="button" class="ev-btn ev-btn-primaire" id="ev-lien-copier">Copier le lien</button>'
         + '<button type="button" class="ev-btn" id="ev-lien-whatsapp">Envoyer par WhatsApp</button>'
+        + (l.code_defini ? '<button type="button" class="ev-btn ev-btn-discret" id="ev-code-reinit">Réinitialiser le code</button>' : '')
         + '<button type="button" class="ev-btn ev-btn-discret" id="ev-lien-regenerer">Régénérer</button>'
       : '<button type="button" class="ev-btn ev-btn-primaire" id="ev-lien-creer">Créer le lien</button>';
     return '<section class="ev-bloc" id="ev-bloc-lien"><div class="ev-bloc-corps">'
       + '<div class="ev-lien"><div>'
       + '<div class="ev-lien-titre">Lien joueur &amp; famille</div>'
       + '<div class="ev-lien-etat">' + esc(etatTxt) + '</div>'
+      + (codeTxt ? '<div class="ev-lien-etat">' + esc(codeTxt) + '</div>' : '')
       + '<div class="ev-note">Le joueur et sa famille ne voient que les évaluations publiées.</div>'
       + '</div><div class="ev-actions">' + boutons + '</div></div>'
       + '<div id="ev-lien-msg" aria-live="polite"></div>'
@@ -356,6 +368,7 @@
       if (cible.id === 'ev-lien-regenerer') { genererLien(true); return; }
       if (cible.id === 'ev-lien-copier') { copierLien(); return; }
       if (cible.id === 'ev-lien-whatsapp') { envoyerWhatsApp(); return; }
+      if (cible.id === 'ev-code-reinit') { reinitialiserCode(); return; }
     });
     page.addEventListener('input', function (ev) {
       var p = ev.target && ev.target.getAttribute('data-periode');
@@ -461,7 +474,8 @@
     message('ev-lien-msg', '');
     var r = await SupabaseHub.genererLienEspaceJoueur(etat.joueurId);
     if (!r.ok) { message('ev-lien-msg', r.error); return; }
-    etat.dossier.lien = { actif: true, date_creation: r.data.date_creation, derniere_consultation: null };
+    etat.dossier.lien = { actif: true, date_creation: r.data.date_creation, derniere_consultation: null,
+      code_defini: false, code_bloque_jusqua: null };
     rendre();
     message('ev-lien-msg', regenerer ? 'Nouveau lien créé. L’ancien ne fonctionne plus.' : 'Lien créé.', true);
   }
@@ -497,8 +511,21 @@
     if (!jeton) return;
     var j = etat.dossier.joueur || {};
     var texte = 'Bonjour ' + (j.prenom || '') + ', voici ton espace joueur MOM pour suivre tes évaluations : '
-      + lienEspace(jeton) + ' (lien personnel, à garder pour toi et ta famille).';
+      + lienEspace(jeton) + ' (lien personnel, à garder pour toi et ta famille ; à la première ouverture, '
+      + 'tu choisiras un code à 4 chiffres).';
     window.open('https://wa.me/?text=' + encodeURIComponent(texte), '_blank', 'noopener');
+  }
+
+  // v1.4 (Avenant B, B6) : code oublié → nouveau code à la prochaine ouverture, même lien.
+  async function reinitialiserCode() {
+    if (!window.confirm('Réinitialiser le code perso ? Le lien reste le même ; le joueur choisira un nouveau code à la prochaine ouverture.')) return;
+    message('ev-lien-msg', '');
+    var r = await SupabaseHub.reinitialiserCodeEspace(etat.joueurId);
+    if (!r.ok) { message('ev-lien-msg', r.error); return; }
+    etat.dossier.lien.code_defini = false;
+    etat.dossier.lien.code_bloque_jusqua = null;
+    rendre();
+    message('ev-lien-msg', 'Code réinitialisé. Le joueur en choisira un nouveau à sa prochaine ouverture.', true);
   }
 
   // ------------------------------------------------------------------
