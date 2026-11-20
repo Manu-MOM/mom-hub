@@ -1,6 +1,10 @@
 /*
  * compo-export.js — Export image d'une composition (feuille « document »)
  * ---------------------------------------------------------------------------
+ * FORME-AU-MOM L2 (20/11/2026, FAIT FOI gelé, D6 = a) : dans « MOM photos »,
+ * astérisque après le NOM des joueurs cochés « Formé au MOM » (titulaires et
+ * remplaçants ; drapeau formeClub fourni par l'éditeur). Autres versions
+ * inchangées.
  * EXPORT-MOM-PHOTOS (20/11/2026, retour terrain Lohann) : 5ᵉ version « MOM
  * photos » = modèle Canva seniors (Instagram 4:5, grille photos, bandeaux
  * jaunes, remplaçants en 16ᵉ case, « *JOUEUR FORMÉ AU CLUB »). Additif :
@@ -1127,7 +1131,8 @@
           ctx.fillStyle = NOIR;
           var lh = Math.min(34, Math.floor((ch - 24) / Math.max(1, rem.length)));
           var lignesR = rem.map(function (rp) {
-            return rp.num + '-' + (rp.nomSeul || rp.nom || '').toUpperCase();
+            return rp.num + '-' + (rp.nomSeul || rp.nom || '').toUpperCase()
+              + (rp.formeClub === true ? '*' : '');   // FORME-AU-MOM L2
           });
           // une seule taille pour toute la liste : la plus grande qui fait tenir
           // la ligne la plus longue (jamais de nom tronqué)
@@ -1176,7 +1181,7 @@
         }
         // bandeau nom
         ctx.fillStyle = JAUNE; ctx.fillRect(x, y + ch - bandH, cw, bandH);
-        var nom = (j.nom || '').toUpperCase();
+        var nom = (j.nom || '').toUpperCase() + (j.formeClub === true ? '*' : '');   // FORME-AU-MOM L2
         var fs = Math.round(bandH * 0.62);
         ctx.font = font(fs, 900);
         while (ctx.measureText(nom).width > cw - 12 && fs > 14) { fs -= 1; ctx.font = font(fs, 900); }
