@@ -4,6 +4,12 @@
  *
  * Module IIFE — initialise l'UI de la page joueurs.html.
  *
+ * Version : v1.15 — 20 novembre 2026
+ *   v1.15 : FORME-AU-MOM L1 (FAIT FOI Conception-FORME-AU-MOM-v1 gelé le
+ *          20/11/2026, sql_277). Modale Profil sportif : case « Formé au MOM »
+ *          (pré-cochée depuis get_joueur_detail.forme_au_club, envoyée dans le
+ *          patch update_joueur_metier). Fiche, section Profil sportif : badge
+ *          « 🌱 Formé au MOM » si coché. Aucun autre changement.
  * Version : v1.14 — 15 novembre 2026
  *   v1.14 : EVAL-JOUEUR lot L2 (FAIT FOI gelé 15/11/2026, D12). Section
  *          « Suivi » de la fiche : bouton « Évaluation » à côté de « Stats de
@@ -1225,6 +1231,12 @@ window.JoueursBrowser = (function () {
       || d.potentiel_jeu || taille || poids;
 
     let body = '';
+    // v1.15 — FORME-AU-MOM : badge en tête de section si coché
+    if (d.forme_au_club === true) {
+      body += '<div class="joueur-fiche-row"><div class="joueur-fiche-row-lbl">Formation</div><div class="joueur-fiche-row-val">'
+            + '<span style="display:inline-block;padding:2px 10px;border-radius:999px;background:#e3f1e6;color:#1d5a2a;font-weight:700;">🌱 Formé au MOM</span>'
+            + '</div></div>';
+    }
     if (d.postes_uuids && d.postes_uuids.length > 0) {
       body += '<div class="joueur-fiche-row"><div class="joueur-fiche-row-lbl">Postes</div><div class="joueur-fiche-row-val">'
             + renderPostesPills(d.postes_uuids) + '</div></div>';
@@ -1812,6 +1824,10 @@ window.JoueursBrowser = (function () {
     const selectPotentiel = document.getElementById('joueur-profil-potentiel');
     if (selectPotentiel) selectPotentiel.value = (d.potentiel_jeu !== null && d.potentiel_jeu !== undefined) ? d.potentiel_jeu : '';
 
+    // v1.15 — FORME-AU-MOM : pré-coche « Formé au MOM »
+    const chkFormeClub = document.getElementById('joueur-profil-forme-club');
+    if (chkFormeClub) chkFormeClub.checked = (d.forme_au_club === true);
+
     // Pré-remplit taille / poids
     const inputTaille = document.getElementById('joueur-profil-taille');
     const inputPoids  = document.getElementById('joueur-profil-poids');
@@ -1948,6 +1964,9 @@ window.JoueursBrowser = (function () {
         taille_cm:       tailleVal,
         poids_g:         poidsG
       };
+      // v1.15 — FORME-AU-MOM : envoyé seulement si la case existe (page à jour)
+      const chkFormeClubSub = document.getElementById('joueur-profil-forme-club');
+      if (chkFormeClubSub) patch.forme_au_club = chkFormeClubSub.checked === true;
 
       const res = await SupabaseHub.updateJoueurMetier(currentEditPersonneId, patch);
       if (!res || !res.ok) {
