@@ -18,6 +18,10 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 2.00 — 20 novembre 2026
+ *   v2.00 : FORME-AU-MOM L2 (sql_278). + getFormesAuClub(ids) → Set des ids
+ *          cochés « Formé au MOM » (RPC get_formes_au_club). Dégradation
+ *          honnête : erreur → Set vide. Aucun autre changement.
  * Version : 1.99 — 16 novembre 2026
  *   v1.99 : EVAL-JOUEUR Avenant B (B6, sql_268). + reinitialiserCodeEspace
  *          (personne) → { code_defini:false } : efface le code perso du
@@ -5055,6 +5059,24 @@
         }));
       } catch (e) {
         console.warn('MOM Hub: getPhotosSignedUrls()', e);
+      }
+      return out;
+    },
+
+    /**
+     * v2.00 — FORME-AU-MOM L2 : parmi les ids fournis, ceux cochés « Formé au
+     * MOM » (RPC get_formes_au_club, sql_278). Renvoie un Set ; erreur → Set
+     * vide (l'export affiche alors les noms sans astérisque).
+     */
+    async getFormesAuClub(ids) {
+      const out = new Set();
+      if (!Array.isArray(ids) || ids.length === 0) return out;
+      try {
+        const { data, error } = await client.rpc('get_formes_au_club', { p_ids: ids });
+        if (error || !Array.isArray(data)) return out;
+        data.forEach(function (row) { if (row && row.personne_id) out.add(row.personne_id); });
+      } catch (e) {
+        console.warn('MOM Hub: getFormesAuClub()', e);
       }
       return out;
     },
