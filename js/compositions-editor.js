@@ -6,6 +6,12 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.95 — Export « MOM photos » : drapeau « Formé au MOM » (20 nov. 2026)
+ *   v3.95 : FORME-AU-MOM L2 (FAIT FOI gelé 20/11/2026, D6 = a, sql_278).
+ *           _collecterDonneesExport : titulaires[].formeClub et
+ *           remplacants[].formeClub (SupabaseHub.getFormesAuClub). ADDITIF ;
+ *           erreur → false partout (noms sans astérisque).
+ *
  * Version : 3.94 — Export réseaux « MOM photos » : adversaire, heure, nom seul remplaçants (20 nov. 2026)
  *   v3.94 : EXPORT-MOM-PHOTOS (retour terrain Lohann, modèle Canva seniors).
  *           _collecterDonneesExport enrichit le payload, ADDITIF : adversaire
@@ -8810,7 +8816,9 @@
         return {
           num: (cj.numero_maillot != null ? cj.numero_maillot : (16 + idx)),
           nom: nomJoueurCompact(cj),
-          nomSeul: (j.nom || '').trim().toUpperCase()   // v3.94 — modèle « MOM photos »
+          nomSeul: (j.nom || '').trim().toUpperCase(),  // v3.94 — modèle « MOM photos »
+          uuid: cj.joueur_id || null,                   // v3.95 — drapeau « Formé au MOM »
+          formeClub: false
         };
       });
     // Compléter jusqu'à 8 emplacements (16→23) avec des places vides.
@@ -8867,6 +8875,24 @@
       }
     } catch (err) {
       console.warn('MOM Hub: collecte photos export échouée (non bloquant)', err);
+    }
+
+    // v3.95 — FORME-AU-MOM L2 : drapeau « Formé au MOM » (astérisque de
+    // l'export « MOM photos »). Dégradation honnête : erreur → aucun drapeau.
+    tit.forEach(function (t) { t.formeClub = false; });
+    try {
+      if (window.SupabaseHub && typeof SupabaseHub.getFormesAuClub === 'function') {
+        var idsForm = tit.map(function (t) { return t.uuid; })
+          .concat(remBruts.map(function (r) { return r.uuid; }))
+          .filter(function (u) { return !!u; });
+        if (idsForm.length) {
+          var setForm = await SupabaseHub.getFormesAuClub(idsForm);
+          tit.forEach(function (t) { t.formeClub = !!(t.uuid && setForm.has(t.uuid)); });
+          remBruts.forEach(function (r) { r.formeClub = !!(r.uuid && setForm.has(r.uuid)); });
+        }
+      }
+    } catch (err) {
+      console.warn('MOM Hub: collecte « Formé au MOM » export échouée (non bloquant)', err);
     }
 
     // v3.87 — saison active pour le pied de page de l'export (fin du
