@@ -6,6 +6,14 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.94 — Export réseaux « MOM photos » : adversaire, heure, nom seul remplaçants (20 nov. 2026)
+ *   v3.94 : EXPORT-MOM-PHOTOS (retour terrain Lohann, modèle Canva seniors).
+ *           _collecterDonneesExport enrichit le payload, ADDITIF : adversaire
+ *           (adversaire unique de l'équipe engagée, sinon vide), heure (heure
+ *           locale de date_debut si l'évènement porte une heure, sinon vide —
+ *           jamais d'heure inventée), remplaçants[].nomSeul (NOM seul pour la
+ *           case remplaçants du modèle). Aucun autre comportement modifié.
+ *
  * Version : 3.93 — Suivi : lien « Grille VEO à imprimer » (17 nov. 2026)
  *   v3.93 : FAIT FOI Conception-GRILLE-VEO-v1 (gelé 17/11/2026, R2, G1).
  *           Demande de Vivien traitée dans la conversation EVAL-JOUEUR
@@ -8801,7 +8809,8 @@
         var j = getJoueurVivier(cj.joueur_id) || {};
         return {
           num: (cj.numero_maillot != null ? cj.numero_maillot : (16 + idx)),
-          nom: nomJoueurCompact(cj)
+          nom: nomJoueurCompact(cj),
+          nomSeul: (j.nom || '').trim().toUpperCase()   // v3.94 — modèle « MOM photos »
         };
       });
     // Compléter jusqu'à 8 emplacements (16→23) avec des places vides.
@@ -8873,10 +8882,29 @@
       console.warn('MOM Hub: collecte saison export échouée (non bloquant)', err);
     }
 
+    // v3.94 — modèle « MOM photos » : adversaire unique et heure du match.
+    // Heure : seulement si date_debut porte une heure (les évènements sans heure
+    // sont stockés à minuit UTC) → sinon vide, jamais d'heure inventée.
+    var adversaire = '';
+    try {
+      var advs = ctx && ctx.evenement_equipe && Array.isArray(ctx.evenement_equipe.adversaires)
+        ? ctx.evenement_equipe.adversaires : [];
+      if (advs.length === 1 && advs[0].adversaire_nom) adversaire = String(advs[0].adversaire_nom).trim();
+    } catch (e) { adversaire = ''; }
+    var heure = '';
+    if (evt && evt.date_debut) {
+      var dd = new Date(evt.date_debut);
+      if (!isNaN(dd) && (dd.getUTCHours() !== 0 || dd.getUTCMinutes() !== 0)) {
+        heure = dd.getHours() + 'H' + (dd.getMinutes() ? String(dd.getMinutes()).padStart(2, '0') : '');
+      }
+    }
+
     return {
       sousTitre: sousTitre,
       meta1: meta1,
       meta2: meta2,
+      adversaire: adversaire,
+      heure: heure,
       dateExport: new Date().toLocaleDateString('fr-FR'),
       slug: (titre || 'compo').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
       titulaires: tit,
