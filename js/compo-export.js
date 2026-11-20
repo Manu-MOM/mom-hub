@@ -1,6 +1,11 @@
 /*
  * compo-export.js — Export image d'une composition (feuille « document »)
  * ---------------------------------------------------------------------------
+ * EXPORT-MOM-PHOTOS (20/11/2026, retour terrain Lohann) : 5ᵉ version « MOM
+ * photos » = modèle Canva seniors (Instagram 4:5, grille photos, bandeaux
+ * jaunes, remplaçants en 16ᵉ case, « *JOUEUR FORMÉ AU CLUB »). Additif :
+ * les 4 versions existantes sont inchangées. Paysage = paysage MOM existant.
+ * ---------------------------------------------------------------------------
  * Module AUTONOME, rendu Canvas natif (zéro dépendance), exposé en global
  * window.CompoExport. Reproduit la charte graphique validée (maquette) :
  *   • version 'mom'     : fond vert bouteille, écusson MOM filigrane, accents jaunes
@@ -1034,8 +1039,161 @@
     });
   }
 
+  // ── Rendu "MOM photos" (EXPORT-MOM-PHOTOS, retour terrain Lohann 20/11/2026) ─
+  // Reprise du modèle Canva seniors de Lohann : publication Instagram 4:5
+  // (1080×1350), fond gris à pois jaunes, titre « COMPOSITION DU MOM », ligne
+  // match (libellé // MOM vs adversaire // heure), écusson MOM en haut à droite,
+  // mention « *JOUEUR FORMÉ AU CLUB » (décision Manu : gardée telle quelle, le
+  // marquage JIFF par joueur viendra d'un chantier fiches joueurs), grille 4
+  // colonnes de cartes photo blanches (n° en haut à gauche, NOM sur bandeau
+  // jaune, pastille rouge « C » sur le capitaine réel uniquement), remplaçants
+  // « 16-NOM » dans la case qui suit le dernier titulaire. Grille adaptative
+  // (match à 10, à 12, à XV). RGPD : photoUrl n'existe que si droit + photo ;
+  // sinon repli initiales. Police : pile condensée du module (la police Canva
+  // n'est pas disponible côté navigateur).
+  var MP = { W: 1080, H: 1350 };
+  function fondMomPhotos(ctx) {
+    var g = ctx.createLinearGradient(0, 0, MP.W, MP.H);
+    g.addColorStop(0, '#9aa5a2'); g.addColorStop(1, '#848f8c');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, MP.W, MP.H);
+    // trame de pois jaunes dégressive (coin haut-gauche et coin bas-droit)
+    function trame(cx, cy, rayon) {
+      for (var y = cy - rayon; y <= cy + rayon; y += 16) {
+        for (var x = cx - rayon; x <= cx + rayon; x += 16) {
+          var d = Math.sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy)) / rayon;
+          if (d >= 1 || x < 0 || y < 0 || x > MP.W || y > MP.H) continue;
+          var r = 3.6 * (1 - d);
+          if (r < 0.6) continue;
+          ctx.beginPath(); ctx.arc(x, y, r, 0, 7);
+          ctx.fillStyle = 'rgba(240,216,0,' + (0.9 * (1 - d)).toFixed(2) + ')';
+          ctx.fill();
+        }
+      }
+    }
+    trame(0, 120, 330);
+    trame(MP.W, MP.H - 60, 300);
+  }
+  function rendreMomPhotos(canvas, data) {
+    canvas.width = MP.W; canvas.height = MP.H;
+    var ctx = canvas.getContext('2d');
+    var JAUNE = '#f0d800', NOIR = '#111111', VERT = '#1d5a2a', ROUGE = '#d9342b';
+    var tit = (data.titulaires || []).slice(0, 15);
+    var rem = (data.remplacants || []).filter(function (r) {
+      return r && (r.nomSeul || (r.nom && r.nom !== '–'));
+    });
+    var logos = data.logos || {};
+    var toLoad = [loadImage(logos.mom)];
+    tit.forEach(function (j) { toLoad.push(loadImage(j.photoUrl)); });
+    return Promise.all(toLoad).then(function (imgs) {
+      var logoMom = imgs[0], photos = imgs.slice(1);
+      fondMomPhotos(ctx);
+
+      // En-tête
+      ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+      ctx.fillStyle = NOIR; ctx.font = font(48, 900);
+      ctx.fillText('COMPOSITION DU MOM', 56, 78);
+      var ligne = [data.meta1, data.adversaire ? ('MOM VS ' + data.adversaire) : '', data.heure]
+        .filter(Boolean).join(' // ').toUpperCase();
+      if (ligne) {
+        // taille suivie dans une variable (ne dépend pas du format de ctx.font)
+        var fsL = 36, maxW = 740;
+        ctx.font = font(fsL, 700);
+        while (ctx.measureText(ligne).width > maxW && fsL > 20) {
+          fsL -= 1; ctx.font = font(fsL, 700);
+        }
+        ctx.fillText(ligne, 76, 128);
+      }
+      if (logoMom) drawImgH(ctx, logoMom, MP.W - 56 - Math.round(130 * logoMom.width / logoMom.height), 28, 130);
+      ctx.fillStyle = VERT; ctx.font = font(22, 700); ctx.textAlign = 'right';
+      ctx.fillText('*JOUEUR FORMÉ AU CLUB', MP.W - 50, 192);
+      ctx.textAlign = 'left';
+
+      // Grille : titulaires + 1 case remplaçants, 4 colonnes
+      var cols = 4, gx = 56, gw = MP.W - 2 * gx, gap = 18;
+      var nCases = tit.length + 1;
+      var nRows = Math.ceil(nCases / cols);
+      var top = 214, bottom = MP.H - 28;
+      var cw = Math.floor((gw - (cols - 1) * gap) / cols);
+      var ch = Math.min(Math.round(cw * 1.2), Math.floor((bottom - top - (nRows - 1) * gap) / nRows));
+      var bandH = Math.round(ch * 0.14);
+      var y0 = top + Math.max(0, Math.round((bottom - top - (nRows * ch + (nRows - 1) * gap)) / 2));
+
+      for (var idx = 0; idx < nCases; idx++) {
+        var r = Math.floor(idx / cols), c = idx % cols;
+        var x = gx + c * (cw + gap), y = y0 + r * (ch + gap);
+        if (idx === tit.length) {
+          // Case remplaçants
+          ctx.fillStyle = JAUNE; ctx.fillRect(x, y, cw, ch);
+          ctx.fillStyle = NOIR;
+          var lh = Math.min(34, Math.floor((ch - 24) / Math.max(1, rem.length)));
+          var lignesR = rem.map(function (rp) {
+            return rp.num + '-' + (rp.nomSeul || rp.nom || '').toUpperCase();
+          });
+          // une seule taille pour toute la liste : la plus grande qui fait tenir
+          // la ligne la plus longue (jamais de nom tronqué)
+          var fsR = Math.min(28, lh - 4);
+          ctx.font = font(fsR, 900);
+          var plusLarge = function () {
+            return lignesR.reduce(function (m, l) { return Math.max(m, ctx.measureText(l).width); }, 0);
+          };
+          while (plusLarge() > cw - 20 && fsR > 12) { fsR -= 1; ctx.font = font(fsR, 900); }
+          lignesR.forEach(function (txt, k) {
+            ctx.fillText(txt, x + 12, y + 14 + lh * (k + 1) - 8);
+          });
+          continue;
+        }
+        var j = tit[idx] || {};
+        // carte blanche
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.22)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 4;
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(x, y, cw, ch);
+        ctx.restore();
+        // photo (déjà recadrée au visage → cover cadré haut)
+        var px = x, py = y, pw = cw, phh = ch - bandH;
+        ctx.save(); ctx.beginPath(); ctx.rect(px, py, pw, phh); ctx.clip();
+        var im = photos[idx];
+        if (im) {
+          var s = Math.max(pw / im.width, phh / im.height);
+          var dw = im.width * s, dh = im.height * s;
+          ctx.drawImage(im, px + (pw - dw) / 2, py, dw, dh);
+        } else {
+          ctx.fillStyle = '#e6eae9'; ctx.fillRect(px, py, pw, phh);
+          ctx.fillStyle = '#9aa5a2'; ctx.font = font(96, 900);
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillText(initiales(j.prenom, j.nom), px + pw / 2, py + phh / 2);
+          ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+        }
+        ctx.restore();
+        // numéro (haut-gauche)
+        var num = (j.num != null && j.num !== '') ? j.num : (idx + 1);
+        ctx.fillStyle = NOIR; ctx.font = font(34, 900);
+        ctx.fillText(String(num), x + 10, y + 38);
+        // capitaine (haut-droite) — flag réel uniquement
+        if (j.capitaine === true) {
+          ctx.fillStyle = ROUGE; roundRect(ctx, x + cw - 50, y + 8, 42, 34, 4); ctx.fill();
+          ctx.fillStyle = '#ffffff'; ctx.font = font(28, 900); ctx.textAlign = 'center';
+          ctx.fillText('C', x + cw - 29, y + 35); ctx.textAlign = 'left';
+        }
+        // bandeau nom
+        ctx.fillStyle = JAUNE; ctx.fillRect(x, y + ch - bandH, cw, bandH);
+        var nom = (j.nom || '').toUpperCase();
+        var fs = Math.round(bandH * 0.62);
+        ctx.font = font(fs, 900);
+        while (ctx.measureText(nom).width > cw - 12 && fs > 14) { fs -= 1; ctx.font = font(fs, 900); }
+        ctx.fillStyle = NOIR; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(nom, x + cw / 2, y + ch - bandH / 2 + 1);
+        ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+      }
+    });
+  }
+
   // ── Dispatcher de rendu (rétrocompat : format défaut = 'vertical') ────────
   function rendre(canvas, data, version, format) {
+    // EXPORT-MOM-PHOTOS : en paysage, la version « MOM photos » reprend le
+    // paysage MOM existant ; en vertical, le modèle Instagram 4:5.
+    if (version === 'mom_photos') {
+      return format === 'paysage' ? rendrePaysage(canvas, data, 'mom') : rendreMomPhotos(canvas, data);
+    }
     if (format === 'paysage') return rendrePaysage(canvas, data, version);
     // Versions Offload (entente_nat/entente_reg) : le vertical devient la grille
     // de portraits photos. Les autres versions gardent le vertical historique.
@@ -1061,6 +1219,7 @@
           '<button type="button" class="compo-export-vtab" data-version="entente">Version entente</button>' +
           '<button type="button" class="compo-export-vtab" data-version="entente_nat">Entente M16 Nat</button>' +
           '<button type="button" class="compo-export-vtab" data-version="entente_reg">Entente M16 Rég</button>' +
+          '<button type="button" class="compo-export-vtab" data-version="mom_photos">MOM photos</button>' +
         '</div>' +
         '<div class="compo-export-tabs compo-export-ftabs">' +
           '<button type="button" class="compo-export-ftab is-active" data-format="vertical">Vertical</button>' +
