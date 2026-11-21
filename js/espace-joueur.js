@@ -1,6 +1,14 @@
 /* =====================================================================
  * espace-joueur.js — Espace joueur & famille (MOM Hub)
  * ---------------------------------------------------------------------
+ * Version : v2.2 — 21 novembre 2026 — PARCOURS-PERFORMANCE v1.3, lot L7
+ *   (FAIT FOI v1.3 D20, sql_282). Nouvelle section « Mon Parcours » entre
+ *   « Ma saison » et « Historique », lue dans la clé 'parcours' de
+ *   get_espace_joueur : convocations en sélection (convoqué, retenu,
+ *   réserviste seulement : la base ne renvoie ni « non retenu », ni
+ *   « absent / blessé », ni les notes du staff) avec leurs matchs, puis
+ *   l'équipe Performance (statut + matchs). Rien n'est affiché si la clé
+ *   est absente ou vide. Aucun autre changement.
  * Version : v2.1 — 17 novembre 2026 — recette Manu : « je ne trouve pas le
  *   bouton Installer l'appli ». La page est installable (contrôle Chrome :
  *   aucune erreur d'installabilité, invite reçue), mais l'invite n'existe
@@ -512,6 +520,91 @@
     return '<section class="ej-carte"><h2 class="ej-titre" style="padding:16px 16px 6px">Mes matchs précédents</h2><ul class="ej-liste">' + lignes + '</ul></section>';
   }
 
+  // v2.2 (PARCOURS v1.3, D20) — section « Mon Parcours ».
+  var PP_TYPES = { scf: 'Super Challenge de France', interdep: 'Tournoi interdépartemental',
+    tournoi: 'Tournoi en sélection', journee_bleue: 'Journée bleue',
+    stage: 'Stage / regroupement', detection: 'Détection', autre: 'Sélection' };
+  var PP_STATUTS = { convoque: 'Convoqué', retenu: 'Retenu', reserviste: 'Réserviste' };
+  var PP_ROLES = { titulaire: 'Titulaire', entre: 'Entré', non_entre: 'Sur la feuille' };
+  var PP_EQUIPE = { integre: 'Intégré', renfort: 'Renfort', double_licence: 'Double licence' };
+
+  function ligneMatchParcours(m, nousDefaut) {
+    var nous = m.equipe_accueil || nousDefaut, eux = m.adversaire || '—';
+    var ext = m.lieu === 'exterieur';
+    var score = '', res = '';
+    if (m.score_pour != null && m.score_contre != null) {
+      res = m.score_pour > m.score_contre ? 'V' : (m.score_pour < m.score_contre ? 'D' : 'N');
+      score = ext ? m.score_contre + '–' + m.score_pour : m.score_pour + '–' + m.score_contre;
+    }
+    var titre = (ext ? eux : nous) + (score ? ' ' + score + ' ' : ' – ') + (ext ? nous : eux);
+    var realis = [];
+    function a(n, un, plus) { n = Number(n) || 0; if (n) realis.push(n + ' ' + (n > 1 ? plus : un)); }
+    a(m.essais, 'essai', 'essais'); a(m.transformations, 'transfo', 'transfos');
+    a(m.penalites, 'pénalité', 'pénalités'); a(m.drops, 'drop', 'drops');
+    var role = [PP_ROLES[m.statut_joueur] || m.statut_joueur]
+      .concat(m.numero != null ? ['n°' + m.numero] : [])
+      .concat(m.capitaine ? ['capitaine'] : [])
+      .concat(realis);
+    var couleur = res === 'V' ? 'var(--feu-v)' : (res === 'D' ? 'var(--feu-r)' : 'var(--mute)');
+    return '<div style="background:var(--paper);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:3px">'
+      + '<div style="font-size:14px;font-weight:700">' + esc((m.phase ? m.phase + ' · ' : dateCourte(m.date_match) + ' · ') + titre)
+      + (res ? ' <span style="color:' + couleur + '">' + res + '</span>' : '') + '</div>'
+      + '<div class="ej-meta">' + esc(role.join(' · ')) + '</div></div>';
+  }
+
+  function carteParcours() {
+    var p = etat.donnees && etat.donnees.parcours;
+    if (!p) return '';
+    var convs = Array.isArray(p.convocations) ? p.convocations : [];
+    var matchs = Array.isArray(p.matchs) ? p.matchs : [];
+    var sel = matchs.filter(function (m) { return !!m.convocation_id; });
+    var club = matchs.filter(function (m) { return !m.convocation_id; });
+    if (!convs.length && !p.equipe && !club.length) return '';
+    function kpi(v, l) {
+      return '<div style="background:var(--doux);border-radius:10px;padding:10px 6px;text-align:center">'
+        + '<div style="font-family:\'Oswald\',sans-serif;font-size:24px;font-weight:600">' + v + '</div>'
+        + '<div class="ej-meta">' + esc(l) + '</div></div>';
+    }
+    function sousTitre(t) {
+      return '<div style="font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase">' + esc(t) + '</div>';
+    }
+    var h = '';
+    if (convs.length) {
+      var essais = sel.reduce(function (t, m) { return t + (Number(m.essais) || 0); }, 0);
+      h += sousTitre('En sélection')
+        + '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">'
+        + kpi(convs.length, convs.length > 1 ? 'convocations' : 'convocation')
+        + kpi(sel.length, sel.length > 1 ? 'matchs' : 'match')
+        + kpi(essais, essais > 1 ? 'essais' : 'essai') + '</div>';
+      h += convs.map(function (c) {
+        var dates = dateCourte(c.date_debut) + (c.date_fin && c.date_fin !== c.date_debut ? ' → ' + dateCourte(c.date_fin) : '');
+        var meta = [dates, c.equipe, c.lieu].filter(Boolean).join(' · ');
+        var retenu = c.statut === 'retenu';
+        var mc = sel.filter(function (m) { return m.convocation_id === c.id; });
+        return '<div style="border-top:1px solid var(--doux);padding-top:12px;display:flex;flex-direction:column;gap:6px">'
+          + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">'
+          + '<strong style="font-size:15px">' + esc(c.intitule || PP_TYPES[c.type] || 'Sélection') + '</strong>'
+          + '<span class="ej-tag" style="' + (retenu ? 'background:var(--feu-v);color:#fff' : 'background:#e6ecf6;color:#1f3a68') + '">'
+          + esc(PP_STATUTS[c.statut] || c.statut) + '</span></div>'
+          + '<div class="ej-meta">' + esc((PP_TYPES[c.type] && c.intitule !== PP_TYPES[c.type] ? PP_TYPES[c.type] + ' · ' : '') + meta) + '</div>'
+          + mc.map(function (m) { return ligneMatchParcours(m, c.equipe || 'Sélection'); }).join('')
+          + '</div>';
+      }).join('');
+    }
+    if (p.equipe || club.length) {
+      var eq = p.equipe || {};
+      var ligne = [PP_EQUIPE[eq.statut] || eq.statut, eq.equipe_accueil, eq.structure].filter(Boolean).join(' · ');
+      h += '<div style="' + (convs.length ? 'border-top:1px solid var(--doux);padding-top:12px;' : '') + 'display:flex;flex-direction:column;gap:6px">'
+        + sousTitre('En équipe Performance')
+        + (ligne ? '<div class="ej-meta">' + esc(ligne) + '</div>' : '')
+        + (club.length ? club.map(function (m) { return ligneMatchParcours(m, eq.equipe_accueil || 'Équipe Performance'); }).join('')
+          : '<div class="ej-meta">Pas encore de match saisi.</div>')
+        + '</div>';
+    }
+    return '<section class="ej-carte ej-carte-une"><div class="ej-carte-tete"><h2>⭐ Mon Parcours</h2></div>'
+      + '<div class="ej-corps">' + h + '</div></section>';
+  }
+
   // ------------------------------------------------------------------
   // Rendu
   // ------------------------------------------------------------------
@@ -534,6 +627,8 @@
     h += carteAvisAutres(heroEvt);
     var saison = carteObjectifs(bilans) + carteProgression(bilans) + carteFrise();
     if (saison) h += titreSection('Ma saison') + saison;
+    var parcours = carteParcours(); // v2.2 (PARCOURS v1.3, D20)
+    if (parcours) h += titreSection('Mon Parcours') + parcours;
     var histo = carteBilans(bilans) + carteMatchs(matchs, heroEvt);
     if (histo) h += titreSection('Historique') + histo;
     h += piedAppli();
