@@ -1,6 +1,13 @@
 /* =====================================================================
  * parcours-performance.js — Page Parcours Performance (MOM Hub)
  * ---------------------------------------------------------------------
+ * Version : v1.5 — 21 novembre 2026 — FAIT FOI v1.3, lot L6 (D16, D19)
+ *   v1.5 : les participations rattachées à une convocation (sélection,
+ *          convocation_id non nul, sql_281) sont retirées du bloc équipe
+ *          Performance et confiées à js/parcours-selections.js, qui peint
+ *          le bloc « En sélection » (#ps-zone) en tête de page. Titre des
+ *          chiffres clés : « En équipe Performance ». Rien d'autre ne
+ *          change (saisie, import FFR, historique).
  * Version : v1.4 — 3 novembre 2026 — amendement v1.2 (D12)
  *   v1.4 : ouvert depuis la fiche joueur (&depuis=fiche&joueur=<id>), le
  *          lien de retour ramène à la fiche (joueurs.html?fiche=<id>).
@@ -188,7 +195,15 @@
         return;
       }
       ETAT.engages = r[0];
-      ETAT.matchs = r[1];
+      // v1.5 (D16, D19) : matchs de sélection = bloc séparé (parcours-selections.js).
+      ETAT.matchs = r[1].filter(function (m) { return !m.convocation_id; });
+      var matchsSelection = r[1].filter(function (m) { return !!m.convocation_id; });
+      if (window.ParcoursSelections) {
+        window.ParcoursSelections.definir({
+          categorieId: ETAT.categorieId, saison: ETAT.saison,
+          matchs: matchsSelection, recharger: charger
+        });
+      }
       // v1.4 (D12) : nom du joueur dans le lien de retour à sa fiche.
       if (ETAT.retourFiche) {
         var refRetour = r[0].concat(r[1]).find(function (x) { return x.personne_id === ETAT.retourFiche; });
@@ -234,7 +249,7 @@
       return '<div class="pp-kpi"><span class="pp-kpi__v">' + v + '</span>' +
              '<span class="pp-kpi__l">' + l + '</span></div>';
     }
-    return '<section class="pp-bloc"><h2>Saison en chiffres</h2><div class="pp-kpis">' +
+    return '<section class="pp-bloc"><h2>En équipe Performance</h2><div class="pp-kpis">' +
       kpi(ETAT.engages.length, 'Joueurs engagés') +
       kpi(groupes.length, 'Matchs') +
       kpi(ETAT.matchs.length, 'Feuilles de match') +
@@ -337,7 +352,9 @@
   function rendre() {
     var groupes = grouperMatchs(ETAT.matchs);
     var zone = mount.querySelector('#pp-zone');
-    zone.innerHTML = rendreKpis(groupes) + rendreEngages() + rendreMatchs(groupes);
+    // v1.5 : bloc « En sélection » en tête (peint par parcours-selections.js).
+    zone.innerHTML = '<div id="ps-zone"></div>' + rendreKpis(groupes) + rendreEngages() + rendreMatchs(groupes);
+    if (window.ParcoursSelections) window.ParcoursSelections.peindre();
 
     zone.querySelectorAll('tr.pp-ligne').forEach(function (tr) {
       function choisir() {
@@ -822,7 +839,7 @@
     }
     mount.innerHTML =
       '<div class="pp-head"><h1>⭐ Parcours Performance <span id="pp-cat-lib"></span></h1>' +
-      '<p class="pp-sub">Nos joueurs en équipe Performance' +
+      '<p class="pp-sub">Nos joueurs en équipe Performance et en sélection' +
       (ETAT.saison && ETAT.saison.libelle ? ' · saison ' + esc(ETAT.saison.libelle) : '') + '</p>' +
       (ETAT.retourFiche
         ? '<a class="pp-retour" id="pp-retour" href="joueurs.html?fiche=' + encodeURIComponent(ETAT.retourFiche) +
