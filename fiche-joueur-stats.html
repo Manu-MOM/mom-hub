@@ -71,6 +71,9 @@
     .ss-pp-res-D { background: #f6e1de; color: #a3271b; }
     .ss-pp-res-N { background: var(--gris-clair); color: var(--gris); }
     .ss-pp-note { color: var(--gris); font-size: .8rem; margin: .6rem 0 0; }
+    /* v1.3 (D19) : sous-titres « En équipe Performance » / « En sélection ». */
+    .ss-pp-sous { margin: .9rem 0 .4rem; font-size: .95rem; color: #1f3a68; }
+    .ss-pp-sous:first-of-type { margin-top: .2rem; }
     /* D11 — impression / « Enregistrer au format PDF » du navigateur. */
     @page { size: A4 portrait; margin: 12mm; }
     @media print {
@@ -144,6 +147,12 @@
      * les stats du collectif, sans aucun calcul commun (D3). Lectures par
      * les RPC sql_261/sql_262 (droits de lecture de la catégorie) ; joueur
      * non inscrit, droit refusé ou erreur → aucun bloc (silence honnête).
+     * v1.3 (FAIT FOI v1.3 D19, L6, sql_281) : le bloc se découpe en
+     * « En équipe Performance » (statut de saison + matchs sans convocation)
+     * et « En sélection » (convocations du joueur + matchs rattachés), avec
+     * des totaux distincts. Il s'affiche si le joueur a un statut de saison
+     * OU au moins une convocation. Les deux restent hors des stats du
+     * collectif.
      * ================================================================= */
     function ajouterBlocParcours(joueurId, mount, retour, depuisFiche) {
       var hub = window.SupabaseHub;
@@ -155,32 +164,46 @@
         return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
           .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
       }
+      var aConv = typeof hub.listParcoursConvocations === 'function'
+        && typeof hub.listParcoursConvocationJoueurs === 'function';
       return Promise.resolve(hub.getJoueurDetail(joueurId)).then(function (d) {
         if (!d) return null;
         if (retour && depuisFiche) {
           retour.textContent = '← Retour à la fiche de ' + (d.prenom ? d.prenom + ' ' : '') + String(d.nom || '').toUpperCase();
         }
         if (!d.categorie_id) return null;
-        return Promise.resolve(hub.listParcoursSaison(d.categorie_id)).then(function (saison) {
-          var st = Array.isArray(saison) && saison.find(function (x) { return x.personne_id === joueurId; });
-          if (!st) return null;
-          return Promise.resolve(hub.listParcoursMatchs(d.categorie_id, null, joueurId)).then(function (matchs) {
-            return { st: st, matchs: Array.isArray(matchs) ? matchs : [] };
-          });
+        return Promise.all([
+          hub.listParcoursSaison(d.categorie_id),
+          hub.listParcoursMatchs(d.categorie_id, null, joueurId),
+          aConv ? hub.listParcoursConvocations(d.categorie_id) : Promise.resolve([]),
+          aConv ? hub.listParcoursConvocationJoueurs(d.categorie_id) : Promise.resolve([])
+        ]).then(function (r) {
+          var st = Array.isArray(r[0]) && r[0].find(function (x) { return x.personne_id === joueurId; });
+          var matchs = Array.isArray(r[1]) ? r[1] : [];
+          var convs = Array.isArray(r[2]) ? r[2] : [];
+          var mesConv = (Array.isArray(r[3]) ? r[3] : []).filter(function (j) { return j.personne_id === joueurId; });
+          if (!st && mesConv.length === 0) return null;
+          return {
+            st: st || null,
+            club: matchs.filter(function (x) { return !x.convocation_id; }),
+            sel: matchs.filter(function (x) { return !!x.convocation_id; }),
+            convs: convs, mesConv: mesConv
+          };
         });
       }).then(function (pp) {
         if (!pp) return;
         var LIB = { integre: 'Intégré', renfort: 'Renfort', double_licence: 'Double licence' };
         var STJ = { titulaire: 'Titulaire', entre: 'Entré', non_entre: 'Non entré' };
-        var m = pp.matchs;
-        var titu = 0, entres = 0, essais = 0, pts = 0;
-        m.forEach(function (x) {
-          if (x.statut_joueur === 'titulaire') titu += 1;
-          if (x.statut_joueur === 'entre') entres += 1;
-          essais += Number(x.essais) || 0;
-          pts += Number(x.points) || 0;
-        });
+        var TYPES = { scf: 'Super Challenge de France', interdep: 'Tournoi interdépartemental',
+          tournoi: 'Autre tournoi en sélection', journee_bleue: 'Journée bleue',
+          stage: 'Stage / regroupement', detection: 'Détection', autre: 'Autre' };
+        var STATUTS = { convoque: 'Convoqué', retenu: 'Retenu', reserviste: 'Réserviste',
+          absent: 'Absent / blessé', non_retenu: 'Non retenu' };
         function kpi(v, l) { return '<div class="ss-pp-kpi"><b>' + v + '</b><span>' + l + '</span></div>'; }
+        function date(iso) {
+          var dt = String(iso || '').slice(0, 10).split('-');
+          return dt.length === 3 ? dt[2] + '/' + dt[1] + '/' + dt[0] : '';
+        }
         function real(x) {
           var p = [];
           function a(n, s1, s2) { n = Number(n) || 0; if (n) p.push(n + ' ' + (n > 1 ? s2 : s1)); }
@@ -188,38 +211,73 @@
           a(x.penalites, 'pénalité', 'pénalités'); a(x.drops, 'drop', 'drops');
           return p.join(', ') || '—';
         }
-        var lignes = m.map(function (x) {
-          var dt = String(x.date_match || '').slice(0, 10).split('-');
-          var nous = x.equipe_accueil || 'Équipe Performance', eux = x.adversaire || '—';
-          var ext = x.lieu === 'exterieur';
-          var score = '—', res = '';
-          if (x.score_pour != null && x.score_contre != null) {
-            res = x.score_pour > x.score_contre ? 'V' : (x.score_pour < x.score_contre ? 'D' : 'N');
-            score = ext ? x.score_contre + '–' + x.score_pour : x.score_pour + '–' + x.score_contre;
-          }
-          var ctx = [x.competition, x.phase].filter(Boolean).join(' · ');
-          return '<tr><td>' + (dt.length === 3 ? dt[2] + '/' + dt[1] + '/' + dt[0] : '') + '</td>' +
-            '<td>' + esc(ext ? eux + ' – ' + nous : nous + ' – ' + eux) +
-              (ctx ? '<br><span class="ss-pp-meta" style="font-size:.78rem">' + esc(ctx) + '</span>' : '') + '</td>' +
-            '<td>' + esc(score) + (res ? '<span class="ss-pp-res ss-pp-res-' + res + '">' + res + '</span>' : '') + '</td>' +
-            '<td>' + esc(STJ[x.statut_joueur] || x.statut_joueur) +
-              (x.numero != null ? ' · n°' + esc(x.numero) : '') + (x.capitaine ? ' · C' : '') + '</td>' +
-            '<td>' + esc(real(x)) + '</td><td class="ss-num">' + (Number(x.points) || 0) + '</td></tr>';
-        }).join('');
-        var st = pp.st;
-        var meta = [LIB[st.statut] || st.statut, st.structure, st.equipe_accueil].filter(Boolean).join(' · ');
+        function totaux(m) {
+          var t = { titu: 0, entres: 0, essais: 0, pts: 0 };
+          m.forEach(function (x) {
+            if (x.statut_joueur === 'titulaire') t.titu += 1;
+            if (x.statut_joueur === 'entre') t.entres += 1;
+            t.essais += Number(x.essais) || 0;
+            t.pts += Number(x.points) || 0;
+          });
+          return t;
+        }
+        function tableau(m, nousDefaut) {
+          return '<div class="ss-pp-scroll"><table class="ss-table"><thead><tr><th>Date</th><th>Rencontre</th>' +
+            '<th>Score</th><th>Rôle</th><th>Réalisations</th><th class="ss-num">Pts</th></tr></thead><tbody>' +
+            m.map(function (x) {
+              var nous = x.equipe_accueil || nousDefaut, eux = x.adversaire || '—';
+              var ext = x.lieu === 'exterieur';
+              var score = '—', res = '';
+              if (x.score_pour != null && x.score_contre != null) {
+                res = x.score_pour > x.score_contre ? 'V' : (x.score_pour < x.score_contre ? 'D' : 'N');
+                score = ext ? x.score_contre + '–' + x.score_pour : x.score_pour + '–' + x.score_contre;
+              }
+              var ctx = [x.competition, x.phase].filter(Boolean).join(' · ');
+              return '<tr><td>' + date(x.date_match) + '</td>' +
+                '<td>' + esc(ext ? eux + ' – ' + nous : nous + ' – ' + eux) +
+                  (ctx ? '<br><span class="ss-pp-meta" style="font-size:.78rem">' + esc(ctx) + '</span>' : '') + '</td>' +
+                '<td>' + esc(score) + (res ? '<span class="ss-pp-res ss-pp-res-' + res + '">' + res + '</span>' : '') + '</td>' +
+                '<td>' + esc(STJ[x.statut_joueur] || x.statut_joueur) +
+                  (x.numero != null ? ' · n°' + esc(x.numero) : '') + (x.capitaine ? ' · C' : '') + '</td>' +
+                '<td>' + esc(real(x)) + '</td><td class="ss-num">' + (Number(x.points) || 0) + '</td></tr>';
+            }).join('') + '</tbody></table></div>';
+        }
+        var h = '<h2>⭐ Parcours Performance</h2>';
+        if (pp.st) {
+          var st = pp.st, m = pp.club, t = totaux(m);
+          var meta = [LIB[st.statut] || st.statut, st.structure, st.equipe_accueil].filter(Boolean).join(' · ');
+          h += '<h3 class="ss-pp-sous">En équipe Performance</h3><p class="ss-pp-meta">' + esc(meta) + '</p>' +
+            (m.length
+              ? '<div class="ss-pp-kpis">' + kpi(m.length, m.length > 1 ? 'Feuilles de match' : 'Feuille de match') +
+                  kpi(t.titu, 'Titularisations') + kpi(t.entres, 'Entrées') + kpi(t.essais, 'Essais') + kpi(t.pts, 'Points') + '</div>' +
+                  tableau(m, 'Équipe Performance')
+              : '<p class="ss-attente">Aucun match saisi cette saison.</p>');
+        }
+        if (pp.mesConv.length) {
+          var parId = {};
+          pp.convs.forEach(function (c) { parId[c.id] = c; });
+          var mc = pp.mesConv.map(function (j) { return { j: j, c: parId[j.convocation_id] }; })
+            .filter(function (x) { return x.c; })
+            .sort(function (a, b) { return String(b.c.date_debut).localeCompare(String(a.c.date_debut)); });
+          var s = pp.sel, ts = totaux(s);
+          var retenu = mc.filter(function (x) { return x.j.statut === 'retenu'; }).length;
+          h += '<h3 class="ss-pp-sous">En sélection</h3>' +
+            '<div class="ss-pp-kpis">' + kpi(mc.length, mc.length > 1 ? 'Convocations' : 'Convocation') +
+              kpi(retenu, retenu > 1 ? 'Fois retenu' : 'Fois retenu') + kpi(s.length, s.length > 1 ? 'Matchs' : 'Match') +
+              kpi(ts.titu, 'Titularisations') + kpi(ts.essais, 'Essais') + kpi(ts.pts, 'Points') + '</div>' +
+            '<ul class="ss-list">' + mc.map(function (x) {
+              var c = x.c;
+              var dates = date(c.date_debut) + (c.date_fin && c.date_fin !== c.date_debut ? ' → ' + date(c.date_fin) : '');
+              return '<li>' + esc(dates) + ' · <strong>' + esc(TYPES[c.type] || c.type) + '</strong>' +
+                (c.intitule && c.intitule !== TYPES[c.type] ? ' · ' + esc(c.intitule) : '') +
+                (c.equipe ? ' · ' + esc(c.equipe) : '') + ' — ' + esc(STATUTS[x.j.statut] || x.j.statut) + '</li>';
+            }).join('') + '</ul>' +
+            (s.length ? tableau(s, 'Sélection') : '<p class="ss-attente">Aucun match de sélection saisi.</p>');
+        }
+        h += '<p class="ss-pp-note">Matchs joués en équipe Performance ou en sélection : ils ne sont jamais comptés dans les statistiques ci-dessus.</p>';
         var sec = document.createElement('section');
         sec.className = 'ss-bloc ss-pp';
-        sec.innerHTML = '<h2>⭐ Parcours Performance</h2>' +
-          '<p class="ss-pp-meta">' + esc(meta) + '</p>' +
-          (m.length
-            ? '<div class="ss-pp-kpis">' + kpi(m.length, m.length > 1 ? 'Feuilles de match' : 'Feuille de match') +
-                kpi(titu, 'Titularisations') + kpi(entres, 'Entrées') + kpi(essais, 'Essais') + kpi(pts, 'Points') + '</div>' +
-              '<div class="ss-pp-scroll"><table class="ss-table"><thead><tr><th>Date</th><th>Rencontre</th>' +
-              '<th>Score</th><th>Rôle</th><th>Réalisations</th><th class="ss-num">Pts</th></tr></thead>' +
-              '<tbody>' + lignes + '</tbody></table></div>'
-            : '<p class="ss-attente">Aucun match saisi cette saison.</p>') +
-          '<p class="ss-pp-note">Matchs joués en équipe Performance : ils ne sont jamais comptés dans les statistiques ci-dessus.</p>';
+        sec.innerHTML = h;
         mount.appendChild(sec);
       });
     }
