@@ -4,6 +4,14 @@
  *
  * Module IIFE — initialise l'UI de la page joueurs.html.
  *
+ * Version : v1.16 — 21 novembre 2026
+ *   v1.16 : PARCOURS-PERFORMANCE v1.3, lot L6 (FAIT FOI v1.3 D19, sql_281).
+ *          Fiche, section « ⭐ Parcours Performance » : partie « En équipe
+ *          Performance » (statut de saison, totaux et 3 derniers matchs SANS
+ *          convocation) et partie « En sélection » (convocations du joueur
+ *          avec leur statut, totaux des matchs de sélection, lien vers la
+ *          page). La partie sélection s'affiche même sans statut de saison.
+ *          Aucun autre changement.
  * Version : v1.15 — 20 novembre 2026
  *   v1.15 : FORME-AU-MOM L1 (FAIT FOI Conception-FORME-AU-MOM-v1 gelé le
  *          20/11/2026, sql_277). Modale Profil sportif : case « Formé au MOM »
@@ -470,16 +478,20 @@ window.JoueursBrowser = (function () {
 
   async function _chargerMatchsParcoursFiche(personneId) {
     const catId = CTX_PERIMETRE && CTX_PERIMETRE.active;
-    if (!PARCOURS_BY_PERSONNE.get(personneId) || !catId
-        || typeof SupabaseHub === 'undefined'
+    if (!catId || typeof SupabaseHub === 'undefined'
         || typeof SupabaseHub.listParcoursMatchs !== 'function') {
       return;
     }
-    let rows = null;
-    try { rows = await SupabaseHub.listParcoursMatchs(catId, null, personneId); }
+    let tous = null;
+    try { tous = await SupabaseHub.listParcoursMatchs(catId, null, personneId); }
     catch (err) { console.warn('Joueurs: _chargerMatchsParcoursFiche()', err); }
+    if (!Array.isArray(tous) || currentEditPersonneId !== personneId) return;
+    // v1.16 (v1.3, D19) : les matchs de sélection ont leur propre partie.
+    _chargerSelectionsFiche(personneId, catId, tous.filter(m => !!m.convocation_id));
+    if (!PARCOURS_BY_PERSONNE.get(personneId)) return;
+    const rows = tous.filter(m => !m.convocation_id);
     const el = document.getElementById('joueur-fiche-pp-matchs');
-    if (!el || !Array.isArray(rows) || currentEditPersonneId !== personneId) return;
+    if (!el) return;
     if (rows.length === 0) {
       el.innerHTML = '<div class="joueur-fiche-perf-meta">Aucun match saisi cette saison.</div>';
       return;
@@ -513,6 +525,56 @@ window.JoueursBrowser = (function () {
       + '<div class="joueur-fiche-perf-meta"><a style="color:#1f3a68;font-weight:600" href="parcours-performance.html?categorie='
       + encodeURIComponent(catId) + '&joueur=' + encodeURIComponent(personneId)
       + '&depuis=fiche">Voir tous ses matchs →</a></div>';
+  }
+
+  // v1.16 (v1.3, D19) — Fiche : partie « En sélection » (convocations du
+  // joueur + matchs rattachés). Lecture seule (list_parcours_convocations,
+  // list_parcours_convocation_joueurs) ; erreur ou aucune convocation =
+  // rien n'est affiché. Le staff voit tous les statuts (la fiche n'est pas
+  // l'espace joueur).
+  const PS_TYPES = { scf: 'Super Challenge de France', interdep: 'Tournoi interdépartemental',
+    tournoi: 'Autre tournoi en sélection', journee_bleue: 'Journée bleue',
+    stage: 'Stage / regroupement', detection: 'Détection', autre: 'Autre' };
+  const PS_STATUTS = { convoque: 'Convoqué', retenu: 'Retenu', reserviste: 'Réserviste',
+    absent: 'Absent / blessé', non_retenu: 'Non retenu' };
+
+  async function _chargerSelectionsFiche(personneId, catId, matchsSel) {
+    if (typeof SupabaseHub.listParcoursConvocations !== 'function'
+        || typeof SupabaseHub.listParcoursConvocationJoueurs !== 'function') return;
+    let convs = null, joueurs = null;
+    try {
+      [convs, joueurs] = await Promise.all([
+        SupabaseHub.listParcoursConvocations(catId),
+        SupabaseHub.listParcoursConvocationJoueurs(catId)
+      ]);
+    } catch (err) { console.warn('Joueurs: _chargerSelectionsFiche()', err); }
+    const el = document.getElementById('joueur-fiche-ps');
+    if (!el || !Array.isArray(convs) || !Array.isArray(joueurs) || currentEditPersonneId !== personneId) return;
+    const parId = new Map(convs.map(c => [c.id, c]));
+    const mes = joueurs.filter(j => j.personne_id === personneId && parId.has(j.convocation_id))
+      .map(j => ({ j, c: parId.get(j.convocation_id) }))
+      .sort((a, b) => String(b.c.date_debut).localeCompare(String(a.c.date_debut)));
+    if (mes.length === 0) return;
+    const retenu = mes.filter(x => x.j.statut === 'retenu').length;
+    const titu = matchsSel.filter(m => m.statut_joueur === 'titulaire').length;
+    const essais = matchsSel.reduce((t, m) => t + (Number(m.essais) || 0), 0);
+    const pts = matchsSel.reduce((t, m) => t + (Number(m.points) || 0), 0);
+    const totaux = mes.length + ' convocation' + (mes.length > 1 ? 's' : '') + ' (retenu ' + retenu + ' fois) · '
+      + matchsSel.length + ' match' + (matchsSel.length > 1 ? 's' : '') + ' · '
+      + titu + ' titularisation' + (titu > 1 ? 's' : '') + ' · '
+      + essais + ' essai' + (essais > 1 ? 's' : '') + ' · ' + pts + ' pt' + (pts > 1 ? 's' : '');
+    const derniers = mes.slice(0, 3).map(function (x) {
+      const d = String(x.c.date_debut || '').slice(0, 10).split('-');
+      const date = d.length === 3 ? d[2] + '/' + d[1] : '';
+      return '<li>' + esc(date) + ' · ' + esc(PS_TYPES[x.c.type] || x.c.type)
+        + (x.c.equipe ? ' · ' + esc(x.c.equipe) : '')
+        + ' <span style="color:var(--ink-mute)">· ' + esc(PS_STATUTS[x.j.statut] || x.j.statut) + '</span></li>';
+    }).join('');
+    el.innerHTML = '<div class="joueur-fiche-perf-ligne" style="margin-top:8px"><strong>En sélection</strong></div>'
+      + '<div class="joueur-fiche-perf-meta"><strong>' + esc(totaux) + '</strong></div>'
+      + '<ul class="joueur-fiche-perf-meta" style="margin:4px 0 0;padding-left:18px;">' + derniers + '</ul>'
+      + '<div class="joueur-fiche-perf-meta"><a style="color:#1f3a68;font-weight:600" href="parcours-performance.html?categorie='
+      + encodeURIComponent(catId) + '">Voir les sélections →</a></div>';
   }
 
   function renderParcoursBadge(j) {
@@ -1142,14 +1204,16 @@ window.JoueursBrowser = (function () {
       lignes.push('<strong>' + esc(PARCOURS_STATUT_LABELS[p.statut] || p.statut) + '</strong>');
       if (p.structure) lignes.push(esc(p.structure));
       if (p.equipe_accueil) lignes.push(esc(p.equipe_accueil));
-      contenu = '<div class="joueur-fiche-perf-ligne">' + lignes.join(' · ') + '</div>'
+      contenu = '<div class="joueur-fiche-perf-ligne">En équipe Performance · ' + lignes.join(' · ') + '</div>'
         + (p.notes ? '<div class="joueur-fiche-perf-meta">' + esc(p.notes) + '</div>' : '')
         // v1.12 (L4) : totaux et derniers matchs remplis par _chargerMatchsParcoursFiche.
         + '<div id="joueur-fiche-pp-matchs"><div class="joueur-fiche-perf-meta">'
         + (Number(p.nb_matchs) || 0) + ' match(s) saisi(s) cette saison</div></div>';
     } else {
-      contenu = '<div class="joueur-fiche-perf-meta">Pas inscrit au Parcours Performance cette saison.</div>';
+      contenu = '<div class="joueur-fiche-perf-meta">Pas en équipe Performance cette saison.</div>';
     }
+    // v1.16 (v1.3, D19) : partie « En sélection », remplie par _chargerSelectionsFiche.
+    contenu += '<div id="joueur-fiche-ps"></div>';
     return `
       <div class="joueur-fiche-section joueur-fiche-perf">
         <div class="joueur-fiche-section-title">⭐ Parcours Performance</div>
