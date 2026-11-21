@@ -18,6 +18,13 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 2.01 — 21 novembre 2026
+ *   v2.01 : PARCOURS-PERFORMANCE v1.3, lot L6 (sql_281, FAIT FOI v1.3
+ *          D14-D17). + listParcoursCandidats, listParcoursConvocations,
+ *          listParcoursConvocationJoueurs, saveParcoursConvocation,
+ *          setParcoursConvocationJoueurs, deleteParcoursConvocation.
+ *          saveParcoursMatch transmet m.convocation_id (p_convocation_id,
+ *          null pour un match en équipe Performance). Aucun autre changement.
  * Version : 2.00 — 20 novembre 2026
  *   v2.00 : FORME-AU-MOM L2 (sql_278). + getFormesAuClub(ids) → Set des ids
  *          cochés « Formé au MOM » (RPC get_formes_au_club). Dégradation
@@ -5454,7 +5461,9 @@
         p_drops: n(m.drops) || 0,
         p_source: m.source || 'manuel',
         p_notes: m.notes || null,
-        p_lieu: ['domicile', 'exterieur', 'neutre'].indexOf(m.lieu) !== -1 ? m.lieu : null
+        p_lieu: ['domicile', 'exterieur', 'neutre'].indexOf(m.lieu) !== -1 ? m.lieu : null,
+        // v2.01 (v1.3, D16) : match de sélection rattaché à sa convocation.
+        p_convocation_id: m.convocation_id || null
       });
       if (error) {
         console.error('MOM Hub: saveParcoursMatch()', error);
@@ -5471,6 +5480,132 @@
       if (error) {
         console.error('MOM Hub: deleteParcoursMatch()', error);
         return { ok: false, error: error.message || 'Erreur delete_parcours_match' };
+      }
+      return { ok: true };
+    },
+
+    // ------------------------------------------------------------------
+    // PARCOURS-PERFORMANCE v1.3 — SÉLECTIONS ET CONVOCATIONS (v2.01,
+    // sql_281, FAIT FOI v1.3 gelé 21/11/2026). Mêmes droits que le
+    // Parcours : lecture puis_je_lire_categorie, écriture
+    // puis_je_ecrire_categorie (RPC = vérité). Jamais agrégé aux stats
+    // du collectif (D3, D19).
+    // ------------------------------------------------------------------
+
+    /**
+     * Joueurs du collectif de l'entente de la catégorie (saison active par
+     * défaut) : candidats à une convocation (D13).
+     * @returns {Promise<Array<{personne_id, nom, prenom, club}>|null>}
+     */
+    async listParcoursCandidats(categorieId, saisonId) {
+      if (!categorieId) return null;
+      const { data, error } = await client.rpc('list_parcours_candidats', {
+        p_categorie_id: categorieId,
+        p_saison_id: saisonId || null
+      });
+      if (error) {
+        console.error('MOM Hub: listParcoursCandidats()', error);
+        return null;
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * Convocations de la catégorie (saison active par défaut) avec
+     * compteurs nb_convoques (convoqué + retenu + réserviste), nb_retenus,
+     * nb_reservistes, nb_absents, nb_non_retenus, nb_matchs.
+     * @returns {Promise<Array<Object>|null>} [] si aucune, null si erreur.
+     */
+    async listParcoursConvocations(categorieId, saisonId) {
+      if (!categorieId) return null;
+      const { data, error } = await client.rpc('list_parcours_convocations', {
+        p_categorie_id: categorieId,
+        p_saison_id: saisonId || null
+      });
+      if (error) {
+        console.error('MOM Hub: listParcoursConvocations()', error);
+        return null;
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * Joueurs de toutes les convocations de la catégorie (saison active par
+     * défaut) : { id, convocation_id, personne_id, nom, prenom, club,
+     * statut, note, updated_at }.
+     * @returns {Promise<Array<Object>|null>}
+     */
+    async listParcoursConvocationJoueurs(categorieId, saisonId) {
+      if (!categorieId) return null;
+      const { data, error } = await client.rpc('list_parcours_convocation_joueurs', {
+        p_categorie_id: categorieId,
+        p_saison_id: saisonId || null
+      });
+      if (error) {
+        console.error('MOM Hub: listParcoursConvocationJoueurs()', error);
+        return null;
+      }
+      return Array.isArray(data) ? data : [];
+    },
+
+    /**
+     * Crée (c.id absent) ou modifie une convocation. type ∈ scf | interdep |
+     * tournoi | journee_bleue | stage | detection | autre.
+     * @returns {Promise<{ok: boolean, data?: Object, error?: string}>}
+     */
+    async saveParcoursConvocation(c) {
+      if (!c) return { ok: false, error: 'Convocation manquante' };
+      const { data, error } = await client.rpc('upsert_parcours_convocation', {
+        p_id: c.id || null,
+        p_categorie_id: c.categorie_id || null,
+        p_type: c.type || null,
+        p_intitule: c.intitule || null,
+        p_date_debut: c.date_debut || null,
+        p_date_fin: c.date_fin || null,
+        p_lieu: c.lieu || null,
+        p_equipe: c.equipe || null,
+        p_organisateur: c.organisateur || null,
+        p_notes: c.notes || null
+      });
+      if (error) {
+        console.error('MOM Hub: saveParcoursConvocation()', error);
+        return { ok: false, error: error.message || 'Erreur upsert_parcours_convocation' };
+      }
+      const row = Array.isArray(data) && data.length > 0 ? data[0] : null;
+      return { ok: true, data: row };
+    },
+
+    /**
+     * Remplace la liste des joueurs d'une convocation.
+     * joueurs = [{ personne_id, statut, note? }], statut ∈ convoque |
+     * retenu | reserviste | absent | non_retenu. Refus en base si un joueur
+     * qui a un match dans la convocation est retiré ou passe absent /
+     * non retenu.
+     * @returns {Promise<{ok: boolean, data?: Array, error?: string}>}
+     */
+    async setParcoursConvocationJoueurs(convocationId, joueurs) {
+      if (!convocationId) return { ok: false, error: 'Convocation requise' };
+      const liste = (Array.isArray(joueurs) ? joueurs : []).map(function (j) {
+        return { personne_id: j.personne_id, statut: j.statut, note: j.note || null };
+      });
+      const { data, error } = await client.rpc('set_parcours_convocation_joueurs', {
+        p_convocation_id: convocationId,
+        p_joueurs: liste
+      });
+      if (error) {
+        console.error('MOM Hub: setParcoursConvocationJoueurs()', error);
+        return { ok: false, error: error.message || 'Erreur set_parcours_convocation_joueurs' };
+      }
+      return { ok: true, data: Array.isArray(data) ? data : [] };
+    },
+
+    /** Supprime une convocation (refusé en base si elle a des matchs). */
+    async deleteParcoursConvocation(id) {
+      if (!id) return { ok: false, error: 'id requis' };
+      const { error } = await client.rpc('delete_parcours_convocation', { p_id: id });
+      if (error) {
+        console.error('MOM Hub: deleteParcoursConvocation()', error);
+        return { ok: false, error: error.message || 'Erreur delete_parcours_convocation' };
       }
       return { ok: true };
     },
