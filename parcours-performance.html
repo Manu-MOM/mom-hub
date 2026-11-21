@@ -111,6 +111,35 @@
     .pp-imp-erreurs { color: var(--rouge); margin: .2rem 0 0; padding-left: 1.2rem; font-size: .88rem; }
     .pp-imp-alertes { color: #8a5a00; margin: .5rem 0 0; padding-left: 1.2rem; font-size: .85rem; }
     .pp-erreur { color: var(--rouge); font-weight: 600; font-size: .88rem; margin: .7rem 0 0; min-height: 1.2em; }
+    /* v1.3 (FAIT FOI v1.3, L6) — bloc « En sélection » et ses modales
+       (js/parcours-selections.js). */
+    .ps-bloc { border: 2px solid var(--perf); }
+    .ps-carte { border: 1px solid var(--bord); border-radius: 8px; padding: .75rem .9rem; margin-top: .8rem; }
+    .ps-carte-head { display: flex; justify-content: space-between; align-items: flex-start; gap: .75rem; }
+    .ps-carte-titre { font-weight: 700; margin-top: .25rem; }
+    .ps-avenir { font-size: .78rem; color: var(--gris); font-style: italic; }
+    .ps-puces { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .55rem; }
+    .ps-puce { border-radius: 999px; padding: .1rem .6rem; font-size: .78rem; font-weight: 700; }
+    .ps-p-retenu { background: #dff0e4; color: var(--vert-fonce); }
+    .ps-p-reserviste { background: #fbefd9; color: #7a4d00; }
+    .ps-p-convoque { background: var(--perf-clair); color: var(--perf); }
+    .ps-p-gris { background: var(--gris-clair); color: #4a525c; }
+    .ps-matchs { list-style: none; margin: .55rem 0 0; padding: 0; }
+    .ps-match, .ps-match-edit { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; padding: .35rem 0; border-top: 1px dashed var(--bord); font-size: .9rem; }
+    .ps-match-phase { color: var(--gris); min-width: 6.5rem; }
+    .ps-match-titre { font-weight: 700; }
+    .ps-match-resume { color: var(--gris); font-size: .82rem; margin-left: auto; }
+    .ps-match-edit .pp-btn { margin-left: .5rem; }
+    .ps-joueurs-head { display: flex; justify-content: space-between; align-items: baseline; gap: .75rem; flex-wrap: wrap; margin-top: 1rem; }
+    .ps-joueurs-head .pp-h3 { margin: 0; }
+    .ps-filtres { display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; margin: .5rem 0; }
+    .pp-modal .ps-filtre { flex: 1 1 220px; }
+    .pp-modal .ps-coche { flex-direction: row; align-items: center; gap: .4rem; }
+    .ps-liste { max-height: 22rem; overflow-y: auto; border: 1px solid var(--bord); border-radius: 8px; }
+    .ps-liste input[type="text"] { width: 11rem; }
+    .ps-st { font-size: .72rem; font-weight: 700; color: var(--gris); margin-left: .3rem; }
+    .ps-st-retenu { color: var(--vert-fonce); }
+    .ps-st-reserviste { color: #7a4d00; }
     footer { max-width: 960px; margin: 2rem auto 0; color: var(--attente); font-size: .8rem; text-align: center; }
     @media (max-width: 560px) {
       .pp-head h1 { font-size: 1.4rem; }
@@ -177,6 +206,46 @@
     </div>
   </div>
 
+  <!-- v1.3 (L6, D14-D15) : modale convocation (js/parcours-selections.js). -->
+  <div class="pp-overlay" id="ps-overlay" hidden>
+    <div class="pp-modal" role="dialog" aria-modal="true" aria-labelledby="ps-modal-titre">
+      <div class="pp-modal-head">
+        <h2 id="ps-modal-titre">Convocation</h2>
+        <button type="button" class="pp-fermer" data-action="ps-fermer" aria-label="Fermer">×</button>
+      </div>
+      <div class="pp-modal-body">
+        <form id="ps-form" onsubmit="return false;"></form>
+      </div>
+      <div class="pp-modal-foot">
+        <button type="button" class="pp-btn pp-btn-danger" id="ps-supprimer" hidden>Supprimer</button>
+        <div class="pp-droite">
+          <button type="button" class="pp-btn" data-action="ps-fermer">Annuler</button>
+          <button type="button" class="pp-btn pp-btn-primaire" id="ps-enregistrer">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- v1.3 (L6, D16-D17) : modale match de sélection (js/parcours-selections.js). -->
+  <div class="pp-overlay" id="psm-overlay" hidden>
+    <div class="pp-modal" role="dialog" aria-modal="true" aria-labelledby="psm-modal-titre">
+      <div class="pp-modal-head">
+        <h2 id="psm-modal-titre">Match de sélection</h2>
+        <button type="button" class="pp-fermer" data-action="psm-fermer" aria-label="Fermer">×</button>
+      </div>
+      <div class="pp-modal-body">
+        <form id="psm-form" onsubmit="return false;"></form>
+      </div>
+      <div class="pp-modal-foot">
+        <button type="button" class="pp-btn pp-btn-danger" id="psm-supprimer" hidden>Supprimer le match</button>
+        <div class="pp-droite">
+          <button type="button" class="pp-btn" data-action="psm-fermer">Annuler</button>
+          <button type="button" class="pp-btn pp-btn-primaire" id="psm-enregistrer">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- L3 : import d'une feuille de match FFR (collage Résumé + Compositions). -->
   <div class="pp-overlay" id="pp-import-overlay" hidden>
     <div class="pp-modal" role="dialog" aria-modal="true" aria-labelledby="pp-import-titre">
@@ -211,6 +280,7 @@
   <script src="js/supabase-client.js"></script>
   <script src="js/season-pill.js"></script>
   <script src="js/parcours-ffr.js"></script>
+  <script src="js/parcours-selections.js"></script>
   <script src="js/parcours-performance.js"></script>
   <script>
     /* Boot topbar (patron pilotage-categorie.html) : anonyme → login.html ;
