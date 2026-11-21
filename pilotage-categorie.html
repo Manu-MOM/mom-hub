@@ -67,8 +67,9 @@
       font-size: .95rem; padding: .35rem .6rem; border: 1px solid var(--bord);
       border-radius: 6px; background: #fff; color: #1c232b; min-width: 160px;
     }
-    /* PARCOURS-PERFORMANCE L2 (D9) : lien vers la page dédiée, affiché
-       seulement si la catégorie pilotée compte au moins un joueur engagé. */
+    /* PARCOURS-PERFORMANCE L2 (D9) : lien vers la page dédiée.
+       v1.3 (D22, précisé par Manu le 21/11/2026) : toujours visible en M14
+       et M16 ; ailleurs seulement s'il y a des données (statut ou convocation). */
     .ss-pp-lien {
       display: flex; align-items: center; justify-content: space-between; gap: .75rem;
       margin-bottom: 1.25rem; padding: .7rem 1rem; border-radius: 10px;
@@ -135,7 +136,7 @@
   <div class="ss-wrap">
     <a class="ss-pp-lien" id="ss-pp-lien" href="parcours-performance.html" hidden>
       <span id="ss-pp-lien-texte">⭐ Parcours Performance</span>
-      <span class="ss-pp-lien__fleche">Voir leurs matchs →</span>
+      <span class="ss-pp-lien__fleche">Ouvrir →</span>
     </a>
     <!-- EVAL-JOUEUR L3 (FAIT FOI gelé 15/11/2026, D12) : lien vers la saisie
          des évals match de la catégorie pilotée (eval-match.html). Même
@@ -209,6 +210,9 @@
       }
 
       var M14_ID = '312ebb88-25e8-40c5-8a37-9dd2e3927e2e';
+      // PARCOURS-PERFORMANCE v1.3 (D22) : catégories où le lien est toujours
+      // visible (M14, M16 — ids sondés en base le 21/11/2026).
+      var PP_TOUJOURS = [M14_ID, 'fa2bb289-cef0-4884-82e9-c50699a52a8f'];
 
       // pt 63/64 + multi-cat — La catégorie pilotée vient du socle
       // resoudrePerimetreCategories() (v1.59+), qui gère :
@@ -235,20 +239,32 @@
       }
 
       // PARCOURS-PERFORMANCE L2 (D9) : lien vers la page dédiée pour la
-      // catégorie pilotée, visible seulement si ≥ 1 joueur engagé. Lecture
-      // gardée par la RPC list_parcours_saison ; échec = lien masqué.
+      // catégorie pilotée. Lecture gardée par les RPC list_parcours_saison
+      // et list_parcours_convocations ; échec de lecture = lien masqué.
+      // v1.3 (D22) : toujours visible en M14 et M16 (même sans donnée, pour
+      // créer la 1re convocation) ; ailleurs seulement si ≥ 1 joueur engagé
+      // ou ≥ 1 convocation dans la saison.
       function majLienPP(catId) {
         majLienEval(catId); // EVAL-JOUEUR L3 : même point d'accroche, aucun appelant modifié
         var lien = document.getElementById('ss-pp-lien');
         if (!lien) return;
         lien.hidden = true;
         if (!catId || typeof SupabaseHub.listParcoursSaison !== 'function') return;
-        Promise.resolve(SupabaseHub.listParcoursSaison(catId)).then(function (rows) {
-          if (!Array.isArray(rows) || rows.length === 0) return;
+        var conv = typeof SupabaseHub.listParcoursConvocations === 'function'
+          ? SupabaseHub.listParcoursConvocations(catId) : Promise.resolve([]);
+        Promise.all([SupabaseHub.listParcoursSaison(catId), conv]).then(function (r) {
+          var rows = r[0], convs = r[1];
+          if (!Array.isArray(rows)) return; // pas de droit de lecture
+          var nConv = Array.isArray(convs) ? convs.length : 0;
+          var toujours = PP_TOUJOURS.indexOf(catId) !== -1;
+          if (!toujours && rows.length === 0 && nConv === 0) return;
           lien.href = 'parcours-performance.html?categorie=' + encodeURIComponent(catId);
+          var morceaux = [];
+          if (rows.length) morceaux.push(rows.length + (rows.length > 1 ? ' joueurs' : ' joueur') + ' en équipe Performance');
+          if (nConv) morceaux.push(nConv + (nConv > 1 ? ' convocations' : ' convocation') + ' en sélection');
           var t = document.getElementById('ss-pp-lien-texte');
-          if (t) t.textContent = '⭐ Parcours Performance — ' + rows.length +
-            (rows.length > 1 ? ' joueurs engagés' : ' joueur engagé') + ' en équipe Performance';
+          if (t) t.textContent = '⭐ Parcours Performance — ' +
+            (morceaux.length ? morceaux.join(' · ') : 'équipe Performance et sélections');
           lien.hidden = false;
         }).catch(function () { /* lien masqué */ });
       }
