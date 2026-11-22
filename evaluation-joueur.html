@@ -10,7 +10,11 @@
        D12) : page dédiée ouverte depuis la fiche joueur
        (evaluation-joueur.html?joueur=<id>&depuis=fiche), SANS entrée de nav
        (hub-nav.js INTERDIT non touché). Logique : js/evaluation-joueur.js.
-       Droits portés par les RPC sql_263. -->
+       Droits portés par les RPC sql_263.
+       Avenant C, lot C3 (22/11/2026, FAIT FOI §11 D29–D45) : bilans à 6
+       critères (rappel FFR), points « à travailler » sous un O ou un R,
+       famille de postes (.ev-ffr, .ev-critere-bloc, .ev-sc*) ;
+       + js/criteres-eval.js. Logique : js/evaluation-joueur.js v1.5. -->
   <style>
     :root {
       --ev-feu-v: #2d7a3e; --ev-feu-o: #b86e0a; --ev-feu-r: #c73e3e;
@@ -92,8 +96,20 @@
     .ev-match-meta { color: var(--ink-mute, #6b7a6f); font-size: .82rem; }
     .ev-niveau { font-size: .72rem; font-weight: 700; border-radius: 999px; padding: .1rem .55rem; background: var(--ev-doux); }
     .ev-titre-section { font-family: 'Oswald', sans-serif; font-size: 1.15rem; font-weight: 600; margin: 0 0 .7rem; }
+    /* --- Avenant C (C3) --- */
+    .ev-critere-nom .ev-ffr { display: block; font-weight: 500; font-size: .72rem; color: var(--ink-mute, #6b7a6f); }
+    .ev-critere-bloc { display: flex; flex-direction: column; gap: .35rem; padding-bottom: .35rem; }
+    .ev-sc { background: #faf7ee; border: 1px solid var(--ev-doux); border-radius: 8px; padding: .55rem .75rem; display: flex; flex-direction: column; gap: .35rem; }
+    .ev-sc-titre { font-size: .82rem; font-weight: 700; color: var(--ink-soft, #2a4836); }
+    .ev-sc-cases { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 1rem; }
+    .ev-sc-case { display: flex; align-items: center; gap: .6rem; min-height: 40px; font-size: .88rem; cursor: pointer; }
+    .ev-sc-case input { width: 18px; height: 18px; accent-color: #2d7a3e; flex: none; }
+    .ev-sc-famille { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; font-size: .82rem; font-weight: 600; }
+    .ev-sc-famille select { font: inherit; font-size: .88rem; min-height: 40px; padding: .3rem .5rem; border: 1px solid var(--ev-bord); border-radius: 8px; }
+    .ev-sc-alerte { background: #eaf1fa; color: #1f4a82; border-radius: 8px; padding: .45rem .65rem; font-size: .85rem; }
     @media (max-width: 720px) {
       .ev-critere { grid-template-columns: 1fr; gap: .45rem; }
+      .ev-sc-cases { grid-template-columns: 1fr; }
     }
     @media print {
       .topbar, .hub-nav, footer, .ev-actions, .ev-retour, .ev-btn, #ev-bloc-lien { display: none !important; }
@@ -143,6 +159,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="js/supabase-client.js"></script>
   <script src="js/season-pill.js"></script>
+  <script src="js/criteres-eval.js"></script>
   <script src="js/evaluation-joueur.js"></script>
   <script>
     /* Boot topbar (patron parcours-performance.html) : anonyme → login.html ;
