@@ -23,6 +23,8 @@
        (rappel FFR), points « à travailler » sous un O ou un R, famille de
        postes, objectifs du joueur (.em-ffr, .em-critere-bloc, .em-ecart,
        .em-veut, .em-chip, .em-sc*, .em-objectifs, .em-bilan-obj) ;
+       Correctif C3 (recette du 22/11/2026) : .em-sc[hidden] masqué
+       (le display: flex l'emportait sur l'attribut hidden).
        + js/criteres-eval.js (référentiel data/criteres-eval.json).
        Logique : js/eval-match.js v1.6. -->
   <style>
@@ -158,6 +160,7 @@
     .em-veut { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; font-size: .8rem; }
     .em-chip { background: #eaf1fa; color: #1f4a82; border-radius: 999px; padding: .15rem .6rem; font-size: .78rem; }
     .em-sc { background: #faf7ee; border: 1px solid var(--ev-doux); border-radius: 8px; padding: .55rem .75rem; display: flex; flex-direction: column; gap: .35rem; }
+    .em-sc[hidden] { display: none; }   /* correctif C3 : le bloc reste fermé tant que le critère n'est pas O ou R */
     .em-sc-titre { font-size: .82rem; font-weight: 700; color: var(--ink-soft, #2a4836); }
     .em-sc-cases { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 1rem; }
     .em-sc-case { display: flex; align-items: center; gap: .6rem; min-height: 40px; font-size: .88rem; cursor: pointer; }
