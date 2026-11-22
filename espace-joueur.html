@@ -46,6 +46,13 @@
      réseau d'abord, aucune donnée en cache) et CODE PERSO (écrans
      .ej-acces, .ej-champ*, pied .ej-appli, .ej-lien-discret).
      Logique : js/espace-joueur.js v2.0.
+     Avenant C, lot C4 (22/11/2026, FAIT FOI §11 D29–D45, sql_286) :
+     auto-évaluation à 6 critères (rappel FFR), « Ce que je veux
+     travailler », poste joué, rappel des objectifs du dernier match,
+     objectifs pour le prochain match, comparaison enrichie (.ej-ffr,
+     .ej-sc*, .ej-ae-rappel, .ej-rappel-*, .ej-res, .ej-ae-poste,
+     .ej-ae-objectifs, .ej-travail*) ; + js/criteres-eval.js.
+     Logique : js/espace-joueur.js v2.3.
      ===================================================================== -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap">
@@ -160,6 +167,21 @@
   .ej-champ-code { font-family: 'Oswald', sans-serif; font-size: 28px; letter-spacing: .5em; text-align: center; max-width: 220px; }
   .ej-appli { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 18px 0 4px; text-align: center; }
   .ej-lien-discret { font: inherit; font-size: 13px; background: none; border: 0; color: var(--mute); text-decoration: underline; cursor: pointer; padding: 6px; }
+  /* --- Avenant C (C4) --- */
+  .ej-ffr { display: block; font-size: 11px; font-weight: 500; color: var(--mute); }
+  .ej-sc { display: flex; flex-direction: column; gap: 2px; background: var(--doux); border-radius: 10px; padding: 10px 12px; }
+  .ej-sc-titre { font-size: 13px; font-weight: 700; }
+  .ej-sc-case { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 14px; cursor: pointer; }
+  .ej-sc-case input { width: 20px; height: 20px; accent-color: var(--feu-v); flex: none; }
+  .ej-sc-alerte { background: #eaf1fa; color: #1f4a82; border-radius: 8px; padding: 8px 10px; font-size: 13px; margin-top: 4px; }
+  .ej-ae-rappel, .ej-ae-poste, .ej-ae-objectifs { display: flex; flex-direction: column; gap: 6px; background: #fff; border: 1px solid var(--bord); border-radius: 12px; padding: 12px; }
+  .ej-rappel-obj { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; border-top: 1px solid var(--doux); }
+  .ej-rappel-texte { font-size: 14px; font-weight: 600; }
+  .ej-res { flex: 1; font: inherit; font-weight: 700; font-size: 13px; min-height: 44px; border-radius: 10px; background: #fff; border: 2px solid var(--bord); color: var(--ink); cursor: pointer; }
+  .ej-res[aria-pressed="true"] { background: var(--vert); border-color: var(--vert); color: var(--paper); }
+  .ej-ae-poste select.ej-champ { min-height: 48px; background: #fff; }
+  .ej-travail-bloc { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+  .ej-travail { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
   .ej-merci { background: #e7f3ec; color: #1f5a32; border-radius: 12px; padding: 12px 14px; font-weight: 700; font-size: 15px; }
 </style>
 </head>
@@ -168,6 +190,7 @@
     <p class="ej-charge">Chargement de ton espace…</p>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/criteres-eval.js"></script>
   <script src="js/espace-joueur.js"></script>
   <script src="js/pwa.js"></script>
 </body>
