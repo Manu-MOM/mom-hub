@@ -53,6 +53,11 @@
      .ej-sc*, .ej-ae-rappel, .ej-rappel-*, .ej-res, .ej-ae-poste,
      .ej-ae-objectifs, .ej-travail*) ; + js/criteres-eval.js.
      Logique : js/espace-joueur.js v2.3.
+     Avenant D, lot D3 (22/11/2026, FAIT FOI §12 D46–D50, sql_287) :
+     vidéo du match visible de toute la feuille : bouton « Revoir le
+     match » dans l'avis à donner et sur une éval verrouillée, carte
+     « Mes vidéos de match » (.ej-ae-video, .ej-videos, .ej-video-lien).
+     Logique : js/espace-joueur.js v2.5.
      ===================================================================== -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap">
@@ -182,6 +187,13 @@
   .ej-ae-poste select.ej-champ { min-height: 48px; background: #fff; }
   .ej-travail-bloc { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
   .ej-travail { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+  /* --- Avenant D (D3) --- */
+  .ej-ae-video { display: flex; flex-direction: column; gap: 6px; }
+  .ej-videos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+  .ej-videos li { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--doux); }
+  .ej-videos li:first-child { border-top: 0; }
+  .ej-video-lien { flex: none; display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border-radius: 10px;
+    background: var(--bleu); color: #fff; text-decoration: none; font-weight: 700; font-size: 14px; }
   .ej-merci { background: #e7f3ec; color: #1f5a32; border-radius: 12px; padding: 12px 14px; font-weight: 700; font-size: 15px; }
 </style>
 </head>
