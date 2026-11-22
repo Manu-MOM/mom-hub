@@ -18,6 +18,13 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 2.03 — 22 novembre 2026
+ *   v2.03 : EVAL-JOUEUR Avenant D, lot D2 (sql_287, FAIT FOI §12 D46–D50).
+ *          + definirVideoMatch(evenement, url) → { evenement_id, veo_url } :
+ *          lien VEO unique du match (vide = effacé pour tout le monde ;
+ *          https:// et droits contrôlés en base). saveEvalMatch inchangé :
+ *          sans veo_url transmis, la base garde l'ancien lien de l'éval.
+ *          Aucun autre changement.
  * Version : 2.02 — 22 novembre 2026
  *   v2.02 : EVAL-JOUEUR Avenant C, lot C3 (sql_286, FAIT FOI §11). saveEvalBilan
  *          transmet feux.mental, obs.mental et sous_criteres ; saveEvalMatch
@@ -5744,6 +5751,19 @@
     async publierBrouillonsMatch(evenementId) {
       if (!evenementId) return { ok: false, error: 'évènement requis' };
       return _evalRpc('publier_brouillons_match', { p_evenement_id: evenementId }, 'publierBrouillonsMatch');
+    },
+
+    /**
+     * v2.03 (Avenant D, D46/D50) : lien VEO du match, saisi une fois pour
+     * toutes les évals du match. url vide ou null = lien effacé. Retour :
+     * { evenement_id, veo_url } (veo_url null après effacement).
+     */
+    async definirVideoMatch(evenementId, url) {
+      if (!evenementId) return { ok: false, error: 'évènement requis' };
+      return _evalRpc('definir_video_match', {
+        p_evenement_id: evenementId,
+        p_veo_url: (url === undefined || url === null) ? '' : String(url)
+      }, 'definirVideoMatch');
     },
 
     /** Lien personnel actif d'un joueur : { token, date_creation, derniere_consultation } ou null. */
