@@ -1,0 +1,587 @@
+{
+  "_meta": {
+    "type": "referentiel",
+    "nom": "Critères d'évaluation joueurs",
+    "version": "1.0",
+    "date_creation": "2026-11-22",
+    "description": "EVAL-JOUEUR Avenant C (FAIT FOI §11, gelé le 22/11/2026) : 6 critères alignés sur les ressources du joueur FFR + technique au poste, sous-critères « à travailler », familles de postes, buteur, masquages par catégorie et seuil d'alerte. Contenu = document Criteres-EVAL-JOUEUR.docx v2 gelé par Manu.",
+    "regles": [
+      "Les clés de critère (cle) sont les colonnes feu_<cle> en base (sql_286) : ne jamais les renommer.",
+      "Les codes de sous-critères sont stockés en base (colonne sous_criteres) : ne jamais renommer un code utilisé ; on peut changer le libellé librement.",
+      "Format des codes : minuscules, chiffres, tirets ou soulignés, 40 caractères au plus (contrôle en base).",
+      "Une famille de postes sans correspondance (postes_codes) : le joueur choisit sa famille (D36).",
+      "categories_masquees : codes de la table categories (M6, M8, M10, M12, M14, F15, M16, M19, F18, SR-M, SR-F, RLO, RLSP, SECTION)."
+    ],
+    "masquages_sources": "Règlements Rugby éducatif 2026-2027 (MAJ 17/06/26) présents dans le Hub : M10 jeu à 7 (pas de transformation, drop ni tir au but ; pas de mêlée ni de touche disputée), M12 jeu à X (pas d'aide au sauteur ; « +2 » liés sans poussée), M14 jeu à XV et à X. Choix de Manu du 22/11/2026 : pas de sous-critères « Technique au poste » ni « Buteur » en M6–M10 ; en M12, masquer « Lifter en touche » et « Me lier et pousser en mêlée ». Contester les mauls : non précisé par les fiches, non masqué.",
+    "_changelog": [
+      "1.0 (2026-11-22) - Création (EVAL-JOUEUR Avenant C, lot C2)."
+    ]
+  },
+  "seuil_alerte": 3,
+  "messages_alerte": {
+    "coach": "{n} points à travailler sur ce critère. Pour que le joueur s'y retrouve, mieux vaut en garder 1 ou 2 prioritaires.",
+    "joueur": "Tu as coché {n} points. Choisis ceux qui comptent le plus pour toi, ce sera plus facile à travailler."
+  },
+  "resultats_objectifs": [
+    {
+      "code": "atteint",
+      "libelle": "Atteint"
+    },
+    {
+      "code": "en_partie",
+      "libelle": "En partie"
+    },
+    {
+      "code": "pas_atteint",
+      "libelle": "Pas atteint"
+    }
+  ],
+  "criteres": [
+    {
+      "cle": "tech_indiv",
+      "ordre": 1,
+      "libelle": "Technique",
+      "ressource_ffr": "Ressources techniques",
+      "sous_criteres": [
+        {
+          "code": "passe-reception",
+          "libelle": "Passe et réception"
+        },
+        {
+          "code": "plaquage",
+          "libelle": "Plaquage"
+        },
+        {
+          "code": "jeu-au-sol",
+          "libelle": "Jeu au sol (ruck, déblayage, grattage)"
+        },
+        {
+          "code": "porteur-contact",
+          "libelle": "Porteur au contact (conserver le ballon)"
+        },
+        {
+          "code": "jeu-au-pied",
+          "libelle": "Jeu au pied"
+        }
+      ]
+    },
+    {
+      "cle": "physique",
+      "ordre": 2,
+      "libelle": "Physique",
+      "ressource_ffr": "Ressources physiques",
+      "sous_criteres": [
+        {
+          "code": "endurance",
+          "libelle": "Tenir tout le match (endurance)"
+        },
+        {
+          "code": "vitesse",
+          "libelle": "Vitesse et démarrage"
+        },
+        {
+          "code": "puissance-contact",
+          "libelle": "Puissance au contact"
+        },
+        {
+          "code": "enchainer-efforts",
+          "libelle": "Enchaîner les efforts (se relever, se replacer vite)"
+        },
+        {
+          "code": "appuis-agilite",
+          "libelle": "Appuis et agilité"
+        }
+      ]
+    },
+    {
+      "cle": "comprehension",
+      "ordre": 3,
+      "libelle": "Lecture du jeu",
+      "ressource_ffr": "Ressources perceptives et décisionnelles",
+      "sous_criteres": [
+        {
+          "code": "voir-espaces",
+          "libelle": "Voir les espaces et les surnombres"
+        },
+        {
+          "code": "bon-choix",
+          "libelle": "Faire le bon choix au bon moment"
+        },
+        {
+          "code": "placement-replacement",
+          "libelle": "Placement et replacement"
+        },
+        {
+          "code": "plan-de-jeu",
+          "libelle": "Appliquer les consignes et le plan de jeu"
+        },
+        {
+          "code": "discipline",
+          "libelle": "Discipline (hors-jeu, fautes évitables)"
+        }
+      ]
+    },
+    {
+      "cle": "etat_esprit",
+      "ordre": 4,
+      "libelle": "Engagement & collectif",
+      "ressource_ffr": "Ressources affectives et relationnelles",
+      "sous_criteres": [
+        {
+          "code": "oser-contact",
+          "libelle": "Oser le contact"
+        },
+        {
+          "code": "soutenir-partenaires",
+          "libelle": "Soutenir mes partenaires"
+        },
+        {
+          "code": "communiquer",
+          "libelle": "Communiquer sur le terrain"
+        },
+        {
+          "code": "respect",
+          "libelle": "Respect (arbitre, adversaires, partenaires)"
+        },
+        {
+          "code": "encourager",
+          "libelle": "Encourager et rester positif avec le groupe"
+        }
+      ]
+    },
+    {
+      "cle": "mental",
+      "ordre": 5,
+      "libelle": "Mental",
+      "ressource_ffr": "Habiletés mentales",
+      "sous_criteres": [
+        {
+          "code": "concentration",
+          "libelle": "Concentration du début à la fin"
+        },
+        {
+          "code": "confiance",
+          "libelle": "Confiance en moi"
+        },
+        {
+          "code": "gerer-emotions",
+          "libelle": "Gérer mes émotions (pression, arbitrage)"
+        },
+        {
+          "code": "rebondir",
+          "libelle": "Rebondir après une erreur"
+        },
+        {
+          "code": "combativite",
+          "libelle": "Combativité et motivation"
+        }
+      ]
+    },
+    {
+      "cle": "tech_poste",
+      "ordre": 6,
+      "libelle": "Technique au poste",
+      "ressource_ffr": "Ressources techniques — spécialisation au poste",
+      "sous_criteres_par_famille_de_postes": true,
+      "sous_criteres": []
+    }
+  ],
+  "poste": {
+    "categories_sans_sous_criteres": [
+      "M6",
+      "M8",
+      "M10"
+    ],
+    "familles": [
+      {
+        "code": "piliers",
+        "libelle": "Piliers (1 et 3)",
+        "postes_codes": [
+          "PG",
+          "PD",
+          "PIL"
+        ],
+        "sous_criteres": [
+          {
+            "code": "melee",
+            "libelle": "Ma mêlée : me placer, me lier, tenir ma ligne de poussée"
+          },
+          {
+            "code": "lifter-touche",
+            "libelle": "Lifter en touche",
+            "categories_masquees": [
+              "M12"
+            ]
+          },
+          {
+            "code": "ligne-avantage",
+            "libelle": "Gagner la ligne d'avantage sur les collisions"
+          },
+          {
+            "code": "deblayer-rucks",
+            "libelle": "Déblayer et nettoyer les rucks"
+          },
+          {
+            "code": "defense-bord-rucks",
+            "libelle": "Plaquer et défendre sur le bord des rucks"
+          },
+          {
+            "code": "se-relever-replacer",
+            "libelle": "Me relever et me replacer vite après les mêlées et les rucks"
+          }
+        ]
+      },
+      {
+        "code": "talonneur",
+        "libelle": "Talonneur (2)",
+        "postes_codes": [
+          "TAL"
+        ],
+        "sous_criteres": [
+          {
+            "code": "lancer-touche",
+            "libelle": "Mon lancer en touche (précision, timing)"
+          },
+          {
+            "code": "melee-talonner",
+            "libelle": "Ma mêlée : talonner et tenir ma ligne"
+          },
+          {
+            "code": "annonces-touche",
+            "libelle": "Connaître et annoncer les combinaisons de touche"
+          },
+          {
+            "code": "renvois",
+            "libelle": "Être disponible sur les renvois"
+          },
+          {
+            "code": "porter-contact",
+            "libelle": "Porter le ballon et me battre au contact"
+          },
+          {
+            "code": "gratter",
+            "libelle": "Défendre et gratter les ballons au sol"
+          }
+        ]
+      },
+      {
+        "code": "deuxieme_ligne",
+        "libelle": "2ᵉ lignes (4 et 5)",
+        "postes_codes": [
+          "2LG",
+          "2LD",
+          "2LU",
+          "2L"
+        ],
+        "sous_criteres": [
+          {
+            "code": "sauter-touche",
+            "libelle": "Sauter en touche, à mon lancer comme au lancer adverse"
+          },
+          {
+            "code": "lifter-touche",
+            "libelle": "Lifter en touche",
+            "categories_masquees": [
+              "M12"
+            ]
+          },
+          {
+            "code": "reception-renvois",
+            "libelle": "Réceptionner les coups d'envoi et les renvois"
+          },
+          {
+            "code": "pousser-melee",
+            "libelle": "Pousser en mêlée (liaison, poussée)"
+          },
+          {
+            "code": "porter-avancer",
+            "libelle": "Porter le ballon et avancer au contact"
+          },
+          {
+            "code": "rucks-mauls",
+            "libelle": "Déblayer les rucks et contester les mauls"
+          },
+          {
+            "code": "volume-jeu",
+            "libelle": "Mon volume de jeu : enchaîner touches, rucks et mauls"
+          }
+        ]
+      },
+      {
+        "code": "flankers",
+        "libelle": "Flankers (6 et 7)",
+        "postes_codes": [
+          "3LG",
+          "3LD"
+        ],
+        "sous_criteres": [
+          {
+            "code": "premier-soutien",
+            "libelle": "Être le premier au soutien du porteur"
+          },
+          {
+            "code": "gratter",
+            "libelle": "Gratter et contester les ballons au sol"
+          },
+          {
+            "code": "plaquer-souvent",
+            "libelle": "Plaquer souvent et avec efficacité"
+          },
+          {
+            "code": "pression-charniere",
+            "libelle": "Ma défense : monter vite et mettre la pression sur la charnière adverse"
+          },
+          {
+            "code": "lier-pousser-melee",
+            "libelle": "Me lier et pousser en mêlée, puis m'en détacher au bon moment",
+            "categories_masquees": [
+              "M12"
+            ]
+          },
+          {
+            "code": "sauter-lifter-touche",
+            "libelle": "Sauter ou lifter en touche"
+          },
+          {
+            "code": "lien-avants-arrieres",
+            "libelle": "Faire le lien entre avants et arrières"
+          }
+        ]
+      },
+      {
+        "code": "n8",
+        "libelle": "N°8 (8)",
+        "postes_codes": [
+          "N8"
+        ],
+        "sous_criteres": [
+          {
+            "code": "controle-fond-melee",
+            "libelle": "Contrôler le ballon en fond de mêlée"
+          },
+          {
+            "code": "partir-melee",
+            "libelle": "Partir de la mêlée (ballon porté ou passe à la charnière)"
+          },
+          {
+            "code": "franchir",
+            "libelle": "Porter le ballon et franchir la ligne d'avantage"
+          },
+          {
+            "code": "defense-avants",
+            "libelle": "Organiser la défense des avants autour des rucks"
+          },
+          {
+            "code": "touche-renvois",
+            "libelle": "Sauter en touche et réceptionner les renvois"
+          },
+          {
+            "code": "soutien",
+            "libelle": "Lire le jeu pour être au bon endroit en soutien"
+          }
+        ]
+      },
+      {
+        "code": "demi_melee",
+        "libelle": "Demi de mêlée (9)",
+        "postes_codes": [
+          "DM"
+        ],
+        "sous_criteres": [
+          {
+            "code": "passe",
+            "libelle": "Ma passe : vitesse, précision, passe des deux côtés"
+          },
+          {
+            "code": "introduction-sortie",
+            "libelle": "Mon introduction en mêlée et la sortie du ballon"
+          },
+          {
+            "code": "animer-avants",
+            "libelle": "Animer les avants : les guider et les placer"
+          },
+          {
+            "code": "jeu-pied-rucks",
+            "libelle": "Jouer au pied depuis les rucks (box kick, dégagement)"
+          },
+          {
+            "code": "choix-jeu",
+            "libelle": "Choisir entre jouer moi-même, passer aux avants ou ouvrir"
+          },
+          {
+            "code": "couverture-ruck",
+            "libelle": "Couvrir en défense et défendre autour du ruck"
+          },
+          {
+            "code": "communiquer-ouvreur",
+            "libelle": "Communiquer avec l'ouvreur"
+          }
+        ]
+      },
+      {
+        "code": "ouvreur",
+        "libelle": "Ouvreur (10)",
+        "postes_codes": [
+          "DO"
+        ],
+        "sous_criteres": [
+          {
+            "code": "diriger-jeu",
+            "libelle": "Diriger le jeu : annonces, placement de la ligne"
+          },
+          {
+            "code": "choix-main-pied",
+            "libelle": "Choisir entre jeu à la main et jeu au pied"
+          },
+          {
+            "code": "jeu-pied-occupation",
+            "libelle": "Mon jeu au pied d'occupation et de pression"
+          },
+          {
+            "code": "fixer-passer",
+            "libelle": "Fixer et faire jouer mes partenaires (passe, timing)"
+          },
+          {
+            "code": "attaquer-ligne",
+            "libelle": "Attaquer la ligne et jouer les intervalles"
+          },
+          {
+            "code": "defense-couloir",
+            "libelle": "Ma défense dans mon couloir"
+          },
+          {
+            "code": "communiquer-9-centres",
+            "libelle": "Communiquer avec le 9 et les centres"
+          }
+        ]
+      },
+      {
+        "code": "ailiers",
+        "libelle": "Ailiers (11 et 14)",
+        "postes_codes": [
+          "AG",
+          "AD",
+          "AIU",
+          "AIL"
+        ],
+        "sous_criteres": [
+          {
+            "code": "finir",
+            "libelle": "Finir les actions : marquer, dépasser mon défenseur"
+          },
+          {
+            "code": "placement-attaque",
+            "libelle": "Mon placement en attaque : largeur, profondeur, aile opposée"
+          },
+          {
+            "code": "duels",
+            "libelle": "Mes duels et ma capacité à éliminer"
+          },
+          {
+            "code": "defense-couloir",
+            "libelle": "Défendre dans mon couloir : glisser et ne pas me faire déborder"
+          },
+          {
+            "code": "ballons-hauts",
+            "libelle": "Réceptionner les ballons hauts"
+          },
+          {
+            "code": "couverture",
+            "libelle": "Couvrir en défense avec l'arrière et me replacer"
+          },
+          {
+            "code": "revenir-jeu",
+            "libelle": "Revenir dans le jeu au milieu du terrain (me rendre disponible)"
+          }
+        ]
+      },
+      {
+        "code": "centres",
+        "libelle": "Centres (12 et 13)",
+        "postes_codes": [
+          "CG",
+          "CD",
+          "CTU",
+          "CTR"
+        ],
+        "sous_criteres": [
+          {
+            "code": "percer",
+            "libelle": "Attaquer la ligne et percer"
+          },
+          {
+            "code": "fixer-passer",
+            "libelle": "Fixer mon défenseur et faire la passe au bon moment"
+          },
+          {
+            "code": "lignes-course",
+            "libelle": "Jouer les lignes de course et les combinaisons de mon couloir"
+          },
+          {
+            "code": "plaquage-central",
+            "libelle": "Mon plaquage dans le couloir central"
+          },
+          {
+            "code": "defense-ligne",
+            "libelle": "Organiser la défense de la ligne (monter ensemble, communiquer)"
+          },
+          {
+            "code": "conserver",
+            "libelle": "Porter le ballon et conserver au contact"
+          },
+          {
+            "code": "soutien-franchissement",
+            "libelle": "Soutenir les ballons cassés et les franchissements"
+          }
+        ]
+      },
+      {
+        "code": "arriere",
+        "libelle": "Arrière (15)",
+        "postes_codes": [
+          "AR"
+        ],
+        "sous_criteres": [
+          {
+            "code": "ballons-hauts",
+            "libelle": "Réceptionner les ballons hauts"
+          },
+          {
+            "code": "placement-defensif",
+            "libelle": "Mon placement défensif : couverture et triangle avec les ailiers"
+          },
+          {
+            "code": "contre-attaque",
+            "libelle": "Contre-attaquer en relançant le jeu au bon moment"
+          },
+          {
+            "code": "jeu-pied-reponse",
+            "libelle": "Jouer au pied pour répondre au jeu au pied adverse"
+          },
+          {
+            "code": "intercaler",
+            "libelle": "M'intercaler dans la ligne en attaque"
+          },
+          {
+            "code": "dernier-rempart",
+            "libelle": "Être le dernier rempart : plaquer quand je suis seul en défense"
+          },
+          {
+            "code": "arriere-garde",
+            "libelle": "Communiquer et organiser l'arrière-garde"
+          }
+        ]
+      }
+    ],
+    "buteur": {
+      "code": "buteur",
+      "libelle": "Mes tirs au but et transformations",
+      "note": "Proposé à tout joueur, quel que soit son poste, sous le critère Technique au poste.",
+      "categories_masquees": [
+        "M6",
+        "M8",
+        "M10"
+      ]
+    }
+  }
+}
