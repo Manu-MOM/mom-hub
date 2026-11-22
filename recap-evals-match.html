@@ -13,7 +13,12 @@
        lecture seule, droits portés par lister_evals_match. Page autonome
        (pas de hub.css), patron grille-veo.html. Logique :
        js/recap-evals-match.js. La colonne ⚠ (santé) n'est jamais
-       imprimée (R6). -->
+       imprimée (R6).
+       EVAL-JOUEUR Avenant C, lot C3 (22/11/2026, FAIT FOI §11 D42/D43) :
+       6 critères, nombre de points « à travailler », colonnes Poste joué
+       et Objectifs, détail par joueur à l'écran seulement (.nb, .poste,
+       .re-detail*) ; + js/criteres-eval.js. Logique :
+       js/recap-evals-match.js v1.1. -->
   <style>
     @page { size: A4 landscape; margin: 7mm; }
     body { font-family: Arial, sans-serif; font-size: 8.5pt; margin: 0; color: #111; background: #fff; }
@@ -59,6 +64,11 @@
     .gene { color: #b11; font-weight: 700; }
     .synthese { margin-top: 2mm; font-size: 7.5pt; color: #333; display: flex; gap: 6mm; flex-wrap: wrap; }
     .pied { margin-top: 1mm; font-size: 6.5pt; color: #777; }
+    /* --- Avenant C (C3) --- */
+    .nb { display: block; font-size: 5.8pt; color: #333; line-height: 1; margin-top: .2mm; }
+    .re-feuille td.poste { font-size: 6.6pt; line-height: 1.05; text-align: left; }
+    .re-detail-btn { font: inherit; font-size: 11px; padding: 2px 6px; margin-left: 4px; border: 1px solid #0c3d24; border-radius: 4px; background: #fff; color: #0c3d24; cursor: pointer; }
+    .re-feuille tr.re-detail td { text-align: left; font-size: 7.5pt; background: #faf7ee; padding: 1mm 2mm; line-height: 1.35; }
 
     [hidden] { display: none !important; }
 
@@ -85,6 +95,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="js/supabase-client.js"></script>
+  <script src="js/criteres-eval.js"></script>
   <script src="js/recap-evals-match.js"></script>
   <script>
     /* Boot (patron grille-veo.html) : anonyme → login.html ; droits de
