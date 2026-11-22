@@ -126,6 +126,10 @@ INTERDITS non modifiés (`hub-agenda.js` `817b4a6f`, `hub-agenda.css` `13d67a67`
 - 22/11/2026 — Maquette validée par Manu sur ses principes (canevas « MOM Hub — Auto-évaluation et éval match, Avenant C » + version HTML). **D45** : sous-critères « Technique » révisés ; référentiel v1.1. Lot C3 entamé puis suspendu à la demande de Manu.
 - 22/11/2026 — Avenant C, **C3 livré** (front staff, recette en attente) : `js/criteres-eval.js` v1.0 (nouveau, lecture partagée du référentiel), `supabase-client.js` v2.02, `eval-match.js` v1.6 + `eval-match.html`, `evaluation-joueur.js` v1.5 + `evaluation-joueur.html`, `recap-evals-match.js` v1.1 + `recap-evals-match.html`. Choix techniques tracés : famille de postes du bilan déduite des codes enregistrés (préfixe), sinon de la dernière auto-évaluation, sinon à choisir ; code de catégorie du match lu par `getCategories()` pour les masquages ; détail du récap à l'écran seulement.
 - 22/11/2026 — C3 : correctif CSS `.em-sc[hidden]` / `.ev-sc[hidden]` (le bloc « à travailler » restait ouvert en vert), commité ; **recette C3 verte** (Manu). **C4 livré** (espace joueur, recette en attente) : `espace-joueur.js` v2.3 + `espace-joueur.html` (auto-évaluation à 6 critères, « Ce que je veux travailler », poste joué, rappel des objectifs du dernier match, 3 objectifs pour le prochain, comparaison enrichie, points à travailler du coach dans les bilans).
+- 22/11/2026 — **Recette C4 verte** (Manu). Avenant C clos (STATE pt 296).
+- 22/11/2026 — Recette Manu (Jules, match de Beaune) : éval antérieure à l'auto-évaluation sans avis du joueur, critères du coach invisibles ; correctif `espace-joueur.js` v2.4 (choix A : bloc « L'avis du coach » seul + « Donner aussi mon avis »), commité (`d9514d6`). Sonde : aucun autre cas en base.
+- 22/11/2026 — **Avenant D** (vidéo VEO du match) proposé au gel (§12), enchaîné dans la même conversation à la demande de Manu (« on enchaîne ici ») : écart de gouvernance à tracer dans STATE.
+- 22/11/2026 — **Avenant D gelé par Manu** (« je gèle ») : D46–D50 retenus. Choix technique tracé : un nouvel enregistrement d'éval sans lien individuel conserve l'ancien lien de l'éval (repli D47), qui ne s'efface plus depuis l'écran.
 
 ---
 
@@ -266,3 +270,32 @@ Retours terrain du 22/11/2026 : **Milan** (référent M16) demande que le joueur
 - Points de vigilance du coach repris automatiquement dans l'auto-évaluation suivante (variante « c » évoquée en réflexion).
 - Statistiques sur les sous-critères (tendances d'équipe, besoins les plus cochés).
 - Ajout d'un 7ᵉ critère principal (cf. D38).
+
+## 12. Avenant D — VIDÉO VEO DU MATCH (GELÉ par Manu le 22/11/2026)
+
+Idée de Manu (22/11/2026) : saisir le lien VEO une seule fois pour le match, sur la page Évals match, et qu'il alimente automatiquement toutes les évaluations individuelles. Option A retenue par Manu (lien porté par le match), et la vidéo doit aussi être visible des joueurs de la feuille qui n'ont pas d'éval publiée (« oui »). Avenant gelé par Manu le 22/11/2026 (« je gèle ») : recommandations D46–D50 retenues.
+
+### 12.1 Faits sondés (22/11/2026)
+
+- Le lien VEO n'existe qu'au niveau de l'éval individuelle : `eval_match.veo_url` (+ `veo_moments`, D28). Aucune colonne VEO ailleurs en base.
+- Usage actuel : 7 évals match sur 4 matchs, une seule avec un lien (Beaune, Jules), aucun moment saisi.
+- Droits d'écriture d'une éval : `_ej_peut_ecrire_joueur` = admin, bureau, ou `puis_je_ecrire_categorie` sur la catégorie du joueur ou celle du match (`_ej_cat_evenement`, qui remonte au plateau parent).
+
+### 12.2 Décisions
+
+- **D46 — Un lien VEO par match.** Fenêtre « Vidéo du match » en tête de la page Évals match : un champ, saisi une fois, modifiable, effaçable. Stocké dans une petite table dédiée (`video_match`, une ligne par match), lue et écrite uniquement par RPC (RLS sans accès direct). Droits : admin, bureau, encadrants de la catégorie du match. Lien `https://` obligatoire (même contrôle que D28). [Recommandé : table dédiée plutôt qu'une colonne sur `evenements`, pour ne toucher à aucun consommateur existant]
+- **D47 — Le lien du match alimente toutes les évals.** Le champ « Lien VEO » disparaît de l'éval individuelle. Les moments à revoir restent par joueur et exigent qu'un lien existe (celui du match, ou pour l'existant celui de l'éval). Lien affiché = celui du match ; à défaut, l'ancien lien de l'éval (repli, cas de Beaune). [Recommandé]
+- **D48 — Vidéo visible de toute la feuille.** Dans l'espace joueur, la vidéo d'un match passé de la saison est proposée à tout joueur de la feuille (compo de match active) ou évalué sur ce match, même sans éval publiée : bouton « Revoir le match » sur la carte du match (dernier match, avis à donner, historique) et carte « Mes vidéos de match » dans « Ma saison » (la plus récente en premier). *(Manu)*
+- **D49 — Pas de verrou sur la vidéo.** La vidéo du match n'est pas un contenu du coach : elle reste visible même quand l'éval du coach est verrouillée en attendant l'avis du joueur (D19). Les moments notés par le coach, eux, restent dans l'éval et suivent le verrou. [Recommandé]
+- **D50 — Changement de lien.** Modifier ou effacer le lien du match vaut pour tout le monde, immédiatement. [Recommandé]
+
+### 12.3 Lots
+
+- **D1 — SQL `sql_287`** : table `video_match` + RLS ; RPC `definir_video_match(p_evenement_id, p_veo_url)` (staff) ; `lister_evals_match` : + `match.veo_url` ; `_ej_json_match` : lien affiché = celui du match, sinon celui de l'éval ; `enregistrer_eval_match` : moments acceptés si le match a un lien ; `get_espace_joueur` : + clé `videos` (matchs de la saison avec lien, où le joueur est sur la feuille ou évalué) et `veo_url` sur les éléments `a_auto_evaluer`. Essai à blanc avec tests, COMMIT sur « feu vert COMMIT ».
+- **D2 — Front staff** : `supabase-client.js` (+ `definirVideoMatch`), `eval-match.js` + `eval-match.html` (fenêtre « Vidéo du match », champ individuel retiré, moments conservés).
+- **D3 — Front joueur** : `espace-joueur.js` + `espace-joueur.html` (bouton « Revoir le match », carte « Mes vidéos de match »).
+
+### 12.4 Hors périmètre
+
+- Plusieurs vidéos par match (mi-temps séparées, angles) : un seul lien pour l'instant.
+- Lien VEO dans le récap après match ou les pages de suivi de match.
