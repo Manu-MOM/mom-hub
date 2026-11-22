@@ -1,6 +1,18 @@
 /* =====================================================================
  * eval-match.js — Saisie des évals match (MOM Hub)
  * ---------------------------------------------------------------------
+ * Version : v1.6 — 22 novembre 2026 — EVAL-JOUEUR Avenant C, lot C3
+ *   FAIT FOI §11 (D29–D44), sql_286, supabase-client v2.02,
+ *   js/criteres-eval.js v1.0, data/criteres-eval.json v1.1.
+ *   v1.6 : 6 critères alignés sur les ressources FFR (libellé + rappel
+ *          FFR, D29/D30) lus dans le référentiel ; un O ou un R ouvre les
+ *          points « à travailler » (cases, D33), message non bloquant dès
+ *          le seuil (D34) ; « Technique au poste » : liste de la famille
+ *          de postes (déclarée par le joueur, sinon poste de compo du
+ *          titulaire, sinon à choisir, D35/D36) + Buteur, masquages par
+ *          catégorie (D37/D44). Avis du joueur : ses sous-critères, son
+ *          poste, ses objectifs pour le prochain match et le bilan de ses
+ *          objectifs précédents (D40/D41/D42).
  * Version : v1.5 — 17 novembre 2026 — RECAP-EVALS-MATCH v1 (FAIT FOI
  *   Conception-RECAP-EVALS-MATCH-v1.md, gelé par Manu le 17/11/2026)
  *   v1.5 : (R7) bouton « 🖨 Récap du match » dans l'en-tête de la feuille
@@ -60,14 +72,10 @@
 (function () {
   'use strict';
 
-  // Avenant A (D16/D17) : les 5 critères des bilans (mêmes libellés, D6).
-  var CRITERES = [
-    { cle: 'tech_indiv', nom: 'Niveau technique individuel' },
-    { cle: 'physique', nom: 'Niveau physique' },
-    { cle: 'tech_poste', nom: 'Niveau technique au poste' },
-    { cle: 'comprehension', nom: 'Compréhension du jeu' },
-    { cle: 'etat_esprit', nom: "État d'esprit" }
-  ];
+  // v1.6 (Avenant C, D29) : les 6 critères viennent du référentiel
+  // (js/criteres-eval.js), renseignés au démarrage.
+  var CRITERES = [];
+  var CE = window.CriteresEval || null;
   var FEUX_CRITERE = [
     { v: 'V', titre: 'Vert — acquis' },
     { v: 'O', titre: 'Orange — en progrès' },
@@ -95,7 +103,9 @@
     reperes: {},         // v1.1 : personne_id -> repères (ou null si non suivi)
     blessures: {},       // v1.2 : personne_id -> blessures en cours (D26), ou null si refus
     formBlessure: false, // v1.2 : formulaire « Créer une blessure » ouvert
-    liens: {}            // v1.3 : personne_id -> jeton | null (pas de lien) ; absent = inconnu
+    liens: {},           // v1.3 : personne_id -> jeton | null (pas de lien) ; absent = inconnu
+    categorieCode: null, // v1.6 : code de la catégorie du match (masquages D44)
+    familles: {}         // v1.6 : personne_id -> famille de postes choisie par le coach
   };
 
   // ------------------------------------------------------------------
@@ -385,34 +395,134 @@
   // ------------------------------------------------------------------
   // v1.2 (Avenant A) — critères du coach + avis du joueur (D17, D23)
   // ------------------------------------------------------------------
-  function rendreCriteres(e, auto, requise) {
+  // v1.6 (D36) : famille de postes retenue pour « Technique au poste ».
+  function familleDe(j) {
+    if (!j) return null;
+    if (etat.familles[j.personne_id]) return etat.familles[j.personne_id];
+    if (j.auto_eval && j.auto_eval.poste_famille) return j.auto_eval.poste_famille;
+    return CE ? CE.familleDuPoste(j.poste_compo) : null;
+  }
+  function sousCriteresDe(cle, j) {
+    if (!CE) return [];
+    return CE.sousCriteres(cle, { famille: cle === 'tech_poste' ? familleDe(j) : null, categorie: etat.categorieCode });
+  }
+  function htmlAlerte(cle, n) {
+    var seuil = CE ? CE.seuil() : 3;
+    return n >= seuil
+      ? '<div class="em-sc-alerte" role="status">' + esc(CE ? CE.messageAlerte('coach', n) : '') + '</div>' : '';
+  }
+  function htmlCases(cle, j, coches) {
+    var l = sousCriteresDe(cle, j);
+    if (!l.length) return '<p class="ev-note" style="margin:0">Pas de point à cocher pour ce critère.</p>';
+    return '<div class="em-sc-cases">' + l.map(function (x) {
+      return '<label class="em-sc-case"><input type="checkbox" data-sc="' + cle + '" value="' + esc(x.code) + '"'
+        + (coches.indexOf(x.code) >= 0 ? ' checked' : '') + '><span>' + esc(x.libelle) + '</span></label>';
+    }).join('') + '</div>';
+  }
+  function htmlFamille(j) {
+    var fam = familleDe(j);
+    var options = (CE ? CE.familles() : []).map(function (f) {
+      return '<option value="' + esc(f.code) + '"' + (f.code === fam ? ' selected' : '') + '>' + esc(f.nom) + '</option>';
+    }).join('');
+    return '<label class="em-sc-famille">Famille de postes '
+      + '<select data-famille="1"><option value="">Choisir…</option>' + options + '</select></label>';
+  }
+  function htmlBlocSous(c, j, feu, coches) {
+    var poste = c.cle === 'tech_poste';
+    var sansPoste = poste && CE && CE.sansSousCriteresPoste(etat.categorieCode);
+    if (sansPoste) return '';
+    return '<div class="em-sc" data-bloc-sc="' + c.cle + '"' + (feu === 'O' || feu === 'R' ? '' : ' hidden') + '>'
+      + '<div class="em-sc-titre">À travailler <span class="em-aide">Facultatif</span></div>'
+      + (poste ? htmlFamille(j) : '')
+      + '<div data-liste-sc="' + c.cle + '">' + htmlCases(c.cle, j, coches) + '</div>'
+      + '<div data-alerte-sc="' + c.cle + '">' + htmlAlerte(c.cle, coches.length) + '</div></div>';
+  }
+  function libSous(cle, codes) {
+    return (codes || []).map(function (x) { return CE ? CE.libelle(cle, x) : x; });
+  }
+
+  function rendreCriteres(e, auto, requise, j) {
     var crit = e.criteres || {};
+    var scCoach = e.sous_criteres || {};
     var feuxJoueur = auto && auto.feux ? auto.feux : null;
+    var scJoueur = auto && auto.sous_criteres ? auto.sous_criteres : {};
     var lignes = CRITERES.map(function (c) {
       var boutons = FEUX_CRITERE.map(function (f) {
         return '<button type="button" class="ev-feu ev-feu-' + f.v + '" title="' + esc(f.titre) + '"'
           + ' aria-pressed="' + (crit[c.cle] === f.v ? 'true' : 'false') + '"'
           + ' data-critere="' + c.cle + '" data-feu="' + f.v + '">' + f.v + '</button>';
       }).join('');
-      var avis = feuxJoueur && feuxJoueur[c.cle]
-        ? '<span class="em-avis">Le joueur : <span class="ev-pastille ev-pastille-' + esc(feuxJoueur[c.cle]) + '">'
-          + esc(feuxJoueur[c.cle]) + '</span></span>'
+      var fj = feuxJoueur ? feuxJoueur[c.cle] : null;
+      var avis = fj
+        ? '<span class="em-avis">Le joueur : <span class="ev-pastille ev-pastille-' + esc(fj) + '">' + esc(fj) + '</span>'
+          + '<span class="em-ecart" data-ecart="' + c.cle + '"' + (crit[c.cle] && crit[c.cle] !== fj ? '' : ' hidden') + '>vous voyez ça différemment</span></span>'
         : '';
-      return '<div class="em-critere"><span class="em-critere-nom">' + esc(c.nom) + '</span>'
+      var veut = libSous(c.cle, scJoueur[c.cle]);
+      var chips = veut.length
+        ? '<div class="em-veut"><span class="ev-note">Le joueur veut travailler :</span>'
+          + veut.map(function (x) { return '<span class="em-chip">' + esc(x) + '</span>'; }).join('') + '</div>'
+        : '';
+      return '<div class="em-critere-bloc"><div class="em-critere"><span class="em-critere-nom">' + esc(c.nom)
+        + (c.ffr ? '<span class="em-ffr">' + esc(c.ffr) + '</span>' : '') + '</span>'
         + '<div class="ev-feux" role="group" aria-label="' + esc('Critère — ' + c.nom) + '">' + boutons + '</div>'
-        + avis + '</div>';
+        + avis + '</div>' + chips + htmlBlocSous(c, j, crit[c.cle], scCoach[c.cle] || []) + '</div>';
     }).join('');
     var etatAuto;
     if (auto) {
+      var objs = Array.isArray(auto.objectifs) ? auto.objectifs : [];
+      var bilan = Array.isArray(auto.bilan_objectifs) ? auto.bilan_objectifs : [];
+      var libRes = {};
+      (CE ? CE.resultatsObjectifs() : []).forEach(function (r) { libRes[r.code] = r.libelle; });
       etatAuto = '<p class="ev-note" style="margin:.4rem 0 0">Auto-évaluation envoyée le ' + esc(dateCourte(auto.envoye_le)) + '.'
-        + (auto.commentaire ? '</p><div class="ev-reponse" style="margin-top:.4rem"><div class="ev-reponse-titre">Le mot du joueur</div><p>'
-          + esc(auto.commentaire) + '</p></div>' : '</p>');
+        + (auto.poste_famille ? ' Poste déclaré : ' + esc(CE ? CE.libelleFamille(auto.poste_famille) || auto.poste_famille : auto.poste_famille) + '.' : '')
+        + '</p>'
+        + (auto.commentaire ? '<div class="ev-reponse" style="margin-top:.4rem"><div class="ev-reponse-titre">Le mot du joueur</div><p>'
+          + esc(auto.commentaire) + '</p></div>' : '')
+        + (objs.length ? '<div class="ev-reponse" style="margin-top:.4rem"><div class="ev-reponse-titre">Ses objectifs pour le prochain match</div><ol class="em-objectifs">'
+          + objs.map(function (o) { return '<li>' + esc(o) + '</li>'; }).join('') + '</ol></div>' : '')
+        + (bilan.length ? '<div class="ev-reponse" style="margin-top:.4rem"><div class="ev-reponse-titre">Ses objectifs du match précédent</div>'
+          + bilan.map(function (b) {
+            return '<div class="em-bilan-obj"><span>' + esc(b.objectif) + '</span><strong class="em-res-' + esc(b.resultat) + '">'
+              + esc(libRes[b.resultat] || b.resultat) + '</strong></div>';
+          }).join('') + '</div>' : '');
     } else {
       etatAuto = '<p class="ev-note" style="margin:.4rem 0 0">Le joueur n’a pas encore envoyé son auto-évaluation.'
         + (requise ? ' Ton éval publiée ne s’ouvrira pour lui qu’après.' : '') + '</p>';
     }
-    return '<div><div class="ev-champ" id="em-crit-label">Les 5 critères <span class="em-aide">Facultatif — re-clic pour effacer</span></div>'
+    return '<div><div class="ev-champ" id="em-crit-label">Les ' + CRITERES.length + ' critères <span class="em-aide">Facultatif — re-clic pour effacer · O ou R ouvre les points à travailler</span></div>'
       + '<div class="em-criteres" role="group" aria-labelledby="em-crit-label">' + lignes + '</div>' + etatAuto + '</div>';
+  }
+
+  // v1.6 : ouvre / ferme le bloc « à travailler » d'un critère selon son feu.
+  function majBlocSous(cle) {
+    var actif = document.querySelector('#em-saisie .ev-feu[data-critere="' + cle + '"][aria-pressed="true"]');
+    var feu = actif ? actif.getAttribute('data-feu') : null;
+    var bloc = document.querySelector('#em-saisie [data-bloc-sc="' + cle + '"]');
+    if (bloc) {
+      var ouvert = feu === 'O' || feu === 'R';
+      bloc.hidden = !ouvert;
+      if (!ouvert) {
+        Array.prototype.forEach.call(bloc.querySelectorAll('input[data-sc]'), function (x) { x.checked = false; });
+        majAlerte(cle);
+      }
+    }
+    var ecart = document.querySelector('#em-saisie [data-ecart="' + cle + '"]');
+    var j = joueurChoisi();
+    if (ecart && j && j.auto_eval && j.auto_eval.feux) ecart.hidden = !(feu && feu !== j.auto_eval.feux[cle]);
+  }
+  function majAlerte(cle) {
+    var z = document.querySelector('#em-saisie [data-alerte-sc="' + cle + '"]');
+    if (!z) return;
+    var n = document.querySelectorAll('#em-saisie input[data-sc="' + cle + '"]:checked').length;
+    z.innerHTML = htmlAlerte(cle, n);
+  }
+  function changerFamille(select) {
+    var j = joueurChoisi();
+    if (!j) return;
+    etat.familles[j.personne_id] = select.value || null;
+    var z = document.querySelector('#em-saisie [data-liste-sc="tech_poste"]');
+    if (z) z.innerHTML = htmlCases('tech_poste', j, []);
+    majAlerte('tech_poste');
   }
 
   // ------------------------------------------------------------------
@@ -573,10 +683,18 @@
     var info = j.eval
       ? (e.redige_par_nom ? 'Rédigé par ' + e.redige_par_nom : '')
       : 'Rien d’enregistré pour ce joueur.';
+    // v1.6 (D36) : poste de compo (titulaires) et poste déclaré par le joueur.
+    var posteCompo = j.poste_compo && CE ? (CE.libelleFamille(CE.familleDuPoste(j.poste_compo)) || j.poste_compo) : (j.poste_compo || '');
+    var posteDeclare = j.auto_eval && j.auto_eval.poste_famille && CE ? CE.libelleFamille(j.auto_eval.poste_famille) : '';
+    var lignePoste = (posteCompo || posteDeclare)
+      ? '<p class="ev-note" style="margin:0">' + (posteCompo ? 'Poste (compo) : <strong>' + esc(posteCompo) + '</strong>' : 'Remplaçant ou sans compo')
+        + (posteDeclare ? ' · Poste déclaré par le joueur : <strong>' + esc(posteDeclare) + '</strong>' : '') + '</p>'
+      : '';
 
     return '<div class="ev-bloc">'
       + '<div class="ev-periode-tete"><h2>' + esc((j.numero != null ? 'N° ' + j.numero + ' · ' : '') + (j.nom || '') + ' ' + (j.prenom || '')) + '</h2>' + badge + '</div>'
       + '<div class="ev-bloc-corps" style="display:flex;flex-direction:column;gap:1rem">'
+      + lignePoste
       + rendreSignalement(j)
       + '<div><div class="ev-champ" id="em-feu-label">Feu du match</div>'
       + '<div class="em-feux-match" id="em-feux-match" role="group" aria-labelledby="em-feu-label">' + feux + '</div></div>'
@@ -589,7 +707,7 @@
       + '<label class="ev-champ">Le mot du coach <span class="em-aide">Facultatif</span>'
       + '<textarea id="em-mot" rows="2">' + esc(e.mot_coach || '') + '</textarea></label>'
       + rendreVeo(e)
-      + rendreCriteres(e, j.auto_eval || null, !j.eval || !!e.auto_eval_requise)
+      + rendreCriteres(e, j.auto_eval || null, !j.eval || !!e.auto_eval_requise, j)
       + reponse
       + '<div id="em-reperes" aria-live="polite"></div>'
       + '<div class="em-lien" id="em-lien" style="display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;border-top:1px dashed var(--ev-bord);padding-top:.8rem">'
@@ -604,9 +722,16 @@
   function lireSaisie() {
     var actif = document.querySelector('#em-feux-match .ev-feu[aria-pressed="true"]');
     var criteres = {};
+    var sous = {};
     CRITERES.forEach(function (c) {
       var a = document.querySelector('#em-saisie .ev-feu[data-critere="' + c.cle + '"][aria-pressed="true"]');
       criteres[c.cle] = a ? a.getAttribute('data-feu') : null;
+      // v1.6 (D33) : points à travailler, seulement sous un O ou un R.
+      if (criteres[c.cle] === 'O' || criteres[c.cle] === 'R') {
+        var codes = Array.prototype.map.call(document.querySelectorAll('#em-saisie input[data-sc="' + c.cle + '"]:checked'),
+          function (x) { return x.value; });
+        if (codes.length) sous[c.cle] = codes;
+      }
     });
     return {
       personne_id: etat.choisi,
@@ -617,7 +742,8 @@
       mot_coach: $('em-mot').value.trim(),
       veo_url: $('em-veo-url').value.trim(),
       veo_moments: lireMoments(),
-      criteres: criteres
+      criteres: criteres,
+      sous_criteres: sous
     };
   }
 
@@ -736,6 +862,7 @@
         var actif = b.getAttribute('aria-pressed') === 'true';
         Array.prototype.forEach.call(b.parentNode.querySelectorAll('.ev-feu'), function (x) { x.setAttribute('aria-pressed', 'false'); });
         if (!actif) b.setAttribute('aria-pressed', 'true');
+        if (b.getAttribute('data-critere')) majBlocSous(b.getAttribute('data-critere'));
         marquerModifie();
         return;
       }
@@ -747,6 +874,12 @@
     page.addEventListener('input', function (ev) {
       // Le formulaire blessure n'est pas la saisie de l'éval.
       if (ev.target.closest && ev.target.closest('#em-saisie') && !ev.target.closest('.em-blessure-form')) marquerModifie();
+    });
+    // v1.6 : cases « à travailler » et famille de postes.
+    page.addEventListener('change', function (ev) {
+      var t = ev.target;
+      if (t.getAttribute && t.getAttribute('data-sc')) { majAlerte(t.getAttribute('data-sc')); marquerModifie(); }
+      else if (t.getAttribute && t.getAttribute('data-famille')) { changerFamille(t); marquerModifie(); }
     });
     window.addEventListener('beforeunload', function (ev) {
       if (etat.modifie) { ev.preventDefault(); ev.returnValue = ''; }
@@ -768,6 +901,12 @@
       Array.prototype.forEach.call(document.querySelectorAll('#em-saisie .ev-feu[data-critere="' + c.cle + '"]'), function (x) {
         x.setAttribute('aria-pressed', x.getAttribute('data-feu') === s.criteres[c.cle] ? 'true' : 'false');
       });
+      majBlocSous(c.cle);
+      var codes = (s.sous_criteres || {})[c.cle] || [];
+      Array.prototype.forEach.call(document.querySelectorAll('#em-saisie input[data-sc="' + c.cle + '"]'), function (x) {
+        x.checked = codes.indexOf(x.value) >= 0;
+      });
+      majAlerte(c.cle);
     });
     marquerModifie();
   }
@@ -789,8 +928,23 @@
       erreurPage('Client Supabase indisponible (version trop ancienne ?).');
       return;
     }
+    // v1.6 : référentiel des critères (repli sur les 6 libellés s'il manque).
+    if (CE) { await CE.charger(); CRITERES = CE.criteres(); }
+    else {
+      CRITERES = [{ cle: 'tech_indiv', nom: 'Technique' }, { cle: 'physique', nom: 'Physique' },
+        { cle: 'comprehension', nom: 'Lecture du jeu' }, { cle: 'etat_esprit', nom: 'Engagement & collectif' },
+        { cle: 'mental', nom: 'Mental' }, { cle: 'tech_poste', nom: 'Technique au poste' }];
+    }
     if (etat.evenementId) {
       if (!(await chargerFeuille())) return;
+      // v1.6 (D44) : code de la catégorie du match, pour les masquages.
+      if (etat.categorieId && typeof SupabaseHub.getCategories === 'function') {
+        try {
+          var cats = await SupabaseHub.getCategories();
+          var cat = (cats || []).filter(function (c) { return c.id === etat.categorieId; })[0];
+          etat.categorieCode = cat ? cat.code : null;
+        } catch (_) { etat.categorieCode = null; }
+      }
       var pre = etat.params.get('joueur');
       etat.choisi = pre && etat.joueurs.some(function (j) { return j.personne_id === pre; })
         ? pre : (etat.joueurs[0] ? etat.joueurs[0].personne_id : null);
