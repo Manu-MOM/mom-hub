@@ -1,6 +1,17 @@
 /* =====================================================================
  * espace-joueur.js — Espace joueur & famille (MOM Hub)
  * ---------------------------------------------------------------------
+ * Version : v2.4 — 22 novembre 2026 — recette Manu (Jules, match de Beaune)
+ *   Éval publiée SANS auto-évaluation du joueur (éval antérieure à
+ *   l'Avenant A, auto_eval_requise = false) : les critères du coach ne
+ *   s'affichaient nulle part (seulement dans la comparaison), et le
+ *   formulaire d'avis de ce match n'était proposé nulle part quand il
+ *   était « Ton dernier match ». v2.4 (choix A de Manu) : bloc « L'avis
+ *   du coach » seul (6 critères + points à travailler) et bouton
+ *   « Donner aussi mon avis » s'il peut encore répondre ; son formulaire
+ *   figure alors dans « Encore à donner ton avis ». Après l'envoi, la
+ *   comparaison habituelle. Évals récentes : inchangé (verrouillées
+ *   jusqu'à l'avis du joueur, D19). Aucun changement SQL.
  * Version : v2.3 — 22 novembre 2026 — EVAL-JOUEUR Avenant C, lot C4
  *   FAIT FOI §11 (D29–D45), sql_286, js/criteres-eval.js v1.0,
  *   data/criteres-eval.json v1.1.
@@ -268,9 +279,28 @@
   }
 
   // v1.2 (D23) : comparaison neutre, critère par critère.
+  // v2.4 : éval sans auto-évaluation du joueur — l'avis du coach seul.
+  function blocAvisCoach(m) {
+    var coach = m.criteres || {};
+    var sc = m.sous_criteres || {};
+    if (!CRITERES.some(function (c) { return coach[c.cle]; })) return '';
+    var lignes = CRITERES.map(function (c) {
+      var lc = libs(c.cle, sc[c.cle]);
+      return '<div class="ej-critere">' + pastille(coach[c.cle])
+        + '<div class="ej-critere-texte"><strong>' + esc(c.nom) + (coach[c.cle] ? ' · ' + esc(FEU_CRITERE_MATCH[coach[c.cle]]) : '') + '</strong>'
+        + (lc.length ? '<span class="ej-meta">À travailler : ' + esc(lc.join(' · ')) + '</span>' : '') + '</div></div>';
+    }).join('');
+    var peut = aAutoEvaluer(m.evenement_id);
+    return '<div class="ej-encart ej-compare"><span class="ej-encart-titre">L’avis du coach'
+      + (m.publie_par_prenom ? ' · ' + esc(m.publie_par_prenom) : '') + '</span>' + lignes
+      + (peut ? '<p class="ej-meta" style="margin-top:6px">Toi, comment as-tu vu ce match ? Donne ton avis pour comparer.</p>'
+        + '<button type="button" class="ej-btn ej-btn-clair" data-aller-auto="' + esc(m.evenement_id) + '">Donner aussi mon avis</button>' : '')
+      + '</div>';
+  }
+
   function blocComparaison(m) {
     var a = m.auto_eval;
-    if (!a || !a.feux) return '';
+    if (!a || !a.feux) return blocAvisCoach(m);
     var coach = m.criteres || {};
     var coachNote = CRITERES.some(function (c) { return coach[c.cle]; });
     var ecarts = 0;
@@ -741,7 +771,10 @@
       h += '<section class="ej-carte"><p class="ej-vide">Pas encore d’évaluation publiée cette saison. '
         + 'Reviens après le prochain match : ton coach t’écrira ici.</p></section>';
     }
-    h += carteAvisAutres(heroEvt);
+    // v2.4 : si « Ton dernier match » montre une éval déjà ouverte, son
+    // formulaire d'avis (s'il existe encore) va dans « Encore à donner ton avis ».
+    var heroAvecForm = heros && !(heros.eval && !heros.eval.verrouille) ? heroEvt : null;
+    h += carteAvisAutres(heroAvecForm);
     var saison = carteObjectifs(bilans) + carteProgression(bilans) + carteFrise();
     if (saison) h += titreSection('Ma saison') + saison;
     var parcours = carteParcours(); // v2.2 (PARCOURS v1.3, D20)
