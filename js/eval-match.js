@@ -1,6 +1,16 @@
 /* =====================================================================
  * eval-match.js — Saisie des évals match (MOM Hub)
  * ---------------------------------------------------------------------
+ * Version : v1.7 — 22 novembre 2026 — EVAL-JOUEUR Avenant D, lot D2
+ *   FAIT FOI §12 (D46–D50), sql_287, supabase-client v2.03.
+ *   v1.7 : (D46) fenêtre « Vidéo du match » en tête de la feuille : un lien
+ *          VEO saisi une fois pour le match (Enregistrer / Ouvrir / Effacer,
+ *          RPC definir_video_match) ; (D47) le champ « lien VEO » disparaît
+ *          de l'éval individuelle, les moments à revoir restent par joueur
+ *          et s'appuient sur le lien du match, ou à défaut sur l'ancien lien
+ *          de l'éval (repli, en lecture) ; sans aucun lien, les moments sont
+ *          grisés. (D50) effacer le lien vaut pour tous, après confirmation.
+ *          Le lien n'est plus envoyé avec l'éval (la base garde l'ancien).
  * Version : v1.6 — 22 novembre 2026 — EVAL-JOUEUR Avenant C, lot C3
  *   FAIT FOI §11 (D29–D44), sql_286, supabase-client v2.02,
  *   js/criteres-eval.js v1.0, data/criteres-eval.json v1.1.
@@ -62,7 +72,8 @@
  *                     ajout depuis les joueurs de la catégorie) et saisie
  *                     de l'éval du joueur sélectionné (D7-a/b) : feu,
  *                     point fort (obligatoire pour publier, D7-f), axe de
- *                     travail, mot du coach, lien VEO + moments (v1.4).
+ *                     travail, mot du coach, moments VEO (v1.4) ; lien VEO
+ *                     saisi une fois pour le match en tête de page (v1.7).
  *   Paramètres optionnels : joueur=<id> (joueur présélectionné),
  *   depuis=joueur (retour vers la page Évaluation de ce joueur).
  *
@@ -105,7 +116,8 @@
     formBlessure: false, // v1.2 : formulaire « Créer une blessure » ouvert
     liens: {},           // v1.3 : personne_id -> jeton | null (pas de lien) ; absent = inconnu
     categorieCode: null, // v1.6 : code de la catégorie du match (masquages D44)
-    familles: {}         // v1.6 : personne_id -> famille de postes choisie par le coach
+    familles: {},        // v1.6 : personne_id -> famille de postes choisie par le coach
+    videoBrouillon: null // v1.7 : lien VEO du match tapé mais pas encore enregistré
   };
 
   // ------------------------------------------------------------------
@@ -269,6 +281,8 @@
       + '<div class="ev-periode-tete"><h2>Feuille de match</h2></div>' + liste + ajout + '</aside>';
 
     $('ev-page').innerHTML = tete + '<div id="em-msg" aria-live="polite"></div>'
+      + (typeof SupabaseHub.definirVideoMatch === 'function'
+        ? '<section class="ev-bloc em-video" id="em-video">' + rendreVideo() + '</section>' : '')
       + '<div class="em-grille">' + feuille + '<section class="em-saisie" id="em-saisie">' + rendreSaisie() + '</section></div>';
     afficherReperes();
     afficherBlessures();
@@ -351,25 +365,127 @@
   }
 
   // ------------------------------------------------------------------
-  // v1.4 (D28) — lien VEO du match + jusqu'à 5 moments
+  // v1.7 (Avenant D, D46/D50) — vidéo du match, un lien pour tous
   // ------------------------------------------------------------------
+  function lienMatch() {
+    return (etat.feuille && etat.feuille.match && etat.feuille.match.veo_url) || null;
+  }
+  function lienSur(url) {
+    // Lien affiché seulement s'il est en https:// (même contrôle que la base).
+    return /^https:\/\//i.test(String(url || '')) ? url : null;
+  }
+  function rendreVideo() {
+    var url = lienMatch();
+    var valeur = etat.videoBrouillon !== null ? etat.videoBrouillon : (url || '');
+    var ouvrir = lienSur(url)
+      ? '<a class="ev-btn" href="' + esc(url) + '" target="_blank" rel="noopener"'
+        + ' style="display:inline-flex;align-items:center;text-decoration:none;">Ouvrir la vidéo ↗</a>' : '';
+    return '<div class="ev-bloc-corps em-video-corps">'
+      + '<div class="em-video-tete"><span class="ev-lien-titre">Vidéo du match</span>'
+      + '<span class="em-aide">' + (url
+        ? 'Lien enregistré : il sert à l’éval de chaque joueur et s’affiche dans l’espace joueur de toute la feuille.'
+        : 'Colle le lien VEO une seule fois : il servira à l’éval de chaque joueur et s’affichera dans l’espace joueur de toute la feuille.')
+      + '</span></div>'
+      + '<div class="em-video-ligne">'
+      + '<input type="url" id="em-video-url" inputmode="url" maxlength="500" placeholder="https://app.veo.co/matches/…"'
+      + ' aria-label="Lien VEO du match" value="' + esc(valeur) + '">'
+      + '<div class="ev-actions"><button type="button" class="ev-btn ev-btn-primaire" data-video="enregistrer">Enregistrer le lien</button>'
+      + ouvrir
+      + (url ? '<button type="button" class="ev-btn ev-btn-discret" data-video="effacer">Effacer</button>' : '')
+      + '</div></div>'
+      + '<div id="em-video-msg" aria-live="polite"></div></div>';
+  }
+  function msgVideo(texte, ok) {
+    var z = $('em-video-msg');
+    if (z) z.innerHTML = texte ? '<div class="' + (ok ? 'ev-ok' : 'ev-erreur') + '">' + esc(texte) + '</div>' : '';
+  }
+  async function agirVideo(action, bouton) {
+    msgVideo('');
+    var champ = $('em-video-url');
+    var url = action === 'effacer' ? '' : (champ ? champ.value.trim() : '');
+    if (action === 'enregistrer') {
+      if (!url) { msgVideo(lienMatch() ? 'Le champ est vide : utilise « Effacer » pour retirer le lien.' : 'Colle d’abord le lien VEO du match.'); return; }
+      if (!/^https:\/\//i.test(url)) { msgVideo('Le lien VEO doit commencer par https://'); return; }
+    } else if (!window.confirm('Effacer le lien VEO du match ? Il disparaît pour tous les joueurs du match.')) {
+      return;
+    }
+    bouton.disabled = true;
+    var r = await SupabaseHub.definirVideoMatch(etat.evenementId, url);
+    if (!r.ok) {
+      bouton.disabled = false;
+      msgVideo(/Droit insuffisant/.test(r.error || '') ? 'Tu n’as pas le droit de modifier la vidéo de ce match.' : r.error);
+      return;
+    }
+    if (etat.feuille.match) etat.feuille.match.veo_url = r.data ? r.data.veo_url || null : null;
+    etat.videoBrouillon = null;
+    await relireLiensEvals();
+    var z = $('em-video');
+    if (z) z.innerHTML = rendreVideo();
+    majVeoSaisie();
+    msgVideo(action === 'effacer' ? 'Lien du match effacé.' : 'Lien du match enregistré.', true);
+  }
+
+  // Le lien renvoyé avec chaque éval est « lien du match, sinon ancien lien
+  // de l'éval » : après un changement, on relit ces liens (sans redessiner
+  // la saisie en cours). En cas d'échec, on garde l'état local.
+  async function relireLiensEvals() {
+    var r = await SupabaseHub.listEvalsMatch(etat.evenementId);
+    if (!r.ok || !r.data) return;
+    var parId = {};
+    (r.data.joueurs || []).forEach(function (x) { parId[x.personne_id] = x; });
+    etat.joueurs.forEach(function (j) {
+      var x = parId[j.personne_id];
+      if (j.eval && x && x.eval) j.eval.veo_url = x.eval.veo_url || null;
+    });
+  }
+
+  // ------------------------------------------------------------------
+  // v1.4 (D28) — moments à revoir (jusqu'à 5) ; v1.7 (D47) : le lien
+  // vient du match (repli : ancien lien de l'éval), plus de champ ici.
+  // ------------------------------------------------------------------
+  function lienEval(e) {
+    return lienMatch() || (e && e.veo_url) || null;
+  }
+  function etatVeo(e) {
+    var m = lienMatch();
+    if (m) {
+      return 'Vidéo du match'
+        + (lienSur(m) ? ' : <a href="' + esc(m) + '" target="_blank" rel="noopener">ouvrir ↗</a>' : ' enregistrée.');
+    }
+    if (e && e.veo_url) {
+      return 'Lien de cette éval (saisi avant la vidéo du match)'
+        + (lienSur(e.veo_url) ? ' : <a href="' + esc(e.veo_url) + '" target="_blank" rel="noopener">ouvrir ↗</a>' : '.');
+    }
+    return 'Ajoute d’abord le lien VEO du match, en haut de la page, pour noter des moments.';
+  }
   function rendreVeo(e) {
     var moments = Array.isArray(e.veo_moments) ? e.veo_moments : [];
+    var inactif = lienEval(e) ? '' : ' disabled';
     var lignes = '';
     for (var i = 0; i < NB_MOMENTS; i++) {
       var m = moments[i] || {};
       lignes += '<div class="em-moment" style="display:grid;grid-template-columns:minmax(80px,110px) minmax(0,1fr);gap:.5rem">'
         + '<input type="text" data-moment-minute="' + i + '" maxlength="10" placeholder="' + (i === 0 ? '24:10' : 'mm:ss') + '"'
-        + ' aria-label="' + esc('Moment ' + (i + 1) + ' — minute') + '" value="' + esc(m.minute || '') + '">'
+        + ' aria-label="' + esc('Moment ' + (i + 1) + ' — minute') + '" value="' + esc(m.minute || '') + '"' + inactif + '>'
         + '<input type="text" data-moment-libelle="' + i + '" maxlength="60" placeholder="' + (i === 0 ? 'Ex. ton plaquage sur le 10' : 'Libellé (facultatif)') + '"'
-        + ' aria-label="' + esc('Moment ' + (i + 1) + ' — libellé') + '" value="' + esc(m.libelle || '') + '">'
+        + ' aria-label="' + esc('Moment ' + (i + 1) + ' — libellé') + '" value="' + esc(m.libelle || '') + '"' + inactif + '>'
         + '</div>';
     }
-    return '<div style="display:flex;flex-direction:column;gap:.5rem;background:var(--feedback-info-bg,#eaf1fa);border-radius:10px;padding:.8rem .9rem">'
-      + '<label class="ev-champ">Revoir tes actions — lien VEO du match <span class="em-aide">Facultatif, commence par https://</span>'
-      + '<input type="url" id="em-veo-url" inputmode="url" placeholder="https://app.veo.co/matches/…" value="' + esc(e.veo_url || '') + '"></label>'
-      + '<div class="ev-champ" style="margin:0">Moments à revoir <span class="em-aide">Jusqu’à ' + NB_MOMENTS + ' : minute + ce qu’il doit regarder</span></div>'
+    return '<div id="em-veo" style="display:flex;flex-direction:column;gap:.5rem;background:var(--feedback-info-bg,#eaf1fa);border-radius:10px;padding:.8rem .9rem">'
+      + '<div class="ev-champ" style="margin:0">Revoir tes actions — moments à revoir <span class="em-aide">Facultatif · jusqu’à ' + NB_MOMENTS + ' : minute + ce qu’il doit regarder</span></div>'
+      + '<p class="ev-note" id="em-veo-etat" style="margin:0">' + etatVeo(e) + '</p>'
       + lignes + '</div>';
+  }
+  // v1.7 : après un changement du lien du match, met à jour la saisie en
+  // cours sans la redessiner (les moments tapés sont conservés).
+  function majVeoSaisie() {
+    var j = joueurChoisi();
+    var e = (j && j.eval) || {};
+    var z = $('em-veo-etat');
+    if (z) z.innerHTML = etatVeo(e);
+    var actif = !!lienEval(e);
+    Array.prototype.forEach.call(document.querySelectorAll('#em-saisie [data-moment-minute], #em-saisie [data-moment-libelle]'),
+      function (x) { x.disabled = !actif; });
   }
   function lireMoments() {
     var out = [];
@@ -740,7 +856,7 @@
       point_fort: $('em-point-fort').value.trim(),
       axe_travail: $('em-axe').value.trim(),
       mot_coach: $('em-mot').value.trim(),
-      veo_url: $('em-veo-url').value.trim(),
+      // v1.7 (D47) : plus de lien VEO par éval ; la base garde l'ancien.
       veo_moments: lireMoments(),
       criteres: criteres,
       sous_criteres: sous
@@ -851,6 +967,8 @@
       }
       var li = b.getAttribute('data-lien');
       if (li) { agirLien(li, b); return; }
+      var vi = b.getAttribute('data-video');
+      if (vi) { agirVideo(vi, b); return; }
       var bl = b.getAttribute('data-blessure');
       if (bl) {
         if (bl === 'ouvrir') { etat.formBlessure = true; garderSaisie(); }
@@ -872,8 +990,17 @@
       if (b.id === 'em-ajout-btn') { ajouterJoueur(); return; }
     });
     page.addEventListener('input', function (ev) {
+      // v1.7 : lien VEO du match tapé, gardé si la page se redessine.
+      if (ev.target.id === 'em-video-url') { etat.videoBrouillon = ev.target.value; return; }
       // Le formulaire blessure n'est pas la saisie de l'éval.
       if (ev.target.closest && ev.target.closest('#em-saisie') && !ev.target.closest('.em-blessure-form')) marquerModifie();
+    });
+    // v1.7 : Entrée dans le champ du lien du match = Enregistrer le lien.
+    page.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Enter' || ev.target.id !== 'em-video-url') return;
+      ev.preventDefault();
+      var b = document.querySelector('#em-video [data-video="enregistrer"]');
+      if (b && !b.disabled) agirVideo('enregistrer', b);
     });
     // v1.6 : cases « à travailler » et famille de postes.
     page.addEventListener('change', function (ev) {
@@ -882,7 +1009,9 @@
       else if (t.getAttribute && t.getAttribute('data-famille')) { changerFamille(t); marquerModifie(); }
     });
     window.addEventListener('beforeunload', function (ev) {
-      if (etat.modifie) { ev.preventDefault(); ev.returnValue = ''; }
+      if (etat.modifie || (etat.videoBrouillon !== null && etat.videoBrouillon.trim() !== (lienMatch() || ''))) {
+        ev.preventDefault(); ev.returnValue = '';
+      }
     });
   }
 
@@ -893,7 +1022,7 @@
     rendreMatch();
     if (!s) return;
     $('em-point-fort').value = s.point_fort; $('em-axe').value = s.axe_travail; $('em-mot').value = s.mot_coach;
-    $('em-veo-url').value = s.veo_url; ecrireMoments(s.veo_moments);
+    ecrireMoments(s.veo_moments);
     Array.prototype.forEach.call(document.querySelectorAll('#em-feux-match .ev-feu'), function (x) {
       x.setAttribute('aria-pressed', x.getAttribute('data-feu') === s.feu ? 'true' : 'false');
     });
