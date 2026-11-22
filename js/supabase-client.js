@@ -18,6 +18,12 @@
  *   Pour l'accès aux données sensibles, l'utilisateur doit s'authentifier
  *   via Magic Link (Phase 2.5).
  *
+ * Version : 2.02 — 22 novembre 2026
+ *   v2.02 : EVAL-JOUEUR Avenant C, lot C3 (sql_286, FAIT FOI §11). saveEvalBilan
+ *          transmet feux.mental, obs.mental et sous_criteres ; saveEvalMatch
+ *          transmet criteres.mental et sous_criteres ({ "<critère>": [codes] },
+ *          seulement sous un critère O ou R, contrôle base). Absents = vides
+ *          (la RPC remplace tout). Aucun autre changement.
  * Version : 2.01 — 21 novembre 2026
  *   v2.01 : PARCOURS-PERFORMANCE v1.3, lot L6 (sql_281, FAIT FOI v1.3
  *          D14-D17). + listParcoursCandidats, listParcoursConvocations,
@@ -5630,8 +5636,9 @@
     /**
      * Crée ou met à jour le bilan d'une période (unicité joueur × saison ×
      * période côté base). b = { personne_id, periode, objectif_1?, objectif_2?,
-     * feux: {tech_indiv, physique, tech_poste, comprehension, etat_esprit},
-     * obs: {…mêmes clés}, saison_id? }. Feu ∈ V | O | R | null.
+     * feux: {tech_indiv, physique, tech_poste, comprehension, etat_esprit, mental},
+     * obs: {…mêmes clés}, sous_criteres?: { "<critère>": [codes] }, saison_id? }.
+     * Feu ∈ V | O | R | null. v2.02 : mental et sous_criteres (Avenant C).
      */
     async saveEvalBilan(b) {
       if (!b || !b.personne_id) return { ok: false, error: 'personne_id requis' };
@@ -5656,7 +5663,11 @@
         p_obs_tech_poste: v(o.tech_poste),
         p_obs_comprehension: v(o.comprehension),
         p_obs_etat_esprit: v(o.etat_esprit),
-        p_saison_id: b.saison_id || null
+        p_saison_id: b.saison_id || null,
+        // v2.02 (Avenant C) : 6ᵉ critère et sous-critères.
+        p_feu_mental: v(f.mental),
+        p_obs_mental: v(o.mental),
+        p_sous_criteres: (b.sous_criteres && typeof b.sous_criteres === 'object') ? b.sous_criteres : {}
       }, 'saveEvalBilan');
     },
 
@@ -5713,7 +5724,10 @@
         p_feu_tech_poste: v(c.tech_poste),
         p_feu_comprehension: v(c.comprehension),
         p_feu_etat_esprit: v(c.etat_esprit),
-        p_veo_moments: Array.isArray(m.veo_moments) ? m.veo_moments : []
+        p_veo_moments: Array.isArray(m.veo_moments) ? m.veo_moments : [],
+        // v2.02 (Avenant C) : 6ᵉ critère et sous-critères.
+        p_feu_mental: v(c.mental),
+        p_sous_criteres: (m.sous_criteres && typeof m.sous_criteres === 'object') ? m.sous_criteres : {}
       }, 'saveEvalMatch');
     },
 
