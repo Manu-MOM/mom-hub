@@ -1,6 +1,18 @@
 /* =====================================================================
  * espace-joueur.js — Espace joueur & famille (MOM Hub)
  * ---------------------------------------------------------------------
+ * Version : v2.5 — 22 novembre 2026 — EVAL-JOUEUR Avenant D, lot D3
+ *   FAIT FOI §12 (D46–D50), sql_287. Vidéo VEO du match, saisie une fois
+ *   par le staff, visible de toute la feuille (même sans éval publiée).
+ *   v2.5 : (D48) bouton « Revoir le match » sur le formulaire d'avis d'un
+ *          match (dernier match, « Encore à donner ton avis ») d'après
+ *          a_auto_evaluer[].veo_url ; carte « Mes vidéos de match » dans
+ *          « Ma saison » (clé 'videos', la plus récente en premier).
+ *          (D49) éval du coach verrouillée : la vidéo reste proposée, les
+ *          moments notés par le coach restent cachés. Éval ouverte :
+ *          « Revoir tes actions » inchangé (le lien reçu est déjà celui du
+ *          match, sinon l'ancien lien de l'éval). Lien cliquable seulement
+ *          en https:// (veoSur). Aucune nouvelle RPC.
  * Version : v2.4 — 22 novembre 2026 — recette Manu (Jules, match de Beaune)
  *   Éval publiée SANS auto-évaluation du joueur (éval antérieure à
  *   l'Avenant A, auto_eval_requise = false) : les critères du coach ne
@@ -197,6 +209,13 @@
     return new Date(publieLe).getTime() > new Date(prec).getTime();
   }
   function veoSur(url) { return typeof url === 'string' && /^https:\/\//i.test(url); }
+  // v2.5 (D48/D49) : bouton vers la vidéo du match (rien si lien absent ou non https).
+  function boutonVideo(url, texte) {
+    if (!veoSur(url)) return '';
+    return '<a class="ej-veo" href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">'
+      + '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>'
+      + esc(texte || 'Revoir le match') + '</a>';
+  }
   function getClient() {
     if (etat.client) return etat.client;
     if (typeof supabase === 'undefined') return null;
@@ -275,7 +294,10 @@
       + '<p>' + (ouvert ? 'Donne d’abord ton avis sur ton match pour découvrir le sien.'
         : 'Ton avis sur ce match n’est plus disponible ici : parles-en à ton coach.') + '</p>'
       + (ouvert ? '<button type="button" class="ej-btn ej-btn-clair" data-aller-auto="' + esc(m.evenement_id) + '">Donner mon avis</button>' : '')
-      + '</div></div>';
+      + '</div></div>'
+      // v2.5 (D49) : la vidéo du match n'est pas un contenu du coach.
+      + (veoSur(m.veo_url) ? '<div class="ej-encart ej-veo-bloc"><span class="ej-encart-titre">La vidéo du match</span>'
+        + boutonVideo(m.veo_url, 'Revoir le match') + '</div>' : '');
   }
 
   // v1.2 (D23) : comparaison neutre, critère par critère.
@@ -500,6 +522,9 @@
       }).join('')
       + '<span class="ej-meta">Tu les retrouveras à ta prochaine auto-évaluation.</span></div>';
     return '<div class="ej-ae" data-ae="' + esc(evt) + '">'
+      // v2.5 (D48) : revoir le match avant de donner son avis.
+      + (veoSur(x.veo_url) ? '<div class="ej-ae-video">' + boutonVideo(x.veo_url, 'Revoir le match')
+        + '<span class="ej-meta">Revois ton match avant de donner ton avis.</span></div>' : '')
       + rappel + poste
       + '<p class="ej-meta" style="margin:0">Pour chaque point : <strong>V</strong> ça a bien marché · <strong>O</strong> moyen · <strong>R</strong> difficile. '
       + 'Si tu mets O ou R, tu peux cocher ce que tu veux travailler.</p>'
@@ -595,6 +620,21 @@
       + '<div class="ej-frise">' + h + '</div>'
       + '<div class="ej-meta">Ton avis match après match, du plus ancien au plus récent' + (autos.length > 1 ? '' : ' (premier match)') + '.</div>'
       + '</div></section>';
+  }
+
+  // v2.5 (D48) : « Mes vidéos de match » — matchs passés de la saison dont
+  // la vidéo est en ligne, où le joueur était sur la feuille ou évalué.
+  function carteVideos() {
+    var v = (etat.donnees.videos || []).filter(function (x) { return x && veoSur(x.veo_url); });
+    if (!v.length) return '';
+    return '<section class="ej-carte"><div class="ej-corps"><h2 class="ej-titre">Mes vidéos de match</h2>'
+      + '<ul class="ej-videos">' + v.map(function (x) {
+        return '<li><span class="ej-ligne-texte"><strong>' + esc(titreMatch(x)) + '</strong>'
+          + '<span class="ej-meta">' + esc(dateCourte(x.date)) + ' ' + tagNiveau(x.niveau) + '</span></span>'
+          + '<a class="ej-video-lien" href="' + esc(x.veo_url) + '" target="_blank" rel="noopener noreferrer"'
+          + ' aria-label="' + esc('Revoir le match ' + titreMatch(x)) + '">▶ Revoir</a></li>';
+      }).join('') + '</ul>'
+      + '<div class="ej-meta">La vidéo VEO s’ouvre dans un nouvel onglet.</div></div></section>';
   }
 
   function carteDernierMatch(m) {
@@ -775,7 +815,7 @@
     // formulaire d'avis (s'il existe encore) va dans « Encore à donner ton avis ».
     var heroAvecForm = heros && !(heros.eval && !heros.eval.verrouille) ? heroEvt : null;
     h += carteAvisAutres(heroAvecForm);
-    var saison = carteObjectifs(bilans) + carteProgression(bilans) + carteFrise();
+    var saison = carteObjectifs(bilans) + carteProgression(bilans) + carteFrise() + carteVideos(); // v2.5 (D48)
     if (saison) h += titreSection('Ma saison') + saison;
     var parcours = carteParcours(); // v2.2 (PARCOURS v1.3, D20)
     if (parcours) h += titreSection('Mon Parcours') + parcours;
