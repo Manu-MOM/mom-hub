@@ -18,7 +18,13 @@
        styles des 5 critères facultatifs, de l'avis du joueur et du
        signalement blessure / gêne / fatigue (.em-critere*, .em-avis,
        .em-alerte*, .em-badge-gene, .em-blessure-form). Logique :
-       js/eval-match.js v1.2. -->
+       js/eval-match.js v1.2.
+       Avenant C, lot C3 (22/11/2026, FAIT FOI §11 D29–D45) : 6 critères
+       (rappel FFR), points « à travailler » sous un O ou un R, famille de
+       postes, objectifs du joueur (.em-ffr, .em-critere-bloc, .em-ecart,
+       .em-veut, .em-chip, .em-sc*, .em-objectifs, .em-bilan-obj) ;
+       + js/criteres-eval.js (référentiel data/criteres-eval.json).
+       Logique : js/eval-match.js v1.6. -->
   <style>
     :root {
       --ev-feu-v: #2d7a3e; --ev-feu-o: #b86e0a; --ev-feu-r: #c73e3e;
@@ -145,7 +151,25 @@
     .em-blessure-form { display: grid; grid-template-columns: minmax(0, 2fr) minmax(130px, 1fr) minmax(130px, 1fr); gap: .7rem;
       background: #fff; border-radius: 8px; padding: .7rem; margin-top: .5rem; }
     .em-blessure-form .em-bl-notes, .em-blessure-form .ev-actions { grid-column: 1 / -1; }
+    /* --- Avenant C (C3) --- */
+    .em-critere-nom .em-ffr { display: block; font-weight: 500; font-size: .72rem; color: var(--ink-mute, #6b7a6f); }
+    .em-critere-bloc { display: flex; flex-direction: column; gap: .35rem; padding-bottom: .35rem; }
+    .em-ecart { font-size: .78rem; color: #1f4a82; }
+    .em-veut { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; font-size: .8rem; }
+    .em-chip { background: #eaf1fa; color: #1f4a82; border-radius: 999px; padding: .15rem .6rem; font-size: .78rem; }
+    .em-sc { background: #faf7ee; border: 1px solid var(--ev-doux); border-radius: 8px; padding: .55rem .75rem; display: flex; flex-direction: column; gap: .35rem; }
+    .em-sc-titre { font-size: .82rem; font-weight: 700; color: var(--ink-soft, #2a4836); }
+    .em-sc-cases { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 1rem; }
+    .em-sc-case { display: flex; align-items: center; gap: .6rem; min-height: 40px; font-size: .88rem; cursor: pointer; }
+    .em-sc-case input { width: 18px; height: 18px; accent-color: #2d7a3e; flex: none; }
+    .em-sc-famille { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; font-size: .82rem; font-weight: 600; }
+    .em-sc-famille select { font: inherit; font-size: .88rem; min-height: 40px; padding: .3rem .5rem; border: 1px solid var(--ev-bord); border-radius: 8px; }
+    .em-sc-alerte { background: #eaf1fa; color: #1f4a82; border-radius: 8px; padding: .45rem .65rem; font-size: .85rem; }
+    .em-objectifs { margin: .2rem 0 0; padding-left: 1.2rem; font-size: .9rem; }
+    .em-bilan-obj { display: flex; justify-content: space-between; gap: .8rem; font-size: .9rem; padding: .15rem 0; }
+    .em-res-atteint { color: #1f5a32; } .em-res-en_partie { color: #8a5208; } .em-res-pas_atteint { color: #a52f2f; }
     @media (max-width: 720px) {
+      .em-sc-cases { grid-template-columns: 1fr; }
       .em-critere { grid-template-columns: 1fr; gap: .35rem; }
       .em-blessure-form { grid-template-columns: 1fr; }
       .ev-critere { grid-template-columns: 1fr; gap: .45rem; }
@@ -200,6 +224,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="js/supabase-client.js"></script>
   <script src="js/season-pill.js"></script>
+  <script src="js/criteres-eval.js"></script>
   <script src="js/eval-match.js"></script>
   <script>
     /* Boot topbar (patron parcours-performance.html) : anonyme → login.html ;
