@@ -26,7 +26,12 @@
        Correctif C3 (recette du 22/11/2026) : .em-sc[hidden] masqué
        (le display: flex l'emportait sur l'attribut hidden).
        + js/criteres-eval.js (référentiel data/criteres-eval.json).
-       Logique : js/eval-match.js v1.6. -->
+       Logique : js/eval-match.js v1.6.
+       Avenant D, lot D2 (22/11/2026, FAIT FOI §12 D46–D50, sql_287) :
+       fenêtre « Vidéo du match » en tête de la feuille (.em-video*), lien
+       VEO saisi une fois pour tout le match ; le champ lien de l'éval
+       individuelle disparaît, les moments restent. Logique :
+       js/eval-match.js v1.7, supabase-client v2.03. -->
   <style>
     :root {
       --ev-feu-v: #2d7a3e; --ev-feu-o: #b86e0a; --ev-feu-r: #c73e3e;
@@ -171,6 +176,14 @@
     .em-objectifs { margin: .2rem 0 0; padding-left: 1.2rem; font-size: .9rem; }
     .em-bilan-obj { display: flex; justify-content: space-between; gap: .8rem; font-size: .9rem; padding: .15rem 0; }
     .em-res-atteint { color: #1f5a32; } .em-res-en_partie { color: #8a5208; } .em-res-pas_atteint { color: #a52f2f; }
+    /* --- Avenant D (D2) --- */
+    .em-video { border-color: #9fbbe0; background: var(--feedback-info-bg, #eaf1fa); }
+    .em-video-corps { display: flex; flex-direction: column; gap: .55rem; }
+    .em-video-tete { display: flex; flex-direction: column; gap: .15rem; }
+    .em-video-ligne { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; }
+    .em-video-ligne input { flex: 1 1 320px; min-width: 0; min-height: 44px; font: inherit; font-size: .92rem;
+      padding: .55rem .7rem; border: 1px solid var(--ev-bord); border-radius: 8px; background: #fff; color: var(--ink, #0c3d24); }
+    #em-veo input[disabled] { background: #f1f1ef; cursor: not-allowed; }
     @media (max-width: 720px) {
       .em-sc-cases { grid-template-columns: 1fr; }
       .em-critere { grid-template-columns: 1fr; gap: .35rem; }
