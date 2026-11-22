@@ -119,6 +119,8 @@ INTERDITS non modifiés (`hub-agenda.js` `817b4a6f`, `hub-agenda.css` `13d67a67`
   - **Consigne transitoire** : ne pas publier de nouvelle éval match avant A2 + A3 (elle serait verrouillée côté joueur sans formulaire d'auto-évaluation disponible).
 - 16/11/2026 — Avenant A complété par **D24–D27 (signalement blessure / gêne / fatigue)**, gelés par Manu (« je gèle ») ; implémentation `sql_266`.
 - 16/11/2026 — Recette A1–A3 verte (Manu). Retours : lien joueur accessible depuis l'éval match (eval-match.js v1.3) ; **D28** moments VEO multiples. Auto-évaluation de recette (Julien WEIL, 14/11) supprimée à la demande de Manu. Consigne transitoire levée.
+- 22/11/2026 — **Avenant C** (ressources FFR, sous-critères, objectifs) rédigé et proposé au gel (§11). Contenu gelé par Manu le 22/11/2026 (« je gèle » sur le document `Criteres-EVAL-JOUEUR.docx` v2, puis sur l'option 1 « colonnes fixes »). Chantier enchaîné dans la conversation d'idéation à la demande de Manu (choix « B ») : écart de gouvernance à tracer dans STATE.
+- 22/11/2026 — **Avenant C gelé par Manu** (« je te suis et je gèle ») : D29–D42 retenus, **D43** ajouté (tableau récap après match adapté). Prochaine étape : DS-1 puis C1 (`sql_286`) en dry-run.
 
 ---
 
@@ -201,3 +203,59 @@ Retour terrain de Manu : « cette fiche pourrait se transformer en appli install
 ### 10.4 Invariant modifié
 
 L'invariant « 3 fonctions anon » devient **6 fonctions anon** : `get_espace_joueur`, `repondre_eval`, `envoyer_auto_eval`, `etat_acces_espace`, `definir_code_espace`, `ouvrir_session_espace`. Aucune donnée ne sort sans session valide.
+
+## 11. Avenant C — RESSOURCES FFR, SOUS-CRITÈRES ET OBJECTIFS (GELÉ par Manu le 22/11/2026)
+
+Retours terrain du 22/11/2026 : **Milan** (référent M16) demande que le joueur se fixe des objectifs pour le prochain match ; **Lohann** (pôle EDR / seniors) demande des critères selon le poste joué. Réflexion menée avec Manu le 22/11/2026, contenu gelé par Manu (« je gèle ») sur le document de travail `Criteres-EVAL-JOUEUR.docx` v2 (libellés, sous-critères, listes par famille de postes) et sur l'option 1 (colonnes fixes). Avenant gelé par Manu le 22/11/2026 (« je te suis et je gèle ») : toutes les recommandations [Recommandé] sont retenues, avec l'ajout D43 (tableau récap).
+
+### 11.1 Faits sondés (DS-1 du 22/11/2026)
+
+- Porte : STATE pt 295 (914 875 octets, md5 `fbcea632…`, Drive modifiedTime 2026-11-22T05:09:11Z) ; clone `main` = `d68f773`.
+- Volumes en base : `eval_bilan` 2 lignes (2 publiées) ; `eval_match` 6 lignes (4 publiées, 6 avec au moins un critère) ; `auto_eval_match` 2 lignes. La reprise de l'historique porte donc sur très peu de données.
+- Critères : 5 colonnes `feu_<critère>` dans `eval_bilan` (+ `obs_<critère>`), `eval_match` (facultatives) et `auto_eval_match` (NOT NULL). Libellés en dur dans 4 fichiers front : `evaluation-joueur.js`, `eval-match.js`, `espace-joueur.js` (v2.2), `recap-evals-match.js` ; wrappers dans `supabase-client.js`.
+- Postes : `composition_joueurs.poste_id` référence la table `postes` (uuid ; codes `PG`, `TAL`, `PD`, `2LG`, `2LD`, `2LU`, `3LG`, `3LD`, `3LU`, `N8`, `DM`, `DO`, `AG`, `AIU`, `AD`, `CG`, `CTU`, `CD`, `AR`, `J1`–`J5`, regroupements `PIL`, `2L`, `3L`, `CTR`, `AIL`).
+- **Remplaçants** : dans les compos de match actives, ils sont presque tous rangés sur un poste « par défaut » (78 sur `2LU`, 32 sur `PG`). Le poste de la compo n'est fiable que pour les **titulaires**.
+- `get_espace_joueur` a été remplacée en dernier par `sql_282` (Parcours) : c'est la base à reprendre.
+
+### 11.2 Décisions
+
+- **D29 — 6 critères alignés sur les ressources du joueur FFR** (Plan de formation du joueur) : 1 Technique (ressources techniques), 2 Physique (ressources physiques), 3 Lecture du jeu (ressources perceptives et décisionnelles), 4 Engagement & collectif (ressources affectives et relationnelles), 5 Mental (habiletés mentales), 6 Technique au poste. *(Manu)*
+- **D30 — Affichage.** Libellé court du critère, avec rappel de la ressource FFR en petit. *(Manu)*
+- **D31 — Partout.** Les 6 critères valent pour l'éval match du coach, l'auto-évaluation et les **bilans de période**. *(Manu)*
+- **D32 — Reprise de l'historique.** Les 5 critères actuels deviennent : technique individuelle → Technique ; physique → Physique ; compréhension du jeu → Lecture du jeu ; état d'esprit → Engagement & collectif ; technique au poste → Technique au poste. **Mental** est nouveau, sans historique (affiché « — » sur les évaluations antérieures). [Recommandé]
+- **D33 — Sous-critères, déclenchement a + b.** (a) Le coach qui note un critère O ou R peut cocher des sous-critères « à travailler » ; le joueur les découvre une fois l'éval déverrouillée (D19 inchangé). (b) Le joueur qui se note O ou R dans son auto-évaluation peut aussi cocher des sous-critères, facultatifs. Simple case cochée, **pas de V/O/R par sous-critère**. *(Manu)*
+- **D34 — Plafond non bloquant.** À partir de **3** cases cochées dans un même critère, un message invite à prioriser (formulation coach / formulation joueur) ; on peut continuer. Seuil réglable dans le référentiel. *(Manu)*
+- **D35 — Sous-critères du critère 6 par famille de postes** : Piliers (1-3), Talonneur (2), 2ᵉ lignes (4-5), Flankers (6-7), N°8 (8), Demi de mêlée (9), Ouvreur (10), Ailiers (11-14), Centres (12-13), Arrière (15) ; plus un sous-critère **Buteur** (« Mes tirs au but et transformations ») proposé à tout joueur, quel que soit son poste. Contenu = document v2 gelé. *(Manu)*
+- **D36 — Poste du match.** Proposé par défaut depuis la compo de match **pour les titulaires seulement** ; le joueur peut le corriger. Pour un remplaçant, ou sans compo, ou sur un poste sans famille (`J1`–`J5`), le joueur choisit sa famille de postes (pas de pré-remplissage, cf. 11.1). Le coach voit le poste déclaré par le joueur ; à défaut, celui de la compo. *(Manu, précisé par la sonde [Recommandé])*
+- **D37 — Adaptation selon l'âge.** Liste unique ; un sous-critère peut être masqué pour certaines catégories (champ du référentiel). Les masquages sont **vérifiés dans les règlements Rugby éducatif** déjà présents dans le Hub avant d'être saisis (lifter en touche, contester les mauls, box kick, tirs au but, flankers en format 13). *(Manu)*
+- **D38 — Où vivent les critères (option 1).** Les **6 critères principaux** restent des **colonnes fixes** en base (continuité sql_263 / sql_265). Les **libellés, rappels FFR, sous-critères, familles de postes, masquages et seuil** vivent dans un référentiel JSON du dépôt, modifiable à la main. Ajouter ou retirer un critère principal = futur chantier SQL + front (assumé). *(Manu)*
+- **D39 — Sous-critères aussi dans les bilans de période (côté coach).** Même mécanique que l'éval match : O ou R → cases facultatives. [Recommandé]
+- **D40 — Objectifs du prochain match (demande de Milan).** En fin d'auto-évaluation : « Mes objectifs pour le prochain match », **jusqu'à 3**, texte libre (120 caractères chacun), facultatifs, figés avec l'auto-évaluation (D20). Visibles du joueur et du staff (page éval match, récap après match). [Recommandé]
+- **D41 — Rappel au match suivant.** À l'auto-évaluation suivante, le joueur voit ses objectifs précédents et répond pour chacun « atteint / en partie / pas atteint » (facultatif). La réponse est gardée avec la nouvelle auto-évaluation. [Recommandé]
+- **D42 — Comparaison et frise.** La comparaison coach / joueur (D23) et la frise « Comment je me vois » passent à 6 critères ; les sous-critères cochés s'affichent sous le critère, côte à côte coach / joueur, sans jugement. Le récap après match (RECAP-EVALS-MATCH) affiche les 6 critères et le nombre de sous-critères cochés. [Recommandé]
+- **D43 — Tableau récap après match adapté (ajout de Manu au gel).** `recap-evals-match.js` passe à 6 critères (coach / joueur) et affiche, pour chaque joueur, le poste joué, les sous-critères cochés (coach et joueur) et les objectifs du joueur pour le prochain match. À l'écran : détail complet. À l'impression A4 paysage : nombre de sous-critères cochés par critère et objectifs en texte court, pour tenir sur la page. Règle de la gêne santé inchangée (⚠ à l'écran sans détail, jamais imprimée). *(Manu ; format d'impression recommandé par l'agent)*
+
+### 11.3 Modèle (à confirmer en DS-1 du lot C1)
+
+- **Noms de colonnes conservés** (`feu_tech_indiv`, `feu_comprehension`, `feu_etat_esprit`…) : seule la signification affichée change (D32). Aucune migration de données, aucun renommage risqué. *(décision technique, tracée)*
+- `eval_bilan` + `feu_mental`, `obs_mental`, `sous_criteres jsonb NOT NULL DEFAULT '{}'`.
+- `eval_match` + `feu_mental`, `sous_criteres jsonb NOT NULL DEFAULT '{}'`.
+- `auto_eval_match` + `feu_mental` (**nullable** : 2 lignes antérieures ; exigé par l'écran pour les nouvelles), `sous_criteres jsonb NOT NULL DEFAULT '{}'`, `poste_famille text`, `objectifs jsonb NOT NULL DEFAULT '[]'`, `bilan_objectifs jsonb NOT NULL DEFAULT '[]'`.
+- Format `sous_criteres` : `{ "<critère>": ["<code sous-critère>", …] }`, clés limitées aux 6 critères ; contrôle en base de la **forme** seulement (objet de listes de textes) et de la règle « sous-critères seulement si le critère est O ou R ». Les codes eux-mêmes ne sont pas contrôlés en base (le référentiel vit dans le dépôt) : coût assumé, cohérent avec D38.
+- Contraintes : `objectifs` 3 au plus, 120 car. ; `bilan_objectifs` = liste de `{objectif, resultat: atteint|en_partie|pas_atteint}`.
+- Référentiel **`data/criteres-eval.json`** : 6 critères (clé colonne, libellé, rappel FFR, ordre) ; sous-critères par critère (code, libellé, catégories masquées) ; familles de postes (code, libellé, codes `postes` inclus, sous-critères) ; sous-critère Buteur ; seuil d'alerte (3) ; formulations du message coach / joueur.
+- RPC (DROP + CREATE dès que la signature change, jamais d'overload) : `enregistrer_eval_bilan`, `enregistrer_eval_match`, `envoyer_auto_eval` (+ mental, sous-critères, famille de poste, objectifs, bilan des objectifs ; nouveaux paramètres avec `DEFAULT NULL` pour que le front actuel continue de fonctionner jusqu'au déploiement) ; `_ej_json_bilan`, `_ej_json_match`, `_ej_json_auto` remplacés à signature identique ; `get_espace_joueur` (base `sql_282`) : + objectifs de la dernière auto-évaluation envoyée, à rappeler ; + poste de compo (titulaire) pour le pré-remplissage.
+
+### 11.4 Lots
+
+- **C1 — SQL** `sql_286` : schéma + RPC ; dry-run `BEGIN … ROLLBACK` avec tests fail-loud, puis COMMIT sur « feu vert COMMIT » de Manu, vérifié par SELECT séparé.
+- **C2 — Référentiel** `data/criteres-eval.json` : contenu du document v2 ; masquages par catégorie après vérification dans les règlements Rugby éducatif (D37).
+- **C3 — Front staff** : `supabase-client.js`, `evaluation-joueur.js` (bilans 6 critères + sous-critères), `eval-match.js` (6 critères, sous-critères, poste, objectifs du joueur), `recap-evals-match.js` (D43 : 6 critères, poste, sous-critères, objectifs ; impression condensée).
+- **C4 — Front joueur** : `espace-joueur.js` (auto-évaluation 6 critères, poste, sous-critères, message de priorisation, objectifs, rappel des objectifs, comparaison et frise à 6).
+- Maquette des écrans auto-évaluation et éval match à valider par Manu avant C3 / C4.
+
+### 11.5 Hors périmètre de l'avenant
+
+- Points de vigilance du coach repris automatiquement dans l'auto-évaluation suivante (variante « c » évoquée en réflexion).
+- Statistiques sur les sous-critères (tendances d'équipe, besoins les plus cochés).
+- Ajout d'un 7ᵉ critère principal (cf. D38).
