@@ -6,6 +6,17 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.96 — Jeu à XII : postes 1-5 / 8-14, banc de 10 (24 nov. 2026)
+ *   v3.96 : COMPO-XII (FAIT FOI gelé 24/11/2026, retour terrain Vivien ;
+ *           sujet enchaîné dans la conversation du jour, écart tracé STATE).
+ *           COMPO_FORMATS '12' : subs 4 → 10 (D2), numMaillot (D3 : feuille
+ *           1-5, 8-14, banc à partir de 15). TERRAIN_POS_12 : 2LG/2LD, plus
+ *           d'arrière (D4, placement à corriger en recette). Postes XII en
+ *           base : sql_288 (D1). Décision mineure tracée : la plage du banc
+ *           (prochainNumeroBancLibre + ajout depuis le popover) suit le
+ *           format au lieu de 16..23 codé en dur ; XV inchangé (16..23),
+ *           message « banc complet » au nombre du format.
+ *
  * Version : 3.95 — Export « MOM photos » : drapeau « Formé au MOM » (20 nov. 2026)
  *   v3.95 : FORME-AU-MOM L2 (FAIT FOI gelé 20/11/2026, D6 = a, sql_278).
  *           _collecterDonneesExport : titulaires[].formeClub et
@@ -1242,7 +1253,10 @@
     'XV': { subs: 8,  label: 'XV',  fmtBase: 'XV' },
     '15': { subs: 8,  label: 'XV',  fmtBase: 'XV' },
     '13': { subs: 6,  label: 'XIII', fmtBase: '13' },
-    '12': { subs: 4,  label: 'XII', fmtBase: '12' },
+    // v3.96 (COMPO-XII, FAIT FOI gelé 24/11/2026) — retour terrain Vivien :
+    // banc de 10 (D2) ; feuille aux numéros de maillot 1-5, 8-14 (D3),
+    // remplaçants à partir de 15.
+    '12': { subs: 10, label: 'XII', fmtBase: '12', numMaillot: true },
     // v3.85 (X-ORIGINE, D4) — numMaillot : feuille numérotée aux numéros de
     // maillot (poste.numero_xv : 1 2 3 4 5 9 10 12 14 15) et non 1..N.
     'X':  { subs: 10, label: 'X',   fmtBase: 'X', numMaillot: true },
@@ -9149,21 +9163,22 @@
   // NB : dispositions PROPOSÉES par l'agent, à corriger en recette — le
   // placement des joueurs est une décision de coach, pas de développeur.
 
-  // Format 12 — mêlée à 5 (1re ligne + 2LU + 3LU), ligne de trois-quarts
-  // complète et latéralisée. Occupation ~72 %.
+  // Format 12 — v3.96 (COMPO-XII, D1/D4) : postes 1-5, 8-14 (retour terrain
+  // Vivien) — mêlée à 6 (1re ligne + 2LG/2LD + 3LU), pas d'arrière.
+  // Placement proposé, à corriger en recette. Occupation ~68 %.
   const TERRAIN_POS_12 = {
     'PG':  { x: 34.0, y: 16.0 },
     'TAL': { x: 47.0, y: 16.0 },
     'PD':  { x: 60.0, y: 16.0 },
-    '2LU': { x: 18.0, y: 27.0 },   // 2L sur l'extérieur (consigne Manu, v3.22)
-    '3LU': { x: 47.0, y: 29.0 },
-    'DM':  { x: 36.0, y: 42.0 },
-    'DO':  { x: 52.0, y: 51.0 },
-    'CG':  { x: 34.0, y: 64.0 },
-    'CD':  { x: 55.0, y: 66.0 },
-    'AG':  { x: 15.0, y: 74.0 },
-    'AD':  { x: 76.0, y: 74.0 },
-    'AR':  { x: 47.0, y: 88.0 }
+    '2LG': { x: 40.0, y: 26.0 },
+    '2LD': { x: 54.0, y: 26.0 },
+    '3LU': { x: 47.0, y: 35.0 },
+    'DM':  { x: 36.0, y: 46.0 },
+    'DO':  { x: 52.0, y: 55.0 },
+    'CG':  { x: 34.0, y: 68.0 },
+    'CD':  { x: 55.0, y: 70.0 },
+    'AG':  { x: 15.0, y: 80.0 },
+    'AD':  { x: 76.0, y: 80.0 }
   };
 
   // Format 9 — le X sans l'arrière. Occupation ~55 %.
@@ -9533,7 +9548,10 @@
   // couche existante (addJoueurCompo / updateJoueurCompo / removeJoueurCompo) ;
   // état via etatJoueurPourCompoCourante() (→ 'modifie' en compo de match).
   //
-  // Calcule le prochain numéro de banc libre (16..23) ou null si plein.
+  // Calcule le prochain numéro de banc libre ou null si plein.
+  // v3.96 (COMPO-XII) : plage calée sur le format (1er numéro après les
+  // titulaires, autant de numéros que de remplaçants du format) au lieu
+  // de 16..23 codé en dur. XV inchangé (16..23).
   function prochainNumeroBancLibre() {
     const used = new Set(
       State.compoJoueurs
@@ -9541,7 +9559,9 @@
         .map(cj => cj.numero_maillot)
         .filter(n => n != null)
     );
-    for (let n = 16; n <= 23; n++) { if (!used.has(n)) return n; }
+    const debut = _numDepartRemplacants();
+    const fin = debut + _nbRemplacantsCourant() - 1;
+    for (let n = debut; n <= fin; n++) { if (!used.has(n)) return n; }
     return null; // banc plein
   }
 
@@ -9629,7 +9649,7 @@
     if (existant && existant.role === 'remplacant') return; // déjà au banc
 
     const numBanc = prochainNumeroBancLibre();
-    if (numBanc == null) { alert('Le banc est complet (8 remplaçants).'); return; }
+    if (numBanc == null) { alert('Le banc est complet (' + _nbRemplacantsCourant() + ' remplaçants).'); return; }
 
     const etat = etatJoueurPourCompoCourante();
     const horsCat = State.evenementEquipeId
@@ -10485,12 +10505,9 @@
       const p = getPoste(posteId);
       if (p && p.numero_xv) params.numero_maillot = p.numero_xv;
     } else {
-      const remp = State.compoJoueurs.filter(cj => cj.role === 'remplacant');
-      const usedNums = new Set(remp.map(cj => cj.numero_maillot).filter(Boolean));
-      let nextNum = 16;
-      while (usedNums.has(nextNum) && nextNum <= 23) nextNum++;
+      // v3.96 (COMPO-XII) : plage du banc selon le format (helper commun).
       params.role = 'remplacant';
-      params.numero_maillot = nextNum <= 23 ? nextNum : null;
+      params.numero_maillot = prochainNumeroBancLibre();
       const libres = postesVides();
       params.poste_id = libres.length > 0 ? libres[0].id : (State.postes[0] && State.postes[0].id);
     }
