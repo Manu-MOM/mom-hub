@@ -6,6 +6,18 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.97 — Export : places libres + banc du format (24 nov. 2026)
+ *   v3.97 : EXPORT-PLACE-LIBRE (FAIT FOI gelé 24/11/2026, « je te suis et
+ *           je gèle », D3 inclus ; enchaîné dans la conversation du jour,
+ *           écart tracé STATE). _collecterDonneesExport :
+ *           (D1) chaque poste du format non pourvu est transmis comme
+ *           titulaire { libre: true } (numéro + poste, sans joueur), trié
+ *           avec les autres ; rien si la base ne déclare aucun poste pour
+ *           le format. (D3) banc complété jusqu'au nombre du format
+ *           (_nbRemplacantsCourant) et numéroté depuis
+ *           _numDepartRemplacants() (15→24 en XII ; XV inchangé 16→23) ;
+ *           places vides marquées { libre: true }. Rendu : compo-export.js.
+ *
  * Version : 3.96 — Jeu à XII : postes 1-5 / 8-14, banc de 10 (24 nov. 2026)
  *   v3.96 : COMPO-XII (FAIT FOI gelé 24/11/2026, retour terrain Vivien ;
  *           sujet enchaîné dans la conversation du jour, écart tracé STATE).
@@ -8819,6 +8831,41 @@
       })
       .sort(function (a, b) { return a.ordre - b.ordre; });
 
+    // v3.97 (EXPORT-PLACE-LIBRE, D1) — un poste du format non pourvu reste
+    // dans l'export sous forme de place libre (numéro + poste, sans joueur),
+    // au lieu de disparaître. Uniquement les postes réellement déclarés pour
+    // le format (formats_applicables) : si la base n'en déclare aucun, rien
+    // n'est ajouté (pas de repli sur tout le référentiel).
+    (function () {
+      var fmt = _formatCourant();
+      var postesFmt = (Array.isArray(State.postes) ? State.postes : []).filter(function (p) {
+        return Array.isArray(p.formats_applicables) && p.formats_applicables.indexOf(fmt) !== -1;
+      });
+      if (!postesFmt.length) return;
+      var pourvus = new Set(State.compoJoueurs
+        .filter(function (cj) { return cj.role === 'titulaire'; })
+        .map(function (cj) { return String(cj.poste_id); }));
+      // Même ordre que la feuille (_postesCourants) : rang dans le format.
+      var rang = new Map();
+      _postesCourants().forEach(function (p, idx) { rang.set(String(p.id), idx); });
+      postesFmt.forEach(function (p) {
+        if (pourvus.has(String(p.id))) return;
+        var idx = rang.has(String(p.id)) ? rang.get(String(p.id)) : 0;
+        tit.push({
+          num: _numeroTitulaire(p, idx),
+          ordre: p.numero_xv || 99,
+          uuid: null, nom: '', prenom: '',
+          poste: (p.libelle_long || p.libelle_court || p.code || ''),
+          code: (p.code || ''),
+          club: '', clubCouleur: null,
+          ligne: _ligneDePoste(p),
+          capitaine: false, photoUrl: null,
+          libre: true
+        });
+      });
+      tit.sort(function (a, b) { return a.ordre - b.ordre; });
+    })();
+
     var remBruts = State.compoJoueurs
       .filter(function (cj) { return cj.role === 'remplacant'; })
       .sort(function (a, b) {
@@ -8828,17 +8875,27 @@
       .map(function (cj, idx) {
         var j = getJoueurVivier(cj.joueur_id) || {};
         return {
-          num: (cj.numero_maillot != null ? cj.numero_maillot : (16 + idx)),
+          num: (cj.numero_maillot != null ? cj.numero_maillot : (_numDepartRemplacants() + idx)),
           nom: nomJoueurCompact(cj),
           nomSeul: (j.nom || '').trim().toUpperCase(),  // v3.94 — modèle « MOM photos »
           uuid: cj.joueur_id || null,                   // v3.95 — drapeau « Formé au MOM »
           formeClub: false
         };
       });
-    // Compléter jusqu'à 8 emplacements (16→23) avec des places vides.
+    // v3.97 (EXPORT-PLACE-LIBRE, D3) — compléter jusqu'au banc du FORMAT
+    // (10 en XII, 8 en XV…) avec des places libres numérotées comme la
+    // feuille (15→24 en XII, 16→23 en XV) au lieu de 8 places 16→23 en dur.
+    // Un banc déjà plus garni que le format est transmis en entier.
     var rem = [];
-    for (var i = 0; i < 8; i++) {
-      rem.push(remBruts[i] || { num: 16 + i, nom: '–' });
+    var nbBanc = Math.max(_nbRemplacantsCourant(), remBruts.length);
+    var numBanc0 = _numDepartRemplacants();
+    var numsPris = new Set(remBruts.map(function (r) { return r.num; }));
+    var numLibre = numBanc0;
+    for (var i = 0; i < nbBanc; i++) {
+      if (remBruts[i]) { rem.push(remBruts[i]); continue; }
+      while (numsPris.has(numLibre)) numLibre++;
+      numsPris.add(numLibre);
+      rem.push({ num: numLibre, nom: '–', libre: true });
     }
 
     // Méta : titre, sous-titre (équipe), compétition/date/lieu.
