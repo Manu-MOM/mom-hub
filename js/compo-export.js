@@ -1,6 +1,14 @@
 /*
  * compo-export.js — Export image d'une composition (feuille « document »)
  * ---------------------------------------------------------------------------
+ * EXPORT-PLACE-LIBRE (24/11/2026, FAIT FOI gelé, D3 inclus ; retour terrain
+ * compo XII) : un titulaire { libre: true } (poste du format non pourvu,
+ * fourni par compositions-editor v3.97) garde sa case dans les 5 versions —
+ * carte atténuée « PLACE LIBRE » + numéro + poste + « ? » (MOM/entente
+ * vertical et paysage), maillot pointillé « Libre » (terrain paysage), carte
+ * grise (Offload, MOM photos). Banc Offload vertical : rangées de 5 au-delà
+ * de 8 remplaçants (10 en XII), nom réduit pour tenir ; XV inchangé.
+ * ---------------------------------------------------------------------------
  * FORME-AU-MOM L2 (20/11/2026, FAIT FOI gelé, D6 = a) : dans « MOM photos »,
  * astérisque après le NOM des joueurs cochés « Formé au MOM » (titulaires et
  * remplaçants ; drapeau formeClub fourni par l'éditeur). Autres versions
@@ -161,6 +169,9 @@
 
   // ── Utilitaires couleur / police ─────────────────────────────────────────
   function rgb(c) { return 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')'; }
+  // EXPORT-PLACE-LIBRE (D2) : rendu d'un poste non pourvu ({libre: true}).
+  var COUL_LIBRE = 'rgb(130,140,135)';
+  var TXT_LIBRE = 'PLACE LIBRE';
   function font(px, weight, style) {
     // pile de polices condensées « sport » avec repli sûr
     var w = weight || 700;
@@ -347,6 +358,7 @@
       var cw = Math.floor((W - 40 - 40 - 30) / 2);
 
       function carte(x, y, j) {
+        if (j && j.libre) { carteLibre(x, y, j); return; }
         ctx.fillStyle = rgb(t.card);
         roundRect(ctx, x, y, cw, ch, 14); ctx.fill();
         // liseré ligne
@@ -385,6 +397,29 @@
           ctx.fillStyle = rgb(t.badgeTxt);
           ctx.fillText(club, x + cw - bw - 6, y + ch / 2 - 14);
         }
+      }
+
+      // EXPORT-PLACE-LIBRE (D2) : poste du format non pourvu → carte atténuée
+      // « PLACE LIBRE » (numéro + poste conservés, pastille « ? »).
+      function carteLibre(x, y, j) {
+        ctx.fillStyle = rgb(t.card2);
+        roundRect(ctx, x, y, cw, ch, 14); ctx.fill();
+        ctx.fillStyle = COUL_LIBRE;
+        ctx.font = font(58, 700);
+        ctx.fillText(String(j.num != null ? j.num : ''), x + 34, y + ch / 2 - 36);
+        var cx = x + 165, cy = y + ch / 2, rr = 46;
+        ctx.save();
+        ctx.setLineDash([8, 6]); ctx.lineWidth = 3; ctx.strokeStyle = COUL_LIBRE;
+        ctx.beginPath(); ctx.arc(cx, cy, rr, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+        ctx.fillStyle = COUL_LIBRE; ctx.font = font(34, 700);
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('?', cx, cy + 2);
+        ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+        ctx.font = font(38, 700);
+        ctx.fillText(TXT_LIBRE, x + 235, y + ch / 2 - 42);
+        ctx.font = font(24, 400);
+        ctx.fillText(j.poste || '', x + 235, y + ch / 2 + 4);
       }
 
       var y = yCards, i;
@@ -499,6 +534,22 @@
     ctx.lineTo(x, y + sh);                       // manche gauche
     ctx.closePath();
     var coul = (version === 'mom') ? t.jaune : (avant ? t.jaune : t.sub);
+    if (j && j.libre) {
+      // EXPORT-PLACE-LIBRE (D2) : maillot en pointillé atténué, n° + « Libre ».
+      ctx.save();
+      ctx.fillStyle = rgb(t.card2); ctx.fill();
+      ctx.setLineDash([Math.max(4, h * 0.08), Math.max(3, h * 0.06)]);
+      ctx.lineWidth = Math.max(2, h * 0.04); ctx.strokeStyle = COUL_LIBRE; ctx.stroke();
+      ctx.restore();
+      ctx.fillStyle = COUL_LIBRE;
+      ctx.font = font(Math.round(h * 0.42), 700);
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(String(j.num != null ? j.num : ''), cx, y + h * 0.60);
+      ctx.font = font(Math.round(h * 0.24), 700);
+      ctx.fillText('Libre', cx, y + h + h * 0.20);
+      ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+      return;
+    }
     if (avant) {
       ctx.fillStyle = rgb(t.jaune); ctx.fill();
       ctx.lineWidth = Math.max(2, h * 0.04); ctx.strokeStyle = rgb(t.bgBot); ctx.stroke();
@@ -651,6 +702,29 @@
 
       function carteL(cx0, yy, j) {
         if (!j) return;
+        if (j.libre) {
+          // EXPORT-PLACE-LIBRE (D2) : carte atténuée, numéro + poste, « ? ».
+          ctx.fillStyle = rgb(t.card2);
+          roundRect(ctx, cx0, yy, colW, ch, 7); ctx.fill();
+          ctx.fillStyle = COUL_LIBRE; ctx.font = font(Math.min(24, ch - 6), 700);
+          ctx.fillText(String(j.num != null ? j.num : ''), cx0 + 12, yy + ch / 2 - Math.min(24, ch - 6) / 2);
+          var lrr = offload ? Math.max(12, Math.min(27, (ch - 10) / 2)) : Math.min(15, (ch - 6) / 2);
+          var lcx = offload ? cx0 + 46 + lrr : cx0 + 52, lcy = yy + ch / 2;
+          ctx.save();
+          ctx.setLineDash([5, 4]); ctx.lineWidth = 2; ctx.strokeStyle = COUL_LIBRE;
+          ctx.beginPath(); ctx.arc(lcx, lcy, lrr, 0, Math.PI * 2); ctx.stroke();
+          ctx.restore();
+          ctx.fillStyle = COUL_LIBRE; ctx.font = font(Math.max(10, Math.round(lrr * 0.8)), 700);
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillText('?', lcx, lcy + 1);
+          ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+          var lnX = lcx + lrr + 10;
+          ctx.font = font(Math.min(19, ch - 10), 700);
+          ctx.fillText(TXT_LIBRE, lnX, yy + (ch - 14) / 2 - 7);
+          ctx.font = font(Math.min(13, ch - 14), 400);
+          ctx.fillText((j.poste || ''), lnX, yy + ch / 2 + 3);
+          return;
+        }
         ctx.fillStyle = rgb(t.card);
         roundRect(ctx, cx0, yy, colW, ch, 7); ctx.fill();
         var lis = (j.ligne === 'av') ? t.liseroAv : t.liseroAr;
@@ -958,7 +1032,7 @@
         var x = x0 + xDecal + c * (cw + gap), y = y0 + r * (ch + vgap);
         var j = tit[idx] || {};
         var num = (j.num != null && j.num !== '') ? j.num : (idx + 1);
-        var col = couleurClubPhoto(j);
+        var col = j.libre ? '#8a8f96' : couleurClubPhoto(j);   // EXPORT-PLACE-LIBRE : gris neutre
         // carte blanche + ombre
         ctx.save();
         ctx.shadowColor = 'rgba(10,26,58,0.30)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 6;
@@ -1003,8 +1077,8 @@
         ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
         // nom + pastille poste couleur club
         var by = y + phH;
-        ctx.fillStyle = NAVY; ctx.font = '900 30px Arial, sans-serif'; ctx.textAlign = 'center';
-        ctx.fillText((j.nom || '').toUpperCase(), x + cw / 2, by + 34);
+        ctx.fillStyle = j.libre ? '#8a8f96' : NAVY; ctx.font = '900 30px Arial, sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText(j.libre ? TXT_LIBRE : (j.nom || '').toUpperCase(), x + cw / 2, by + 34);
         var poste = (j.poste || j.code || '').toUpperCase();
         if (poste) {
           ctx.font = '700 18px Arial, sans-serif';
@@ -1026,8 +1100,11 @@
       ctx.fillRect(x0, ry + 40, W - 2 * x0, 20);
       ctx.fillStyle = YELLOW; ctx.font = '900 30px Arial, sans-serif'; ctx.textAlign = 'center';
       ctx.fillText('REMPLAÇANTS', W / 2, ry + 40); ctx.textAlign = 'left';
-      var per = 4, cwr = (W - 2 * x0 - 60) / per;
-      for (var m = 0; m < rem.length && m < 8; m++) {
+      // EXPORT-PLACE-LIBRE (D3) : banc du format (10 en XII) — rangées de 4
+      // jusqu'à 8 remplaçants (XV inchangé), de 5 au-delà (2 rangées tiennent
+      // dans la bande). Nom réduit si besoin pour tenir dans sa colonne.
+      var per = rem.length > 8 ? 5 : 4, cwr = (W - 2 * x0 - 60) / per;
+      for (var m = 0; m < rem.length && m < 2 * per; m++) {
         var rj = rem[m] || {}, rr = Math.floor(m / per), rcx = m % per;
         var rxp = x0 + 30 + rcx * cwr, ryp = ry + 108 + rr * 56;
         var rcol = couleurClubPhoto(rj);
@@ -1036,8 +1113,13 @@
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText(String(rj.num != null ? rj.num : (16 + m)), rxp + 18, ryp - 7);
         ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-        ctx.fillStyle = NAVY; ctx.font = '800 24px Arial, sans-serif';
-        ctx.fillText((rj.nom || '–'), rxp + 48, ryp);
+        ctx.fillStyle = NAVY;
+        var rfs = 24, rTxt = (rj.nom || '–');
+        ctx.font = '800 ' + rfs + 'px Arial, sans-serif';
+        while (ctx.measureText(rTxt).width > cwr - 56 && rfs > 14) {
+          rfs -= 1; ctx.font = '800 ' + rfs + 'px Arial, sans-serif';
+        }
+        ctx.fillText(rTxt, rxp + 48, ryp);
       }
       return canvas;
     });
@@ -1165,7 +1247,7 @@
           ctx.fillStyle = '#e6eae9'; ctx.fillRect(px, py, pw, phh);
           ctx.fillStyle = '#9aa5a2'; ctx.font = font(96, 900);
           ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-          ctx.fillText(initiales(j.prenom, j.nom), px + pw / 2, py + phh / 2);
+          ctx.fillText(j.libre ? '?' : initiales(j.prenom, j.nom), px + pw / 2, py + phh / 2);
           ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
         }
         ctx.restore();
@@ -1180,8 +1262,10 @@
           ctx.fillText('C', x + cw - 29, y + 35); ctx.textAlign = 'left';
         }
         // bandeau nom
-        ctx.fillStyle = JAUNE; ctx.fillRect(x, y + ch - bandH, cw, bandH);
-        var nom = (j.nom || '').toUpperCase() + (j.formeClub === true ? '*' : '');   // FORME-AU-MOM L2
+        // EXPORT-PLACE-LIBRE (D2) : bandeau gris « PLACE LIBRE » pour un poste non pourvu
+        ctx.fillStyle = j.libre ? '#d5dad8' : JAUNE; ctx.fillRect(x, y + ch - bandH, cw, bandH);
+        var nom = j.libre ? TXT_LIBRE
+          : (j.nom || '').toUpperCase() + (j.formeClub === true ? '*' : '');   // FORME-AU-MOM L2
         var fs = Math.round(bandH * 0.62);
         ctx.font = font(fs, 900);
         while (ctx.measureText(nom).width > cw - 12 && fs > 14) { fs -= 1; ctx.font = font(fs, 900); }
