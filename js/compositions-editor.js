@@ -6,6 +6,18 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.98 — Titulaires hors format : bandeau + « Mettre sur le banc » (24 nov. 2026)
+ *   v3.98 : COMPO-HORS-FORMAT (FAIT FOI gelé 24/11/2026 ; retour terrain
+ *           Vivien : passage XII→XV, MURAIL resté sur la 3e ligne « 8 » du
+ *           XII, invisible sur la feuille XV et masqué de la pioche ;
+ *           enchaîné dans la conversation du jour, écart tracé STATE).
+ *           _titulairesHorsFormat() : titulaires dont le poste n'est pas dans
+ *           _postesCourants(). (D1) bandeau dans l'indicateur de remplissage
+ *           + bouton « Mettre sur le banc » (geste existant
+ *           onDropJoueurSurBanc, un par un, arrêt si banc plein) — rien n'est
+ *           déplacé sans clic. (D2) exclus du compteur « postes pourvus » et
+ *           des titulaires de l'export.
+ *
  * Version : 3.97 — Export : places libres + banc du format (24 nov. 2026)
  *   v3.97 : EXPORT-PLACE-LIBRE (FAIT FOI gelé 24/11/2026, « je te suis et
  *           je gèle », D3 inclus ; enchaîné dans la conversation du jour,
@@ -1754,8 +1766,35 @@
   function joueurDuPoste(posteId) {
     return State.compoJoueurs.find(cj => cj.role === 'titulaire' && cj.poste_id === posteId);
   }
+  // v3.98 (COMPO-HORS-FORMAT) — titulaires placés sur un poste qui n'existe
+  // pas dans le format de la rencontre (ex. 3e ligne « 8 » du XII après un
+  // passage en XV). Invisibles sur la feuille et masqués de la pioche : on
+  // les signale (bandeau) et on les exclut du compteur et de l'export.
+  // Si le format ne déclare aucun poste (_postesCourants en repli sur tout
+  // le référentiel), aucun joueur n'est considéré hors format.
+  function _titulairesHorsFormat() {
+    const ids = new Set(_postesCourants().map(p => String(p.id)));
+    if (!ids.size) return [];
+    return State.compoJoueurs.filter(cj => cj.role === 'titulaire' && !ids.has(String(cj.poste_id)));
+  }
+
+  // v3.98 (COMPO-HORS-FORMAT, D1) — bouton du bandeau : envoie au banc, un par
+  // un, via le geste existant « ↓ banc » (onDropJoueurSurBanc : numéro libre
+  // du format, état base/modifié, rechargement). Arrêt si le banc est plein.
+  async function onMettreHorsFormatAuBanc() {
+    const liste = _titulairesHorsFormat().slice();
+    for (const cj of liste) {
+      if (prochainNumeroBancLibre() == null) {
+        alert('Le banc est complet (' + _nbRemplacantsCourant() + ' remplaçants) : libérez une place puis recommencez.');
+        return;
+      }
+      await onDropJoueurSurBanc(cj.joueur_id);
+    }
+  }
+
   function compteurs() {
-    const titulaires = State.compoJoueurs.filter(cj => cj.role === 'titulaire').length;
+    const _horsFmt = new Set(_titulairesHorsFormat().map(cj => cj.id));
+    const titulaires = State.compoJoueurs.filter(cj => cj.role === 'titulaire' && !_horsFmt.has(cj.id)).length;
     const remplacants = State.compoJoueurs.filter(cj => cj.role === 'remplacant').length;
     const modifs = State.compoJoueurs.filter(cj => etatDeriveJoueur(cj) !== 'base').length;
     return { titulaires, remplacants, modifs };
@@ -2151,6 +2190,29 @@
       '<strong>' + c.titulaires + ' / ' + _nbTit + ' postes pourvus</strong>' +
       '&nbsp;·&nbsp; ' + c.remplacants + ' / ' + _nbRempl + ' remplaçants' +
       (compo.type_compo === 'match' ? '&nbsp;·&nbsp; ' + c.modifs + ' modification' + (c.modifs > 1 ? 's' : '') + ' vs base' : '');
+
+    // v3.98 (COMPO-HORS-FORMAT, D1) — bandeau + bouton « Mettre sur le banc ».
+    const hors = _titulairesHorsFormat();
+    if (hors.length) {
+      const noms = hors.map(function (cj) {
+        const j = getJoueurVivier(cj.joueur_id) || {};
+        const p = getPoste(cj.poste_id) || {};
+        return escapeHtml(((j.nom || '') + ' ' + (j.prenom || '')).trim() || '?') +
+          ' (' + escapeHtml(p.libelle_court || p.code || 'poste ?') + ')';
+      }).join(', ');
+      el.className = 'fill-indicator fill-low';
+      el.innerHTML +=
+        '<div class="fill-hors-format" style="margin-top:6px;display:flex;flex-wrap:wrap;align-items:center;gap:8px;">' +
+          '<span>⚠ ' + hors.length + ' joueur' + (hors.length > 1 ? 's placés' : ' placé') +
+          ' sur un poste de l\'ancien format : ' + noms + '.</span>' +
+          '<button type="button" id="btn-hors-format-banc" class="btn">Mettre sur le banc</button>' +
+        '</div>';
+      const btn = document.getElementById('btn-hors-format-banc');
+      if (btn) btn.addEventListener('click', function () {
+        btn.disabled = true;
+        onMettreHorsFormatAuBanc().finally(function () { btn.disabled = false; });
+      });
+    }
   }
 
   // ============================================================
@@ -8809,8 +8871,11 @@
     var eq  = ctx && ctx.equipe ? ctx.equipe : null;
 
     // Titulaires triés par numero_xv du poste (1→15) ; remplaçants par ordre.
+    // v3.98 (COMPO-HORS-FORMAT, D2) : un titulaire resté sur un poste absent
+    // du format de la rencontre n'est pas exporté comme titulaire.
+    var _horsFmt = new Set(_titulairesHorsFormat().map(function (cj) { return cj.id; }));
     var tit = State.compoJoueurs
-      .filter(function (cj) { return cj.role === 'titulaire'; })
+      .filter(function (cj) { return cj.role === 'titulaire' && !_horsFmt.has(cj.id); })
       .map(function (cj) {
         var p = getPoste(cj.poste_id) || {};
         var j = getJoueurVivier(cj.joueur_id) || {};
