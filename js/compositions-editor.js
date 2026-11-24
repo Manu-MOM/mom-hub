@@ -6,6 +6,16 @@
  *   - 6a/6b/6c-1 : déjà livrés (squelette, navigation, vivier)
  *   - 6c-2/6c-3 : Vue Liste éditable + Popover Picker (CETTE VERSION)
  *
+ * Version : 3.99 — Banc numéroté en continu (24 nov. 2026)
+ *   v3.99 : BANC-CONTINU (FAIT FOI gelé 24/11/2026 ; retour terrain Manu :
+ *           retrait du n°17 → banc 16, 18 ; enchaîné dans la conversation du
+ *           jour, écart tracé STATE). _tasserBanc() renumérote les
+ *           remplaçants restants à la suite, dans leur ordre actuel, depuis
+ *           le premier numéro du format (D1) ; appelé après
+ *           onRemoveJoueurClick, onDropJoueurSurPoste, onDropJoueurSurBanc,
+ *           onPickJoueurPourSlot, onPickPostePourJoueur. Rien à l'ouverture
+ *           d'une compo (D3) ; compos passées non retouchées, pas de SQL (D2).
+ *
  * Version : 3.98 — Titulaires hors format : bandeau + « Mettre sur le banc » (24 nov. 2026)
  *   v3.98 : COMPO-HORS-FORMAT (FAIT FOI gelé 24/11/2026 ; retour terrain
  *           Vivien : passage XII→XV, MURAIL resté sur la 3e ligne « 8 » du
@@ -9670,6 +9680,35 @@
   // couche existante (addJoueurCompo / updateJoueurCompo / removeJoueurCompo) ;
   // état via etatJoueurPourCompoCourante() (→ 'modifie' en compo de match).
   //
+  // v3.99 (BANC-CONTINU, FAIT FOI gelé 24/11/2026, D1/D3) — après un geste
+  // qui peut faire sortir un joueur du banc (retrait ×, montée titulaire,
+  // glisser depuis le banc), renumérote les remplaçants restants EN CONTINU,
+  // dans leur ordre actuel (numéro puis date d'ajout), à partir du premier
+  // numéro du format (_numDepartRemplacants : 16 XV, 15 XII, 8 VII…).
+  // N'écrit que les numéros qui changent ; recharge seulement si besoin.
+  // Jamais appelé à l'ouverture d'une compo (D3) : compos passées intactes (D2).
+  async function _tasserBanc() {
+    if (!State.selectedCompoId) return;
+    const banc = State.compoJoueurs
+      .filter(cj => cj.role === 'remplacant')
+      .sort(function (a, b) {
+        const na = (a.numero_maillot == null ? Infinity : a.numero_maillot);
+        const nb = (b.numero_maillot == null ? Infinity : b.numero_maillot);
+        if (na !== nb) return na - nb;
+        return String(a.created_at || '').localeCompare(String(b.created_at || ''));
+      });
+    const depart = _numDepartRemplacants();
+    let change = false;
+    for (let i = 0; i < banc.length; i++) {
+      const attendu = depart + i;
+      if (banc[i].numero_maillot === attendu) continue;
+      const r = await SupabaseHub.updateJoueurCompo(banc[i].id, { numero_maillot: attendu });
+      if (!r.ok) { alert('Erreur (renumérotation du banc) : ' + r.error); break; }
+      change = true;
+    }
+    if (change) await loadCompoJoueurs();
+  }
+
   // Calcule le prochain numéro de banc libre ou null si plein.
   // v3.96 (COMPO-XII) : plage calée sur le format (1er numéro après les
   // titulaires, autant de numéros que de remplaçants du format) au lieu
@@ -9754,6 +9793,7 @@
     }
 
     await loadCompoJoueurs();
+    await _tasserBanc();   // v3.99 BANC-CONTINU (D1)
     renderFillIndicator();
     renderEditorArea();
     renderEffectifPanel();
@@ -9799,6 +9839,7 @@
     }
 
     await loadCompoJoueurs();
+    await _tasserBanc();   // v3.99 BANC-CONTINU (D1)
     renderFillIndicator();
     renderEditorArea();
     renderEffectifPanel();
@@ -10600,6 +10641,7 @@
     if (!r.ok) { alert('Erreur ajout joueur : ' + r.error); return; }
     closePopover();
     await loadCompoJoueurs();
+    await _tasserBanc();   // v3.99 BANC-CONTINU (D1)
     renderFillIndicator();
     renderEditorArea();
     renderEffectifPanel();
@@ -10643,6 +10685,7 @@
     if (!r.ok) { alert('Erreur ajout joueur : ' + r.error); return; }
     closePopover();
     await loadCompoJoueurs();
+    await _tasserBanc();   // v3.99 BANC-CONTINU (D1)
     renderFillIndicator();
     renderEditorArea();
     renderEffectifPanel();
@@ -10652,6 +10695,7 @@
     const r = await SupabaseHub.removeJoueurCompo(compoJoueurId);
     if (!r.ok) { alert('Erreur retrait : ' + r.error); return; }
     await loadCompoJoueurs();
+    await _tasserBanc();   // v3.99 BANC-CONTINU (D1)
     renderFillIndicator();
     renderEditorArea();
     renderEffectifPanel();
